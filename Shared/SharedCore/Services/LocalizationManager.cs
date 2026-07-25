@@ -66,7 +66,7 @@ namespace Shared.Core.Services
             }
             catch (FormatException)
             {
-                _logger.Here().Error($"Format error for localization key {key}");
+                _logger.Here().Error($"Format error for localization key {key} in {LanguageFile}");
                 return Get(key);
             }
         }
