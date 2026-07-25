@@ -97,4 +97,16 @@
         <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" Properties="PublishDir=$(AbsolutePublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishReadyToRun=$(PublishReadyToRun)" />
     </Target>
 
+    <Target Name="ExcludeLegacyDotNetRuntimeFromPublish" AfterTargets="ComputeFilesToPublish">
+        <ItemGroup>
+            <!-- MonoGame's legacy runtime dependencies must not override the current app host. -->
+            <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                                   Condition="'%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.App'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.DotNetAppHost'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.DotNetHostPolicy'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.DotNetHostResolver'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.Jit'" />
+        </ItemGroup>
+    </Target>
+
 </Project>
