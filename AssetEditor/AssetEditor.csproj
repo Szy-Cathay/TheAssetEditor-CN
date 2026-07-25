@@ -92,9 +92,10 @@
         <PropertyGroup>
             <UpdaterProject>$(MSBuildProjectDirectory)\..\AssetEditorUpdater\AssetEditorUpdater.csproj</UpdaterProject>
             <AbsolutePublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</AbsolutePublishDir>
+            <UpdaterPublishDir>$(AbsolutePublishDir)\Updater</UpdaterPublishDir>
         </PropertyGroup>
 
-        <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" Properties="PublishDir=$(AbsolutePublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishReadyToRun=$(PublishReadyToRun)" />
+        <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" RemoveProperties="PublishProfile" Properties="PublishDir=$(UpdaterPublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishReadyToRun=$(PublishReadyToRun)" />
     </Target>
 
     <Target Name="ExcludeLegacyDotNetRuntimeFromPublish" AfterTargets="ComputeFilesToPublish">

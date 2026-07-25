@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using Octokit;
-using SharpCompress.Archives;
 using FileMode = System.IO.FileMode;
 
 namespace AssetEditorUpdater
@@ -11,9 +10,6 @@ namespace AssetEditorUpdater
         private const string GitHubRepository = "TheAssetEditor-CN";
         private const string AssetEditorExe = "AssetEditor.CN.exe";
         private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
-        // We assume the release RAR contains a single folder named AssetEditor.CN with all the files for the update in it
-        private const string UpdateFilesDirectoryName = "AssetEditor.CN";
-        private const string InstallationUpdateBackupDirectoryName = "UpdateBackup";
          
         public static async Task Main(string[] args)
         {
@@ -26,28 +22,38 @@ namespace AssetEditorUpdater
             var updateDirectory = Path.Combine(userDirectory, "AssetEditor.CN", "Temp", "Update");
 
             var isInitialLaunch = args.Length == 0;
-            var installationDirectory = isInitialLaunch ? currentDirectory : args[0];
+            var installationDirectory = isInitialLaunch
+                ? Directory.GetParent(Path.TrimEndingDirectorySeparator(currentDirectory))?.FullName
+                    ?? throw new InvalidOperationException("Unable to determine the installation directory.")
+                : args[0];
 
             Console.WriteLine($"国区版更新器运行目录：{currentDirectory}");
 
             if (isInitialLaunch)
-                RelaunchFromUpdateDirectory(updateDirectory, installationDirectory);
+                RelaunchFromUpdateDirectory(currentDirectory, updateDirectory, installationDirectory);
             else
                 await UpdateAsync(installationDirectory, updateDirectory);
         }
 
-        private static void RelaunchFromUpdateDirectory(string updateDirectory, string installationDirectory)
+        private static void RelaunchFromUpdateDirectory(
+            string updaterPayloadDirectory,
+            string updateDirectory,
+            string installationDirectory)
         {
             Console.WriteLine($"正在将更新器复制到：{updateDirectory}");
 
-            if (!Directory.Exists(updateDirectory))
-                Directory.CreateDirectory(updateDirectory);
-
-            var currentUpdaterPath = Path.Combine(installationDirectory, AssetEditorUpdaterExe);
+            CopyUpdaterPayload(updaterPayloadDirectory, updateDirectory);
             var newUpdaterPath = Path.Combine(updateDirectory, AssetEditorUpdaterExe);
-            File.Copy(currentUpdaterPath, newUpdaterPath, true);
 
             LaunchUpdater(newUpdaterPath, updateDirectory, installationDirectory);
+        }
+
+        internal static void CopyUpdaterPayload(string updaterPayloadDirectory, string updateDirectory)
+        {
+            if (Directory.Exists(updateDirectory))
+                Directory.Delete(updateDirectory, true);
+
+            UpdateInstaller.CopyDirectory(updaterPayloadDirectory, updateDirectory);
         }
 
         private static void LaunchUpdater(string updaterPath, string workingDirectory, string installationDirectory)
@@ -84,9 +90,7 @@ namespace AssetEditorUpdater
             if (downloadResult == false)
                 return;
 
-            BackupOldFiles(installationDirectory);
-
-            ExtractRar(assetPath, installationDirectory);
+            UpdateInstaller.Install(assetPath, installationDirectory, updateDirectory);
 
             var assetEditorPath = Path.Combine(installationDirectory, AssetEditorExe);
             if (File.Exists(assetEditorPath))
@@ -140,10 +144,15 @@ namespace AssetEditorUpdater
 
             var asset = latestRelease.Assets[0];
             var extension = Path.GetExtension(asset.Name);
-            if (extension != ".rar")
-                throw new InvalidOperationException($"Asset has extension {extension}, expected .rar.");
+            if (!IsZipAssetName(asset.Name))
+                throw new InvalidOperationException($"Asset has extension {extension}, expected .zip.");
 
             return asset;
+        }
+
+        internal static bool IsZipAssetName(string assetName)
+        {
+            return string.Equals(Path.GetExtension(assetName), ".zip", StringComparison.OrdinalIgnoreCase);
         }
 
         private static async Task<bool> DownloadAssetAsync(string downloadUrl, string downloadPath)
@@ -168,48 +177,6 @@ namespace AssetEditorUpdater
             {
                 Console.WriteLine("无法从 GitHub 下载最新版本。");
                 return false;
-            }
-        }
-
-        private static void BackupOldFiles(string installationDirectory)
-        {
-            var updateBackupDirectory = Path.Combine(installationDirectory, InstallationUpdateBackupDirectoryName);
-            if (Directory.Exists(updateBackupDirectory))
-                Directory.Delete(updateBackupDirectory, true);
-            Directory.CreateDirectory(updateBackupDirectory);
-
-            Console.WriteLine($"正在备份 {installationDirectory} 到 {updateBackupDirectory}……");
-
-            foreach (var entryPath in Directory.EnumerateFileSystemEntries(installationDirectory))
-            {
-                var entryName = Path.GetFileName(entryPath);
-                if (entryName == InstallationUpdateBackupDirectoryName)
-                    continue;
-
-                var destinationPath = Path.Combine(updateBackupDirectory, entryName);
-                if (Directory.Exists(entryPath))
-                    Directory.Move(entryPath, destinationPath);
-                else
-                    File.Move(entryPath, destinationPath);
-            }
-        }
-
-        private static void ExtractRar(string rarPath, string installationDirectory)
-        {
-            Console.WriteLine($"正在解压更新文件到 {installationDirectory}……");
-
-            var prefix = UpdateFilesDirectoryName + Path.DirectorySeparatorChar;
-
-            using var archive = ArchiveFactory.OpenArchive(rarPath);
-            foreach (var entry in archive.Entries)
-            {
-                if (entry.Key == null || entry.Key == UpdateFilesDirectoryName || entry.IsDirectory)
-                    continue;
-
-                var entryKeyWithoutPrefix = entry.Key[prefix.Length..];
-                var destinationPath = Path.Combine(installationDirectory, entryKeyWithoutPrefix);
-                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-                entry.WriteToFile(destinationPath);
             }
         }
 

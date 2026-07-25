@@ -29,6 +29,7 @@ namespace AssetEditor.ViewModels
         private Action? _closeAction;
 
         private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
+        private const string UpdaterDirectoryName = "Updater";
 
         private List<Release> _newerReleases = [];
 
@@ -76,12 +77,13 @@ namespace AssetEditor.ViewModels
         public static void LaunchUpdater()
         {
             var currentDirectory = AppContext.BaseDirectory;
-            var updaterPath = Path.Combine(currentDirectory, AssetEditorUpdaterExe);
+            var updaterDirectory = Path.Combine(currentDirectory, UpdaterDirectoryName);
+            var updaterPath = Path.Combine(updaterDirectory, AssetEditorUpdaterExe);
 
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = updaterPath,
-                WorkingDirectory = currentDirectory,
+                WorkingDirectory = updaterDirectory,
                 UseShellExecute = true,
             };
 
