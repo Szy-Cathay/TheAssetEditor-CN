@@ -8,7 +8,6 @@ using CommunityToolkit.Mvvm.Input;
 using Octokit;
 using Serilog;
 using Shared.Core.ErrorHandling;
-using Shared.Core.Misc;
 using Shared.Core.Services;
 using Application = System.Windows.Application;
 
@@ -60,18 +59,9 @@ namespace AssetEditor.ViewModels
             var latestVersion = VersionChecker.ParseReleaseVersion(latestRelease.TagName);
             _logger.Information($"Updating Asset Editor 国区版 from version {currentVersion} to version {latestVersion}");
 
-            DeleteUpdateDirectory();
-
             LaunchUpdater();
 
             Application.Current.Shutdown();
-        }
-
-        public static void DeleteUpdateDirectory()
-        {
-            var updateDirectory = DirectoryHelper.UpdateDirectory;
-            if (Directory.Exists(updateDirectory))
-                Directory.Delete(updateDirectory, true);
         }
 
         public static void LaunchUpdater()
