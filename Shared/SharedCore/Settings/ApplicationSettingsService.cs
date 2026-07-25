@@ -26,7 +26,6 @@ namespace Shared.Core.Settings
         public string WwisePath { get; set; }
         public bool OnlyLoadLod0ForReferenceMeshes { get; set; } = true;
         public int VisualEditorsGridSize { get; set; } = 10;
-        public string SelectedLangauge { get; set; } = "en";
         public AppFontFamily AppFont { get; set; } = AppFontFamily.Default;
         public string AppFontWeight { get; set; } = "Regular";
         public string CustomBackgroundColour { get; set; } = "50,50,50";

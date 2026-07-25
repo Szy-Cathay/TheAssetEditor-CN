@@ -56,40 +56,35 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="{loc:Loc SettingsWindow.Application}" Margin="5, 10, 0, 0" FontSize="15"/>
             <Separator Grid.Row="1" Grid.ColumnSpan="3" Height="1" Margin="5, 5, 10, 10"/>
 
-            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.SelectedLanguage}" Margin="5, 0, 0, 0"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding SelectedLanguage, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                      ItemsSource="{Binding AvailableLangauges}" ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
-
-            <TextBlock Grid.Row="3" Text="{loc:Loc SettingsWindow.Theme}" Margin="5, 0, 0, 0"/>
-            <ComboBox Grid.Row="3" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding CurrentTheme, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.Theme}" Margin="5, 0, 0, 0"/>
+            <ComboBox Grid.Row="2" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding CurrentTheme, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                       ItemsSource="{Binding AvailableThemes}" ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
 
-            <TextBlock Grid.Row="4" Text="{loc:Loc SettingsWindow.Font}" Margin="5, 0, 0, 0"/>
-            <ComboBox Grid.Row="4" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding SelectedFont, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+            <TextBlock Grid.Row="3" Text="{loc:Loc SettingsWindow.Font}" Margin="5, 0, 0, 0"/>
+            <ComboBox Grid.Row="3" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding SelectedFont, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                       ItemsSource="{Binding AvailableFonts}" ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
 
-            <TextBlock Grid.Row="5" Text="{loc:Loc SettingsWindow.FontWeight}" Margin="5, 0, 0, 0"/>
-            <ComboBox Grid.Row="5" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding SelectedFontWeight, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+            <TextBlock Grid.Row="4" Text="{loc:Loc SettingsWindow.FontWeight}" Margin="5, 0, 0, 0"/>
+            <ComboBox Grid.Row="4" Grid.Column="1" Margin="0, 0, 0, 5" SelectedItem="{Binding SelectedFontWeight, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                       ItemsSource="{Binding AvailableFontWeights}" ItemTemplate="{StaticResource FontWeightTemplate}"/>
 
-            <TextBlock Grid.Row="6" Grid.Column="0" Text="{loc:Loc SettingsWindow.StartMaximised}" Margin="5, 0, 0, 0"/>
-            <CheckBox Grid.Row="6" Grid.Column="1" Margin="-1, 0, 0, 5" IsChecked="{Binding StartMaximised, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="{loc:Loc SettingsWindow.StartMaximised}" Margin="5, 0, 0, 0"/>
+            <CheckBox Grid.Row="5" Grid.Column="1" Margin="-1, 0, 0, 5" IsChecked="{Binding StartMaximised, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-            <TextBlock Grid.Row="7" Grid.Column="0"  Text="{loc:Loc SettingsWindow.SelectedGame}" Margin="5, 0, 0, 0"/>
-            <ComboBox Grid.Row="7" Grid.Column="1" Width="150" Margin="0, 0, 0, 5" SelectedItem="{Binding CurrentGame, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+            <TextBlock Grid.Row="6" Grid.Column="0"  Text="{loc:Loc SettingsWindow.SelectedGame}" Margin="5, 0, 0, 0"/>
+            <ComboBox Grid.Row="6" Grid.Column="1" Width="150" Margin="0, 0, 0, 5" SelectedItem="{Binding CurrentGame, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                       ItemsSource="{Binding Games}" ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
 
-            <TextBlock Grid.Row="8" Grid.Column="0" Text="{loc:Loc SettingsWindow.LoadGameFileOnStartup}" Margin="5, 0, 0, 0"/>
-            <CheckBox Grid.Row="8" Grid.Column="1" Margin="-1, 0, 0, 5" IsChecked="{Binding LoadCaPacksByDefault, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <TextBlock Grid.Row="7" Grid.Column="0" Text="{loc:Loc SettingsWindow.LoadGameFileOnStartup}" Margin="5, 0, 0, 0"/>
+            <CheckBox Grid.Row="7" Grid.Column="1" Margin="-1, 0, 0, 5" IsChecked="{Binding LoadCaPacksByDefault, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-            <TextBlock Grid.Row="9" Grid.Column="0" Text="{loc:Loc SettingsWindow.ShowCaWems}" Margin="5, 0, 0, 0"/>
-            <CheckBox Grid.Row="9" Grid.Column="1" Margin="-1, 0, 0, 5" IsChecked="{Binding ShowCAWemFiles, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <TextBlock Grid.Row="8" Grid.Column="0" Text="{loc:Loc SettingsWindow.ShowCaWems}" Margin="5, 0, 0, 0"/>
+            <CheckBox Grid.Row="8" Grid.Column="1" Margin="-1, 0, 0, 5" IsChecked="{Binding ShowCAWemFiles, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
         </Grid>
 
 

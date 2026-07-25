@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Globalization;
 using System.Windows.Data;
-using Shared.Core.Services;
 using Shared.Core.Settings;
 using static Shared.Core.Settings.ThemesController;
 using static Shared.Core.Settings.ApplicationSettingsHelper;
@@ -22,14 +21,6 @@ namespace AssetEditor.Views.Settings
                 return GetEnumAsString(backgroundColour);
             else if (value is AppFontFamily font)
                 return FontSettingsHelper.GetFontDisplayName(font);
-            else if (value is string langCode)
-            {
-                // Language code -> localized display name
-                var key = "Language." + langCode.ToUpper();
-                if (LocalizationManager.Instance != null)
-                    return LocalizationManager.Instance.Get(key);
-                return langCode;
-            }
             else
                 return null;
         }
