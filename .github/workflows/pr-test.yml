@@ -27,4 +27,4 @@ jobs:
       run: dotnet build AssetEditor\AssetEditor.csproj --no-restore
 
     - name: Run all tests
-      run: dotnet test AssetEditor.CN.sln --configuration Release --no-restore --verbosity normal
+      run: dotnet test AssetEditor.sln --configuration Release --no-restore --verbosity normal
