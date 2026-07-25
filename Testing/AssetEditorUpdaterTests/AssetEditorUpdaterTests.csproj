@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\AssetEditorUpdater\AssetEditorUpdater.csproj" />
+    <ProjectReference Include="..\..\Shared\SharedCore\Shared.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

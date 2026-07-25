@@ -8,19 +8,27 @@ internal static class UpdateInstaller
     private const string UpdaterExe = "AssetEditor.CN.Updater.exe";
     private const string ArchiveRoot = "AssetEditor.CN/";
     private const string BackupDirectoryName = "UpdateBackup";
+    private const string BackupRootDirectoryName = "UpdateBackups";
+    internal const string BackupRootMarkerFileName = ".asset-editor-cn-updater-backups";
+    private const string BackupRootMarkerContents = "AssetEditor.CN updater backup root v1";
     private const string StagingDirectoryName = "staging";
 
-    internal static void Install(string archivePath, string installationDirectory, string updateDirectory)
+    internal static string Install(string archivePath, string installationDirectory, string updateDirectory)
     {
-        Install(archivePath, installationDirectory, updateDirectory, CopyDirectory);
+        return Install(archivePath, installationDirectory, updateDirectory, CopyDirectory);
     }
 
-    internal static void Install(
+    internal static string Install(
         string archivePath,
         string installationDirectory,
         string updateDirectory,
         Action<string, string> copyDirectory)
     {
+        ArgumentNullException.ThrowIfNull(copyDirectory);
+
+        var backupRootDirectory = GetBackupRootDirectory(updateDirectory);
+        ValidateDirectoryLayout(installationDirectory, updateDirectory, backupRootDirectory);
+
         var stagingDirectory = Path.Combine(updateDirectory, StagingDirectoryName);
         ExtractToStaging(archivePath, stagingDirectory);
 
@@ -31,7 +39,7 @@ internal static class UpdateInstaller
         if (!File.Exists(updaterPath))
             throw new InvalidDataException($"The update does not contain Updater/{UpdaterExe}.");
 
-        var backupDirectory = GetBackupDirectory(installationDirectory);
+        var backupDirectory = CreateBackupCandidate(backupRootDirectory);
         BackupInstallation(installationDirectory, backupDirectory, copyDirectory);
 
         try
@@ -54,22 +62,47 @@ internal static class UpdateInstaller
 
             throw;
         }
+
+        return backupDirectory;
     }
 
-    internal static void RestoreBackup(string installationDirectory)
+    internal static void RestoreBackup(string installationDirectory, string backupDirectory)
     {
-        RestoreBackup(installationDirectory, GetBackupDirectory(installationDirectory), CopyDirectory);
+        RestoreBackup(installationDirectory, backupDirectory, CopyDirectory);
     }
 
-    internal static string GetBackupDirectory(string installationDirectory)
+    internal static string GetBackupRootDirectory(string updateDirectory)
     {
-        var fullInstallationPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installationDirectory));
-        var parentDirectory = Path.GetDirectoryName(fullInstallationPath);
-        var installationName = Path.GetFileName(fullInstallationPath);
-        if (string.IsNullOrEmpty(parentDirectory) || string.IsNullOrEmpty(installationName))
-            throw new InvalidOperationException("The installation directory must have a parent directory.");
+        var fullUpdatePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(updateDirectory));
+        var parentDirectory = Path.GetDirectoryName(fullUpdatePath);
+        if (string.IsNullOrEmpty(parentDirectory))
+            throw new InvalidOperationException("The update directory must have a parent directory.");
 
-        return Path.Combine(parentDirectory, $"{installationName}.{BackupDirectoryName}");
+        return Path.Combine(parentDirectory, BackupRootDirectoryName);
+    }
+
+    internal static void ValidateDirectoryLayout(string installationDirectory, string updateDirectory)
+    {
+        ValidateDirectoryLayout(
+            installationDirectory,
+            updateDirectory,
+            GetBackupRootDirectory(updateDirectory));
+    }
+
+    private static void ValidateDirectoryLayout(
+        string installationDirectory,
+        string updateDirectory,
+        string backupRootDirectory)
+    {
+        if (DirectoriesOverlap(installationDirectory, updateDirectory)
+            || DirectoriesOverlap(installationDirectory, backupRootDirectory))
+        {
+            throw new InvalidOperationException(
+                "The updater working directories must not overlap the installation directory.");
+        }
+
+        if (DirectoriesOverlap(updateDirectory, backupRootDirectory))
+            throw new InvalidOperationException("The update and backup directories must not overlap.");
     }
 
     private static void RestoreBackup(
@@ -80,9 +113,7 @@ internal static class UpdateInstaller
         if (!Directory.Exists(backupDirectory))
             throw new DirectoryNotFoundException($"Update backup not found: {backupDirectory}");
 
-        foreach (var entryPath in Directory.EnumerateFileSystemEntries(installationDirectory))
-            DeleteEntry(entryPath);
-
+        ClearDirectory(installationDirectory);
         copyDirectory(backupDirectory, installationDirectory);
     }
 
@@ -185,22 +216,13 @@ internal static class UpdateInstaller
         string backupDirectory,
         Action<string, string> copyDirectory)
     {
-        if (Directory.Exists(backupDirectory))
-            Directory.Delete(backupDirectory, true);
-        Directory.CreateDirectory(backupDirectory);
+        copyDirectory(installationDirectory, backupDirectory);
 
         try
         {
-            foreach (var entryPath in Directory.EnumerateFileSystemEntries(installationDirectory))
-            {
-                var destinationPath = Path.Combine(backupDirectory, Path.GetFileName(entryPath));
-                if (Directory.Exists(entryPath))
-                    Directory.Move(entryPath, destinationPath);
-                else
-                    File.Move(entryPath, destinationPath);
-            }
+            ClearDirectory(installationDirectory);
         }
-        catch (Exception backupException)
+        catch (Exception clearException)
         {
             try
             {
@@ -209,13 +231,58 @@ internal static class UpdateInstaller
             catch (Exception restoreException)
             {
                 throw new AggregateException(
-                    "The installation backup and partial-backup restore both failed.",
-                    backupException,
+                    "Clearing the installation and restoring its backup both failed.",
+                    clearException,
                     restoreException);
             }
 
             throw;
         }
+    }
+
+    private static string CreateBackupCandidate(string backupRootDirectory)
+    {
+        EnsureOwnedBackupRoot(backupRootDirectory);
+
+        var backupDirectory = Path.Combine(
+            backupRootDirectory,
+            $"backup-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(backupDirectory);
+        return backupDirectory;
+    }
+
+    private static void EnsureOwnedBackupRoot(string backupRootDirectory)
+    {
+        var markerPath = Path.Combine(backupRootDirectory, BackupRootMarkerFileName);
+        if (Directory.Exists(backupRootDirectory))
+        {
+            if (!File.Exists(markerPath)
+                || !string.Equals(
+                    File.ReadAllText(markerPath),
+                    BackupRootMarkerContents,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"The backup root is not owned by AssetEditor.CN updater: {backupRootDirectory}");
+            }
+
+            return;
+        }
+
+        Directory.CreateDirectory(backupRootDirectory);
+        using var markerStream = new FileStream(
+            markerPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None);
+        using var markerWriter = new StreamWriter(markerStream);
+        markerWriter.Write(BackupRootMarkerContents);
+    }
+
+    private static void ClearDirectory(string directory)
+    {
+        foreach (var entryPath in Directory.EnumerateFileSystemEntries(directory))
+            DeleteEntry(entryPath);
     }
 
     private static void DeleteEntry(string entryPath)
@@ -229,5 +296,13 @@ internal static class UpdateInstaller
     private static string EnsureTrailingSeparator(string path)
     {
         return Path.EndsInDirectorySeparator(path) ? path : path + Path.DirectorySeparatorChar;
+    }
+
+    private static bool DirectoriesOverlap(string firstDirectory, string secondDirectory)
+    {
+        var firstRoot = EnsureTrailingSeparator(Path.GetFullPath(firstDirectory));
+        var secondRoot = EnsureTrailingSeparator(Path.GetFullPath(secondDirectory));
+        return firstRoot.StartsWith(secondRoot, StringComparison.OrdinalIgnoreCase)
+            || secondRoot.StartsWith(firstRoot, StringComparison.OrdinalIgnoreCase);
     }
 }

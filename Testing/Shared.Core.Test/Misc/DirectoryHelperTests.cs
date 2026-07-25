@@ -14,15 +14,18 @@ namespace Test.Shared.Core.Misc
         }
 
         [Test]
-        public void UpdateDirectory_IsUnderCnEditionRoot()
+        public void UpdateDirectories_UseLocalApplicationDataAndAreSiblings()
         {
-            var expected = Path.Combine(
-                DirectoryHelper.UserDirectory,
+            var tempRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "AssetEditor.CN",
-                "Temp",
-                "Update");
+                "Temp");
 
-            Assert.That(DirectoryHelper.UpdateDirectory, Is.EqualTo(expected));
+            Assert.Multiple(() =>
+            {
+                Assert.That(DirectoryHelper.UpdateDirectory, Is.EqualTo(Path.Combine(tempRoot, "Update")));
+                Assert.That(DirectoryHelper.UpdateBackupRootDirectory, Is.EqualTo(Path.Combine(tempRoot, "UpdateBackups")));
+            });
         }
     }
 }

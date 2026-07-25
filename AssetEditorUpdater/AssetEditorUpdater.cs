@@ -18,8 +18,7 @@ namespace AssetEditorUpdater
             // from the update directory we pass the installation directory as an arg and access it that way.
 
             var currentDirectory = AppContext.BaseDirectory;
-            var userDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var updateDirectory = Path.Combine(userDirectory, "AssetEditor.CN", "Temp", "Update");
+            var updateDirectory = GetUpdateDirectory();
 
             var isInitialLaunch = args.Length == 0;
             var installationDirectory = isInitialLaunch
@@ -42,14 +41,19 @@ namespace AssetEditorUpdater
         {
             Console.WriteLine($"正在将更新器复制到：{updateDirectory}");
 
-            CopyUpdaterPayload(updaterPayloadDirectory, updateDirectory);
+            CopyUpdaterPayload(updaterPayloadDirectory, updateDirectory, installationDirectory);
             var newUpdaterPath = Path.Combine(updateDirectory, AssetEditorUpdaterExe);
 
             LaunchUpdater(newUpdaterPath, updateDirectory, installationDirectory);
         }
 
-        internal static void CopyUpdaterPayload(string updaterPayloadDirectory, string updateDirectory)
+        internal static void CopyUpdaterPayload(
+            string updaterPayloadDirectory,
+            string updateDirectory,
+            string installationDirectory)
         {
+            UpdateInstaller.ValidateDirectoryLayout(installationDirectory, updateDirectory);
+
             if (Directory.Exists(updateDirectory))
                 Directory.Delete(updateDirectory, true);
 
@@ -153,6 +157,20 @@ namespace AssetEditorUpdater
         internal static bool IsZipAssetName(string assetName)
         {
             return string.Equals(Path.GetExtension(assetName), ".zip", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static string GetUpdateDirectory()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "AssetEditor.CN",
+                "Temp",
+                "Update");
+        }
+
+        internal static string GetUpdateBackupRootDirectory()
+        {
+            return UpdateInstaller.GetBackupRootDirectory(GetUpdateDirectory());
         }
 
         private static async Task<bool> DownloadAssetAsync(string downloadUrl, string downloadPath)
