@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Formats.Tar;
 using AssetEditorUpdater;
 using UpdaterProgram = AssetEditorUpdater.AssetEditorUpdater;
 
@@ -75,6 +76,104 @@ public class UpdateInstallerTests
                 UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
 
             AssertInstallationWasNotTouched(installationDirectory);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [TestCase("UpdateBackup")]
+    [TestCase("updatebackup")]
+    public void Install_PayloadContainingBackupDirectory_RejectsBeforeChangingInstallation(string backupDirectoryName)
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
+            var archivePath = CreateZip(root,
+                ("AssetEditor.CN/AssetEditor.CN.exe", "new executable"),
+                ($"AssetEditor.CN/{backupDirectoryName}/injected.txt", "injected"));
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+
+            AssertInstallationWasNotTouched(installationDirectory);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_DirectoryOutsideArchiveRoot_RejectsBeforeChangingInstallation()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
+            var archivePath = CreateZipWithDirectory(root, "AnotherRoot/");
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+
+            AssertInstallationWasNotTouched(installationDirectory);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_TarRenamedAsZip_RejectsBeforeChangingInstallation()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
+            var archivePath = CreateTarWithZipExtension(root);
+
+            Assert.That(
+                () => UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory),
+                Throws.Exception);
+
+            AssertInstallationWasNotTouched(installationDirectory);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_BackupAndPartialRestoreFailure_ThrowsBothErrors()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var restoreLockedPath = Path.Combine(installationDirectory, "00-restore-locked.txt");
+            var backupLockedPath = Path.Combine(installationDirectory, "zz-backup-locked.txt");
+            File.WriteAllText(restoreLockedPath, "restore lock");
+            File.WriteAllText(backupLockedPath, "backup lock");
+
+            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
+            var archivePath = CreateZip(root, ("AssetEditor.CN/AssetEditor.CN.exe", "new executable"));
+
+            using (new FileStream(restoreLockedPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Delete))
+            using (new FileStream(backupLockedPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            {
+                var exception = Assert.Throws<AggregateException>(() =>
+                    UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+
+                Assert.That(exception!.InnerExceptions, Has.Count.EqualTo(2));
+                Assert.That(Directory.Exists(Path.Combine(installationDirectory, "UpdateBackup")), Is.True);
+            }
         }
         finally
         {
@@ -174,6 +273,29 @@ public class UpdateInstallerTests
             writer.Write(contents);
         }
 
+        return archivePath;
+    }
+
+    private static string CreateZipWithDirectory(string root, string directoryPath)
+    {
+        var archivePath = Path.Combine(root, $"update-{Guid.NewGuid():N}.zip");
+        using var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
+        archive.CreateEntry(directoryPath);
+
+        var executableEntry = archive.CreateEntry("AssetEditor.CN/AssetEditor.CN.exe");
+        using var writer = new StreamWriter(executableEntry.Open());
+        writer.Write("new executable");
+        return archivePath;
+    }
+
+    private static string CreateTarWithZipExtension(string root)
+    {
+        var payloadRoot = Directory.CreateDirectory(Path.Combine(root, "tar-payload")).FullName;
+        var archiveRoot = Directory.CreateDirectory(Path.Combine(payloadRoot, "AssetEditor.CN")).FullName;
+        File.WriteAllText(Path.Combine(archiveRoot, "AssetEditor.CN.exe"), "new executable");
+
+        var archivePath = Path.Combine(root, $"update-{Guid.NewGuid():N}.zip");
+        TarFile.CreateFromDirectory(payloadRoot, archivePath, false);
         return archivePath;
     }
 

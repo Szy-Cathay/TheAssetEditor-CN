@@ -1,4 +1,4 @@
-using SharpCompress.Archives;
+using SharpCompress.Archives.Zip;
 
 namespace AssetEditorUpdater;
 
@@ -23,9 +23,20 @@ internal static class UpdateInstaller
         {
             CopyDirectory(stagingDirectory, installationDirectory);
         }
-        catch
+        catch (Exception installException)
         {
-            TryRestoreBackup(installationDirectory);
+            try
+            {
+                RestoreBackup(installationDirectory);
+            }
+            catch (Exception restoreException)
+            {
+                throw new AggregateException(
+                    "The update installation and rollback both failed.",
+                    installException,
+                    restoreException);
+            }
+
             throw;
         }
     }
@@ -76,13 +87,16 @@ internal static class UpdateInstaller
 
         try
         {
-            using var archive = ArchiveFactory.OpenArchive(archivePath);
+            using var archive = ZipArchive.OpenArchive(archivePath);
             foreach (var entry in archive.Entries)
             {
+                var destinationPath = GetValidatedDestinationPath(entry.Key, entry.IsDirectory, stagingRoot);
                 if (entry.IsDirectory)
+                {
+                    Directory.CreateDirectory(destinationPath);
                     continue;
+                }
 
-                var destinationPath = GetValidatedDestinationPath(entry.Key, stagingRoot);
                 Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
 
                 using var entryStream = entry.OpenEntryStream();
@@ -98,13 +112,23 @@ internal static class UpdateInstaller
         }
     }
 
-    private static string GetValidatedDestinationPath(string? entryKey, string stagingRoot)
+    private static string GetValidatedDestinationPath(
+        string? entryKey,
+        bool isDirectory,
+        string stagingRoot)
     {
         var normalizedKey = entryKey?.Replace('\\', '/') ?? string.Empty;
-        if (!normalizedKey.StartsWith(ArchiveRoot, StringComparison.Ordinal))
+        var normalizedPath = isDirectory && normalizedKey.EndsWith('/')
+            ? normalizedKey[..^1]
+            : normalizedKey;
+
+        if (isDirectory && string.Equals(normalizedPath, ArchiveRoot[..^1], StringComparison.Ordinal))
+            return stagingRoot;
+
+        if (!normalizedPath.StartsWith(ArchiveRoot, StringComparison.Ordinal))
             throw new InvalidDataException($"Update entry is outside {ArchiveRoot}: {entryKey}");
 
-        var relativePath = normalizedKey[ArchiveRoot.Length..];
+        var relativePath = normalizedPath[ArchiveRoot.Length..];
         var segments = relativePath.Split('/');
         if (Path.IsPathRooted(relativePath)
             || segments.Length == 0
@@ -112,6 +136,9 @@ internal static class UpdateInstaller
         {
             throw new InvalidDataException($"Update entry has an unsafe path: {entryKey}");
         }
+
+        if (string.Equals(segments[0], BackupDirectoryName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"Update entry uses the reserved {BackupDirectoryName} directory: {entryKey}");
 
         var destinationPath = Path.GetFullPath(
             Path.Combine(stagingRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
@@ -142,34 +169,21 @@ internal static class UpdateInstaller
                     File.Move(entryPath, destinationPath);
             }
         }
-        catch
+        catch (Exception backupException)
         {
-            TryRestoreMovedEntries(installationDirectory, backupDirectory);
+            try
+            {
+                CopyDirectory(backupDirectory, installationDirectory);
+            }
+            catch (Exception restoreException)
+            {
+                throw new AggregateException(
+                    "The installation backup and partial-backup restore both failed.",
+                    backupException,
+                    restoreException);
+            }
+
             throw;
-        }
-    }
-
-    private static void TryRestoreMovedEntries(string installationDirectory, string backupDirectory)
-    {
-        try
-        {
-            CopyDirectory(backupDirectory, installationDirectory);
-        }
-        catch
-        {
-            // Preserve the original backup failure after making a best-effort restore.
-        }
-    }
-
-    private static void TryRestoreBackup(string installationDirectory)
-    {
-        try
-        {
-            RestoreBackup(installationDirectory);
-        }
-        catch
-        {
-            // Preserve the install failure after making a best-effort restore.
         }
     }
 
