@@ -3,7 +3,7 @@
     public class DirectoryHelper
     {
         public static string UserDirectory { get { return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); } }
-        public static string ApplicationDirectory { get { return UserDirectory + "\\AssetEditor"; } }
+        public static string ApplicationDirectory { get { return Path.Combine(UserDirectory, "AssetEditor.CN"); } }
         public static string SchemaDirectory { get { return ApplicationDirectory + "\\Schemas"; } }
         public static string LogDirectory { get { return ApplicationDirectory + "\\Logs"; } }
         public static string ReportsDirectory { get { return ApplicationDirectory + "\\Reports"; } }

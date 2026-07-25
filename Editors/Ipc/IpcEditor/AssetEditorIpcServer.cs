@@ -10,7 +10,7 @@ namespace Editors.Ipc
 {
     public class AssetEditorIpcServer : IDisposable
     {
-        public const string PipeName = "TheAssetEditor.Ipc";
+        public const string PipeName = "AssetEditor.CN.Ipc";
 
         private static readonly JsonSerializerOptions SerializerOptions = new()
         {
