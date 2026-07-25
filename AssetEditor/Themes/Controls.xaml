@@ -5527,7 +5527,7 @@
     </ControlTemplate>
     
     <Style x:Key="CustomWindowStyle" TargetType="{x:Type Window}">
-        <Setter Property="Icon" Value="pack://application:,,,/AssetEditor.CN;component/AssetEditorIcon.png"/>
+        <Setter Property="Icon" Value="pack://application:,,,/AssetEditor.CN;component/AssetEditor.CN.png"/>
         <Setter Property="Background" Value="{DynamicResource Window.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Window.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource Window.Static.Foreground}"/>
