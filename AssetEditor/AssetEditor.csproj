@@ -4,6 +4,8 @@
         <LangVersion>preview</LangVersion>
         <TargetFramework>net10.0-windows</TargetFramework>
         <UseWPF>true</UseWPF>
+        <AssemblyName>AssetEditor.CN</AssemblyName>
+        <RootNamespace>AssetEditor</RootNamespace>
         <ApplicationIcon>AssetEditorIcon.ico</ApplicationIcon>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -41,13 +43,13 @@
 
     <PropertyGroup>
         <DebugType>embedded</DebugType>
-        <Authors>AssetEdCommunity</Authors>
-        <Company>Private</Company>
-        <Product>AssetEditor</Product>
-        <PackageProjectUrl>https://github.com/donkeyProgramming/TheAssetEditor</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/donkeyProgramming/TheAssetEditor</RepositoryUrl>
-        <PackageId>AssetEditor</PackageId>
-        <Version>1.0.4</Version>
+        <Authors>Szy-Cathay;AssetEdCommunity</Authors>
+        <Company>Szy-Cathay</Company>
+        <Product>AssetEditor.CN</Product>
+        <PackageProjectUrl>https://github.com/Szy-Cathay/TheAssetEditor-CN</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/Szy-Cathay/TheAssetEditor-CN</RepositoryUrl>
+        <PackageId>AssetEditor.CN</PackageId>
+        <Version>1.1.0</Version>
         <AssemblyVersion>$(Version)</AssemblyVersion>
         <AnalysisLevel>6.0</AnalysisLevel>
     </PropertyGroup>
