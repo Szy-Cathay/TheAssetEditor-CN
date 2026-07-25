@@ -12,6 +12,7 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
     <ItemGroup>
+      <None Remove="AssetEditor.CN.ico" />
       <None Remove="AssetEditor.CN.png" />
     </ItemGroup>
 
@@ -64,6 +65,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Resource Include="AssetEditor.CN.ico" />
       <Resource Include="AssetEditor.CN.png" />
       <Resource Include="Fonts\*.ttf" />
     </ItemGroup>
