@@ -28,7 +28,7 @@ namespace AssetEditor.ViewModels
         private readonly ILogger _logger = Logging.Create<UpdaterViewModel>();
         private Action? _closeAction;
 
-        private const string AssetEditorUpdaterExe = "AssetEditorUpdater.exe";
+        private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
 
         private List<Release> _newerReleases = [];
 
@@ -57,7 +57,7 @@ namespace AssetEditor.ViewModels
             var currentVersion = VersionChecker.GetCurrentVersion();
             var latestRelease = _newerReleases[0];
             var latestVersion = VersionChecker.ParseReleaseVersion(latestRelease.TagName);
-            _logger.Information($"Updating AssetEditor from version {currentVersion} to version {latestVersion}");
+            _logger.Information($"Updating Asset Editor 国区版 from version {currentVersion} to version {latestVersion}");
 
             DeleteUpdateDirectory();
 

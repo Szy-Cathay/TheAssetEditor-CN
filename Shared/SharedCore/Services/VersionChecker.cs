@@ -8,8 +8,8 @@ namespace Shared.Core.Services
     {
         private static readonly ILogger s_logger = Logging.Create<VersionChecker>();
 
-        private const string GitHubOwner = "donkeyProgramming";
-        private const string GitHubRepository = "TheAssetEditor";
+        private const string GitHubOwner = "Szy-Cathay";
+        private const string GitHubRepository = "TheAssetEditor-CN";
 
         public static async Task<List<Release>?> GetNewerReleases()
         {
@@ -29,7 +29,7 @@ namespace Shared.Core.Services
         {
             try
             {
-                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor"));
+                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor.CN"));
                 var releases = await gitHubClient.Repository.Release.GetAll(GitHubOwner, GitHubRepository);
                 return releases.Count > 0 ? releases : null;
             }

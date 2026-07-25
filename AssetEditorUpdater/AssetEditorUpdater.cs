@@ -7,12 +7,12 @@ namespace AssetEditorUpdater
 {
     public class AssetEditorUpdater
     {
-        private const string GitHubOwner = "donkeyProgramming";
-        private const string GitHubRepository = "TheAssetEditor";
-        private const string AssetEditorExe = "AssetEditor.exe";
-        private const string AssetEditorUpdaterExe = "AssetEditorUpdater.exe";
-        // We assume the release RAR contains a single folder named AssetEditor with all the files for the update in it
-        private const string UpdateFilesDirectoryName = "AssetEditor";
+        private const string GitHubOwner = "Szy-Cathay";
+        private const string GitHubRepository = "TheAssetEditor-CN";
+        private const string AssetEditorExe = "AssetEditor.CN.exe";
+        private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
+        // We assume the release RAR contains a single folder named AssetEditor.CN with all the files for the update in it
+        private const string UpdateFilesDirectoryName = "AssetEditor.CN";
         private const string InstallationUpdateBackupDirectoryName = "UpdateBackup";
          
         public static async Task Main(string[] args)
@@ -23,12 +23,12 @@ namespace AssetEditorUpdater
 
             var currentDirectory = AppContext.BaseDirectory;
             var userDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var updateDirectory = Path.Combine(userDirectory, "AssetEditor", "Temp", "Update");
+            var updateDirectory = Path.Combine(userDirectory, "AssetEditor.CN", "Temp", "Update");
 
             var isInitialLaunch = args.Length == 0;
             var installationDirectory = isInitialLaunch ? currentDirectory : args[0];
 
-            Console.WriteLine($"Running updater from {currentDirectory}.");
+            Console.WriteLine($"国区版更新器运行目录：{currentDirectory}");
 
             if (isInitialLaunch)
                 RelaunchFromUpdateDirectory(updateDirectory, installationDirectory);
@@ -38,7 +38,7 @@ namespace AssetEditorUpdater
 
         private static void RelaunchFromUpdateDirectory(string updateDirectory, string installationDirectory)
         {
-            Console.WriteLine($"Copying updater to {updateDirectory} and relaunching...");
+            Console.WriteLine($"正在将更新器复制到：{updateDirectory}");
 
             if (!Directory.Exists(updateDirectory))
                 Directory.CreateDirectory(updateDirectory);
@@ -72,11 +72,11 @@ namespace AssetEditorUpdater
             var latestVersion = ParseReleaseVersion(latestRelease.TagName);
             if (installedVersion >= latestVersion)
             {
-                Console.WriteLine("No update required.");
+                Console.WriteLine("当前已是最新版本。");
                 return;
             }
 
-            Console.WriteLine($"Updating AssetEditor from version {installedVersion} to {latestVersion}.");
+            Console.WriteLine($"正在将 Asset Editor 国区版从 {installedVersion} 更新到 {latestVersion}。");
 
             var asset = GetAsset(latestRelease);
             var assetPath = Path.Combine(updateDirectory, asset.Name);
@@ -92,9 +92,9 @@ namespace AssetEditorUpdater
             if (File.Exists(assetEditorPath))
                 LaunchAssetEditor(installationDirectory, assetEditorPath);
             else
-                Console.WriteLine("Uh oh something with the update went wrong.");
+                Console.WriteLine("更新失败：未找到 AssetEditor.CN.exe。");
 
-            Console.WriteLine("Press any key to close.");
+            Console.WriteLine("按任意键关闭。");
             Console.ReadKey();
         }
 
@@ -102,13 +102,13 @@ namespace AssetEditorUpdater
         {
             try
             {
-                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor"));
+                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor.CN"));
                 var releases = await gitHubClient.Repository.Release.GetAll(GitHubOwner, GitHubRepository);
                 return releases.Count > 0 ? releases[0] : null;
             }
             catch (ApiException exception)
             {
-                Console.WriteLine($"Unable to retrieve latest release from GitHub: {exception.Message}");
+                Console.WriteLine($"无法从 GitHub 获取最新版本：{exception.Message}");
                 return null;
             }
         }
@@ -151,12 +151,12 @@ namespace AssetEditorUpdater
 
         private static async Task<bool> DownloadAssetAsync(string downloadUrl, string downloadPath)
         {
-            Console.WriteLine("Downloading the latest release...");
+            Console.WriteLine("正在下载最新版本……");
 
             try
             {
                 using var client = new HttpClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetEditor_instance");
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetEditor.CN");
 
                 using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode();
@@ -169,7 +169,7 @@ namespace AssetEditorUpdater
             }
             catch
             {
-                Console.WriteLine("Unable to download latest release from Github.");
+                Console.WriteLine("无法从 GitHub 下载最新版本。");
                 return false;
             }
         }
@@ -181,7 +181,7 @@ namespace AssetEditorUpdater
                 Directory.Delete(updateBackupDirectory, true);
             Directory.CreateDirectory(updateBackupDirectory);
 
-            Console.WriteLine($"Backing up files from {installationDirectory} to {updateBackupDirectory}...");
+            Console.WriteLine($"正在备份 {installationDirectory} 到 {updateBackupDirectory}……");
 
             foreach (var entryPath in Directory.EnumerateFileSystemEntries(installationDirectory))
             {
@@ -199,7 +199,7 @@ namespace AssetEditorUpdater
 
         private static void ExtractRar(string rarPath, string installationDirectory)
         {
-            Console.WriteLine($"Extracting update files from {rarPath} to {installationDirectory}...");
+            Console.WriteLine($"正在解压更新文件到 {installationDirectory}……");
 
             var prefix = UpdateFilesDirectoryName + Path.DirectorySeparatorChar;
 
@@ -218,11 +218,11 @@ namespace AssetEditorUpdater
 
         private static void LaunchAssetEditor(string installationDirectory, string assetEditorPath)
         {
-            Console.WriteLine("Update complete.");
-            Console.WriteLine("Relaunching AssetEditor...");
+            Console.WriteLine("更新完成。");
+            Console.WriteLine("正在重新启动 Asset Editor 国区版……");
 
             // We launch using explorer.exe as that ensures admin priveliges aren't used as they
-            // would otherwise automatically be used if the AssetEditorUpdater.exe required them.
+            // would otherwise automatically be used if the AssetEditor.CN.Updater.exe required them.
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = "explorer.exe",
