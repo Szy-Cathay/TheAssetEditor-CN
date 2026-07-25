@@ -21,10 +21,10 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Install dependencies
-      run: dotnet restore
+      run: dotnet restore AssetEditor.CN.sln
 
     - name: Build the project
-      run: dotnet build AssetEditor\AssetEditor.csproj --no-restore
+      run: dotnet build AssetEditor.CN.sln --configuration Release --no-restore
 
     - name: Run all tests
-      run: dotnet test AssetEditor.CN.sln --configuration Release --no-restore --verbosity normal
+      run: dotnet test AssetEditor.CN.sln --configuration Release --no-build --no-restore --verbosity normal
