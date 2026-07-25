@@ -121,11 +121,8 @@ namespace AssetEditorUpdater
                 return new Version();
 
             var parsedVersion = new Version(versionInfo.FileVersion);
-            if (parsedVersion.Build == 0 && parsedVersion.Revision == 0)
-                return new Version(parsedVersion.Major, parsedVersion.Minor);
-
-            if (parsedVersion.Revision == 0)
-                return new Version(parsedVersion.Major, parsedVersion.Minor, parsedVersion.Build);
+            if (parsedVersion.Revision <= 0)
+                return new Version(parsedVersion.Major, parsedVersion.Minor, Math.Max(parsedVersion.Build, 0));
 
             return parsedVersion;
         }
