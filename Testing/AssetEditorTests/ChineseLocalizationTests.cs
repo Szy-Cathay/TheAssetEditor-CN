@@ -26,5 +26,37 @@ namespace AssetEditorTests
 
             Assert.AreEqual("Asset Editor 国区版 v{0}", title);
         }
+
+        [TestMethod]
+        [DoNotParallelize]
+        public void LoadLanguage_UsesApplicationDirectoryWhenCurrentDirectoryChanges()
+        {
+            var originalDirectory = Directory.GetCurrentDirectory();
+            var temporaryDirectory = Path.Combine(
+                Path.GetTempPath(),
+                $"AssetEditorLocalizationTests-{Guid.NewGuid():N}");
+
+            Directory.CreateDirectory(temporaryDirectory);
+            File.WriteAllText(
+                Path.Combine(temporaryDirectory, "Language_Cn.json"),
+                """{"Title.AppTitle":"wrong"}""");
+
+            try
+            {
+                Directory.SetCurrentDirectory(temporaryDirectory);
+
+                var localizationManager = new Shared.Core.Services.LocalizationManager();
+                localizationManager.LoadLanguage();
+
+                Assert.AreEqual(
+                    "Asset Editor 国区版 v{0}",
+                    localizationManager.Get("Title.AppTitle"));
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(originalDirectory);
+                Directory.Delete(temporaryDirectory, true);
+            }
+        }
     }
 }
