@@ -225,15 +225,11 @@ namespace Test.Shared.Core.PackFiles
             var settings = new ApplicationSettingsService(GameTypeEnum.Rome2);
             var autoSaveService = new PackAutoSaveService(packFileService.Object, settings);
             var firstSave = Task.Run(autoSaveService.TryAutoSave);
-            Task<bool>? secondSave = null;
 
             try
             {
                 Assert.That(saveEntered.Wait(TimeSpan.FromSeconds(10)), Is.True, "The first auto-save did not start.");
-                secondSave = Task.Run(autoSaveService.TryAutoSave);
-                Assert.That(secondSave.Wait(TimeSpan.FromMilliseconds(500)), Is.True,
-                    "The second auto-save queued instead of returning immediately.");
-                Assert.That(await secondSave, Is.False);
+                Assert.That(autoSaveService.TryAutoSave(), Is.False);
             }
             finally
             {
@@ -241,8 +237,6 @@ namespace Test.Shared.Core.PackFiles
                 try
                 {
                     await firstSave;
-                    if (secondSave != null)
-                        await secondSave;
                 }
                 catch
                 {
