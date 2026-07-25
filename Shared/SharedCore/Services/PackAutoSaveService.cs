@@ -81,7 +81,9 @@ namespace Shared.Core.Services
                     return false;
 
                 var gameInfo = GameInformationDatabase.GetGameById(_settingsService.CurrentSettings.CurrentGame);
-                _packFileService.SavePackContainer(editablePack, systemPath, false, gameInfo);
+                if (!_packFileService.TryAutoSavePackContainer(editablePack, systemPath, gameInfo))
+                    return false;
+
                 _logger.Here().Information($"Auto-save completed: {systemPath}");
                 return true;
             }

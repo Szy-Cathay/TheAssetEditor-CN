@@ -24,6 +24,7 @@ namespace Shared.Core.PackFiles
         void RenameFile(PackFileContainer pf, PackFile file, string newName);
         void SaveFile(PackFile file, byte[] data);
         void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation);
+        bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation);
         void SetEditablePack(PackFileContainer? pf);
         void UnloadPackContainer(PackFileContainer pf);
     }
