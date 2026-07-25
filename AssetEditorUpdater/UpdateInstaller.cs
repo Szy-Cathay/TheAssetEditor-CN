@@ -5,11 +5,21 @@ namespace AssetEditorUpdater;
 internal static class UpdateInstaller
 {
     private const string AssetEditorExe = "AssetEditor.CN.exe";
+    private const string UpdaterExe = "AssetEditor.CN.Updater.exe";
     private const string ArchiveRoot = "AssetEditor.CN/";
     private const string BackupDirectoryName = "UpdateBackup";
     private const string StagingDirectoryName = "staging";
 
     internal static void Install(string archivePath, string installationDirectory, string updateDirectory)
+    {
+        Install(archivePath, installationDirectory, updateDirectory, CopyDirectory);
+    }
+
+    internal static void Install(
+        string archivePath,
+        string installationDirectory,
+        string updateDirectory,
+        Action<string, string> copyDirectory)
     {
         var stagingDirectory = Path.Combine(updateDirectory, StagingDirectoryName);
         ExtractToStaging(archivePath, stagingDirectory);
@@ -17,17 +27,22 @@ internal static class UpdateInstaller
         if (!File.Exists(Path.Combine(stagingDirectory, AssetEditorExe)))
             throw new InvalidDataException($"The update does not contain {AssetEditorExe}.");
 
-        BackupInstallation(installationDirectory);
+        var updaterPath = Path.Combine(stagingDirectory, "Updater", UpdaterExe);
+        if (!File.Exists(updaterPath))
+            throw new InvalidDataException($"The update does not contain Updater/{UpdaterExe}.");
+
+        var backupDirectory = GetBackupDirectory(installationDirectory);
+        BackupInstallation(installationDirectory, backupDirectory, copyDirectory);
 
         try
         {
-            CopyDirectory(stagingDirectory, installationDirectory);
+            copyDirectory(stagingDirectory, installationDirectory);
         }
         catch (Exception installException)
         {
             try
             {
-                RestoreBackup(installationDirectory);
+                RestoreBackup(installationDirectory, backupDirectory, copyDirectory);
             }
             catch (Exception restoreException)
             {
@@ -43,19 +58,32 @@ internal static class UpdateInstaller
 
     internal static void RestoreBackup(string installationDirectory)
     {
-        var backupDirectory = Path.Combine(installationDirectory, BackupDirectoryName);
+        RestoreBackup(installationDirectory, GetBackupDirectory(installationDirectory), CopyDirectory);
+    }
+
+    internal static string GetBackupDirectory(string installationDirectory)
+    {
+        var fullInstallationPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installationDirectory));
+        var parentDirectory = Path.GetDirectoryName(fullInstallationPath);
+        var installationName = Path.GetFileName(fullInstallationPath);
+        if (string.IsNullOrEmpty(parentDirectory) || string.IsNullOrEmpty(installationName))
+            throw new InvalidOperationException("The installation directory must have a parent directory.");
+
+        return Path.Combine(parentDirectory, $"{installationName}.{BackupDirectoryName}");
+    }
+
+    private static void RestoreBackup(
+        string installationDirectory,
+        string backupDirectory,
+        Action<string, string> copyDirectory)
+    {
         if (!Directory.Exists(backupDirectory))
             throw new DirectoryNotFoundException($"Update backup not found: {backupDirectory}");
 
         foreach (var entryPath in Directory.EnumerateFileSystemEntries(installationDirectory))
-        {
-            if (string.Equals(Path.GetFileName(entryPath), BackupDirectoryName, StringComparison.OrdinalIgnoreCase))
-                continue;
-
             DeleteEntry(entryPath);
-        }
 
-        CopyDirectory(backupDirectory, installationDirectory);
+        copyDirectory(backupDirectory, installationDirectory);
     }
 
     internal static void CopyDirectory(string sourceDirectory, string destinationDirectory)
@@ -132,7 +160,11 @@ internal static class UpdateInstaller
         var segments = relativePath.Split('/');
         if (Path.IsPathRooted(relativePath)
             || segments.Length == 0
-            || segments.Any(segment => string.IsNullOrEmpty(segment) || segment is "." or ".."))
+            || segments.Any(segment =>
+                string.IsNullOrEmpty(segment)
+                || segment is "." or ".."
+                || segment.EndsWith('.')
+                || segment.EndsWith(' ')))
         {
             throw new InvalidDataException($"Update entry has an unsafe path: {entryKey}");
         }
@@ -148,9 +180,11 @@ internal static class UpdateInstaller
         return destinationPath;
     }
 
-    private static void BackupInstallation(string installationDirectory)
+    private static void BackupInstallation(
+        string installationDirectory,
+        string backupDirectory,
+        Action<string, string> copyDirectory)
     {
-        var backupDirectory = Path.Combine(installationDirectory, BackupDirectoryName);
         if (Directory.Exists(backupDirectory))
             Directory.Delete(backupDirectory, true);
         Directory.CreateDirectory(backupDirectory);
@@ -159,9 +193,6 @@ internal static class UpdateInstaller
         {
             foreach (var entryPath in Directory.EnumerateFileSystemEntries(installationDirectory))
             {
-                if (string.Equals(Path.GetFileName(entryPath), BackupDirectoryName, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
                 var destinationPath = Path.Combine(backupDirectory, Path.GetFileName(entryPath));
                 if (Directory.Exists(entryPath))
                     Directory.Move(entryPath, destinationPath);
@@ -173,7 +204,7 @@ internal static class UpdateInstaller
         {
             try
             {
-                CopyDirectory(backupDirectory, installationDirectory);
+                copyDirectory(backupDirectory, installationDirectory);
             }
             catch (Exception restoreException)
             {
