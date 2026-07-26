@@ -94,51 +94,39 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         private void OnRequestRestoreInitialState()
         {
-            if (_activeTransformation?.HasBackup == true)
-            {
-                // Restore vertices without GPU upload — the subsequent transform event
-                // will overwrite vertices and upload the final result in one pass.
-                _activeTransformation.RestoreVertexState(resetTransform: true, skipGpuUpload: true);
-            }
+            _activeTransformation?.RestoreInitialPreviewState();
         }
 
         private void GizmoTransformStart()
         {
-            // Only set mouse owner, don't start command here
-            // Command will be started in GizmoTransformEnd for confirm
-            _mouse.MouseOwner = this;
             // Update falloff on active transformation when starting transform
             if (_activeTransformation != null && _selectionManager.GetState() is FaceSelectionState or EdgeSelectionState)
                 _activeTransformation.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
+            _activeTransformation?.BeginTransform();
+            _mouse.MouseOwner = this;
         }
 
         private void GizmoTransformEnd()
         {
-            // Check if this is a cancel operation
-            if (_gizmo.IsModalCancelled)
+            var isCancelled = _gizmo.IsModalCancelled;
+            try
             {
-                // Cancel: restore vertices to initial state (like Blender's restoreTransObjects)
-                // Reset transform state as well since we're going back to initial
-                _activeTransformation?.RestoreVertexState(resetTransform: true);
-                _activeTransformation?.ClearBackup();
+                if (isCancelled)
+                    _activeTransformation?.CancelTransform();
+                else
+                    _activeTransformation?.CommitTransform(_commandManager);
+            }
+            finally
+            {
                 _gizmo.IsModalCancelled = false;
-            }
-            else
-            {
-                // Confirm: record the final transform for undo/redo
-                // Use ConfirmModalTransform to avoid the Start() method which resets _totalGizomTransform
-                _activeTransformation?.ClearBackup();
-                _activeTransformation?.ConfirmModalTransform(_commandManager);
-            }
+                // Gizmo should only be visible when explicitly enabled via toolbar button
+                _isEnabled = false;
 
-            // Reset _isEnabled after modal transform ends
-            // Gizmo should only be visible when explicitly enabled via toolbar button
-            _isEnabled = false;
-
-            if (_mouse.MouseOwner == this)
-            {
-                _mouse.MouseOwner = null;
-                _mouse.ClearStates();
+                if (_mouse.MouseOwner == this)
+                {
+                    _mouse.MouseOwner = null;
+                    _mouse.ClearStates();
+                }
             }
         }
 
@@ -331,10 +319,6 @@ namespace GameWorld.Core.Components.Gizmo
         {
             // Don't set _isEnabled = true - Gizmo should not be visible during modal transform
             _mouse.MouseOwner = this;
-
-            // Backup initial vertex state (like Blender's createTransData)
-            // This allows cancel to restore vertices to original positions
-            _activeTransformation?.BackupVertexState();
 
             _gizmo.StartModalTransform(mode);
         }

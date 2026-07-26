@@ -12,6 +12,7 @@ using Shared.Core.ErrorHandling;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 
 namespace GameWorld.Core.Components.Gizmo
 {
@@ -49,6 +50,7 @@ namespace GameWorld.Core.Components.Gizmo
         private List<ushort[]> _backupIndexArrays;
         private Vector3 _backupPosition;                 // Backup initial position for rotation center
         private Quaternion _backupOrientation;           // Backup initial orientation
+        private Vector3 _backupScale;
         private bool _hasBackup = false;
 
         // -- Partial VBO upload tracking -- //
@@ -159,101 +161,143 @@ namespace GameWorld.Core.Components.Gizmo
             return average;
         }
 
-        public void Start(CommandExecutor commandManager)
+        public void BeginTransform()
         {
+            if (_activeCommand != null || _hasBackup)
+                CancelTransform();
 
-            if (_activeCommand is TransformVertexCommand transformVertexCommand)
-            {
-                //   MessageBox.Show("Transform debug check - Please inform the creator of the tool that you got this message. Would also love it if you tried undoing your last command to see if that works..\n E-001");
-                ConfigureTransformCommandForCommit(transformVertexCommand);
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-                if (_hasBackup)
-                    ClearBackup();
-                _vertexTransformReplayPlan = null;
-            }
-
-            if (_activeCommand is TransformBoneCommand transformBoneCommand)
-            {
-                var matrix = _totalGizomTransform;
-                matrix.Translation = Position;
-                transformBoneCommand.Transform = matrix;
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-            }
-
-            _invertedWindingOrder = false;
+            ResetGestureState();
             if (_selectionState is BoneSelectionState)
             {
-                _totalGizomTransform = Matrix.Identity;
-                _activeCommand = _commandFactory.Create<TransformBoneCommand>().Configure(x => x.Configure(_selectedBones, (BoneSelectionState)_selectionState)).Build();
-            }
-            else
-            {
-                _totalGizomTransform = Matrix.Identity;
-                _activeCommand = _commandFactory.Create<TransformVertexCommand>().Configure(x => x.Configure(_effectedObjects, Position)).Build();
-                // Pass affected vertex indices for Face/Edge mode undo
-                if (_activeCommand is TransformVertexCommand tvc && _faceVertexIndices != null)
-                    tvc.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
-                BackupVertexState();
-            }
-
-        }
-
-        public void Stop(CommandExecutor commandManager)
-        {
-            if (_activeCommand is TransformVertexCommand transformVertexCommand)
-            {
-                ConfigureTransformCommandForCommit(transformVertexCommand);
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-                ClearBackup();
-                _vertexTransformReplayPlan = null;
-                _invertedWindingOrder = false;
-                return;
-            }
-
-            if (_activeCommand is TransformBoneCommand transformBoneCommand)
-            {
-                var matrix = _totalGizomTransform;
-                matrix.Translation = Position;
-                transformBoneCommand.Transform = matrix;
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-                return;
-            }
-        }
-
-        /// <summary>
-        /// Confirm modal transform - record the final transform for undo/redo
-        /// This is different from the normal gizmo flow where Start/Stop are used
-        /// </summary>
-        public void ConfirmModalTransform(CommandExecutor commandManager)
-        {
-            // Create the command with current transform state
-            if (_selectionState is BoneSelectionState)
-            {
-                var command = _commandFactory.Create<TransformBoneCommand>()
+                _activeCommand = _commandFactory.Create<TransformBoneCommand>()
                     .Configure(x => x.Configure(_selectedBones, (BoneSelectionState)_selectionState))
                     .Build();
-                var matrix = _totalGizomTransform;
-                matrix.Translation = Position;
-                command.Transform = matrix;
-                commandManager.ExecuteCommand(command);
-            }
-            else
-            {
-                var command = _commandFactory.Create<TransformVertexCommand>()
-                    .Configure(x => x.Configure(_effectedObjects, Position))
-                    .Build();
-                ConfigureTransformCommandForCommit(command);
-                commandManager.ExecuteCommand(command);
+                return;
             }
 
-            // Reset state after confirming
+            var command = _commandFactory.Create<TransformVertexCommand>()
+                .Configure(x => x.Configure(_effectedObjects, Position))
+                .Build();
+            if (_faceVertexIndices != null)
+                command.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
+
+            try
+            {
+                CaptureVertexBaseline();
+                _activeCommand = command;
+            }
+            catch
+            {
+                _activeCommand = null;
+                ResetGestureState();
+                throw;
+            }
+        }
+
+        public void CommitTransform(CommandExecutor commandExecutor)
+        {
+            EndTransform(() =>
+            {
+                if (_activeCommand is TransformVertexCommand transformVertexCommand)
+                {
+                    ConfigureTransformCommandForCommit(transformVertexCommand);
+                    if (HasVertexMutation())
+                        commandExecutor.ExecuteCommand(transformVertexCommand);
+                }
+                else if (_activeCommand is TransformBoneCommand transformBoneCommand)
+                {
+                    var matrix = _totalGizomTransform;
+                    matrix.Translation = Position;
+                    transformBoneCommand.Transform = matrix;
+                    commandExecutor.ExecuteCommand(transformBoneCommand);
+                }
+            });
+        }
+
+        public void CancelTransform()
+        {
+            EndTransform(() =>
+            {
+                if (_activeCommand is TransformVertexCommand || _hasBackup)
+                    RestoreVertexBaseline(skipVertexUpload: false);
+            });
+        }
+
+        public void RestoreInitialPreviewState()
+        {
+            if (_activeCommand is not TransformVertexCommand || !_hasBackup)
+                return;
+
+            RestoreVertexBaseline(skipVertexUpload: true);
+        }
+
+        private void EndTransform(Action transformEnd)
+        {
+            ExceptionDispatchInfo primaryError = null;
+            try
+            {
+                transformEnd();
+            }
+            catch (Exception exception)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                try
+                {
+                    ReleaseVertexBaseline();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+                finally
+                {
+                    _activeCommand = null;
+                    ResetGestureState();
+                }
+            }
+
+            primaryError?.Throw();
+        }
+
+        private bool HasVertexMutation()
+        {
+            if (_vertexTransformReplayPlan?.OperationCount <= 0 ||
+                _effectedObjects == null ||
+                _backupVertexArrays == null ||
+                _backupIndexArrays == null)
+            {
+                return false;
+            }
+
+            var meshCount = Math.Min(
+                _effectedObjects.Count,
+                Math.Min(_backupVertexArrays.Count, _backupIndexArrays.Count));
+            for (var meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            {
+                var mesh = _effectedObjects[meshIndex];
+                if (mesh?.VertexArray == null ||
+                    mesh.IndexArray == null ||
+                    !mesh.VertexArray.SequenceEqual(_backupVertexArrays[meshIndex]) ||
+                    !mesh.IndexArray.SequenceEqual(_backupIndexArrays[meshIndex]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void ResetGestureState()
+        {
             _totalGizomTransform = Matrix.Identity;
             _invertedWindingOrder = false;
             _vertexTransformReplayPlan = null;
+            _modifiedMin = int.MaxValue;
+            _modifiedMax = -1;
+            _hasModifications = false;
         }
 
         void ConfigureTransformCommandForCommit(TransformVertexCommand command)
@@ -430,114 +474,139 @@ namespace GameWorld.Core.Components.Gizmo
 
         #region Modal Transform State Backup (Blender-style)
 
-        /// <summary>
-        /// Backup current vertex state for modal transform (like Blender's createTransData)
-        /// Call this when modal transform starts
-        /// </summary>
-        public void BackupVertexState()
+        private void CaptureVertexBaseline()
         {
-            _modifiedMin = int.MaxValue;
-            _modifiedMax = -1;
-            _hasModifications = false;
-
             if (_effectedObjects == null || _effectedObjects.Count == 0)
                 return;
 
-            _backupVertexArrays = new List<VertexPositionNormalTextureCustom[]>();
-            _backupIndexArrays = new List<ushort[]>();
-
-            foreach (var mesh in _effectedObjects)
+            var vertexArrays = new List<VertexPositionNormalTextureCustom[]>(_effectedObjects.Count);
+            var indexArrays = new List<ushort[]>(_effectedObjects.Count);
+            try
             {
-                // Single Array.Copy instead of 4 separate element-by-element lists
-                var backup = new VertexPositionNormalTextureCustom[mesh.VertexCount()];
-                Array.Copy(mesh.VertexArray, backup, mesh.VertexCount());
-                _backupVertexArrays.Add(backup);
+                foreach (var mesh in _effectedObjects)
+                {
+                    var vertexBackup = new VertexPositionNormalTextureCustom[mesh.VertexCount()];
+                    Array.Copy(mesh.VertexArray, vertexBackup, vertexBackup.Length);
+                    vertexArrays.Add(vertexBackup);
 
-                // Backup index array as raw ushort[]
-                var indexBackup = new ushort[mesh.IndexArray.Length];
-                Array.Copy(mesh.IndexArray, indexBackup, mesh.IndexArray.Length);
-                _backupIndexArrays.Add(indexBackup);
+                    var indexBackup = new ushort[mesh.IndexArray.Length];
+                    Array.Copy(mesh.IndexArray, indexBackup, indexBackup.Length);
+                    indexArrays.Add(indexBackup);
+                }
 
-                // Defer BoundingBox rebuild during modal transform to avoid O(n) per-frame cost
-                mesh.DeferBoundingBoxRebuild = true;
+                var replayPlan = VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    _selectionState,
+                    _falloffDistance > 0 ? _falloffWeights : null);
+                foreach (var mesh in _effectedObjects)
+                    mesh.DeferBoundingBoxRebuild = true;
+
+                _backupVertexArrays = vertexArrays;
+                _backupIndexArrays = indexArrays;
+                _backupPosition = _pos;
+                _backupOrientation = _orientation;
+                _backupScale = _scale;
+                _vertexTransformReplayPlan = replayPlan;
+                _hasBackup = true;
+            }
+            catch (Exception exception)
+            {
+                var primaryError = ExceptionDispatchInfo.Capture(exception);
+                ReleaseDeferredMeshes(rebuildBoundingBoxes: false);
+                ClearBackupStorage();
+                primaryError.Throw();
+            }
+        }
+
+        private void RestoreVertexBaseline(bool skipVertexUpload)
+        {
+            if (!_hasBackup || _effectedObjects == null ||
+                _backupVertexArrays == null || _backupIndexArrays == null)
+            {
+                return;
             }
 
-            // Backup position and orientation for rotation center
-            _backupPosition = _pos;
-            _backupOrientation = _orientation;
+            ExceptionDispatchInfo primaryError = null;
+            var meshCount = Math.Min(
+                _effectedObjects.Count,
+                Math.Min(_backupVertexArrays.Count, _backupIndexArrays.Count));
+            for (var meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            {
+                try
+                {
+                    var mesh = _effectedObjects[meshIndex];
+                    var vertexBackup = _backupVertexArrays[meshIndex];
+                    var indexBackup = _backupIndexArrays[meshIndex];
+                    Array.Copy(vertexBackup, mesh.VertexArray, vertexBackup.Length);
+                    Array.Copy(indexBackup, mesh.IndexArray, indexBackup.Length);
+                    mesh.RebuildIndexBuffer();
+                    if (!skipVertexUpload)
+                        mesh.RebuildVertexBuffer();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            ResetGestureCandidateToBaseline();
+            primaryError?.Throw();
+        }
+
+        private void ResetGestureCandidateToBaseline()
+        {
+            _totalGizomTransform = Matrix.Identity;
+            _invertedWindingOrder = false;
             _vertexTransformReplayPlan =
                 VertexTransformOperationApplier.CreateEmptyReplayPlan(
                     _selectionState,
                     _falloffDistance > 0 ? _falloffWeights : null);
-
-            _hasBackup = true;
-        }
-
-        /// <summary>
-        /// Restore vertex state from backup (like Blender's restoreTransObjects)
-        /// Call this when modal transform is cancelled or when recalculating from initial state
-        /// </summary>
-        /// <param name="resetTransform">Whether to reset internal transform state (true for cancel, false for recalculating)</param>
-        /// <param name="skipGpuUpload">If true, only restore VertexArray without uploading to GPU (used when next ApplyTransform will overwrite immediately)</param>
-        public void RestoreVertexState(bool resetTransform = true, bool skipGpuUpload = false)
-        {
-            if (!_hasBackup || _effectedObjects == null)
-                return;
-
             _modifiedMin = int.MaxValue;
             _modifiedMax = -1;
             _hasModifications = false;
-
-            for (int meshIndex = 0; meshIndex < _effectedObjects.Count && meshIndex < _backupVertexArrays.Count; meshIndex++)
-            {
-                var mesh = _effectedObjects[meshIndex];
-                var backup = _backupVertexArrays[meshIndex];
-
-                // Single Array.Copy instead of element-by-element field assignment
-                Array.Copy(backup, mesh.VertexArray, backup.Length);
-
-                // Restore index array with Array.Copy
-                Array.Copy(_backupIndexArrays[meshIndex], mesh.IndexArray, _backupIndexArrays[meshIndex].Length);
-
-                if (!skipGpuUpload)
-                {
-                    mesh.RebuildIndexBuffer();
-                    mesh.RebuildVertexBuffer();
-                }
-            }
-
-            // Reset internal state only when explicitly requested (e.g., on cancel)
-            if (resetTransform)
-            {
-                _totalGizomTransform = Matrix.Identity;
-                _invertedWindingOrder = false;
-                _vertexTransformReplayPlan =
-                    VertexTransformOperationApplier.CreateEmptyReplayPlan(
-                        _selectionState,
-                        _falloffDistance > 0 ? _falloffWeights : null);
-                // Restore position and orientation for correct rotation center
-                _pos = _backupPosition;
-                _orientation = _backupOrientation;
-            }
+            _pos = _backupPosition;
+            _orientation = _backupOrientation;
+            _scale = _backupScale;
         }
 
-        /// <summary>
-        /// Clear backup data (call when modal transform is confirmed or done)
-        /// </summary>
-        public void ClearBackup()
+        private void ReleaseVertexBaseline()
         {
-            // Restore BoundingBox rebuild and rebuild once with final vertex positions
-            if (_effectedObjects != null)
+            if (!_hasBackup && _backupVertexArrays == null && _backupIndexArrays == null)
+                return;
+
+            var cleanupError = ReleaseDeferredMeshes(rebuildBoundingBoxes: true);
+            ClearBackupStorage();
+            cleanupError?.Throw();
+        }
+
+        private ExceptionDispatchInfo ReleaseDeferredMeshes(bool rebuildBoundingBoxes)
+        {
+            ExceptionDispatchInfo cleanupError = null;
+            if (_effectedObjects == null)
+                return null;
+
+            foreach (var mesh in _effectedObjects)
             {
-                foreach (var mesh in _effectedObjects)
+                try
                 {
                     mesh.DeferBoundingBoxRebuild = false;
-                    mesh.BuildBoundingBox();
+                    if (rebuildBoundingBoxes)
+                        mesh.BuildBoundingBox();
+                }
+                catch (Exception exception)
+                {
+                    cleanupError ??= ExceptionDispatchInfo.Capture(exception);
                 }
             }
 
+            return cleanupError;
+        }
+
+        private void ClearBackupStorage()
+        {
             _backupVertexArrays?.Clear();
             _backupIndexArrays?.Clear();
+            _backupVertexArrays = null;
+            _backupIndexArrays = null;
             _hasBackup = false;
         }
 
@@ -545,20 +614,6 @@ namespace GameWorld.Core.Components.Gizmo
         /// Check if there's a valid backup
         /// </summary>
         public bool HasBackup => _hasBackup;
-
-        /// <summary>
-        /// Reset the total gizmo transform (call when starting fresh transform)
-        /// </summary>
-        public void ResetTotalTransform()
-        {
-            _totalGizomTransform = Matrix.Identity;
-            _invertedWindingOrder = false;
-            _vertexTransformReplayPlan = _hasBackup
-                ? VertexTransformOperationApplier.CreateEmptyReplayPlan(
-                    _selectionState,
-                    _falloffDistance > 0 ? _falloffWeights : null)
-                : null;
-        }
 
         /// <summary>
         /// Set falloff distance for face/edge mode proportional editing

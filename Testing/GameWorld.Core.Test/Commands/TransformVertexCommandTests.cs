@@ -92,13 +92,13 @@ namespace Testing.GameWorld.Core.Commands
             var selection = CreateEditSelection(selectionMode, mesh);
             var context = CreateTransformContext(selection, mesh);
             var initialIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-2.2f, 0, 0),
                 PivotType.ObjectCenter);
             var previewIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoIndices = mesh.IndexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -120,13 +120,13 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialIndices = mesh.IndexArray.ToArray();
             var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-2.2f, 0, 0),
                 PivotType.ObjectCenter);
             var previewIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoIndices = mesh.IndexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -147,13 +147,13 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initialIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-2.2f, -2.2f, 0),
                 PivotType.ObjectCenter);
             var previewIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoIndices = mesh.IndexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -175,7 +175,7 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialIndices = mesh.IndexArray.ToArray();
             var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
             graphicsContext.ResetRebuildCounts();
 
             context.Wrapper.GizmoScaleEvent(
@@ -201,15 +201,16 @@ namespace Testing.GameWorld.Core.Commands
             var mesh = CreateMesh();
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
+            var initialIndices = mesh.IndexArray.ToArray();
             var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-2.2f, 0, 0),
                 PivotType.ObjectCenter);
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
 
-            context.Wrapper.Start(context.CommandExecutor);
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             var secondPreviewIndices = mesh.IndexArray.ToArray();
             context.CommandExecutor.Undo();
             var secondUndoIndices = mesh.IndexArray.ToArray();
@@ -219,28 +220,32 @@ namespace Testing.GameWorld.Core.Commands
             Assert.Multiple(() =>
             {
                 Assert.That(secondPreviewIndices, Is.EqualTo(reversedIndices));
-                Assert.That(secondUndoIndices, Is.EqualTo(reversedIndices));
+                Assert.That(secondUndoIndices, Is.EqualTo(initialIndices));
                 Assert.That(secondRedoIndices, Is.EqualTo(reversedIndices));
             });
         }
 
         [Test]
-        public void ObjectStartingNextGesture_DoesNotInheritPriorWindingParity()
+        public void ObjectBeginningReplacementGesture_CancelsPriorPreviewAndResetsWindingParity()
         {
             var mesh = CreateMesh();
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
-            var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
-            context.Wrapper.Start(context.CommandExecutor);
+            var initialIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.BeginTransform();
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-2.2f, 0, 0),
                 PivotType.ObjectCenter);
 
-            context.Wrapper.Start(context.CommandExecutor);
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
 
-            Assert.That(mesh.IndexArray, Is.EqualTo(reversedIndices));
+            Assert.Multiple(() =>
+            {
+                Assert.That(mesh.IndexArray, Is.EqualTo(initialIndices));
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+            });
         }
 
         [Test]
@@ -251,7 +256,7 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
             var initialIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-1.00001f, 0, 0),
@@ -259,7 +264,7 @@ namespace Testing.GameWorld.Core.Commands
             var previewVertices = mesh.VertexArray.ToArray();
             var previewIndices = mesh.IndexArray.ToArray();
             var previewScale = context.Wrapper.Scale;
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -284,13 +289,13 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, stableMesh, unstableMesh);
             var initialVertices = Snapshot(new[] { stableMesh, unstableMesh });
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-0.9989f, 0, 0),
                 PivotType.ObjectCenter);
             var previewVertices = Snapshot(new[] { stableMesh, unstableMesh });
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = Snapshot(new[] { stableMesh, unstableMesh });
             context.CommandExecutor.Redo();
@@ -342,7 +347,7 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
             var aggregateScale = MathF.Pow(1.0f + scaleDelta, updateCount);
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
             {
@@ -353,7 +358,7 @@ namespace Testing.GameWorld.Core.Commands
 
             var previewVertices = mesh.VertexArray.ToArray();
             var previewScale = context.Wrapper.Scale;
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -416,7 +421,7 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
             Assert.That(context.Wrapper.Position.X, Is.EqualTo(10.0f).Within(Epsilon));
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
             {
@@ -426,7 +431,7 @@ namespace Testing.GameWorld.Core.Commands
             }
 
             var previewVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -459,13 +464,13 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
                 context.Wrapper.GizmoTranslateEvent(delta, PivotType.WorldOrigin);
 
             var previewVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -497,7 +502,7 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             for (var updateIndex = 0; updateIndex < acceptedUpdateCount; updateIndex++)
             {
@@ -518,7 +523,7 @@ namespace Testing.GameWorld.Core.Commands
                 PivotType.ObjectCenter);
             AssertVertices(mesh.VertexArray, lastValidPreview, "Rejected cumulative contraction preview");
             Assert.That(context.Wrapper.Scale, Is.EqualTo(lastValidScale));
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
 
             context.CommandExecutor.Undo();
             AssertVertices(mesh.VertexArray, initialVertices, "Cumulative contraction Undo");
@@ -535,13 +540,13 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
                 context.Wrapper.GizmoRotateEvent(rotation, PivotType.WorldOrigin);
 
             var previewVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -574,14 +579,14 @@ namespace Testing.GameWorld.Core.Commands
             var translation = new Vector3(0.25f, -0.1f, 0.05f);
             var rotation = Matrix.CreateFromAxisAngle(Vector3.UnitZ, 0.2f);
             var scale = Matrix.CreateScale(1.1f, 0.9f, 1.05f);
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoTranslateEvent(translation, PivotType.WorldOrigin);
             var rotationPivot = context.Wrapper.Position;
             context.Wrapper.GizmoRotateEvent(rotation, PivotType.ObjectCenter);
             context.Wrapper.GizmoScaleEvent(new Vector3(0.1f, -0.1f, 0.05f), PivotType.WorldOrigin);
             var previewVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -611,7 +616,7 @@ namespace Testing.GameWorld.Core.Commands
                 Assert.That(mesh.DeferBoundingBoxRebuild, Is.False);
             });
 
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
             Assert.Multiple(() =>
             {
                 Assert.That(context.Wrapper.HasBackup, Is.True);
@@ -622,7 +627,7 @@ namespace Testing.GameWorld.Core.Commands
                 PivotType.WorldOrigin);
             var previewVertices = mesh.VertexArray.ToArray();
 
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             Assert.Multiple(() =>
             {
                 Assert.That(context.Wrapper.HasBackup, Is.False);
@@ -640,7 +645,7 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(0.1f, 0, 0),
@@ -656,7 +661,7 @@ namespace Testing.GameWorld.Core.Commands
                 PivotType.ObjectCenter);
             AssertVertices(mesh.VertexArray, validPreview, "Rejected delta after valid preview");
             Assert.That(context.Wrapper.Scale, Is.EqualTo(new Vector3(1.1f, 1, 1)));
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
 
             context.CommandExecutor.Undo();
             AssertVertices(mesh.VertexArray, initialVertices, "Mixed valid-invalid Undo");
@@ -738,7 +743,7 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
             var initialIndices = mesh.IndexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-1.99998f, 0, 0),
@@ -746,7 +751,7 @@ namespace Testing.GameWorld.Core.Commands
             var previewVertices = mesh.VertexArray.ToArray();
             var previewIndices = mesh.IndexArray.ToArray();
             var previewScale = context.Wrapper.Scale;
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = mesh.VertexArray.ToArray();
             context.CommandExecutor.Redo();
@@ -806,7 +811,7 @@ namespace Testing.GameWorld.Core.Commands
             var context = CreateTransformContext(selection, mesh);
             var initialVertices = mesh.VertexArray.ToArray();
 
-            context.Wrapper.BackupVertexState();
+            context.Wrapper.BeginTransform();
             context.Wrapper.GizmoTranslateEvent(
                 new Vector3(0.3f, 0, 0),
                 PivotType.ObjectCenter);
@@ -815,7 +820,7 @@ namespace Testing.GameWorld.Core.Commands
                 new Vector3(1.3f, 0, 0.2f),
                 "First modal preview");
 
-            context.Wrapper.RestoreVertexState(resetTransform: true, skipGpuUpload: true);
+            context.Wrapper.RestoreInitialPreviewState();
             AssertVertices(mesh.VertexArray, initialVertices, "Modal restore");
             context.Wrapper.GizmoTranslateEvent(
                 new Vector3(0, 0.4f, 0),
@@ -826,8 +831,7 @@ namespace Testing.GameWorld.Core.Commands
                 new Vector3(1.0f, 0.4f, 0.2f),
                 "Reapplied modal preview");
 
-            context.Wrapper.ClearBackup();
-            context.Wrapper.ConfirmModalTransform(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             Assert.That(context.Wrapper.HasBackup, Is.False);
             context.CommandExecutor.Undo();
             AssertVertices(mesh.VertexArray, initialVertices, "Modal confirm Undo");
@@ -931,7 +935,7 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initial = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(new Vector3(-1.0f, 0, 0), PivotType.ObjectCenter);
 
@@ -951,7 +955,7 @@ namespace Testing.GameWorld.Core.Commands
             };
             var context = CreateTransformContext(selection, mesh);
             var initial = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoScaleEvent(new Vector3(-2.0f, 0, 0), PivotType.ObjectCenter);
 
@@ -966,7 +970,7 @@ namespace Testing.GameWorld.Core.Commands
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
             var initial = mesh.VertexArray.ToArray();
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             context.Wrapper.GizmoTranslateEvent(
                 new Vector3(float.NaN, 0, 0),
@@ -983,11 +987,11 @@ namespace Testing.GameWorld.Core.Commands
             var secondMesh = CreateMesh(out var secondContext);
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, firstMesh, secondMesh);
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
             context.Wrapper.GizmoTranslateEvent(
                 new Vector3(0.3f, 0.2f, -0.1f),
                 PivotType.ObjectCenter);
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             firstContext.ResetRebuildCounts();
             secondContext.ResetRebuildCounts();
 
@@ -1042,13 +1046,13 @@ namespace Testing.GameWorld.Core.Commands
             Action<VertexPositionNormalTextureCustom[][], VertexPositionNormalTextureCustom[][]> assertPreview = null)
         {
             var initialVertices = Snapshot(meshes);
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
 
             applyPreview();
 
             var previewVertices = Snapshot(meshes);
             assertPreview?.Invoke(initialVertices, previewVertices);
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
 
             context.CommandExecutor.Undo();
             for (var meshIndex = 0; meshIndex < meshes.Count; meshIndex++)
@@ -1065,12 +1069,12 @@ namespace Testing.GameWorld.Core.Commands
             string message)
         {
             var initialVertices = Snapshot(meshes);
-            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
             context.Wrapper.GizmoScaleEvent(
                 new Vector3(-0.9989f, 0, 0),
                 PivotType.ObjectCenter);
             var previewVertices = Snapshot(meshes);
-            context.Wrapper.Stop(context.CommandExecutor);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
             context.CommandExecutor.Undo();
             var undoVertices = Snapshot(meshes);
             context.CommandExecutor.Redo();

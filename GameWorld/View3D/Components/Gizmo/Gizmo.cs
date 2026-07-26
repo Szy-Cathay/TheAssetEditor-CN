@@ -2062,7 +2062,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         /// <summary>
         /// Event to request restoring initial state (for Blender-style modal transform)
-        /// GizmoComponent handles this by calling RestoreVertexState on the wrapper
+        /// GizmoComponent handles this through the wrapper's gesture baseline
         /// </summary>
         public event Action RequestRestoreInitialState;
 
