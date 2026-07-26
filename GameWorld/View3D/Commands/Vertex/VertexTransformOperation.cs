@@ -27,6 +27,9 @@ namespace GameWorld.Core.Commands.Vertex
 
     internal static class VertexTransformOperationApplier
     {
+        internal const float MinimumReversibleScaleAxisMagnitude = 0.001f;
+        internal const float MaximumReversibleScaleConditionNumber = 1000.0f;
+
         public static bool TryApply(
             IReadOnlyList<MeshObject> geometryList,
             ISelectionState selectionState,
@@ -98,6 +101,8 @@ namespace GameWorld.Core.Commands.Vertex
         {
             if (!Enum.IsDefined(operation.Mode) ||
                 !IsFinite(operation.PivotPoint) ||
+                (operation.Mode == VertexTransformOperationMode.Scale &&
+                 !IsNumericallyReversibleScale(operation.Transform)) ||
                 !IsInvertible(operation.Transform) ||
                 !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, false, out _) ||
                 !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, true, out _))
@@ -177,6 +182,8 @@ namespace GameWorld.Core.Commands.Vertex
                 return true;
 
             return TryCreateWeightedTransform(operation, weight, out var weightedTransform) &&
+                   (operation.Mode != VertexTransformOperationMode.Scale ||
+                    IsNumericallyReversibleScale(weightedTransform)) &&
                    IsInvertible(weightedTransform) &&
                    TryCreateReplayMatrix(weightedTransform, pivotPoint, false, out _) &&
                    TryCreateReplayMatrix(weightedTransform, pivotPoint, true, out _);
@@ -274,7 +281,36 @@ namespace GameWorld.Core.Commands.Vertex
             if (operation.Mode == VertexTransformOperationMode.Rotate)
                 geometry.TransformVertexRotation(vertexIndex, replayMatrix, normalMatrix);
             else
-                geometry.TransformVertex(vertexIndex, replayMatrix, normalMatrix);
+                TransformScaleVertexPreservingBasisMagnitude(
+                    geometry,
+                    vertexIndex,
+                    replayMatrix,
+                    normalMatrix);
+        }
+
+        static void TransformScaleVertexPreservingBasisMagnitude(
+            MeshObject geometry,
+            int vertexIndex,
+            Matrix transform,
+            Matrix normalMatrix)
+        {
+            var normalLength = geometry.VertexArray[vertexIndex].Normal.Length();
+            var tangentLength = geometry.VertexArray[vertexIndex].Tangent.Length();
+            var binormalLength = geometry.VertexArray[vertexIndex].BiNormal.Length();
+
+            geometry.TransformVertex(vertexIndex, transform, normalMatrix);
+
+            geometry.VertexArray[vertexIndex].Normal =
+                RestoreMagnitude(geometry.VertexArray[vertexIndex].Normal, normalLength);
+            geometry.VertexArray[vertexIndex].Tangent =
+                RestoreMagnitude(geometry.VertexArray[vertexIndex].Tangent, tangentLength);
+            geometry.VertexArray[vertexIndex].BiNormal =
+                RestoreMagnitude(geometry.VertexArray[vertexIndex].BiNormal, binormalLength);
+        }
+
+        static Vector3 RestoreMagnitude(Vector3 direction, float magnitude)
+        {
+            return magnitude == 0 ? Vector3.Zero : direction * magnitude;
         }
 
         static Matrix CreateWeightedTransform(VertexTransformOperation operation, float weight)
@@ -345,6 +381,20 @@ namespace GameWorld.Core.Commands.Vertex
             }
 
             return IsFinite(Matrix.Invert(transform));
+        }
+
+        static bool IsNumericallyReversibleScale(Matrix transform)
+        {
+            var x = MathF.Abs(transform.M11);
+            var y = MathF.Abs(transform.M22);
+            var z = MathF.Abs(transform.M33);
+            var minimum = MathF.Min(x, MathF.Min(y, z));
+            var maximum = MathF.Max(x, MathF.Max(y, z));
+
+            // Cap per-axis inverse amplification and normal-matrix anisotropy at 1,000x,
+            // leaving margin for pivoted single-precision round trips.
+            return minimum >= MinimumReversibleScaleAxisMagnitude &&
+                   maximum / minimum <= MaximumReversibleScaleConditionNumber;
         }
 
         static void IncludeVertex(

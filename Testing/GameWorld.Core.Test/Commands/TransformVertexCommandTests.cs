@@ -55,9 +55,10 @@ namespace Testing.GameWorld.Core.Commands
                 },
                 (initial, preview) =>
                 {
-                    Assert.That(
-                        Vector3.Distance(initial[0][1].Position3(), preview[0][1].Position3()),
-                        Is.GreaterThan(Epsilon));
+                    AssertVector3(
+                        preview[0][1].Position3(),
+                        new Vector3(-0.65375f, 1.3f, -0.4f),
+                        "Weighted two-update preview vertex 1");
                     AssertVertex(preview[0][2], initial[0][2], "Zero-weight preview vertex");
                 });
         }
@@ -75,9 +76,172 @@ namespace Testing.GameWorld.Core.Commands
                 () => context.Wrapper.GizmoScaleEvent(
                     new Vector3(-2.2f, -0.2f, 0.1f),
                     PivotType.ObjectCenter),
-                (initial, preview) => Assert.That(
-                    Vector3.Distance(initial[0][0].Position3(), preview[0][0].Position3()),
-                    Is.GreaterThan(Epsilon)));
+                (_, preview) => AssertVector3(
+                    preview[0][0].Position3(),
+                    new Vector3(-0.21f, 0.05f, 0.2f),
+                    "Negative nonuniform object-pivot preview"));
+        }
+
+        [Test]
+        public void ObjectNearSingularScale_IsRejectedAcrossCommitUndoAndRedo()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            var initialIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-1.00001f, 0, 0),
+                PivotType.ObjectCenter);
+            var previewVertices = mesh.VertexArray.ToArray();
+            var previewIndices = mesh.IndexArray.ToArray();
+            var previewScale = context.Wrapper.Scale;
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            AssertVertices(undoVertices, initialVertices, "Rejected near-singular scale Undo");
+            AssertVertices(previewVertices, initialVertices, "Rejected near-singular scale preview");
+            AssertVertices(redoVertices, initialVertices, "Rejected near-singular scale Redo");
+            Assert.Multiple(() =>
+            {
+                Assert.That(previewScale, Is.EqualTo(Vector3.One));
+                Assert.That(previewIndices, Is.EqualTo(initialIndices));
+                Assert.That(mesh.IndexArray, Is.EqualTo(initialIndices));
+            });
+        }
+
+        [Test]
+        public void ObjectScale_AboveReversibilityThreshold_IsAcceptedAndRoundTrips()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+
+            RunRoundTrip(
+                context,
+                new[] { mesh },
+                () => context.Wrapper.GizmoScaleEvent(
+                    new Vector3(-0.9989f, 0, 0),
+                    PivotType.ObjectCenter),
+                (_, preview) => AssertVector3(
+                    preview[0][2].Position3(),
+                    new Vector3(0.44978f, -0.8f, 1.5f),
+                    "Accepted small-scale preview"));
+        }
+
+        [Test]
+        public void WeightedNearSingularScale_IsRejectedAcrossCommitUndoAndRedo()
+        {
+            var mesh = CreateMesh();
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            var selection = new VertexSelectionState(selectable, 0)
+            {
+                SelectedVertices = new List<int> { 0 },
+                VertexWeights = new List<float> { 1.0f, 0.5f, 0.0f, 0.25f }
+            };
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            var initialIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-1.99998f, 0, 0),
+                PivotType.ObjectCenter);
+            var previewVertices = mesh.VertexArray.ToArray();
+            var previewIndices = mesh.IndexArray.ToArray();
+            var previewScale = context.Wrapper.Scale;
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            AssertVertices(previewVertices, initialVertices, "Rejected weighted near-singular preview");
+            AssertVertices(undoVertices, initialVertices, "Rejected weighted near-singular Undo");
+            AssertVertices(redoVertices, initialVertices, "Rejected weighted near-singular Redo");
+            Assert.Multiple(() =>
+            {
+                Assert.That(previewScale, Is.EqualTo(Vector3.One));
+                Assert.That(previewIndices, Is.EqualTo(initialIndices));
+                Assert.That(mesh.IndexArray, Is.EqualTo(initialIndices));
+            });
+        }
+
+        [Test]
+        public void ObjectScale_PreservesNonUnitBasisMagnitudeThroughUndoAndRedo()
+        {
+            var mesh = CreateMesh(nonUnitBasisVertex: 0);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+
+            RunRoundTrip(
+                context,
+                new[] { mesh },
+                () => context.Wrapper.GizmoScaleEvent(
+                    new Vector3(0.2f, -0.1f, 0.15f),
+                    PivotType.ObjectCenter),
+                (initial, preview) =>
+                {
+                    AssertVector3(
+                        preview[0][0].Position3(),
+                        new Vector3(1.11f, 0.025f, 0.2f),
+                        "Non-unit object scale preview position");
+                    var scale = new Vector3(1.2f, 0.9f, 1.15f);
+                    AssertVector3(
+                        preview[0][0].Normal,
+                        ScaleBasisPreservingMagnitude(initial[0][0].Normal, scale),
+                        "Non-unit object scale preview normal");
+                    AssertVector3(
+                        preview[0][0].Tangent,
+                        ScaleBasisPreservingMagnitude(initial[0][0].Tangent, scale),
+                        "Non-unit object scale preview tangent");
+                    AssertVector3(
+                        preview[0][0].BiNormal,
+                        ScaleBasisPreservingMagnitude(initial[0][0].BiNormal, scale),
+                        "Non-unit object scale preview binormal");
+                });
+        }
+
+        [Test]
+        public void ModalRestore_ReplacesPriorOperationBeforeConfirmUndoAndRedo()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+
+            context.Wrapper.BackupVertexState();
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(0.3f, 0, 0),
+                PivotType.ObjectCenter);
+            AssertVector3(
+                mesh.VertexArray[0].Position3(),
+                new Vector3(1.3f, 0, 0.2f),
+                "First modal preview");
+
+            context.Wrapper.RestoreVertexState(resetTransform: true, skipGpuUpload: true);
+            AssertVertices(mesh.VertexArray, initialVertices, "Modal restore");
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(0, 0.4f, 0),
+                PivotType.ObjectCenter);
+            var confirmedVertices = mesh.VertexArray.ToArray();
+            AssertVector3(
+                confirmedVertices[0].Position3(),
+                new Vector3(1.0f, 0.4f, 0.2f),
+                "Reapplied modal preview");
+
+            context.Wrapper.ClearBackup();
+            context.Wrapper.ConfirmModalTransform(context.CommandExecutor);
+            Assert.That(context.Wrapper.HasBackup, Is.False);
+            context.CommandExecutor.Undo();
+            AssertVertices(mesh.VertexArray, initialVertices, "Modal confirm Undo");
+            context.CommandExecutor.Redo();
+            AssertVertices(mesh.VertexArray, confirmedVertices, "Modal confirm Redo");
         }
 
         [Test]
@@ -100,9 +264,10 @@ namespace Testing.GameWorld.Core.Commands
                     PivotType.ObjectCenter),
                 (initial, preview) =>
                 {
-                    Assert.That(
-                        Vector3.Distance(initial[0][0].Position3(), preview[0][0].Position3()),
-                        Is.GreaterThan(Epsilon));
+                    AssertVector3(
+                        preview[0][0].Position3(),
+                        new Vector3(1.15f, 0.01666667f, 0.165f),
+                        "Face object-pivot preview vertex");
                     AssertVertex(preview[0][3], initial[0][3], "Unselected face vertex");
                 });
         }
@@ -124,12 +289,13 @@ namespace Testing.GameWorld.Core.Commands
                 new[] { mesh },
                 () => context.Wrapper.GizmoRotateEvent(
                     Matrix.CreateFromAxisAngle(Vector3.UnitZ, 0.35f),
-                    PivotType.ObjectCenter),
+                    PivotType.WorldOrigin),
                 (initial, preview) =>
                 {
-                    Assert.That(
-                        Vector3.Distance(initial[0][1].Position3(), preview[0][1].Position3()),
-                        Is.GreaterThan(Epsilon));
+                    AssertVector3(
+                        preview[0][1].Position3(),
+                        new Vector3(-0.9154533f, 1.0497355f, -0.4f),
+                        "World-origin edge rotation preview");
                     AssertVertex(preview[0][0], initial[0][0], "Unselected edge vertex");
                 });
         }
@@ -155,10 +321,15 @@ namespace Testing.GameWorld.Core.Commands
                     PivotType.ObjectCenter),
                 (initial, preview) =>
                 {
-                    Assert.That(
-                        Vector3.Distance(initial[0][0].Position3(), preview[0][0].Position3()),
-                        Is.GreaterThan(Epsilon));
-                    Assert.That(preview[0][3], Is.EqualTo(initial[0][3]));
+                    AssertVector3(
+                        preview[0][0].Position3(),
+                        new Vector3(0.4f, -0.2f, 0.1f),
+                        "Full-weight falloff preview vertex");
+                    AssertVector3(
+                        preview[0][3].Position3(),
+                        new Vector3(1.7f, -0.1f, 0.05f),
+                        "Half-weight falloff preview vertex");
+                    Assert.That(preview[0][4], Is.EqualTo(initial[0][4]));
                 });
         }
 
@@ -349,9 +520,10 @@ namespace Testing.GameWorld.Core.Commands
                     CreateVertex(new Vector3(0, 0, 0)),
                     CreateVertex(new Vector3(1, 0, 0)),
                     CreateVertex(new Vector3(0, 1, 0)),
+                    CreateVertex(new Vector3(1.5f, 0, 0)),
                     CreateVertex(new Vector3(2, 0, 0), nonUnitBasis: true)
                 },
-                IndexArray = new ushort[] { 0, 1, 2, 1, 3, 2 }
+                IndexArray = new ushort[] { 0, 1, 2, 1, 4, 2 }
             };
             mesh.BuildBoundingBox();
             return mesh;
@@ -367,6 +539,15 @@ namespace Testing.GameWorld.Core.Commands
                 Tangent = Vector3.Normalize(new Vector3(1.0f, -0.2f, 0.1f)) * magnitude,
                 BiNormal = Vector3.Normalize(new Vector3(0.1f, 1.0f, -0.3f)) * magnitude
             };
+        }
+
+        static Vector3 ScaleBasisPreservingMagnitude(Vector3 basis, Vector3 scale)
+        {
+            var transformedDirection = new Vector3(
+                basis.X / scale.X,
+                basis.Y / scale.Y,
+                basis.Z / scale.Z);
+            return Vector3.Normalize(transformedDirection) * basis.Length();
         }
 
         static VertexPositionNormalTextureCustom[][] Snapshot(IReadOnlyList<MeshObject> meshes)
