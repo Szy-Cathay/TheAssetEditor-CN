@@ -94,7 +94,10 @@ namespace GameWorld.Core.Services
             _logger.Here().Information($"Redoing {command.GetType().Name}");
             try
             {
-                command.Execute();
+                if (command is IRedoableCommand redoable)
+                    redoable.Redo();
+                else
+                    command.Execute();
             }
             catch (Exception e)
             {
