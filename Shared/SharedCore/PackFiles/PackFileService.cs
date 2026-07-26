@@ -415,16 +415,14 @@ namespace Shared.Core.PackFiles
             {
                 foreach (var pf in _packFileContainers)
                 {
-                    var res = pf.FileList.FirstOrDefault(x => ReferenceEquals(x.Value, file) 
-                        || string.Equals(x.Value.Name, file.Name, StringComparison.OrdinalIgnoreCase)).Key;
+                    var res = pf.FileList.FirstOrDefault(x => ReferenceEquals(x.Value, file)).Key;
                     if (string.IsNullOrWhiteSpace(res) == false)
                         return res;
                 }
             }
             else
             {
-                var res = container.FileList.FirstOrDefault(x => ReferenceEquals(x.Value, file) 
-                    || string.Equals(x.Value.Name, file.Name, StringComparison.OrdinalIgnoreCase)).Key;
+                var res = container.FileList.FirstOrDefault(x => ReferenceEquals(x.Value, file)).Key;
                 if (string.IsNullOrWhiteSpace(res) == false)
                     return res;
             }
