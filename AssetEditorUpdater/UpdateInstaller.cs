@@ -89,6 +89,32 @@ internal static class UpdateInstaller
             GetBackupRootDirectory(updateDirectory));
     }
 
+    internal static UpdaterWorkspace ValidateDirectoryLayout(
+        string installationDirectory,
+        string updateDirectory,
+        bool isElevated,
+        string? localApplicationDataRoot = null,
+        string? commonApplicationDataRoot = null)
+    {
+        var workspace = UpdaterWorkspaceFactory.ValidateExisting(
+            isElevated,
+            updateDirectory,
+            localApplicationDataRoot,
+            commonApplicationDataRoot);
+        ValidateDirectoryLayout(
+            installationDirectory,
+            workspace.UpdateDirectory,
+            GetBackupRootDirectory(workspace.UpdateDirectory));
+
+        if (DirectoriesOverlap(installationDirectory, workspace.TransactionRoot))
+        {
+            throw new InvalidOperationException(
+                "The updater transaction root must not overlap the installation directory.");
+        }
+
+        return workspace;
+    }
+
     private static void ValidateDirectoryLayout(
         string installationDirectory,
         string updateDirectory,

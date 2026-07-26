@@ -1,11 +1,241 @@
 using System.Security.AccessControl;
 using System.Security.Principal;
 using AssetEditorUpdater;
+using UpdaterProgram = AssetEditorUpdater.AssetEditorUpdater;
 
 namespace AssetEditorUpdaterTests;
 
 public class UpdaterWorkspaceTests
 {
+    [Test]
+    public void ParseInvocation_ZeroArgumentsUsesCurrentUpdaterParentAsInstallationDirectory()
+    {
+        var currentDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "AssetEditor.CN",
+            "Updater",
+            string.Empty);
+
+        var invocation = UpdaterProgram.ParseInvocation(currentDirectory, []);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(invocation.IsInitialLaunch, Is.True);
+            Assert.That(
+                invocation.InstallationDirectory,
+                Is.EqualTo(Path.GetFullPath(Path.Combine(currentDirectory, ".."))));
+            Assert.That(invocation.UpdateDirectory, Is.Null);
+        });
+    }
+
+    [Test]
+    public void ParseInvocation_TwoArgumentsUsesInstallationThenUpdateDirectory()
+    {
+        var installationDirectory = Path.Combine(Path.GetTempPath(), "installation");
+        var updateDirectory = Path.Combine(Path.GetTempPath(), "transaction", "Update");
+
+        var invocation = UpdaterProgram.ParseInvocation(
+            Path.Combine(Path.GetTempPath(), "ignored"),
+            [installationDirectory, updateDirectory]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(invocation.IsInitialLaunch, Is.False);
+            Assert.That(invocation.InstallationDirectory, Is.EqualTo(installationDirectory));
+            Assert.That(invocation.UpdateDirectory, Is.EqualTo(updateDirectory));
+        });
+    }
+
+    [TestCase(1)]
+    [TestCase(3)]
+    public void ParseInvocation_AnyOtherArgumentCountIsRejected(int argumentCount)
+    {
+        var args = Enumerable.Range(0, argumentCount)
+            .Select(index => $"argument-{index}")
+            .ToArray();
+
+        Assert.Throws<ArgumentException>(() =>
+            UpdaterProgram.ParseInvocation(Path.GetTempPath(), args));
+    }
+
+    [Test]
+    public void CreateUpdaterProcessStartInfo_PassesInstallationAndUpdateDirectoriesInOrder()
+    {
+        var updateDirectory = Path.Combine(Path.GetTempPath(), "transaction", "Update");
+        var workingDirectory = Path.Combine(updateDirectory, ".");
+        var updaterPath = Path.Combine(updateDirectory, "AssetEditor.CN.Updater.exe");
+        var installationDirectory = Path.Combine(Path.GetTempPath(), "installation");
+
+        var startInfo = UpdaterProgram.CreateUpdaterProcessStartInfo(
+            updaterPath,
+            workingDirectory,
+            installationDirectory,
+            updateDirectory);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(startInfo.FileName, Is.EqualTo(updaterPath));
+            Assert.That(startInfo.WorkingDirectory, Is.EqualTo(workingDirectory));
+            Assert.That(startInfo.UseShellExecute, Is.False);
+            Assert.That(
+                startInfo.ArgumentList,
+                Is.EqualTo(new[] { installationDirectory, updateDirectory }));
+        });
+    }
+
+    [Test]
+    public void ValidateDirectoryLayout_NonElevatedAcceptsOnlyFixedLocalApplicationDataPath()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var installationDirectory = Directory.CreateDirectory(Path.Combine(root, "installation")).FullName;
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                localRoot,
+                commonRoot);
+            Directory.CreateDirectory(layout.UpdateDirectory);
+
+            Assert.DoesNotThrow(() =>
+                UpdateInstaller.ValidateDirectoryLayout(
+                    installationDirectory,
+                    layout.UpdateDirectory,
+                    false,
+                    localRoot,
+                    commonRoot));
+
+            var lookalikeUpdateDirectory = Directory.CreateDirectory(
+                Path.Combine(root, "lookalike", "AssetEditor.CN", "Temp", "Update")).FullName;
+            var sentinelPath = Path.Combine(lookalikeUpdateDirectory, "preserve.txt");
+            File.WriteAllText(sentinelPath, "preserve");
+
+            Assert.Throws<ArgumentException>(() =>
+                UpdateInstaller.ValidateDirectoryLayout(
+                    installationDirectory,
+                    lookalikeUpdateDirectory,
+                    false,
+                    localRoot,
+                    commonRoot));
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateDirectoryLayout_RejectsInstallationInsideFixedTransactionRoot()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                localRoot,
+                commonRoot);
+            Directory.CreateDirectory(layout.UpdateDirectory);
+            var installationDirectory = Directory.CreateDirectory(
+                Path.Combine(layout.TransactionRoot, "installation")).FullName;
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdateInstaller.ValidateDirectoryLayout(
+                    installationDirectory,
+                    layout.UpdateDirectory,
+                    false,
+                    localRoot,
+                    commonRoot));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateDirectoryLayout_ElevatedRejectsLocalAndLookalikeProtectedPaths()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var installationDirectory = Directory.CreateDirectory(Path.Combine(root, "installation")).FullName;
+            var localLayout = UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                localRoot,
+                commonRoot);
+            Directory.CreateDirectory(localLayout.UpdateDirectory);
+            var lookalikeUpdateDirectory = Directory.CreateDirectory(
+                Path.Combine(
+                    root,
+                    "lookalike",
+                    "AssetEditor.CN",
+                    "UpdaterTransactions",
+                    Guid.NewGuid().ToString("N"),
+                    "Update")).FullName;
+
+            Assert.Multiple(() =>
+            {
+                Assert.Throws<ArgumentException>(() =>
+                    UpdateInstaller.ValidateDirectoryLayout(
+                        installationDirectory,
+                        localLayout.UpdateDirectory,
+                        true,
+                        localRoot,
+                        commonRoot));
+                Assert.Throws<ArgumentException>(() =>
+                    UpdateInstaller.ValidateDirectoryLayout(
+                        installationDirectory,
+                        lookalikeUpdateDirectory,
+                        true,
+                        localRoot,
+                        commonRoot));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateDirectoryLayout_ElevatedRejectsOrdinaryAclInProtectedFamily()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var installationDirectory = Directory.CreateDirectory(Path.Combine(root, "installation")).FullName;
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                true,
+                Guid.NewGuid(),
+                localRoot,
+                commonRoot);
+            Directory.CreateDirectory(layout.UpdateDirectory);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdateInstaller.ValidateDirectoryLayout(
+                    installationDirectory,
+                    layout.UpdateDirectory,
+                    true,
+                    localRoot,
+                    commonRoot));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     [Test]
     public void GetLayout_SelectsLocalRootForNormalProcessAndCommonRootForElevatedProcess()
     {
@@ -234,6 +464,13 @@ public class UpdaterWorkspaceTests
             {
                 Assert.That(Directory.Exists(workspace.UpdateDirectory), Is.True);
                 Assert.That(workspace.IsProtected, Is.True);
+                Assert.DoesNotThrow(() =>
+                    UpdateInstaller.ValidateDirectoryLayout(
+                        Path.Combine(root, "installation"),
+                        workspace.UpdateDirectory,
+                        true,
+                        Path.Combine(root, "local"),
+                        commonRoot));
                 Assert.DoesNotThrow(() =>
                     UpdaterWorkspaceSecurity.ValidateProtectedDirectory(workspace.TransactionRoot));
                 Assert.DoesNotThrow(() =>

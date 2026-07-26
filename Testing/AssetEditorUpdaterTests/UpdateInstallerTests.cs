@@ -478,7 +478,10 @@ public class UpdateInstallerTests
 
             UpdaterProgram.CopyUpdaterPayload(
                 payloadDirectory,
-                updateDirectory,
+                new UpdaterWorkspace(
+                    Path.GetDirectoryName(updateDirectory)!,
+                    updateDirectory,
+                    false),
                 Path.GetDirectoryName(payloadDirectory)!);
 
             Assert.Multiple(() =>
@@ -509,7 +512,10 @@ public class UpdateInstallerTests
             Assert.Throws<InvalidOperationException>(() =>
                 UpdaterProgram.CopyUpdaterPayload(
                     payloadDirectory,
-                    installationDirectory,
+                    new UpdaterWorkspace(
+                        Path.GetDirectoryName(installationDirectory)!,
+                        installationDirectory,
+                        false),
                     installationDirectory));
 
             Assert.Multiple(() =>
@@ -518,6 +524,36 @@ public class UpdateInstallerTests
                 Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")), Is.EqualTo("old file"));
                 Assert.That(File.Exists(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe")), Is.True);
             });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void CopyUpdaterPayload_ProtectedWorkspaceRejectsNonEmptyUpdateWithoutDeletingIt()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var payloadDirectory = Directory.CreateDirectory(
+                Path.Combine(installationDirectory, "Updater")).FullName;
+            File.WriteAllText(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe"), "updater");
+            var transactionRoot = Directory.CreateDirectory(Path.Combine(root, "transaction")).FullName;
+            var updateDirectory = Directory.CreateDirectory(Path.Combine(transactionRoot, "Update")).FullName;
+            var sentinelPath = Path.Combine(updateDirectory, "preserve.txt");
+            File.WriteAllText(sentinelPath, "preserve");
+            var workspace = new UpdaterWorkspace(transactionRoot, updateDirectory, true);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdaterProgram.CopyUpdaterPayload(
+                    payloadDirectory,
+                    workspace,
+                    installationDirectory));
+
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
         }
         finally
         {

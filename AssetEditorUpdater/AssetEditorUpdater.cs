@@ -4,6 +4,11 @@ using FileMode = System.IO.FileMode;
 
 namespace AssetEditorUpdater
 {
+    internal sealed record UpdaterInvocation(
+        bool IsInitialLaunch,
+        string InstallationDirectory,
+        string? UpdateDirectory);
+
     public class AssetEditorUpdater
     {
         private const string GitHubOwner = "Szy-Cathay";
@@ -13,62 +18,131 @@ namespace AssetEditorUpdater
          
         public static async Task Main(string[] args)
         {
-            // The first time the updater is run it should be from the installation directory (with no args)
-            // so we use the app's base directory to get the installation directory. When we rerun the updater
-            // from the update directory we pass the installation directory as an arg and access it that way.
-
             var currentDirectory = AppContext.BaseDirectory;
-            var updateDirectory = GetUpdateDirectory();
-
-            var isInitialLaunch = args.Length == 0;
-            var installationDirectory = isInitialLaunch
-                ? Directory.GetParent(Path.TrimEndingDirectorySeparator(currentDirectory))?.FullName
-                    ?? throw new InvalidOperationException("Unable to determine the installation directory.")
-                : args[0];
+            var invocation = ParseInvocation(currentDirectory, args);
 
             Console.WriteLine($"国区版更新器运行目录：{currentDirectory}");
 
-            if (isInitialLaunch)
-                RelaunchFromUpdateDirectory(currentDirectory, updateDirectory, installationDirectory);
+            if (invocation.IsInitialLaunch)
+            {
+                var layout = UpdaterWorkspaceFactory.GetLayout(
+                    UpdaterWorkspaceFactory.IsProcessElevated(),
+                    Guid.NewGuid());
+                var workspace = UpdaterWorkspaceFactory.Create(layout);
+                RelaunchFromUpdateDirectory(
+                    currentDirectory,
+                    workspace,
+                    invocation.InstallationDirectory);
+            }
             else
-                await UpdateAsync(installationDirectory, updateDirectory);
+            {
+                var updateDirectory = invocation.UpdateDirectory!;
+                UpdateInstaller.ValidateDirectoryLayout(
+                    invocation.InstallationDirectory,
+                    updateDirectory,
+                    UpdaterWorkspaceFactory.IsProcessElevated());
+                await UpdateAsync(invocation.InstallationDirectory, updateDirectory);
+            }
         }
 
         private static void RelaunchFromUpdateDirectory(
             string updaterPayloadDirectory,
-            string updateDirectory,
+            UpdaterWorkspace workspace,
             string installationDirectory)
         {
-            Console.WriteLine($"正在将更新器复制到：{updateDirectory}");
+            Console.WriteLine($"正在将更新器复制到：{workspace.UpdateDirectory}");
 
-            CopyUpdaterPayload(updaterPayloadDirectory, updateDirectory, installationDirectory);
-            var newUpdaterPath = Path.Combine(updateDirectory, AssetEditorUpdaterExe);
+            UpdaterWorkspaceFactory.ValidateExisting(
+                workspace.IsProtected,
+                workspace.UpdateDirectory);
+            CopyUpdaterPayload(updaterPayloadDirectory, workspace, installationDirectory);
+            var newUpdaterPath = Path.Combine(workspace.UpdateDirectory, AssetEditorUpdaterExe);
 
-            LaunchUpdater(newUpdaterPath, updateDirectory, installationDirectory);
+            LaunchUpdater(
+                newUpdaterPath,
+                workspace.UpdateDirectory,
+                installationDirectory,
+                workspace.UpdateDirectory);
         }
 
         internal static void CopyUpdaterPayload(
             string updaterPayloadDirectory,
-            string updateDirectory,
+            UpdaterWorkspace workspace,
             string installationDirectory)
         {
+            ArgumentNullException.ThrowIfNull(workspace);
+
+            var updateDirectory = workspace.UpdateDirectory;
             UpdateInstaller.ValidateDirectoryLayout(installationDirectory, updateDirectory);
 
-            if (Directory.Exists(updateDirectory))
+            if (workspace.IsProtected)
+            {
+                if (!Directory.Exists(updateDirectory))
+                    throw new DirectoryNotFoundException($"Protected update directory not found: {updateDirectory}");
+
+                if (Directory.EnumerateFileSystemEntries(updateDirectory).Any())
+                {
+                    throw new InvalidOperationException(
+                        "A protected update directory must be empty before copying the updater payload.");
+                }
+            }
+            else if (Directory.Exists(updateDirectory))
+            {
                 Directory.Delete(updateDirectory, true);
+            }
 
             UpdateInstaller.CopyDirectory(updaterPayloadDirectory, updateDirectory);
         }
 
-        private static void LaunchUpdater(string updaterPath, string workingDirectory, string installationDirectory)
+        internal static UpdaterInvocation ParseInvocation(
+            string currentDirectory,
+            string[] args)
         {
-            var processStartInfo = new ProcessStartInfo
+            ArgumentException.ThrowIfNullOrWhiteSpace(currentDirectory);
+            ArgumentNullException.ThrowIfNull(args);
+
+            if (args.Length == 0)
+            {
+                var installationDirectory = Directory.GetParent(
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(currentDirectory)))?.FullName
+                    ?? throw new InvalidOperationException("Unable to determine the installation directory.");
+                return new UpdaterInvocation(true, installationDirectory, null);
+            }
+
+            if (args.Length == 2)
+                return new UpdaterInvocation(false, args[0], args[1]);
+
+            throw new ArgumentException(
+                "The updater accepts either zero arguments or exactly installation and update directories.",
+                nameof(args));
+        }
+
+        internal static ProcessStartInfo CreateUpdaterProcessStartInfo(
+            string updaterPath,
+            string workingDirectory,
+            string installationDirectory,
+            string updateDirectory)
+        {
+            return new ProcessStartInfo
             {
                 FileName = updaterPath,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
-                ArgumentList = { installationDirectory }
+                ArgumentList = { installationDirectory, updateDirectory }
             };
+        }
+
+        private static void LaunchUpdater(
+            string updaterPath,
+            string workingDirectory,
+            string installationDirectory,
+            string updateDirectory)
+        {
+            var processStartInfo = CreateUpdaterProcessStartInfo(
+                updaterPath,
+                workingDirectory,
+                installationDirectory,
+                updateDirectory);
             Process.Start(processStartInfo);
         }
 
