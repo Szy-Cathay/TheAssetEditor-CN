@@ -64,7 +64,7 @@ namespace GameWorld.Core.Commands.Vertex
 
         private void ApplyTransform(bool inverse)
         {
-            if (!VertexTransformOperationApplier.AreValid(
+            if (!VertexTransformOperationApplier.AreStructurallyValid(
                 _geometryList,
                 _oldSelectionState,
                 AffectedVertexIndices,
@@ -105,7 +105,9 @@ namespace GameWorld.Core.Commands.Vertex
                 FalloffWeights,
                 operation,
                 inverse,
-                out _);
+                out _,
+                // Preview already validated the coordinates at this operation's historical state.
+                validateScalePositionRoundTrip: false);
         }
 
         internal static void ReverseWindingOrder(MeshObject geometry)

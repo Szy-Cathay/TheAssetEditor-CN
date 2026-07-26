@@ -374,7 +374,8 @@ namespace GameWorld.Core.Components.Gizmo
                 falloffWeights,
                 operation,
                 inverse: false,
-                out var results))
+                out var results,
+                validateScalePositionRoundTrip: true))
             {
                 return false;
             }

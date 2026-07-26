@@ -27,8 +27,9 @@ namespace GameWorld.Core.Commands.Vertex
 
     internal static class VertexTransformOperationApplier
     {
-        internal const float MinimumReversibleScaleAxisMagnitude = 0.001f;
-        internal const float MaximumReversibleScaleConditionNumber = 1000.0f;
+        internal const float MinimumScaleAxisSafetyMagnitude = 0.001f;
+        internal const float MaximumScaleAxisSafetyConditionNumber = 1000.0f;
+        internal const float MaximumScalePositionRoundTripError = 0.00001f;
 
         public static bool TryApply(
             IReadOnlyList<MeshObject> geometryList,
@@ -37,9 +38,23 @@ namespace GameWorld.Core.Commands.Vertex
             IReadOnlyDictionary<int, float>? falloffWeights,
             VertexTransformOperation operation,
             bool inverse,
-            out IReadOnlyList<VertexTransformMeshResult> results)
+            out IReadOnlyList<VertexTransformMeshResult> results,
+            bool validateScalePositionRoundTrip)
         {
-            if (!IsValid(geometryList, selectionState, affectedVertexIndices, falloffWeights, operation))
+            if (!IsStructurallyValid(
+                    geometryList,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    operation) ||
+                (validateScalePositionRoundTrip &&
+                 operation.Mode == VertexTransformOperationMode.Scale &&
+                 !AreAffectedScalePositionsReversible(
+                     geometryList,
+                     selectionState,
+                     affectedVertexIndices,
+                     falloffWeights,
+                     operation)))
             {
                 results = Array.Empty<VertexTransformMeshResult>();
                 return false;
@@ -69,7 +84,7 @@ namespace GameWorld.Core.Commands.Vertex
             return true;
         }
 
-        public static bool AreValid(
+        public static bool AreStructurallyValid(
             IReadOnlyList<MeshObject> geometryList,
             ISelectionState selectionState,
             HashSet<int>? affectedVertexIndices,
@@ -78,7 +93,7 @@ namespace GameWorld.Core.Commands.Vertex
         {
             foreach (var operation in operations)
             {
-                if (!IsValid(
+                if (!IsStructurallyValid(
                     geometryList,
                     selectionState,
                     affectedVertexIndices,
@@ -92,7 +107,7 @@ namespace GameWorld.Core.Commands.Vertex
             return true;
         }
 
-        static bool IsValid(
+        static bool IsStructurallyValid(
             IReadOnlyList<MeshObject> geometryList,
             ISelectionState selectionState,
             HashSet<int>? affectedVertexIndices,
@@ -102,7 +117,7 @@ namespace GameWorld.Core.Commands.Vertex
             if (!Enum.IsDefined(operation.Mode) ||
                 !IsFinite(operation.PivotPoint) ||
                 (operation.Mode == VertexTransformOperationMode.Scale &&
-                 !IsNumericallyReversibleScale(operation.Transform)) ||
+                 !PassesScaleAxisSafetyGuards(operation.Transform)) ||
                 !IsInvertible(operation.Transform) ||
                 !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, false, out _) ||
                 !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, true, out _))
@@ -171,6 +186,115 @@ namespace GameWorld.Core.Commands.Vertex
             return true;
         }
 
+        static bool AreAffectedScalePositionsReversible(
+            IReadOnlyList<MeshObject> geometryList,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformOperation operation)
+        {
+            // This second, read-only affected-vertex pass keeps rejection atomic.
+            foreach (var geometry in geometryList)
+            {
+                if (selectionState.Mode == GeometrySelectionMode.Vertex)
+                {
+                    var vertexSelectionState = (VertexSelectionState)selectionState;
+                    for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
+                    {
+                        var weight = vertexSelectionState.VertexWeights[vertexIndex];
+                        if (weight == 0)
+                            continue;
+
+                        if (!IsScalePositionReversible(
+                            geometry.VertexArray[vertexIndex].Position,
+                            CreateWeightedTransform(operation, weight),
+                            operation.PivotPoint))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (affectedVertexIndices != null &&
+                         falloffWeights != null &&
+                         falloffWeights.Count > 0)
+                {
+                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                    {
+                        if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
+                            continue;
+
+                        if (!IsScalePositionReversible(
+                            geometry.VertexArray[vertexIndex].Position,
+                            CreateWeightedTransform(operation, weight),
+                            operation.PivotPoint))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (affectedVertexIndices != null)
+                {
+                    foreach (var vertexIndex in affectedVertexIndices)
+                    {
+                        if (!IsScalePositionReversible(
+                            geometry.VertexArray[vertexIndex].Position,
+                            operation.Transform,
+                            operation.PivotPoint))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                    {
+                        if (!IsScalePositionReversible(
+                            geometry.VertexArray[vertexIndex].Position,
+                            operation.Transform,
+                            operation.PivotPoint))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        static bool IsScalePositionReversible(
+            Vector4 position,
+            Matrix transform,
+            Vector3 pivotPoint)
+        {
+            if (!TryCreateReplayMatrix(transform, pivotPoint, inverse: false, out var forward) ||
+                !TryCreateReplayMatrix(transform, pivotPoint, inverse: true, out var reverse) ||
+                !TryTransformPosition(position, forward, out var transformed) ||
+                !TryTransformPosition(transformed, reverse, out var roundTrip))
+            {
+                return false;
+            }
+
+            return
+                MathF.Abs(roundTrip.X - position.X) <= MaximumScalePositionRoundTripError &&
+                MathF.Abs(roundTrip.Y - position.Y) <= MaximumScalePositionRoundTripError &&
+                MathF.Abs(roundTrip.Z - position.Z) <= MaximumScalePositionRoundTripError;
+        }
+
+        static bool TryTransformPosition(
+            Vector4 position,
+            Matrix transform,
+            out Vector4 transformed)
+        {
+            transformed = Vector4.Transform(position, transform);
+            transformed.X /= transformed.W;
+            transformed.Y /= transformed.W;
+            transformed.Z /= transformed.W;
+            transformed.W = 1;
+            return IsFinite(transformed);
+        }
+
         static bool IsValidWeightedTransform(
             float weight,
             VertexTransformOperation operation,
@@ -183,7 +307,7 @@ namespace GameWorld.Core.Commands.Vertex
 
             return TryCreateWeightedTransform(operation, weight, out var weightedTransform) &&
                    (operation.Mode != VertexTransformOperationMode.Scale ||
-                    IsNumericallyReversibleScale(weightedTransform)) &&
+                    PassesScaleAxisSafetyGuards(weightedTransform)) &&
                    IsInvertible(weightedTransform) &&
                    TryCreateReplayMatrix(weightedTransform, pivotPoint, false, out _) &&
                    TryCreateReplayMatrix(weightedTransform, pivotPoint, true, out _);
@@ -383,7 +507,7 @@ namespace GameWorld.Core.Commands.Vertex
             return IsFinite(Matrix.Invert(transform));
         }
 
-        static bool IsNumericallyReversibleScale(Matrix transform)
+        static bool PassesScaleAxisSafetyGuards(Matrix transform)
         {
             var x = MathF.Abs(transform.M11);
             var y = MathF.Abs(transform.M22);
@@ -391,10 +515,10 @@ namespace GameWorld.Core.Commands.Vertex
             var minimum = MathF.Min(x, MathF.Min(y, z));
             var maximum = MathF.Max(x, MathF.Max(y, z));
 
-            // Cap per-axis inverse amplification and normal-matrix anisotropy at 1,000x,
-            // leaving margin for pivoted single-precision round trips.
-            return minimum >= MinimumReversibleScaleAxisMagnitude &&
-                   maximum / minimum <= MaximumReversibleScaleConditionNumber;
+            // Cheap early rejection before the coordinate-aware pass; this is not
+            // sufficient to establish reversibility by itself.
+            return minimum >= MinimumScaleAxisSafetyMagnitude &&
+                   maximum / minimum <= MaximumScaleAxisSafetyConditionNumber;
         }
 
         static void IncludeVertex(
@@ -433,6 +557,15 @@ namespace GameWorld.Core.Commands.Vertex
                 float.IsFinite(value.X) &&
                 float.IsFinite(value.Y) &&
                 float.IsFinite(value.Z);
+        }
+
+        static bool IsFinite(Vector4 value)
+        {
+            return
+                float.IsFinite(value.X) &&
+                float.IsFinite(value.Y) &&
+                float.IsFinite(value.Z) &&
+                float.IsFinite(value.W);
         }
 
         static bool IsFinite(Quaternion value)

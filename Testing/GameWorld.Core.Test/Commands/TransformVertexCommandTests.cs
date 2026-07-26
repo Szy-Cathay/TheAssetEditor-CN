@@ -116,9 +116,46 @@ namespace Testing.GameWorld.Core.Commands
         }
 
         [Test]
-        public void ObjectScale_AboveReversibilityThreshold_IsAcceptedAndRoundTrips()
+        public void ObjectScale_PivotTenAcrossMeshes_IsRejectedAcrossCommitUndoAndRedo()
         {
-            var mesh = CreateMesh();
+            var stableMesh = CreatePivotTenMesh(collapsedX: true);
+            var unstableMesh = CreatePivotTenMesh(collapsedX: false);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, stableMesh, unstableMesh);
+            var initialVertices = Snapshot(new[] { stableMesh, unstableMesh });
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-0.9989f, 0, 0),
+                PivotType.ObjectCenter);
+            var previewVertices = Snapshot(new[] { stableMesh, unstableMesh });
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = Snapshot(new[] { stableMesh, unstableMesh });
+            context.CommandExecutor.Redo();
+            var redoVertices = Snapshot(new[] { stableMesh, unstableMesh });
+
+            for (var meshIndex = 0; meshIndex < initialVertices.Length; meshIndex++)
+            {
+                AssertVertices(
+                    previewVertices[meshIndex],
+                    initialVertices[meshIndex],
+                    $"Pivot-ten rejected scale preview mesh {meshIndex}");
+                AssertVertices(
+                    undoVertices[meshIndex],
+                    initialVertices[meshIndex],
+                    $"Pivot-ten rejected scale Undo mesh {meshIndex}");
+                AssertVertices(
+                    redoVertices[meshIndex],
+                    initialVertices[meshIndex],
+                    $"Pivot-ten rejected scale Redo mesh {meshIndex}");
+            }
+        }
+
+        [Test]
+        public void ObjectScale_PivotTenCommonFactor_IsAcceptedAndRoundTrips()
+        {
+            var mesh = CreatePivotTenMesh(collapsedX: false);
             var selection = new ObjectSelectionState();
             var context = CreateTransformContext(selection, mesh);
 
@@ -126,12 +163,104 @@ namespace Testing.GameWorld.Core.Commands
                 context,
                 new[] { mesh },
                 () => context.Wrapper.GizmoScaleEvent(
-                    new Vector3(-0.9989f, 0, 0),
+                    new Vector3(-0.5f, 0, 0),
                     PivotType.ObjectCenter),
                 (_, preview) => AssertVector3(
-                    preview[0][2].Position3(),
-                    new Vector3(0.44978f, -0.8f, 1.5f),
-                    "Accepted small-scale preview"));
+                    preview[0][0].Position3(),
+                    new Vector3(10.5f, 0, 0),
+                    "Pivot-ten common scale preview"));
+        }
+
+        [Test]
+        public void MixedValidThenCoordinateInvalidScale_StoresOnlyValidOperation()
+        {
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(0.1f, 0, 0),
+                PivotType.ObjectCenter);
+            var validPreview = mesh.VertexArray.ToArray();
+            AssertVector3(
+                validPreview[0].Position3(),
+                new Vector3(11.1f, 0, 0),
+                "Valid preview before rejected delta");
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-0.9989f, 0, 0),
+                PivotType.ObjectCenter);
+            AssertVertices(mesh.VertexArray, validPreview, "Rejected delta after valid preview");
+            Assert.That(context.Wrapper.Scale, Is.EqualTo(new Vector3(1.1f, 1, 1)));
+            context.Wrapper.Stop(context.CommandExecutor);
+
+            context.CommandExecutor.Undo();
+            AssertVertices(mesh.VertexArray, initialVertices, "Mixed valid-invalid Undo");
+            context.CommandExecutor.Redo();
+            AssertVertices(mesh.VertexArray, validPreview, "Mixed valid-invalid Redo");
+        }
+
+        [Test]
+        public void VertexScaleCoordinatePreflight_RejectsAffectedPositions()
+        {
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            var selection = new VertexSelectionState(selectable, 0)
+            {
+                SelectedVertices = new List<int> { 0, 1 },
+                VertexWeights = new List<float> { 1.0f, 1.0f, 0.0f, 0.0f }
+            };
+            var context = CreateTransformContext(selection, mesh);
+
+            AssertRejectedScaleRoundTrip(context, new[] { mesh }, "Vertex coordinate preflight");
+        }
+
+        [Test]
+        public void FaceScaleCoordinatePreflight_RejectsAffectedPositions()
+        {
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            var selection = new FaceSelectionState
+            {
+                RenderObject = selectable,
+                SelectedFaces = new List<int> { 0 }
+            };
+            var context = CreateTransformContext(selection, mesh);
+
+            AssertRejectedScaleRoundTrip(context, new[] { mesh }, "Face coordinate preflight");
+        }
+
+        [Test]
+        public void EdgeScaleCoordinatePreflight_RejectsAffectedPositions()
+        {
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            var selection = new EdgeSelectionState
+            {
+                RenderObject = selectable,
+                SelectedEdges = new HashSet<(int, int)> { (0, 1) }
+            };
+            var context = CreateTransformContext(selection, mesh);
+
+            AssertRejectedScaleRoundTrip(context, new[] { mesh }, "Edge coordinate preflight");
+        }
+
+        [Test]
+        public void FaceFalloffScaleCoordinatePreflight_RejectsWeightedPositions()
+        {
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            var selection = new FaceSelectionState
+            {
+                RenderObject = selectable,
+                SelectedFaces = new List<int> { 0 }
+            };
+            var context = CreateTransformContext(selection, mesh);
+            context.Wrapper.SetFalloffDistance(2.0f);
+
+            AssertRejectedScaleRoundTrip(context, new[] { mesh }, "Falloff coordinate preflight");
         }
 
         [Test]
@@ -468,6 +597,40 @@ namespace Testing.GameWorld.Core.Commands
                 AssertVertices(meshes[meshIndex].VertexArray, previewVertices[meshIndex], $"Redo mesh {meshIndex}");
         }
 
+        static void AssertRejectedScaleRoundTrip(
+            TransformContext context,
+            IReadOnlyList<MeshObject> meshes,
+            string message)
+        {
+            var initialVertices = Snapshot(meshes);
+            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-0.9989f, 0, 0),
+                PivotType.ObjectCenter);
+            var previewVertices = Snapshot(meshes);
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = Snapshot(meshes);
+            context.CommandExecutor.Redo();
+            var redoVertices = Snapshot(meshes);
+
+            for (var meshIndex = 0; meshIndex < meshes.Count; meshIndex++)
+            {
+                AssertVertices(
+                    previewVertices[meshIndex],
+                    initialVertices[meshIndex],
+                    $"{message} preview mesh {meshIndex}");
+                AssertVertices(
+                    undoVertices[meshIndex],
+                    initialVertices[meshIndex],
+                    $"{message} Undo mesh {meshIndex}");
+                AssertVertices(
+                    redoVertices[meshIndex],
+                    initialVertices[meshIndex],
+                    $"{message} Redo mesh {meshIndex}");
+            }
+        }
+
         static TransformContext CreateTransformContext(ISelectionState selection, params MeshObject[] meshes)
         {
             var (selectionManager, commandExecutor) = CreateCommandContext(selection);
@@ -524,6 +687,26 @@ namespace Testing.GameWorld.Core.Commands
                     CreateVertex(new Vector3(2, 0, 0), nonUnitBasis: true)
                 },
                 IndexArray = new ushort[] { 0, 1, 2, 1, 4, 2 }
+            };
+            mesh.BuildBoundingBox();
+            return mesh;
+        }
+
+        static MeshObject CreatePivotTenMesh(bool collapsedX)
+        {
+            var xCoordinates = collapsedX
+                ? new[] { 10.0f, 10.0f, 10.0f, 10.0f }
+                : new[] { 11.0f, 9.0f, 10.0f, 10.5f };
+            var mesh = new MeshObject(new TestGraphicsCardGeometry(), string.Empty)
+            {
+                VertexArray = new[]
+                {
+                    CreateVertex(new Vector3(xCoordinates[0], 0, 0)),
+                    CreateVertex(new Vector3(xCoordinates[1], 1, 0)),
+                    CreateVertex(new Vector3(xCoordinates[2], -1, 1)),
+                    CreateVertex(new Vector3(xCoordinates[3], 0, -1))
+                },
+                IndexArray = new ushort[] { 0, 1, 2, 0, 2, 3 }
             };
             mesh.BuildBoundingBox();
             return mesh;
