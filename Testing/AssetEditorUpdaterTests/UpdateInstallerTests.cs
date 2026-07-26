@@ -358,18 +358,22 @@ public class UpdateInstallerTests
     }
 
     [Test]
-    public void UpdateDirectories_UseLocalApplicationDataAndMatchMainApplication()
+    public void UpdateDirectories_NonElevatedLayoutMatchesMainApplication()
     {
         var tempRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "AssetEditor.CN",
             "Temp");
+        var layout = UpdaterWorkspaceFactory.GetLayout(false, Guid.Empty);
 
         Assert.Multiple(() =>
         {
-            Assert.That(UpdaterProgram.GetUpdateDirectory(), Is.EqualTo(Path.Combine(tempRoot, "Update")));
+            Assert.That(layout.TransactionRoot, Is.EqualTo(tempRoot));
+            Assert.That(layout.UpdateDirectory, Is.EqualTo(Path.Combine(tempRoot, "Update")));
+            Assert.That(layout.IsProtected, Is.False);
+            Assert.That(UpdaterProgram.GetUpdateDirectory(), Is.EqualTo(layout.UpdateDirectory));
             Assert.That(UpdaterProgram.GetUpdateBackupRootDirectory(), Is.EqualTo(Path.Combine(tempRoot, "UpdateBackups")));
-            Assert.That(UpdaterProgram.GetUpdateDirectory(), Is.EqualTo(DirectoryHelper.UpdateDirectory));
+            Assert.That(layout.UpdateDirectory, Is.EqualTo(DirectoryHelper.UpdateDirectory));
             Assert.That(UpdaterProgram.GetUpdateBackupRootDirectory(), Is.EqualTo(DirectoryHelper.UpdateBackupRootDirectory));
         });
     }
