@@ -76,9 +76,9 @@ namespace GameWorld.Core.Commands.Vertex
                 return;
             }
 
-            var reverseWinding = InvertWindingOrder &&
-                                 _oldSelectionState.Mode != GeometrySelectionMode.Vertex &&
-                                 AffectedVertexIndices == null;
+            var reverseWinding =
+                InvertWindingOrder &&
+                _oldSelectionState is ObjectSelectionState;
             foreach (var geometry in _geometryList)
             {
                 if (reverseWinding)

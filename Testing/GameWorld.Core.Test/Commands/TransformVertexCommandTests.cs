@@ -82,6 +82,167 @@ namespace Testing.GameWorld.Core.Commands
                     "Negative nonuniform object-pivot preview"));
         }
 
+        [TestCase(GeometrySelectionMode.Vertex)]
+        [TestCase(GeometrySelectionMode.Face)]
+        [TestCase(GeometrySelectionMode.Edge)]
+        public void EditModeOneNegativeAxisScale_NeverChangesIndices(
+            GeometrySelectionMode selectionMode)
+        {
+            var mesh = CreateMesh();
+            var selection = CreateEditSelection(selectionMode, mesh);
+            var context = CreateTransformContext(selection, mesh);
+            var initialIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, 0, 0),
+                PivotType.ObjectCenter);
+            var previewIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoIndices = mesh.IndexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoIndices = mesh.IndexArray.ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(previewIndices, Is.EqualTo(initialIndices));
+                Assert.That(undoIndices, Is.EqualTo(initialIndices));
+                Assert.That(redoIndices, Is.EqualTo(initialIndices));
+            });
+        }
+
+        [Test]
+        public void ObjectOneNegativeAxisScale_ReversesPreviewAndRoundTripsIndices()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialIndices = mesh.IndexArray.ToArray();
+            var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, 0, 0),
+                PivotType.ObjectCenter);
+            var previewIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoIndices = mesh.IndexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoIndices = mesh.IndexArray.ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(previewIndices, Is.EqualTo(reversedIndices));
+                Assert.That(undoIndices, Is.EqualTo(initialIndices));
+                Assert.That(redoIndices, Is.EqualTo(reversedIndices));
+            });
+        }
+
+        [Test]
+        public void ObjectTwoNegativeAxisScale_NeverChangesIndices()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, -2.2f, 0),
+                PivotType.ObjectCenter);
+            var previewIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoIndices = mesh.IndexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoIndices = mesh.IndexArray.ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(previewIndices, Is.EqualTo(initialIndices));
+                Assert.That(undoIndices, Is.EqualTo(initialIndices));
+                Assert.That(redoIndices, Is.EqualTo(initialIndices));
+            });
+        }
+
+        [Test]
+        public void ObjectScale_CrossingDeterminantSignTwice_ReversesWindingExactlyTwice()
+        {
+            var mesh = CreateMesh(out var graphicsContext);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialIndices = mesh.IndexArray.ToArray();
+            var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
+            context.Wrapper.Start(context.CommandExecutor);
+            graphicsContext.ResetRebuildCounts();
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, 0, 0),
+                PivotType.ObjectCenter);
+            var firstPreviewIndices = mesh.IndexArray.ToArray();
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, 0, 0),
+                PivotType.ObjectCenter);
+            var secondPreviewIndices = mesh.IndexArray.ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(firstPreviewIndices, Is.EqualTo(reversedIndices));
+                Assert.That(secondPreviewIndices, Is.EqualTo(initialIndices));
+                Assert.That(graphicsContext.IndexBufferRebuildCount, Is.EqualTo(2));
+            });
+        }
+
+        [Test]
+        public void ObjectEmptySecondGesture_DoesNotInheritPriorWindingParity()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
+            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, 0, 0),
+                PivotType.ObjectCenter);
+            context.Wrapper.Stop(context.CommandExecutor);
+
+            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.Stop(context.CommandExecutor);
+            var secondPreviewIndices = mesh.IndexArray.ToArray();
+            context.CommandExecutor.Undo();
+            var secondUndoIndices = mesh.IndexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var secondRedoIndices = mesh.IndexArray.ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(secondPreviewIndices, Is.EqualTo(reversedIndices));
+                Assert.That(secondUndoIndices, Is.EqualTo(reversedIndices));
+                Assert.That(secondRedoIndices, Is.EqualTo(reversedIndices));
+            });
+        }
+
+        [Test]
+        public void ObjectStartingNextGesture_DoesNotInheritPriorWindingParity()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var reversedIndices = new ushort[] { 2, 1, 0, 3, 2, 0 };
+            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-2.2f, 0, 0),
+                PivotType.ObjectCenter);
+
+            context.Wrapper.Start(context.CommandExecutor);
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+
+            Assert.That(mesh.IndexArray, Is.EqualTo(reversedIndices));
+        }
+
         [Test]
         public void ObjectNearSingularScale_IsRejectedAcrossCommitUndoAndRedo()
         {
@@ -942,6 +1103,32 @@ namespace Testing.GameWorld.Core.Commands
             var commandFactory = new CommandFactory(serviceProvider.Object, commandExecutor);
             var wrapper = new TransformGizmoWrapper(commandFactory, meshes.ToList(), selection);
             return new TransformContext(commandExecutor, wrapper);
+        }
+
+        static ISelectionState CreateEditSelection(
+            GeometrySelectionMode selectionMode,
+            MeshObject mesh)
+        {
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            return selectionMode switch
+            {
+                GeometrySelectionMode.Vertex => new VertexSelectionState(selectable, 0)
+                {
+                    SelectedVertices = new List<int> { 0 },
+                    VertexWeights = new List<float> { 1, 0, 0, 0 }
+                },
+                GeometrySelectionMode.Face => new FaceSelectionState
+                {
+                    RenderObject = selectable,
+                    SelectedFaces = new List<int> { 0 }
+                },
+                GeometrySelectionMode.Edge => new EdgeSelectionState
+                {
+                    RenderObject = selectable,
+                    SelectedEdges = new HashSet<(int, int)> { (0, 1) }
+                },
+                _ => throw new ArgumentOutOfRangeException(nameof(selectionMode))
+            };
         }
 
         static (SelectionManager SelectionManager, CommandExecutor CommandExecutor) CreateCommandContext(ISelectionState selection)

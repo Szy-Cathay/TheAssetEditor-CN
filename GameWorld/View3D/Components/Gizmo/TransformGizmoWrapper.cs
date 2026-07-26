@@ -182,6 +182,7 @@ namespace GameWorld.Core.Components.Gizmo
                 _activeCommand = null;
             }
 
+            _invertedWindingOrder = false;
             if (_selectionState is BoneSelectionState)
             {
                 _totalGizomTransform = Matrix.Identity;
@@ -208,6 +209,7 @@ namespace GameWorld.Core.Components.Gizmo
                 _activeCommand = null;
                 ClearBackup();
                 _vertexTransformReplayPlan = null;
+                _invertedWindingOrder = false;
                 return;
             }
 
@@ -311,7 +313,6 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void GizmoScaleEvent(Vector3 scale, PivotType pivot)
         {
-            var realScale = scale + Vector3.One;
             var scaleMatrix = Matrix.CreateScale(scale + Vector3.One);
             if (!ApplyTransform(scaleMatrix, pivot, GizmoMode.UniformScale))
                 return;
@@ -319,33 +320,6 @@ namespace GameWorld.Core.Components.Gizmo
             Scale += scale;
 
             _totalGizomTransform *= scaleMatrix;
-
-            if (_selectionState is BoneSelectionState &&
-                CountNegativeAxis(realScale) % 2 != 0)
-            {
-                _invertedWindingOrder = !_invertedWindingOrder;
-
-                foreach (var geo in _effectedObjects)
-                {
-                    var indexes = geo.GetIndexBuffer();
-                    for (var i = 0; i < indexes.Count; i += 3)
-                    {
-                        var temp = indexes[i + 2];
-                        indexes[i + 2] = indexes[i + 0];
-                        indexes[i + 0] = temp;
-                    }
-                    geo.SetIndexBuffer(indexes);
-                }
-            }
-        }
-
-        int CountNegativeAxis(Vector3 vector)
-        {
-            var result = 0;
-            if (vector.X < 0) result++;
-            if (vector.Y < 0) result++;
-            if (vector.Z < 0) result++;
-            return result;
         }
 
         bool ApplyTransform(Matrix transform, PivotType pivotType, GizmoMode gizmoMode)
@@ -408,15 +382,20 @@ namespace GameWorld.Core.Components.Gizmo
                 falloffWeights,
                 candidatePlan,
                 inverse: false);
-            var candidateInvertedWindingOrder =
+            var isObjectSelection = _selectionState is ObjectSelectionState;
+            var wasInverted =
+                isObjectSelection &&
+                _vertexTransformReplayPlan.RawMatrices.Forward.Determinant() < 0;
+            var isInverted =
+                isObjectSelection &&
                 candidatePlan.RawMatrices.Forward.Determinant() < 0;
-            if (candidateInvertedWindingOrder != _invertedWindingOrder)
+            if (wasInverted != isInverted)
             {
                 foreach (var geometry in _effectedObjects)
                     TransformVertexCommand.ReverseWindingOrder(geometry);
             }
 
-            _invertedWindingOrder = candidateInvertedWindingOrder;
+            _invertedWindingOrder = isInverted;
             _vertexTransformReplayPlan = candidatePlan;
             foreach (var result in results)
             {
