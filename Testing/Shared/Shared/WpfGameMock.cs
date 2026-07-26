@@ -22,9 +22,8 @@ namespace Test.TestingUtility.Shared
                 var mock = new GraphicsDeviceServiceMock();
                 var services = new GameServiceContainer();
                 services.AddService<IGraphicsDeviceService>(mock);
-                var fullPath = PathHelper.GetDataFolder("GameWorld\\ContentProject\\bin\\Debug\\net10.0-windows\\Content");
-
-                //var fullPath = Path.GetFullPath(@"..\..\..\..\..\GameWorld\ContentProject\bin\Debug\net10.0-windows\Content");
+                var contentPath = PathHelper.GetProjectOutputPath("GameWorld\\ContentProject", "Content");
+                var fullPath = PathHelper.GetDataFolder(contentPath);
                 if (Directory.Exists(fullPath) == false)
                 {
                     throw new Exception("Unable to determine full path of content folder");

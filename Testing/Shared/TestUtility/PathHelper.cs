@@ -32,6 +32,20 @@ namespace Test.TestingUtility.TestUtility
             return fullPath;
         }
 
+        public static string GetProjectOutputPath(string projectDirectory, string outputFolder, string? testDirectory = null)
+        {
+            var targetFrameworkDirectory = new DirectoryInfo(testDirectory ?? TestContext.CurrentContext.TestDirectory);
+            var configurationDirectory = targetFrameworkDirectory.Parent
+                ?? throw new DirectoryNotFoundException($"Unable to determine build configuration from {targetFrameworkDirectory.FullName}.");
+
+            return Path.Combine(
+                projectDirectory,
+                "bin",
+                configurationDirectory.Name,
+                targetFrameworkDirectory.Name,
+                outputFolder);
+        }
+
         public static string GetDataFile(string fileName, string subDir = "Data")
         {
             var fullPath = Path.Combine(FindRepositoryRoot(), subDir, fileName);
