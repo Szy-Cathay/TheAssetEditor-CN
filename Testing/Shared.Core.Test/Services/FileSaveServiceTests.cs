@@ -154,6 +154,84 @@ namespace Test.Shared.Core.Services
             _uiProvider.Verify(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()), Times.Once);
         }
 
-        // SaveAs
+        [Test]
+        public void SaveAs_ConfirmedNewPath_CreatesAndReturnsFile()
+        {
+            var saveService = new FileSaveService(_pfs, _uiProvider.Object);
+            _uiProvider
+                .Setup(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()))
+                .Returns(new SaveDialogResult(true, null, "folder\\save-as\\Created.test"));
+
+            var result = saveService.SaveAs(".test", [3]);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.DataSource.ReadData(), Is.EqualTo(new byte[] { 3 }));
+            Assert.That(_pfs.FindFile("folder\\save-as\\Created.test"), Is.SameAs(result));
+            Assert.That(_container.FileList.Count, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void SaveAs_ConfirmedExistingPath_OverwritesAndReturnsFile()
+        {
+            var saveService = new FileSaveService(_pfs, _uiProvider.Object);
+            _uiProvider
+                .Setup(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()))
+                .Returns(new SaveDialogResult(true, null, "folder\\subfolder\\File1.test"));
+
+            var result = saveService.SaveAs(".test", [3]);
+
+            Assert.That(result, Is.SameAs(_fileHandle));
+            Assert.That(result!.DataSource.ReadData(), Is.EqualTo(new byte[] { 3 }));
+            Assert.That(_container.FileList.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void SaveAs_Cancelled_DoesNotMutatePackAndReturnsNull()
+        {
+            var saveService = new FileSaveService(_pfs, _uiProvider.Object);
+            _uiProvider
+                .Setup(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()))
+                .Returns(new SaveDialogResult(false, null, null));
+
+            var result = saveService.SaveAs(".test", [3]);
+
+            Assert.That(result, Is.Null);
+            Assert.That(_container.FileList.Count, Is.EqualTo(2));
+            Assert.That(_fileHandle.DataSource.ReadData(), Is.EqualTo(new byte[] { 1 }));
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("   ")]
+        [TestCase("folder\\")]
+        public void SaveAs_ConfirmedInvalidPath_DoesNotMutatePackAndReturnsNull(string? selectedFilePath)
+        {
+            var saveService = new FileSaveService(_pfs, _uiProvider.Object);
+            _uiProvider
+                .Setup(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()))
+                .Returns(new SaveDialogResult(true, null, selectedFilePath));
+
+            var result = saveService.SaveAs(".test", [3]);
+
+            Assert.That(result, Is.Null);
+            Assert.That(_container.FileList.Count, Is.EqualTo(2));
+            Assert.That(_fileHandle.DataSource.ReadData(), Is.EqualTo(new byte[] { 1 }));
+        }
+
+        [Test]
+        public void SaveAs_ConfirmedRootFileName_CreatesAndReturnsFile()
+        {
+            var saveService = new FileSaveService(_pfs, _uiProvider.Object);
+            _uiProvider
+                .Setup(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()))
+                .Returns(new SaveDialogResult(true, null, "Root.test"));
+
+            var result = saveService.SaveAs(".test", [3]);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.DataSource.ReadData(), Is.EqualTo(new byte[] { 3 }));
+            Assert.That(_pfs.FindFile("Root.test"), Is.SameAs(result));
+            Assert.That(_container.FileList.Count, Is.EqualTo(3));
+        }
     }
 }

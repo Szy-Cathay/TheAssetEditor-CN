@@ -53,6 +53,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
         public CommandExecutor CommandExecutor { get => _commandExecutor; private set { _commandExecutor = value; } }
         private CommandExecutor _commandExecutor;
         private readonly IFileSaveService _packFileSaveService;
+        private readonly IStandardDialogs _standardDialogs;
         private SceneObject _newAnimation;
 
         public SceneObject Mount { get => _mount; private set { _mount = value; } }
@@ -169,7 +170,8 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             SelectionManager selectionManager,
             GizmoComponent gizmoComponent,
             CommandExecutor commandExecutor,
-            IFileSaveService packFileSaveService)
+            IFileSaveService packFileSaveService,
+            IStandardDialogs standardDialogs)
         {
             _sceneObjectViewModelBuilder = sceneObjectViewModelBuilder;
             _animationPlayerViewModel = animationPlayerViewModel;
@@ -185,6 +187,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             _gizmoComponent = gizmoComponent;
             _commandExecutor = commandExecutor;
             _packFileSaveService = packFileSaveService;
+            _standardDialogs = standardDialogs;
 
             SelectedRiderBone = new FilterCollection<SkeletonBoneNode>(null, (x) => UpdateCanSaveAndPreviewStates());
 
@@ -702,9 +705,10 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
 
             var animFile = _rider.AnimationClip.ConvertToFileFormat(_rider.Skeleton);
             var path = _rider.AnimationName.Value;
-            MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SaveWithVersionAndPath", animFile.Header.Version, path), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-            _packFileSaveService.Save(path, AnimationFile.ConvertToBytes(animFile), true);
-            IsDirty.Value = false;
+            _standardDialogs.ShowDialogBox(LocalizationManager.Instance.GetFormat("Msg.SaveWithVersionAndPath", animFile.Header.Version, path), LocalizationManager.Instance.Get("Msg.GeneralError"));
+            var savedFile = _packFileSaveService.Save(path, AnimationFile.ConvertToBytes(animFile), true);
+            if (savedFile != null)
+                IsDirty.Value = false;
         }
         public void SaveAs()
         {
@@ -716,10 +720,11 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
 
             var animFile = _rider.AnimationClip.ConvertToFileFormat(_rider.Skeleton);
 
-            MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SaveWithVersion", animFile.Header.Version), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _standardDialogs.ShowDialogBox(LocalizationManager.Instance.GetFormat("Msg.SaveWithVersion", animFile.Header.Version), LocalizationManager.Instance.Get("Msg.GeneralError"));
             var bytes = AnimationFile.ConvertToBytes(animFile);
-            _packFileSaveService.SaveAs(".anim", bytes);
-            IsDirty.Value = false;
+            var savedFile = _packFileSaveService.SaveAs(".anim", bytes);
+            if (savedFile != null)
+                IsDirty.Value = false;
         }
     }
 }
