@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework;
 using Shared.Core.Events;
 using Shared.Core.Misc;
 using Shared.Ui.BaseDialogs.MathViews;
+using System.Runtime.ExceptionServices;
 
 namespace KitbasherEditor.ViewModels.MenuBarViews
 {
@@ -66,6 +67,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         private void SelectionChanged(ISelectionState state)
         {
             ShowVertexFalloff.Value = false;
+            ButtonEnabled = false;
             if (state is ObjectSelectionState objectSelectionState)
                 ButtonEnabled = objectSelectionState.SelectionCount() != 0;
             else if (state is VertexSelectionState vertexSelectionState)
@@ -83,6 +85,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
                 ButtonEnabled = edgeSelectionState.SelectionCount() != 0;
                 ShowVertexFalloff.Value = true;
             }
+            else if (state is BoneSelectionState boneSelectionState)
+                ButtonEnabled = boneSelectionState.SelectionCount() != 0;
         }
 
         public void SetMode(TransformMode mode)
@@ -102,31 +106,59 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 
         void ApplyTransform()
         {
-            var transform = TransformGizmoWrapper.CreateFromSelectionState(_selectionManager.GetState(), _commandFactory);
-            if (transform == null || _activeMode == TransformMode.None)
+            if (_activeMode == TransformMode.None)
                 return;
 
-            if (_activeMode == TransformMode.Rotate)
-            {
-                transform.BeginTransform();
-                transform.GizmoRotateEvent(
-                    Matrix.CreateRotationX(MathHelper.ToRadians((float)_vector3.X.Value)) *
-                    Matrix.CreateRotationY(MathHelper.ToRadians((float)_vector3.Y.Value)) *
-                    Matrix.CreateRotationZ(MathHelper.ToRadians((float)_vector3.Z.Value)), PivotType.ObjectCenter);
-            }
-            else if (_activeMode == TransformMode.Translate)
-            {
-                transform.BeginTransform();
-                transform.GizmoTranslateEvent(new Vector3((float)_vector3.X.Value, (float)_vector3.Y.Value, (float)_vector3.Z.Value), PivotType.ObjectCenter);
-            }
-            else if (_activeMode == TransformMode.Scale)
-            {
-                transform.BeginTransform();
-                transform.GizmoScaleEvent(new Vector3((float)_vector3.X.Value - 1, (float)_vector3.Y.Value - 1, (float)_vector3.Z.Value - 1), PivotType.ObjectCenter);    // -1 due to weirdness inside the function
-            }
+            var transform = TransformGizmoWrapper.CreateFromSelectionState(_selectionManager.GetState(), _commandFactory);
+            if (transform == null)
+                return;
 
-            transform.CommitTransform(_commandExecutor);
-            SetDefaultValue();
+            using (transform)
+            {
+                ExceptionDispatchInfo primaryError = null;
+                var commitAttempted = false;
+                try
+                {
+                    if (_activeMode == TransformMode.Rotate)
+                    {
+                        transform.BeginTransform();
+                        transform.GizmoRotateEvent(
+                            Matrix.CreateRotationX(MathHelper.ToRadians((float)_vector3.X.Value)) *
+                            Matrix.CreateRotationY(MathHelper.ToRadians((float)_vector3.Y.Value)) *
+                            Matrix.CreateRotationZ(MathHelper.ToRadians((float)_vector3.Z.Value)), PivotType.ObjectCenter);
+                    }
+                    else if (_activeMode == TransformMode.Translate)
+                    {
+                        transform.BeginTransform();
+                        transform.GizmoTranslateEvent(new Vector3((float)_vector3.X.Value, (float)_vector3.Y.Value, (float)_vector3.Z.Value), PivotType.ObjectCenter);
+                    }
+                    else if (_activeMode == TransformMode.Scale)
+                    {
+                        transform.BeginTransform();
+                        transform.GizmoScaleEvent(new Vector3((float)_vector3.X.Value - 1, (float)_vector3.Y.Value - 1, (float)_vector3.Z.Value - 1), PivotType.ObjectCenter);    // -1 due to weirdness inside the function
+                    }
+
+                    commitAttempted = true;
+                    transform.CommitTransform(_commandExecutor);
+                    SetDefaultValue();
+                }
+                catch (Exception exception)
+                {
+                    primaryError = ExceptionDispatchInfo.Capture(exception);
+                    if (!commitAttempted)
+                    {
+                        try
+                        {
+                            transform.CancelTransform();
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+
+                primaryError?.Throw();
+            }
         }
 
         void SetDefaultValue()

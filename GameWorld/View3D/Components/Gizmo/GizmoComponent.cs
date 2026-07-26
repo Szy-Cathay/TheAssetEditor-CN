@@ -220,16 +220,8 @@ namespace GameWorld.Core.Components.Gizmo
         public override void Update(GameTime gameTime)
         {
             var selectionMode = _selectionManager.GetState().Mode;
-            switch (selectionMode)
-            {
-                case GeometrySelectionMode.Object:
-                case GeometrySelectionMode.Face:
-                case GeometrySelectionMode.Vertex:
-                case GeometrySelectionMode.Bone:
-                    break;
-                default:
-                    return;
-            }
+            if (!IsSupportedSelectionMode(selectionMode))
+                return;
 
             // Blender-style hotkey triggers for modal transform
             // G = Translate, R = Rotate, S = Scale
@@ -402,17 +394,8 @@ namespace GameWorld.Core.Components.Gizmo
         public override void Draw(GameTime gameTime)
         {
             var selectionMode = _selectionManager.GetState().Mode;
-
-            switch (selectionMode)
-            {
-                case GeometrySelectionMode.Object:
-                case GeometrySelectionMode.Face:
-                case GeometrySelectionMode.Vertex:
-                case GeometrySelectionMode.Bone:
-                    break;
-                default:
-                    return;
-            }
+            if (!IsSupportedSelectionMode(selectionMode))
+                return;
 
             // During modal transform, always draw (for dashed line visuals)
             // Otherwise, only draw if gizmo is enabled
@@ -432,11 +415,86 @@ namespace GameWorld.Core.Components.Gizmo
             _gizmo.ScaleModifier += v;
         }
 
+        private static bool IsSupportedSelectionMode(GeometrySelectionMode mode)
+        {
+            return mode is
+                GeometrySelectionMode.Object or
+                GeometrySelectionMode.Face or
+                GeometrySelectionMode.Edge or
+                GeometrySelectionMode.Vertex or
+                GeometrySelectionMode.Bone;
+        }
+
         public void Dispose()
         {
-            _activeTransformation?.Dispose();
+            ExceptionDispatchInfo primaryError = null;
+            var transformation = _activeTransformation;
+
+            if (transformation?.IsTransformActive == true)
+            {
+                try
+                {
+                    transformation.CancelTransform();
+                }
+                catch (Exception exception)
+                {
+                    primaryError = ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            if (_gizmo != null)
+            {
+                try
+                {
+                    _gizmo.AbortTransformInteraction();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            try
+            {
+                ReleaseMouseOwnership();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                transformation?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+
             _activeTransformation = null;
-            _gizmo.Dispose();
+            if (_gizmo != null)
+            {
+                try
+                {
+                    _gizmo.Selection.Clear();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    _gizmo.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            primaryError?.Throw();
         }
 
         public void Handle(SelectionChangedEvent notification) => OnSelectionChanged(notification.NewState);

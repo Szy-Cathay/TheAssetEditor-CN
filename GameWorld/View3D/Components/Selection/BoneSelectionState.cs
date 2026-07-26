@@ -12,6 +12,8 @@ namespace GameWorld.Core.Components.Selection
     internal sealed class BoneModificationNotifier
     {
         private event BoneModifiedEvent Modified;
+        internal int SubscriberCount =>
+            Modified?.GetInvocationList().Length ?? 0;
 
         public void Subscribe(BoneModifiedEvent handler)
         {
@@ -64,6 +66,8 @@ namespace GameWorld.Core.Components.Selection
             add => _modificationNotifier.Subscribe(value);
             remove => _modificationNotifier.Unsubscribe(value);
         }
+        internal int BoneModificationSubscriberCount =>
+            _modificationNotifier.SubscriberCount;
         public List<int> ModifiedBones { get; set; } = new List<int>();
 
         public BoneSelectionState(ISelectable renderObj)

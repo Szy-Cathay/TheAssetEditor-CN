@@ -51,6 +51,222 @@ namespace Testing.GameWorld.Core.Components.Gizmo
         }
 
         [Test]
+        public void EdgeMode_ComponentUpdateRunsStartPreviewStopAndSharedDrawGate()
+        {
+            using var context = CreateEdgeComponentContext();
+            var wrapper = (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+            var initialVertices = context.Mesh.VertexArray.ToArray();
+            context.Component.SetGizmoMode(GizmoMode.Rotate);
+            context.Component.Gizmo.ActiveAxis = GizmoAxis.X;
+
+            context.Component.Update(new GameTime());
+            context.Mouse.Setup(component => component.Position()).Returns(new Vector2(80, 10));
+            context.Mouse.Setup(component => component.DeltaPosition()).Returns(new Vector2(1, 0));
+            context.Mouse.Setup(component => component.LastState()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Pressed,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Component.Update(
+                new GameTime(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(wrapper.HasBackup, Is.True);
+                Assert.That(context.Mesh.VertexArray, Is.Not.EqualTo(initialVertices));
+                Assert.That(context.Mouse.Object.MouseOwner, Is.SameAs(context.Component));
+            });
+
+            context.Mouse
+                .Setup(component => component.IsMouseButtonDown(MouseButton.Left))
+                .Returns(false);
+            context.Mouse.Setup(component => component.State()).Returns(
+                new MouseState(
+                    80,
+                    10,
+                    0,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Component.Update(new GameTime());
+
+            var supportedModeMethod = typeof(GizmoComponent).GetMethod(
+                "IsSupportedSelectionMode",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.CommandExecutor.CanUndo(), Is.True);
+                Assert.That(wrapper.HasBackup, Is.False);
+                Assert.That(context.Mouse.Object.MouseOwner, Is.Null);
+                Assert.That(supportedModeMethod, Is.Not.Null);
+                Assert.That(
+                    supportedModeMethod?.Invoke(null, [GeometrySelectionMode.Edge]),
+                    Is.True);
+            });
+        }
+
+        [Test]
+        public void ComponentDispose_DuringVertexPreviewRestoresCpuGpuAndGestureOwnership()
+        {
+            var context = CreateComponentContext();
+            var wrapper = (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+            var initialVertices = context.Mesh.VertexArray.ToArray();
+            var initialIndices = context.Mesh.IndexArray.ToArray();
+            var initialBounds = context.Mesh.BoundingBox;
+            context.Component.Gizmo.ActiveAxis = GizmoAxis.X;
+            context.Component.Gizmo.ActiveMode = GizmoMode.Translate;
+            context.Component.Gizmo.Update(new GameTime(), enableMove: true);
+            wrapper.GizmoTranslateEvent(
+                new Vector3(0.25f, 0, 0),
+                PivotType.WorldOrigin);
+            Assert.That(context.Mesh.VertexArray, Is.Not.EqualTo(initialVertices));
+
+            context.Component.Dispose();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Mesh.VertexArray, Is.EqualTo(initialVertices));
+                Assert.That(context.Mesh.IndexArray, Is.EqualTo(initialIndices));
+                Assert.That(context.Graphics.UploadedVertexArray, Is.EqualTo(initialVertices));
+                Assert.That(context.Graphics.IndexBufferRebuildCount, Is.GreaterThanOrEqualTo(1));
+                Assert.That(context.Mesh.BoundingBox, Is.EqualTo(initialBounds));
+                Assert.That(context.Mesh.DeferBoundingBoxRebuild, Is.False);
+                Assert.That(wrapper.HasBackup, Is.False);
+                Assert.That(wrapper.IsTransformActive, Is.False);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+                Assert.That(context.Component.Gizmo.ActiveAxis, Is.EqualTo(GizmoAxis.None));
+                Assert.That(context.Component.Gizmo.IsInModalTransform, Is.False);
+                Assert.That(context.Mouse.Object.MouseOwner, Is.Null);
+            });
+            AssertNoTransientBackup(wrapper);
+            AssertNoActiveCommand(wrapper);
+            context.Mouse.Verify(component => component.ClearStates(), Times.Once);
+        }
+
+        [Test]
+        public void ComponentDispose_DuringBonePreviewRestoresFrameAndRemovesSubscription()
+        {
+            var initialFrame = new AnimationClip.KeyFrame
+            {
+                Position = [new Vector3(2, 0, 0)],
+                Rotation = [Quaternion.Identity],
+                Scale = [Vector3.One]
+            };
+            var context = CreateBoneComponentContext(initialFrame);
+            var selection =
+                context.SelectionManager.GetState<BoneSelectionState>();
+            var wrapper =
+                (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+            context.Component.Gizmo.StartModalTransform(GizmoMode.Translate);
+            wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+            Assert.That(
+                selection.CurrentAnimation.DynamicFrames[0].Position,
+                Is.Not.EqualTo(initialFrame.Position));
+
+            context.Component.Dispose();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(initialFrame.Position));
+                Assert.That(
+                    selection.CurrentAnimation.DynamicFrames[0].Rotation,
+                    Is.EqualTo(initialFrame.Rotation));
+                Assert.That(
+                    selection.CurrentAnimation.DynamicFrames[0].Scale,
+                    Is.EqualTo(initialFrame.Scale));
+                Assert.That(selection.BoneModificationSubscriberCount, Is.Zero);
+                Assert.That(wrapper.IsTransformActive, Is.False);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+                Assert.That(context.Component.Gizmo.ActiveAxis, Is.EqualTo(GizmoAxis.None));
+                Assert.That(context.Component.Gizmo.IsInModalTransform, Is.False);
+                Assert.That(context.Mouse.Object.MouseOwner, Is.Null);
+            });
+            AssertNoActiveCommand(wrapper);
+            context.Mouse.Verify(component => component.ClearStates(), Times.Once);
+        }
+
+        [Test]
+        public void ComponentDispose_WhenBoneCancelThrowsPreservesFirstErrorAndFinishesCleanup()
+        {
+            var initialFrame = new AnimationClip.KeyFrame
+            {
+                Position = [Vector3.Zero],
+                Rotation = [Quaternion.Identity],
+                Scale = [Vector3.One]
+            };
+            var context = CreateBoneComponentContext(initialFrame);
+            var selection =
+                context.SelectionManager.GetState<BoneSelectionState>();
+            var wrapper =
+                (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+            var expectedException = new InvalidOperationException("cancel failed");
+            BoneModifiedEvent throwingSubscriber = _ => throw expectedException;
+            context.Component.Gizmo.StartModalTransform(GizmoMode.Translate);
+            wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+            selection.BoneModifiedEvent += throwingSubscriber;
+
+            var actualException = Assert.Throws<InvalidOperationException>(
+                context.Component.Dispose);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(actualException, Is.SameAs(expectedException));
+                Assert.That(
+                    selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(initialFrame.Position));
+                Assert.That(wrapper.IsTransformActive, Is.False);
+                Assert.That(
+                    selection.BoneModificationSubscriberCount,
+                    Is.EqualTo(1));
+                Assert.That(context.Component.Gizmo.Selection, Is.Empty);
+                Assert.That(context.Component.Gizmo.ActiveAxis, Is.EqualTo(GizmoAxis.None));
+                Assert.That(context.Component.Gizmo.IsInModalTransform, Is.False);
+                Assert.That(context.Mouse.Object.MouseOwner, Is.Null);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+            });
+            context.Mouse.Verify(component => component.ClearStates(), Times.Once);
+            selection.BoneModifiedEvent -= throwingSubscriber;
+        }
+
+        [Test]
+        public void ComponentDispose_BeforeInitializeIsSafe()
+        {
+            var eventHub = new TestEventHub();
+            var commandExecutor = new CommandExecutor(eventHub);
+            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            var mouse = new Mock<IMouseComponent>();
+            mouse.SetupProperty(component => component.MouseOwner);
+            var component = new GizmoComponent(
+                eventHub,
+                null,
+                mouse.Object,
+                null,
+                commandExecutor,
+                null,
+                null,
+                null,
+                selectionManager);
+
+            Assert.DoesNotThrow(component.Dispose);
+            mouse.Verify(component => component.ClearStates(), Times.Never);
+        }
+
+        [Test]
         public void SelectionChangeDuringLivePreview_CancelsOldGestureAndStopsSameDrag()
         {
             using var context = CreateComponentContext();
@@ -1172,6 +1388,30 @@ namespace Testing.GameWorld.Core.Components.Gizmo
 
         private static ComponentContext CreateComponentContext()
         {
+            var mesh = CreateMesh(out var graphics);
+            var selectable = new TestTransformableNode { Geometry = mesh };
+            var selection = new ObjectSelectionState();
+            selection.ModifySelectionSingleObject(selectable, onlyRemove: false);
+            return CreateComponentContext(selection, mesh, graphics);
+        }
+
+        private static ComponentContext CreateEdgeComponentContext()
+        {
+            var mesh = CreateMesh(out var graphics);
+            var selectable = new TestTransformableNode { Geometry = mesh };
+            var selection = new EdgeSelectionState
+            {
+                RenderObject = selectable,
+                SelectedEdges = [(0, 1)]
+            };
+            return CreateComponentContext(selection, mesh, graphics);
+        }
+
+        private static ComponentContext CreateComponentContext(
+            ISelectionState selection,
+            MeshObject mesh,
+            TestGraphicsCardGeometry graphics)
+        {
             var eventHub = new TestEventHub();
             var commandExecutor = new CommandExecutor(eventHub);
             var selectionManager = new SelectionManager(eventHub, null, null, null);
@@ -1222,10 +1462,6 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 selectionManager);
             component.Initialize();
 
-            var mesh = CreateMesh();
-            var selectable = new TestTransformableNode { Geometry = mesh };
-            var selection = new ObjectSelectionState();
-            selection.ModifySelectionSingleObject(selectable, onlyRemove: false);
             selectionManager.SetState(selection);
 
             return new ComponentContext(
@@ -1234,7 +1470,8 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 commandExecutor,
                 eventHub,
                 mouse,
-                mesh);
+                mesh,
+                graphics);
         }
 
         private static DirectContext CreateDirectContext(params MeshObject[] meshes)
@@ -1403,6 +1640,8 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 component,
                 selectionManager,
                 commandExecutor,
+                eventHub,
+                mouse,
                 scene.Node);
         }
 
@@ -1648,6 +1887,8 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             GizmoComponent Component,
             SelectionManager SelectionManager,
             CommandExecutor CommandExecutor,
+            TestEventHub EventHub,
+            Mock<IMouseComponent> Mouse,
             Rmv2MeshNode Node) : IDisposable
         {
             public void Dispose() => Component.Dispose();
@@ -1667,7 +1908,8 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             CommandExecutor CommandExecutor,
             TestEventHub EventHub,
             Mock<IMouseComponent> Mouse,
-            MeshObject Mesh) : IDisposable
+            MeshObject Mesh,
+            TestGraphicsCardGeometry Graphics) : IDisposable
         {
             public void Dispose() => Component.Dispose();
         }
