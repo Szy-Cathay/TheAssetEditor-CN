@@ -140,8 +140,9 @@ namespace Shared.ByteParsing.Parsers
 
 
 
-            var byteLength = BitConverter.GetBytes((short)value.Length);
             var byteStr = StringEncoding.GetBytes(value);
+            var length = StringEncoding == Encoding.Unicode ? value.Length : byteStr.Length;
+            var byteLength = BitConverter.GetBytes((short)length);
 
             var stringWithCountAtFront = byteLength.Concat(byteStr).ToArray();
 

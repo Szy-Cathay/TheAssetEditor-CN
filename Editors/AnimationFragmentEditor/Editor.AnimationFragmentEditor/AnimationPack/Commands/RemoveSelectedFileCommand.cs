@@ -7,7 +7,10 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
     {
         public void Execute(AnimPackViewModel editor)
         {
-            editor.AnimationPackItems.PossibleValues.Remove(editor.AnimationPackItems.SelectedItem);
+            var selectedItem = editor.AnimationPackItems.SelectedItem;
+            if (selectedItem != null && editor.AnimationPackItems.PossibleValues.Remove(selectedItem))
+                editor.HasUnsavedChanges = true;
+
             editor.AnimationPackItems.RefreshFilter();
         }
 

@@ -20,9 +20,10 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
             var animSet = CreateExampleWarhammer3AnimSet(fileName);
             editor.AnimationPackItems.PossibleValues.Add(animSet);
             editor.AnimationPackItems.UpdatePossibleValues(editor.AnimationPackItems.PossibleValues);
+            editor.HasUnsavedChanges = true;
         }
 
-        string? GetAnimSetFileName()
+        protected virtual string? GetAnimSetFileName()
         {
             var window = new TextInputWindow("Fragment name", "");
             if (window.ShowDialog() == true)
