@@ -172,6 +172,124 @@ namespace Testing.GameWorld.Core.Commands
         }
 
         [Test]
+        public void ObjectScale_PivotTenWith240IncrementalUpdates_RoundTripsWithinTolerance()
+        {
+            const int updateCount = 240;
+            const float scaleDelta = -0.001f;
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            var aggregateScale = MathF.Pow(1.0f + scaleDelta, updateCount);
+            context.Wrapper.Start(context.CommandExecutor);
+
+            for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
+            {
+                context.Wrapper.GizmoScaleEvent(
+                    new Vector3(scaleDelta, 0, 0),
+                    PivotType.ObjectCenter);
+            }
+
+            var previewVertices = mesh.VertexArray.ToArray();
+            var previewScale = context.Wrapper.Scale;
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            var undoError = MathF.Abs(
+                undoVertices[0].Position.X -
+                initialVertices[0].Position.X);
+            TestContext.Out.WriteLine(
+                $"240-update vertex 0 Undo X error: {undoError:R}; " +
+                $"preview X: {previewVertices[0].Position.X:R}; " +
+                $"expected preview X: {10.0f + aggregateScale:R}; " +
+                $"Redo X: {redoVertices[0].Position.X:R}");
+            for (var vertexIndex = 0; vertexIndex < initialVertices.Length; vertexIndex++)
+            {
+                var initialPosition = initialVertices[vertexIndex].Position3();
+                var expectedPreviewPosition = new Vector3(
+                    10.0f + (initialPosition.X - 10.0f) * aggregateScale,
+                    initialPosition.Y,
+                    initialPosition.Z);
+                AssertVector3(
+                    previewVertices[vertexIndex].Position3(),
+                    expectedPreviewPosition,
+                    $"Long incremental preview vertex {vertexIndex}");
+            }
+
+            Assert.That(
+                previewScale.X,
+                Is.EqualTo(1.0f + updateCount * scaleDelta).Within(Epsilon));
+            AssertVertices(undoVertices, initialVertices, "Long incremental Undo");
+            for (var vertexIndex = 0; vertexIndex < initialVertices.Length; vertexIndex++)
+            {
+                var initialPosition = initialVertices[vertexIndex].Position3();
+                var expectedPreviewPosition = new Vector3(
+                    10.0f + (initialPosition.X - 10.0f) * aggregateScale,
+                    initialPosition.Y,
+                    initialPosition.Z);
+                AssertVector3(
+                    redoVertices[vertexIndex].Position3(),
+                    expectedPreviewPosition,
+                    $"Long incremental Redo vertex {vertexIndex}");
+            }
+
+            AssertVertices(redoVertices, previewVertices, "Long incremental Redo");
+        }
+
+        [Test]
+        public void WeightedVertexScale_PivotTenWith240IncrementalUpdates_RoundTripsWithinTolerance()
+        {
+            const int updateCount = 240;
+            const float scaleDelta = -0.001f;
+            var weights = new[] { 1.0f, 0.5f, 0.0f, 0.25f };
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selectable = new TestSelectableNode { Geometry = mesh };
+            var selection = new VertexSelectionState(selectable, 0)
+            {
+                SelectedVertices = new List<int> { 0, 1 },
+                VertexWeights = weights.ToList()
+            };
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            Assert.That(context.Wrapper.Position.X, Is.EqualTo(10.0f).Within(Epsilon));
+            context.Wrapper.Start(context.CommandExecutor);
+
+            for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
+            {
+                context.Wrapper.GizmoScaleEvent(
+                    new Vector3(scaleDelta, 0, 0),
+                    PivotType.ObjectCenter);
+            }
+
+            var previewVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            TestContext.Out.WriteLine(
+                $"240-update weighted vertex 0 Undo X error: " +
+                $"{MathF.Abs(undoVertices[0].Position.X - initialVertices[0].Position.X):R}");
+            AssertVector3(
+                previewVertices[0].Position3(),
+                new Vector3(
+                    10.0f + MathF.Pow(1.0f + scaleDelta, updateCount),
+                    0,
+                    0),
+                "Long weighted full-weight preview vertex");
+            Assert.That(previewVertices[1].Position.X, Is.GreaterThan(initialVertices[1].Position.X));
+            AssertVertex(previewVertices[2], initialVertices[2], "Long weighted zero-weight preview vertex");
+            Assert.That(previewVertices[3].Position.X, Is.LessThan(initialVertices[3].Position.X));
+
+            AssertVertices(undoVertices, initialVertices, "Long weighted Undo");
+            AssertVertices(redoVertices, previewVertices, "Long weighted Redo");
+        }
+
+        [Test]
         public void MixedValidThenCoordinateInvalidScale_StoresOnlyValidOperation()
         {
             var mesh = CreatePivotTenMesh(collapsedX: false);

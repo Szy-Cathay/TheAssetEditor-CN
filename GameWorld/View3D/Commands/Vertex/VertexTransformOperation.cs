@@ -107,6 +107,48 @@ namespace GameWorld.Core.Commands.Vertex
             return true;
         }
 
+        public static bool TryApplySequence(
+            IReadOnlyList<MeshObject> geometryList,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            IReadOnlyList<VertexTransformOperation> operations,
+            bool inverse)
+        {
+            if (!AreStructurallyValid(
+                    geometryList,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    operations) ||
+                !AreAggregateReplayMatricesValid(
+                    geometryList,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    operations,
+                    inverse))
+            {
+                return false;
+            }
+
+            if (operations.Count == 0)
+                return true;
+
+            foreach (var geometry in geometryList)
+            {
+                ApplySequenceToMesh(
+                    geometry,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    operations,
+                    inverse);
+            }
+
+            return true;
+        }
+
         static bool IsStructurallyValid(
             IReadOnlyList<MeshObject> geometryList,
             ISelectionState selectionState,
@@ -180,6 +222,76 @@ namespace GameWorld.Core.Commands.Vertex
                         if (vertexIndex < 0 || vertexIndex >= geometry.VertexCount())
                             return false;
                     }
+                }
+            }
+
+            return true;
+        }
+
+        static bool AreAggregateReplayMatricesValid(
+            IReadOnlyList<MeshObject> geometryList,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            IReadOnlyList<VertexTransformOperation> operations,
+            bool inverse)
+        {
+            if (operations.Count == 0)
+                return true;
+
+            foreach (var geometry in geometryList)
+            {
+                if (selectionState.Mode == GeometrySelectionMode.Vertex)
+                {
+                    var vertexSelectionState = (VertexSelectionState)selectionState;
+                    for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
+                    {
+                        var weight = vertexSelectionState.VertexWeights[vertexIndex];
+                        if (weight == 0)
+                            continue;
+
+                        if (!TryCreateAggregateReplayMatrix(
+                            operations,
+                            weight,
+                            inverse,
+                            out _,
+                            out _,
+                            out _))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (affectedVertexIndices != null &&
+                         falloffWeights != null &&
+                         falloffWeights.Count > 0)
+                {
+                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                    {
+                        if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
+                            continue;
+
+                        if (!TryCreateAggregateReplayMatrix(
+                            operations,
+                            weight,
+                            inverse,
+                            out _,
+                            out _,
+                            out _))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (!TryCreateAggregateReplayMatrix(
+                    operations,
+                    weight: null,
+                    inverse,
+                    out _,
+                    out _,
+                    out _))
+                {
+                    return false;
                 }
             }
 
@@ -261,6 +373,156 @@ namespace GameWorld.Core.Commands.Vertex
             }
 
             return true;
+        }
+
+        static void ApplySequenceToMesh(
+            MeshObject geometry,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            IReadOnlyList<VertexTransformOperation> operations,
+            bool inverse)
+        {
+            if (selectionState.Mode == GeometrySelectionMode.Vertex)
+            {
+                var vertexSelectionState = (VertexSelectionState)selectionState;
+                for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
+                {
+                    var weight = vertexSelectionState.VertexWeights[vertexIndex];
+                    if (weight == 0)
+                        continue;
+
+                    ApplySequenceVertex(
+                        geometry,
+                        vertexIndex,
+                        operations,
+                        weight,
+                        inverse);
+                }
+            }
+            else if (affectedVertexIndices != null &&
+                     falloffWeights != null &&
+                     falloffWeights.Count > 0)
+            {
+                for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                {
+                    if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
+                        continue;
+
+                    ApplySequenceVertex(
+                        geometry,
+                        vertexIndex,
+                        operations,
+                        weight,
+                        inverse);
+                }
+            }
+            else if (affectedVertexIndices != null)
+            {
+                foreach (var vertexIndex in affectedVertexIndices)
+                {
+                    ApplySequenceVertex(
+                        geometry,
+                        vertexIndex,
+                        operations,
+                        weight: null,
+                        inverse);
+                }
+            }
+            else
+            {
+                for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                {
+                    ApplySequenceVertex(
+                        geometry,
+                        vertexIndex,
+                        operations,
+                        weight: null,
+                        inverse);
+                }
+            }
+        }
+
+        static void ApplySequenceVertex(
+            MeshObject geometry,
+            int vertexIndex,
+            IReadOnlyList<VertexTransformOperation> operations,
+            float? weight,
+            bool inverse)
+        {
+            TryCreateAggregateReplayMatrix(
+                operations,
+                weight,
+                inverse,
+                out var replayMatrix,
+                out var containsScale,
+                out var transformsBasis);
+            if (!transformsBasis)
+            {
+                geometry.TransformVertexTranslation(vertexIndex, replayMatrix);
+                return;
+            }
+
+            var normalMatrix = Matrix.Transpose(Matrix.Invert(replayMatrix));
+            if (containsScale)
+            {
+                TransformScaleVertexPreservingBasisMagnitude(
+                    geometry,
+                    vertexIndex,
+                    replayMatrix,
+                    normalMatrix);
+            }
+            else
+            {
+                geometry.TransformVertexRotation(vertexIndex, replayMatrix, normalMatrix);
+            }
+        }
+
+        static bool TryCreateAggregateReplayMatrix(
+            IReadOnlyList<VertexTransformOperation> operations,
+            float? weight,
+            bool inverse,
+            out Matrix aggregateReplayMatrix,
+            out bool containsScale,
+            out bool transformsBasis)
+        {
+            aggregateReplayMatrix = Matrix.Identity;
+            containsScale = false;
+            transformsBasis = false;
+            foreach (var operation in operations)
+            {
+                var transform = operation.Transform;
+                if (weight.HasValue &&
+                    !TryCreateWeightedTransform(operation, weight.Value, out transform))
+                {
+                    return false;
+                }
+
+                if (!TryCreateReplayMatrix(
+                        transform,
+                        operation.PivotPoint,
+                        inverse: false,
+                        out var replayMatrix))
+                {
+                    return false;
+                }
+
+                // XNA uses row vectors: compose accepted pivoted steps in preview order,
+                // then invert the single aggregate for Undo to avoid per-step vertex rounding.
+                aggregateReplayMatrix *= replayMatrix;
+                if (!IsFinite(aggregateReplayMatrix))
+                    return false;
+
+                containsScale |= operation.Mode == VertexTransformOperationMode.Scale;
+                transformsBasis |= operation.Mode != VertexTransformOperationMode.Translate;
+            }
+
+            if (!IsInvertible(aggregateReplayMatrix))
+                return false;
+
+            if (inverse)
+                aggregateReplayMatrix = Matrix.Invert(aggregateReplayMatrix);
+            return IsFinite(aggregateReplayMatrix);
         }
 
         static bool IsScalePositionReversible(

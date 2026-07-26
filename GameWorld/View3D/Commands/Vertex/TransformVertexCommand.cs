@@ -64,25 +64,15 @@ namespace GameWorld.Core.Commands.Vertex
 
         private void ApplyTransform(bool inverse)
         {
-            if (!VertexTransformOperationApplier.AreStructurallyValid(
+            if (!VertexTransformOperationApplier.TryApplySequence(
                 _geometryList,
                 _oldSelectionState,
                 AffectedVertexIndices,
                 FalloffWeights,
-                _previewOperations))
+                _previewOperations,
+                inverse))
             {
                 return;
-            }
-
-            if (inverse)
-            {
-                for (var operationIndex = _previewOperations.Count - 1; operationIndex >= 0; operationIndex--)
-                    ApplyOperation(_previewOperations[operationIndex], inverse: true);
-            }
-            else
-            {
-                for (var operationIndex = 0; operationIndex < _previewOperations.Count; operationIndex++)
-                    ApplyOperation(_previewOperations[operationIndex], inverse: false);
             }
 
             var reverseWinding = InvertWindingOrder &&
@@ -94,20 +84,6 @@ namespace GameWorld.Core.Commands.Vertex
                     ReverseWindingOrder(geometry);
                 geometry.RebuildVertexBuffer();
             }
-        }
-
-        void ApplyOperation(VertexTransformOperation operation, bool inverse)
-        {
-            VertexTransformOperationApplier.TryApply(
-                _geometryList,
-                _oldSelectionState,
-                AffectedVertexIndices,
-                FalloffWeights,
-                operation,
-                inverse,
-                out _,
-                // Preview already validated the coordinates at this operation's historical state.
-                validateScalePositionRoundTrip: false);
         }
 
         internal static void ReverseWindingOrder(MeshObject geometry)
