@@ -1,0 +1,286 @@
+using GameWorld.Core.Animation;
+using GameWorld.Core.Commands;
+using GameWorld.Core.Commands.Bone;
+using GameWorld.Core.Components.Gizmo;
+using GameWorld.Core.Components.Selection;
+using Microsoft.Xna.Framework;
+using Moq;
+using Shared.Core.Events;
+
+namespace Testing.GameWorld.Core.Commands
+{
+    [TestFixture]
+    public class TransformBoneCommandTests
+    {
+        private const float Epsilon = 0.0001f;
+
+        [TestCase(GizmoMode.Translate)]
+        [TestCase(GizmoMode.Rotate)]
+        [TestCase(GizmoMode.UniformScale)]
+        public void PreviewCommitUndoRedo_RestoresIsolatedFramesAndPublishesOneModifiedEvent(
+            GizmoMode mode)
+        {
+            var context = CreateContext();
+            var initialFrameReference = context.Animation.DynamicFrames[1];
+            var transform = GetTransform(mode);
+
+            context.Command.ApplyTransformation(transform, mode);
+
+            var committedFrameReference = context.Animation.DynamicFrames[1];
+            AssertExpectedFrame(committedFrameReference, mode);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Command, Is.InstanceOf<IRedoableCommand>());
+                Assert.That(committedFrameReference, Is.Not.SameAs(initialFrameReference));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+
+            context.Command.Execute();
+            Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+
+            initialFrameReference.Position[0] = new Vector3(91, 92, 93);
+            committedFrameReference.Position[0] = new Vector3(81, 82, 83);
+            committedFrameReference.Rotation[0] = Quaternion.CreateFromAxisAngle(
+                Vector3.UnitY,
+                0.7f);
+            committedFrameReference.Scale[0] = new Vector3(71, 72, 73);
+            context.Selection.SelectedBones.Clear();
+            context.Selection.CurrentFrame = 0;
+            context.Selection.CurrentAnimation = CreateAnimation();
+
+            context.Command.Undo();
+
+            AssertInitialFrame(context.Animation.DynamicFrames[1]);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Animation.DynamicFrames[1], Is.Not.SameAs(initialFrameReference));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
+                Assert.That(context.Selection.ModifiedBones, Is.EqualTo(new[] { 0 }));
+                Assert.That(context.LastModifiedState.CurrentFrame, Is.EqualTo(1));
+                Assert.That(
+                    context.LastModifiedState.CurrentAnimation,
+                    Is.SameAs(context.Animation));
+            });
+
+            ((IRedoableCommand)context.Command).Redo();
+
+            AssertExpectedFrame(context.Animation.DynamicFrames[1], mode);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Animation.DynamicFrames[1], Is.Not.SameAs(committedFrameReference));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(3));
+            });
+        }
+
+        [Test]
+        public void Configure_CapturesSelectedBonesAnimationAndFrameBeforePreview()
+        {
+            var context = CreateContext();
+            var replacementAnimation = CreateAnimation();
+            context.Selection.SelectedBones.Clear();
+            context.Selection.CurrentAnimation = replacementAnimation;
+            context.Selection.CurrentFrame = 0;
+
+            context.Command.ApplyTransformation(
+                Matrix.CreateTranslation(new Vector3(4, -2, 1)),
+                GizmoMode.Translate);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Animation.DynamicFrames[1].Position[0],
+                    Is.EqualTo(new Vector3(5, 0, 4)));
+                AssertInitialFrame(replacementAnimation.DynamicFrames[0]);
+                Assert.That(context.Selection.ModifiedBones, Is.EqualTo(new[] { 0 }));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+                Assert.That(context.LastModifiedState.CurrentFrame, Is.EqualTo(1));
+                Assert.That(
+                    context.LastModifiedState.CurrentAnimation,
+                    Is.SameAs(context.Animation));
+            });
+        }
+
+        [Test]
+        public void ModifiedNotificationMutation_DoesNotChangeCapturedBones()
+        {
+            var context = CreateContext();
+            context.Command.ApplyTransformation(
+                Matrix.CreateTranslation(new Vector3(1, 0, 0)),
+                GizmoMode.Translate);
+            context.LastModifiedState.ModifiedBones.Clear();
+
+            context.Command.ApplyTransformation(
+                Matrix.CreateTranslation(new Vector3(2, 0, 0)),
+                GizmoMode.Translate);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Animation.DynamicFrames[1].Position[0],
+                    Is.EqualTo(new Vector3(3, 2, 3)));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
+                Assert.That(context.LastModifiedState.ModifiedBones, Is.EqualTo(new[] { 0 }));
+            });
+        }
+
+        [Test]
+        public void Execute_CapturesFinalFrameExactlyOnce()
+        {
+            var context = CreateContext();
+            context.Command.ApplyTransformation(
+                Matrix.CreateTranslation(new Vector3(2, 0, 0)),
+                GizmoMode.Translate);
+            context.Command.Execute();
+
+            context.Animation.DynamicFrames[1].Position[0] = new Vector3(50, 0, 0);
+            context.Command.Execute();
+            context.Command.Undo();
+            ((IRedoableCommand)context.Command).Redo();
+
+            Assert.That(
+                context.Animation.DynamicFrames[1].Position[0],
+                Is.EqualTo(new Vector3(3, 2, 3)));
+        }
+
+        [Test]
+        public void RestoreInitialFrame_UsesFreshCloneAndResetsPreviewDelta()
+        {
+            var context = CreateContext();
+            var initialFrameReference = context.Animation.DynamicFrames[1];
+            var translation = Matrix.CreateTranslation(new Vector3(2, 0, 0));
+            context.Command.ApplyTransformation(translation, GizmoMode.Translate);
+
+            context.Command.RestoreInitialFrame();
+
+            AssertInitialFrame(context.Animation.DynamicFrames[1]);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Animation.DynamicFrames[1], Is.Not.SameAs(initialFrameReference));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
+            });
+
+            context.Command.ApplyTransformation(translation, GizmoMode.Translate);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Animation.DynamicFrames[1].Position[0],
+                    Is.EqualTo(new Vector3(3, 2, 3)));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(3));
+            });
+        }
+
+        private static TransformContext CreateContext()
+        {
+            var eventHub = new Mock<IEventHub>();
+            var selectionManager = new SelectionManager(eventHub.Object, null, null, null);
+            var animation = CreateAnimation();
+            var selection = new BoneSelectionState(null)
+            {
+                CurrentAnimation = animation,
+                CurrentFrame = 1,
+                SelectedBones = [0]
+            };
+            var modifiedEventCount = 0;
+            BoneSelectionState lastModifiedState = null;
+            selection.BoneModifiedEvent += state =>
+            {
+                modifiedEventCount++;
+                lastModifiedState = state;
+            };
+            selectionManager.SetState(selection);
+
+            var command = new TransformBoneCommand(selectionManager);
+            command.Configure(selection.SelectedBones, selection);
+            return new TransformContext(
+                command,
+                selection,
+                animation,
+                () => modifiedEventCount,
+                () => lastModifiedState);
+        }
+
+        private static AnimationClip CreateAnimation()
+        {
+            var animation = new AnimationClip();
+            animation.DynamicFrames.Add(CreateInitialFrame());
+            animation.DynamicFrames.Add(CreateInitialFrame());
+            return animation;
+        }
+
+        private static AnimationClip.KeyFrame CreateInitialFrame()
+        {
+            return new AnimationClip.KeyFrame
+            {
+                Position = [new Vector3(1, 2, 3)],
+                Rotation = [new Quaternion(0.38268343f, 0, 0, 0.9238795f)],
+                Scale = [new Vector3(2, 3, 4)]
+            };
+        }
+
+        private static Matrix GetTransform(GizmoMode mode)
+        {
+            return mode switch
+            {
+                GizmoMode.Translate => Matrix.CreateTranslation(new Vector3(4, -2, 1)),
+                GizmoMode.Rotate => Matrix.CreateFromQuaternion(
+                    Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathHelper.PiOver2)),
+                GizmoMode.UniformScale => Matrix.CreateScale(new Vector3(1.5f, 0.5f, 2)),
+                _ => throw new ArgumentOutOfRangeException(nameof(mode))
+            };
+        }
+
+        private static void AssertInitialFrame(AnimationClip.KeyFrame frame)
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(frame.Position[0], Is.EqualTo(new Vector3(1, 2, 3)));
+                AssertQuaternionEquivalent(
+                    frame.Rotation[0],
+                    new Quaternion(0.38268343f, 0, 0, 0.9238795f));
+                Assert.That(frame.Scale[0], Is.EqualTo(new Vector3(2, 3, 4)));
+            });
+        }
+
+        private static void AssertExpectedFrame(AnimationClip.KeyFrame frame, GizmoMode mode)
+        {
+            var expectedPosition = mode == GizmoMode.Translate
+                ? new Vector3(5, 0, 4)
+                : new Vector3(1, 2, 3);
+            var expectedRotation = mode == GizmoMode.Rotate
+                ? new Quaternion(
+                    0.27059805f,
+                    -0.27059805f,
+                    0.6532815f,
+                    0.6532815f)
+                : new Quaternion(0.38268343f, 0, 0, 0.9238795f);
+            var expectedScale = mode == GizmoMode.UniformScale
+                ? new Vector3(3, 1.5f, 8)
+                : new Vector3(2, 3, 4);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(frame.Position[0], Is.EqualTo(expectedPosition));
+                AssertQuaternionEquivalent(frame.Rotation[0], expectedRotation);
+                Assert.That(frame.Scale[0], Is.EqualTo(expectedScale));
+            });
+        }
+
+        private static void AssertQuaternionEquivalent(Quaternion actual, Quaternion expected)
+        {
+            var dot = Math.Abs(Quaternion.Dot(actual, expected));
+            Assert.That(dot, Is.EqualTo(1).Within(Epsilon));
+        }
+
+        private sealed record TransformContext(
+            TransformBoneCommand Command,
+            BoneSelectionState Selection,
+            AnimationClip Animation,
+            Func<int> GetModifiedEventCount,
+            Func<BoneSelectionState> GetLastModifiedState)
+        {
+            public int ModifiedEventCount => GetModifiedEventCount();
+            public BoneSelectionState LastModifiedState => GetLastModifiedState();
+        }
+    }
+}

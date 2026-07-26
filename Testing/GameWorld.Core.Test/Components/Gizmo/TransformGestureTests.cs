@@ -348,12 +348,140 @@ namespace Testing.GameWorld.Core.Components.Gizmo
         }
 
         [Test]
+        public void BoneBegin_CreatesActiveCommandBeforeFirstPreview()
+        {
+            var context = CreateBoneContext();
+            var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
+
+            context.Wrapper.BeginTransform();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Wrapper.IsTransformActive, Is.True);
+                Assert.That(
+                    GetActiveCommand(context.Wrapper),
+                    Is.InstanceOf<TransformBoneCommand>());
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(initialFrame.Position));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(Vector3.One));
+                Assert.That(context.ModifiedEventCount, Is.Zero);
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [TestCase(GizmoMode.Translate)]
+        [TestCase(GizmoMode.Rotate)]
+        [TestCase(GizmoMode.UniformScale)]
+        public void BonePreview_AppliesEveryIncrementalDelta(GizmoMode mode)
+        {
+            var context = CreateBoneContext();
+            context.Wrapper.BeginTransform();
+
+            switch (mode)
+            {
+                case GizmoMode.Translate:
+                    context.Wrapper.GizmoTranslateEvent(
+                        new Vector3(0.4f, 0, 0),
+                        PivotType.WorldOrigin);
+                    context.Wrapper.GizmoTranslateEvent(
+                        new Vector3(0.6f, 0, 0),
+                        PivotType.WorldOrigin);
+                    break;
+                case GizmoMode.Rotate:
+                    var rotation = Matrix.CreateRotationZ(MathHelper.Pi / 6);
+                    context.Wrapper.GizmoRotateEvent(rotation, PivotType.WorldOrigin);
+                    context.Wrapper.GizmoRotateEvent(rotation, PivotType.WorldOrigin);
+                    break;
+                case GizmoMode.UniformScale:
+                    context.Wrapper.GizmoScaleEvent(
+                        new Vector3(0.25f),
+                        PivotType.WorldOrigin);
+                    context.Wrapper.GizmoScaleEvent(
+                        new Vector3(0.25f),
+                        PivotType.WorldOrigin);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
+            var frame = context.Selection.CurrentAnimation.DynamicFrames[0];
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    frame.Position[0],
+                    Is.EqualTo(
+                        mode == GizmoMode.Translate
+                            ? new Vector3(1, 0, 0)
+                            : Vector3.Zero));
+                Assert.That(
+                    Math.Abs(Quaternion.Dot(
+                        frame.Rotation[0],
+                        mode == GizmoMode.Rotate
+                            ? Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathHelper.Pi / 3)
+                            : Quaternion.Identity)),
+                    Is.EqualTo(1).Within(0.0001f));
+                Assert.That(
+                    frame.Scale[0],
+                    Is.EqualTo(
+                        mode == GizmoMode.UniformScale
+                            ? new Vector3(1.5625f)
+                            : Vector3.One));
+                Assert.That(
+                    context.Wrapper.Scale,
+                    Is.EqualTo(
+                        mode == GizmoMode.UniformScale
+                            ? new Vector3(1.5625f)
+                            : Vector3.One));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [TestCase(GizmoMode.Rotate)]
+        [TestCase(GizmoMode.UniformScale)]
+        public void EquivalentBoneGesture_DoesNotCreateMutationHistory(GizmoMode mode)
+        {
+            var context = CreateBoneContext();
+            context.Wrapper.BeginTransform();
+            if (mode == GizmoMode.Rotate)
+            {
+                var halfTurn = Matrix.CreateRotationZ(MathHelper.Pi);
+                context.Wrapper.GizmoRotateEvent(halfTurn, PivotType.WorldOrigin);
+                context.Wrapper.GizmoRotateEvent(halfTurn, PivotType.WorldOrigin);
+            }
+            else
+            {
+                context.Wrapper.GizmoScaleEvent(Vector3.One, PivotType.WorldOrigin);
+                context.Wrapper.GizmoScaleEvent(
+                    new Vector3(-0.5f),
+                    PivotType.WorldOrigin);
+            }
+
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            var frame = context.Selection.CurrentAnimation.DynamicFrames[0];
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    Math.Abs(Quaternion.Dot(frame.Rotation[0], Quaternion.Identity)),
+                    Is.EqualTo(1).Within(0.0001f));
+                Assert.That(frame.Scale[0], Is.EqualTo(Vector3.One));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(Vector3.One));
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+            });
+        }
+
+        [Test]
         public void BoneCancel_RestoresInitialFrameAndCreatesNoHistory()
         {
             var context = CreateBoneContext();
             var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
             context.Wrapper.BeginTransform();
-            ApplyTwoBoneTranslationPreviews(context.Wrapper);
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
             Assert.That(
                 context.Selection.CurrentAnimation.DynamicFrames[0].Position,
                 Is.Not.EqualTo(initialFrame.Position));
@@ -371,40 +499,114 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 Assert.That(
                     context.Selection.CurrentAnimation.DynamicFrames[0].Scale,
                     Is.EqualTo(initialFrame.Scale));
-                Assert.That(context.ModifiedEventCount, Is.GreaterThanOrEqualTo(2));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
                 Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+                Assert.That(context.Wrapper.IsTransformActive, Is.False);
             });
         }
 
         [Test]
-        public void BoneRestoreInitialPreviewState_RestoresFrameAndResetsPreviewDelta()
+        public void BoneRestoreInitialPreviewState_RestoresAndRepreviewsFromSameBaseline()
         {
             var context = CreateBoneContext();
             var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
             context.Wrapper.BeginTransform();
-            ApplyTwoBoneTranslationPreviews(context.Wrapper);
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
             Assert.That(
                 context.Selection.CurrentAnimation.DynamicFrames[0].Position,
                 Is.Not.EqualTo(initialFrame.Position));
 
             context.Wrapper.RestoreInitialPreviewState();
-            Assert.That(
-                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
-                Is.EqualTo(initialFrame.Position));
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(initialFrame.Position));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
+            });
 
             context.Wrapper.GizmoTranslateEvent(
                 new Vector3(1, 0, 0),
                 PivotType.WorldOrigin);
-            Assert.That(
-                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
-                Is.EqualTo(initialFrame.Position));
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Position[0],
+                    Is.EqualTo(new Vector3(1, 0, 0)));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(3));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [Test]
+        public void BoneCommit_CapturesDistinctFinalFrameForUndoAndRedo()
+        {
+            var context = CreateBoneContext();
+            var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
+            context.Wrapper.BeginTransform();
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(0.75f, 0, 0),
+                PivotType.WorldOrigin);
+            var committedFrameReference =
+                context.Selection.CurrentAnimation.DynamicFrames[0];
+            var expectedFinalFrame = committedFrameReference.Clone();
+
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.CommandExecutor.CanUndo(), Is.True);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.EqualTo(1));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+                Assert.That(context.Wrapper.IsTransformActive, Is.False);
+            });
+
+            committedFrameReference.Position[0] = new Vector3(99, 0, 0);
+            context.CommandExecutor.Undo();
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(initialFrame.Position));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
+            });
+
+            context.CommandExecutor.Redo();
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(expectedFinalFrame.Position));
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.Not.SameAs(committedFrameReference));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(3));
+            });
+        }
+
+        [Test]
+        public void EmptyOrRestoredBoneGesture_DoesNotCreateMutationHistory()
+        {
+            var context = CreateBoneContext();
+
+            context.Wrapper.BeginTransform();
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+            context.Wrapper.BeginTransform();
             context.Wrapper.GizmoTranslateEvent(
                 new Vector3(1, 0, 0),
                 PivotType.WorldOrigin);
-            Assert.That(
-                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
-                Is.Not.EqualTo(initialFrame.Position));
-            context.Wrapper.CancelTransform();
+            context.Wrapper.RestoreInitialPreviewState();
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+                Assert.That(context.Wrapper.IsTransformActive, Is.False);
+            });
         }
 
         private static ComponentContext CreateComponentContext()
@@ -568,17 +770,16 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 wrapper,
                 selection,
                 commandExecutor,
+                eventHub,
                 () => modifiedEventCount);
         }
 
-        private static void ApplyTwoBoneTranslationPreviews(TransformGizmoWrapper wrapper)
+        private static ICommand GetActiveCommand(TransformGizmoWrapper wrapper)
         {
-            wrapper.GizmoTranslateEvent(
-                new Vector3(1, 0, 0),
-                PivotType.WorldOrigin);
-            wrapper.GizmoTranslateEvent(
-                new Vector3(1, 0, 0),
-                PivotType.WorldOrigin);
+            const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            return (ICommand)typeof(TransformGizmoWrapper)
+                .GetField("_activeCommand", Flags)
+                ?.GetValue(wrapper);
         }
 
         private static void AssertNoTransientBackup(TransformGizmoWrapper wrapper)
@@ -705,6 +906,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             TransformGizmoWrapper Wrapper,
             BoneSelectionState Selection,
             CommandExecutor CommandExecutor,
+            TestEventHub EventHub,
             Func<int> GetModifiedEventCount)
         {
             public int ModifiedEventCount => GetModifiedEventCount();

@@ -136,6 +136,7 @@ namespace GameWorld.Core.Components.Gizmo
             var bones = boneSelectionState.SelectedBones;
             var totalBones = bones.Count;
             var rotations = new List<Quaternion>();
+            Scale = Vector3.Zero;
             foreach (var boneIdx in bones)
             {
                 var bone = currentFrame.GetSkeletonAnimatedWorld(skeleton, boneIdx);
@@ -213,7 +214,8 @@ namespace GameWorld.Core.Components.Gizmo
                     var matrix = _totalGizomTransform;
                     matrix.Translation = Position;
                     transformBoneCommand.Transform = matrix;
-                    commandExecutor.ExecuteCommand(transformBoneCommand);
+                    if (transformBoneCommand.HasFrameMutation())
+                        commandExecutor.ExecuteCommand(transformBoneCommand);
                 }
             });
         }
@@ -397,7 +399,16 @@ namespace GameWorld.Core.Components.Gizmo
             if (!ApplyTransform(scaleMatrix, pivot, GizmoMode.UniformScale))
                 return;
 
-            Scale += scale;
+            if (_selectionState is BoneSelectionState)
+            {
+                var scaleFactor = scale + Vector3.One;
+                Scale = new Vector3(
+                    Scale.X * scaleFactor.X,
+                    Scale.Y * scaleFactor.Y,
+                    Scale.Z * scaleFactor.Z);
+            }
+            else
+                Scale += scale;
 
             _totalGizomTransform *= scaleMatrix;
         }
@@ -406,17 +417,8 @@ namespace GameWorld.Core.Components.Gizmo
         {
             if (_selectionState is BoneSelectionState)
             {
-                if (!transform.Decompose(out _, out var rotation, out _))
-                    return false;
-
-                var objCenter = pivotType == PivotType.ObjectCenter ? Position : Vector3.Zero;
-                TransformBone(
-                    Matrix.CreateScale(Scale) *
-                    Matrix.CreateFromQuaternion(rotation) *
-                    Matrix.CreateTranslation(Position),
-                    objCenter,
-                    gizmoMode);
-                return true;
+                var cumulativeTransform = _totalGizomTransform * transform;
+                return TransformBone(cumulativeTransform, gizmoMode);
             }
 
             var operationMode = gizmoMode switch
@@ -495,12 +497,12 @@ namespace GameWorld.Core.Components.Gizmo
             return true;
         }
 
-        void TransformBone(Matrix transform, Vector3 objCenter, GizmoMode gizmoMode)
+        bool TransformBone(Matrix transform, GizmoMode gizmoMode)
         {
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
-            {
-                transformBoneCommand.ApplyTransformation(transform, gizmoMode);
-            }
+                return transformBoneCommand.ApplyTransformation(transform, gizmoMode);
+
+            return false;
         }
 
         public Vector3 GetObjectCentre()

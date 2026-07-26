@@ -102,8 +102,17 @@ namespace GameWorld.Core.Components.Selection
 
         public void TriggerModifiedBoneEvent(List<int> modifiedBones)
         {
-            ModifiedBones = modifiedBones;
+            ModifiedBones = new List<int>(modifiedBones);
             BoneModifiedEvent.Invoke(this);
+        }
+
+        internal void TriggerModifiedBoneEvent(
+            BoneSelectionState eventState,
+            List<int> modifiedBones)
+        {
+            ModifiedBones = new List<int>(modifiedBones);
+            eventState.ModifiedBones = new List<int>(modifiedBones);
+            BoneModifiedEvent.Invoke(eventState);
         }
     }
 }

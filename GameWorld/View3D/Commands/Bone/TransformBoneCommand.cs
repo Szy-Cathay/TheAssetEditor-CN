@@ -10,12 +10,15 @@ using static GameWorld.Core.Animation.AnimationClip;
 
 namespace GameWorld.Core.Commands.Bone
 {
-    public class TransformBoneCommand : ICommand
+    public class TransformBoneCommand : IRedoableCommand
     {
         List<int> _selectedBones;
         BoneSelectionState _boneSelectionState;
+        BoneSelectionState _selectionSnapshot;
+        AnimationClip _animation;
         int _currentFrame;
         KeyFrame _oldFrame;
+        KeyFrame _newFrame;
         public Matrix Transform { get; set; }
 
         public string HintText => "Bone Transform";
@@ -24,26 +27,26 @@ namespace GameWorld.Core.Commands.Bone
 
         private Matrix _oldTransform = Matrix.Identity;
 
-        ISelectionState _oldSelectionState;
-        private SelectionManager _selectionManager;
-
         public TransformBoneCommand(SelectionManager selectionManager)
         {
-            _selectionManager = selectionManager;
         }
 
         public void Configure(List<int> selectedBones, BoneSelectionState state)
         {
-            _selectedBones = selectedBones;
+            _selectedBones = new List<int>(selectedBones);
             _boneSelectionState = state;
+            _selectionSnapshot = (BoneSelectionState)state.Clone();
+            _animation = state.CurrentAnimation;
             _currentFrame = state.CurrentFrame;
-            _oldFrame = _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Clone();
+            _oldFrame = _animation.DynamicFrames[_currentFrame].Clone();
+            _newFrame = null;
             _oldTransform = Matrix.Identity;
         }
 
-        public void ApplyTransformation(Matrix newPosition, GizmoMode gizmoMode)
+        public bool ApplyTransformation(Matrix newTransform, GizmoMode gizmoMode)
         {
-            if (_selectedBones.Count == 0) return;
+            if (_selectedBones.Count == 0)
+                return false;
 
             //TODO: FIX ME
             //if(_boneSelectionState.EnableInverseKinematics)
@@ -51,55 +54,73 @@ namespace GameWorld.Core.Commands.Bone
             //    ApplyTransformationInverseKinematic(newPosition, _selectedBones[0], _boneSelectionState.InverseKinematicsEndBoneIndex);
             //    return;
             //}
-            if (_oldTransform == Matrix.Identity)
+            if (!_oldTransform.Decompose(
+                    out var oldScale,
+                    out var oldRotation,
+                    out var oldTranslation) ||
+                !newTransform.Decompose(
+                    out var newScale,
+                    out var newRotation,
+                    out var newTranslation))
             {
-                _oldTransform = newPosition;
-                return;
+                return false;
             }
 
-            var matrixDelta = newPosition - _oldTransform;
-            _oldTransform = newPosition;
-            Console.WriteLine($" gizmo moved: {Transform.Translation}");
-            //Console.WriteLine($" gizmo pivotPoint: {PivotPoint}");
+            var translationDelta = newTranslation - oldTranslation;
+            var rotationDelta = Quaternion.Inverse(oldRotation) * newRotation;
+            rotationDelta.Normalize();
+            if (gizmoMode is GizmoMode.NonUniformScale or GizmoMode.UniformScale &&
+                (Math.Abs(oldScale.X) < 0.000001f ||
+                 Math.Abs(oldScale.Y) < 0.000001f ||
+                 Math.Abs(oldScale.Z) < 0.000001f))
+            {
+                return false;
+            }
+
+            var scaleDelta = new Vector3(
+                newScale.X / oldScale.X,
+                newScale.Y / oldScale.Y,
+                newScale.Z / oldScale.Z);
+            _oldTransform = newTransform;
+
+            var isNoOp = gizmoMode switch
+            {
+                GizmoMode.Translate => translationDelta == Vector3.Zero,
+                GizmoMode.Rotate =>
+                    Math.Abs(Quaternion.Dot(rotationDelta, Quaternion.Identity)) >
+                    0.999999f,
+                GizmoMode.NonUniformScale or GizmoMode.UniformScale =>
+                    scaleDelta == Vector3.One,
+                _ => throw new InvalidOperationException("unknown gizmo mode")
+            };
+            if (isNoOp)
+                return false;
+
+            var modifiedFrame = _animation.DynamicFrames[_currentFrame].Clone();
             foreach (var selectedBone in _selectedBones)
             {
-                var node = _boneSelectionState.RenderObject as Rmv2MeshNode;
-                var animationPlayer = node.AnimationPlayer;
-                var currentAnimFrame = animationPlayer.GetCurrentAnimationFrame();
-                var currentBoneWorldTransform = currentAnimFrame.GetSkeletonAnimatedWorld(_boneSelectionState.Skeleton, selectedBone);
-                currentBoneWorldTransform.Translation += matrixDelta.Translation;
-                var newBoneTransform = GetSkeletonAnimatedBoneFromWorld(currentAnimFrame, _boneSelectionState.Skeleton, selectedBone, currentBoneWorldTransform);
-
-                Console.WriteLine(_boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Position[selectedBone]);
-                newBoneTransform.Decompose(out var scale, out var rot, out var trans);
-                newPosition.Decompose(out var newScale, out var rot2, out var trans2);
-                var modifiedTransform = _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Clone();
                 switch (gizmoMode)
                 {
                     case GizmoMode.Translate:
-                        modifiedTransform.Position[selectedBone] += trans;
+                        modifiedFrame.Position[selectedBone] += translationDelta;
                         break;
                     case GizmoMode.Rotate:
-                        modifiedTransform.Rotation[selectedBone] *= rot2;
+                        modifiedFrame.Rotation[selectedBone] *= rotationDelta;
+                        modifiedFrame.Rotation[selectedBone].Normalize();
                         break;
                     case GizmoMode.NonUniformScale:
                     case GizmoMode.UniformScale:
-                        modifiedTransform.Scale[selectedBone] = scale;
+                        modifiedFrame.Scale[selectedBone] = new Vector3(
+                            modifiedFrame.Scale[selectedBone].X * scaleDelta.X,
+                            modifiedFrame.Scale[selectedBone].Y * scaleDelta.Y,
+                            modifiedFrame.Scale[selectedBone].Z * scaleDelta.Z);
                         break;
-                    default:
-                        throw new InvalidOperationException("unknown gizmo mode");
                 }
-
-                _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = modifiedTransform;
             }
 
-            _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
-        }
-
-        public Matrix GetSkeletonAnimatedBoneFromWorld(AnimationFrame frame, GameSkeleton gameSkeleton, int boneIndex, Matrix objectInWorldTransform)
-        {
-            var output = objectInWorldTransform * Matrix.Invert(frame.GetSkeletonAnimatedWorld(gameSkeleton, boneIndex));
-            return output;
+            _animation.DynamicFrames[_currentFrame] = modifiedFrame;
+            PublishModified();
+            return true;
         }
 
         //TODO: FIX ME
@@ -213,37 +234,70 @@ namespace GameWorld.Core.Commands.Bone
             BackwardReaching(positions, boneLengths, positions[index + 1], index + 1);
         }
 
-        public static void CompareKeyFrames(KeyFrame A, KeyFrame B)
+        internal bool HasFrameMutation()
         {
-            for (var j = 0; j < A.Position.Count; j++)
+            if (_oldFrame == null || _animation == null)
+                return false;
+
+            var currentFrame = _animation.DynamicFrames[_currentFrame];
+            const float epsilon = 0.00001f;
+            foreach (var selectedBone in _selectedBones)
             {
-                var posDiff = A.Position[j] - B.Position[j];
-                var rotDiff = A.Rotation[j].ToVector4() - B.Rotation[j].ToVector4();
-                var scaleDiff = A.Scale[j] - B.Scale[j];
-                if (posDiff != new Vector3(0) || rotDiff != new Vector4(0) || scaleDiff != new Vector3(0))
-                    Console.WriteLine($"Bone {j}: Position difference: {posDiff}, Rotation difference: {rotDiff}, Scale difference: {scaleDiff}");
+                if (Vector3.DistanceSquared(
+                        currentFrame.Position[selectedBone],
+                        _oldFrame.Position[selectedBone]) >
+                    epsilon * epsilon ||
+                    Vector3.DistanceSquared(
+                        currentFrame.Scale[selectedBone],
+                        _oldFrame.Scale[selectedBone]) >
+                    epsilon * epsilon)
+                {
+                    return true;
+                }
+
+                var currentRotation = currentFrame.Rotation[selectedBone];
+                var oldRotation = _oldFrame.Rotation[selectedBone];
+                currentRotation.Normalize();
+                oldRotation.Normalize();
+                if (1 - Math.Abs(Quaternion.Dot(currentRotation, oldRotation)) > epsilon)
+                    return true;
             }
+
+            return false;
         }
 
         public void Undo()
         {
             if (_oldFrame == null) return;
-            CompareKeyFrames(_oldFrame, _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame]);
-            _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
-            _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
+            _animation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
+            PublishModified();
+        }
+
+        public void Redo()
+        {
+            if (_newFrame == null) return;
+            _animation.DynamicFrames[_currentFrame] = _newFrame.Clone();
+            PublishModified();
         }
 
         internal void RestoreInitialFrame()
         {
             if (_oldFrame == null) return;
-            _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
+            _animation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
             _oldTransform = Matrix.Identity;
-            _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
+            PublishModified();
         }
 
         public void Execute()
         {
-            _oldSelectionState = _boneSelectionState;
+            _newFrame ??= _animation.DynamicFrames[_currentFrame].Clone();
+        }
+
+        private void PublishModified()
+        {
+            _boneSelectionState.TriggerModifiedBoneEvent(
+                (BoneSelectionState)_selectionSnapshot.Clone(),
+                _selectedBones);
         }
     }
 }
