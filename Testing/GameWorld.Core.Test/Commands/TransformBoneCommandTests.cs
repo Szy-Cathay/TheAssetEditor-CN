@@ -168,6 +168,67 @@ namespace Testing.GameWorld.Core.Commands
             });
         }
 
+        [Test]
+        public void BoneSelectionClone_SharesNotificationLineageWithIsolatedPayload()
+        {
+            var original = new BoneSelectionState(null)
+            {
+                CurrentAnimation = CreateAnimation(),
+                CurrentFrame = 1,
+                SelectedBones = [0]
+            };
+            var clone = (BoneSelectionState)original.Clone();
+            var eventState = (BoneSelectionState)original.Clone();
+            BoneSelectionState receivedState = null;
+            clone.BoneModifiedEvent += state => receivedState = state;
+
+            original.TriggerModifiedBoneEvent(eventState, [0]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(receivedState, Is.SameAs(eventState));
+                Assert.That(receivedState, Is.Not.SameAs(original));
+                Assert.That(receivedState.ModifiedBones, Is.EqualTo(new[] { 0 }));
+                Assert.That(original.ModifiedBones, Is.EqualTo(new[] { 0 }));
+            });
+            receivedState.ModifiedBones.Clear();
+            Assert.That(original.ModifiedBones, Is.EqualTo(new[] { 0 }));
+        }
+
+        [Test]
+        public void BoneSelectionClone_UnsubscribeRemovesOnlyThatLineageHandler()
+        {
+            var original = new BoneSelectionState(null);
+            var clone = (BoneSelectionState)original.Clone();
+            var notificationCount = 0;
+            BoneModifiedEvent handler = _ => notificationCount++;
+            clone.BoneModifiedEvent += handler;
+            original.TriggerModifiedBoneEvent([0]);
+
+            clone.BoneModifiedEvent -= handler;
+            original.TriggerModifiedBoneEvent([0]);
+
+            Assert.That(notificationCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void BoneSelectionClone_SubscriberExceptionStillPropagates()
+        {
+            var original = new BoneSelectionState(null);
+            var clone = (BoneSelectionState)original.Clone();
+            var expected = new InvalidOperationException("subscriber failed");
+            var laterSubscriberCount = 0;
+            clone.BoneModifiedEvent += _ => throw expected;
+            clone.BoneModifiedEvent += _ => laterSubscriberCount++;
+
+            var actual = Assert.Throws<InvalidOperationException>(
+                () => original.TriggerModifiedBoneEvent([0]));
+
+            Assert.That(actual, Is.SameAs(expected));
+            Assert.That(original.ModifiedBones, Is.EqualTo(new[] { 0 }));
+            Assert.That(laterSubscriberCount, Is.EqualTo(1));
+        }
+
         private static TransformContext CreateContext()
         {
             var eventHub = new Mock<IEventHub>();

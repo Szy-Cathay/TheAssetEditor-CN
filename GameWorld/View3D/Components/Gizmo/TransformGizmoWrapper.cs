@@ -445,8 +445,6 @@ namespace GameWorld.Core.Components.Gizmo
                     return;
                 }
 
-                Position += translation;
-                _totalGizomTransform *= Matrix.CreateTranslation(translation);
                 return;
             }
 
@@ -471,13 +469,6 @@ namespace GameWorld.Core.Components.Gizmo
                     return;
                 }
 
-                Position = Vector3.Transform(
-                    Position,
-                    boneDelta.CreateWorldMatrix());
-                _totalGizomTransform *= rotation;
-                var boneFixedTransform = FixRotationAxis2(_totalGizomTransform);
-                boneFixedTransform.Decompose(out _, out var boneQuat, out _);
-                Orientation = boneQuat;
                 return;
             }
 
@@ -507,14 +498,6 @@ namespace GameWorld.Core.Components.Gizmo
                     return;
                 }
 
-                Position = Vector3.Transform(
-                    Position,
-                    boneDelta.CreateWorldMatrix());
-                Scale = new Vector3(
-                    Scale.X * scaleFactor.X,
-                    Scale.Y * scaleFactor.Y,
-                    Scale.Z * scaleFactor.Z);
-                _totalGizomTransform *= scaleMatrix;
                 return;
             }
 
@@ -607,7 +590,30 @@ namespace GameWorld.Core.Components.Gizmo
         bool TransformBone(BoneTransformDelta delta)
         {
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
-                return transformBoneCommand.ApplyTransformation(delta);
+            {
+                try
+                {
+                    var applied = transformBoneCommand.ApplyTransformation(delta);
+                    if (applied)
+                        RefreshBoneDisplay();
+                    return applied;
+                }
+                catch (Exception exception)
+                {
+                    try
+                    {
+                        RefreshBoneDisplay();
+                    }
+                    catch (Exception refreshException)
+                    {
+                        _logger.Error(
+                            refreshException,
+                            "Failed to refresh bone transform display");
+                    }
+
+                    ExceptionDispatchInfo.Capture(exception).Throw();
+                }
+            }
 
             return false;
         }
