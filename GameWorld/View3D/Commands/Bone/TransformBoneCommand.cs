@@ -38,6 +38,7 @@ namespace GameWorld.Core.Commands.Bone
             _boneSelectionState = state;
             _currentFrame = state.CurrentFrame;
             _oldFrame = _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Clone();
+            _oldTransform = Matrix.Identity;
         }
 
         public void ApplyTransformation(Matrix newPosition, GizmoMode gizmoMode)
@@ -229,6 +230,14 @@ namespace GameWorld.Core.Commands.Bone
             if (_oldFrame == null) return;
             CompareKeyFrames(_oldFrame, _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame]);
             _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
+            _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
+        }
+
+        internal void RestoreInitialFrame()
+        {
+            if (_oldFrame == null) return;
+            _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
+            _oldTransform = Matrix.Identity;
             _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
         }
 

@@ -117,6 +117,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         // For precise ray-plane intersection calculation (like Blender's InputVector)
         private Vector3 _lastModalIntersection = Vector3.Zero;
+        private bool _suppressPointerGestureUntilRelease;
 
         // Dashed line parameters from mouse to pivot during modal transform
         private const int DASH_SCREEN_LENGTH = 20;  // Length of each dash in screen pixels
@@ -282,6 +283,29 @@ namespace GameWorld.Core.Components.Gizmo
             _mouse.ResetCursor();
 
             StopEvent?.Invoke();
+        }
+
+        internal void AbortTransformInteraction()
+        {
+            var wasModalTransform = IsInModalTransform;
+
+            IsInModalTransform = false;
+            IsModalCancelled = false;
+            ActiveAxis = GizmoAxis.None;
+            _suppressPointerGestureUntilRelease =
+                _mouse.State().LeftButton == ButtonState.Pressed;
+            _virtualMouse = default;
+            _lastModalIntersection = Vector3.Zero;
+            _numericInput = "";
+            IsInNumericInput = false;
+            _numericValue = 0f;
+            ResetDeltas();
+
+            if (wasModalTransform)
+            {
+                JustFinishedModalTransform = true;
+                _mouse.ResetCursor();
+            }
         }
 
         /// <summary>
@@ -1374,6 +1398,21 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
+            var suppressReleaseThisUpdate = false;
+            if (_suppressPointerGestureUntilRelease)
+            {
+                ActiveAxis = GizmoAxis.None;
+                ResetDeltas();
+                if (_mouse.State().LeftButton == ButtonState.Pressed)
+                {
+                    UpdateGizmoPosition();
+                    return;
+                }
+
+                _suppressPointerGestureUntilRelease = false;
+                suppressReleaseThisUpdate = true;
+            }
+
             // Blender-style axis/plane locking via X/Y/Z keys during transform
             if (_keyboard != null && _mouse.IsMouseButtonDown(MouseButton.Left))
             {
@@ -1425,7 +1464,9 @@ namespace GameWorld.Core.Components.Gizmo
                 }
                 else
                 {
-                    if (_mouse.LastState().LeftButton == ButtonState.Pressed && _mouse.State().LeftButton == ButtonState.Released)
+                    if (!suppressReleaseThisUpdate &&
+                        _mouse.LastState().LeftButton == ButtonState.Pressed &&
+                        _mouse.State().LeftButton == ButtonState.Released)
                         StopEvent?.Invoke();
 
                     ResetDeltas();

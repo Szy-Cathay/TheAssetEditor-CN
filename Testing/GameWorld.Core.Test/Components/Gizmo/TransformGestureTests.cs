@@ -1,6 +1,8 @@
 using System.Threading;
 using System.Reflection;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Commands;
+using GameWorld.Core.Commands.Bone;
 using GameWorld.Core.Commands.Vertex;
 using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Input;
@@ -16,6 +18,9 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using Moq;
 using Shared.Core.Events;
+using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel.MaterialHeaders;
+using Shared.GameFormats.RigidModel.Transforms;
 using Test.TestingUtility.Shared;
 
 namespace Testing.GameWorld.Core.Components.Gizmo
@@ -42,6 +47,74 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 Assert.That(context.Mesh.DeferBoundingBoxRebuild, Is.True);
                 Assert.That(context.Mesh.VertexArray, Is.Not.EqualTo(initialVertices));
             });
+        }
+
+        [Test]
+        public void SelectionChangeDuringLivePreview_CancelsOldGestureAndStopsSameDrag()
+        {
+            using var context = CreateComponentContext();
+            var oldWrapper = (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+            var initialVertices = context.Mesh.VertexArray.ToArray();
+            var stopEventCount = 0;
+            context.Component.Gizmo.StopEvent += () => stopEventCount++;
+            context.Component.Gizmo.ActiveAxis = GizmoAxis.X;
+            context.Component.Gizmo.ActiveMode = GizmoMode.Translate;
+            context.Component.Gizmo.Update(new GameTime(), enableMove: true);
+            oldWrapper.GizmoTranslateEvent(new Vector3(0.25f, 0, 0), PivotType.WorldOrigin);
+            Assert.That(context.Mesh.VertexArray, Is.Not.EqualTo(initialVertices));
+
+            var replacementMesh = CreateMesh();
+            var replacementVertices = replacementMesh.VertexArray.ToArray();
+            var replacementNode = new TestTransformableNode { Geometry = replacementMesh };
+            var replacementSelection = new ObjectSelectionState();
+            replacementSelection.ModifySelectionSingleObject(replacementNode, onlyRemove: false);
+            context.SelectionManager.SetState(replacementSelection);
+            var replacementWrapper =
+                (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+
+            context.Component.Gizmo.Update(new GameTime(), enableMove: true);
+            context.Mouse
+                .Setup(component => component.IsMouseButtonDown(MouseButton.Left))
+                .Returns(false);
+            context.Mouse.Setup(component => component.LastState()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Pressed,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Mouse.Setup(component => component.State()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Component.Gizmo.Update(new GameTime(), enableMove: true);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(replacementWrapper, Is.Not.SameAs(oldWrapper));
+                Assert.That(context.Mesh.VertexArray, Is.EqualTo(initialVertices));
+                Assert.That(context.Mesh.DeferBoundingBoxRebuild, Is.False);
+                Assert.That(oldWrapper.HasBackup, Is.False);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+                Assert.That(stopEventCount, Is.Zero);
+                Assert.That(context.Component.Gizmo.ActiveAxis, Is.EqualTo(GizmoAxis.None));
+                Assert.That(context.Component.Gizmo.IsInModalTransform, Is.False);
+                Assert.That(context.Mouse.Object.MouseOwner, Is.Null);
+                Assert.That(replacementMesh.VertexArray, Is.EqualTo(replacementVertices));
+            });
+            AssertNoTransientBackup(oldWrapper);
+            AssertNoActiveCommand(oldWrapper);
+            context.Mouse.Verify(component => component.ClearStates(), Times.Once);
         }
 
         [Test]
@@ -123,6 +196,38 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             Assert.That(context.Meshes[0].VertexArray, Is.EqualTo(initialVertices));
             context.CommandExecutor.Redo();
             Assert.That(context.Meshes[0].VertexArray, Is.EqualTo(replacementPreview));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RestoreInitialPreviewState_UploadsBaselineWhenReplacementIsMissingOrRejected(
+            bool attemptRejectedReplacement)
+        {
+            var mesh = CreateMesh(out var graphics);
+            var context = CreateDirectContext(mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.BeginTransform();
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(0.3f, 0, 0),
+                PivotType.WorldOrigin);
+            Assert.That(graphics.UploadedVertexArray, Is.EqualTo(mesh.VertexArray));
+            graphics.ResetRebuildCounts();
+
+            context.Wrapper.RestoreInitialPreviewState();
+            if (attemptRejectedReplacement)
+            {
+                context.Wrapper.GizmoScaleEvent(
+                    new Vector3(-1.00001f, 0, 0),
+                    PivotType.ObjectCenter);
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(mesh.VertexArray, Is.EqualTo(initialVertices));
+                Assert.That(graphics.UploadedVertexArray, Is.EqualTo(initialVertices));
+                Assert.That(graphics.VertexBufferRebuildCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CancelTransform();
         }
 
         [Test]
@@ -242,6 +347,66 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 Is.EqualTo(new[] { selectedNode }));
         }
 
+        [Test]
+        public void BoneCancel_RestoresInitialFrameAndCreatesNoHistory()
+        {
+            var context = CreateBoneContext();
+            var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
+            context.Wrapper.BeginTransform();
+            ApplyTwoBoneTranslationPreviews(context.Wrapper);
+            Assert.That(
+                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                Is.Not.EqualTo(initialFrame.Position));
+
+            context.Wrapper.CancelTransform();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                    Is.EqualTo(initialFrame.Position));
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Rotation,
+                    Is.EqualTo(initialFrame.Rotation));
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Scale,
+                    Is.EqualTo(initialFrame.Scale));
+                Assert.That(context.ModifiedEventCount, Is.GreaterThanOrEqualTo(2));
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+            });
+        }
+
+        [Test]
+        public void BoneRestoreInitialPreviewState_RestoresFrameAndResetsPreviewDelta()
+        {
+            var context = CreateBoneContext();
+            var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
+            context.Wrapper.BeginTransform();
+            ApplyTwoBoneTranslationPreviews(context.Wrapper);
+            Assert.That(
+                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                Is.Not.EqualTo(initialFrame.Position));
+
+            context.Wrapper.RestoreInitialPreviewState();
+            Assert.That(
+                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                Is.EqualTo(initialFrame.Position));
+
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+            Assert.That(
+                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                Is.EqualTo(initialFrame.Position));
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+            Assert.That(
+                context.Selection.CurrentAnimation.DynamicFrames[0].Position,
+                Is.Not.EqualTo(initialFrame.Position));
+            context.Wrapper.CancelTransform();
+        }
+
         private static ComponentContext CreateComponentContext()
         {
             var eventHub = new TestEventHub();
@@ -300,7 +465,13 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             selection.ModifySelectionSingleObject(selectable, onlyRemove: false);
             selectionManager.SetState(selection);
 
-            return new ComponentContext(component, selectionManager, commandExecutor, eventHub, mesh);
+            return new ComponentContext(
+                component,
+                selectionManager,
+                commandExecutor,
+                eventHub,
+                mouse,
+                mesh);
         }
 
         private static DirectContext CreateDirectContext(params MeshObject[] meshes)
@@ -330,6 +501,86 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 meshes);
         }
 
+        private static BoneContext CreateBoneContext()
+        {
+            var player = new AnimationPlayer();
+            var skeletonFile = new AnimationFile
+            {
+                Header = new AnimationFile.AnimationHeader { SkeletonName = "TestSkeleton" },
+                Bones =
+                [
+                    new AnimationFile.BoneInfo
+                    {
+                        Name = "root",
+                        ParentId = -1
+                    }
+                ]
+            };
+            var skeletonFrame = new AnimationFile.Frame();
+            skeletonFrame.Transforms.Add(new RmvVector3());
+            skeletonFrame.Quaternion.Add(new RmvVector4(0, 0, 0, 1));
+            var skeletonPart = new AnimationFile.AnimationPart();
+            skeletonPart.DynamicFrames.Add(skeletonFrame);
+            skeletonFile.AnimationParts.Add(skeletonPart);
+            var skeleton = new GameSkeleton(skeletonFile, player);
+
+            var clip = new AnimationClip();
+            clip.DynamicFrames.Add(new AnimationClip.KeyFrame
+            {
+                Position = [Vector3.Zero],
+                Rotation = [Quaternion.Identity],
+                Scale = [Vector3.One]
+            });
+            clip.PlayTimeInSec = 1;
+            player.SetAnimation(clip, skeleton);
+            player.IsEnabled = true;
+            player.Pause();
+            player.Refresh();
+
+            var material = new Mock<IRmvMaterial>();
+            material.SetupProperty(value => value.ModelName, "TestMesh");
+            material.SetupProperty(value => value.PivotPoint, Vector3.Zero);
+            var node = new Rmv2MeshNode(CreateMesh(), material.Object, null, player);
+            var selection = new BoneSelectionState(node)
+            {
+                CurrentAnimation = clip,
+                Skeleton = skeleton,
+                CurrentFrame = 0,
+                SelectedBones = [0]
+            };
+            var modifiedEventCount = 0;
+            selection.BoneModifiedEvent += _ => modifiedEventCount++;
+
+            var eventHub = new TestEventHub();
+            var commandExecutor = new CommandExecutor(eventHub);
+            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            selectionManager.SetState(selection);
+            var serviceProvider = new Mock<IServiceProvider>();
+            serviceProvider
+                .Setup(provider => provider.GetService(typeof(TransformBoneCommand)))
+                .Returns(() => new TransformBoneCommand(selectionManager));
+            var commandFactory = new CommandFactory(serviceProvider.Object, commandExecutor);
+            var wrapper = new TransformGizmoWrapper(
+                commandFactory,
+                selection.SelectedBones,
+                selection);
+            return new BoneContext(
+                wrapper,
+                selection,
+                commandExecutor,
+                () => modifiedEventCount);
+        }
+
+        private static void ApplyTwoBoneTranslationPreviews(TransformGizmoWrapper wrapper)
+        {
+            wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+            wrapper.GizmoTranslateEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+        }
+
         private static void AssertNoTransientBackup(TransformGizmoWrapper wrapper)
         {
             const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -348,9 +599,25 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             });
         }
 
+        private static void AssertNoActiveCommand(TransformGizmoWrapper wrapper)
+        {
+            const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            Assert.That(
+                typeof(TransformGizmoWrapper)
+                    .GetField("_activeCommand", Flags)
+                    ?.GetValue(wrapper),
+                Is.Null);
+        }
+
         private static MeshObject CreateMesh()
         {
-            var mesh = new MeshObject(new TestGraphicsCardGeometry(), string.Empty)
+            return CreateMesh(out _);
+        }
+
+        private static MeshObject CreateMesh(out TestGraphicsCardGeometry graphics)
+        {
+            graphics = new TestGraphicsCardGeometry();
+            var mesh = new MeshObject(graphics, string.Empty)
             {
                 VertexArray =
                 [
@@ -434,11 +701,21 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             TestEventHub EventHub,
             IReadOnlyList<MeshObject> Meshes);
 
+        private sealed record BoneContext(
+            TransformGizmoWrapper Wrapper,
+            BoneSelectionState Selection,
+            CommandExecutor CommandExecutor,
+            Func<int> GetModifiedEventCount)
+        {
+            public int ModifiedEventCount => GetModifiedEventCount();
+        }
+
         private sealed record ComponentContext(
             GizmoComponent Component,
             SelectionManager SelectionManager,
             CommandExecutor CommandExecutor,
             TestEventHub EventHub,
+            Mock<IMouseComponent> Mouse,
             MeshObject Mesh) : IDisposable
         {
             public void Dispose() => Component.Dispose();

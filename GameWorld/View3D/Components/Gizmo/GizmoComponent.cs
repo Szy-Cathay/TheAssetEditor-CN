@@ -9,6 +9,7 @@ using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using Shared.Core.Events;
+using System.Runtime.ExceptionServices;
 
 namespace GameWorld.Core.Components.Gizmo
 {
@@ -74,18 +75,62 @@ namespace GameWorld.Core.Components.Gizmo
 
         private void OnSelectionChanged(ISelectionState state)
         {
-            _gizmo.Selection.Clear();
-            _activeTransformation = TransformGizmoWrapper.CreateFromSelectionState(state, _commandFactory);
-            if (_activeTransformation != null)
+            ExceptionDispatchInfo primaryError = null;
+            if (_activeTransformation?.IsTransformActive == true)
             {
-                // Pass falloff value for face/edge mode proportional editing
-                if (state is FaceSelectionState || state is EdgeSelectionState)
-                    _activeTransformation.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
-                _gizmo.Selection.Add(_activeTransformation);
+                try
+                {
+                    _activeTransformation.CancelTransform();
+                }
+                catch (Exception exception)
+                {
+                    primaryError = ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    _gizmo.AbortTransformInteraction();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    ReleaseMouseOwnership();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
             }
 
-            _gizmo.ResetDeltas();
+            _activeTransformation = null;
+            try
+            {
+                _gizmo.Selection.Clear();
+                var replacement = TransformGizmoWrapper.CreateFromSelectionState(state, _commandFactory);
+                if (replacement != null)
+                {
+                    // Pass falloff value for face/edge mode proportional editing
+                    if (state is FaceSelectionState || state is EdgeSelectionState)
+                        replacement.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
+                    _gizmo.Selection.Add(replacement);
+                }
+
+                _activeTransformation = replacement;
+                _gizmo.ResetDeltas();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                _activeTransformation = null;
+                _gizmo.Selection.Clear();
+            }
+
             // Note: Don't auto-enable Gizmo here - user must click toolbar icon first
+            primaryError?.Throw();
         }
 
         /// <summary>
@@ -122,12 +167,17 @@ namespace GameWorld.Core.Components.Gizmo
                 // Gizmo should only be visible when explicitly enabled via toolbar button
                 _isEnabled = false;
 
-                if (_mouse.MouseOwner == this)
-                {
-                    _mouse.MouseOwner = null;
-                    _mouse.ClearStates();
-                }
+                ReleaseMouseOwnership();
             }
+        }
+
+        private void ReleaseMouseOwnership()
+        {
+            if (_mouse.MouseOwner != this)
+                return;
+
+            _mouse.MouseOwner = null;
+            _mouse.ClearStates();
         }
 
 

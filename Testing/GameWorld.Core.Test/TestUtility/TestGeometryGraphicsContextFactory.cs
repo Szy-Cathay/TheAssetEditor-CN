@@ -16,6 +16,7 @@ namespace GameWorld.Core.Test.TestUtility
         public int IndexBufferRebuildCount { get; private set; }
         public int VertexBufferRebuildCount { get; private set; }
         public int PartialVertexBufferRebuildCount { get; private set; }
+        public VertexPositionNormalTextureCustom[] UploadedVertexArray { get; private set; }
 
         public void RebuildIndexBuffer(ushort[] indexList)
         {
@@ -24,10 +25,13 @@ namespace GameWorld.Core.Test.TestUtility
         public void RebuildVertexBuffer(VertexPositionNormalTextureCustom[] vertArray, VertexDeclaration vertexDeclaration)
         {
             VertexBufferRebuildCount++;
+            UploadedVertexArray = vertArray.ToArray();
         }
         public void RebuildVertexBufferPartial(VertexPositionNormalTextureCustom[] vertArray, int startIndex, int count, VertexDeclaration vertexDeclaration, int vertexStride)
         {
             PartialVertexBufferRebuildCount++;
+            UploadedVertexArray ??= vertArray.ToArray();
+            Array.Copy(vertArray, startIndex, UploadedVertexArray, startIndex, count);
         }
 
         public void ResetRebuildCounts()

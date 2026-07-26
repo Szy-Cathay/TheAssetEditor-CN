@@ -169,9 +169,13 @@ namespace GameWorld.Core.Components.Gizmo
             ResetGestureState();
             if (_selectionState is BoneSelectionState)
             {
-                _activeCommand = _commandFactory.Create<TransformBoneCommand>()
+                var boneCommand = _commandFactory.Create<TransformBoneCommand>()
                     .Configure(x => x.Configure(_selectedBones, (BoneSelectionState)_selectionState))
                     .Build();
+                _backupPosition = _pos;
+                _backupOrientation = _orientation;
+                _backupScale = _scale;
+                _activeCommand = boneCommand;
                 return;
             }
 
@@ -218,17 +222,41 @@ namespace GameWorld.Core.Components.Gizmo
         {
             EndTransform(() =>
             {
-                if (_activeCommand is TransformVertexCommand || _hasBackup)
+                if (_activeCommand is TransformBoneCommand transformBoneCommand)
+                {
+                    try
+                    {
+                        transformBoneCommand.RestoreInitialFrame();
+                    }
+                    finally
+                    {
+                        ResetBonePreviewToBaseline();
+                    }
+                }
+                else if (_activeCommand is TransformVertexCommand || _hasBackup)
                     RestoreVertexBaseline(skipVertexUpload: false);
             });
         }
 
         public void RestoreInitialPreviewState()
         {
+            if (_activeCommand is TransformBoneCommand transformBoneCommand)
+            {
+                try
+                {
+                    transformBoneCommand.RestoreInitialFrame();
+                }
+                finally
+                {
+                    ResetBonePreviewToBaseline();
+                }
+                return;
+            }
+
             if (_activeCommand is not TransformVertexCommand || !_hasBackup)
                 return;
 
-            RestoreVertexBaseline(skipVertexUpload: true);
+            RestoreVertexBaseline(skipVertexUpload: false);
         }
 
         private void EndTransform(Action transformEnd)
@@ -298,6 +326,14 @@ namespace GameWorld.Core.Components.Gizmo
             _modifiedMin = int.MaxValue;
             _modifiedMax = -1;
             _hasModifications = false;
+        }
+
+        private void ResetBonePreviewToBaseline()
+        {
+            ResetGestureState();
+            _pos = _backupPosition;
+            _orientation = _backupOrientation;
+            _scale = _backupScale;
         }
 
         void ConfigureTransformCommandForCommit(TransformVertexCommand command)
@@ -614,6 +650,8 @@ namespace GameWorld.Core.Components.Gizmo
         /// Check if there's a valid backup
         /// </summary>
         public bool HasBackup => _hasBackup;
+
+        internal bool IsTransformActive => _activeCommand != null || _hasBackup;
 
         /// <summary>
         /// Set falloff distance for face/edge mode proportional editing
