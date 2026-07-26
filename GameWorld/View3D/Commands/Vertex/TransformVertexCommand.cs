@@ -21,7 +21,7 @@ namespace GameWorld.Core.Commands.Vertex
 
         SelectionManager _selectionManager;
         ISelectionState _oldSelectionState;
-        readonly List<VertexTransformOperation> _previewOperations = new();
+        VertexTransformReplayPlan? _replayPlan;
 
         public void Configure(List<MeshObject> geometryList, Vector3 pivotPoint)
         {
@@ -56,21 +56,22 @@ namespace GameWorld.Core.Commands.Vertex
             _selectionManager.SetState(_oldSelectionState);
         }
 
-        internal void SetPreviewOperations(IEnumerable<VertexTransformOperation> operations)
+        internal void SetReplayPlan(VertexTransformReplayPlan replayPlan)
         {
-            _previewOperations.Clear();
-            _previewOperations.AddRange(operations);
+            _replayPlan = replayPlan;
         }
 
         private void ApplyTransform(bool inverse)
         {
-            if (!VertexTransformOperationApplier.TryApplySequence(
+            if (_replayPlan == null ||
+                !VertexTransformOperationApplier.TryApplyReplayPlan(
                 _geometryList,
                 _oldSelectionState,
                 AffectedVertexIndices,
                 FalloffWeights,
-                _previewOperations,
-                inverse))
+                _replayPlan,
+                inverse,
+                out _))
             {
                 return;
             }

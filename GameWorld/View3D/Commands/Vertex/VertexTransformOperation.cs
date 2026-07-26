@@ -1,4 +1,5 @@
 using GameWorld.Core.Components.Selection;
+using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
 using Microsoft.Xna.Framework;
 using System.Collections.Generic;
@@ -25,42 +26,285 @@ namespace GameWorld.Core.Commands.Vertex
         public bool HasModifiedVertices => LastModifiedVertex >= FirstModifiedVertex;
     }
 
+    internal readonly record struct VertexTransformMatrixPair(
+        Matrix Forward,
+        Matrix Reverse);
+
+    internal sealed class VertexTransformReplayPlan
+    {
+        public VertexTransformMatrixPair RawMatrices { get; }
+        public IReadOnlyDictionary<float, VertexTransformMatrixPair> WeightedMatrices { get; }
+        public bool ContainsScale { get; }
+        public bool TransformsBasis { get; }
+        public int OperationCount { get; }
+
+        public VertexTransformReplayPlan(
+            VertexTransformMatrixPair rawMatrices,
+            IReadOnlyDictionary<float, VertexTransformMatrixPair> weightedMatrices,
+            bool containsScale,
+            bool transformsBasis,
+            int operationCount)
+        {
+            RawMatrices = rawMatrices;
+            WeightedMatrices = weightedMatrices;
+            ContainsScale = containsScale;
+            TransformsBasis = transformsBasis;
+            OperationCount = operationCount;
+        }
+    }
+
     internal static class VertexTransformOperationApplier
     {
         internal const float MinimumScaleAxisSafetyMagnitude = 0.001f;
         internal const float MaximumScaleAxisSafetyConditionNumber = 1000.0f;
         internal const float MaximumScalePositionRoundTripError = 0.00001f;
+        internal const float MaximumPositionRoundTripError = 0.0001f;
 
-        public static bool TryApply(
+        public static VertexTransformReplayPlan CreateEmptyReplayPlan(
+            ISelectionState selectionState,
+            IReadOnlyDictionary<int, float>? falloffWeights)
+        {
+            var identity = new VertexTransformMatrixPair(
+                Matrix.Identity,
+                Matrix.Identity);
+            var weightedMatrices = new Dictionary<float, VertexTransformMatrixPair>();
+            if (selectionState is VertexSelectionState vertexSelectionState)
+            {
+                foreach (var weight in vertexSelectionState.VertexWeights)
+                {
+                    if (weight != 0)
+                        weightedMatrices.TryAdd(weight, identity);
+                }
+            }
+            else if (falloffWeights != null && falloffWeights.Count > 0)
+            {
+                foreach (var weight in falloffWeights.Values)
+                {
+                    if (weight != 0)
+                        weightedMatrices.TryAdd(weight, identity);
+                }
+            }
+
+            return new VertexTransformReplayPlan(
+                identity,
+                weightedMatrices,
+                containsScale: false,
+                transformsBasis: false,
+                operationCount: 0);
+        }
+
+        public static bool TryAppendOperation(
             IReadOnlyList<MeshObject> geometryList,
             ISelectionState selectionState,
             HashSet<int>? affectedVertexIndices,
             IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformReplayPlan currentPlan,
             VertexTransformOperation operation,
-            bool inverse,
-            out IReadOnlyList<VertexTransformMeshResult> results,
-            bool validateScalePositionRoundTrip)
+            out VertexTransformReplayPlan candidatePlan)
         {
+            candidatePlan = currentPlan;
             if (!IsStructurallyValid(
                     geometryList,
                     selectionState,
                     affectedVertexIndices,
                     falloffWeights,
                     operation) ||
-                (validateScalePositionRoundTrip &&
-                 operation.Mode == VertexTransformOperationMode.Scale &&
-                 !AreAffectedScalePositionsReversible(
-                     geometryList,
-                     selectionState,
-                     affectedVertexIndices,
-                     falloffWeights,
-                     operation)))
+                !HasRequiredWeightMatrices(selectionState, falloffWeights, currentPlan) ||
+                !TryAppendMatrix(
+                    currentPlan.RawMatrices,
+                    operation.Transform,
+                    operation.PivotPoint,
+                    out var rawMatrices,
+                    out var rawStepMatrices))
+            {
+                return false;
+            }
+
+            var weightedMatrices =
+                new Dictionary<float, VertexTransformMatrixPair>(currentPlan.WeightedMatrices.Count);
+            var weightedStepMatrices =
+                new Dictionary<float, VertexTransformMatrixPair>(currentPlan.WeightedMatrices.Count);
+            foreach (var (weight, currentMatrices) in currentPlan.WeightedMatrices)
+            {
+                if (!TryCreateWeightedTransform(operation, weight, out var weightedTransform) ||
+                    !TryAppendMatrix(
+                        currentMatrices,
+                        weightedTransform,
+                        operation.PivotPoint,
+                        out var candidateMatrices,
+                        out var stepMatrices))
+                {
+                    return false;
+                }
+
+                weightedMatrices.Add(weight, candidateMatrices);
+                weightedStepMatrices.Add(weight, stepMatrices);
+            }
+
+            var nextPlan = new VertexTransformReplayPlan(
+                rawMatrices,
+                weightedMatrices,
+                currentPlan.ContainsScale || operation.Mode == VertexTransformOperationMode.Scale,
+                currentPlan.TransformsBasis || operation.Mode != VertexTransformOperationMode.Translate,
+                currentPlan.OperationCount + 1);
+            // Keep the stricter single-step scale guard in addition to baseline aggregate validation.
+            if (operation.Mode == VertexTransformOperationMode.Scale &&
+                !AreAffectedCurrentPositionsReversible(
+                    geometryList,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    rawStepMatrices,
+                    weightedStepMatrices))
+            {
+                return false;
+            }
+
+            candidatePlan = nextPlan;
+            return true;
+        }
+
+        public static bool IsReplayPlanReversibleFromBaseline(
+            IReadOnlyList<MeshObject> geometryList,
+            IReadOnlyList<VertexPositionNormalTextureCustom[]> baselineVertexArrays,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformReplayPlan replayPlan)
+        {
+            if (!IsReplayTargetValid(
+                    geometryList,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    replayPlan) ||
+                baselineVertexArrays.Count != geometryList.Count)
+            {
+                return false;
+            }
+
+            for (var meshIndex = 0; meshIndex < geometryList.Count; meshIndex++)
+            {
+                var geometry = geometryList[meshIndex];
+                var baseline = baselineVertexArrays[meshIndex];
+                if (baseline.Length != geometry.VertexCount())
+                    return false;
+
+                if (selectionState.Mode == GeometrySelectionMode.Vertex)
+                {
+                    var vertexSelectionState = (VertexSelectionState)selectionState;
+                    for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
+                    {
+                        var weight = vertexSelectionState.VertexWeights[vertexIndex];
+                        if (weight == 0)
+                            continue;
+
+                        if (!replayPlan.WeightedMatrices.TryGetValue(weight, out var matrices) ||
+                            !IsPositionReversible(
+                                baseline[vertexIndex].Position,
+                                matrices,
+                                MaximumPositionRoundTripError))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (affectedVertexIndices != null &&
+                         falloffWeights != null &&
+                         falloffWeights.Count > 0)
+                {
+                    foreach (var (vertexIndex, weight) in falloffWeights)
+                    {
+                        if (weight == 0)
+                            continue;
+
+                        if (vertexIndex < 0 ||
+                            vertexIndex >= baseline.Length ||
+                            !replayPlan.WeightedMatrices.TryGetValue(weight, out var matrices) ||
+                            !IsPositionReversible(
+                                baseline[vertexIndex].Position,
+                                matrices,
+                                MaximumPositionRoundTripError))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (affectedVertexIndices != null)
+                {
+                    foreach (var vertexIndex in affectedVertexIndices)
+                    {
+                        if (vertexIndex < 0 ||
+                            vertexIndex >= baseline.Length ||
+                            !IsPositionReversible(
+                                baseline[vertexIndex].Position,
+                                replayPlan.RawMatrices,
+                                MaximumPositionRoundTripError))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    for (var vertexIndex = 0; vertexIndex < baseline.Length; vertexIndex++)
+                    {
+                        if (!IsPositionReversible(
+                            baseline[vertexIndex].Position,
+                            replayPlan.RawMatrices,
+                            MaximumPositionRoundTripError))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        public static bool TryApplyReplayPlan(
+            IReadOnlyList<MeshObject> geometryList,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformReplayPlan replayPlan,
+            bool inverse,
+            out IReadOnlyList<VertexTransformMeshResult> results)
+        {
+            if (!IsReplayTargetValid(
+                    geometryList,
+                    selectionState,
+                    affectedVertexIndices,
+                    falloffWeights,
+                    replayPlan))
             {
                 results = Array.Empty<VertexTransformMeshResult>();
                 return false;
             }
 
-            var appliedResults = new List<VertexTransformMeshResult>(geometryList.Count);
+            results = ApplyReplayPlan(
+                geometryList,
+                selectionState,
+                affectedVertexIndices,
+                falloffWeights,
+                replayPlan,
+                inverse);
+            return true;
+        }
+
+        public static IReadOnlyList<VertexTransformMeshResult> ApplyReplayPlan(
+            IReadOnlyList<MeshObject> geometryList,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformReplayPlan replayPlan,
+            bool inverse)
+        {
+            if (replayPlan.OperationCount == 0)
+                return Array.Empty<VertexTransformMeshResult>();
+
+            var results = new List<VertexTransformMeshResult>(geometryList.Count);
             foreach (var geometry in geometryList)
             {
                 var firstModifiedVertex = int.MaxValue;
@@ -70,83 +314,59 @@ namespace GameWorld.Core.Commands.Vertex
                     selectionState,
                     affectedVertexIndices,
                     falloffWeights,
-                    operation,
+                    replayPlan,
                     inverse,
                     ref firstModifiedVertex,
                     ref lastModifiedVertex);
-                appliedResults.Add(new VertexTransformMeshResult(
+                results.Add(new VertexTransformMeshResult(
                     geometry,
                     firstModifiedVertex,
                     lastModifiedVertex));
             }
 
-            results = appliedResults;
-            return true;
+            return results;
         }
 
-        public static bool AreStructurallyValid(
+        public static void RestoreAffectedVerticesFromBaseline(
             IReadOnlyList<MeshObject> geometryList,
+            IReadOnlyList<VertexPositionNormalTextureCustom[]> baselineVertexArrays,
             ISelectionState selectionState,
             HashSet<int>? affectedVertexIndices,
-            IReadOnlyDictionary<int, float>? falloffWeights,
-            IReadOnlyList<VertexTransformOperation> operations)
+            IReadOnlyDictionary<int, float>? falloffWeights)
         {
-            foreach (var operation in operations)
+            for (var meshIndex = 0; meshIndex < geometryList.Count; meshIndex++)
             {
-                if (!IsStructurallyValid(
-                    geometryList,
-                    selectionState,
-                    affectedVertexIndices,
-                    falloffWeights,
-                    operation))
+                var geometry = geometryList[meshIndex];
+                var baseline = baselineVertexArrays[meshIndex];
+                if (selectionState.Mode == GeometrySelectionMode.Vertex)
                 {
-                    return false;
+                    var vertexSelectionState = (VertexSelectionState)selectionState;
+                    for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
+                    {
+                        if (vertexSelectionState.VertexWeights[vertexIndex] != 0)
+                            geometry.VertexArray[vertexIndex] = baseline[vertexIndex];
+                    }
+                }
+                else if (affectedVertexIndices != null &&
+                         falloffWeights != null &&
+                         falloffWeights.Count > 0)
+                {
+                    foreach (var (vertexIndex, weight) in falloffWeights)
+                    {
+                        if (weight != 0)
+                            geometry.VertexArray[vertexIndex] = baseline[vertexIndex];
+                    }
+                }
+                else if (affectedVertexIndices != null)
+                {
+                    foreach (var vertexIndex in affectedVertexIndices)
+                        geometry.VertexArray[vertexIndex] = baseline[vertexIndex];
+                }
+                else
+                {
+                    Array.Copy(baseline, geometry.VertexArray, baseline.Length);
                 }
             }
-
-            return true;
-        }
-
-        public static bool TryApplySequence(
-            IReadOnlyList<MeshObject> geometryList,
-            ISelectionState selectionState,
-            HashSet<int>? affectedVertexIndices,
-            IReadOnlyDictionary<int, float>? falloffWeights,
-            IReadOnlyList<VertexTransformOperation> operations,
-            bool inverse)
-        {
-            if (!AreStructurallyValid(
-                    geometryList,
-                    selectionState,
-                    affectedVertexIndices,
-                    falloffWeights,
-                    operations) ||
-                !AreAggregateReplayMatricesValid(
-                    geometryList,
-                    selectionState,
-                    affectedVertexIndices,
-                    falloffWeights,
-                    operations,
-                    inverse))
-            {
-                return false;
-            }
-
-            if (operations.Count == 0)
-                return true;
-
-            foreach (var geometry in geometryList)
-            {
-                ApplySequenceToMesh(
-                    geometry,
-                    selectionState,
-                    affectedVertexIndices,
-                    falloffWeights,
-                    operations,
-                    inverse);
-            }
-
-            return true;
         }
 
         static bool IsStructurallyValid(
@@ -161,8 +381,7 @@ namespace GameWorld.Core.Commands.Vertex
                 (operation.Mode == VertexTransformOperationMode.Scale &&
                  !PassesScaleAxisSafetyGuards(operation.Transform)) ||
                 !IsInvertible(operation.Transform) ||
-                !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, false, out _) ||
-                !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, true, out _))
+                !TryCreateReplayMatrix(operation.Transform, operation.PivotPoint, out _))
             {
                 return false;
             }
@@ -170,25 +389,17 @@ namespace GameWorld.Core.Commands.Vertex
             if (selectionState.Mode == GeometrySelectionMode.Vertex)
             {
                 if (selectionState is not VertexSelectionState vertexSelectionState)
-                {
                     return false;
-                }
 
                 foreach (var geometry in geometryList)
                 {
                     if (vertexSelectionState.VertexWeights.Count > geometry.VertexCount())
                         return false;
 
-                    for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
+                    foreach (var weight in vertexSelectionState.VertexWeights)
                     {
-                        var weight = vertexSelectionState.VertexWeights[vertexIndex];
-                        if (!IsValidWeightedTransform(
-                            weight,
-                            operation,
-                            operation.PivotPoint))
-                        {
+                        if (!IsValidWeightedTransform(weight, operation))
                             return false;
-                        }
                     }
                 }
             }
@@ -198,15 +409,11 @@ namespace GameWorld.Core.Commands.Vertex
             {
                 foreach (var geometry in geometryList)
                 {
-                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                    foreach (var (vertexIndex, weight) in falloffWeights)
                     {
-                        if (!falloffWeights.TryGetValue(vertexIndex, out var weight))
-                            continue;
-
-                        if (!IsValidWeightedTransform(
-                            weight,
-                            operation,
-                            operation.PivotPoint))
+                        if (vertexIndex < 0 ||
+                            vertexIndex >= geometry.VertexCount() ||
+                            !IsValidWeightedTransform(weight, operation))
                         {
                             return false;
                         }
@@ -228,84 +435,108 @@ namespace GameWorld.Core.Commands.Vertex
             return true;
         }
 
-        static bool AreAggregateReplayMatricesValid(
-            IReadOnlyList<MeshObject> geometryList,
+        static bool HasRequiredWeightMatrices(
             ISelectionState selectionState,
-            HashSet<int>? affectedVertexIndices,
             IReadOnlyDictionary<int, float>? falloffWeights,
-            IReadOnlyList<VertexTransformOperation> operations,
-            bool inverse)
+            VertexTransformReplayPlan replayPlan)
         {
-            if (operations.Count == 0)
-                return true;
-
-            foreach (var geometry in geometryList)
+            if (selectionState is VertexSelectionState vertexSelectionState)
             {
-                if (selectionState.Mode == GeometrySelectionMode.Vertex)
+                foreach (var weight in vertexSelectionState.VertexWeights)
                 {
-                    var vertexSelectionState = (VertexSelectionState)selectionState;
-                    for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
-                    {
-                        var weight = vertexSelectionState.VertexWeights[vertexIndex];
-                        if (weight == 0)
-                            continue;
-
-                        if (!TryCreateAggregateReplayMatrix(
-                            operations,
-                            weight,
-                            inverse,
-                            out _,
-                            out _,
-                            out _))
-                        {
-                            return false;
-                        }
-                    }
+                    if (weight != 0 && !replayPlan.WeightedMatrices.ContainsKey(weight))
+                        return false;
                 }
-                else if (affectedVertexIndices != null &&
-                         falloffWeights != null &&
-                         falloffWeights.Count > 0)
+            }
+            else if (falloffWeights != null && falloffWeights.Count > 0)
+            {
+                foreach (var weight in falloffWeights.Values)
                 {
-                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
-                    {
-                        if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
-                            continue;
-
-                        if (!TryCreateAggregateReplayMatrix(
-                            operations,
-                            weight,
-                            inverse,
-                            out _,
-                            out _,
-                            out _))
-                        {
-                            return false;
-                        }
-                    }
-                }
-                else if (!TryCreateAggregateReplayMatrix(
-                    operations,
-                    weight: null,
-                    inverse,
-                    out _,
-                    out _,
-                    out _))
-                {
-                    return false;
+                    if (weight != 0 && !replayPlan.WeightedMatrices.ContainsKey(weight))
+                        return false;
                 }
             }
 
             return true;
         }
 
-        static bool AreAffectedScalePositionsReversible(
+        static bool IsReplayPlanValid(
+            ISelectionState selectionState,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformReplayPlan replayPlan)
+        {
+            if (!IsMatrixPairValid(replayPlan.RawMatrices) ||
+                !HasRequiredWeightMatrices(selectionState, falloffWeights, replayPlan))
+            {
+                return false;
+            }
+
+            foreach (var matrices in replayPlan.WeightedMatrices.Values)
+            {
+                if (!IsMatrixPairValid(matrices))
+                    return false;
+            }
+
+            return true;
+        }
+
+        static bool IsReplayTargetValid(
             IReadOnlyList<MeshObject> geometryList,
             ISelectionState selectionState,
             HashSet<int>? affectedVertexIndices,
             IReadOnlyDictionary<int, float>? falloffWeights,
-            VertexTransformOperation operation)
+            VertexTransformReplayPlan replayPlan)
         {
-            // This second, read-only affected-vertex pass keeps rejection atomic.
+            if (!IsReplayPlanValid(selectionState, falloffWeights, replayPlan))
+                return false;
+
+            if (selectionState.Mode == GeometrySelectionMode.Vertex)
+            {
+                if (selectionState is not VertexSelectionState vertexSelectionState)
+                    return false;
+
+                foreach (var geometry in geometryList)
+                {
+                    if (vertexSelectionState.VertexWeights.Count > geometry.VertexCount())
+                        return false;
+                }
+            }
+            else if (affectedVertexIndices != null &&
+                     falloffWeights != null &&
+                     falloffWeights.Count > 0)
+            {
+                foreach (var geometry in geometryList)
+                {
+                    foreach (var vertexIndex in falloffWeights.Keys)
+                    {
+                        if (vertexIndex < 0 || vertexIndex >= geometry.VertexCount())
+                            return false;
+                    }
+                }
+            }
+            else if (affectedVertexIndices != null)
+            {
+                foreach (var geometry in geometryList)
+                {
+                    foreach (var vertexIndex in affectedVertexIndices)
+                    {
+                        if (vertexIndex < 0 || vertexIndex >= geometry.VertexCount())
+                            return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        static bool AreAffectedCurrentPositionsReversible(
+            IReadOnlyList<MeshObject> geometryList,
+            ISelectionState selectionState,
+            HashSet<int>? affectedVertexIndices,
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            VertexTransformMatrixPair rawStepMatrices,
+            IReadOnlyDictionary<float, VertexTransformMatrixPair> weightedStepMatrices)
+        {
             foreach (var geometry in geometryList)
             {
                 if (selectionState.Mode == GeometrySelectionMode.Vertex)
@@ -317,10 +548,11 @@ namespace GameWorld.Core.Commands.Vertex
                         if (weight == 0)
                             continue;
 
-                        if (!IsScalePositionReversible(
-                            geometry.VertexArray[vertexIndex].Position,
-                            CreateWeightedTransform(operation, weight),
-                            operation.PivotPoint))
+                        if (!weightedStepMatrices.TryGetValue(weight, out var matrices) ||
+                            !IsPositionReversible(
+                                geometry.VertexArray[vertexIndex].Position,
+                                matrices,
+                                MaximumScalePositionRoundTripError))
                         {
                             return false;
                         }
@@ -330,15 +562,16 @@ namespace GameWorld.Core.Commands.Vertex
                          falloffWeights != null &&
                          falloffWeights.Count > 0)
                 {
-                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                    foreach (var (vertexIndex, weight) in falloffWeights)
                     {
-                        if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
+                        if (weight == 0)
                             continue;
 
-                        if (!IsScalePositionReversible(
-                            geometry.VertexArray[vertexIndex].Position,
-                            CreateWeightedTransform(operation, weight),
-                            operation.PivotPoint))
+                        if (!weightedStepMatrices.TryGetValue(weight, out var matrices) ||
+                            !IsPositionReversible(
+                                geometry.VertexArray[vertexIndex].Position,
+                                matrices,
+                                MaximumScalePositionRoundTripError))
                         {
                             return false;
                         }
@@ -348,10 +581,10 @@ namespace GameWorld.Core.Commands.Vertex
                 {
                     foreach (var vertexIndex in affectedVertexIndices)
                     {
-                        if (!IsScalePositionReversible(
+                        if (!IsPositionReversible(
                             geometry.VertexArray[vertexIndex].Position,
-                            operation.Transform,
-                            operation.PivotPoint))
+                            rawStepMatrices,
+                            MaximumScalePositionRoundTripError))
                         {
                             return false;
                         }
@@ -359,12 +592,12 @@ namespace GameWorld.Core.Commands.Vertex
                 }
                 else
                 {
-                    for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                    foreach (var vertex in geometry.VertexArray)
                     {
-                        if (!IsScalePositionReversible(
-                            geometry.VertexArray[vertexIndex].Position,
-                            operation.Transform,
-                            operation.PivotPoint))
+                        if (!IsPositionReversible(
+                            vertex.Position,
+                            rawStepMatrices,
+                            MaximumScalePositionRoundTripError))
                         {
                             return false;
                         }
@@ -375,173 +608,24 @@ namespace GameWorld.Core.Commands.Vertex
             return true;
         }
 
-        static void ApplySequenceToMesh(
-            MeshObject geometry,
-            ISelectionState selectionState,
-            HashSet<int>? affectedVertexIndices,
-            IReadOnlyDictionary<int, float>? falloffWeights,
-            IReadOnlyList<VertexTransformOperation> operations,
-            bool inverse)
-        {
-            if (selectionState.Mode == GeometrySelectionMode.Vertex)
-            {
-                var vertexSelectionState = (VertexSelectionState)selectionState;
-                for (var vertexIndex = 0; vertexIndex < vertexSelectionState.VertexWeights.Count; vertexIndex++)
-                {
-                    var weight = vertexSelectionState.VertexWeights[vertexIndex];
-                    if (weight == 0)
-                        continue;
-
-                    ApplySequenceVertex(
-                        geometry,
-                        vertexIndex,
-                        operations,
-                        weight,
-                        inverse);
-                }
-            }
-            else if (affectedVertexIndices != null &&
-                     falloffWeights != null &&
-                     falloffWeights.Count > 0)
-            {
-                for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
-                {
-                    if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
-                        continue;
-
-                    ApplySequenceVertex(
-                        geometry,
-                        vertexIndex,
-                        operations,
-                        weight,
-                        inverse);
-                }
-            }
-            else if (affectedVertexIndices != null)
-            {
-                foreach (var vertexIndex in affectedVertexIndices)
-                {
-                    ApplySequenceVertex(
-                        geometry,
-                        vertexIndex,
-                        operations,
-                        weight: null,
-                        inverse);
-                }
-            }
-            else
-            {
-                for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
-                {
-                    ApplySequenceVertex(
-                        geometry,
-                        vertexIndex,
-                        operations,
-                        weight: null,
-                        inverse);
-                }
-            }
-        }
-
-        static void ApplySequenceVertex(
-            MeshObject geometry,
-            int vertexIndex,
-            IReadOnlyList<VertexTransformOperation> operations,
-            float? weight,
-            bool inverse)
-        {
-            TryCreateAggregateReplayMatrix(
-                operations,
-                weight,
-                inverse,
-                out var replayMatrix,
-                out var containsScale,
-                out var transformsBasis);
-            if (!transformsBasis)
-            {
-                geometry.TransformVertexTranslation(vertexIndex, replayMatrix);
-                return;
-            }
-
-            var normalMatrix = Matrix.Transpose(Matrix.Invert(replayMatrix));
-            if (containsScale)
-            {
-                TransformScaleVertexPreservingBasisMagnitude(
-                    geometry,
-                    vertexIndex,
-                    replayMatrix,
-                    normalMatrix);
-            }
-            else
-            {
-                geometry.TransformVertexRotation(vertexIndex, replayMatrix, normalMatrix);
-            }
-        }
-
-        static bool TryCreateAggregateReplayMatrix(
-            IReadOnlyList<VertexTransformOperation> operations,
-            float? weight,
-            bool inverse,
-            out Matrix aggregateReplayMatrix,
-            out bool containsScale,
-            out bool transformsBasis)
-        {
-            aggregateReplayMatrix = Matrix.Identity;
-            containsScale = false;
-            transformsBasis = false;
-            foreach (var operation in operations)
-            {
-                var transform = operation.Transform;
-                if (weight.HasValue &&
-                    !TryCreateWeightedTransform(operation, weight.Value, out transform))
-                {
-                    return false;
-                }
-
-                if (!TryCreateReplayMatrix(
-                        transform,
-                        operation.PivotPoint,
-                        inverse: false,
-                        out var replayMatrix))
-                {
-                    return false;
-                }
-
-                // XNA uses row vectors: compose accepted pivoted steps in preview order,
-                // then invert the single aggregate for Undo to avoid per-step vertex rounding.
-                aggregateReplayMatrix *= replayMatrix;
-                if (!IsFinite(aggregateReplayMatrix))
-                    return false;
-
-                containsScale |= operation.Mode == VertexTransformOperationMode.Scale;
-                transformsBasis |= operation.Mode != VertexTransformOperationMode.Translate;
-            }
-
-            if (!IsInvertible(aggregateReplayMatrix))
-                return false;
-
-            if (inverse)
-                aggregateReplayMatrix = Matrix.Invert(aggregateReplayMatrix);
-            return IsFinite(aggregateReplayMatrix);
-        }
-
-        static bool IsScalePositionReversible(
+        static bool IsPositionReversible(
             Vector4 position,
-            Matrix transform,
-            Vector3 pivotPoint)
+            VertexTransformMatrixPair matrices,
+            float maximumRoundTripError)
         {
-            if (!TryCreateReplayMatrix(transform, pivotPoint, inverse: false, out var forward) ||
-                !TryCreateReplayMatrix(transform, pivotPoint, inverse: true, out var reverse) ||
-                !TryTransformPosition(position, forward, out var transformed) ||
-                !TryTransformPosition(transformed, reverse, out var roundTrip))
+            if (!TryTransformPosition(position, matrices.Forward, out var transformed) ||
+                !TryTransformPosition(
+                    transformed,
+                    matrices.Reverse,
+                    out var roundTrip))
             {
                 return false;
             }
 
             return
-                MathF.Abs(roundTrip.X - position.X) <= MaximumScalePositionRoundTripError &&
-                MathF.Abs(roundTrip.Y - position.Y) <= MaximumScalePositionRoundTripError &&
-                MathF.Abs(roundTrip.Z - position.Z) <= MaximumScalePositionRoundTripError;
+                MathF.Abs(roundTrip.X - position.X) <= maximumRoundTripError &&
+                MathF.Abs(roundTrip.Y - position.Y) <= maximumRoundTripError &&
+                MathF.Abs(roundTrip.Z - position.Z) <= maximumRoundTripError;
         }
 
         static bool TryTransformPosition(
@@ -559,8 +643,7 @@ namespace GameWorld.Core.Commands.Vertex
 
         static bool IsValidWeightedTransform(
             float weight,
-            VertexTransformOperation operation,
-            Vector3 pivotPoint)
+            VertexTransformOperation operation)
         {
             if (!float.IsFinite(weight))
                 return false;
@@ -571,8 +654,10 @@ namespace GameWorld.Core.Commands.Vertex
                    (operation.Mode != VertexTransformOperationMode.Scale ||
                     PassesScaleAxisSafetyGuards(weightedTransform)) &&
                    IsInvertible(weightedTransform) &&
-                   TryCreateReplayMatrix(weightedTransform, pivotPoint, false, out _) &&
-                   TryCreateReplayMatrix(weightedTransform, pivotPoint, true, out _);
+                   TryCreateReplayMatrix(
+                       weightedTransform,
+                       operation.PivotPoint,
+                       out _);
         }
 
         static void ApplyToMesh(
@@ -580,7 +665,7 @@ namespace GameWorld.Core.Commands.Vertex
             ISelectionState selectionState,
             HashSet<int>? affectedVertexIndices,
             IReadOnlyDictionary<int, float>? falloffWeights,
-            VertexTransformOperation operation,
+            VertexTransformReplayPlan replayPlan,
             bool inverse,
             ref int firstModifiedVertex,
             ref int lastModifiedVertex)
@@ -597,8 +682,8 @@ namespace GameWorld.Core.Commands.Vertex
                     ApplyVertex(
                         geometry,
                         vertexIndex,
-                        CreateWeightedTransform(operation, weight),
-                        operation,
+                        replayPlan.WeightedMatrices[weight],
+                        replayPlan,
                         inverse);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
@@ -607,16 +692,16 @@ namespace GameWorld.Core.Commands.Vertex
                      falloffWeights != null &&
                      falloffWeights.Count > 0)
             {
-                for (var vertexIndex = 0; vertexIndex < geometry.VertexCount(); vertexIndex++)
+                foreach (var (vertexIndex, weight) in falloffWeights)
                 {
-                    if (!falloffWeights.TryGetValue(vertexIndex, out var weight) || weight == 0)
+                    if (weight == 0)
                         continue;
 
                     ApplyVertex(
                         geometry,
                         vertexIndex,
-                        CreateWeightedTransform(operation, weight),
-                        operation,
+                        replayPlan.WeightedMatrices[weight],
+                        replayPlan,
                         inverse);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
@@ -628,8 +713,8 @@ namespace GameWorld.Core.Commands.Vertex
                     ApplyVertex(
                         geometry,
                         vertexIndex,
-                        operation.Transform,
-                        operation,
+                        replayPlan.RawMatrices,
+                        replayPlan,
                         inverse);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
@@ -641,8 +726,8 @@ namespace GameWorld.Core.Commands.Vertex
                     ApplyVertex(
                         geometry,
                         vertexIndex,
-                        operation.Transform,
-                        operation,
+                        replayPlan.RawMatrices,
+                        replayPlan,
                         inverse);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
@@ -652,26 +737,30 @@ namespace GameWorld.Core.Commands.Vertex
         static void ApplyVertex(
             MeshObject geometry,
             int vertexIndex,
-            Matrix transform,
-            VertexTransformOperation operation,
+            VertexTransformMatrixPair matrices,
+            VertexTransformReplayPlan replayPlan,
             bool inverse)
         {
-            TryCreateReplayMatrix(transform, operation.PivotPoint, inverse, out var replayMatrix);
-            if (operation.Mode == VertexTransformOperationMode.Translate)
+            var replayMatrix = inverse ? matrices.Reverse : matrices.Forward;
+            if (!replayPlan.TransformsBasis)
             {
                 geometry.TransformVertexTranslation(vertexIndex, replayMatrix);
                 return;
             }
 
             var normalMatrix = Matrix.Transpose(Matrix.Invert(replayMatrix));
-            if (operation.Mode == VertexTransformOperationMode.Rotate)
-                geometry.TransformVertexRotation(vertexIndex, replayMatrix, normalMatrix);
-            else
+            if (replayPlan.ContainsScale)
+            {
                 TransformScaleVertexPreservingBasisMagnitude(
                     geometry,
                     vertexIndex,
                     replayMatrix,
                     normalMatrix);
+            }
+            else
+            {
+                geometry.TransformVertexRotation(vertexIndex, replayMatrix, normalMatrix);
+            }
         }
 
         static void TransformScaleVertexPreservingBasisMagnitude(
@@ -699,10 +788,37 @@ namespace GameWorld.Core.Commands.Vertex
             return magnitude == 0 ? Vector3.Zero : direction * magnitude;
         }
 
-        static Matrix CreateWeightedTransform(VertexTransformOperation operation, float weight)
+        static bool TryAppendMatrix(
+            VertexTransformMatrixPair currentMatrices,
+            Matrix transform,
+            Vector3 pivotPoint,
+            out VertexTransformMatrixPair candidateMatrices,
+            out VertexTransformMatrixPair stepMatrices)
         {
-            TryCreateWeightedTransform(operation, weight, out var weightedTransform);
-            return weightedTransform;
+            candidateMatrices = default;
+            stepMatrices = default;
+            if (!TryCreateReplayMatrix(transform, pivotPoint, out var replayMatrix) ||
+                !TryCreateReplayMatrix(
+                    Matrix.Invert(transform),
+                    pivotPoint,
+                    out var conservativeReverseStep))
+                return false;
+
+            var forward = currentMatrices.Forward * replayMatrix;
+            if (!IsInvertible(forward))
+                return false;
+
+            var reverse = Matrix.Invert(forward);
+            if (!IsFinite(reverse))
+                return false;
+
+            candidateMatrices = new VertexTransformMatrixPair(
+                forward,
+                reverse);
+            stepMatrices = new VertexTransformMatrixPair(
+                replayMatrix,
+                conservativeReverseStep);
+            return true;
         }
 
         static bool TryCreateWeightedTransform(
@@ -716,8 +832,8 @@ namespace GameWorld.Core.Commands.Vertex
                     weightedTransform = Matrix.CreateTranslation(operation.Transform.Translation * weight);
                     return IsFinite(weightedTransform);
                 case VertexTransformOperationMode.Rotate:
-                    if (!operation.Transform.Decompose(out _, out var rotation, out _)
-                        || !IsFinite(rotation))
+                    if (!operation.Transform.Decompose(out _, out var rotation, out _) ||
+                        !IsFinite(rotation))
                     {
                         weightedTransform = default;
                         return false;
@@ -743,13 +859,11 @@ namespace GameWorld.Core.Commands.Vertex
         static bool TryCreateReplayMatrix(
             Matrix transform,
             Vector3 pivotPoint,
-            bool inverse,
             out Matrix replayMatrix)
         {
-            var transformToApply = inverse ? Matrix.Invert(transform) : transform;
             replayMatrix =
                 Matrix.CreateTranslation(-pivotPoint) *
-                transformToApply *
+                transform *
                 Matrix.CreateTranslation(pivotPoint);
             return IsInvertible(replayMatrix);
         }
@@ -760,13 +874,17 @@ namespace GameWorld.Core.Commands.Vertex
                 return false;
 
             var determinant = transform.Determinant();
-            if (!float.IsFinite(determinant) ||
-                determinant == 0)
-            {
+            if (!float.IsFinite(determinant) || determinant == 0)
                 return false;
-            }
 
             return IsFinite(Matrix.Invert(transform));
+        }
+
+        static bool IsMatrixPairValid(VertexTransformMatrixPair matrices)
+        {
+            return
+                IsInvertible(matrices.Forward) &&
+                IsInvertible(matrices.Reverse);
         }
 
         static bool PassesScaleAxisSafetyGuards(Matrix transform)
@@ -777,8 +895,7 @@ namespace GameWorld.Core.Commands.Vertex
             var minimum = MathF.Min(x, MathF.Min(y, z));
             var maximum = MathF.Max(x, MathF.Max(y, z));
 
-            // Cheap early rejection before the coordinate-aware pass; this is not
-            // sufficient to establish reversibility by itself.
+            // Cheap early rejection; cumulative coordinate validation is authoritative.
             return minimum >= MinimumScaleAxisSafetyMagnitude &&
                    maximum / minimum <= MaximumScaleAxisSafetyConditionNumber;
         }

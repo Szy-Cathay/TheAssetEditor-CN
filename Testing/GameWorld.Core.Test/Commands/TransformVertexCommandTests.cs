@@ -290,6 +290,189 @@ namespace Testing.GameWorld.Core.Commands
         }
 
         [Test]
+        public void ObjectTranslation_LargeCoordinateWith240IncrementalUpdates_RendersAndRoundTripsFromBaseline()
+        {
+            const int updateCount = 240;
+            var delta = new Vector3(0.001f, 0, 0);
+            var mesh = CreateLargeCoordinateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
+                context.Wrapper.GizmoTranslateEvent(delta, PivotType.WorldOrigin);
+
+            var previewVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            var expectedTranslation = delta * updateCount;
+            for (var vertexIndex = 0; vertexIndex < initialVertices.Length; vertexIndex++)
+            {
+                AssertVector3(
+                    previewVertices[vertexIndex].Position3(),
+                    initialVertices[vertexIndex].Position3() + expectedTranslation,
+                    $"Long translation preview vertex {vertexIndex}");
+            }
+
+            TestContext.Out.WriteLine(
+                $"240-update translation Undo X error: " +
+                $"{MathF.Abs(undoVertices[0].Position.X - initialVertices[0].Position.X):R}; " +
+                $"preview X: {previewVertices[0].Position.X:R}; " +
+                $"Redo X: {redoVertices[0].Position.X:R}");
+            AssertVertices(undoVertices, initialVertices, "Long translation Undo");
+            AssertVertices(redoVertices, previewVertices, "Long translation Redo");
+        }
+
+        [Test]
+        public void ObjectScale_PivotTenRejectsTwentyFirstHalfScaleAndKeepsLastValidPreview()
+        {
+            const int acceptedUpdateCount = 20;
+            var mesh = CreatePivotTenMesh(collapsedX: false);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            for (var updateIndex = 0; updateIndex < acceptedUpdateCount; updateIndex++)
+            {
+                context.Wrapper.GizmoScaleEvent(
+                    new Vector3(-0.5f, 0, 0),
+                    PivotType.ObjectCenter);
+            }
+
+            var lastValidPreview = mesh.VertexArray.ToArray();
+            var lastValidScale = context.Wrapper.Scale;
+            Assert.That(lastValidPreview[0].Position.X, Is.GreaterThan(10.0f));
+            Assert.That(
+                lastValidPreview[0].Position.X,
+                Is.EqualTo(10.0f + MathF.Pow(0.5f, acceptedUpdateCount)).Within(Epsilon));
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-0.5f, 0, 0),
+                PivotType.ObjectCenter);
+            AssertVertices(mesh.VertexArray, lastValidPreview, "Rejected cumulative contraction preview");
+            Assert.That(context.Wrapper.Scale, Is.EqualTo(lastValidScale));
+            context.Wrapper.Stop(context.CommandExecutor);
+
+            context.CommandExecutor.Undo();
+            AssertVertices(mesh.VertexArray, initialVertices, "Cumulative contraction Undo");
+            context.CommandExecutor.Redo();
+            AssertVertices(mesh.VertexArray, lastValidPreview, "Cumulative contraction Redo");
+        }
+
+        [Test]
+        public void ObjectRotation_LargeCoordinateWith240SmallUpdates_PreservesNonUnitBasisAndRoundTrips()
+        {
+            const int updateCount = 240;
+            var rotation = Matrix.CreateFromAxisAngle(Vector3.UnitZ, 0.001f);
+            var mesh = CreateLargeCoordinateMesh(nonUnitBasisVertex: 0);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Start(context.CommandExecutor);
+
+            for (var updateIndex = 0; updateIndex < updateCount; updateIndex++)
+                context.Wrapper.GizmoRotateEvent(rotation, PivotType.WorldOrigin);
+
+            var previewVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            Assert.That(
+                Vector3.Distance(
+                    previewVertices[0].Position3(),
+                    initialVertices[0].Position3()),
+                Is.GreaterThan(1.0f));
+            Assert.That(previewVertices[0].Normal.Length(), Is.EqualTo(2.5f).Within(Epsilon));
+            Assert.That(previewVertices[0].Tangent.Length(), Is.EqualTo(2.5f).Within(Epsilon));
+            Assert.That(previewVertices[0].BiNormal.Length(), Is.EqualTo(2.5f).Within(Epsilon));
+            TestContext.Out.WriteLine(
+                $"240-update rotation Undo position error: " +
+                $"{Vector3.Distance(undoVertices[0].Position3(), initialVertices[0].Position3()):R}; " +
+                $"Redo-preview position error: " +
+                $"{Vector3.Distance(redoVertices[0].Position3(), previewVertices[0].Position3()):R}");
+            AssertVertices(undoVertices, initialVertices, "Long rotation Undo");
+            AssertVertices(redoVertices, previewVertices, "Long rotation Redo");
+        }
+
+        [Test]
+        public void MixedModeAndPivotGesture_RendersAggregateFromBaselineAndRoundTrips()
+        {
+            var mesh = CreateMesh(nonUnitBasisVertex: 0);
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            var initialVertices = mesh.VertexArray.ToArray();
+            var translation = new Vector3(0.25f, -0.1f, 0.05f);
+            var rotation = Matrix.CreateFromAxisAngle(Vector3.UnitZ, 0.2f);
+            var scale = Matrix.CreateScale(1.1f, 0.9f, 1.05f);
+            context.Wrapper.Start(context.CommandExecutor);
+
+            context.Wrapper.GizmoTranslateEvent(translation, PivotType.WorldOrigin);
+            var rotationPivot = context.Wrapper.Position;
+            context.Wrapper.GizmoRotateEvent(rotation, PivotType.ObjectCenter);
+            context.Wrapper.GizmoScaleEvent(new Vector3(0.1f, -0.1f, 0.05f), PivotType.WorldOrigin);
+            var previewVertices = mesh.VertexArray.ToArray();
+            context.Wrapper.Stop(context.CommandExecutor);
+            context.CommandExecutor.Undo();
+            var undoVertices = mesh.VertexArray.ToArray();
+            context.CommandExecutor.Redo();
+            var redoVertices = mesh.VertexArray.ToArray();
+
+            var aggregate =
+                Matrix.CreateTranslation(translation) *
+                Matrix.CreateTranslation(-rotationPivot) *
+                rotation *
+                Matrix.CreateTranslation(rotationPivot) *
+                scale;
+            var expectedPosition = Vector4.Transform(initialVertices[0].Position, aggregate);
+            AssertVector4(previewVertices[0].Position, expectedPosition, "Mixed gesture preview");
+            AssertVertices(undoVertices, initialVertices, "Mixed gesture Undo");
+            AssertVertices(redoVertices, previewVertices, "Mixed gesture Redo");
+        }
+
+        [Test]
+        public void NormalGesture_StartCapturesAndStopClearsTransientBackup()
+        {
+            var mesh = CreateMesh();
+            var selection = new ObjectSelectionState();
+            var context = CreateTransformContext(selection, mesh);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Wrapper.HasBackup, Is.False);
+                Assert.That(mesh.DeferBoundingBoxRebuild, Is.False);
+            });
+
+            context.Wrapper.Start(context.CommandExecutor);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Wrapper.HasBackup, Is.True);
+                Assert.That(mesh.DeferBoundingBoxRebuild, Is.True);
+            });
+            context.Wrapper.GizmoTranslateEvent(
+                new Vector3(0.2f, 0, 0),
+                PivotType.WorldOrigin);
+            var previewVertices = mesh.VertexArray.ToArray();
+
+            context.Wrapper.Stop(context.CommandExecutor);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Wrapper.HasBackup, Is.False);
+                Assert.That(mesh.DeferBoundingBoxRebuild, Is.False);
+            });
+            context.CommandExecutor.Undo();
+            context.CommandExecutor.Redo();
+            AssertVertices(mesh.VertexArray, previewVertices, "Backup lifecycle Redo");
+        }
+
+        [Test]
         public void MixedValidThenCoordinateInvalidScale_StoresOnlyValidOperation()
         {
             var mesh = CreatePivotTenMesh(collapsedX: false);
@@ -823,6 +1006,23 @@ namespace Testing.GameWorld.Core.Commands
                     CreateVertex(new Vector3(xCoordinates[1], 1, 0)),
                     CreateVertex(new Vector3(xCoordinates[2], -1, 1)),
                     CreateVertex(new Vector3(xCoordinates[3], 0, -1))
+                },
+                IndexArray = new ushort[] { 0, 1, 2, 0, 2, 3 }
+            };
+            mesh.BuildBoundingBox();
+            return mesh;
+        }
+
+        static MeshObject CreateLargeCoordinateMesh(int nonUnitBasisVertex = -1)
+        {
+            var mesh = new MeshObject(new TestGraphicsCardGeometry(), string.Empty)
+            {
+                VertexArray = new[]
+                {
+                    CreateVertex(new Vector3(100.0f, 20.0f, 0.2f), nonUnitBasisVertex == 0),
+                    CreateVertex(new Vector3(99.0f, -10.0f, -0.4f), nonUnitBasisVertex == 1),
+                    CreateVertex(new Vector3(100.5f, 5.0f, 1.5f), nonUnitBasisVertex == 2),
+                    CreateVertex(new Vector3(101.0f, -3.0f, -1.1f), nonUnitBasisVertex == 3)
                 },
                 IndexArray = new ushort[] { 0, 1, 2, 0, 2, 3 }
             };

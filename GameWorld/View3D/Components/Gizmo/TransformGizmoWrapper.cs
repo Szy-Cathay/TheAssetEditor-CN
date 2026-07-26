@@ -42,7 +42,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         Matrix _totalGizomTransform = Matrix.Identity;
         bool _invertedWindingOrder = false;
-        readonly List<VertexTransformOperation> _vertexTransformOperations = new();
+        VertexTransformReplayPlan? _vertexTransformReplayPlan;
 
         // -- Modal transform state backup (like Blender's TransData.iloc) -- //
         private List<VertexPositionNormalTextureCustom[]> _backupVertexArrays;
@@ -168,7 +168,9 @@ namespace GameWorld.Core.Components.Gizmo
                 ConfigureTransformCommandForCommit(transformVertexCommand);
                 commandManager.ExecuteCommand(_activeCommand);
                 _activeCommand = null;
-                _vertexTransformOperations.Clear();
+                if (_hasBackup)
+                    ClearBackup();
+                _vertexTransformReplayPlan = null;
             }
 
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
@@ -188,11 +190,11 @@ namespace GameWorld.Core.Components.Gizmo
             else
             {
                 _totalGizomTransform = Matrix.Identity;
-                _vertexTransformOperations.Clear();
                 _activeCommand = _commandFactory.Create<TransformVertexCommand>().Configure(x => x.Configure(_effectedObjects, Position)).Build();
                 // Pass affected vertex indices for Face/Edge mode undo
                 if (_activeCommand is TransformVertexCommand tvc && _faceVertexIndices != null)
                     tvc.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
+                BackupVertexState();
             }
 
         }
@@ -204,7 +206,8 @@ namespace GameWorld.Core.Components.Gizmo
                 ConfigureTransformCommandForCommit(transformVertexCommand);
                 commandManager.ExecuteCommand(_activeCommand);
                 _activeCommand = null;
-                _vertexTransformOperations.Clear();
+                ClearBackup();
+                _vertexTransformReplayPlan = null;
                 return;
             }
 
@@ -248,7 +251,7 @@ namespace GameWorld.Core.Components.Gizmo
             // Reset state after confirming
             _totalGizomTransform = Matrix.Identity;
             _invertedWindingOrder = false;
-            _vertexTransformOperations.Clear();
+            _vertexTransformReplayPlan = null;
         }
 
         void ConfigureTransformCommandForCommit(TransformVertexCommand command)
@@ -256,7 +259,11 @@ namespace GameWorld.Core.Components.Gizmo
             command.InvertWindingOrder = _invertedWindingOrder;
             command.Transform = _totalGizomTransform;
             command.PivotPoint = Position;
-            command.SetPreviewOperations(_vertexTransformOperations);
+            command.SetReplayPlan(
+                _vertexTransformReplayPlan ??
+                VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    _selectionState,
+                    _falloffDistance > 0 ? _falloffWeights : null));
             if (_faceVertexIndices != null)
                 command.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
             if (_falloffWeights != null && _falloffDistance > 0)
@@ -313,8 +320,8 @@ namespace GameWorld.Core.Components.Gizmo
 
             _totalGizomTransform *= scaleMatrix;
 
-            var negativeAxis = CountNegativeAxis(realScale);
-            if (negativeAxis % 2 != 0)
+            if (_selectionState is BoneSelectionState &&
+                CountNegativeAxis(realScale) % 2 != 0)
             {
                 _invertedWindingOrder = !_invertedWindingOrder;
 
@@ -367,20 +374,50 @@ namespace GameWorld.Core.Components.Gizmo
             var pivotPoint = pivotType == PivotType.ObjectCenter ? Position : Vector3.Zero;
             var operation = new VertexTransformOperation(operationMode, transform, pivotPoint);
             var falloffWeights = _falloffDistance > 0 ? _falloffWeights : null;
-            if (!VertexTransformOperationApplier.TryApply(
-                _effectedObjects,
-                _selectionState,
-                _faceVertexIndices,
-                falloffWeights,
-                operation,
-                inverse: false,
-                out var results,
-                validateScalePositionRoundTrip: true))
+            if (_vertexTransformReplayPlan == null ||
+                _backupVertexArrays == null ||
+                !VertexTransformOperationApplier.TryAppendOperation(
+                    _effectedObjects,
+                    _selectionState,
+                    _faceVertexIndices,
+                    falloffWeights,
+                    _vertexTransformReplayPlan,
+                    operation,
+                    out var candidatePlan) ||
+                !VertexTransformOperationApplier.IsReplayPlanReversibleFromBaseline(
+                    _effectedObjects,
+                    _backupVertexArrays,
+                    _selectionState,
+                    _faceVertexIndices,
+                    falloffWeights,
+                    candidatePlan))
             {
                 return false;
             }
 
-            _vertexTransformOperations.Add(operation);
+            VertexTransformOperationApplier.RestoreAffectedVerticesFromBaseline(
+                _effectedObjects,
+                _backupVertexArrays,
+                _selectionState,
+                _faceVertexIndices,
+                falloffWeights);
+            var results = VertexTransformOperationApplier.ApplyReplayPlan(
+                _effectedObjects,
+                _selectionState,
+                _faceVertexIndices,
+                falloffWeights,
+                candidatePlan,
+                inverse: false);
+            var candidateInvertedWindingOrder =
+                candidatePlan.RawMatrices.Forward.Determinant() < 0;
+            if (candidateInvertedWindingOrder != _invertedWindingOrder)
+            {
+                foreach (var geometry in _effectedObjects)
+                    TransformVertexCommand.ReverseWindingOrder(geometry);
+            }
+
+            _invertedWindingOrder = candidateInvertedWindingOrder;
+            _vertexTransformReplayPlan = candidatePlan;
             foreach (var result in results)
             {
                 if (_selectionState is VertexSelectionState && result.HasModifiedVertices)
@@ -423,7 +460,6 @@ namespace GameWorld.Core.Components.Gizmo
             _modifiedMin = int.MaxValue;
             _modifiedMax = -1;
             _hasModifications = false;
-            _vertexTransformOperations.Clear();
 
             if (_effectedObjects == null || _effectedObjects.Count == 0)
                 return;
@@ -450,6 +486,10 @@ namespace GameWorld.Core.Components.Gizmo
             // Backup position and orientation for rotation center
             _backupPosition = _pos;
             _backupOrientation = _orientation;
+            _vertexTransformReplayPlan =
+                VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    _selectionState,
+                    _falloffDistance > 0 ? _falloffWeights : null);
 
             _hasBackup = true;
         }
@@ -492,7 +532,10 @@ namespace GameWorld.Core.Components.Gizmo
             {
                 _totalGizomTransform = Matrix.Identity;
                 _invertedWindingOrder = false;
-                _vertexTransformOperations.Clear();
+                _vertexTransformReplayPlan =
+                    VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                        _selectionState,
+                        _falloffDistance > 0 ? _falloffWeights : null);
                 // Restore position and orientation for correct rotation center
                 _pos = _backupPosition;
                 _orientation = _backupOrientation;
@@ -531,7 +574,11 @@ namespace GameWorld.Core.Components.Gizmo
         {
             _totalGizomTransform = Matrix.Identity;
             _invertedWindingOrder = false;
-            _vertexTransformOperations.Clear();
+            _vertexTransformReplayPlan = _hasBackup
+                ? VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    _selectionState,
+                    _falloffDistance > 0 ? _falloffWeights : null)
+                : null;
         }
 
         /// <summary>
