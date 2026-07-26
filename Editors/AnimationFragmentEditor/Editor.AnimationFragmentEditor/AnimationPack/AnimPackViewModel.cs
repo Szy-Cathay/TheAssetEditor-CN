@@ -78,7 +78,7 @@ namespace CommonControls.Editors.AnimationPack
 
         bool BeforeItemSelected(IAnimationPackFile item)
         {
-            if (SelectedItemViewModel != null && SelectedItemViewModel.HasUnsavedChanges())
+            if (HasUnsavedChildChanges())
             {
                 if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.UnsavedChangesLost"), "", MessageBoxButton.YesNo) == MessageBoxResult.No)
                     return false;
@@ -129,11 +129,21 @@ namespace CommonControls.Editors.AnimationPack
         }
         public void Close() { }
         private bool _hasUnsavedChanges;
-        public bool HasUnsavedChanges { get => _hasUnsavedChanges; set => SetAndNotify(ref _hasUnsavedChanges, value); }
+        public bool HasUnsavedChanges
+        {
+            get => _hasUnsavedChanges || HasUnsavedChildChanges();
+            set => SetAndNotify(ref _hasUnsavedChanges, value);
+        }
 
         public PackFile CurrentFile => _packFile;
 
- 
+        private bool HasUnsavedChildChanges()
+        {
+            return TableEditorVM?.IsDirty == true ||
+                SelectedItemViewModel?.HasUnsavedChanges() == true;
+        }
+
+
         public bool SaveActiveFile()
         {
             if (_packFile == null)
@@ -142,13 +152,21 @@ namespace CommonControls.Editors.AnimationPack
                 return false;
             }
 
+            var tableDirty = TableEditorVM?.IsDirty == true;
+            var xmlDirty = SelectedItemViewModel?.HasUnsavedChanges() == true;
+            if (tableDirty && xmlDirty)
+                return false;
+
             var fileName = AnimationPackItems.SelectedItem.FileName;
             byte[] bytes;
             ITextConverter.SaveError? error;
+            var saveTable = (tableDirty && !xmlDirty) ||
+                (tableDirty == xmlDirty && IsTableView);
+            var tableEditorToSave = saveTable ? TableEditorVM : null;
 
-            if (IsTableView && TableEditorVM != null)
+            if (tableEditorToSave != null)
             {
-                bytes = TableEditorVM.SaveToBinary(fileName, out error);
+                bytes = tableEditorToSave.SaveToBinary(fileName, out error);
             }
             else
             {
@@ -167,7 +185,17 @@ namespace CommonControls.Editors.AnimationPack
             seletedFile.CreateFromBytes(bytes);
             seletedFile.IsChanged.Value = true;
 
-            SelectedItemViewModel.ResetChangeLog();
+            if (tableEditorToSave != null)
+            {
+                tableEditorToSave.IsDirty = false;
+                SelectedItemViewModel.Text = _activeConverter.GetText(bytes);
+                SelectedItemViewModel.ResetChangeLog();
+            }
+            else
+            {
+                SelectedItemViewModel.ResetChangeLog();
+                TableEditorVM?.LoadFromBinary(bytes, fileName);
+            }
             HasUnsavedChanges = true;
 
             return true;
@@ -182,9 +210,14 @@ namespace CommonControls.Editors.AnimationPack
                 return false;
             }
 
-            if (SelectedItemViewModel != null && SelectedItemViewModel.HasUnsavedChanges())
+            var tableDirty = TableEditorVM?.IsDirty == true;
+            var xmlDirty = SelectedItemViewModel?.HasUnsavedChanges() == true;
+            if (tableDirty && xmlDirty)
+                return false;
+
+            if (tableDirty || xmlDirty)
             {
-                if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.SaveAnyway"), "", MessageBoxButton.YesNo) == MessageBoxResult.No)
+                if (!SaveActiveFile() || HasUnsavedChildChanges())
                     return false;
             }
 
@@ -196,13 +229,12 @@ namespace CommonControls.Editors.AnimationPack
             var savePath = _pfs.GetFullPath(_packFile);
 
             var result = _packFileSaveService.Save(savePath, AnimationPackSerializer.ConvertToBytes(newAnimPack), false);
-            if (result != null)
-            {
-                HasUnsavedChanges = false;
-                foreach (var file in AnimationPackItems.PossibleValues)
-                    file.IsChanged.Value = false;
-            }
+            if (result == null)
+                return false;
 
+            HasUnsavedChanges = false;
+            foreach (var file in AnimationPackItems.PossibleValues)
+                file.IsChanged.Value = false;
             return true;
         }
 

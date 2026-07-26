@@ -1,7 +1,10 @@
 using System.Collections;
+using System.Collections.Specialized;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
@@ -54,6 +57,8 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         private AnimationEntryRowViewModel? _selectedRow;
         private IList _multiSelectedRows = new List<AnimationEntryRowViewModel>();
         private ITextConverter? _activeConverter;
+        private bool _suppressDirtyTracking;
+        private readonly HashSet<AnimationEntryRowViewModel> _trackedRows = new();
 
         // Undo system - snapshot based (includes header metadata)
         private readonly Stack<TableSnapshot> _undoSnapshots = new();
@@ -123,20 +128,20 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         public ICommand? SaveCommand { get; set; }
 
         // WH3 header properties
-        public string Name { get => _name; set => SetAndNotify(ref _name, value); }
-        public string SkeletonName { get => _skeletonName; set => SetAndNotify(ref _skeletonName, value); }
-        public string MountBin { get => _mountBin; set => SetAndNotify(ref _mountBin, value); }
-        public string LocomotionGraph { get => _locomotionGraph; set => SetAndNotify(ref _locomotionGraph, value); }
-        public uint TableVersion { get => _tableVersion; set => SetAndNotify(ref _tableVersion, value); }
-        public uint TableSubVersion { get => _tableSubVersion; set => SetAndNotify(ref _tableSubVersion, value); }
-        public short UnknownValue1 { get => _unknownValue1; set => SetAndNotify(ref _unknownValue1, value); }
+        public string Name { get => _name; set => SetAndMarkDirty(ref _name, value); }
+        public string SkeletonName { get => _skeletonName; set => SetAndMarkDirty(ref _skeletonName, value); }
+        public string MountBin { get => _mountBin; set => SetAndMarkDirty(ref _mountBin, value); }
+        public string LocomotionGraph { get => _locomotionGraph; set => SetAndMarkDirty(ref _locomotionGraph, value); }
+        public uint TableVersion { get => _tableVersion; set => SetAndMarkDirty(ref _tableVersion, value); }
+        public uint TableSubVersion { get => _tableSubVersion; set => SetAndMarkDirty(ref _tableSubVersion, value); }
+        public short UnknownValue1 { get => _unknownValue1; set => SetAndMarkDirty(ref _unknownValue1, value); }
 
         // Fragment header
-        public string Skeleton { get => _skeleton; set => SetAndNotify(ref _skeleton, value); }
+        public string Skeleton { get => _skeleton; set => SetAndMarkDirty(ref _skeleton, value); }
 
         // State
         public bool IsWh3 { get => _isWh3; set => SetAndNotify(ref _isWh3, value); }
-        public bool IsDirty { get => _isDirty; set => SetAndNotify(ref _isDirty, value); }
+        public bool IsDirty { get => _isDirty; set => SetAndNotifyWhenChanged(ref _isDirty, value); }
         public AnimationEntryRowViewModel? SelectedRow { get => _selectedRow; set => SetAndNotify(ref _selectedRow, value); }
         public IList MultiSelectedRows { get => _multiSelectedRows; set => SetAndNotify(ref _multiSelectedRows, value); }
 
@@ -152,8 +157,67 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             _metaDataFileParser = metaDataFileParser;
             _animPackFile = animPackFile;
             _gameType = gameType;
+            Rows.CollectionChanged += Rows_CollectionChanged;
             LoadFileLists();
         }
+
+        private void SetAndMarkDirty<T>(ref T field, T value, [CallerMemberName] string propertyName = "")
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return;
+
+            SetAndNotifyWhenChanged(ref field, value, propertyName: propertyName);
+            MarkDirty();
+        }
+
+        private void MarkDirty()
+        {
+            if (!_suppressDirtyTracking)
+                IsDirty = true;
+        }
+
+        private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                foreach (var row in _trackedRows)
+                    row.PropertyChanged -= Row_PropertyChanged;
+                _trackedRows.Clear();
+
+                foreach (var row in Rows)
+                    TrackRow(row);
+            }
+            else
+            {
+                if (e.OldItems != null)
+                {
+                    foreach (AnimationEntryRowViewModel row in e.OldItems)
+                        UntrackRow(row);
+                }
+
+                if (e.NewItems != null)
+                {
+                    foreach (AnimationEntryRowViewModel row in e.NewItems)
+                        TrackRow(row);
+                }
+            }
+
+            MarkDirty();
+        }
+
+        private void TrackRow(AnimationEntryRowViewModel row)
+        {
+            if (_trackedRows.Add(row))
+                row.PropertyChanged += Row_PropertyChanged;
+        }
+
+        private void UntrackRow(AnimationEntryRowViewModel row)
+        {
+            if (_trackedRows.Remove(row))
+                row.PropertyChanged -= Row_PropertyChanged;
+        }
+
+        private void Row_PropertyChanged(object? sender, PropertyChangedEventArgs e) => MarkDirty();
 
         private void LoadFileLists()
         {
@@ -179,27 +243,35 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
         public void LoadFromBinary(byte[] bytes, string fileName)
         {
-            Rows.Clear();
-            _undoSnapshots.Clear();
-            IsDirty = false;
-
+            _suppressDirtyTracking = true;
             try
             {
-                var bin = new AnimationBinWh3("", bytes);
-                LoadFromWh3Bin(bin);
-                return;
-            }
-            catch { }
+                Rows.Clear();
+                _undoSnapshots.Clear();
 
-            try
+                try
+                {
+                    var bin = new AnimationBinWh3("", bytes);
+                    LoadFromWh3Bin(bin);
+                    return;
+                }
+                catch { }
+
+                try
+                {
+                    var frag = new AnimationFragmentFile("", bytes, _gameType);
+                    LoadFromFragment(frag);
+                    return;
+                }
+                catch { }
+
+                IsWh3 = true;
+            }
+            finally
             {
-                var frag = new AnimationFragmentFile("", bytes, _gameType);
-                LoadFromFragment(frag);
-                return;
+                _suppressDirtyTracking = false;
+                IsDirty = false;
             }
-            catch { }
-
-            IsWh3 = true;
         }
 
         private void LoadFromWh3Bin(AnimationBinWh3 bin)

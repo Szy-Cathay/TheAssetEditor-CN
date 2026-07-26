@@ -12,12 +12,24 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
             if (animFile == null)
                 return;
 
-            var window = new TextInputWindow("Rename Anim File", animFile.FileName);
-            if (window.ShowDialog() == true)
-                animFile.FileName = window.TextValue;
+            var newFileName = GetNewFileName(animFile.FileName);
+            if (newFileName != null && newFileName != animFile.FileName)
+            {
+                animFile.FileName = newFileName;
+                editor.HasUnsavedChanges = true;
+            }
 
             // way to refresh the view
             editor.AnimationPackItems.RefreshFilter();
+        }
+
+        protected virtual string? GetNewFileName(string currentFileName)
+        {
+            var window = new TextInputWindow("Rename Anim File", currentFileName);
+            if (window.ShowDialog() == true)
+                return window.TextValue;
+
+            return null;
         }
     }
 
