@@ -1,10 +1,10 @@
 ﻿using GameWorld.Core.Commands;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Commands.Bone;
 using GameWorld.Core.Commands.Vertex;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
-using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Serilog;
@@ -16,7 +16,7 @@ using System.Runtime.ExceptionServices;
 
 namespace GameWorld.Core.Components.Gizmo
 {
-    public class TransformGizmoWrapper : ITransformable
+    public class TransformGizmoWrapper : ITransformable, IDisposable
     {
         protected ILogger _logger = Logging.Create<TransformGizmoWrapper>();
 
@@ -33,6 +33,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         List<MeshObject> _effectedObjects;
         List<int> _selectedBones;
+        BoneSelectionState _boneSelectionState;
         private readonly CommandFactory _commandFactory;
         ISelectionState _selectionState;
         // Vertex indices from selected faces (used by FaceSelectionState transform)
@@ -122,34 +123,95 @@ namespace GameWorld.Core.Components.Gizmo
         {
             _commandFactory = commandFactory;
             _selectionState = boneSelectionState;
-            _selectedBones = selectedBones;
+            _boneSelectionState = boneSelectionState;
+            _selectedBones = new List<int>(selectedBones);
 
             _effectedObjects = new List<MeshObject> { boneSelectionState.RenderObject.Geometry };
+            RefreshBoneDisplay();
+            _boneSelectionState.BoneModifiedEvent += OnBoneModified;
+        }
 
-            var sceneNode = boneSelectionState.RenderObject as Rmv2MeshNode;
-            var animPlayer = sceneNode.AnimationPlayer;
-            var currentFrame = animPlayer.GetCurrentAnimationFrame();
-            var skeleton = boneSelectionState.Skeleton;
-
-            if (currentFrame == null) return;
-
-            var bones = boneSelectionState.SelectedBones;
-            var totalBones = bones.Count;
-            var rotations = new List<Quaternion>();
-            Scale = Vector3.Zero;
-            foreach (var boneIdx in bones)
+        private void RefreshBoneDisplay()
+        {
+            var skeleton = _boneSelectionState.Skeleton;
+            var animation = _boneSelectionState.CurrentAnimation;
+            var frameIndex = _boneSelectionState.CurrentFrame;
+            if (skeleton == null ||
+                animation == null ||
+                frameIndex < 0 ||
+                frameIndex >= animation.DynamicFrames.Count)
             {
-                var bone = currentFrame.GetSkeletonAnimatedWorld(skeleton, boneIdx);
-                bone.Decompose(out var scale, out var rot, out var trans);
-                Position += trans;
-                Scale += scale;
-                rotations.Add(rot);
-
+                return;
             }
 
-            Orientation = AverageOrientation(rotations);
-            Position = Position / totalBones;
-            Scale = Scale / totalBones;
+            var currentFrame = AnimationSampler.Sample(
+                frameIndex,
+                0,
+                skeleton,
+                animation,
+                freezeFrame: true);
+            if (currentFrame == null)
+                return;
+
+            var totalBones = 0;
+            var rotations = new List<Quaternion>();
+            var position = Vector3.Zero;
+            var scaleTotal = Vector3.Zero;
+            foreach (var boneIdx in _selectedBones)
+            {
+                if (boneIdx < 0 || boneIdx >= currentFrame.BoneTransforms.Count)
+                    continue;
+
+                var bone = currentFrame.GetSkeletonAnimatedWorld(skeleton, boneIdx);
+                var scaleSignHint =
+                    GetWorldScaleSignHint(currentFrame, skeleton, boneIdx);
+                if (!BoneTransformMath.TryDecomposeSignedTrs(
+                        bone,
+                        scaleSignHint,
+                        out var scale,
+                        out var rot,
+                        out var trans) &&
+                    !bone.Decompose(out scale, out rot, out trans))
+                {
+                    continue;
+                }
+
+                position += trans;
+                scaleTotal += scale;
+                rotations.Add(rot);
+                totalBones++;
+            }
+
+            if (totalBones == 0)
+                return;
+
+            _orientation = AverageOrientation(rotations);
+            _pos = position / totalBones;
+            _scale = scaleTotal / totalBones;
+        }
+
+        private void OnBoneModified(BoneSelectionState state)
+        {
+            if (!IsTransformActive)
+                RefreshBoneDisplay();
+        }
+
+        private static Vector3 GetWorldScaleSignHint(
+            AnimationFrame frame,
+            GameSkeleton skeleton,
+            int boneIndex)
+        {
+            var signHint = Vector3.One;
+            var visitedBones = 0;
+            while (boneIndex >= 0 && visitedBones++ < skeleton.BoneCount)
+            {
+                signHint = BoneTransformMath.MultiplyComponents(
+                    signHint,
+                    frame.BoneTransforms[boneIndex].Scale);
+                boneIndex = skeleton.GetParentBoneIndex(boneIndex);
+            }
+
+            return signHint;
         }
 
         private Quaternion AverageOrientation(List<Quaternion> orientations)
@@ -211,9 +273,6 @@ namespace GameWorld.Core.Components.Gizmo
                 }
                 else if (_activeCommand is TransformBoneCommand transformBoneCommand)
                 {
-                    var matrix = _totalGizomTransform;
-                    matrix.Translation = Position;
-                    transformBoneCommand.Transform = matrix;
                     if (transformBoneCommand.HasFrameMutation())
                         commandExecutor.ExecuteCommand(transformBoneCommand);
                 }
@@ -374,6 +433,23 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void GizmoTranslateEvent(Vector3 translation, PivotType pivot)
         {
+            if (_selectionState is BoneSelectionState)
+            {
+                var pivotPoint = GetBonePivot(pivot);
+                if (!BoneTransformDelta.TryCreateTranslation(
+                        translation,
+                        pivotPoint,
+                        out var boneDelta) ||
+                    !TransformBone(boneDelta))
+                {
+                    return;
+                }
+
+                Position += translation;
+                _totalGizomTransform *= Matrix.CreateTranslation(translation);
+                return;
+            }
+
             if (!ApplyTransform(Matrix.CreateTranslation(translation), pivot, GizmoMode.Translate))
                 return;
 
@@ -383,6 +459,28 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void GizmoRotateEvent(Matrix rotation, PivotType pivot)
         {
+            if (_selectionState is BoneSelectionState)
+            {
+                var pivotPoint = GetBonePivot(pivot);
+                if (!BoneTransformDelta.TryCreateRotation(
+                        rotation,
+                        pivotPoint,
+                        out var boneDelta) ||
+                    !TransformBone(boneDelta))
+                {
+                    return;
+                }
+
+                Position = Vector3.Transform(
+                    Position,
+                    boneDelta.CreateWorldMatrix());
+                _totalGizomTransform *= rotation;
+                var boneFixedTransform = FixRotationAxis2(_totalGizomTransform);
+                boneFixedTransform.Decompose(out _, out var boneQuat, out _);
+                Orientation = boneQuat;
+                return;
+            }
+
             if (!ApplyTransform(rotation, pivot, GizmoMode.Rotate))
                 return;
 
@@ -395,32 +493,41 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void GizmoScaleEvent(Vector3 scale, PivotType pivot)
         {
-            var scaleMatrix = Matrix.CreateScale(scale + Vector3.One);
-            if (!ApplyTransform(scaleMatrix, pivot, GizmoMode.UniformScale))
-                return;
-
+            var scaleFactor = scale + Vector3.One;
+            var scaleMatrix = Matrix.CreateScale(scaleFactor);
             if (_selectionState is BoneSelectionState)
             {
-                var scaleFactor = scale + Vector3.One;
+                var pivotPoint = GetBonePivot(pivot);
+                if (!BoneTransformDelta.TryCreateScale(
+                        scaleFactor,
+                        pivotPoint,
+                        out var boneDelta) ||
+                    !TransformBone(boneDelta))
+                {
+                    return;
+                }
+
+                Position = Vector3.Transform(
+                    Position,
+                    boneDelta.CreateWorldMatrix());
                 Scale = new Vector3(
                     Scale.X * scaleFactor.X,
                     Scale.Y * scaleFactor.Y,
                     Scale.Z * scaleFactor.Z);
+                _totalGizomTransform *= scaleMatrix;
+                return;
             }
-            else
-                Scale += scale;
+
+            if (!ApplyTransform(scaleMatrix, pivot, GizmoMode.UniformScale))
+                return;
+
+            Scale += scale;
 
             _totalGizomTransform *= scaleMatrix;
         }
 
         bool ApplyTransform(Matrix transform, PivotType pivotType, GizmoMode gizmoMode)
         {
-            if (_selectionState is BoneSelectionState)
-            {
-                var cumulativeTransform = _totalGizomTransform * transform;
-                return TransformBone(cumulativeTransform, gizmoMode);
-            }
-
             var operationMode = gizmoMode switch
             {
                 GizmoMode.Translate => VertexTransformOperationMode.Translate,
@@ -497,12 +604,19 @@ namespace GameWorld.Core.Components.Gizmo
             return true;
         }
 
-        bool TransformBone(Matrix transform, GizmoMode gizmoMode)
+        bool TransformBone(BoneTransformDelta delta)
         {
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
-                return transformBoneCommand.ApplyTransformation(transform, gizmoMode);
+                return transformBoneCommand.ApplyTransformation(delta);
 
             return false;
+        }
+
+        private Vector3 GetBonePivot(PivotType pivot)
+        {
+            return pivot == PivotType.WorldOrigin
+                ? Vector3.Zero
+                : Position;
         }
 
         public Vector3 GetObjectCentre()
@@ -745,6 +859,15 @@ namespace GameWorld.Core.Components.Gizmo
                     return new TransformGizmoWrapper(commandFactory, boneSelectionState.SelectedBones, boneSelectionState);
             }
             return null;
+        }
+
+        public void Dispose()
+        {
+            if (_boneSelectionState != null)
+            {
+                _boneSelectionState.BoneModifiedEvent -= OnBoneModified;
+                _boneSelectionState = null;
+            }
         }
 
     }

@@ -474,6 +474,368 @@ namespace Testing.GameWorld.Core.Components.Gizmo
         }
 
         [Test]
+        public void SignedBoneScale_PreviewUndoRedoPreservesReflectionAndClones()
+        {
+            var context = CreateBoneContext();
+            var initialFrame = context.Selection.CurrentAnimation.DynamicFrames[0].Clone();
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-3, 0, 0),
+                PivotType.WorldOrigin);
+
+            var committedFrameReference =
+                context.Selection.CurrentAnimation.DynamicFrames[0];
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    committedFrameReference.Scale[0],
+                    Is.EqualTo(new Vector3(-2, 1, 1)));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(new Vector3(-2, 1, 1)));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            committedFrameReference.Scale[0] = new Vector3(99);
+            context.CommandExecutor.Undo();
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Scale,
+                    Is.EqualTo(initialFrame.Scale));
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.Not.SameAs(committedFrameReference));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(Vector3.One));
+            });
+
+            context.CommandExecutor.Redo();
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Scale[0],
+                    Is.EqualTo(new Vector3(-2, 1, 1)));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(new Vector3(-2, 1, 1)));
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.Not.SameAs(committedFrameReference));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(3));
+            });
+        }
+
+        [Test]
+        public void ExistingSignedBoneScale_InitialDisplayAndPreviewStaySigned()
+        {
+            var context = CreateBoneContext(
+                new AnimationClip.KeyFrame
+                {
+                    Position = [Vector3.Zero],
+                    Rotation = [Quaternion.Identity],
+                    Scale = [new Vector3(-2, 1, 1)]
+                },
+                [-1],
+                [0]);
+
+            Assert.That(context.Wrapper.Scale, Is.EqualTo(new Vector3(-2, 1, 1)));
+            context.Wrapper.BeginTransform();
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(0.5f, 0, 0),
+                PivotType.ObjectCenter);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0].Scale[0],
+                    Is.EqualTo(new Vector3(-3, 1, 1)));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(new Vector3(-3, 1, 1)));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [Test]
+        public void SelectionCenterRotation_UsesBoneSelectionCenterAsPivot()
+        {
+            var context = CreateBoneContext(
+                new AnimationClip.KeyFrame
+                {
+                    Position = [new Vector3(2, 0, 0)],
+                    Rotation = [Quaternion.Identity],
+                    Scale = [Vector3.One]
+                },
+                [-1],
+                [0]);
+            var worldBefore = GetBoneWorld(context, 0);
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoRotateEvent(
+                Matrix.CreateRotationZ(MathHelper.PiOver2),
+                PivotType.SelectionCenter);
+
+            Assert.Multiple(() =>
+            {
+                AssertMatrixNear(
+                    GetBoneWorld(context, 0),
+                    worldBefore *
+                    Matrix.CreateTranslation(-worldBefore.Translation) *
+                    Matrix.CreateRotationZ(MathHelper.PiOver2) *
+                    Matrix.CreateTranslation(worldBefore.Translation));
+                Assert.That(context.Wrapper.Position, Is.EqualTo(worldBefore.Translation));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [Test]
+        public void ShearedBoneRotation_IsRejectedAtomically()
+        {
+            var context = CreateBoneContext();
+            var initialFrameReference =
+                context.Selection.CurrentAnimation.DynamicFrames[0];
+            var initialPosition = context.Wrapper.Position;
+            var initialOrientation = context.Wrapper.Orientation;
+            var shearedRotation = Matrix.Identity;
+            shearedRotation.M21 = 0.5f;
+            shearedRotation.M22 = MathF.Sqrt(0.75f);
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoRotateEvent(
+                shearedRotation,
+                PivotType.WorldOrigin);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.SameAs(initialFrameReference));
+                Assert.That(context.Wrapper.Position, Is.EqualTo(initialPosition));
+                Assert.That(context.Wrapper.Orientation, Is.EqualTo(initialOrientation));
+                Assert.That(context.ModifiedEventCount, Is.Zero);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+            });
+        }
+
+        [Test]
+        public void ZeroBoneScale_IsRejectedBeforeFrameOrDisplayMutation()
+        {
+            var context = CreateBoneContext();
+            var initialFrameReference =
+                context.Selection.CurrentAnimation.DynamicFrames[0];
+            var initialScale = context.Wrapper.Scale;
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(-1, 0, 0),
+                PivotType.WorldOrigin);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.SameAs(initialFrameReference));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(initialScale));
+                Assert.That(context.ModifiedEventCount, Is.Zero);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+            });
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        public void NonFiniteBoneScale_IsRejectedAtomically(float invalidScale)
+        {
+            var context = CreateBoneContext();
+            var initialFrameReference =
+                context.Selection.CurrentAnimation.DynamicFrames[0];
+            var initialScale = context.Wrapper.Scale;
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(invalidScale, 0, 0),
+                PivotType.WorldOrigin);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.SameAs(initialFrameReference));
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(initialScale));
+                Assert.That(context.ModifiedEventCount, Is.Zero);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+            });
+        }
+
+        [Test]
+        public void ChildTranslation_UnderRotatedScaledParentMovesInWorldSpace()
+        {
+            var initialFrame = CreateTwoBoneFrame(
+                Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathHelper.PiOver2),
+                new Vector3(2));
+            var context = CreateBoneContext(initialFrame, [-1, 0], [1]);
+            var parentBefore = GetBoneWorld(context, 0);
+            var childBefore = GetBoneWorld(context, 1);
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoTranslateEvent(
+                Vector3.UnitX,
+                PivotType.WorldOrigin);
+
+            Assert.Multiple(() =>
+            {
+                AssertMatrixNear(GetBoneWorld(context, 0), parentBefore);
+                AssertMatrixNear(
+                    GetBoneWorld(context, 1),
+                    childBefore * Matrix.CreateTranslation(Vector3.UnitX));
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [TestCase(GizmoMode.Translate)]
+        [TestCase(GizmoMode.Rotate)]
+        [TestCase(GizmoMode.UniformScale)]
+        [TestCase(GizmoMode.NonUniformScale)]
+        public void SelectedHierarchy_AppliesWorldDeltaOnceToParentAndChild(
+            GizmoMode mode)
+        {
+            var context = CreateBoneContext(
+                CreateTwoBoneFrame(Quaternion.Identity, Vector3.One),
+                [-1, 0],
+                [0, 1]);
+            var before = new[]
+            {
+                GetBoneWorld(context, 0),
+                GetBoneWorld(context, 1)
+            };
+            context.Wrapper.BeginTransform();
+
+            Matrix expectedWorldDelta;
+            switch (mode)
+            {
+                case GizmoMode.Translate:
+                    expectedWorldDelta = Matrix.CreateTranslation(Vector3.UnitX);
+                    context.Wrapper.GizmoTranslateEvent(
+                        Vector3.UnitX,
+                        PivotType.WorldOrigin);
+                    break;
+                case GizmoMode.Rotate:
+                    expectedWorldDelta = Matrix.CreateRotationZ(MathHelper.PiOver2);
+                    context.Wrapper.GizmoRotateEvent(
+                        expectedWorldDelta,
+                        PivotType.WorldOrigin);
+                    break;
+                case GizmoMode.UniformScale:
+                    expectedWorldDelta = Matrix.CreateScale(2);
+                    context.Wrapper.GizmoScaleEvent(
+                        Vector3.One,
+                        PivotType.WorldOrigin);
+                    break;
+                case GizmoMode.NonUniformScale:
+                    expectedWorldDelta = Matrix.CreateScale(2, 0.5f, 1);
+                    context.Wrapper.GizmoScaleEvent(
+                        new Vector3(1, -0.5f, 0),
+                        PivotType.WorldOrigin);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
+            Assert.Multiple(() =>
+            {
+                AssertMatrixNear(
+                    GetBoneWorld(context, 0),
+                    before[0] * expectedWorldDelta);
+                AssertMatrixNear(
+                    GetBoneWorld(context, 1),
+                    before[1] * expectedWorldDelta);
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [Test]
+        public void SelectedDescendantThroughUnselectedParent_InheritsWorldDeltaOnce()
+        {
+            var initialFrame = new AnimationClip.KeyFrame
+            {
+                Position =
+                [
+                    new Vector3(1, 0, 0),
+                    new Vector3(1, 0, 0),
+                    new Vector3(1, 0, 0)
+                ],
+                Rotation =
+                [
+                    Quaternion.Identity,
+                    Quaternion.Identity,
+                    Quaternion.Identity
+                ],
+                Scale = [Vector3.One, Vector3.One, Vector3.One]
+            };
+            var context = CreateBoneContext(
+                initialFrame,
+                [-1, 0, 1],
+                [0, 2]);
+            var before = new[]
+            {
+                GetBoneWorld(context, 0),
+                GetBoneWorld(context, 1),
+                GetBoneWorld(context, 2)
+            };
+            var worldDelta = Matrix.CreateTranslation(Vector3.UnitX);
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoTranslateEvent(
+                Vector3.UnitX,
+                PivotType.WorldOrigin);
+
+            Assert.Multiple(() =>
+            {
+                AssertMatrixNear(GetBoneWorld(context, 0), before[0] * worldDelta);
+                AssertMatrixNear(GetBoneWorld(context, 1), before[1] * worldDelta);
+                AssertMatrixNear(GetBoneWorld(context, 2), before[2] * worldDelta);
+                Assert.That(context.ModifiedEventCount, Is.EqualTo(1));
+            });
+            context.Wrapper.CancelTransform();
+        }
+
+        [Test]
+        public void NonUniformWorldScaleThatCreatesShear_IsRejectedAtomically()
+        {
+            var initialFrame = CreateTwoBoneFrame(
+                Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathHelper.PiOver4),
+                new Vector3(2, 1, 1));
+            var context = CreateBoneContext(initialFrame, [-1, 0], [1]);
+            var initialFrameReference =
+                context.Selection.CurrentAnimation.DynamicFrames[0];
+            var initialWrapperScale = context.Wrapper.Scale;
+            var childBefore = GetBoneWorld(context, 1);
+            context.Wrapper.BeginTransform();
+
+            context.Wrapper.GizmoScaleEvent(
+                new Vector3(1, 0, 0),
+                PivotType.WorldOrigin);
+            context.Wrapper.CommitTransform(context.CommandExecutor);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    context.Selection.CurrentAnimation.DynamicFrames[0],
+                    Is.SameAs(initialFrameReference));
+                AssertMatrixNear(GetBoneWorld(context, 1), childBefore);
+                Assert.That(context.Wrapper.Scale, Is.EqualTo(initialWrapperScale));
+                Assert.That(context.ModifiedEventCount, Is.Zero);
+                Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+                Assert.That(context.EventHub.CommandStackChangedCount, Is.Zero);
+            });
+        }
+
+        [Test]
         public void BoneCancel_RestoresInitialFrameAndCreatesNoHistory()
         {
             var context = CreateBoneContext();
@@ -705,34 +1067,47 @@ namespace Testing.GameWorld.Core.Components.Gizmo
 
         private static BoneContext CreateBoneContext()
         {
+            return CreateBoneContext(
+                new AnimationClip.KeyFrame
+                {
+                    Position = [Vector3.Zero],
+                    Rotation = [Quaternion.Identity],
+                    Scale = [Vector3.One]
+                },
+                [-1],
+                [0]);
+        }
+
+        private static BoneContext CreateBoneContext(
+            AnimationClip.KeyFrame initialFrame,
+            int[] parentIds,
+            int[] selectedBones)
+        {
             var player = new AnimationPlayer();
             var skeletonFile = new AnimationFile
             {
                 Header = new AnimationFile.AnimationHeader { SkeletonName = "TestSkeleton" },
-                Bones =
-                [
-                    new AnimationFile.BoneInfo
+                Bones = parentIds
+                    .Select((parentId, boneIndex) => new AnimationFile.BoneInfo
                     {
-                        Name = "root",
-                        ParentId = -1
-                    }
-                ]
+                        Name = $"bone_{boneIndex}",
+                        ParentId = parentId
+                    })
+                    .ToArray()
             };
             var skeletonFrame = new AnimationFile.Frame();
-            skeletonFrame.Transforms.Add(new RmvVector3());
-            skeletonFrame.Quaternion.Add(new RmvVector4(0, 0, 0, 1));
+            foreach (var _ in parentIds)
+            {
+                skeletonFrame.Transforms.Add(new RmvVector3());
+                skeletonFrame.Quaternion.Add(new RmvVector4(0, 0, 0, 1));
+            }
             var skeletonPart = new AnimationFile.AnimationPart();
             skeletonPart.DynamicFrames.Add(skeletonFrame);
             skeletonFile.AnimationParts.Add(skeletonPart);
             var skeleton = new GameSkeleton(skeletonFile, player);
 
             var clip = new AnimationClip();
-            clip.DynamicFrames.Add(new AnimationClip.KeyFrame
-            {
-                Position = [Vector3.Zero],
-                Rotation = [Quaternion.Identity],
-                Scale = [Vector3.One]
-            });
+            clip.DynamicFrames.Add(initialFrame.Clone());
             clip.PlayTimeInSec = 1;
             player.SetAnimation(clip, skeleton);
             player.IsEnabled = true;
@@ -748,7 +1123,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 CurrentAnimation = clip,
                 Skeleton = skeleton,
                 CurrentFrame = 0,
-                SelectedBones = [0]
+                SelectedBones = selectedBones.ToList()
             };
             var modifiedEventCount = 0;
             selection.BoneModifiedEvent += _ => modifiedEventCount++;
@@ -772,6 +1147,59 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 commandExecutor,
                 eventHub,
                 () => modifiedEventCount);
+        }
+
+        private static AnimationClip.KeyFrame CreateTwoBoneFrame(
+            Quaternion parentRotation,
+            Vector3 parentScale)
+        {
+            return new AnimationClip.KeyFrame
+            {
+                Position = [new Vector3(1, 0, 0), new Vector3(1, 0, 0)],
+                Rotation = [parentRotation, Quaternion.Identity],
+                Scale = [parentScale, Vector3.One]
+            };
+        }
+
+        private static Matrix GetBoneWorld(BoneContext context, int boneIndex)
+        {
+            var frame = AnimationSampler.Sample(
+                0,
+                0,
+                context.Selection.Skeleton,
+                context.Selection.CurrentAnimation,
+                freezeFrame: true);
+            return frame.GetSkeletonAnimatedWorld(
+                context.Selection.Skeleton,
+                boneIndex);
+        }
+
+        private static void AssertMatrixNear(
+            Matrix actual,
+            Matrix expected,
+            float epsilon = 0.0001f)
+        {
+            var actualValues = new[]
+            {
+                actual.M11, actual.M12, actual.M13, actual.M14,
+                actual.M21, actual.M22, actual.M23, actual.M24,
+                actual.M31, actual.M32, actual.M33, actual.M34,
+                actual.M41, actual.M42, actual.M43, actual.M44
+            };
+            var expectedValues = new[]
+            {
+                expected.M11, expected.M12, expected.M13, expected.M14,
+                expected.M21, expected.M22, expected.M23, expected.M24,
+                expected.M31, expected.M32, expected.M33, expected.M34,
+                expected.M41, expected.M42, expected.M43, expected.M44
+            };
+            for (var component = 0; component < actualValues.Length; component++)
+            {
+                Assert.That(
+                    actualValues[component],
+                    Is.EqualTo(expectedValues[component]).Within(epsilon),
+                    $"matrix component {component}");
+            }
         }
 
         private static ICommand GetActiveCommand(TransformGizmoWrapper wrapper)

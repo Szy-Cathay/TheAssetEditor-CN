@@ -76,11 +76,12 @@ namespace GameWorld.Core.Components.Gizmo
         private void OnSelectionChanged(ISelectionState state)
         {
             ExceptionDispatchInfo primaryError = null;
-            if (_activeTransformation?.IsTransformActive == true)
+            var previousTransformation = _activeTransformation;
+            if (previousTransformation?.IsTransformActive == true)
             {
                 try
                 {
-                    _activeTransformation.CancelTransform();
+                    previousTransformation.CancelTransform();
                 }
                 catch (Exception exception)
                 {
@@ -104,6 +105,15 @@ namespace GameWorld.Core.Components.Gizmo
                 {
                     primaryError ??= ExceptionDispatchInfo.Capture(exception);
                 }
+            }
+
+            try
+            {
+                previousTransformation?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
             }
 
             _activeTransformation = null;
@@ -424,6 +434,8 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void Dispose()
         {
+            _activeTransformation?.Dispose();
+            _activeTransformation = null;
             _gizmo.Dispose();
         }
 

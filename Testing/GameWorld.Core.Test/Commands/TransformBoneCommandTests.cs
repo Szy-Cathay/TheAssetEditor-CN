@@ -6,6 +6,8 @@ using GameWorld.Core.Components.Selection;
 using Microsoft.Xna.Framework;
 using Moq;
 using Shared.Core.Events;
+using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel.Transforms;
 
 namespace Testing.GameWorld.Core.Commands
 {
@@ -22,9 +24,9 @@ namespace Testing.GameWorld.Core.Commands
         {
             var context = CreateContext();
             var initialFrameReference = context.Animation.DynamicFrames[1];
-            var transform = GetTransform(mode);
+            var transform = GetDelta(mode);
 
-            context.Command.ApplyTransformation(transform, mode);
+            context.Command.ApplyTransformation(transform);
 
             var committedFrameReference = context.Animation.DynamicFrames[1];
             AssertExpectedFrame(committedFrameReference, mode);
@@ -82,8 +84,7 @@ namespace Testing.GameWorld.Core.Commands
             context.Selection.CurrentFrame = 0;
 
             context.Command.ApplyTransformation(
-                Matrix.CreateTranslation(new Vector3(4, -2, 1)),
-                GizmoMode.Translate);
+                CreateTranslationDelta(new Vector3(4, -2, 1)));
 
             Assert.Multiple(() =>
             {
@@ -105,13 +106,11 @@ namespace Testing.GameWorld.Core.Commands
         {
             var context = CreateContext();
             context.Command.ApplyTransformation(
-                Matrix.CreateTranslation(new Vector3(1, 0, 0)),
-                GizmoMode.Translate);
+                CreateTranslationDelta(new Vector3(1, 0, 0)));
             context.LastModifiedState.ModifiedBones.Clear();
 
             context.Command.ApplyTransformation(
-                Matrix.CreateTranslation(new Vector3(2, 0, 0)),
-                GizmoMode.Translate);
+                CreateTranslationDelta(new Vector3(1, 0, 0)));
 
             Assert.Multiple(() =>
             {
@@ -128,8 +127,7 @@ namespace Testing.GameWorld.Core.Commands
         {
             var context = CreateContext();
             context.Command.ApplyTransformation(
-                Matrix.CreateTranslation(new Vector3(2, 0, 0)),
-                GizmoMode.Translate);
+                CreateTranslationDelta(new Vector3(2, 0, 0)));
             context.Command.Execute();
 
             context.Animation.DynamicFrames[1].Position[0] = new Vector3(50, 0, 0);
@@ -147,8 +145,8 @@ namespace Testing.GameWorld.Core.Commands
         {
             var context = CreateContext();
             var initialFrameReference = context.Animation.DynamicFrames[1];
-            var translation = Matrix.CreateTranslation(new Vector3(2, 0, 0));
-            context.Command.ApplyTransformation(translation, GizmoMode.Translate);
+            var translation = CreateTranslationDelta(new Vector3(2, 0, 0));
+            context.Command.ApplyTransformation(translation);
 
             context.Command.RestoreInitialFrame();
 
@@ -159,7 +157,7 @@ namespace Testing.GameWorld.Core.Commands
                 Assert.That(context.ModifiedEventCount, Is.EqualTo(2));
             });
 
-            context.Command.ApplyTransformation(translation, GizmoMode.Translate);
+            context.Command.ApplyTransformation(translation);
 
             Assert.Multiple(() =>
             {
@@ -179,7 +177,8 @@ namespace Testing.GameWorld.Core.Commands
             {
                 CurrentAnimation = animation,
                 CurrentFrame = 1,
-                SelectedBones = [0]
+                SelectedBones = [0],
+                Skeleton = CreateSkeleton()
             };
             var modifiedEventCount = 0;
             BoneSelectionState lastModifiedState = null;
@@ -218,16 +217,76 @@ namespace Testing.GameWorld.Core.Commands
             };
         }
 
-        private static Matrix GetTransform(GizmoMode mode)
+        private static BoneTransformDelta GetDelta(GizmoMode mode)
         {
-            return mode switch
+            var pivot = new Vector3(1, 2, 3);
+            BoneTransformDelta delta;
+            bool created;
+            switch (mode)
             {
-                GizmoMode.Translate => Matrix.CreateTranslation(new Vector3(4, -2, 1)),
-                GizmoMode.Rotate => Matrix.CreateFromQuaternion(
-                    Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathHelper.PiOver2)),
-                GizmoMode.UniformScale => Matrix.CreateScale(new Vector3(1.5f, 0.5f, 2)),
-                _ => throw new ArgumentOutOfRangeException(nameof(mode))
+                case GizmoMode.Translate:
+                    created = BoneTransformDelta.TryCreateTranslation(
+                        new Vector3(4, -2, 1),
+                        Vector3.Zero,
+                        out delta);
+                    break;
+                case GizmoMode.Rotate:
+                    created = BoneTransformDelta.TryCreateRotation(
+                        Quaternion.CreateFromAxisAngle(
+                            Vector3.UnitZ,
+                            MathHelper.PiOver2),
+                        pivot,
+                        out delta);
+                    break;
+                case GizmoMode.UniformScale:
+                    created = BoneTransformDelta.TryCreateScale(
+                        new Vector3(1.5f),
+                        pivot,
+                        out delta);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
+            Assert.That(created, Is.True);
+            return delta;
+        }
+
+        private static BoneTransformDelta CreateTranslationDelta(Vector3 translation)
+        {
+            Assert.That(
+                BoneTransformDelta.TryCreateTranslation(
+                    translation,
+                    Vector3.Zero,
+                    out var delta),
+                Is.True);
+            return delta;
+        }
+
+        private static GameSkeleton CreateSkeleton()
+        {
+            var skeletonFile = new AnimationFile
+            {
+                Header = new AnimationFile.AnimationHeader
+                {
+                    SkeletonName = "TestSkeleton"
+                },
+                Bones =
+                [
+                    new AnimationFile.BoneInfo
+                    {
+                        Name = "root",
+                        ParentId = -1
+                    }
+                ]
             };
+            var skeletonFrame = new AnimationFile.Frame();
+            skeletonFrame.Transforms.Add(new RmvVector3());
+            skeletonFrame.Quaternion.Add(new RmvVector4(0, 0, 0, 1));
+            var skeletonPart = new AnimationFile.AnimationPart();
+            skeletonPart.DynamicFrames.Add(skeletonFrame);
+            skeletonFile.AnimationParts.Add(skeletonPart);
+            return new GameSkeleton(skeletonFile, null);
         }
 
         private static void AssertInitialFrame(AnimationClip.KeyFrame frame)
@@ -250,19 +309,21 @@ namespace Testing.GameWorld.Core.Commands
             var expectedRotation = mode == GizmoMode.Rotate
                 ? new Quaternion(
                     0.27059805f,
-                    -0.27059805f,
+                    0.27059805f,
                     0.6532815f,
                     0.6532815f)
                 : new Quaternion(0.38268343f, 0, 0, 0.9238795f);
             var expectedScale = mode == GizmoMode.UniformScale
-                ? new Vector3(3, 1.5f, 8)
+                ? new Vector3(3, 4.5f, 6)
                 : new Vector3(2, 3, 4);
 
             Assert.Multiple(() =>
             {
                 Assert.That(frame.Position[0], Is.EqualTo(expectedPosition));
                 AssertQuaternionEquivalent(frame.Rotation[0], expectedRotation);
-                Assert.That(frame.Scale[0], Is.EqualTo(expectedScale));
+                Assert.That(
+                    Vector3.Distance(frame.Scale[0], expectedScale),
+                    Is.LessThan(Epsilon));
             });
         }
 
