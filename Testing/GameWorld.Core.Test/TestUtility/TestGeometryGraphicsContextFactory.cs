@@ -13,13 +13,29 @@ namespace GameWorld.Core.Test.TestUtility
     {
         public IndexBuffer IndexBuffer { get; }
         public VertexBuffer VertexBuffer { get; }
+        public int IndexBufferRebuildCount { get; private set; }
+        public int VertexBufferRebuildCount { get; private set; }
+        public int PartialVertexBufferRebuildCount { get; private set; }
 
         public void RebuildIndexBuffer(ushort[] indexList)
-        { }
+        {
+            IndexBufferRebuildCount++;
+        }
         public void RebuildVertexBuffer(VertexPositionNormalTextureCustom[] vertArray, VertexDeclaration vertexDeclaration)
-        { }
+        {
+            VertexBufferRebuildCount++;
+        }
         public void RebuildVertexBufferPartial(VertexPositionNormalTextureCustom[] vertArray, int startIndex, int count, VertexDeclaration vertexDeclaration, int vertexStride)
-        { }
+        {
+            PartialVertexBufferRebuildCount++;
+        }
+
+        public void ResetRebuildCounts()
+        {
+            IndexBufferRebuildCount = 0;
+            VertexBufferRebuildCount = 0;
+            PartialVertexBufferRebuildCount = 0;
+        }
 
         public IGraphicsCardGeometry Clone() { return this; }
         public void Dispose()
