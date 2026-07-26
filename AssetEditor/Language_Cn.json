@@ -1,5 +1,5 @@
 {
-  "_comment": "Language_Cn.json - TheAssetEditor 中文本地化",
+  "_comment": "Language_Cn.json - Asset Editor 国区版中文本地化",
 
   "General.Ok": "确定",
   "General.Cancel": "取消",
@@ -83,7 +83,6 @@
   "MainWindow.StatusBar.LoadingGamePacks": "正在加载游戏 Pack...",
 
   "SettingsWindow.Application": "应用程序",
-  "SettingsWindow.SelectedLanguage": "选择语言",
   "SettingsWindow.Theme": "主题",
   "SettingsWindow.StartMaximised": "启动时最大化",
   "SettingsWindow.SelectedGame": "选择游戏",
@@ -100,7 +99,7 @@
   "SettingsWindow.WwiseCli": "Wwise CLI",
 
   "UpdaterWindow.Title": "更新",
-  "UpdaterWindow.UpdateInfo": "AssetEditor 有新版本可用！\n\n当前版本为 {0}，更新到版本 {1} 以获取以下最新更改。",
+  "UpdaterWindow.UpdateInfo": "Asset Editor 国区版有新版本可用！\n\n当前版本为 {0}，更新到版本 {1} 以获取以下最新更改。",
   "UpdaterWindow.ReleaseNotes": "更新日志",
   "UpdaterWindow.UpdateButton": "更新",
   "UpdaterWindow.CancelButton": "取消",
@@ -119,7 +118,7 @@
   "Shared.CustomException.ForceClose": "紧急 - 强制关闭当前窗口",
   "Shared.CustomException.CloseError": "关闭错误窗口",
   "Shared.CustomException.CopyToClipboard": "复制到剪贴板",
-  "Shared.CustomException.InfoText": "如果此错误是意外的，请按复制按钮并通过 Discord 或 GitHub 将文本提供给开发者。\n剪贴板包含的信息比显示的更多！\n \nDiscord: https://discord.gg/moddingden \nGitHub: https://github.com/donkeyProgramming/TheAssetEditor/issues",
+  "Shared.CustomException.InfoText": "如果此错误是意外的，请按复制按钮并通过 Discord 或 GitHub 将文本提供给开发者。\n剪贴板包含的信息比显示的更多！\n \nDiscord: https://discord.gg/moddingden \nGitHub: https://github.com/Szy-Cathay/TheAssetEditor-CN/issues",
   "Shared.CustomException.ExtraInfoHeader": "附加信息",
   "Shared.CustomException.ErrorMessageLabel": "错误信息",
 
@@ -1083,7 +1082,7 @@
   "Msg.SourceIdConflictsDetected": "检测到以下 .wem 文件的 Source ID 与原版冲突：\n{0}",
   "Msg.StatePathIncomplete": "State Path 不完整，可能是 CA 修改了 Dialogue Event。请添加缺失的 State。",
 
-  "Title.AppTitle": "AssetEditor 国区特供 v{0}",
+  "Title.AppTitle": "Asset Editor 国区版 v{0}",
   "Title.CurrentGame": "当前游戏：{0}",
   "Title.EditablePack": "可编辑 Pack：{0}",
   "Title.EditablePackNone": "可编辑 Pack：未设置",
@@ -1193,10 +1192,6 @@
   "BackgroundColour.LegacyBlue": "经典蓝",
   "BackgroundColour.Green": "绿色",
   "BackgroundColour.Custom": "自定义",
-
-  "Language.CN": "中文",
-  "Language.EN": "English",
-  "Language.FR": "Français",
 
   "SettingsWindow.Font": "字体",
   "SettingsWindow.FontWeight": "字体粗细",

@@ -3,13 +3,16 @@
     public class DirectoryHelper
     {
         public static string UserDirectory { get { return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); } }
-        public static string ApplicationDirectory { get { return UserDirectory + "\\AssetEditor"; } }
+        public static string ApplicationDirectory { get { return Path.Combine(UserDirectory, "AssetEditor.CN"); } }
         public static string SchemaDirectory { get { return ApplicationDirectory + "\\Schemas"; } }
         public static string LogDirectory { get { return ApplicationDirectory + "\\Logs"; } }
         public static string ReportsDirectory { get { return ApplicationDirectory + "\\Reports"; } }
         public static string Applications { get { return ApplicationDirectory + "\\Applications"; } }
         public static string Temp { get { return ApplicationDirectory + "\\Temp"; } }
-        public static string UpdateDirectory { get { return Temp + "\\Update"; } }
+        public static string LocalApplicationDirectory { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetEditor.CN"); } }
+        public static string UpdateTempDirectory { get { return Path.Combine(LocalApplicationDirectory, "Temp"); } }
+        public static string UpdateDirectory { get { return Path.Combine(UpdateTempDirectory, "Update"); } }
+        public static string UpdateBackupRootDirectory { get { return Path.Combine(UpdateTempDirectory, "UpdateBackups"); } }
         public static string AnimationIndexMappingDirectory { get { return ApplicationDirectory + "\\Animation\\BoneIndexMapping"; } }
 
         public static void EnsureCreated()

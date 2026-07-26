@@ -4,13 +4,16 @@
         <LangVersion>preview</LangVersion>
         <TargetFramework>net10.0-windows</TargetFramework>
         <UseWPF>true</UseWPF>
-        <ApplicationIcon>AssetEditorIcon.ico</ApplicationIcon>
+        <AssemblyName>AssetEditor.CN</AssemblyName>
+        <RootNamespace>AssetEditor</RootNamespace>
+        <ApplicationIcon>AssetEditor.CN.ico</ApplicationIcon>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <Nullable>enable</Nullable>
     </PropertyGroup>
     <ItemGroup>
-      <None Remove="AssetEditorIcon.png" />
+      <None Remove="AssetEditor.CN.ico" />
+      <None Remove="AssetEditor.CN.png" />
     </ItemGroup>
 
     <ItemGroup>
@@ -41,13 +44,13 @@
 
     <PropertyGroup>
         <DebugType>embedded</DebugType>
-        <Authors>AssetEdCommunity</Authors>
-        <Company>Private</Company>
-        <Product>AssetEditor</Product>
-        <PackageProjectUrl>https://github.com/donkeyProgramming/TheAssetEditor</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/donkeyProgramming/TheAssetEditor</RepositoryUrl>
-        <PackageId>AssetEditor</PackageId>
-        <Version>1.0.4</Version>
+        <Authors>Szy-Cathay;AssetEdCommunity</Authors>
+        <Company>Szy-Cathay</Company>
+        <Product>AssetEditor.CN</Product>
+        <PackageProjectUrl>https://github.com/Szy-Cathay/TheAssetEditor-CN</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/Szy-Cathay/TheAssetEditor-CN</RepositoryUrl>
+        <PackageId>AssetEditor.CN</PackageId>
+        <Version>1.1.0</Version>
         <AssemblyVersion>$(Version)</AssemblyVersion>
         <AnalysisLevel>6.0</AnalysisLevel>
     </PropertyGroup>
@@ -62,18 +65,13 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Resource Include="AssetEditorIcon.png" />
+      <Resource Include="AssetEditor.CN.ico" />
+      <Resource Include="AssetEditor.CN.png" />
       <Resource Include="Fonts\*.ttf" />
     </ItemGroup>
 
     <ItemGroup>
       <None Update="Language_Cn.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="Language_Fr.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="Language_En.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>
@@ -94,9 +92,23 @@
         <PropertyGroup>
             <UpdaterProject>$(MSBuildProjectDirectory)\..\AssetEditorUpdater\AssetEditorUpdater.csproj</UpdaterProject>
             <AbsolutePublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</AbsolutePublishDir>
+            <UpdaterPublishDir>$(AbsolutePublishDir)\Updater</UpdaterPublishDir>
         </PropertyGroup>
 
-        <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" Properties="PublishDir=$(AbsolutePublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishReadyToRun=$(PublishReadyToRun)" />
+        <RemoveDir Directories="$(UpdaterPublishDir)" />
+        <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" RemoveProperties="PublishProfile" Properties="PublishDir=$(UpdaterPublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishReadyToRun=$(PublishReadyToRun)" />
+    </Target>
+
+    <Target Name="ExcludeLegacyDotNetRuntimeFromPublish" AfterTargets="ComputeFilesToPublish">
+        <ItemGroup>
+            <!-- MonoGame's legacy runtime dependencies must not override the current app host. -->
+            <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                                   Condition="'%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.App'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.DotNetAppHost'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.DotNetHostPolicy'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.DotNetHostResolver'
+                                           Or '%(ResolvedFileToPublish.NuGetPackageId)' == 'runtime.win-x64.Microsoft.NETCore.Jit'" />
+        </ItemGroup>
     </Target>
 
 </Project>

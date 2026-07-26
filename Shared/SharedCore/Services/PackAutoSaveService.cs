@@ -16,6 +16,7 @@ namespace Shared.Core.Services
         private readonly IPackFileService _packFileService;
         private readonly ApplicationSettingsService _settingsService;
         private readonly ILogger _logger = Logging.Create<PackAutoSaveService>();
+        private int _autoSaveInProgress;
 
         public PackAutoSaveService(IPackFileService packFileService, ApplicationSettingsService settingsService)
         {
@@ -61,23 +62,39 @@ namespace Shared.Core.Services
 
         private void OnTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+            TryAutoSave();
+        }
+
+        internal bool TryAutoSave()
+        {
+            if (Interlocked.CompareExchange(ref _autoSaveInProgress, 1, 0) != 0)
+                return false;
+
             try
             {
                 var editablePack = _packFileService.GetEditablePack();
                 if (editablePack == null || editablePack.IsCaPackFile)
-                    return;
+                    return false;
 
                 var systemPath = editablePack.SystemFilePath;
                 if (string.IsNullOrWhiteSpace(systemPath) || !File.Exists(systemPath))
-                    return;
+                    return false;
 
                 var gameInfo = GameInformationDatabase.GetGameById(_settingsService.CurrentSettings.CurrentGame);
-                _packFileService.SavePackContainer(editablePack, systemPath, false, gameInfo);
+                if (!_packFileService.TryAutoSavePackContainer(editablePack, systemPath, gameInfo))
+                    return false;
+
                 _logger.Here().Information($"Auto-save completed: {systemPath}");
+                return true;
             }
             catch (Exception ex)
             {
                 _logger.Here().Error(ex, "Auto-save failed");
+                return false;
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _autoSaveInProgress, 0);
             }
         }
     }

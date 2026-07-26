@@ -1,15 +1,15 @@
-# AssetEditor IPC (Current Support)
+# Asset Editor 国区版 IPC
 
 This document describes the current IPC endpoint implemented by `AssetEditor`.
 
 ## Status
 - Transport: Windows named pipe
-- Pipe name: `TheAssetEditor.Ipc`
+- Pipe name: `AssetEditor.CN.Ipc`
 - Protocol: JSON line per request (`UTF-8`, newline-terminated)
 - Current supported actions: `open` only
 
 ## Pipe Path (Windows)
-- `\\.\pipe\TheAssetEditor.Ipc`
+- `\\.\pipe\AssetEditor.CN.Ipc`
 
 ## Request Format
 Send one JSON object followed by a newline.

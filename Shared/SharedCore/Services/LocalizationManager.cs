@@ -8,8 +8,9 @@ namespace Shared.Core.Services
     {
         private readonly ILogger _logger = Logging.Create<LocalizationManager>();
 
+        private const string LanguageFile = "Language_Cn.json";
+        private static readonly string LanguageFilePath = Path.Combine(AppContext.BaseDirectory, LanguageFile);
         private Dictionary<string, string> _strings = [];
-        private string _selectedLangauge = "Not set";
 
         public static LocalizationManager Instance { get; private set; }
 
@@ -18,40 +19,23 @@ namespace Shared.Core.Services
             Instance = this;
         }
 
-        public string SelectedLangauge { get => _selectedLangauge; }
-
-        public List<string> GetPossibleLanguages()
+        public void LoadLanguage()
         {
-            var currentDirectory = Directory.GetCurrentDirectory();
-            var langaugeFiles = Directory.GetFiles(currentDirectory, "Language_*.json")
-                .Select(Path.GetFileNameWithoutExtension)
-                .Select(name => name!.Substring("Language_".Length).ToLower())
-                .ToList();
-
-            _logger.Here().Information($"Found language files: {string.Join(", ", langaugeFiles)}");    
-            return langaugeFiles;
-        }
-
-        public void LoadLanguage(string languageCode)
-        {
-            _selectedLangauge = languageCode.ToLower();
-
-            var languageFile= $"Language_{_selectedLangauge}.json";
-            if (File.Exists(languageFile) == false)
+            if (File.Exists(LanguageFilePath) == false)
             {
-                MessageBox.Show($"Language file for code '{_selectedLangauge}' not found.");
-                _logger.Here().Error($"Language file for code '{_selectedLangauge}' not found. in {Directory.GetCurrentDirectory()}");
+                MessageBox.Show($"找不到中文语言文件“{LanguageFile}”。");
+                _logger.Here().Error($"Chinese language file was not found at {LanguageFilePath}");
                 return;
             }
 
             try
             {
-                var json = File.ReadAllText(languageFile);
+                var json = File.ReadAllText(LanguageFilePath);
                 var strings = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
                 if (strings == null || strings.Count == 0)
                 {
-                    MessageBox.Show($"Failed to parse langauge file {_selectedLangauge}");
-                    _logger.Here().Error($"Failed to parse langauge file {_selectedLangauge}");
+                    MessageBox.Show($"中文语言文件解析失败：{LanguageFile}");
+                    _logger.Here().Error($"Failed to parse Chinese language file {LanguageFilePath}");
 
                     _strings = [];
                     return;
@@ -61,8 +45,8 @@ namespace Shared.Core.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to load language file: {ex.Message}");
-                _logger.Here().Error($"Failed to load language file: {ex.Message}");    
+                MessageBox.Show($"中文语言文件加载失败：{ex.Message}");
+                _logger.Here().Error($"Failed to load Chinese language file {LanguageFilePath}: {ex.Message}");
             }
         }
 
@@ -71,7 +55,7 @@ namespace Shared.Core.Services
             if (_strings.TryGetValue(key, out var value))
                 return value;
 
-            _logger.Here().Error($"Failed to load language code {key} for language {_selectedLangauge}");
+            _logger.Here().Error($"Failed to load localization key {key} from {LanguageFilePath}");
             return key;
         }
 
@@ -83,7 +67,7 @@ namespace Shared.Core.Services
             }
             catch (FormatException)
             {
-                _logger.Here().Error($"Format error for localization key {key}");
+                _logger.Here().Error($"Format error for localization key {key} in {LanguageFilePath}");
                 return Get(key);
             }
         }

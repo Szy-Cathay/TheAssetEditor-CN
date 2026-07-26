@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text;
 using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles.Models;
@@ -113,7 +112,8 @@ namespace Shared.Core.PackFiles.Utility
                 }
 
                 var packList = new List<PackFileContainer>();
-                var packsCompressionStats = new ConcurrentDictionary<CompressionFormat, CompressionInformation>();
+                var packsCompressionStats = new Dictionary<CompressionFormat, CompressionInformation>();
+                var mergeLock = new object();
 
                 Parallel.ForEach(allCaPackFiles, packFilePath =>
                 {
@@ -125,16 +125,18 @@ namespace Shared.Core.PackFiles.Utility
 
                         var packFileSize = new FileInfo(path).Length;
                         var pack = PackFileSerializerLoader.Load(path, packFileSize, reader, packfileResolver);
-                        packList.Add(pack);
-
                         PackFileLog.LogPackCompression(pack);
                         var packCompressionStats = PackFileLog.GetCompressionInformation(pack);
-                        foreach (var kvp in packCompressionStats)
+                        lock (mergeLock)
                         {
-                            if (!packsCompressionStats.TryGetValue(kvp.Key, out var existingStats))
-                                packsCompressionStats[kvp.Key] = new CompressionInformation(kvp.Value.DiskSize, kvp.Value.UncompressedSize);
-                            else
-                                existingStats.Add(kvp.Value);
+                            packList.Add(pack);
+                            foreach (var kvp in packCompressionStats)
+                            {
+                                if (!packsCompressionStats.TryGetValue(kvp.Key, out var existingStats))
+                                    packsCompressionStats[kvp.Key] = new CompressionInformation(kvp.Value.DiskSize, kvp.Value.UncompressedSize);
+                                else
+                                    existingStats.Add(kvp.Value);
+                            }
                         }
                     }
                     else

@@ -3,12 +3,19 @@ using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 
 namespace Test.Shared.Core.PackFiles
 {
     internal class PackFileServiceTest
     {
+        [SetUp]
+        public void SetUp()
+        {
+            new LocalizationManager().LoadLanguage();
+        }
+
         [Test]
         public void AddContainer_CaPackFile()
         {

@@ -8,7 +8,6 @@ using CommunityToolkit.Mvvm.Input;
 using Octokit;
 using Serilog;
 using Shared.Core.ErrorHandling;
-using Shared.Core.Misc;
 using Shared.Core.Services;
 using Application = System.Windows.Application;
 
@@ -28,7 +27,8 @@ namespace AssetEditor.ViewModels
         private readonly ILogger _logger = Logging.Create<UpdaterViewModel>();
         private Action? _closeAction;
 
-        private const string AssetEditorUpdaterExe = "AssetEditorUpdater.exe";
+        private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
+        private const string UpdaterDirectoryName = "Updater";
 
         private List<Release> _newerReleases = [];
 
@@ -57,31 +57,23 @@ namespace AssetEditor.ViewModels
             var currentVersion = VersionChecker.GetCurrentVersion();
             var latestRelease = _newerReleases[0];
             var latestVersion = VersionChecker.ParseReleaseVersion(latestRelease.TagName);
-            _logger.Information($"Updating AssetEditor from version {currentVersion} to version {latestVersion}");
-
-            DeleteUpdateDirectory();
+            _logger.Information($"Updating Asset Editor 国区版 from version {currentVersion} to version {latestVersion}");
 
             LaunchUpdater();
 
             Application.Current.Shutdown();
         }
 
-        public static void DeleteUpdateDirectory()
-        {
-            var updateDirectory = DirectoryHelper.UpdateDirectory;
-            if (Directory.Exists(updateDirectory))
-                Directory.Delete(updateDirectory, true);
-        }
-
         public static void LaunchUpdater()
         {
             var currentDirectory = AppContext.BaseDirectory;
-            var updaterPath = Path.Combine(currentDirectory, AssetEditorUpdaterExe);
+            var updaterDirectory = Path.Combine(currentDirectory, UpdaterDirectoryName);
+            var updaterPath = Path.Combine(updaterDirectory, AssetEditorUpdaterExe);
 
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = updaterPath,
-                WorkingDirectory = currentDirectory,
+                WorkingDirectory = updaterDirectory,
                 UseShellExecute = true,
             };
 

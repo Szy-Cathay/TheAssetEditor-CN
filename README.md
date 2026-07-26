@@ -1,28 +1,27 @@
-Modding tool for total war games
-Features:
-- Super easy to use 3d editor which supports saving and loading to all game formats (rmv2)
-- Animation editor that easily allows for moving animation between skeletons or making mount animations where there is none. 
-- Lots of other cool stuff, check it out! 
+# Asset Editor 国区版
 
-![image](https://user-images.githubusercontent.com/54080240/143955132-badd843e-b823-4a4d-8326-e64be4e2c877.png)
+Asset Editor 国区版是面向中国大陆用户维护的 Total War 资产编辑工具下游版本，仅提供中文界面。
 
+## 版本身份
 
-Planned major features:
-- Mesh verifications (Show normals, ensure weights)
-- Animation transfer tool
-- Flip faces tool/Invert normals
-- Rendering improvements
-- Improve re-rigging
-- Auto rig mesh to mesh
-- Load anim 4 save rmv2
-- UV selection/display
-- Realtime meta editor/full preview
-- Animated prop creator
-- Split face tool
-- Campagin animation bin editor
-- Improve animPack editing
+- 程序：`AssetEditor.CN.exe`
+- 用户数据：`%USERPROFILE%\AssetEditor.CN`
+- 更新仓库：`Szy-Cathay/TheAssetEditor-CN`
+- 当前版本：`1.1.0`
 
-Known bugs:
-- Pivot/Normal bug
-- Some older vmds not loading
-- Some anims for 3k not loading
+国区版可以与原版 Asset Editor 并存，两者不共用配置、日志、缓存、更新目录或 IPC 接口。
+
+## 构建
+
+```powershell
+dotnet restore AssetEditor.CN.sln
+dotnet build AssetEditor.CN.sln --configuration Release --no-restore
+dotnet test AssetEditor.CN.sln --configuration Release --no-build
+```
+
+## 上游来源
+
+本项目基于 Asset Editor 开发，并保留原项目及社区贡献者的历史。
+
+- 上游项目：<https://github.com/donkeyProgramming/TheAssetEditor>
+- 国区版问题反馈：<https://github.com/Szy-Cathay/TheAssetEditor-CN/issues>

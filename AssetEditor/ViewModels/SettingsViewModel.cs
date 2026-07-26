@@ -15,9 +15,7 @@ namespace AssetEditor.ViewModels
     partial class SettingsViewModel : ObservableObject
     {
         private readonly ApplicationSettingsService _settingsService;
-        private readonly LocalizationManager _localizationManager;
 
-        public ObservableCollection<string> AvailableLangauges { get; set; } = [];
         public ObservableCollection<ThemeType> AvailableThemes { get; set; } = [];
         public ObservableCollection<BackgroundColour> RenderEngineBackgroundColours { get; set; } = [];
         public ObservableCollection<AppFontFamily> AvailableFonts { get; set; } = [];
@@ -25,7 +23,6 @@ namespace AssetEditor.ViewModels
         public ObservableCollection<GameTypeEnum> Games { get; set; } = [];
         public ObservableCollection<GamePathItem> GameDirectores { get; set; } = [];
 
-        [ObservableProperty] private string _selectedLanguage;
         [ObservableProperty] private ThemeType _currentTheme;
         partial void OnCurrentThemeChanged(ThemeType value)
         {
@@ -74,13 +71,9 @@ namespace AssetEditor.ViewModels
         // Compression settings
         [ObservableProperty] private bool _useZstdCompression;
 
-        public SettingsViewModel(ApplicationSettingsService settingsService, LocalizationManager localizationManager)
+        public SettingsViewModel(ApplicationSettingsService settingsService)
         {
             _settingsService = settingsService;
-            _localizationManager = localizationManager;
-
-            AvailableLangauges = new ObservableCollection<string>(_localizationManager.GetPossibleLanguages());
-            SelectedLanguage = _localizationManager.SelectedLangauge;
 
             AvailableThemes = new ObservableCollection<ThemeType>((ThemeType[])Enum.GetValues(typeof(ThemeType)));
             CurrentTheme = _settingsService.CurrentSettings.Theme;
@@ -142,7 +135,6 @@ namespace AssetEditor.ViewModels
             _settingsService.CurrentSettings.CurrentGame = CurrentGame;
             _settingsService.CurrentSettings.LoadCaPacksByDefault = LoadCaPacksByDefault;
             _settingsService.CurrentSettings.ShowCAWemFiles = ShowCAWemFiles;
-            _settingsService.CurrentSettings.SelectedLangauge = SelectedLanguage;
             _settingsService.CurrentSettings.OnlyLoadLod0ForReferenceMeshes = OnlyLoadLod0ForReferenceMeshes;
             _settingsService.CurrentSettings.AppFont = SelectedFont;
             _settingsService.CurrentSettings.AppFontWeight = SelectedFontWeight;
@@ -161,7 +153,6 @@ namespace AssetEditor.ViewModels
             // Compression settings
             _settingsService.CurrentSettings.UseZstdCompression = UseZstdCompression;
 
-            _localizationManager.LoadLanguage(SelectedLanguage);
             _settingsService.Save();
             MessageBox.Show(LocalizationManager.Instance.Get("Msg.RestartAfterSettings"));
         }

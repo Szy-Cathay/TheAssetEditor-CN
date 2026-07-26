@@ -8,8 +8,8 @@ namespace Shared.Core.Services
     {
         private static readonly ILogger s_logger = Logging.Create<VersionChecker>();
 
-        private const string GitHubOwner = "donkeyProgramming";
-        private const string GitHubRepository = "TheAssetEditor";
+        private const string GitHubOwner = "Szy-Cathay";
+        private const string GitHubRepository = "TheAssetEditor-CN";
 
         public static async Task<List<Release>?> GetNewerReleases()
         {
@@ -29,7 +29,7 @@ namespace Shared.Core.Services
         {
             try
             {
-                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor"));
+                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor.CN"));
                 var releases = await gitHubClient.Repository.Release.GetAll(GitHubOwner, GitHubRepository);
                 return releases.Count > 0 ? releases : null;
             }
@@ -60,10 +60,15 @@ namespace Shared.Core.Services
             if (version == null)
                 throw new Exception("Current version is unknown.");
 
-            if (version.Build == 0 && version.Revision == 0)
-                return new Version(version.Major, version.Minor);
+            return NormalizeVersion(version);
+        }
 
-            return new Version(version.Major, version.Minor, version.Build);
+        internal static Version NormalizeVersion(Version version)
+        {
+            if (version.Revision > 0)
+                return version;
+
+            return new Version(version.Major, version.Minor, Math.Max(version.Build, 0));
         }
 
         public static Version ParseReleaseVersion(string tagName)

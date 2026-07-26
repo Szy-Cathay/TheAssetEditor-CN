@@ -57,8 +57,7 @@ namespace AssetEditor
             settingsService.Load();
 
             var localizationManager = _serviceProvider.GetRequiredService<LocalizationManager>();
-            localizationManager.GetPossibleLanguages();
-            localizationManager.LoadLanguage(settingsService.CurrentSettings.SelectedLangauge);
+            localizationManager.LoadLanguage();
 
             // Show the settings window if its the first time the tool is ran
             if (settingsService.CurrentSettings.IsFirstTimeStartingApplication)

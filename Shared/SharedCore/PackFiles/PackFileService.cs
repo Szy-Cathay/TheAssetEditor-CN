@@ -12,6 +12,7 @@ namespace Shared.Core.PackFiles
 {
     class PackFileService : IPackFileService
     {
+        private static readonly object s_saveGate = new();
         private readonly ILogger _logger = Logging.Create<PackFileService>();
         private readonly IGlobalEventHub? _globalEventHub;
 
@@ -129,7 +130,10 @@ namespace Shared.Core.PackFiles
         {
             if (pf != null && pf.IsCaPackFile)
                 throw new Exception("Trying to set CA packfile container to be editable - this is not legal!");
-            _packFileContainerSelectedForEdit = pf;
+
+            lock (s_saveGate)
+                _packFileContainerSelectedForEdit = pf;
+
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerSetAsMainEditableEvent(pf));
         }
 
@@ -261,68 +265,105 @@ namespace Shared.Core.PackFiles
 
         public void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation)
         {
-            if (File.Exists(path) && DirectoryHelper.IsFileLocked(path))
+            lock (s_saveGate)
+                SavePackContainerCore(pf, path, createBackup, gameInformation);
+
+            _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
+        }
+
+        public bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation)
+        {
+            lock (s_saveGate)
             {
-                throw new IOException($"Cannot access {path} because another process has locked it, most likely the game.");
+                if (!ReferenceEquals(_packFileContainerSelectedForEdit, pf) ||
+                    !string.Equals(pf.SystemFilePath, expectedPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                SavePackContainerCore(pf, expectedPath, false, gameInformation);
             }
 
-            if (pf.IsCaPackFile)
-                throw new Exception("Can not save ca pack file");
-            if (createBackup)
-                SaveUtility.CreateFileBackup(path);
+            _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
+            return true;
+        }
 
-            // Check if file has changed in size
-            if (pf.OriginalLoadByteSize != -1)
+        private void SavePackContainerCore(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation)
+        {
+            var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
+            try
             {
-                var fileInfo = new FileInfo(pf.SystemFilePath);
-                var byteSize = fileInfo.Length;
-                if (byteSize != pf.OriginalLoadByteSize)
-                    throw new Exception("File has been changed outside of AssetEditor. Can not save the file as it will cause corruptions");
+                if (File.Exists(path) && DirectoryHelper.IsFileLocked(path))
+                {
+                    throw new IOException($"Cannot access {path} because another process has locked it, most likely the game.");
+                }
+
+                if (pf.IsCaPackFile)
+                    throw new Exception("Can not save ca pack file");
+                if (createBackup)
+                    SaveUtility.CreateFileBackup(path);
+
+                // Check if file has changed in size
+                if (pf.OriginalLoadByteSize != -1)
+                {
+                    var fileInfo = new FileInfo(pf.SystemFilePath);
+                    var byteSize = fileInfo.Length;
+                    if (byteSize != pf.OriginalLoadByteSize)
+                        throw new Exception("File has been changed outside of AssetEditor. Can not save the file as it will cause corruptions");
+                }
+
+                // Capture old parent references BEFORE serialization,
+                // because SerializeFileBlob replaces all DataSources with new PackedFileSource objects.
+                var oldParents = pf.FileList.Values
+                    .Where(f => f.DataSource is PackedFileSource)
+                    .Select(f => ((PackedFileSource)f.DataSource).Parent)
+                    .Distinct()
+                    .ToList();
+
+                using (var memoryStream = new FileStream(tempPath, FileMode.CreateNew))
+                {
+                    using var writer = new BinaryWriter(memoryStream);
+                    var useCompression = SettingsService?.CurrentSettings.UseZstdCompression ?? true;
+                    _logger.Here().Information($"Saving pack with compression={useCompression}");
+                    PackFileSerializerWriter.SaveToByteArray(path, pf, writer, gameInformation, useCompression);
+                }
+
+                // Close the OLD parent streams (no longer referenced after SerializeFileBlob replaced DataSources)
+                foreach (var parent in oldParents)
+                    parent.CloseStream();
+
+                // Auto-backup the original file before overwriting (only for non-CA packs with existing file)
+                if (!pf.IsCaPackFile && File.Exists(path))
+                {
+                    try
+                    {
+                        var settings = SettingsService?.CurrentSettings;
+                        var backupDir = settings?.BackupPath ?? "";
+                        var maxCount = settings?.MaxBackupCount ?? 10;
+                        SaveUtility.CreateBackupWithRotation(path, backupDir, maxCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Here().Error(ex, "Failed to create backup, proceeding with save");
+                    }
+                }
+
+                File.Move(tempPath, path, true);
+
+                pf.SystemFilePath = path;
+                pf.OriginalLoadByteSize = new FileInfo(path).Length;
             }
-
-            // Capture old parent references BEFORE serialization,
-            // because SerializeFileBlob replaces all DataSources with new PackedFileSource objects.
-            var oldParents = pf.FileList.Values
-                .Where(f => f.DataSource is PackedFileSource)
-                .Select(f => ((PackedFileSource)f.DataSource).Parent)
-                .Distinct()
-                .ToList();
-
-            using (var memoryStream = new FileStream(path + "_temp", FileMode.Create))
-            {
-                using var writer = new BinaryWriter(memoryStream);
-                var useCompression = SettingsService?.CurrentSettings.UseZstdCompression ?? true;
-                _logger.Here().Information($"Saving pack with compression={useCompression}");
-                PackFileSerializerWriter.SaveToByteArray(path, pf, writer, gameInformation, useCompression);
-            }
-
-            // Close the OLD parent streams (no longer referenced after SerializeFileBlob replaced DataSources)
-            foreach (var parent in oldParents)
-                parent.CloseStream();
-
-            // Auto-backup the original file before overwriting (only for non-CA packs with existing file)
-            if (!pf.IsCaPackFile && File.Exists(path))
+            finally
             {
                 try
                 {
-                    var settings = SettingsService?.CurrentSettings;
-                    var backupDir = settings?.BackupPath ?? "";
-                    var maxCount = settings?.MaxBackupCount ?? 10;
-                    SaveUtility.CreateBackupWithRotation(path, backupDir, maxCount);
+                    File.Delete(tempPath);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _logger.Here().Error(ex, "Failed to create backup, proceeding with save");
+                    // Cleanup is best effort; preserve the original save exception.
                 }
             }
-
-            File.Delete(path);
-            File.Move(path + "_temp", path);
-
-            pf.SystemFilePath = path;
-            pf.OriginalLoadByteSize = new FileInfo(path).Length;
-
-            _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
         }
 
         public PackFileContainer? GetPackFileContainer(PackFile file)
