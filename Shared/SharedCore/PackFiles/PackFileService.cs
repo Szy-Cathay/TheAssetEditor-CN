@@ -312,23 +312,24 @@ namespace Shared.Core.PackFiles
                         throw new Exception("File has been changed outside of AssetEditor. Can not save the file as it will cause corruptions");
                 }
 
-                // Capture old parent references BEFORE serialization,
-                // because SerializeFileBlob replaces all DataSources with new PackedFileSource objects.
+                // Capture parent references before serialization so their streams can be
+                // closed before replacing the destination file.
                 var oldParents = pf.FileList.Values
                     .Where(f => f.DataSource is PackedFileSource)
                     .Select(f => ((PackedFileSource)f.DataSource).Parent)
                     .Distinct()
                     .ToList();
 
+                PackFileSerializationResult serializationResult;
                 using (var memoryStream = new FileStream(tempPath, FileMode.CreateNew))
                 {
                     using var writer = new BinaryWriter(memoryStream);
                     var useCompression = SettingsService?.CurrentSettings.UseZstdCompression ?? true;
                     _logger.Here().Information($"Saving pack with compression={useCompression}");
-                    PackFileSerializerWriter.SaveToByteArray(path, pf, writer, gameInformation, useCompression);
+                    serializationResult = PackFileSerializerWriter.SaveToByteArray(
+                        path, pf, writer, gameInformation, useCompression);
                 }
 
-                // Close the OLD parent streams (no longer referenced after SerializeFileBlob replaced DataSources)
                 foreach (var parent in oldParents)
                     parent.CloseStream();
 
@@ -350,6 +351,7 @@ namespace Shared.Core.PackFiles
 
                 File.Move(tempPath, path, true);
 
+                serializationResult.Commit();
                 pf.SystemFilePath = path;
                 pf.OriginalLoadByteSize = new FileInfo(path).Length;
             }

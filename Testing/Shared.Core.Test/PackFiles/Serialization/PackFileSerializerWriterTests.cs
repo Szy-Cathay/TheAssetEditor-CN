@@ -32,6 +32,42 @@ namespace Test.Shared.Core.PackFiles.Serialization
         }
 
         [Test]
+        public void SaveToByteArray_WhenLaterSourceReadFails_DoesNotReplaceEarlierSources()
+        {
+            var gameInfo = GameInformationDatabase.GetGameById(GameTypeEnum.Rome2);
+            var outputPath = Path.Combine(Path.GetTempPath(), $"pack-output-{Guid.NewGuid():N}.pack");
+            var missingPath = Path.Combine(Path.GetTempPath(), $"missing-pack-{Guid.NewGuid():N}.pack");
+            var firstSource = new MemorySource([1, 2, 3]);
+            var missingSource = new PackedFileSource(
+                new PackedFileSourceParent { FilePath = missingPath },
+                0,
+                4,
+                false,
+                false,
+                CompressionFormat.None,
+                0);
+            var first = new PackFile("first.bin", firstSource);
+            var second = new PackFile("second.bin", missingSource);
+            var container = new PackFileContainer("test")
+            {
+                Header = new PFHeader(
+                    PackFileVersionConverter.ToString(PackFileVersion.PFH4),
+                    PackFileCAType.MOD),
+            };
+            container.FileList["a\\first.bin"] = first;
+            container.FileList["z\\second.bin"] = second;
+
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            Assert.Throws<FileNotFoundException>(() =>
+                PackFileSerializerWriter.SaveToByteArray(
+                    outputPath, container, writer, gameInfo, false));
+            Assert.That(first.DataSource, Is.SameAs(firstSource));
+            Assert.That(second.DataSource, Is.SameAs(missingSource));
+        }
+
+        [Test]
         [TestCase(GameTypeEnum.Rome2, PackFileVersion.PFH4, false)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH4, false)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH5, true)]
@@ -62,13 +98,21 @@ namespace Test.Shared.Core.PackFiles.Serialization
 
             foreach (var fileInfo in expectedFileInfo)
                 container.FileList[fileInfo.FilePath] = PackFile.CreateFromASCII(fileInfo.FileName, new string(fileInfo.Content, fileInfo.Length));
+            var originalSources = container.FileList.ToDictionary(
+                file => file.Key,
+                file => file.Value.DataSource);
 
             using var writeMs = new MemoryStream();
             using var writer = new BinaryWriter(writeMs);
-            PackFileSerializerWriter.SaveToByteArray(outputContainerName, container, writer, gameInfo);
+            var result = PackFileSerializerWriter.SaveToByteArray(outputContainerName, container, writer, gameInfo);
             var data = writeMs.ToArray();
 
-            // Asser that the internal file references have been updated
+            foreach (var fileInfo in expectedFileInfo)
+                Assert.That(container.FileList[fileInfo.FilePath].DataSource, Is.SameAs(originalSources[fileInfo.FilePath]));
+
+            result.Commit();
+
+            // Assert that the internal file references have been updated
             foreach (var fileInfo in expectedFileInfo)
             {
                 var dataSourceInstance = container.FileList[fileInfo.FilePath].DataSource as PackedFileSource;
