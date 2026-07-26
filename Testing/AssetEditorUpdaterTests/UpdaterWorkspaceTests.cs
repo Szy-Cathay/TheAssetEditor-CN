@@ -137,6 +137,36 @@ public class UpdaterWorkspaceTests
     }
 
     [Test]
+    public void Create_ProtectedLayoutRejectsUnprotectedExistingProductRoot()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var productRoot = Directory.CreateDirectory(Path.Combine(commonRoot, "AssetEditor.CN")).FullName;
+            var sentinelPath = Path.Combine(productRoot, "existing-user-data.txt");
+            File.WriteAllText(sentinelPath, "preserve");
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                true,
+                Guid.NewGuid(),
+                Path.Combine(root, "local"),
+                commonRoot);
+
+            Assert.Throws<InvalidOperationException>(() => UpdaterWorkspaceFactory.Create(layout));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+                Assert.That(Directory.Exists(Path.Combine(productRoot, "UpdaterTransactions")), Is.False);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
     public void Create_ProtectedLayoutRejectsReparsePointApprovedRoot()
     {
         var root = CreateTemporaryDirectory();

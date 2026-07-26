@@ -153,10 +153,9 @@ internal static class UpdaterWorkspaceFactory
 
         var descriptor = UpdaterWorkspaceSecurity.CreateProtectedDescriptor();
         if (!Directory.Exists(productRoot))
-        {
             CreateDirectoryAtomically(productRoot, descriptor);
-            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(productRoot);
-        }
+
+        UpdaterWorkspaceSecurity.ValidateProtectedDirectory(productRoot);
 
         if (!Directory.Exists(protectedParent))
             CreateDirectoryAtomically(protectedParent, descriptor);
