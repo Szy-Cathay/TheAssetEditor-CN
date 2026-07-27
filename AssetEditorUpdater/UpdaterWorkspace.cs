@@ -135,20 +135,28 @@ internal static class UpdaterWorkspaceFactory
             ?? throw new ArgumentException("The transaction root must have a parent directory.", nameof(layout));
         EnsureProtectedParent(layout.ApprovedRoot, protectedParent);
 
-        var descriptor = UpdaterWorkspaceSecurity.CreateProtectedDescriptor();
         var transactionCreated = false;
         var markerCreated = false;
         try
         {
-            CreateDirectoryAtomically(paths.TransactionRoot, descriptor);
+            using var protectedParentIdentity =
+                WindowsPathIdentity.OpenExistingDirectory(
+                    protectedParent,
+                    nameof(protectedParent));
+            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(protectedParent);
+            using var transactionIdentity = CreateOwnedDirectoryFresh(
+                paths.TransactionRoot,
+                requireProtectedAcl: true,
+                protectedParentIdentity);
             transactionCreated = true;
-            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(paths.TransactionRoot);
 
             CreateTransactionMarker(layout, paths.MarkerPath);
             markerCreated = true;
 
-            CreateDirectoryAtomically(paths.UpdateDirectory, descriptor);
-            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(paths.UpdateDirectory);
+            using var updateIdentity = CreateOwnedDirectoryFresh(
+                paths.UpdateDirectory,
+                requireProtectedAcl: true,
+                transactionIdentity);
         }
         catch
         {
@@ -239,13 +247,76 @@ internal static class UpdaterWorkspaceFactory
                 "The updater directory must have a parent.",
                 nameof(path));
         ValidateExistingDirectory(parent);
+        CreateOwnedDirectoryFreshCore(fullPath, requireProtectedAcl);
+        ValidateExistingDirectory(fullPath);
+        if (requireProtectedAcl)
+            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(fullPath);
+    }
+
+    internal static WindowsDirectoryIdentityLease CreateOwnedDirectoryFresh(
+        string path,
+        bool requireProtectedAcl,
+        WindowsDirectoryIdentityLease parentIdentity,
+        WindowsDirectoryLeaseMode childLeaseMode =
+            WindowsDirectoryLeaseMode.Stable)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(parentIdentity);
+        parentIdentity.ThrowIfDisposed();
+        if (!Enum.IsDefined(childLeaseMode))
+            throw new ArgumentOutOfRangeException(nameof(childLeaseMode));
+
+        var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var parentPath = Path.GetDirectoryName(fullPath)
+            ?? throw new ArgumentException(
+                "The updater directory must have a parent.",
+                nameof(path));
+        using var currentParentIdentity =
+            WindowsPathIdentity.OpenExistingDirectory(
+                parentPath,
+                nameof(path));
+        if (!WindowsPathIdentity.IsSameDirectory(
+                parentIdentity,
+                currentParentIdentity))
+        {
+            throw new InvalidOperationException(
+                "The updater directory parent changed before fresh creation.");
+        }
+
+        CreateOwnedDirectoryFreshCore(fullPath, requireProtectedAcl);
+
+        WindowsDirectoryIdentityLease? childIdentity = null;
+        try
+        {
+            childIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                fullPath,
+                nameof(path),
+                childLeaseMode);
+            WindowsPathIdentity.RequireDirectChild(
+                parentIdentity,
+                childIdentity,
+                "The freshly created updater directory is not the expected direct child.");
+            if (requireProtectedAcl)
+                UpdaterWorkspaceSecurity.ValidateProtectedDirectory(fullPath);
+            return childIdentity;
+        }
+        catch
+        {
+            childIdentity?.Dispose();
+            throw;
+        }
+    }
+
+    private static void CreateOwnedDirectoryFreshCore(
+        string fullPath,
+        bool requireProtectedAcl)
+    {
 
         if (requireProtectedAcl)
         {
             CreateDirectoryAtomically(
                 fullPath,
                 UpdaterWorkspaceSecurity.CreateProtectedDescriptor());
-            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(fullPath);
             return;
         }
 
@@ -256,8 +327,6 @@ internal static class UpdaterWorkspaceFactory
                 $"Unable to create a fresh updater directory: {fullPath}",
                 new Win32Exception(error));
         }
-
-        ValidateExistingDirectory(fullPath);
     }
 
     private static string GetCanonicalRoot(string? configuredRoot, Environment.SpecialFolder specialFolder)

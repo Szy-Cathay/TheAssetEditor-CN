@@ -112,6 +112,97 @@ public class WindowsPathIdentityTests
         }
     }
 
+    [Test]
+    public void OpenExistingDirectory_DeleteTargetMarksExactEmptyDirectoryForDeletion()
+    {
+        var root = CreateTemporaryDirectory();
+        var childPath = Directory.CreateDirectory(Path.Combine(root, "child")).FullName;
+        try
+        {
+            using (var parent = WindowsPathIdentity.OpenExistingDirectory(root, nameof(root)))
+            using (var child = WindowsPathIdentity.OpenExistingDirectory(
+                       childPath,
+                       nameof(childPath),
+                       WindowsDirectoryLeaseMode.DeleteTarget))
+            {
+                WindowsPathIdentity.RequireDirectChild(
+                    parent,
+                    child,
+                    "The test child must belong to the held parent.");
+                child.MarkForDeletion();
+            }
+
+            Assert.That(Directory.Exists(childPath), Is.False);
+        }
+        finally
+        {
+            if (Directory.Exists(childPath))
+                Directory.Delete(childPath);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void OpenExistingDirectory_DeleteTargetRejectsReparseLeaf()
+    {
+        var root = CreateTemporaryDirectory();
+        var aliasPath = Path.Combine(root, "alias");
+        try
+        {
+            var targetPath = Directory.CreateDirectory(Path.Combine(root, "target")).FullName;
+            var sentinelPath = Path.Combine(targetPath, "preserve.txt");
+            File.WriteAllText(sentinelPath, "preserve");
+            TryCreateDirectorySymbolicLinkOrIgnore(aliasPath, targetPath);
+
+            Assert.Throws<InvalidDataException>(() =>
+                WindowsPathIdentity.OpenExistingDirectory(
+                    aliasPath,
+                    nameof(aliasPath),
+                    WindowsDirectoryLeaseMode.DeleteTarget));
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            if (Directory.Exists(aliasPath))
+                Directory.Delete(aliasPath);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void CreateOwnedDirectoryFresh_ReturnsLiveDirectChildLease()
+    {
+        var root = CreateTemporaryDirectory();
+        var childPath = Path.Combine(root, "child");
+        try
+        {
+            using var parent = WindowsPathIdentity.OpenExistingDirectory(root, nameof(root));
+            using var child = UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
+                childPath,
+                requireProtectedAcl: false,
+                parent);
+            using var reopenedChild = WindowsPathIdentity.OpenExistingDirectory(
+                childPath,
+                nameof(childPath));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    WindowsPathIdentity.IsSameDirectory(child, reopenedChild),
+                    Is.True);
+                Assert.DoesNotThrow(() =>
+                    WindowsPathIdentity.RequireDirectChild(
+                        parent,
+                        child,
+                        "The fresh directory must be the held parent's direct child."));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static string CreateTemporaryDirectory()
     {
         return Directory.CreateDirectory(
