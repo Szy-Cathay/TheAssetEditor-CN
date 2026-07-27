@@ -8,6 +8,19 @@ using Shared.Core.ErrorHandling;
 
 namespace Editors.Ipc
 {
+    internal sealed record AssetEditorIpcServerOptions(
+        TimeSpan RetryDelay,
+        TimeSpan ReadTimeout,
+        TimeSpan WriteTimeout,
+        int MaxRequestChars)
+    {
+        internal static AssetEditorIpcServerOptions Default { get; } = new(
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(5),
+            64 * 1024);
+    }
+
     public class AssetEditorIpcServer : IDisposable
     {
         public const string PipeName = "AssetEditor.CN.Ipc";
@@ -31,6 +44,63 @@ namespace Editors.Ipc
         public AssetEditorIpcServer(IServiceScopeFactory scopeFactory)
         {
             _scopeFactory = scopeFactory;
+        }
+
+        internal static async Task<string?> ReadBoundedLineAsync(
+            TextReader reader,
+            int maxChars,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(reader);
+            if (maxChars <= 0)
+                throw new ArgumentOutOfRangeException(nameof(maxChars));
+
+            var buffer = new char[1024];
+            var line = new StringBuilder();
+            var pendingCarriageReturn = false;
+
+            void Append(char character)
+            {
+                line.Append(character);
+                if (line.Length > maxChars)
+                {
+                    throw new InvalidDataException(
+                        $"IPC request exceeds the {maxChars}-character limit.");
+                }
+            }
+
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var charsRead = await reader.ReadAsync(
+                    buffer.AsMemory(),
+                    cancellationToken);
+                if (charsRead == 0)
+                {
+                    if (pendingCarriageReturn)
+                        Append('\r');
+                    return line.Length == 0 ? null : line.ToString();
+                }
+
+                for (var index = 0; index < charsRead; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var character = buffer[index];
+                    if (character == '\n')
+                        return line.ToString();
+
+                    if (pendingCarriageReturn)
+                    {
+                        Append('\r');
+                        pendingCarriageReturn = false;
+                    }
+
+                    if (character == '\r')
+                        pendingCarriageReturn = true;
+                    else
+                        Append(character);
+                }
+            }
         }
 
         public void Start()
