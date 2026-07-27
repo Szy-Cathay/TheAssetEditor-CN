@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace GameWorld.Core.Commands.Vertex
 {
 
-    public class TransformVertexCommand : ICommand
+    public class TransformVertexCommand : IRedoableCommand
     {
         List<MeshObject> _geometryList;
         public Vector3 PivotPoint;
@@ -21,11 +21,13 @@ namespace GameWorld.Core.Commands.Vertex
 
         SelectionManager _selectionManager;
         ISelectionState _oldSelectionState;
+        VertexTransformReplayPlan? _replayPlan;
 
         public void Configure(List<MeshObject> geometryList, Vector3 pivotPoint)
         {
             _geometryList = geometryList;
             PivotPoint = pivotPoint;
+            _oldSelectionState = _selectionManager.GetStateCopy();
         }
 
         public string HintText { get => "Transform"; }
@@ -39,83 +41,62 @@ namespace GameWorld.Core.Commands.Vertex
 
         public void Execute()
         {
-            _oldSelectionState = _selectionManager.GetStateCopy();
             // Nothing to do, vertexes already updated
         }
 
         public void Undo()
         {
-            Transform.Decompose(out var scale, out var rot, out var trans);
+            ApplyTransform(inverse: true);
+            _selectionManager.SetState(_oldSelectionState);
+        }
 
-            for (var meshIndex = 0; meshIndex < _geometryList.Count; meshIndex++)
+        public void Redo()
+        {
+            ApplyTransform(inverse: false);
+            _selectionManager.SetState(_oldSelectionState);
+        }
+
+        internal void SetReplayPlan(VertexTransformReplayPlan replayPlan)
+        {
+            _replayPlan = replayPlan;
+        }
+
+        private void ApplyTransform(bool inverse)
+        {
+            if (_replayPlan == null ||
+                !VertexTransformOperationApplier.TryApplyReplayPlan(
+                _geometryList,
+                _oldSelectionState,
+                AffectedVertexIndices,
+                FalloffWeights,
+                _replayPlan,
+                inverse,
+                out _))
             {
-                var geo = _geometryList[meshIndex];
-                if (_oldSelectionState.Mode == GeometrySelectionMode.Vertex)
-                {
-                    var vState = _oldSelectionState as VertexSelectionState;
-                    for (var vertIndex = 0; vertIndex < vState.VertexWeights.Count; vertIndex++)
-                    {
-                        if (vState.VertexWeights[vertIndex] != 0)
-                        {
-                            var weight = vState.VertexWeights[vertIndex];
-                            var vertexScale = Vector3.Lerp(Vector3.One, scale, weight);
-                            var vertRot = Quaternion.Slerp(Quaternion.Identity, rot, weight);
-                            var vertTrnas = trans * weight;
-
-                            var weightedUndoTransform = Matrix.CreateScale(vertexScale) * Matrix.CreateFromQuaternion(vertRot) * Matrix.CreateTranslation(vertTrnas);
-                            var finalMatrix = Matrix.CreateTranslation(-PivotPoint) * Matrix.Invert(weightedUndoTransform) * Matrix.CreateTranslation(PivotPoint);
-
-                            geo.TransformVertex(vertIndex, finalMatrix);
-                        }
-                    }
-                }
-                else if (AffectedVertexIndices != null && FalloffWeights != null && FalloffWeights.Count > 0)
-                {
-                    // Face/Edge mode with falloff: per-vertex weighted inverse
-                    // Uses scale/rot/trans already decomposed at the top
-                    foreach (var kvp in FalloffWeights)
-                    {
-                        var vertIdx = kvp.Key;
-                        var weight = kvp.Value;
-                        var vertexScale = Vector3.Lerp(Vector3.One, scale, weight);
-                        var vertRot = Quaternion.Slerp(Quaternion.Identity, rot, weight);
-                        var vertTrans = trans * weight;
-                        var weightedUndoTransform = Matrix.CreateScale(vertexScale) * Matrix.CreateFromQuaternion(vertRot) * Matrix.CreateTranslation(vertTrans);
-                        var finalMatrix = Matrix.CreateTranslation(-PivotPoint) * Matrix.Invert(weightedUndoTransform) * Matrix.CreateTranslation(PivotPoint);
-                        geo.TransformVertex(vertIdx, finalMatrix);
-                    }
-                }
-                else if (AffectedVertexIndices != null)
-                {
-                    // Face/Edge mode without falloff: only undo vertices that were actually transformed
-                    var undoMatrix = Matrix.CreateTranslation(-PivotPoint) * Matrix.Invert(Transform) * Matrix.CreateTranslation(PivotPoint);
-                    foreach (var vertIdx in AffectedVertexIndices)
-                        geo.TransformVertex(vertIdx, undoMatrix);
-                }
-                else
-                {
-                    // Object mode: undo all vertices
-                    var undoMatrix = Matrix.CreateTranslation(-PivotPoint) * Matrix.Invert(Transform) * Matrix.CreateTranslation(PivotPoint);
-                    for (var v = 0; v < geo.VertexCount(); v++)
-                        geo.TransformVertex(v, undoMatrix);
-
-                    if (InvertWindingOrder)
-                    {
-                        var indexes = geo.GetIndexBuffer();
-                        for (var index = 0; index < indexes.Count; index += 3)
-                        {
-                            var temp = indexes[index + 2];
-                            indexes[index + 2] = indexes[index + 0];
-                            indexes[index + 0] = temp;
-                        }
-                        geo.SetIndexBuffer(indexes);
-                    }
-                }
-
-                geo.RebuildVertexBuffer();
+                return;
             }
 
-            _selectionManager.SetState(_oldSelectionState);
+            var reverseWinding =
+                InvertWindingOrder &&
+                _oldSelectionState is ObjectSelectionState;
+            foreach (var geometry in _geometryList)
+            {
+                if (reverseWinding)
+                    ReverseWindingOrder(geometry);
+                geometry.RebuildVertexBuffer();
+            }
+        }
+
+        internal static void ReverseWindingOrder(MeshObject geometry)
+        {
+            var indexes = geometry.GetIndexBuffer();
+            for (var index = 0; index < indexes.Count; index += 3)
+            {
+                var temp = indexes[index + 2];
+                indexes[index + 2] = indexes[index];
+                indexes[index] = temp;
+            }
+            geometry.SetIndexBuffer(indexes);
         }
 
     }

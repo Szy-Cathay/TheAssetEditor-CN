@@ -55,6 +55,7 @@ namespace GameWorld.Core.Rendering
 
         readonly int _maxInstanceCount = 50000;
         int _currentInstanceCount;
+        internal int CurrentInstanceCount => _currentInstanceCount;
 
         // Default edge half-width in pixels (Blender default: 0.5 + 0.5 for AA ≈ 1.0)
         // Using 0.75 for slightly thinner edges to make vertices more visible
@@ -112,7 +113,11 @@ namespace GameWorld.Core.Rendering
         /// <param name="edges">List of edge data (positions and colors)</param>
         public void Update(EdgeData[] edges)
         {
+            ArgumentNullException.ThrowIfNull(edges);
+
             _currentInstanceCount = Math.Min(edges.Length, _maxInstanceCount);
+            if (_currentInstanceCount == 0)
+                return;
 
             for (var i = 0; i < _currentInstanceCount; i++)
             {

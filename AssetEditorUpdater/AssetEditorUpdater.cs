@@ -4,6 +4,11 @@ using FileMode = System.IO.FileMode;
 
 namespace AssetEditorUpdater
 {
+    internal sealed record UpdaterInvocation(
+        bool IsInitialLaunch,
+        string InstallationDirectory,
+        string? UpdateDirectory);
+
     public class AssetEditorUpdater
     {
         private const string GitHubOwner = "Szy-Cathay";
@@ -13,67 +18,260 @@ namespace AssetEditorUpdater
          
         public static async Task Main(string[] args)
         {
-            // The first time the updater is run it should be from the installation directory (with no args)
-            // so we use the app's base directory to get the installation directory. When we rerun the updater
-            // from the update directory we pass the installation directory as an arg and access it that way.
-
             var currentDirectory = AppContext.BaseDirectory;
-            var updateDirectory = GetUpdateDirectory();
-
-            var isInitialLaunch = args.Length == 0;
-            var installationDirectory = isInitialLaunch
-                ? Directory.GetParent(Path.TrimEndingDirectorySeparator(currentDirectory))?.FullName
-                    ?? throw new InvalidOperationException("Unable to determine the installation directory.")
-                : args[0];
+            var invocation = ParseInvocation(currentDirectory, args);
 
             Console.WriteLine($"国区版更新器运行目录：{currentDirectory}");
 
-            if (isInitialLaunch)
-                RelaunchFromUpdateDirectory(currentDirectory, updateDirectory, installationDirectory);
+            if (invocation.IsInitialLaunch)
+            {
+                var layout = UpdaterWorkspaceFactory.GetLayout(
+                    UpdaterWorkspaceFactory.IsProcessElevated(),
+                    Guid.NewGuid());
+                var workspace = UpdaterWorkspaceFactory.Create(layout);
+                RelaunchFromUpdateDirectory(
+                    currentDirectory,
+                    workspace,
+                    invocation.InstallationDirectory);
+            }
             else
-                await UpdateAsync(installationDirectory, updateDirectory);
+            {
+                var updateDirectory = invocation.UpdateDirectory!;
+                var workspace = UpdateInstaller.ValidateDirectoryLayout(
+                    invocation.InstallationDirectory,
+                    updateDirectory,
+                    UpdaterWorkspaceFactory.IsProcessElevated());
+                await UpdateAsync(
+                    invocation.InstallationDirectory,
+                    workspace);
+            }
         }
 
         private static void RelaunchFromUpdateDirectory(
             string updaterPayloadDirectory,
-            string updateDirectory,
+            UpdaterWorkspace workspace,
             string installationDirectory)
         {
-            Console.WriteLine($"正在将更新器复制到：{updateDirectory}");
-
-            CopyUpdaterPayload(updaterPayloadDirectory, updateDirectory, installationDirectory);
-            var newUpdaterPath = Path.Combine(updateDirectory, AssetEditorUpdaterExe);
-
-            LaunchUpdater(newUpdaterPath, updateDirectory, installationDirectory);
+            RelaunchFromUpdateDirectory(
+                updaterPayloadDirectory,
+                workspace,
+                installationDirectory,
+                (sourceDirectory, destinationWorkspace, targetInstallationDirectory) =>
+                    CopyUpdaterPayload(
+                        sourceDirectory,
+                        destinationWorkspace,
+                        targetInstallationDirectory),
+                (isProtected, updateDirectory) =>
+                    UpdaterWorkspaceFactory.ValidateExisting(isProtected, updateDirectory),
+                AcquireRelaunchWorkspaceLease,
+                processStartInfo => Process.Start(processStartInfo),
+                workspaceToClean =>
+                    UpdaterWorkspaceFactory.CleanupFreshProtectedTransaction(
+                        workspaceToClean));
         }
 
-        internal static void CopyUpdaterPayload(
+        internal static void RelaunchFromUpdateDirectory(
             string updaterPayloadDirectory,
-            string updateDirectory,
-            string installationDirectory)
+            UpdaterWorkspace workspace,
+            string installationDirectory,
+            Func<string, UpdaterWorkspace, string, IReadOnlyDictionary<string, string>> copyAndVerify,
+            Func<bool, string, UpdaterWorkspace> validateWorkspace,
+            Func<UpdaterWorkspace, IDisposable?> acquireLaunchLease,
+            Action<ProcessStartInfo> startProcess,
+            Action<UpdaterWorkspace> cleanupFreshProtectedTransaction)
         {
-            UpdateInstaller.ValidateDirectoryLayout(installationDirectory, updateDirectory);
+            ArgumentNullException.ThrowIfNull(workspace);
+            ArgumentNullException.ThrowIfNull(copyAndVerify);
+            ArgumentNullException.ThrowIfNull(validateWorkspace);
+            ArgumentNullException.ThrowIfNull(acquireLaunchLease);
+            ArgumentNullException.ThrowIfNull(startProcess);
+            ArgumentNullException.ThrowIfNull(cleanupFreshProtectedTransaction);
 
-            if (Directory.Exists(updateDirectory))
-                Directory.Delete(updateDirectory, true);
+            Console.WriteLine($"正在将更新器复制到：{workspace.UpdateDirectory}");
 
-            UpdateInstaller.CopyDirectory(updaterPayloadDirectory, updateDirectory);
+            try
+            {
+                validateWorkspace(
+                    workspace.IsProtected,
+                    workspace.UpdateDirectory);
+                copyAndVerify(
+                    updaterPayloadDirectory,
+                    workspace,
+                    installationDirectory);
+                var newUpdaterPath = Path.Combine(
+                    workspace.UpdateDirectory,
+                    AssetEditorUpdaterExe);
+                var processStartInfo = CreateUpdaterProcessStartInfo(
+                    newUpdaterPath,
+                    workspace.UpdateDirectory,
+                    installationDirectory,
+                    workspace.UpdateDirectory);
+
+                validateWorkspace(
+                    workspace.IsProtected,
+                    workspace.UpdateDirectory);
+                using var launchLease = acquireLaunchLease(workspace);
+                startProcess(processStartInfo);
+            }
+            catch
+            {
+                if (workspace.IsProtected)
+                {
+                    try
+                    {
+                        cleanupFreshProtectedTransaction(workspace);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Console.Error.WriteLine(
+                            $"Updater cleanup failed; preserving the original failure: {cleanupException}");
+                    }
+                }
+
+                throw;
+            }
         }
 
-        private static void LaunchUpdater(string updaterPath, string workingDirectory, string installationDirectory)
+        private static IDisposable AcquireRelaunchWorkspaceLease(
+            UpdaterWorkspace workspace)
         {
-            var processStartInfo = new ProcessStartInfo
+            WindowsDirectoryIdentityLease? transactionIdentity = null;
+            WindowsDirectoryIdentityLease? updateIdentity = null;
+            try
+            {
+                transactionIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                    workspace.TransactionRoot,
+                    nameof(workspace),
+                    WindowsDirectoryLeaseMode.Pinned);
+                updateIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                    workspace.UpdateDirectory,
+                    nameof(workspace),
+                    WindowsDirectoryLeaseMode.Pinned);
+                WindowsPathIdentity.RequireDirectChild(
+                    transactionIdentity,
+                    updateIdentity,
+                    "Update must be a direct child of the transaction root.");
+                return new RelaunchWorkspaceLease(
+                    transactionIdentity,
+                    updateIdentity);
+            }
+            catch
+            {
+                updateIdentity?.Dispose();
+                transactionIdentity?.Dispose();
+                throw;
+            }
+        }
+
+        internal static IReadOnlyDictionary<string, string> CopyUpdaterPayload(
+            string updaterPayloadDirectory,
+            UpdaterWorkspace workspace,
+            string installationDirectory,
+            string? localApplicationDataRoot = null,
+            string? commonApplicationDataRoot = null)
+        {
+            ArgumentNullException.ThrowIfNull(workspace);
+
+            var validatedWorkspace = UpdateInstaller.ValidateDirectoryLayout(
+                installationDirectory,
+                workspace.UpdateDirectory,
+                workspace.IsProtected,
+                localApplicationDataRoot,
+                commonApplicationDataRoot);
+            if (workspace.IsProtected != validatedWorkspace.IsProtected
+                || !PathsEqual(workspace.TransactionRoot, validatedWorkspace.TransactionRoot))
+            {
+                throw new InvalidOperationException(
+                    "The updater workspace does not match the validated update directory.");
+            }
+
+            using var installationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                installationDirectory,
+                nameof(installationDirectory));
+            using var transactionIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                validatedWorkspace.TransactionRoot,
+                nameof(validatedWorkspace.TransactionRoot));
+            WindowsPathIdentity.RequireDisjoint(
+                installationIdentity,
+                transactionIdentity,
+                "The updater transaction root must not overlap the installation directory.");
+
+            using var sourceIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                updaterPayloadDirectory,
+                nameof(updaterPayloadDirectory));
+            using var destinationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                validatedWorkspace.UpdateDirectory,
+                nameof(validatedWorkspace.UpdateDirectory));
+            WindowsPathIdentity.RequireDisjoint(
+                sourceIdentity,
+                destinationIdentity,
+                "The updater payload source and destination must not overlap.");
+
+            // Root leases stay open through cleanup and copy. Same-integrity child
+            // mutation still requires the DFS rechecks below and remains out of scope.
+
+            if (!validatedWorkspace.IsProtected)
+            {
+                ClearLegacyUpdatePayload(validatedWorkspace.UpdateDirectory);
+                UpdaterWorkspaceFactory.ValidateExisting(
+                    false,
+                    validatedWorkspace.UpdateDirectory,
+                    localApplicationDataRoot,
+                    commonApplicationDataRoot);
+            }
+
+            return UpdaterPayloadCopier.CopyAndVerify(
+                updaterPayloadDirectory,
+                validatedWorkspace.UpdateDirectory);
+        }
+
+        internal static UpdaterInvocation ParseInvocation(
+            string currentDirectory,
+            string[] args)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(currentDirectory);
+            ArgumentNullException.ThrowIfNull(args);
+
+            if (args.Length == 0)
+            {
+                var installationDirectory = Directory.GetParent(
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(currentDirectory)))?.FullName
+                    ?? throw new InvalidOperationException("Unable to determine the installation directory.");
+                return new UpdaterInvocation(true, installationDirectory, null);
+            }
+
+            if (args.Length == 2)
+                return new UpdaterInvocation(false, args[0], args[1]);
+
+            throw new ArgumentException(
+                "The updater accepts either zero arguments or exactly installation and update directories.",
+                nameof(args));
+        }
+
+        internal static ProcessStartInfo CreateUpdaterProcessStartInfo(
+            string updaterPath,
+            string workingDirectory,
+            string installationDirectory,
+            string updateDirectory)
+        {
+            return new ProcessStartInfo
             {
                 FileName = updaterPath,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
-                ArgumentList = { installationDirectory }
+                ArgumentList = { installationDirectory, updateDirectory }
             };
-            Process.Start(processStartInfo);
         }
 
-        private static async Task UpdateAsync(string installationDirectory, string updateDirectory)
+        private static async Task UpdateAsync(
+            string installationDirectory,
+            UpdaterWorkspace workspace)
         {
+            ArgumentNullException.ThrowIfNull(workspace);
+            workspace = UpdateInstaller.ValidateWorkspace(
+                installationDirectory,
+                workspace);
+            var updateDirectory = workspace.UpdateDirectory;
             var latestRelease = await GetLatestReleaseAsync();
             if (latestRelease == null)
                 return;
@@ -89,12 +287,20 @@ namespace AssetEditorUpdater
             Console.WriteLine($"正在将 Asset Editor 国区版从 {installedVersion} 更新到 {latestVersion}。");
 
             var asset = GetAsset(latestRelease);
-            var assetPath = Path.Combine(updateDirectory, asset.Name);
-            var downloadResult = await DownloadAssetAsync(asset.BrowserDownloadUrl, assetPath);
+            workspace = UpdateInstaller.ValidateWorkspace(
+                installationDirectory,
+                workspace);
+            updateDirectory = workspace.UpdateDirectory;
+            var assetPath = GetAssetDownloadPath(updateDirectory, asset.Name);
+            var downloadResult = await DownloadAssetAsync(
+                asset.BrowserDownloadUrl,
+                assetPath,
+                installationDirectory,
+                workspace);
             if (downloadResult == false)
                 return;
 
-            UpdateInstaller.Install(assetPath, installationDirectory, updateDirectory);
+            UpdateInstaller.Install(assetPath, installationDirectory, workspace);
 
             var assetEditorPath = Path.Combine(installationDirectory, AssetEditorExe);
             if (File.Exists(assetEditorPath))
@@ -159,6 +365,136 @@ namespace AssetEditorUpdater
             return string.Equals(Path.GetExtension(assetName), ".zip", StringComparison.OrdinalIgnoreCase);
         }
 
+        internal static string GetAssetDownloadPath(
+            string updateDirectory,
+            string assetName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(updateDirectory);
+
+            if (string.IsNullOrWhiteSpace(assetName)
+                || Path.IsPathRooted(assetName)
+                || Path.IsPathFullyQualified(assetName)
+                || assetName is "." or ".."
+                || assetName.Contains(Path.DirectorySeparatorChar)
+                || assetName.Contains(Path.AltDirectorySeparatorChar)
+                || assetName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || assetName.EndsWith('.')
+                || assetName.EndsWith(' ')
+                || !IsZipAssetName(assetName))
+            {
+                throw new InvalidDataException(
+                    $"The release asset name is not a safe .zip leaf: {assetName}");
+            }
+
+            var fullUpdateDirectory = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(updateDirectory));
+            var assetPath = Path.GetFullPath(
+                Path.Combine(fullUpdateDirectory, assetName));
+            if (!string.Equals(
+                    Path.GetDirectoryName(assetPath),
+                    fullUpdateDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"The release asset path escaped the Update directory: {assetName}");
+            }
+
+            return assetPath;
+        }
+
+        internal static async Task CopyAssetDownloadAsync(
+            Stream source,
+            string downloadPath,
+            string installationDirectory,
+            UpdaterWorkspace workspace,
+            string? localApplicationDataRoot = null,
+            string? commonApplicationDataRoot = null,
+            Action? afterDestinationCreated = null)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentException.ThrowIfNullOrWhiteSpace(downloadPath);
+            ArgumentNullException.ThrowIfNull(workspace);
+
+            var validatedWorkspace = UpdateInstaller.ValidateWorkspace(
+                installationDirectory,
+                workspace,
+                localApplicationDataRoot,
+                commonApplicationDataRoot);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                validatedWorkspace.UpdateDirectory);
+            var canonicalDownloadPath = GetAssetDownloadPath(
+                paths.UpdateDirectory,
+                Path.GetFileName(downloadPath));
+            if (!PathsEqual(downloadPath, canonicalDownloadPath))
+            {
+                throw new InvalidDataException(
+                    "The release asset path is outside the validated Update directory.");
+            }
+
+            using var transactionIdentity =
+                WindowsPathIdentity.OpenExistingDirectory(
+                    paths.TransactionRoot,
+                    nameof(workspace),
+                    WindowsDirectoryLeaseMode.Pinned);
+            using var updateIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                paths.UpdateDirectory,
+                nameof(workspace),
+                WindowsDirectoryLeaseMode.Pinned);
+            WindowsPathIdentity.RequireDirectChild(
+                transactionIdentity,
+                updateIdentity,
+                "Update must be a direct child of the transaction root.");
+
+            var destinationCreated = false;
+            try
+            {
+                await CopyAssetDownloadFileAsync(
+                    source,
+                    canonicalDownloadPath,
+                    () =>
+                    {
+                        destinationCreated = true;
+                        afterDestinationCreated?.Invoke();
+                    });
+            }
+            catch
+            {
+                if (destinationCreated)
+                {
+                    try
+                    {
+                        UpdateInstaller.DeleteOwnedArchive(
+                            validatedWorkspace,
+                            canonicalDownloadPath,
+                            transactionIdentity,
+                            updateIdentity);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Console.Error.WriteLine(
+                            $"Updater cleanup failed; preserving the original failure: {cleanupException}");
+                    }
+                }
+
+                throw;
+            }
+        }
+
+        private static async Task CopyAssetDownloadFileAsync(
+            Stream source,
+            string downloadPath,
+            Action afterDestinationCreated)
+        {
+            await using var fileStream = new FileStream(
+                downloadPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None);
+            afterDestinationCreated();
+            await source.CopyToAsync(fileStream);
+            fileStream.Flush(flushToDisk: true);
+        }
+
         internal static string GetUpdateDirectory()
         {
             return Path.Combine(
@@ -173,7 +509,11 @@ namespace AssetEditorUpdater
             return UpdateInstaller.GetBackupRootDirectory(GetUpdateDirectory());
         }
 
-        private static async Task<bool> DownloadAssetAsync(string downloadUrl, string downloadPath)
+        private static async Task<bool> DownloadAssetAsync(
+            string downloadUrl,
+            string downloadPath,
+            string installationDirectory,
+            UpdaterWorkspace workspace)
         {
             Console.WriteLine("正在下载最新版本……");
 
@@ -186,9 +526,12 @@ namespace AssetEditorUpdater
                 response.EnsureSuccessStatusCode();
 
                 await using var responseStream = await response.Content.ReadAsStreamAsync();
-                await using var fileStream = new FileStream(downloadPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await responseStream.CopyToAsync(fileStream);
-                
+                await CopyAssetDownloadAsync(
+                    responseStream,
+                    downloadPath,
+                    installationDirectory,
+                    workspace);
+
                 return true;
             }
             catch
@@ -213,6 +556,65 @@ namespace AssetEditorUpdater
                 Arguments = $"\"{assetEditorPath}\"".Trim()
             };
             Process.Start(processStartInfo);
+        }
+
+        private static void ClearLegacyUpdatePayload(string updateDirectory)
+        {
+            foreach (var entry in new DirectoryInfo(updateDirectory).EnumerateFileSystemInfos())
+            {
+                entry.Refresh();
+                if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new InvalidDataException(
+                        $"Legacy updater payload entry cannot be a reparse point: {entry.FullName}");
+                }
+
+                if ((entry.Attributes & FileAttributes.Directory) != 0)
+                {
+                    ClearLegacyUpdatePayload(entry.FullName);
+                    Directory.Delete(entry.FullName);
+                }
+                else
+                {
+                    File.Delete(entry.FullName);
+                }
+            }
+
+            if (Directory.EnumerateFileSystemEntries(updateDirectory).Any())
+                throw new InvalidDataException("Legacy updater payload changed while it was being cleared.");
+        }
+
+        private sealed class RelaunchWorkspaceLease : IDisposable
+        {
+            private readonly WindowsDirectoryIdentityLease transactionIdentity;
+            private readonly WindowsDirectoryIdentityLease updateIdentity;
+            private bool isDisposed;
+
+            internal RelaunchWorkspaceLease(
+                WindowsDirectoryIdentityLease transactionIdentity,
+                WindowsDirectoryIdentityLease updateIdentity)
+            {
+                this.transactionIdentity = transactionIdentity;
+                this.updateIdentity = updateIdentity;
+            }
+
+            public void Dispose()
+            {
+                if (isDisposed)
+                    return;
+
+                isDisposed = true;
+                updateIdentity.Dispose();
+                transactionIdentity.Dispose();
+            }
+        }
+
+        private static bool PathsEqual(string firstPath, string secondPath)
+        {
+            return string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(firstPath)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(secondPath)),
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 }

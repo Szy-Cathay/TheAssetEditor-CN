@@ -8,7 +8,10 @@ using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Serilog;
 using Shared.Core.Events;
+using Shared.Core.ErrorHandling;
+using System.Runtime.ExceptionServices;
 
 namespace GameWorld.Core.Components.Gizmo
 {
@@ -16,6 +19,7 @@ namespace GameWorld.Core.Components.Gizmo
     {
         private readonly IMouseComponent _mouse;
         private readonly IEventHub _eventHub;
+        private readonly ILogger _logger = Logging.Create<GizmoComponent>();
 
         private readonly IKeyboardComponent _keyboard;
         private readonly SelectionManager _selectionManager;
@@ -64,7 +68,8 @@ namespace GameWorld.Core.Components.Gizmo
             _gizmo.ScaleEvent += GizmoScaleEvent;
             _gizmo.StartEvent += GizmoTransformStart;
             _gizmo.StopEvent += GizmoTransformEnd;
-            _gizmo.RequestRestoreInitialState += OnRequestRestoreInitialState;
+            _gizmo.ReplacePreviewFromInitialRequested +=
+                OnReplacePreviewFromInitial;
         }
 
         /// <summary>
@@ -74,72 +79,166 @@ namespace GameWorld.Core.Components.Gizmo
 
         private void OnSelectionChanged(ISelectionState state)
         {
-            _gizmo.Selection.Clear();
-            _activeTransformation = TransformGizmoWrapper.CreateFromSelectionState(state, _commandFactory);
-            if (_activeTransformation != null)
+            ExceptionDispatchInfo primaryError = null;
+            var previousTransformation = _activeTransformation;
+            if (previousTransformation?.IsTransformActive == true)
             {
-                // Pass falloff value for face/edge mode proportional editing
-                if (state is FaceSelectionState || state is EdgeSelectionState)
-                    _activeTransformation.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
-                _gizmo.Selection.Add(_activeTransformation);
+                try
+                {
+                    previousTransformation.CancelTransform();
+                }
+                catch (Exception exception)
+                {
+                    primaryError = ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    _gizmo.AbortTransformInteraction();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    ReleaseMouseOwnership();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
             }
 
-            _gizmo.ResetDeltas();
+            try
+            {
+                previousTransformation?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+
+            _activeTransformation = null;
+            try
+            {
+                _gizmo.Selection.Clear();
+                var replacement = TransformGizmoWrapper.CreateFromSelectionState(state, _commandFactory);
+                if (replacement != null)
+                {
+                    // Pass falloff value for face/edge mode proportional editing
+                    if (state is FaceSelectionState || state is EdgeSelectionState)
+                        replacement.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
+                    _gizmo.Selection.Add(replacement);
+                }
+
+                _activeTransformation = replacement;
+                _gizmo.ResetDeltas();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                _activeTransformation = null;
+                _gizmo.Selection.Clear();
+            }
+
             // Note: Don't auto-enable Gizmo here - user must click toolbar icon first
+            primaryError?.Throw();
         }
 
-        /// <summary>
-        /// Called when Gizmo needs to restore initial state for Blender-style modal transform
-        /// (for rotation and scale, which calculate from initial state each frame)
-        /// </summary>
-        private void OnRequestRestoreInitialState()
+        private void OnReplacePreviewFromInitial(
+            ModalPreviewReplacement replacement)
         {
-            if (_activeTransformation?.HasBackup == true)
+            if (_activeTransformation == null)
+                return;
+
+            replacement = ApplyCtrlScaleConstraint(
+                replacement,
+                _isCtrlPressed);
+            ExceptionDispatchInfo primaryError;
+            try
             {
-                // Restore vertices without GPU upload — the subsequent transform event
-                // will overwrite vertices and upload the final result in one pass.
-                _activeTransformation.RestoreVertexState(resetTransform: true, skipGpuUpload: true);
+                _activeTransformation.ReplaceInitialPreview(replacement);
+                return;
             }
+            catch (Exception exception)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                _activeTransformation.CancelTransform();
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(
+                    exception,
+                    "Failed to cancel a rejected modal transform preview");
+            }
+
+            try
+            {
+                _gizmo.AbortTransformInteraction();
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(
+                    exception,
+                    "Failed to abort a rejected modal transform interaction");
+            }
+
+            try
+            {
+                ReleaseMouseOwnership();
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(
+                    exception,
+                    "Failed to release mouse ownership after a modal transform error");
+            }
+
+            primaryError.Throw();
         }
 
         private void GizmoTransformStart()
         {
-            // Only set mouse owner, don't start command here
-            // Command will be started in GizmoTransformEnd for confirm
-            _mouse.MouseOwner = this;
             // Update falloff on active transformation when starting transform
             if (_activeTransformation != null && _selectionManager.GetState() is FaceSelectionState or EdgeSelectionState)
                 _activeTransformation.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
+            _activeTransformation?.BeginTransform();
+            _mouse.MouseOwner = this;
         }
 
         private void GizmoTransformEnd()
         {
-            // Check if this is a cancel operation
-            if (_gizmo.IsModalCancelled)
+            var isCancelled = _gizmo.IsModalCancelled;
+            try
             {
-                // Cancel: restore vertices to initial state (like Blender's restoreTransObjects)
-                // Reset transform state as well since we're going back to initial
-                _activeTransformation?.RestoreVertexState(resetTransform: true);
-                _activeTransformation?.ClearBackup();
+                if (isCancelled)
+                    _activeTransformation?.CancelTransform();
+                else
+                    _activeTransformation?.CommitTransform(_commandManager);
+            }
+            finally
+            {
                 _gizmo.IsModalCancelled = false;
-            }
-            else
-            {
-                // Confirm: record the final transform for undo/redo
-                // Use ConfirmModalTransform to avoid the Start() method which resets _totalGizomTransform
-                _activeTransformation?.ClearBackup();
-                _activeTransformation?.ConfirmModalTransform(_commandManager);
-            }
+                // Gizmo should only be visible when explicitly enabled via toolbar button
+                _isEnabled = false;
 
-            // Reset _isEnabled after modal transform ends
-            // Gizmo should only be visible when explicitly enabled via toolbar button
-            _isEnabled = false;
-
-            if (_mouse.MouseOwner == this)
-            {
-                _mouse.MouseOwner = null;
-                _mouse.ClearStates();
+                ReleaseMouseOwnership();
             }
+        }
+
+        private void ReleaseMouseOwnership()
+        {
+            if (_mouse.MouseOwner != this)
+                return;
+
+            _mouse.MouseOwner = null;
+            _mouse.ClearStates();
         }
 
 
@@ -155,33 +254,48 @@ namespace GameWorld.Core.Components.Gizmo
 
         private void GizmoScaleEvent(ITransformable transformable, TransformationEventArgs e)
         {
-            var value = (Vector3)e.Value;
-            if (_isCtrlPressed)
+            var value = ApplyCtrlScaleConstraint(
+                (Vector3)e.Value,
+                _isCtrlPressed);
+            _activeTransformation?.GizmoScaleEvent(value, e.Pivot);
+        }
+
+        private static ModalPreviewReplacement ApplyCtrlScaleConstraint(
+            ModalPreviewReplacement replacement,
+            bool isCtrlPressed)
+        {
+            if (replacement.Kind != ModalPreviewReplacementKind.Scale)
             {
-                if (value.X != 0)
-                    value = new Vector3(value.X);
-                else if (value.Y != 0)
-                    value = new Vector3(value.Y);
-                else if (value.Z != 0)
-                    value = new Vector3(value.Z);
+                return replacement;
             }
 
-            _activeTransformation?.GizmoScaleEvent(value, e.Pivot);
+            return ModalPreviewReplacement.Scale(
+                ApplyCtrlScaleConstraint(
+                    replacement.VectorValue,
+                    isCtrlPressed),
+                replacement.Pivot);
+        }
+
+        private static Vector3 ApplyCtrlScaleConstraint(
+            Vector3 value,
+            bool isCtrlPressed)
+        {
+            if (!isCtrlPressed)
+                return value;
+            if (value.X != 0)
+                return new Vector3(value.X);
+            if (value.Y != 0)
+                return new Vector3(value.Y);
+            if (value.Z != 0)
+                return new Vector3(value.Z);
+            return value;
         }
 
         public override void Update(GameTime gameTime)
         {
             var selectionMode = _selectionManager.GetState().Mode;
-            switch (selectionMode)
-            {
-                case GeometrySelectionMode.Object:
-                case GeometrySelectionMode.Face:
-                case GeometrySelectionMode.Vertex:
-                case GeometrySelectionMode.Bone:
-                    break;
-                default:
-                    return;
-            }
+            if (!IsSupportedSelectionMode(selectionMode))
+                return;
 
             // Blender-style hotkey triggers for modal transform
             // G = Translate, R = Rotate, S = Scale
@@ -251,7 +365,10 @@ namespace GameWorld.Core.Components.Gizmo
             if (_gizmo.IsInModalTransform)
             {
                 // Ctrl key toggles snap during modal transform
-                _gizmo.SnapEnabled = _keyboard.IsKeyDown(Keys.LeftControl) || _keyboard.IsKeyDown(Keys.RightControl);
+                _isCtrlPressed =
+                    _keyboard.IsKeyDown(Keys.LeftControl) ||
+                    _keyboard.IsKeyDown(Keys.RightControl);
+                _gizmo.SnapEnabled = _isCtrlPressed;
 
                 var isCameraMoving = _keyboard.IsKeyDown(Keys.LeftAlt);
                 _gizmo.Update(gameTime, !isCameraMoving);
@@ -261,7 +378,9 @@ namespace GameWorld.Core.Components.Gizmo
             if (!_isEnabled)
                 return;
 
-            _isCtrlPressed = _keyboard.IsKeyDown(Keys.LeftControl);
+            _isCtrlPressed =
+                _keyboard.IsKeyDown(Keys.LeftControl) ||
+                _keyboard.IsKeyDown(Keys.RightControl);
             if (_gizmo.ActiveMode == GizmoMode.NonUniformScale && _isCtrlPressed)
                 _gizmo.ActiveMode = GizmoMode.UniformScale;
             else if (_gizmo.ActiveMode == GizmoMode.UniformScale && !_isCtrlPressed)
@@ -332,10 +451,6 @@ namespace GameWorld.Core.Components.Gizmo
             // Don't set _isEnabled = true - Gizmo should not be visible during modal transform
             _mouse.MouseOwner = this;
 
-            // Backup initial vertex state (like Blender's createTransData)
-            // This allows cancel to restore vertices to original positions
-            _activeTransformation?.BackupVertexState();
-
             _gizmo.StartModalTransform(mode);
         }
 
@@ -358,17 +473,8 @@ namespace GameWorld.Core.Components.Gizmo
         public override void Draw(GameTime gameTime)
         {
             var selectionMode = _selectionManager.GetState().Mode;
-
-            switch (selectionMode)
-            {
-                case GeometrySelectionMode.Object:
-                case GeometrySelectionMode.Face:
-                case GeometrySelectionMode.Vertex:
-                case GeometrySelectionMode.Bone:
-                    break;
-                default:
-                    return;
-            }
+            if (!IsSupportedSelectionMode(selectionMode))
+                return;
 
             // During modal transform, always draw (for dashed line visuals)
             // Otherwise, only draw if gizmo is enabled
@@ -388,9 +494,86 @@ namespace GameWorld.Core.Components.Gizmo
             _gizmo.ScaleModifier += v;
         }
 
+        private static bool IsSupportedSelectionMode(GeometrySelectionMode mode)
+        {
+            return mode is
+                GeometrySelectionMode.Object or
+                GeometrySelectionMode.Face or
+                GeometrySelectionMode.Edge or
+                GeometrySelectionMode.Vertex or
+                GeometrySelectionMode.Bone;
+        }
+
         public void Dispose()
         {
-            _gizmo.Dispose();
+            ExceptionDispatchInfo primaryError = null;
+            var transformation = _activeTransformation;
+
+            if (transformation?.IsTransformActive == true)
+            {
+                try
+                {
+                    transformation.CancelTransform();
+                }
+                catch (Exception exception)
+                {
+                    primaryError = ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            if (_gizmo != null)
+            {
+                try
+                {
+                    _gizmo.AbortTransformInteraction();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            try
+            {
+                ReleaseMouseOwnership();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                transformation?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+
+            _activeTransformation = null;
+            if (_gizmo != null)
+            {
+                try
+                {
+                    _gizmo.Selection.Clear();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    _gizmo.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            primaryError?.Throw();
         }
 
         public void Handle(SelectionChangedEvent notification) => OnSelectionChanged(notification.NewState);

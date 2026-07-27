@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Rendering;
+using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.Rendering.Materials.Shaders;
 using GameWorld.Core.Rendering.RenderItems;
 using GameWorld.Core.SceneNodes;
@@ -36,8 +37,12 @@ namespace GameWorld.Core.Components.Selection
         private readonly IDeviceResolver _deviceResolverComponent;
 
         // Cached edge topology for current mesh (avoids per-frame recomputation)
-        private (int v0, int v1)[] _cachedEdgeIndices;
+        private (int v0, int v1)[] _cachedEdgeIndices = Array.Empty<(int, int)>();
         private Rmv2MeshNode _cachedEdgeMesh;
+        private MeshObject _cachedEdgeGeometry;
+        private ushort[] _cachedEdgeIndexArray;
+        private int _cachedEdgeIndexLength = -1;
+        private Matrix _cachedEdgeRenderMatrix;
         private bool _edgeDataDirty = true;
 
         // Sample vertex positions to detect vertex transformation without full iteration
@@ -45,9 +50,8 @@ namespace GameWorld.Core.Components.Selection
         private int _sampleIdx0 = 0;
         private int _sampleIdx1 = 1;
 
-        // Pre-allocated edge data buffer (matches EdgeQuadInstanceMesh max instance count)
         const int MaxRenderEdges = 50000;
-        private EdgeData[] _edgeDataCache = new EdgeData[MaxRenderEdges];
+        private EdgeData[] _edgeDataCache = Array.Empty<EdgeData>();
 
         public SelectionManager(IEventHub eventHub, RenderEngineComponent renderEngine, IScopedResourceLibrary resourceLib, IDeviceResolver deviceResolverComponent)
         {
@@ -170,34 +174,78 @@ namespace GameWorld.Core.Components.Selection
                 var vertexObject = selectionVertexState.RenderObject as Rmv2MeshNode;
                 var geo = vertexObject.Geometry;
 
-                // Rebuild edge topology cache when mesh changes
-                if (_cachedEdgeMesh != vertexObject)
+                var topologyChanged =
+                    _cachedEdgeMesh != vertexObject ||
+                    _cachedEdgeGeometry != geo ||
+                    !ReferenceEquals(_cachedEdgeIndexArray, geo.IndexArray) ||
+                    _cachedEdgeIndexLength != geo.IndexArray.Length;
+
+                // Index mutation paths replace the array. Rebuild when that identity changes.
+                if (topologyChanged)
                 {
                     _cachedEdgeMesh = vertexObject;
-                    _cachedEdgeIndices = BuildEdgeIndexCache(geo);
+                    _cachedEdgeGeometry = geo;
+                    _cachedEdgeIndexArray = geo.IndexArray;
+                    _cachedEdgeIndexLength = geo.IndexArray.Length;
+                    _cachedEdgeIndices = EdgeIndexCacheBuilder.Build(geo.IndexArray, MaxRenderEdges);
+                    _edgeDataCache = new EdgeData[_cachedEdgeIndices.Length];
+
+                    var topologyVertexCount = geo.VertexCount();
+                    selectionVertexState.SelectedVertices.RemoveAll(
+                        index => index < 0 || index >= topologyVertexCount);
+                    if (selectionVertexState.VertexWeights.Count != topologyVertexCount)
+                        selectionVertexState.VertexWeights = new List<float>(new float[topologyVertexCount]);
+                    selectionVertexState.UpdateWeights(_vertexSelectionFalloff);
+
                     _edgeDataDirty = true;
                 }
 
-                // Use selected vertices as sample targets (fixes edge freeze during transform)
-                if (selectionVertexState.SelectedVertices.Count >= 2)
+                var vertexCount = geo.VertexCount();
+                var firstSelectedVertex = -1;
+                var secondSelectedVertex = -1;
+                for (var i = 0; i < selectionVertexState.SelectedVertices.Count; i++)
                 {
-                    _sampleIdx0 = selectionVertexState.SelectedVertices[0];
-                    _sampleIdx1 = selectionVertexState.SelectedVertices[1];
+                    var index = selectionVertexState.SelectedVertices[i];
+                    if (index < 0 || index >= vertexCount)
+                        continue;
+
+                    if (firstSelectedVertex == -1)
+                        firstSelectedVertex = index;
+                    else
+                    {
+                        secondSelectedVertex = index;
+                        break;
+                    }
                 }
-                else if (selectionVertexState.SelectedVertices.Count == 1)
+
+                // Use selected vertices as sample targets (fixes edge freeze during transform).
+                if (secondSelectedVertex != -1)
                 {
-                    _sampleIdx0 = selectionVertexState.SelectedVertices[0];
-                    _sampleIdx1 = _sampleIdx0 < geo.VertexCount() - 1 ? _sampleIdx0 + 1 : 0;
+                    _sampleIdx0 = firstSelectedVertex;
+                    _sampleIdx1 = secondSelectedVertex;
+                }
+                else if (firstSelectedVertex != -1)
+                {
+                    _sampleIdx0 = firstSelectedVertex;
+                    _sampleIdx1 = _sampleIdx0 < vertexCount - 1 ? _sampleIdx0 + 1 : 0;
+                }
+                else
+                {
+                    _sampleIdx0 = 0;
+                    _sampleIdx1 = vertexCount > 1 ? 1 : 0;
                 }
 
                 // Detect vertex position changes during transformation by sampling selected vertices
-                if (!_edgeDataDirty && geo.VertexCount() >= 2)
+                if (!_edgeDataDirty && vertexCount > 0)
                 {
                     var p0 = geo.GetVertexById(_sampleIdx0);
                     var p1 = geo.GetVertexById(_sampleIdx1);
                     if (p0 != _samplePos0 || p1 != _samplePos1)
                         _edgeDataDirty = true;
                 }
+
+                if (!_edgeDataDirty && _cachedEdgeRenderMatrix != vertexObject.RenderMatrix)
+                    _edgeDataDirty = true;
 
                 // Only rebuild edge data when dirty (selection change or position change)
                 if (_edgeDataDirty)
@@ -206,7 +254,7 @@ namespace GameWorld.Core.Components.Selection
                     _edgeDataDirty = false;
 
                     // Cache sample positions for next frame comparison
-                    if (geo.VertexCount() >= 2)
+                    if (vertexCount > 0)
                     {
                         _samplePos0 = geo.GetVertexById(_sampleIdx0);
                         _samplePos1 = geo.GetVertexById(_sampleIdx1);
@@ -222,9 +270,7 @@ namespace GameWorld.Core.Components.Selection
             }
             else
             {
-                // Reset cache when leaving vertex mode
-                _cachedEdgeMesh = null;
-                _edgeDataDirty = true;
+                ResetEdgeCache();
             }
 
             if (selectionState is EdgeSelectionState selectionEdgeState && selectionEdgeState.RenderObject is Rmv2MeshNode edgeNode)
@@ -318,41 +364,13 @@ namespace GameWorld.Core.Components.Selection
             _vertexSelectionFalloff = Math.Clamp(newValue, 0, float.MaxValue);
             var vertexSelectionState = GetState<VertexSelectionState>();
             if (vertexSelectionState != null)
+            {
                 vertexSelectionState.UpdateWeights(_vertexSelectionFalloff);
+                _edgeDataDirty = true;
+            }
         }
 
         public float VertexSelectionFalloff => _vertexSelectionFalloff;
-
-        /// <summary>
-        /// Build deduplicated edge index pairs from mesh geometry.
-        /// Called once per mesh, cached until mesh changes.
-        /// </summary>
-        private static (int v0, int v1)[] BuildEdgeIndexCache(GameWorld.Core.Rendering.Geometry.MeshObject geo)
-        {
-            var processedEdges = new HashSet<(int, int)>();
-            var result = new List<(int, int)>();
-
-            for (var i = 0; i < geo.IndexArray.Length; i += 3)
-            {
-                var i0 = geo.IndexArray[i];
-                var i1 = geo.IndexArray[i + 1];
-                var i2 = geo.IndexArray[i + 2];
-
-                var edges = new[] {
-                    (Math.Min(i0, i1), Math.Max(i0, i1)),
-                    (Math.Min(i1, i2), Math.Max(i1, i2)),
-                    (Math.Min(i0, i2), Math.Max(i0, i2))
-                };
-
-                foreach (var edge in edges)
-                {
-                    if (processedEdges.Add(edge))
-                        result.Add(edge);
-                }
-            }
-
-            return result.ToArray();
-        }
 
         /// <summary>
         /// Update edge quad instance data (positions + colors).
@@ -362,31 +380,41 @@ namespace GameWorld.Core.Components.Selection
         {
             var geo = meshNode.Geometry;
             var matrix = meshNode.RenderMatrix;
-            var weights = selectionState.VertexWeights;
-
-            var wireColor = new Vector3(0.15f, 0.15f, 0.15f);
-            var selectColor = new Vector3(1.0f, 0.47f, 0.0f);
-
-            // Only process up to max renderable edges (avoids iterating millions of edges for large meshes)
-            var edgeCount = Math.Min(_cachedEdgeIndices.Length, MaxRenderEdges);
-            for (var i = 0; i < edgeCount; i++)
-            {
-                var (v0, v1) = _cachedEdgeIndices[i];
-                var w0 = weights[v0];
-                var w1 = weights[v1];
-
-                _edgeDataCache[i] = new EdgeData
-                {
-                    P0 = Vector3.Transform(geo.GetVertexById(v0), matrix),
-                    P1 = Vector3.Transform(geo.GetVertexById(v1), matrix),
-                    C0 = Vector3.Lerp(wireColor, selectColor, w0),
-                    C1 = Vector3.Lerp(wireColor, selectColor, w1),
-                    Width = 0
-                };
-            }
+            EdgeOverlayDataBuilder.Fill(
+                _edgeDataCache,
+                geo,
+                matrix,
+                _cachedEdgeIndices,
+                selectionState.VertexWeights);
+            _cachedEdgeRenderMatrix = matrix;
 
             _edgeQuadRenderItem.Edges = _edgeDataCache;
             _edgeQuadRenderItem.MarkDirty();
+        }
+
+        private void ResetEdgeCache()
+        {
+            if (_cachedEdgeMesh == null &&
+                _cachedEdgeIndices.Length == 0 &&
+                _edgeDataCache.Length == 0)
+            {
+                _edgeDataDirty = true;
+                return;
+            }
+
+            _cachedEdgeMesh = null;
+            _cachedEdgeGeometry = null;
+            _cachedEdgeIndexArray = null;
+            _cachedEdgeIndexLength = -1;
+            _cachedEdgeIndices = Array.Empty<(int, int)>();
+            _edgeDataCache = Array.Empty<EdgeData>();
+            _edgeDataDirty = true;
+
+            if (_edgeQuadRenderItem != null)
+            {
+                _edgeQuadRenderItem.Edges = _edgeDataCache;
+                _edgeQuadRenderItem.MarkDirty();
+            }
         }
     }
 }

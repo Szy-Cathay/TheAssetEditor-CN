@@ -22,14 +22,25 @@ namespace AssetEditor.Services
 
         private readonly IPackFileService _packFileService;
         private readonly IEditorDatabase _editorDatabase;
+        private readonly Func<string, string, MessageBoxButton, MessageBoxResult> _showMessage;
 
         public ObservableCollection<IEditorInterface> CurrentEditorsList { get; set; } = [];
         [ObservableProperty] private int _selectedEditorIndex = -1;
 
         public EditorManager(IGlobalEventHub eventHub, IPackFileService packFileService, IEditorDatabase editorDatabase)
+            : this(eventHub, packFileService, editorDatabase, MessageBox.Show)
+        {
+        }
+
+        internal EditorManager(
+            IGlobalEventHub eventHub,
+            IPackFileService packFileService,
+            IEditorDatabase editorDatabase,
+            Func<string, string, MessageBoxButton, MessageBoxResult> showMessage)
         {
             _packFileService = packFileService;
             _editorDatabase = editorDatabase;
+            _showMessage = showMessage;
 
             eventHub.Register<BeforePackFileContainerRemovedEvent>(this, OnBeforeRemoved);
             eventHub.Register<ForceShutdownEvent>(this, OnForceShutdownEditor);
@@ -143,17 +154,15 @@ namespace AssetEditor.Services
 
             if (openFiles.Any())
             {
-                if (MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ClosePackWithOpenFiles", container.Name, openFiles.First().DisplayName), LocalizationManager.Instance.Get("Msg.AreYouSure"), MessageBoxButton.YesNo) == MessageBoxResult.No)
+                if (_showMessage(LocalizationManager.Instance.GetFormat("Msg.ClosePackWithOpenFiles", container.Name, openFiles.First().DisplayName), LocalizationManager.Instance.Get("Msg.AreYouSure"), MessageBoxButton.YesNo) == MessageBoxResult.No)
                 {
                     e.AllowClose = false;
+                    return;
                 }
             }
 
             foreach (var editor in openFiles)
-            {
-                CurrentEditorsList.Remove(editor);
-                editor.Close();
-            }
+                DestroyEditor(editor);
         }
 
         private void OnForceShutdownEditor(ForceShutdownEvent e)
@@ -166,14 +175,11 @@ namespace AssetEditor.Services
         {
             if (tool is ISaveableEditor saveableEditor && saveableEditor.HasUnsavedChanges)
             {
-                if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.UnsavedChangesOnClose"), LocalizationManager.Instance.Get("Msg.CloseTitle"), MessageBoxButton.OKCancel) == MessageBoxResult.Cancel)
+                if (_showMessage(LocalizationManager.Instance.Get("Msg.UnsavedChangesOnClose"), LocalizationManager.Instance.Get("Msg.CloseTitle"), MessageBoxButton.OKCancel) == MessageBoxResult.Cancel)
                     return;
             }
 
-            var index = CurrentEditorsList.IndexOf(tool);
-            CurrentEditorsList.RemoveAt(index);
-            _editorDatabase.DestroyEditor(tool);
-            tool.Close();
+            DestroyEditor(tool);
         }
 
         public  void CloseOtherTools(IEditorInterface tool)
@@ -187,8 +193,17 @@ namespace AssetEditor.Services
 
         public void CloseAllTools(IEditorInterface tool)
         {
-            foreach (var editorViewModel in CurrentEditorsList)
+            foreach (var editorViewModel in CurrentEditorsList.ToList())
                 CloseTool(editorViewModel);
+        }
+
+        private void DestroyEditor(IEditorInterface editor)
+        {
+            if (!CurrentEditorsList.Remove(editor))
+                return;
+
+            _editorDatabase.DestroyEditor(editor);
+            editor.Close();
         }
 
         public void CloseToolsToLeft(IEditorInterface tool)

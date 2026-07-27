@@ -114,7 +114,11 @@ namespace Shared.GameFormats.AnimationPack
             }
             catch
             {
-                return new UnknownAnimFile(animationInfoDataFile.Name, data.Buffer);
+                return new UnknownAnimFile(
+                    animationInfoDataFile.Name,
+                    data.GetBytesFromBuffer(
+                        animationInfoDataFile.StartOffset,
+                        animationInfoDataFile.Size));
             }
         }
 

@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Commands;
-using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
@@ -10,39 +10,42 @@ using static GameWorld.Core.Animation.AnimationClip;
 
 namespace GameWorld.Core.Commands.Bone
 {
-    public class TransformBoneCommand : ICommand
+    public class TransformBoneCommand : IRedoableCommand
     {
         List<int> _selectedBones;
         BoneSelectionState _boneSelectionState;
+        BoneSelectionState _selectionSnapshot;
+        AnimationClip _animation;
         int _currentFrame;
         KeyFrame _oldFrame;
-        public Matrix Transform { get; set; }
-
+        KeyFrame _newFrame;
         public string HintText => "Bone Transform";
 
         public bool IsMutation => true;
 
-        private Matrix _oldTransform = Matrix.Identity;
-
-        ISelectionState _oldSelectionState;
-        private SelectionManager _selectionManager;
-
         public TransformBoneCommand(SelectionManager selectionManager)
         {
-            _selectionManager = selectionManager;
         }
 
         public void Configure(List<int> selectedBones, BoneSelectionState state)
         {
-            _selectedBones = selectedBones;
+            _selectedBones = new List<int>(selectedBones);
             _boneSelectionState = state;
+            _selectionSnapshot = (BoneSelectionState)state.Clone();
+            _animation = state.CurrentAnimation;
             _currentFrame = state.CurrentFrame;
-            _oldFrame = _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Clone();
+            _oldFrame = _animation.DynamicFrames[_currentFrame].Clone();
+            _newFrame = null;
         }
 
-        public void ApplyTransformation(Matrix newPosition, GizmoMode gizmoMode)
+        internal bool ApplyTransformation(BoneTransformDelta delta)
         {
-            if (_selectedBones.Count == 0) return;
+            if (_selectedBones.Count == 0 ||
+                delta.IsNoOp() ||
+                _boneSelectionState.Skeleton == null)
+            {
+                return false;
+            }
 
             //TODO: FIX ME
             //if(_boneSelectionState.EnableInverseKinematics)
@@ -50,55 +53,193 @@ namespace GameWorld.Core.Commands.Bone
             //    ApplyTransformationInverseKinematic(newPosition, _selectedBones[0], _boneSelectionState.InverseKinematicsEndBoneIndex);
             //    return;
             //}
-            if (_oldTransform == Matrix.Identity)
+            var sourceFrame = _animation.DynamicFrames[_currentFrame];
+            var skeleton = _boneSelectionState.Skeleton;
+            var boneCount = sourceFrame.GetBoneCountFromFrame();
+            if (boneCount == 0 ||
+                boneCount > skeleton.BoneCount ||
+                _selectedBones.Any(index => index < 0 || index >= boneCount))
             {
-                _oldTransform = newPosition;
-                return;
+                return false;
             }
 
-            var matrixDelta = newPosition - _oldTransform;
-            _oldTransform = newPosition;
-            Console.WriteLine($" gizmo moved: {Transform.Translation}");
-            //Console.WriteLine($" gizmo pivotPoint: {PivotPoint}");
-            foreach (var selectedBone in _selectedBones)
+            var sampledFrame = AnimationSampler.Sample(
+                _currentFrame,
+                0,
+                skeleton,
+                _animation,
+                freezeFrame: true);
+            if (sampledFrame == null ||
+                sampledFrame.BoneTransforms.Count < boneCount)
             {
-                var node = _boneSelectionState.RenderObject as Rmv2MeshNode;
-                var animationPlayer = node.AnimationPlayer;
-                var currentAnimFrame = animationPlayer.GetCurrentAnimationFrame();
-                var currentBoneWorldTransform = currentAnimFrame.GetSkeletonAnimatedWorld(_boneSelectionState.Skeleton, selectedBone);
-                currentBoneWorldTransform.Translation += matrixDelta.Translation;
-                var newBoneTransform = GetSkeletonAnimatedBoneFromWorld(currentAnimFrame, _boneSelectionState.Skeleton, selectedBone, currentBoneWorldTransform);
+                return false;
+            }
 
-                Console.WriteLine(_boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Position[selectedBone]);
-                newBoneTransform.Decompose(out var scale, out var rot, out var trans);
-                newPosition.Decompose(out var newScale, out var rot2, out var trans2);
-                var modifiedTransform = _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame].Clone();
-                switch (gizmoMode)
+            var selectedBones = new HashSet<int>(_selectedBones);
+            var sourceLocal = new Matrix[boneCount];
+            var sourceWorld = new Matrix[boneCount];
+            for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+            {
+                sourceLocal[boneIndex] =
+                    Matrix.CreateScale(sourceFrame.Scale[boneIndex]) *
+                    Matrix.CreateFromQuaternion(sourceFrame.Rotation[boneIndex]) *
+                    Matrix.CreateTranslation(sourceFrame.Position[boneIndex]);
+                sourceWorld[boneIndex] =
+                    sampledFrame.GetSkeletonAnimatedWorld(skeleton, boneIndex);
+                if (!BoneTransformMath.IsFinite(sourceLocal[boneIndex]) ||
+                    !BoneTransformMath.IsFinite(sourceWorld[boneIndex]))
                 {
-                    case GizmoMode.Translate:
-                        modifiedTransform.Position[selectedBone] += trans;
-                        break;
-                    case GizmoMode.Rotate:
-                        modifiedTransform.Rotation[selectedBone] *= rot2;
-                        break;
-                    case GizmoMode.NonUniformScale:
-                    case GizmoMode.UniformScale:
-                        modifiedTransform.Scale[selectedBone] = scale;
-                        break;
-                    default:
-                        throw new InvalidOperationException("unknown gizmo mode");
+                    return false;
+                }
+            }
+
+            var worldDelta = delta.CreateWorldMatrix();
+            if (!BoneTransformMath.IsFinite(worldDelta))
+                return false;
+
+            var resolvedWorld = new Matrix[boneCount];
+            var resolutionState = new byte[boneCount];
+            bool TryResolveWorld(int boneIndex)
+            {
+                if (resolutionState[boneIndex] == 2)
+                    return true;
+                if (resolutionState[boneIndex] == 1)
+                    return false;
+
+                resolutionState[boneIndex] = 1;
+                var parentIndex = skeleton.GetParentBoneIndex(boneIndex);
+                if (parentIndex < -1 || parentIndex >= boneCount)
+                    return false;
+                if (parentIndex >= 0 && !TryResolveWorld(parentIndex))
+                    return false;
+
+                if (selectedBones.Contains(boneIndex))
+                {
+                    resolvedWorld[boneIndex] = sourceWorld[boneIndex] * worldDelta;
+                }
+                else if (parentIndex == -1)
+                {
+                    resolvedWorld[boneIndex] = sourceWorld[boneIndex];
+                }
+                else
+                {
+                    resolvedWorld[boneIndex] =
+                        sourceLocal[boneIndex] * resolvedWorld[parentIndex];
                 }
 
-                _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = modifiedTransform;
+                if (!BoneTransformMath.IsFinite(resolvedWorld[boneIndex]))
+                    return false;
+
+                resolutionState[boneIndex] = 2;
+                return true;
             }
 
-            _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
-        }
+            for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+            {
+                if (!TryResolveWorld(boneIndex))
+                    return false;
+            }
 
-        public Matrix GetSkeletonAnimatedBoneFromWorld(AnimationFrame frame, GameSkeleton gameSkeleton, int boneIndex, Matrix objectInWorldTransform)
-        {
-            var output = objectInWorldTransform * Matrix.Invert(frame.GetSkeletonAnimatedWorld(gameSkeleton, boneIndex));
-            return output;
+            var orderedSelection = _selectedBones
+                .Distinct()
+                .OrderBy(GetBoneDepth)
+                .ToList();
+            var candidateComponents =
+                new Dictionary<int, (Vector3 Scale, Quaternion Rotation, Vector3 Position)>();
+            foreach (var selectedBone in orderedSelection)
+            {
+                var parentIndex = skeleton.GetParentBoneIndex(selectedBone);
+                var parentWorld = parentIndex == -1
+                    ? Matrix.Identity
+                    : resolvedWorld[parentIndex];
+                if (!BoneTransformMath.TryInvert(
+                        parentWorld,
+                        out var inverseParentWorld))
+                    return false;
+
+                var desiredLocal =
+                    resolvedWorld[selectedBone] * inverseParentWorld;
+                if (delta.Kind == BoneTransformDeltaKind.Translation)
+                {
+                    var sourceScale = sourceFrame.Scale[selectedBone];
+                    var sourceRotation = sourceFrame.Rotation[selectedBone];
+                    var translatedLocal =
+                        Matrix.CreateScale(sourceScale) *
+                        Matrix.CreateFromQuaternion(sourceRotation) *
+                        Matrix.CreateTranslation(desiredLocal.Translation);
+                    if (!BoneTransformMath.MatricesNear(
+                            desiredLocal,
+                            translatedLocal,
+                            0.0005f))
+                        return false;
+
+                    candidateComponents[selectedBone] = (
+                        sourceScale,
+                        sourceRotation,
+                        desiredLocal.Translation);
+                    continue;
+                }
+
+                var scaleSignHint = sourceFrame.Scale[selectedBone];
+                if (delta.Kind == BoneTransformDeltaKind.Scale &&
+                    !HasSelectedAncestor(selectedBone))
+                {
+                    scaleSignHint = BoneTransformMath.MultiplyComponents(
+                        scaleSignHint,
+                        delta.ScaleFactor);
+                }
+
+                if (!BoneTransformMath.TryDecomposeSignedTrs(
+                        desiredLocal,
+                        scaleSignHint,
+                        out var scale,
+                        out var rotation,
+                        out var position))
+                {
+                    return false;
+                }
+
+                candidateComponents[selectedBone] = (scale, rotation, position);
+            }
+
+            var modifiedFrame = sourceFrame.Clone();
+            foreach (var selectedBone in orderedSelection)
+            {
+                var components = candidateComponents[selectedBone];
+                modifiedFrame.Scale[selectedBone] = components.Scale;
+                modifiedFrame.Rotation[selectedBone] = components.Rotation;
+                modifiedFrame.Position[selectedBone] = components.Position;
+            }
+
+            _animation.DynamicFrames[_currentFrame] = modifiedFrame;
+            PublishModified();
+            return true;
+
+            bool HasSelectedAncestor(int boneIndex)
+            {
+                var parentIndex = skeleton.GetParentBoneIndex(boneIndex);
+                while (parentIndex >= 0)
+                {
+                    if (selectedBones.Contains(parentIndex))
+                        return true;
+                    parentIndex = skeleton.GetParentBoneIndex(parentIndex);
+                }
+
+                return false;
+            }
+
+            int GetBoneDepth(int boneIndex)
+            {
+                var depth = 0;
+                var parentIndex = skeleton.GetParentBoneIndex(boneIndex);
+                while (parentIndex >= 0 && depth <= boneCount)
+                {
+                    depth++;
+                    parentIndex = skeleton.GetParentBoneIndex(parentIndex);
+                }
+
+                return depth;
+            }
         }
 
         //TODO: FIX ME
@@ -212,29 +353,69 @@ namespace GameWorld.Core.Commands.Bone
             BackwardReaching(positions, boneLengths, positions[index + 1], index + 1);
         }
 
-        public static void CompareKeyFrames(KeyFrame A, KeyFrame B)
+        internal bool HasFrameMutation()
         {
-            for (var j = 0; j < A.Position.Count; j++)
+            if (_oldFrame == null || _animation == null)
+                return false;
+
+            var currentFrame = _animation.DynamicFrames[_currentFrame];
+            const float epsilon = 0.00001f;
+            foreach (var selectedBone in _selectedBones)
             {
-                var posDiff = A.Position[j] - B.Position[j];
-                var rotDiff = A.Rotation[j].ToVector4() - B.Rotation[j].ToVector4();
-                var scaleDiff = A.Scale[j] - B.Scale[j];
-                if (posDiff != new Vector3(0) || rotDiff != new Vector4(0) || scaleDiff != new Vector3(0))
-                    Console.WriteLine($"Bone {j}: Position difference: {posDiff}, Rotation difference: {rotDiff}, Scale difference: {scaleDiff}");
+                if (Vector3.DistanceSquared(
+                        currentFrame.Position[selectedBone],
+                        _oldFrame.Position[selectedBone]) >
+                    epsilon * epsilon ||
+                    Vector3.DistanceSquared(
+                        currentFrame.Scale[selectedBone],
+                        _oldFrame.Scale[selectedBone]) >
+                    epsilon * epsilon)
+                {
+                    return true;
+                }
+
+                var currentRotation = currentFrame.Rotation[selectedBone];
+                var oldRotation = _oldFrame.Rotation[selectedBone];
+                currentRotation.Normalize();
+                oldRotation.Normalize();
+                if (1 - Math.Abs(Quaternion.Dot(currentRotation, oldRotation)) > epsilon)
+                    return true;
             }
+
+            return false;
         }
 
         public void Undo()
         {
             if (_oldFrame == null) return;
-            CompareKeyFrames(_oldFrame, _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame]);
-            _boneSelectionState.CurrentAnimation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
-            _boneSelectionState.TriggerModifiedBoneEvent(_selectedBones);
+            _animation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
+            PublishModified();
+        }
+
+        public void Redo()
+        {
+            if (_newFrame == null) return;
+            _animation.DynamicFrames[_currentFrame] = _newFrame.Clone();
+            PublishModified();
+        }
+
+        internal void RestoreInitialFrame()
+        {
+            if (_oldFrame == null) return;
+            _animation.DynamicFrames[_currentFrame] = _oldFrame.Clone();
+            PublishModified();
         }
 
         public void Execute()
         {
-            _oldSelectionState = _boneSelectionState;
+            _newFrame ??= _animation.DynamicFrames[_currentFrame].Clone();
+        }
+
+        private void PublishModified()
+        {
+            _boneSelectionState.TriggerModifiedBoneEvent(
+                (BoneSelectionState)_selectionSnapshot.Clone(),
+                _selectedBones);
         }
     }
 }

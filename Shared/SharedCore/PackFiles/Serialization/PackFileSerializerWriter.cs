@@ -15,9 +15,24 @@ namespace Shared.Core.PackFiles.Serialization
         public FileCompressionInfo CompressionInfo { get; set; } = compressionInfo;
     }
 
+    internal sealed record PendingDataSourceUpdate(
+        PackFile PackFile,
+        PackedFileSource DataSource);
+
+    internal sealed class PackFileSerializationResult(IReadOnlyList<PendingDataSourceUpdate> updates)
+    {
+        internal IReadOnlyList<PendingDataSourceUpdate> Updates { get; } = updates;
+
+        internal void Commit()
+        {
+            foreach (var update in Updates)
+                update.PackFile.DataSource = update.DataSource;
+        }
+    }
+
     static class PackFileSerializerWriter
     {
-        public static void SaveToByteArray(string outputFileName, PackFileContainer container, BinaryWriter writer, GameInformation currentGameInformation, bool enableCompression = true)
+        internal static PackFileSerializationResult SaveToByteArray(string outputFileName, PackFileContainer container, BinaryWriter writer, GameInformation currentGameInformation, bool enableCompression = true)
         {
             if (container.Header.HasEncryptedData || container.Header.HasEncryptedIndex)
                 throw new InvalidOperationException("Saving encrypted packs is not supported.");
@@ -33,7 +48,10 @@ namespace Shared.Core.PackFiles.Serialization
             // Write the core of the file
             var fileMetaDataTable = BuildMetaDataTable(sortedFiles, container, currentGameInformation, enableCompression);
             SerializeFileTable(fileMetaDataTable, container, writer);
-            SerializeFileBlob(outputFileName, fileMetaDataTable, container, writer);
+            var outputParent = new PackedFileSourceParent { FilePath = outputFileName };
+            var pendingUpdates = new List<PendingDataSourceUpdate>(fileMetaDataTable.Count);
+            SerializeFileBlob(fileMetaDataTable, container, writer, outputParent, pendingUpdates);
+            return new PackFileSerializationResult(pendingUpdates);
         }
 
         public static void WriteHeader(PFHeader header, uint fileContentSize, BinaryWriter writer)
@@ -193,7 +211,12 @@ namespace Shared.Core.PackFiles.Serialization
             }
         }
 
-        public static void SerializeFileBlob(string outputFileName, List<PackFileWriteInformation> fileMetaDataTabel, PackFileContainer container, BinaryWriter writer)
+        public static void SerializeFileBlob(
+            List<PackFileWriteInformation> fileMetaDataTabel,
+            PackFileContainer container,
+            BinaryWriter writer,
+            PackedFileSourceParent outputParent,
+            List<PendingDataSourceUpdate> pendingUpdates)
         {
             foreach (var fileMetaData in fileMetaDataTabel)
             {
@@ -234,16 +257,16 @@ namespace Shared.Core.PackFiles.Serialization
                 writer.Write(data.Length);
                 writer.BaseStream.Position = currentPosition;
 
-                // Update DataSource
-                var packedFileSourceParent = new PackedFileSourceParent { FilePath = outputFileName };
-                packFile.DataSource = new PackedFileSource(
-                    packedFileSourceParent,
-                    offset,
-                    data.Length,
-                    false,     // We do not encrypt
-                    shouldCompress,
-                    fileMetaData.CompressionInfo.IntendedCompressionFormat,
-                    uncompressedSize);
+                pendingUpdates.Add(new PendingDataSourceUpdate(
+                    packFile,
+                    new PackedFileSource(
+                        outputParent,
+                        offset,
+                        data.Length,
+                        false,     // We do not encrypt
+                        shouldCompress,
+                        fileMetaData.CompressionInfo.IntendedCompressionFormat,
+                        uncompressedSize)));
             }
         }
 

@@ -196,6 +196,15 @@ namespace Shared.GameFormats.AnimationMeta.Parsing
 
         public byte[]? Serialize(ParsedMetadataAttribute entry, out string? errorMessage)
         {
+            if (entry is ParsedUnknownMetadataAttribute unknown)
+            {
+                if (unknown.Data == null)
+                    throw new InvalidDataException("Unknown metadata is missing its raw payload.");
+
+                errorMessage = null;
+                return unknown.Data.ToArray();
+            }
+
             var classLayout = GetClassLayoutsForMetaDataAttribute(entry);
             if (classLayout == null)
             {

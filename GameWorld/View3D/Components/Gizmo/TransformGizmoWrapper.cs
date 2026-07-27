@@ -1,10 +1,10 @@
 ﻿using GameWorld.Core.Commands;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Commands.Bone;
 using GameWorld.Core.Commands.Vertex;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
-using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Serilog;
@@ -12,10 +12,11 @@ using Shared.Core.ErrorHandling;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 
 namespace GameWorld.Core.Components.Gizmo
 {
-    public class TransformGizmoWrapper : ITransformable
+    public class TransformGizmoWrapper : ITransformable, IDisposable
     {
         protected ILogger _logger = Logging.Create<TransformGizmoWrapper>();
 
@@ -32,6 +33,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         List<MeshObject> _effectedObjects;
         List<int> _selectedBones;
+        BoneSelectionState _boneSelectionState;
         private readonly CommandFactory _commandFactory;
         ISelectionState _selectionState;
         // Vertex indices from selected faces (used by FaceSelectionState transform)
@@ -42,18 +44,61 @@ namespace GameWorld.Core.Components.Gizmo
 
         Matrix _totalGizomTransform = Matrix.Identity;
         bool _invertedWindingOrder = false;
+        VertexTransformReplayPlan? _vertexTransformReplayPlan;
 
         // -- Modal transform state backup (like Blender's TransData.iloc) -- //
         private List<VertexPositionNormalTextureCustom[]> _backupVertexArrays;
         private List<ushort[]> _backupIndexArrays;
         private Vector3 _backupPosition;                 // Backup initial position for rotation center
         private Quaternion _backupOrientation;           // Backup initial orientation
+        private Vector3 _backupScale;
         private bool _hasBackup = false;
 
-        // -- Partial VBO upload tracking -- //
-        private int _modifiedMin = int.MaxValue;
-        private int _modifiedMax = -1;
-        private bool _hasModifications = false;
+        private ISelectionState _gestureSelectionState;
+        private HashSet<int> _gestureAffectedVertexIndices;
+        private Dictionary<int, float> _gestureFalloffWeights;
+        private VertexUploadRange?[] _displayedPreviewRanges;
+        private VertexUploadRange?[] _nextPreviewRanges;
+        private bool _previewSynchronizationFaulted;
+
+        private readonly record struct VertexUploadRange(
+            int FirstModifiedVertex,
+            int LastModifiedVertex)
+        {
+            public static VertexUploadRange From(VertexTransformMeshResult result)
+            {
+                return new VertexUploadRange(
+                    result.FirstModifiedVertex,
+                    result.LastModifiedVertex);
+            }
+
+            public static VertexUploadRange Union(
+                VertexUploadRange first,
+                VertexUploadRange second)
+            {
+                return new VertexUploadRange(
+                    Math.Min(first.FirstModifiedVertex, second.FirstModifiedVertex),
+                    Math.Max(first.LastModifiedVertex, second.LastModifiedVertex));
+            }
+        }
+
+        private readonly record struct PreviewApplyResult(
+            bool Accepted,
+            IReadOnlyList<VertexTransformMeshResult> MeshResults)
+        {
+            public static PreviewApplyResult Rejected()
+            {
+                return new PreviewApplyResult(
+                    false,
+                    Array.Empty<VertexTransformMeshResult>());
+            }
+
+            public static PreviewApplyResult Applied(
+                IReadOnlyList<VertexTransformMeshResult> meshResults)
+            {
+                return new PreviewApplyResult(true, meshResults);
+            }
+        }
 
         public TransformGizmoWrapper(CommandFactory commandFactory, List<MeshObject> effectedObjects, ISelectionState vertexSelectionState)
         {
@@ -119,33 +164,95 @@ namespace GameWorld.Core.Components.Gizmo
         {
             _commandFactory = commandFactory;
             _selectionState = boneSelectionState;
-            _selectedBones = selectedBones;
+            _boneSelectionState = boneSelectionState;
+            _selectedBones = new List<int>(selectedBones);
 
             _effectedObjects = new List<MeshObject> { boneSelectionState.RenderObject.Geometry };
+            RefreshBoneDisplay();
+            _boneSelectionState.BoneModifiedEvent += OnBoneModified;
+        }
 
-            var sceneNode = boneSelectionState.RenderObject as Rmv2MeshNode;
-            var animPlayer = sceneNode.AnimationPlayer;
-            var currentFrame = animPlayer.GetCurrentAnimationFrame();
-            var skeleton = boneSelectionState.Skeleton;
-
-            if (currentFrame == null) return;
-
-            var bones = boneSelectionState.SelectedBones;
-            var totalBones = bones.Count;
-            var rotations = new List<Quaternion>();
-            foreach (var boneIdx in bones)
+        private void RefreshBoneDisplay()
+        {
+            var skeleton = _boneSelectionState.Skeleton;
+            var animation = _boneSelectionState.CurrentAnimation;
+            var frameIndex = _boneSelectionState.CurrentFrame;
+            if (skeleton == null ||
+                animation == null ||
+                frameIndex < 0 ||
+                frameIndex >= animation.DynamicFrames.Count)
             {
-                var bone = currentFrame.GetSkeletonAnimatedWorld(skeleton, boneIdx);
-                bone.Decompose(out var scale, out var rot, out var trans);
-                Position += trans;
-                Scale += scale;
-                rotations.Add(rot);
-
+                return;
             }
 
-            Orientation = AverageOrientation(rotations);
-            Position = Position / totalBones;
-            Scale = Scale / totalBones;
+            var currentFrame = AnimationSampler.Sample(
+                frameIndex,
+                0,
+                skeleton,
+                animation,
+                freezeFrame: true);
+            if (currentFrame == null)
+                return;
+
+            var totalBones = 0;
+            var rotations = new List<Quaternion>();
+            var position = Vector3.Zero;
+            var scaleTotal = Vector3.Zero;
+            foreach (var boneIdx in _selectedBones)
+            {
+                if (boneIdx < 0 || boneIdx >= currentFrame.BoneTransforms.Count)
+                    continue;
+
+                var bone = currentFrame.GetSkeletonAnimatedWorld(skeleton, boneIdx);
+                var scaleSignHint =
+                    GetWorldScaleSignHint(currentFrame, skeleton, boneIdx);
+                if (!BoneTransformMath.TryDecomposeSignedTrs(
+                        bone,
+                        scaleSignHint,
+                        out var scale,
+                        out var rot,
+                        out var trans) &&
+                    !bone.Decompose(out scale, out rot, out trans))
+                {
+                    continue;
+                }
+
+                position += trans;
+                scaleTotal += scale;
+                rotations.Add(rot);
+                totalBones++;
+            }
+
+            if (totalBones == 0)
+                return;
+
+            _orientation = AverageOrientation(rotations);
+            _pos = position / totalBones;
+            _scale = scaleTotal / totalBones;
+        }
+
+        private void OnBoneModified(BoneSelectionState state)
+        {
+            if (!IsTransformActive)
+                RefreshBoneDisplay();
+        }
+
+        private static Vector3 GetWorldScaleSignHint(
+            AnimationFrame frame,
+            GameSkeleton skeleton,
+            int boneIndex)
+        {
+            var signHint = Vector3.One;
+            var visitedBones = 0;
+            while (boneIndex >= 0 && visitedBones++ < skeleton.BoneCount)
+            {
+                signHint = BoneTransformMath.MultiplyComponents(
+                    signHint,
+                    frame.BoneTransforms[boneIndex].Scale);
+                boneIndex = skeleton.GetParentBoneIndex(boneIndex);
+            }
+
+            return signHint;
         }
 
         private Quaternion AverageOrientation(List<Quaternion> orientations)
@@ -158,112 +265,347 @@ namespace GameWorld.Core.Components.Gizmo
             return average;
         }
 
-        public void Start(CommandExecutor commandManager)
+        public void BeginTransform()
         {
+            if (_activeCommand != null || _hasBackup)
+                CancelTransform();
 
-            if (_activeCommand is TransformVertexCommand transformVertexCommand)
-            {
-                //   MessageBox.Show("Transform debug check - Please inform the creator of the tool that you got this message. Would also love it if you tried undoing your last command to see if that works..\n E-001");
-                transformVertexCommand.InvertWindingOrder = _invertedWindingOrder;
-                transformVertexCommand.Transform = _totalGizomTransform;
-                transformVertexCommand.PivotPoint = Position;
-                if (_faceVertexIndices != null)
-                    transformVertexCommand.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
-                if (_falloffWeights != null && _falloffDistance > 0)
-                    transformVertexCommand.FalloffWeights = new Dictionary<int, float>(_falloffWeights);
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-            }
-
-            if (_activeCommand is TransformBoneCommand transformBoneCommand)
-            {
-                var matrix = _totalGizomTransform;
-                matrix.Translation = Position;
-                transformBoneCommand.Transform = matrix;
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-            }
-
+            ResetGestureState();
+            if (_selectionState is FaceSelectionState or EdgeSelectionState)
+                ComputeFalloffWeights();
             if (_selectionState is BoneSelectionState)
             {
-                _totalGizomTransform = Matrix.Identity;
-                _activeCommand = _commandFactory.Create<TransformBoneCommand>().Configure(x => x.Configure(_selectedBones, (BoneSelectionState)_selectionState)).Build();
-            }
-            else
-            {
-                _totalGizomTransform = Matrix.Identity;
-                _activeCommand = _commandFactory.Create<TransformVertexCommand>().Configure(x => x.Configure(_effectedObjects, Position)).Build();
-                // Pass affected vertex indices for Face/Edge mode undo
-                if (_activeCommand is TransformVertexCommand tvc && _faceVertexIndices != null)
-                    tvc.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
-            }
-
-        }
-
-        public void Stop(CommandExecutor commandManager)
-        {
-            if (_activeCommand is TransformVertexCommand transformVertexCommand)
-            {
-                transformVertexCommand.InvertWindingOrder = _invertedWindingOrder;
-                transformVertexCommand.Transform = _totalGizomTransform;
-                transformVertexCommand.PivotPoint = Position;
-                if (_faceVertexIndices != null)
-                    transformVertexCommand.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
-                if (_falloffWeights != null && _falloffDistance > 0)
-                    transformVertexCommand.FalloffWeights = new Dictionary<int, float>(_falloffWeights);
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-                return;
-            }
-
-            if (_activeCommand is TransformBoneCommand transformBoneCommand)
-            {
-                var matrix = _totalGizomTransform;
-                matrix.Translation = Position;
-                transformBoneCommand.Transform = matrix;
-                commandManager.ExecuteCommand(_activeCommand);
-                _activeCommand = null;
-                return;
-            }
-        }
-
-        /// <summary>
-        /// Confirm modal transform - record the final transform for undo/redo
-        /// This is different from the normal gizmo flow where Start/Stop are used
-        /// </summary>
-        public void ConfirmModalTransform(CommandExecutor commandManager)
-        {
-            // Create the command with current transform state
-            if (_selectionState is BoneSelectionState)
-            {
-                var command = _commandFactory.Create<TransformBoneCommand>()
+                var boneCommand = _commandFactory.Create<TransformBoneCommand>()
                     .Configure(x => x.Configure(_selectedBones, (BoneSelectionState)_selectionState))
                     .Build();
-                var matrix = _totalGizomTransform;
-                matrix.Translation = Position;
-                command.Transform = matrix;
-                commandManager.ExecuteCommand(command);
-            }
-            else
-            {
-                var command = _commandFactory.Create<TransformVertexCommand>()
-                    .Configure(x => x.Configure(_effectedObjects, Position))
-                    .Build();
-                command.InvertWindingOrder = _invertedWindingOrder;
-                command.Transform = _totalGizomTransform;
-                command.PivotPoint = Position;
-                // Pass affected vertex indices for Face/Edge mode undo
-                if (_faceVertexIndices != null)
-                    command.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
-                // Pass falloff weights for proportional editing undo
-                if (_falloffWeights != null && _falloffDistance > 0)
-                    command.FalloffWeights = new Dictionary<int, float>(_falloffWeights);
-                commandManager.ExecuteCommand(command);
+                _backupPosition = _pos;
+                _backupOrientation = _orientation;
+                _backupScale = _scale;
+                _activeCommand = boneCommand;
+                return;
             }
 
-            // Reset state after confirming
+            var command = _commandFactory.Create<TransformVertexCommand>()
+                .Configure(x => x.Configure(_effectedObjects, Position))
+                .Build();
+
+            try
+            {
+                CaptureVertexBaseline();
+                if (_gestureAffectedVertexIndices != null)
+                {
+                    command.AffectedVertexIndices =
+                        new HashSet<int>(_gestureAffectedVertexIndices);
+                }
+                _activeCommand = command;
+            }
+            catch
+            {
+                _activeCommand = null;
+                ResetGestureState();
+                throw;
+            }
+        }
+
+        public void CommitTransform(CommandExecutor commandExecutor)
+        {
+            if (_previewSynchronizationFaulted)
+            {
+                throw new InvalidOperationException(
+                    "The transform preview is not synchronized. Cancel the transform before continuing.");
+            }
+
+            EndTransform(() =>
+            {
+                if (_activeCommand is TransformVertexCommand transformVertexCommand)
+                {
+                    ConfigureTransformCommandForCommit(transformVertexCommand);
+                    if (HasVertexMutation())
+                        commandExecutor.ExecuteCommand(transformVertexCommand);
+                }
+                else if (_activeCommand is TransformBoneCommand transformBoneCommand)
+                {
+                    if (transformBoneCommand.HasFrameMutation())
+                        commandExecutor.ExecuteCommand(transformBoneCommand);
+                }
+            });
+        }
+
+        public void CancelTransform()
+        {
+            EndTransform(() =>
+            {
+                if (_activeCommand is TransformBoneCommand transformBoneCommand)
+                {
+                    try
+                    {
+                        transformBoneCommand.RestoreInitialFrame();
+                    }
+                    finally
+                    {
+                        ResetBonePreviewToBaseline();
+                    }
+                }
+                else if (_activeCommand is TransformVertexCommand || _hasBackup)
+                    RestoreVertexBaseline();
+            });
+        }
+
+        public void RestoreInitialPreviewState()
+        {
+            if (_activeCommand is TransformBoneCommand transformBoneCommand)
+            {
+                try
+                {
+                    transformBoneCommand.RestoreInitialFrame();
+                }
+                finally
+                {
+                    ResetBonePreviewToBaseline();
+                }
+                return;
+            }
+
+            if (_activeCommand is not TransformVertexCommand || !_hasBackup)
+                return;
+
+            if (_previewSynchronizationFaulted)
+            {
+                throw new InvalidOperationException(
+                    "The transform preview is not synchronized. Cancel the transform before continuing.");
+            }
+
+            try
+            {
+                RestoreVertexBaseline();
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
+            }
+        }
+
+        internal void ReplaceInitialPreview(
+            ModalPreviewReplacement replacement)
+        {
+            if (_activeCommand is TransformBoneCommand transformBoneCommand)
+            {
+                ReplaceBoneInitialPreview(
+                    transformBoneCommand,
+                    replacement);
+                return;
+            }
+
+            if (_activeCommand is not TransformVertexCommand || !_hasBackup)
+                return;
+            if (_previewSynchronizationFaulted)
+            {
+                throw new InvalidOperationException(
+                    "The transform preview is not synchronized. Cancel the transform before continuing.");
+            }
+
+            try
+            {
+                var restoreError = RestoreVertexBaselineCpuAndIndex();
+                restoreError?.Throw();
+                ResetGestureCandidateToBaseline();
+
+                var result = ApplyReplacement(replacement);
+                if (result.Accepted)
+                    SynchronizeVertexPreview(result.MeshResults);
+                else
+                    SynchronizeBaselinePreview();
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
+            }
+        }
+
+        private PreviewApplyResult ApplyReplacement(
+            ModalPreviewReplacement replacement)
+        {
+            return replacement.Kind switch
+            {
+                ModalPreviewReplacementKind.RestoreOnly =>
+                    PreviewApplyResult.Rejected(),
+                ModalPreviewReplacementKind.Translate =>
+                    TryTranslatePreview(
+                        replacement.VectorValue,
+                        replacement.Pivot),
+                ModalPreviewReplacementKind.Rotate =>
+                    TryRotatePreview(
+                        replacement.RotationValue,
+                        replacement.Pivot),
+                ModalPreviewReplacementKind.Scale =>
+                    TryScalePreview(
+                        replacement.VectorValue,
+                        replacement.Pivot),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(replacement))
+            };
+        }
+
+        private void ReplaceBoneInitialPreview(
+            TransformBoneCommand transformBoneCommand,
+            ModalPreviewReplacement replacement)
+        {
+            ExceptionDispatchInfo primaryError = null;
+            try
+            {
+                transformBoneCommand.RestoreInitialFrame();
+                ResetBonePreviewToBaseline();
+                ApplyBoneReplacement(replacement);
+                return;
+            }
+            catch (Exception exception)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                transformBoneCommand.RestoreInitialFrame();
+                ResetBonePreviewToBaseline();
+            }
+            catch (Exception recoveryException)
+            {
+                _logger.Error(
+                    recoveryException,
+                    "Failed to recover the initial bone transform preview");
+            }
+
+            primaryError.Throw();
+        }
+
+        private void ApplyBoneReplacement(
+            ModalPreviewReplacement replacement)
+        {
+            switch (replacement.Kind)
+            {
+                case ModalPreviewReplacementKind.RestoreOnly:
+                    return;
+                case ModalPreviewReplacementKind.Translate:
+                    GizmoTranslateEvent(
+                        replacement.VectorValue,
+                        replacement.Pivot);
+                    return;
+                case ModalPreviewReplacementKind.Rotate:
+                    GizmoRotateEvent(
+                        replacement.RotationValue,
+                        replacement.Pivot);
+                    return;
+                case ModalPreviewReplacementKind.Scale:
+                    GizmoScaleEvent(
+                        replacement.VectorValue,
+                        replacement.Pivot);
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(replacement));
+            }
+        }
+
+        private void EndTransform(Action transformEnd)
+        {
+            ExceptionDispatchInfo primaryError = null;
+            try
+            {
+                transformEnd();
+            }
+            catch (Exception exception)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                try
+                {
+                    ReleaseVertexBaseline();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+                finally
+                {
+                    _activeCommand = null;
+                    ResetGestureState();
+                }
+            }
+
+            primaryError?.Throw();
+        }
+
+        private bool HasVertexMutation()
+        {
+            if (_vertexTransformReplayPlan?.OperationCount <= 0 ||
+                _effectedObjects == null ||
+                _backupVertexArrays == null ||
+                _backupIndexArrays == null)
+            {
+                return false;
+            }
+
+            var meshCount = Math.Min(
+                _effectedObjects.Count,
+                Math.Min(_backupVertexArrays.Count, _backupIndexArrays.Count));
+            for (var meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            {
+                var mesh = _effectedObjects[meshIndex];
+                if (mesh?.VertexArray == null ||
+                    mesh.IndexArray == null ||
+                    !mesh.VertexArray.SequenceEqual(_backupVertexArrays[meshIndex]) ||
+                    !mesh.IndexArray.SequenceEqual(_backupIndexArrays[meshIndex]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void ResetGestureState()
+        {
             _totalGizomTransform = Matrix.Identity;
             _invertedWindingOrder = false;
+            _vertexTransformReplayPlan = null;
+            _gestureSelectionState = null;
+            _gestureAffectedVertexIndices = null;
+            _gestureFalloffWeights = null;
+            _displayedPreviewRanges = null;
+            _nextPreviewRanges = null;
+            _previewSynchronizationFaulted = false;
+        }
+
+        private void ResetBonePreviewToBaseline()
+        {
+            ResetGestureState();
+            _pos = _backupPosition;
+            _orientation = _backupOrientation;
+            _scale = _backupScale;
+        }
+
+        void ConfigureTransformCommandForCommit(TransformVertexCommand command)
+        {
+            command.InvertWindingOrder = _invertedWindingOrder;
+            command.Transform = _totalGizomTransform;
+            command.PivotPoint = Position;
+            command.SetReplayPlan(
+                _vertexTransformReplayPlan ??
+                VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    GestureSelectionState,
+                    GestureFalloffWeights));
+            if (_gestureAffectedVertexIndices != null)
+            {
+                command.AffectedVertexIndices =
+                    new HashSet<int>(_gestureAffectedVertexIndices);
+            }
+            if (_gestureFalloffWeights != null)
+            {
+                command.FalloffWeights =
+                    new Dictionary<int, float>(_gestureFalloffWeights);
+            }
         }
 
         Matrix FixRotationAxis2(Matrix transform)
@@ -286,274 +628,368 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void GizmoTranslateEvent(Vector3 translation, PivotType pivot)
         {
-            ApplyTransform(Matrix.CreateTranslation(translation), pivot, GizmoMode.Translate);
-            Position += translation;
-            _totalGizomTransform *= Matrix.CreateTranslation(translation);
+            if (_selectionState is BoneSelectionState)
+            {
+                var pivotPoint = GetBonePivot(pivot);
+                if (!BoneTransformDelta.TryCreateTranslation(
+                        translation,
+                        pivotPoint,
+                        out var boneDelta) ||
+                    !TransformBone(boneDelta))
+                {
+                    return;
+                }
+
+                return;
+            }
+
+            RunDirectVertexPreview(
+                () => TryTranslatePreview(translation, pivot));
         }
 
         public void GizmoRotateEvent(Matrix rotation, PivotType pivot)
         {
-            ApplyTransform(rotation, pivot, GizmoMode.Rotate);
-            _totalGizomTransform *= rotation;
+            if (_selectionState is BoneSelectionState)
+            {
+                var pivotPoint = GetBonePivot(pivot);
+                if (!BoneTransformDelta.TryCreateRotation(
+                        rotation,
+                        pivotPoint,
+                        out var boneDelta) ||
+                    !TransformBone(boneDelta))
+                {
+                    return;
+                }
 
-            var fixedTransform = FixRotationAxis2(_totalGizomTransform);
-            fixedTransform.Decompose(out var _, out var quat, out var _);
-            Orientation = quat;
+                return;
+            }
+
+            RunDirectVertexPreview(
+                () => TryRotatePreview(rotation, pivot));
         }
 
         public void GizmoScaleEvent(Vector3 scale, PivotType pivot)
         {
-            var realScale = scale + Vector3.One;
-            var scaleMatrix = Matrix.CreateScale(scale + Vector3.One);
-            ApplyTransform(scaleMatrix, pivot, GizmoMode.UniformScale);
-
-            Scale += scale;
-
-            _totalGizomTransform *= scaleMatrix;
-
-            var negativeAxis = CountNegativeAxis(realScale);
-            if (negativeAxis % 2 != 0)
+            var scaleFactor = scale + Vector3.One;
+            var scaleMatrix = Matrix.CreateScale(scaleFactor);
+            if (_selectionState is BoneSelectionState)
             {
-                _invertedWindingOrder = !_invertedWindingOrder;
-
-                foreach (var geo in _effectedObjects)
+                var pivotPoint = GetBonePivot(pivot);
+                if (!BoneTransformDelta.TryCreateScale(
+                        scaleFactor,
+                        pivotPoint,
+                        out var boneDelta) ||
+                    !TransformBone(boneDelta))
                 {
-                    var indexes = geo.GetIndexBuffer();
-                    for (var i = 0; i < indexes.Count; i += 3)
-                    {
-                        var temp = indexes[i + 2];
-                        indexes[i + 2] = indexes[i + 0];
-                        indexes[i + 0] = temp;
-                    }
-                    geo.SetIndexBuffer(indexes);
+                    return;
                 }
-            }
-        }
 
-        int CountNegativeAxis(Vector3 vector)
-        {
-            var result = 0;
-            if (vector.X < 0) result++;
-            if (vector.Y < 0) result++;
-            if (vector.Z < 0) result++;
-            return result;
-        }
-
-        void ApplyTransform(Matrix transform, PivotType pivotType, GizmoMode gizmoMode)
-        {
-            transform.Decompose(out var scale, out var rot, out var trans);
-
-            if (_selectionState is BoneSelectionState boneSelectionState)
-            {
-                var objCenter = Vector3.Zero;
-                if (pivotType == PivotType.ObjectCenter)
-                    objCenter = Position;
-
-                TransformBone(Matrix.CreateScale(Scale) * Matrix.CreateFromQuaternion(rot) * Matrix.CreateTranslation(Position), objCenter, gizmoMode);
                 return;
             }
 
-            foreach (var geo in _effectedObjects)
+            RunDirectVertexPreview(
+                () => TryScalePreview(scale, pivot));
+        }
+
+        private PreviewApplyResult TryTranslatePreview(
+            Vector3 translation,
+            PivotType pivot)
+        {
+            var transform = Matrix.CreateTranslation(translation);
+            if (!TryApplyTransform(
+                    transform,
+                    pivot,
+                    GizmoMode.Translate,
+                    out var results))
             {
-                var objCenter = Vector3.Zero;
-                if (pivotType == PivotType.ObjectCenter)
-                    objCenter = Position;
+                return PreviewApplyResult.Rejected();
+            }
 
-                if (_selectionState is ObjectSelectionState objectSelectionState)
-                {
-                    // Pre-compute combined transform and normal matrix once for all vertices
-                    var combinedTransform = Matrix.CreateTranslation(-objCenter) * transform * Matrix.CreateTranslation(objCenter);
-                    var vertexCount = geo.VertexCount();
+            Position += translation;
+            _totalGizomTransform *= transform;
+            return PreviewApplyResult.Applied(results);
+        }
 
-                    if (gizmoMode == GizmoMode.Translate)
-                    {
-                        // Translation doesn't change normals — skip TransformNormal + Normalize
-                        for (var i = 0; i < vertexCount; i++)
-                            geo.TransformVertexTranslation(i, combinedTransform);
-                    }
-                    else if (gizmoMode == GizmoMode.Rotate)
-                    {
-                        // Rotation normal matrix is orthogonal — skip Normalize (3x sqrt per vertex)
-                        var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                        for (var i = 0; i < vertexCount; i++)
-                            geo.TransformVertexRotation(i, combinedTransform, normalMatrix);
-                    }
-                    else
-                    {
-                        // Scale needs full processing with Normalize
-                        var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                        for (var i = 0; i < vertexCount; i++)
-                            geo.TransformVertex(i, combinedTransform, normalMatrix);
-                    }
-                }
-                else if (_selectionState is VertexSelectionState vertSelectionState)
-                {
-                    for (var i = 0; i < vertSelectionState.VertexWeights.Count; i++)
-                    {
-                        if (vertSelectionState.VertexWeights[i] != 0)
-                        {
-                            var weight = vertSelectionState.VertexWeights[i];
-                            var vertexScale = Vector3.Lerp(Vector3.One, scale, weight);
-                            var vertRot = Quaternion.Slerp(Quaternion.Identity, rot, weight);
-                            var vertTrnas = trans * weight;
+        private PreviewApplyResult TryRotatePreview(
+            Matrix rotation,
+            PivotType pivot)
+        {
+            if (!TryApplyTransform(
+                    rotation,
+                    pivot,
+                    GizmoMode.Rotate,
+                    out var results))
+            {
+                return PreviewApplyResult.Rejected();
+            }
 
-                            var weightedTransform = Matrix.CreateScale(vertexScale) * Matrix.CreateFromQuaternion(vertRot) * Matrix.CreateTranslation(vertTrnas);
-                            var combinedTransform = Matrix.CreateTranslation(-objCenter) * weightedTransform * Matrix.CreateTranslation(objCenter);
+            _totalGizomTransform *= rotation;
+            var fixedTransform = FixRotationAxis2(_totalGizomTransform);
+            fixedTransform.Decompose(out var _, out var quat, out var _);
+            Orientation = quat;
+            return PreviewApplyResult.Applied(results);
+        }
 
-                            if (gizmoMode == GizmoMode.Translate)
-                                geo.TransformVertexTranslation(i, combinedTransform);
-                            else if (gizmoMode == GizmoMode.Rotate)
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertexRotation(i, combinedTransform, normalMatrix);
-                            }
-                            else
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertex(i, combinedTransform, normalMatrix);
-                            }
+        private PreviewApplyResult TryScalePreview(
+            Vector3 scale,
+            PivotType pivot)
+        {
+            var scaleMatrix = Matrix.CreateScale(scale + Vector3.One);
+            if (!TryApplyTransform(
+                    scaleMatrix,
+                    pivot,
+                    GizmoMode.UniformScale,
+                    out var results))
+            {
+                return PreviewApplyResult.Rejected();
+            }
 
-                            _modifiedMin = Math.Min(_modifiedMin, i);
-                            _modifiedMax = Math.Max(_modifiedMax, i);
-                            _hasModifications = true;
-                        }
-                    }
-                }
-                else if (_selectionState is FaceSelectionState)
-                {
-                    // If falloff is enabled, transform ALL vertices with weights
-                    // Otherwise, transform only vertices belonging to selected faces
-                    if (_falloffDistance > 0 && _falloffWeights != null && _falloffWeights.Count > 0)
-                    {
-                        // Proportional editing mode - transform all vertices with falloff weights
-                        for (int i = 0; i < geo.VertexCount(); i++)
-                        {
-                            if (!_falloffWeights.TryGetValue(i, out var weight) || weight == 0)
-                                continue;
+            Scale += scale;
+            _totalGizomTransform *= scaleMatrix;
+            return PreviewApplyResult.Applied(results);
+        }
 
-                            var vertexScale = Vector3.Lerp(Vector3.One, scale, weight);
-                            var vertRot = Quaternion.Slerp(Quaternion.Identity, rot, weight);
-                            var vertTrans = trans * weight;
-                            var weightedTransform = Matrix.CreateScale(vertexScale) * Matrix.CreateFromQuaternion(vertRot) * Matrix.CreateTranslation(vertTrans);
-                            var combinedTransform = Matrix.CreateTranslation(-objCenter) * weightedTransform * Matrix.CreateTranslation(objCenter);
-
-                            if (gizmoMode == GizmoMode.Translate)
-                                geo.TransformVertexTranslation(i, combinedTransform);
-                            else if (gizmoMode == GizmoMode.Rotate)
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertexRotation(i, combinedTransform, normalMatrix);
-                            }
-                            else
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertex(i, combinedTransform, normalMatrix);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // No falloff - transform only selected face vertices
-                        foreach (var vertIdx in _faceVertexIndices)
-                        {
-                            var combinedTransform = Matrix.CreateTranslation(-objCenter) * transform * Matrix.CreateTranslation(objCenter);
-
-                            if (gizmoMode == GizmoMode.Translate)
-                                geo.TransformVertexTranslation(vertIdx, combinedTransform);
-                            else if (gizmoMode == GizmoMode.Rotate)
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertexRotation(vertIdx, combinedTransform, normalMatrix);
-                            }
-                            else
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertex(vertIdx, combinedTransform, normalMatrix);
-                            }
-                        }
-                    }
-                }
-                else if (_selectionState is EdgeSelectionState)
-                {
-                    // Edge mode: similar to face mode, use falloff if enabled
-                    if (_falloffDistance > 0 && _falloffWeights != null && _falloffWeights.Count > 0)
-                    {
-                        // Proportional editing mode - transform all vertices with falloff weights
-                        for (int i = 0; i < geo.VertexCount(); i++)
-                        {
-                            if (!_falloffWeights.TryGetValue(i, out var weight) || weight == 0)
-                                continue;
-
-                            var vertexScale = Vector3.Lerp(Vector3.One, scale, weight);
-                            var vertRot = Quaternion.Slerp(Quaternion.Identity, rot, weight);
-                            var vertTrans = trans * weight;
-                            var weightedTransform = Matrix.CreateScale(vertexScale) * Matrix.CreateFromQuaternion(vertRot) * Matrix.CreateTranslation(vertTrans);
-                            var combinedTransform = Matrix.CreateTranslation(-objCenter) * weightedTransform * Matrix.CreateTranslation(objCenter);
-
-                            if (gizmoMode == GizmoMode.Translate)
-                                geo.TransformVertexTranslation(i, combinedTransform);
-                            else if (gizmoMode == GizmoMode.Rotate)
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertexRotation(i, combinedTransform, normalMatrix);
-                            }
-                            else
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertex(i, combinedTransform, normalMatrix);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // No falloff - transform only edge vertices
-                        foreach (var vertIdx in _faceVertexIndices)
-                        {
-                            var combinedTransform = Matrix.CreateTranslation(-objCenter) * transform * Matrix.CreateTranslation(objCenter);
-
-                            if (gizmoMode == GizmoMode.Translate)
-                                geo.TransformVertexTranslation(vertIdx, combinedTransform);
-                            else if (gizmoMode == GizmoMode.Rotate)
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertexRotation(vertIdx, combinedTransform, normalMatrix);
-                            }
-                            else
-                            {
-                                var normalMatrix = Matrix.Transpose(Matrix.Invert(combinedTransform));
-                                geo.TransformVertex(vertIdx, combinedTransform, normalMatrix);
-                            }
-                        }
-                    }
-                }
-
-                if (_hasModifications)
-                {
-                    if (_selectionState is ObjectSelectionState)
-                        geo.RebuildVertexBuffer();
-                    else
-                        geo.RebuildVertexBufferPartial(_modifiedMin, _modifiedMax);
-                }
-                else
-                {
-                    geo.RebuildVertexBuffer();
-                }
+        private void RunDirectVertexPreview(
+            Func<PreviewApplyResult> applyPreview)
+        {
+            try
+            {
+                var result = applyPreview();
+                if (result.Accepted)
+                    SynchronizeVertexPreview(result.MeshResults);
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
             }
         }
 
-        void TransformBone(Matrix transform, Vector3 objCenter, GizmoMode gizmoMode)
+        bool TryApplyTransform(
+            Matrix transform,
+            PivotType pivotType,
+            GizmoMode gizmoMode,
+            out IReadOnlyList<VertexTransformMeshResult> results)
+        {
+            results = Array.Empty<VertexTransformMeshResult>();
+            if (_previewSynchronizationFaulted)
+                return false;
+
+            var operationMode = gizmoMode switch
+            {
+                GizmoMode.Translate => VertexTransformOperationMode.Translate,
+                GizmoMode.Rotate => VertexTransformOperationMode.Rotate,
+                _ => VertexTransformOperationMode.Scale
+            };
+            var pivotPoint = pivotType == PivotType.ObjectCenter ? Position : Vector3.Zero;
+            var operation = new VertexTransformOperation(operationMode, transform, pivotPoint);
+            if (_vertexTransformReplayPlan == null ||
+                _backupVertexArrays == null ||
+                !VertexTransformOperationApplier.TryAppendOperation(
+                    _effectedObjects,
+                    GestureSelectionState,
+                    GestureAffectedVertexIndices,
+                    GestureFalloffWeights,
+                    _vertexTransformReplayPlan,
+                    operation,
+                    out var candidatePlan) ||
+                !VertexTransformOperationApplier.IsReplayPlanReversibleFromBaseline(
+                    _effectedObjects,
+                    _backupVertexArrays,
+                    GestureSelectionState,
+                    GestureAffectedVertexIndices,
+                    GestureFalloffWeights,
+                    candidatePlan))
+            {
+                return false;
+            }
+
+            VertexTransformOperationApplier.RestoreAffectedVerticesFromBaseline(
+                _effectedObjects,
+                _backupVertexArrays,
+                GestureSelectionState,
+                GestureAffectedVertexIndices,
+                GestureFalloffWeights);
+            results = VertexTransformOperationApplier.ApplyReplayPlan(
+                _effectedObjects,
+                GestureSelectionState,
+                GestureAffectedVertexIndices,
+                GestureFalloffWeights,
+                candidatePlan,
+                inverse: false);
+            var isObjectSelection = GestureSelectionState is ObjectSelectionState;
+            var wasInverted =
+                isObjectSelection &&
+                _vertexTransformReplayPlan.RawMatrices.Forward.Determinant() < 0;
+            var isInverted =
+                isObjectSelection &&
+                candidatePlan.RawMatrices.Forward.Determinant() < 0;
+            if (wasInverted != isInverted)
+            {
+                foreach (var geometry in _effectedObjects)
+                    TransformVertexCommand.ReverseWindingOrder(geometry);
+            }
+
+            _invertedWindingOrder = isInverted;
+            _vertexTransformReplayPlan = candidatePlan;
+            return true;
+        }
+
+        private void SynchronizeVertexPreview(
+            IReadOnlyList<VertexTransformMeshResult> results)
+        {
+            if (_displayedPreviewRanges == null ||
+                results.Count != _effectedObjects.Count ||
+                _displayedPreviewRanges.Length != _effectedObjects.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview results do not match the captured mesh set.");
+            }
+
+            if (_nextPreviewRanges == null ||
+                _nextPreviewRanges.Length != results.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview scratch ranges do not match the captured mesh set.");
+            }
+
+            var nextRanges = _nextPreviewRanges;
+            for (var meshIndex = 0; meshIndex < results.Count; meshIndex++)
+            {
+                var result = results[meshIndex];
+                var mesh = _effectedObjects[meshIndex];
+                if (!ReferenceEquals(result.Geometry, mesh))
+                {
+                    throw new InvalidOperationException(
+                        "Vertex preview result geometry changed during the gesture.");
+                }
+
+                var nextRange = result.HasModifiedVertices
+                    ? VertexUploadRange.From(result)
+                    : (VertexUploadRange?)null;
+                nextRanges[meshIndex] = nextRange;
+            }
+
+            SynchronizePreviewRanges(nextRanges);
+        }
+
+        private void SynchronizeBaselinePreview()
+        {
+            if (_effectedObjects == null)
+                return;
+            if (_nextPreviewRanges == null ||
+                _nextPreviewRanges.Length != _effectedObjects.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview scratch ranges do not match the captured mesh set.");
+            }
+
+            Array.Clear(
+                _nextPreviewRanges,
+                0,
+                _nextPreviewRanges.Length);
+            SynchronizePreviewRanges(_nextPreviewRanges);
+        }
+
+        private void SynchronizePreviewRanges(
+            VertexUploadRange?[] nextRanges)
+        {
+            if (_displayedPreviewRanges == null ||
+                _effectedObjects == null ||
+                nextRanges.Length != _effectedObjects.Count ||
+                _displayedPreviewRanges.Length != _effectedObjects.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview ranges do not match the captured mesh set.");
+            }
+
+            ExceptionDispatchInfo uploadError = null;
+            for (var meshIndex = 0; meshIndex < nextRanges.Length; meshIndex++)
+            {
+                var mesh = _effectedObjects[meshIndex];
+                var uploadRange = UnionPreviewRanges(
+                    _displayedPreviewRanges[meshIndex],
+                    nextRanges[meshIndex]);
+                if (!uploadRange.HasValue)
+                    continue;
+
+                try
+                {
+                    UploadVertexRange(mesh, uploadRange.Value);
+                }
+                catch (Exception exception)
+                {
+                    uploadError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            uploadError?.Throw();
+            var previousRanges = _displayedPreviewRanges;
+            _displayedPreviewRanges = nextRanges;
+            _nextPreviewRanges = previousRanges;
+        }
+
+        private void UploadVertexRange(
+            MeshObject mesh,
+            VertexUploadRange uploadRange)
+        {
+            if (GestureSelectionState is ObjectSelectionState)
+            {
+                mesh.RebuildVertexBuffer();
+                return;
+            }
+
+            mesh.RebuildVertexBufferPartial(
+                uploadRange.FirstModifiedVertex,
+                uploadRange.LastModifiedVertex);
+        }
+
+        private static VertexUploadRange? UnionPreviewRanges(
+            VertexUploadRange? first,
+            VertexUploadRange? second)
+        {
+            if (!first.HasValue)
+                return second;
+            if (!second.HasValue)
+                return first;
+            return VertexUploadRange.Union(first.Value, second.Value);
+        }
+
+        bool TransformBone(BoneTransformDelta delta)
         {
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
             {
-                transformBoneCommand.ApplyTransformation(transform, gizmoMode);
+                try
+                {
+                    var applied = transformBoneCommand.ApplyTransformation(delta);
+                    if (applied)
+                        RefreshBoneDisplay();
+                    return applied;
+                }
+                catch (Exception exception)
+                {
+                    try
+                    {
+                        RefreshBoneDisplay();
+                    }
+                    catch (Exception refreshException)
+                    {
+                        _logger.Error(
+                            refreshException,
+                            "Failed to refresh bone transform display");
+                    }
+
+                    ExceptionDispatchInfo.Capture(exception).Throw();
+                }
             }
+
+            return false;
         }
 
-        void TransformVertex(Matrix transform, MeshObject geo, Vector3 objCenter, int index)
+        private Vector3 GetBonePivot(PivotType pivot)
         {
-            var m = Matrix.CreateTranslation(-objCenter) * transform * Matrix.CreateTranslation(objCenter);
-            var normalMatrix = Matrix.Transpose(Matrix.Invert(m));
-            geo.TransformVertex(index, m, normalMatrix);
+            return pivot == PivotType.WorldOrigin
+                ? Vector3.Zero
+                : Position;
         }
 
         public Vector3 GetObjectCentre()
@@ -563,106 +999,287 @@ namespace GameWorld.Core.Components.Gizmo
 
         #region Modal Transform State Backup (Blender-style)
 
-        /// <summary>
-        /// Backup current vertex state for modal transform (like Blender's createTransData)
-        /// Call this when modal transform starts
-        /// </summary>
-        public void BackupVertexState()
+        private void CaptureVertexBaseline()
         {
-            _modifiedMin = int.MaxValue;
-            _modifiedMax = -1;
-            _hasModifications = false;
-
             if (_effectedObjects == null || _effectedObjects.Count == 0)
                 return;
 
-            _backupVertexArrays = new List<VertexPositionNormalTextureCustom[]>();
-            _backupIndexArrays = new List<ushort[]>();
+            var vertexArrays = new List<VertexPositionNormalTextureCustom[]>(_effectedObjects.Count);
+            var indexArrays = new List<ushort[]>(_effectedObjects.Count);
+            try
+            {
+                var gestureSelectionState = _selectionState.Clone();
+                var gestureAffectedVertexIndices = _faceVertexIndices == null
+                    ? null
+                    : new HashSet<int>(_faceVertexIndices);
+                var gestureFalloffWeights =
+                    _falloffDistance > 0 && _falloffWeights != null
+                        ? new Dictionary<int, float>(_falloffWeights)
+                        : null;
+                foreach (var mesh in _effectedObjects)
+                {
+                    var vertexBackup = new VertexPositionNormalTextureCustom[mesh.VertexCount()];
+                    Array.Copy(mesh.VertexArray, vertexBackup, vertexBackup.Length);
+                    vertexArrays.Add(vertexBackup);
+
+                    var indexBackup = new ushort[mesh.IndexArray.Length];
+                    Array.Copy(mesh.IndexArray, indexBackup, indexBackup.Length);
+                    indexArrays.Add(indexBackup);
+                }
+
+                var replayPlan = VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    gestureSelectionState,
+                    gestureFalloffWeights);
+                foreach (var mesh in _effectedObjects)
+                    mesh.DeferBoundingBoxRebuild = true;
+
+                _backupVertexArrays = vertexArrays;
+                _backupIndexArrays = indexArrays;
+                _backupPosition = _pos;
+                _backupOrientation = _orientation;
+                _backupScale = _scale;
+                _gestureSelectionState = gestureSelectionState;
+                _gestureAffectedVertexIndices = gestureAffectedVertexIndices;
+                _gestureFalloffWeights = gestureFalloffWeights;
+                _displayedPreviewRanges =
+                    new VertexUploadRange?[_effectedObjects.Count];
+                _nextPreviewRanges =
+                    new VertexUploadRange?[_effectedObjects.Count];
+                _vertexTransformReplayPlan = replayPlan;
+                _hasBackup = true;
+            }
+            catch (Exception exception)
+            {
+                var primaryError = ExceptionDispatchInfo.Capture(exception);
+                ReleaseDeferredMeshes(rebuildBoundingBoxes: false);
+                ClearBackupStorage();
+                primaryError.Throw();
+            }
+        }
+
+        private void RestoreVertexBaseline()
+        {
+            if (!_hasBackup || _effectedObjects == null ||
+                _backupVertexArrays == null || _backupIndexArrays == null)
+            {
+                return;
+            }
+
+            var primaryError = RestoreVertexBaselineCpuAndIndex();
+            if (_previewSynchronizationFaulted)
+            {
+                var uploadError = UploadFullVertexBuffers();
+                primaryError ??= uploadError;
+            }
+            else
+            {
+                try
+                {
+                    SynchronizeBaselinePreview();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            try
+            {
+                ResetGestureCandidateToBaseline();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+            ClearDisplayedPreviewRanges();
+            primaryError?.Throw();
+        }
+
+        private ExceptionDispatchInfo RestoreVertexBaselineCpuAndIndex()
+        {
+            if (!_hasBackup || _effectedObjects == null ||
+                _backupVertexArrays == null || _backupIndexArrays == null)
+            {
+                return null;
+            }
+
+            ExceptionDispatchInfo primaryError = null;
+            if (_effectedObjects.Count != _backupVertexArrays.Count ||
+                _effectedObjects.Count != _backupIndexArrays.Count)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(
+                    new InvalidOperationException(
+                        "The transform baseline does not match the captured mesh set."));
+            }
+
+            var meshCount = Math.Min(
+                _effectedObjects.Count,
+                Math.Min(_backupVertexArrays.Count, _backupIndexArrays.Count));
+            for (var meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            {
+                var mesh = _effectedObjects[meshIndex];
+                var vertexBackup = _backupVertexArrays[meshIndex];
+                var indexBackup = _backupIndexArrays[meshIndex];
+                try
+                {
+                    Array.Copy(vertexBackup, mesh.VertexArray, vertexBackup.Length);
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    Array.Copy(indexBackup, mesh.IndexArray, indexBackup.Length);
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    mesh.RebuildIndexBuffer();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            return primaryError;
+        }
+
+        private ExceptionDispatchInfo UploadFullVertexBuffers()
+        {
+            ExceptionDispatchInfo uploadError = null;
+            if (_effectedObjects == null)
+                return null;
 
             foreach (var mesh in _effectedObjects)
             {
-                // Single Array.Copy instead of 4 separate element-by-element lists
-                var backup = new VertexPositionNormalTextureCustom[mesh.VertexCount()];
-                Array.Copy(mesh.VertexArray, backup, mesh.VertexCount());
-                _backupVertexArrays.Add(backup);
-
-                // Backup index array as raw ushort[]
-                var indexBackup = new ushort[mesh.IndexArray.Length];
-                Array.Copy(mesh.IndexArray, indexBackup, mesh.IndexArray.Length);
-                _backupIndexArrays.Add(indexBackup);
-
-                // Defer BoundingBox rebuild during modal transform to avoid O(n) per-frame cost
-                mesh.DeferBoundingBoxRebuild = true;
-            }
-
-            // Backup position and orientation for rotation center
-            _backupPosition = _pos;
-            _backupOrientation = _orientation;
-
-            _hasBackup = true;
-        }
-
-        /// <summary>
-        /// Restore vertex state from backup (like Blender's restoreTransObjects)
-        /// Call this when modal transform is cancelled or when recalculating from initial state
-        /// </summary>
-        /// <param name="resetTransform">Whether to reset internal transform state (true for cancel, false for recalculating)</param>
-        /// <param name="skipGpuUpload">If true, only restore VertexArray without uploading to GPU (used when next ApplyTransform will overwrite immediately)</param>
-        public void RestoreVertexState(bool resetTransform = true, bool skipGpuUpload = false)
-        {
-            if (!_hasBackup || _effectedObjects == null)
-                return;
-
-            _modifiedMin = int.MaxValue;
-            _modifiedMax = -1;
-            _hasModifications = false;
-
-            for (int meshIndex = 0; meshIndex < _effectedObjects.Count && meshIndex < _backupVertexArrays.Count; meshIndex++)
-            {
-                var mesh = _effectedObjects[meshIndex];
-                var backup = _backupVertexArrays[meshIndex];
-
-                // Single Array.Copy instead of element-by-element field assignment
-                Array.Copy(backup, mesh.VertexArray, backup.Length);
-
-                // Restore index array with Array.Copy
-                Array.Copy(_backupIndexArrays[meshIndex], mesh.IndexArray, _backupIndexArrays[meshIndex].Length);
-
-                if (!skipGpuUpload)
+                try
                 {
-                    mesh.RebuildIndexBuffer();
                     mesh.RebuildVertexBuffer();
                 }
-            }
-
-            // Reset internal state only when explicitly requested (e.g., on cancel)
-            if (resetTransform)
-            {
-                _totalGizomTransform = Matrix.Identity;
-                _invertedWindingOrder = false;
-                // Restore position and orientation for correct rotation center
-                _pos = _backupPosition;
-                _orientation = _backupOrientation;
-            }
-        }
-
-        /// <summary>
-        /// Clear backup data (call when modal transform is confirmed or done)
-        /// </summary>
-        public void ClearBackup()
-        {
-            // Restore BoundingBox rebuild and rebuild once with final vertex positions
-            if (_effectedObjects != null)
-            {
-                foreach (var mesh in _effectedObjects)
+                catch (Exception exception)
                 {
-                    mesh.DeferBoundingBoxRebuild = false;
-                    mesh.BuildBoundingBox();
+                    uploadError ??= ExceptionDispatchInfo.Capture(exception);
                 }
             }
 
+            return uploadError;
+        }
+
+        private void RecoverVertexPreviewAndRethrow(Exception exception)
+        {
+            var primaryError = ExceptionDispatchInfo.Capture(exception);
+            var recoveryError = RestoreVertexBaselineCpuAndIndex();
+            var uploadError = UploadFullVertexBuffers();
+            recoveryError ??= uploadError;
+
+            try
+            {
+                ResetGestureCandidateToBaseline();
+            }
+            catch (Exception recoveryException)
+            {
+                recoveryError ??=
+                    ExceptionDispatchInfo.Capture(recoveryException);
+            }
+            ClearDisplayedPreviewRanges();
+
+            _previewSynchronizationFaulted = recoveryError != null;
+            if (recoveryError != null)
+            {
+                _logger.Error(
+                    recoveryError.SourceException,
+                    "Failed to synchronize the transform preview with its baseline");
+            }
+
+            primaryError.Throw();
+        }
+
+        private void ClearDisplayedPreviewRanges()
+        {
+            if (_displayedPreviewRanges == null)
+                return;
+
+            Array.Clear(
+                _displayedPreviewRanges,
+                0,
+                _displayedPreviewRanges.Length);
+            if (_nextPreviewRanges != null)
+            {
+                Array.Clear(
+                    _nextPreviewRanges,
+                    0,
+                    _nextPreviewRanges.Length);
+            }
+        }
+
+        private void ResetGestureCandidateToBaseline()
+        {
+            _totalGizomTransform = Matrix.Identity;
+            _invertedWindingOrder = false;
+            _vertexTransformReplayPlan =
+                VertexTransformOperationApplier.CreateEmptyReplayPlan(
+                    GestureSelectionState,
+                    GestureFalloffWeights);
+            _pos = _backupPosition;
+            _orientation = _backupOrientation;
+            _scale = _backupScale;
+        }
+
+        private ISelectionState GestureSelectionState =>
+            _gestureSelectionState ?? _selectionState;
+
+        private HashSet<int> GestureAffectedVertexIndices =>
+            _gestureAffectedVertexIndices;
+
+        private IReadOnlyDictionary<int, float> GestureFalloffWeights =>
+            _gestureFalloffWeights;
+
+        private void ReleaseVertexBaseline()
+        {
+            if (!_hasBackup && _backupVertexArrays == null && _backupIndexArrays == null)
+                return;
+
+            var cleanupError = ReleaseDeferredMeshes(rebuildBoundingBoxes: true);
+            ClearBackupStorage();
+            cleanupError?.Throw();
+        }
+
+        private ExceptionDispatchInfo ReleaseDeferredMeshes(bool rebuildBoundingBoxes)
+        {
+            ExceptionDispatchInfo cleanupError = null;
+            if (_effectedObjects == null)
+                return null;
+
+            foreach (var mesh in _effectedObjects)
+            {
+                try
+                {
+                    mesh.DeferBoundingBoxRebuild = false;
+                    if (rebuildBoundingBoxes)
+                        mesh.BuildBoundingBox();
+                }
+                catch (Exception exception)
+                {
+                    cleanupError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            return cleanupError;
+        }
+
+        private void ClearBackupStorage()
+        {
             _backupVertexArrays?.Clear();
             _backupIndexArrays?.Clear();
+            _backupVertexArrays = null;
+            _backupIndexArrays = null;
             _hasBackup = false;
         }
 
@@ -671,14 +1288,7 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         public bool HasBackup => _hasBackup;
 
-        /// <summary>
-        /// Reset the total gizmo transform (call when starting fresh transform)
-        /// </summary>
-        public void ResetTotalTransform()
-        {
-            _totalGizomTransform = Matrix.Identity;
-            _invertedWindingOrder = false;
-        }
+        internal bool IsTransformActive => _activeCommand != null || _hasBackup;
 
         /// <summary>
         /// Set falloff distance for face/edge mode proportional editing
@@ -686,7 +1296,8 @@ namespace GameWorld.Core.Components.Gizmo
         public void SetFalloffDistance(float distance)
         {
             _falloffDistance = distance;
-            ComputeFalloffWeights();
+            if (!IsTransformActive)
+                ComputeFalloffWeights();
         }
 
         /// <summary>
@@ -770,6 +1381,15 @@ namespace GameWorld.Core.Components.Gizmo
                     return new TransformGizmoWrapper(commandFactory, boneSelectionState.SelectedBones, boneSelectionState);
             }
             return null;
+        }
+
+        public void Dispose()
+        {
+            if (_boneSelectionState != null)
+            {
+                _boneSelectionState.BoneModifiedEvent -= OnBoneModified;
+                _boneSelectionState = null;
+            }
         }
 
     }

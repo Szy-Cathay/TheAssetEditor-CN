@@ -130,6 +130,35 @@ namespace Test.Shared.Core.PackFiles
         }
 
         [Test]
+        public void SavePackContainer_WhenFinalReplacementFails_PreservesPackModelState()
+        {
+            var originalPath = Path.Combine(_tempDirectory, "original.pack");
+            File.WriteAllBytes(originalPath, [1, 2, 3, 4, 5]);
+            var destinationPath = Path.Combine(_tempDirectory, "destination.pack");
+            Directory.CreateDirectory(destinationPath);
+            var gameInfo = GameInformationDatabase.GetGameById(GameTypeEnum.Rome2);
+            var service = CreatePackFileService();
+            var pack = CreatePackContainer();
+            pack.FileList["data\\second.bin"] = PackFile.CreateFromBytes("second.bin", [5, 6, 7, 8]);
+            pack.SystemFilePath = originalPath;
+            pack.OriginalLoadByteSize = new FileInfo(originalPath).Length;
+            var originalSources = pack.FileList.ToDictionary(
+                file => file.Key,
+                file => file.Value.DataSource);
+            var originalSystemFilePath = pack.SystemFilePath;
+            var originalLoadByteSize = pack.OriginalLoadByteSize;
+
+            Assert.Throws<UnauthorizedAccessException>(() =>
+                service.SavePackContainer(pack, destinationPath, false, gameInfo));
+
+            foreach (var file in pack.FileList)
+                Assert.That(file.Value.DataSource, Is.SameAs(originalSources[file.Key]));
+            Assert.That(pack.SystemFilePath, Is.EqualTo(originalSystemFilePath));
+            Assert.That(pack.OriginalLoadByteSize, Is.EqualTo(originalLoadByteSize));
+            Assert.That(Directory.Exists(destinationPath), Is.True);
+        }
+
+        [Test]
         public void TryAutoSavePackContainer_SavedEventRunsOnceAfterSaveGateIsReleased()
         {
             var firstPath = Path.Combine(_tempDirectory, "first.pack");

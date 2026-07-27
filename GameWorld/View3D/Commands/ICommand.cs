@@ -11,6 +11,11 @@ namespace GameWorld.Core.Commands
         bool IsMutation { get; }
     }
 
+    public interface IRedoableCommand : ICommand
+    {
+        void Redo();
+    }
+
     public class CommandBuilder<T> where T : ICommand
     {
         private readonly CommandExecutor _commandExecutor;
