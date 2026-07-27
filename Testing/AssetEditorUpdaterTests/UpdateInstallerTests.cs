@@ -464,12 +464,21 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
-            var payloadDirectory = Directory.CreateDirectory(Path.Combine(root, "installation", "Updater")).FullName;
+            var installationDirectory = Directory.CreateDirectory(Path.Combine(root, "installation")).FullName;
+            var payloadDirectory = Directory.CreateDirectory(Path.Combine(installationDirectory, "Updater")).FullName;
             Directory.CreateDirectory(Path.Combine(payloadDirectory, "runtimes", "win-x64"));
             File.WriteAllText(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe"), "updater");
             File.WriteAllText(Path.Combine(payloadDirectory, "runtimes", "win-x64", "native.dll"), "dependency");
 
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    false,
+                    Guid.Empty,
+                    localRoot,
+                    commonRoot));
+            var updateDirectory = workspace.UpdateDirectory;
             File.WriteAllText(Path.Combine(updateDirectory, "obsolete.dll"), "old payload");
             var backupRoot = Directory.CreateDirectory(
                 UpdateInstaller.GetBackupRootDirectory(updateDirectory)).FullName;
@@ -478,11 +487,10 @@ public class UpdateInstallerTests
 
             UpdaterProgram.CopyUpdaterPayload(
                 payloadDirectory,
-                new UpdaterWorkspace(
-                    Path.GetDirectoryName(updateDirectory)!,
-                    updateDirectory,
-                    false),
-                Path.GetDirectoryName(payloadDirectory)!);
+                workspace,
+                installationDirectory,
+                localRoot,
+                commonRoot);
 
             Assert.Multiple(() =>
             {
@@ -508,15 +516,23 @@ public class UpdateInstallerTests
             var payloadDirectory = Directory.CreateDirectory(
                 Path.Combine(installationDirectory, "Updater")).FullName;
             File.WriteAllText(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe"), "updater");
+            var localRoot = Directory.CreateDirectory(
+                Path.Combine(installationDirectory, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    false,
+                    Guid.Empty,
+                    localRoot,
+                    commonRoot));
 
             Assert.Throws<InvalidOperationException>(() =>
                 UpdaterProgram.CopyUpdaterPayload(
                     payloadDirectory,
-                    new UpdaterWorkspace(
-                        Path.GetDirectoryName(installationDirectory)!,
-                        installationDirectory,
-                        false),
-                    installationDirectory));
+                    workspace,
+                    installationDirectory,
+                    localRoot,
+                    commonRoot));
 
             Assert.Multiple(() =>
             {
@@ -532,8 +548,47 @@ public class UpdateInstallerTests
     }
 
     [Test]
+    public void CopyUpdaterPayload_SourceInsideLegacyDestinationIsRejectedBeforeCleanup()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    false,
+                    Guid.Empty,
+                    localRoot,
+                    commonRoot));
+            var payloadDirectory = Directory.CreateDirectory(
+                Path.Combine(workspace.UpdateDirectory, "payload")).FullName;
+            var updaterPath = Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe");
+            File.WriteAllText(updaterPath, "updater");
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdaterProgram.CopyUpdaterPayload(
+                    payloadDirectory,
+                    workspace,
+                    installationDirectory,
+                    localRoot,
+                    commonRoot));
+
+            Assert.That(File.ReadAllText(updaterPath), Is.EqualTo("updater"));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
     public void CopyUpdaterPayload_ProtectedWorkspaceRejectsNonEmptyUpdateWithoutDeletingIt()
     {
+        if (!UpdaterWorkspaceFactory.IsProcessElevated())
+            Assert.Ignore("Protected workspace copy requires an elevated Windows token.");
+
         var root = CreateTemporaryDirectory();
         try
         {
@@ -541,19 +596,76 @@ public class UpdateInstallerTests
             var payloadDirectory = Directory.CreateDirectory(
                 Path.Combine(installationDirectory, "Updater")).FullName;
             File.WriteAllText(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe"), "updater");
-            var transactionRoot = Directory.CreateDirectory(Path.Combine(root, "transaction")).FullName;
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(transactionRoot, "Update")).FullName;
-            var sentinelPath = Path.Combine(updateDirectory, "preserve.txt");
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    true,
+                    Guid.NewGuid(),
+                    localRoot,
+                    commonRoot));
+            var sentinelPath = Path.Combine(workspace.UpdateDirectory, "preserve.txt");
             File.WriteAllText(sentinelPath, "preserve");
-            var workspace = new UpdaterWorkspace(transactionRoot, updateDirectory, true);
 
             Assert.Throws<InvalidOperationException>(() =>
                 UpdaterProgram.CopyUpdaterPayload(
                     payloadDirectory,
                     workspace,
-                    installationDirectory));
+                    installationDirectory,
+                    localRoot,
+                    commonRoot));
 
-            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+                Assert.DoesNotThrow(() =>
+                    UpdaterWorkspaceSecurity.ValidateProtectedDirectory(workspace.UpdateDirectory));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void CopyUpdaterPayload_ProtectedWorkspacePreservesExactUpdateAcl()
+    {
+        if (!UpdaterWorkspaceFactory.IsProcessElevated())
+            Assert.Ignore("Protected workspace copy requires an elevated Windows token.");
+
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var payloadDirectory = Directory.CreateDirectory(
+                Path.Combine(installationDirectory, "Updater")).FullName;
+            File.WriteAllText(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe"), "updater");
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    true,
+                    Guid.NewGuid(),
+                    localRoot,
+                    commonRoot));
+
+            UpdaterProgram.CopyUpdaterPayload(
+                payloadDirectory,
+                workspace,
+                installationDirectory,
+                localRoot,
+                commonRoot);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    File.ReadAllText(
+                        Path.Combine(workspace.UpdateDirectory, "AssetEditor.CN.Updater.exe")),
+                    Is.EqualTo("updater"));
+                Assert.DoesNotThrow(() =>
+                    UpdaterWorkspaceSecurity.ValidateProtectedDirectory(workspace.UpdateDirectory));
+            });
         }
         finally
         {
