@@ -303,23 +303,45 @@ public class UpdaterPayloadCopierTests
                 events.Add($"validate-{validationCount}");
                 return workspace;
             },
+            actualWorkspace =>
+            {
+                Assert.That(actualWorkspace, Is.SameAs(workspace));
+                events.Add("lease");
+                return new CallbackDisposable(
+                    () => events.Add("dispose-lease"));
+            },
             startInfo =>
             {
                 Assert.Multiple(() =>
                 {
                     Assert.That(
                         events,
-                        Is.EqualTo(new[] { "validate-1", "copy-and-verify", "validate-2" }));
+                        Is.EqualTo(new[]
+                        {
+                            "validate-1",
+                            "copy-and-verify",
+                            "validate-2",
+                            "lease"
+                        }));
                     Assert.That(
                         startInfo.FileName,
                         Is.EqualTo(Path.Combine(workspace.UpdateDirectory, "AssetEditor.CN.Updater.exe")));
                 });
                 events.Add("start");
-            });
+            },
+            _ => Assert.Fail("Successful relaunch must not clean the transaction."));
 
         Assert.That(
             events,
-            Is.EqualTo(new[] { "validate-1", "copy-and-verify", "validate-2", "start" }));
+            Is.EqualTo(new[]
+            {
+                "validate-1",
+                "copy-and-verify",
+                "validate-2",
+                "lease",
+                "start",
+                "dispose-lease"
+            }));
     }
 
     [Test]
@@ -329,6 +351,7 @@ public class UpdaterPayloadCopierTests
         var expected = new InvalidDataException("initial validation");
         var copyCalled = false;
         var startCalled = false;
+        var cleanupCount = 0;
 
         var actual = Assert.Throws<InvalidDataException>(() =>
             UpdaterProgram.RelaunchFromUpdateDirectory(
@@ -341,13 +364,20 @@ public class UpdaterPayloadCopierTests
                     return new Dictionary<string, string>();
                 },
                 (_, _) => throw expected,
-                _ => startCalled = true));
+                _ => null,
+                _ => startCalled = true,
+                actualWorkspace =>
+                {
+                    Assert.That(actualWorkspace, Is.SameAs(workspace));
+                    cleanupCount++;
+                }));
 
         Assert.Multiple(() =>
         {
             Assert.That(actual, Is.SameAs(expected));
             Assert.That(copyCalled, Is.False);
             Assert.That(startCalled, Is.False);
+            Assert.That(cleanupCount, Is.EqualTo(1));
         });
     }
 
@@ -358,6 +388,7 @@ public class UpdaterPayloadCopierTests
         var expected = new InvalidDataException("copy verification");
         var validationCount = 0;
         var startCalled = false;
+        var cleanupCount = 0;
 
         var actual = Assert.Throws<InvalidDataException>(() =>
             UpdaterProgram.RelaunchFromUpdateDirectory(
@@ -370,13 +401,16 @@ public class UpdaterPayloadCopierTests
                     validationCount++;
                     return workspace;
                 },
-                _ => startCalled = true));
+                _ => null,
+                _ => startCalled = true,
+                _ => cleanupCount++));
 
         Assert.Multiple(() =>
         {
             Assert.That(actual, Is.SameAs(expected));
             Assert.That(validationCount, Is.EqualTo(1));
             Assert.That(startCalled, Is.False);
+            Assert.That(cleanupCount, Is.EqualTo(1));
         });
     }
 
@@ -388,6 +422,7 @@ public class UpdaterPayloadCopierTests
         var validationCount = 0;
         var copyCalled = false;
         var startCalled = false;
+        var cleanupCount = 0;
 
         var actual = Assert.Throws<InvalidDataException>(() =>
             UpdaterProgram.RelaunchFromUpdateDirectory(
@@ -404,7 +439,9 @@ public class UpdaterPayloadCopierTests
                     validationCount++;
                     return validationCount == 2 ? throw expected : workspace;
                 },
-                _ => startCalled = true));
+                _ => null,
+                _ => startCalled = true,
+                _ => cleanupCount++));
 
         Assert.Multiple(() =>
         {
@@ -412,6 +449,79 @@ public class UpdaterPayloadCopierTests
             Assert.That(validationCount, Is.EqualTo(2));
             Assert.That(copyCalled, Is.True);
             Assert.That(startCalled, Is.False);
+            Assert.That(cleanupCount, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void RelaunchFromUpdateDirectory_StartFailurePreservesPrimaryWhenCleanupFails()
+    {
+        var workspace = CreateDummyWorkspace();
+        var startFailure = new IOException("controlled launch failure");
+        var cleanupFailure = new IOException("controlled cleanup failure");
+        var previousError = Console.Error;
+        using var cleanupLog = new StringWriter();
+        IOException? actual;
+        try
+        {
+            Console.SetError(cleanupLog);
+            actual = Assert.Throws<IOException>(() =>
+                UpdaterProgram.RelaunchFromUpdateDirectory(
+                    "source",
+                    workspace,
+                    "installation",
+                    (_, _, _) => new Dictionary<string, string>(),
+                    (_, _) => workspace,
+                    _ => null,
+                    _ => throw startFailure,
+                    _ => throw cleanupFailure));
+        }
+        finally
+        {
+            Console.SetError(previousError);
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(startFailure));
+            Assert.That(
+                cleanupLog.ToString(),
+                Does.Contain(
+                    "Updater cleanup failed; preserving the original failure"));
+            Assert.That(
+                cleanupLog.ToString(),
+                Does.Contain(cleanupFailure.Message));
+        });
+    }
+
+    [Test]
+    public void RelaunchFromUpdateDirectory_LocalFailureDoesNotCleanSharedWorkspace()
+    {
+        var transactionRoot = Path.Combine(
+            Path.GetTempPath(),
+            "local-transaction");
+        var workspace = new UpdaterWorkspace(
+            transactionRoot,
+            Path.Combine(transactionRoot, "Update"),
+            false);
+        var expected = new InvalidDataException("local validation failure");
+        var cleanupCount = 0;
+
+        var actual = Assert.Throws<InvalidDataException>(() =>
+            UpdaterProgram.RelaunchFromUpdateDirectory(
+                "source",
+                workspace,
+                "installation",
+                (_, _, _) => new Dictionary<string, string>(),
+                (_, _) => throw expected,
+                _ => null,
+                _ => Assert.Fail("A failed validation must not start."),
+                _ => cleanupCount++));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(expected));
+            Assert.That(cleanupCount, Is.Zero);
         });
     }
 
@@ -432,6 +542,14 @@ public class UpdaterPayloadCopierTests
             transactionRoot,
             Path.Combine(transactionRoot, "Update"),
             true);
+    }
+
+    private sealed class CallbackDisposable(Action dispose) : IDisposable
+    {
+        public void Dispose()
+        {
+            dispose();
+        }
     }
 
     private static CopiedPayload CreateCopiedPayload()

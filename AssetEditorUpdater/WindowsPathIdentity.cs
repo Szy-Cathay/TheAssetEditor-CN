@@ -9,6 +9,7 @@ namespace AssetEditorUpdater;
 internal enum WindowsDirectoryLeaseMode
 {
     Stable,
+    Pinned,
     DeleteTarget
 }
 
@@ -103,13 +104,13 @@ internal static class WindowsPathIdentity
         try
         {
             var components = GetDirectoryComponents(fullPath).ToArray();
-            var stableComponentCount = mode == WindowsDirectoryLeaseMode.DeleteTarget
+            var stableComponentCount = mode != WindowsDirectoryLeaseMode.Stable
                 ? components.Length - 1
                 : components.Length;
             if (stableComponentCount < 1)
             {
                 throw new InvalidOperationException(
-                    "The updater cannot acquire a delete-target lease for a filesystem root.");
+                    "The updater cannot pin a filesystem root.");
             }
 
             for (var index = 0; index < stableComponentCount; index++)
@@ -123,17 +124,24 @@ internal static class WindowsPathIdentity
                 ValidateOrdinaryDirectory(componentHandle, components[index]);
             }
 
-            var identityHandle = mode == WindowsDirectoryLeaseMode.DeleteTarget
-                ? OpenDirectory(
+            var identityHandle = mode switch
+            {
+                WindowsDirectoryLeaseMode.Pinned => OpenDirectory(
                     fullPath,
                     DeleteAccess,
                     IdentityShare,
-                    FileFlagBackupSemantics | FileFlagOpenReparsePoint)
-                : OpenDirectory(
+                    FileFlagBackupSemantics | FileFlagOpenReparsePoint),
+                WindowsDirectoryLeaseMode.DeleteTarget => OpenDirectory(
+                    fullPath,
+                    DeleteAccess,
+                    IdentityShare,
+                    FileFlagBackupSemantics | FileFlagOpenReparsePoint),
+                _ => OpenDirectory(
                     fullPath,
                     desiredAccess: 0,
                     IdentityShare,
-                    FileFlagBackupSemantics);
+                    FileFlagBackupSemantics)
+            };
             handles.Add(identityHandle);
             ValidateOrdinaryDirectory(identityHandle, fullPath);
 

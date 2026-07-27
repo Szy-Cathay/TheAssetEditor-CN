@@ -10,7 +10,7 @@ namespace AssetEditorUpdaterTests;
 public class UpdateInstallerTests
 {
     [Test]
-    public void Install_UsesOwnedWorkspaceAndSiblingStagingDirectory()
+    public void Install_SuccessDeletesSiblingStagingAndSecondInstallCanRun()
     {
         var root = CreateTemporaryDirectory();
         try
@@ -35,22 +35,118 @@ public class UpdateInstallerTests
                 CopyAndRecord,
                 owned.LocalRoot,
                 owned.CommonRoot);
+            var secondArchivePath = CreateUpdateZip(
+                owned.Workspace.UpdateDirectory,
+                ("AssetEditor.CN/second-update.txt", "second"));
+            UpdateInstaller.Install(
+                secondArchivePath,
+                installationDirectory,
+                owned.Workspace,
+                CopyAndRecord,
+                owned.LocalRoot,
+                owned.CommonRoot);
 
             Assert.Multiple(() =>
             {
                 Assert.That(
-                    copySources.Any(path => PathsEqual(path, transactionPaths.StagingDirectory)),
-                    Is.True);
+                    copySources.Count(path =>
+                        PathsEqual(path, transactionPaths.StagingDirectory)),
+                    Is.EqualTo(2));
                 Assert.That(
                     Directory.Exists(Path.Combine(owned.Workspace.UpdateDirectory, "staging")),
                     Is.False);
                 Assert.That(
                     Directory.Exists(transactionPaths.StagingDirectory),
-                    Is.True);
+                    Is.False);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "second-update.txt")),
+                    Is.EqualTo("second"));
             });
         }
         finally
         {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_StagingCleanupFailurePreservesSuccessfulResult()
+    {
+        var root = CreateTemporaryDirectory();
+        FileStream? stagingBlocker = null;
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(
+                owned.Workspace.UpdateDirectory);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                owned.Workspace.UpdateDirectory);
+
+            void CopyAndBlockStagingCleanup(
+                string sourceDirectory,
+                string destinationDirectory)
+            {
+                UpdateInstaller.CopyDirectory(
+                    sourceDirectory,
+                    destinationDirectory);
+                if (!PathsEqual(
+                        sourceDirectory,
+                        paths.StagingDirectory))
+                {
+                    return;
+                }
+
+                stagingBlocker = new FileStream(
+                    Path.Combine(
+                        sourceDirectory,
+                        "AssetEditor.CN.exe"),
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read);
+            }
+
+            var previousError = Console.Error;
+            using var cleanupLog = new StringWriter();
+            string backupDirectory;
+            try
+            {
+                Console.SetError(cleanupLog);
+                backupDirectory = UpdateInstaller.Install(
+                    archivePath,
+                    installationDirectory,
+                    owned.Workspace,
+                    CopyAndBlockStagingCleanup,
+                    owned.LocalRoot,
+                    owned.CommonRoot);
+            }
+            finally
+            {
+                Console.SetError(previousError);
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Directory.Exists(backupDirectory), Is.True);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "AssetEditor.CN.exe")),
+                    Is.EqualTo("new executable"));
+                Assert.That(
+                    Directory.Exists(paths.StagingDirectory),
+                    Is.True);
+                Assert.That(
+                    cleanupLog.ToString(),
+                    Does.Contain(
+                        "Updater cleanup failed; preserving the primary result"));
+            });
+        }
+        finally
+        {
+            stagingBlocker?.Dispose();
             Directory.Delete(root, true);
         }
     }
@@ -208,9 +304,9 @@ public class UpdateInstallerTests
 
             Assert.Multiple(() =>
             {
-                Assert.DoesNotThrow(() =>
-                    UpdaterWorkspaceSecurity.ValidateProtectedDirectory(
-                        paths.StagingDirectory));
+                Assert.That(
+                    Directory.Exists(paths.StagingDirectory),
+                    Is.False);
                 Assert.DoesNotThrow(() =>
                     UpdaterWorkspaceSecurity.ValidateProtectedDirectory(
                         paths.BackupRootDirectory));
@@ -247,6 +343,12 @@ public class UpdateInstallerTests
                 InstallUpdate(archivePath, installationDirectory, owned));
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
+            Assert.That(
+                Directory.Exists(
+                    UpdaterWorkspaceFactory
+                        .GetTransactionPaths(updateDirectory)
+                        .StagingDirectory),
+                Is.False);
         }
         finally
         {
@@ -452,6 +554,76 @@ public class UpdateInstallerTests
                 Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")), Is.EqualTo("old file"));
                 Assert.That(File.Exists(Path.Combine(installationDirectory, "partial-new.txt")), Is.False);
                 Assert.That(File.Exists(Path.Combine(installationDirectory, "new-only.txt")), Is.False);
+                Assert.That(Directory.Exists(stagingDirectory), Is.False);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_BackupIdentityRemainsLiveThroughRollback()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                owned.Workspace.UpdateDirectory);
+            var movedBackupDirectory = Path.Combine(root, "moved-backup");
+            var installFailure = new IOException("controlled install copy failure");
+            string? backupDirectory = null;
+            Exception? renameFailure = null;
+
+            void CopyWithRenameAttempt(
+                string sourceDirectory,
+                string destinationDirectory)
+            {
+                if (PathsEqual(sourceDirectory, installationDirectory))
+                {
+                    backupDirectory = destinationDirectory;
+                    UpdateInstaller.CopyDirectory(
+                        sourceDirectory,
+                        destinationDirectory);
+                    return;
+                }
+
+                if (PathsEqual(sourceDirectory, paths.StagingDirectory))
+                {
+                    renameFailure = Assert.Catch(() =>
+                        Directory.Move(
+                            backupDirectory!,
+                            movedBackupDirectory));
+                    throw installFailure;
+                }
+
+                UpdateInstaller.CopyDirectory(
+                    sourceDirectory,
+                    destinationDirectory);
+            }
+
+            var actual = Assert.Throws<IOException>(() =>
+                InstallUpdate(
+                    archivePath,
+                    installationDirectory,
+                    owned,
+                    CopyWithRenameAttempt));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual, Is.SameAs(installFailure));
+                Assert.That(renameFailure, Is.TypeOf<IOException>());
+                Assert.That(Directory.Exists(movedBackupDirectory), Is.False);
+                Assert.That(Directory.Exists(backupDirectory), Is.True);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "old-only.txt")),
+                    Is.EqualTo("old file"));
             });
         }
         finally
@@ -512,6 +684,7 @@ public class UpdateInstallerTests
                 Assert.That(backupCandidates, Has.Count.EqualTo(1));
                 Assert.That(File.ReadAllText(Path.Combine(failedTransactionBackup, "old-only.txt")), Is.EqualTo("old file"));
                 Assert.That(File.ReadAllText(Path.Combine(failedTransactionBackup, "current-only.txt")), Is.EqualTo("current file"));
+                Assert.That(Directory.Exists(stagingDirectory), Is.False);
             });
         }
         finally
@@ -552,12 +725,16 @@ public class UpdateInstallerTests
                     CopyWithBackupFailure));
 
             var backupCandidate = GetBackupCandidates(updateDirectory).Single();
+            var stagingDirectory = UpdaterWorkspaceFactory
+                .GetTransactionPaths(updateDirectory)
+                .StagingDirectory;
             Assert.Multiple(() =>
             {
                 Assert.That(exception, Is.SameAs(backupFailure));
                 Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "AssetEditor.CN.exe")), Is.EqualTo("old executable"));
                 Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")), Is.EqualTo("old file"));
                 Assert.That(File.ReadAllText(Path.Combine(backupCandidate, "partial-backup.txt")), Is.EqualTo("partial backup"));
+                Assert.That(Directory.Exists(stagingDirectory), Is.False);
             });
         }
         finally
@@ -630,8 +807,9 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
-            var updateDirectory = Directory.CreateDirectory(
-                Path.Combine(root, "Update")).FullName;
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var updateDirectory = owned.Workspace.UpdateDirectory;
             var assetPath = UpdaterProgram.GetAssetDownloadPath(
                 updateDirectory,
                 "AssetEditor.CN.zip");
@@ -639,12 +817,119 @@ public class UpdateInstallerTests
             await using var source = new MemoryStream("replacement"u8.ToArray());
 
             Assert.ThrowsAsync<IOException>(async () =>
-                await UpdaterProgram.CopyAssetDownloadAsync(source, assetPath));
+                await UpdaterProgram.CopyAssetDownloadAsync(
+                    source,
+                    assetPath,
+                    installationDirectory,
+                    owned.Workspace,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
 
             Assert.That(File.ReadAllText(assetPath), Is.EqualTo("preserve"));
         }
         finally
         {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void CopyAssetDownloadAsync_CopyFailureDeletesCreatedArchiveAndPreservesPrimary()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var assetPath = UpdaterProgram.GetAssetDownloadPath(
+                owned.Workspace.UpdateDirectory,
+                "AssetEditor.CN.zip");
+            using var source = new MemoryStream("partial"u8.ToArray());
+            var copyFailure = new IOException("controlled download copy failure");
+            var previousError = Console.Error;
+            using var cleanupLog = new StringWriter();
+            IOException? actual;
+            try
+            {
+                Console.SetError(cleanupLog);
+                actual = Assert.ThrowsAsync<IOException>(async () =>
+                    await UpdaterProgram.CopyAssetDownloadAsync(
+                        source,
+                        assetPath,
+                        installationDirectory,
+                        owned.Workspace,
+                        owned.LocalRoot,
+                        owned.CommonRoot,
+                        () => throw copyFailure));
+            }
+            finally
+            {
+                Console.SetError(previousError);
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual, Is.SameAs(copyFailure));
+                Assert.That(File.Exists(assetPath), Is.False);
+                Assert.That(cleanupLog.ToString(), Is.Empty);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public async Task CopyAssetDownloadAsync_HoldsUpdateIdentityAcrossCopy()
+    {
+        var root = CreateTemporaryDirectory();
+        var movedUpdateDirectory = Path.Combine(root, "moved-update");
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var assetPath = UpdaterProgram.GetAssetDownloadPath(
+                owned.Workspace.UpdateDirectory,
+                "AssetEditor.CN.zip");
+            await using var source = new GatedReadStream("archive"u8.ToArray());
+
+            var copyTask = UpdaterProgram.CopyAssetDownloadAsync(
+                source,
+                assetPath,
+                installationDirectory,
+                owned.Workspace,
+                owned.LocalRoot,
+                owned.CommonRoot);
+            await source.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+            Assert.Throws<IOException>(() =>
+                Directory.Move(
+                    owned.Workspace.UpdateDirectory,
+                    movedUpdateDirectory));
+
+            source.Release();
+            await copyTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+            Directory.Move(
+                owned.Workspace.UpdateDirectory,
+                movedUpdateDirectory);
+            Directory.Move(
+                movedUpdateDirectory,
+                owned.Workspace.UpdateDirectory);
+            Assert.That(File.ReadAllText(assetPath), Is.EqualTo("archive"));
+        }
+        finally
+        {
+            if (Directory.Exists(movedUpdateDirectory))
+                Directory.Move(
+                    movedUpdateDirectory,
+                    Path.Combine(
+                        root,
+                        "local",
+                        "AssetEditor.CN",
+                        "Temp",
+                        "Update"));
             Directory.Delete(root, true);
         }
     }
@@ -725,7 +1010,7 @@ public class UpdateInstallerTests
     }
 
     [Test]
-    public void Install_PreExistingStagingIsRejectedWithoutDeletingUnknownData()
+    public void Install_LocalOwnedPreExistingStagingIsRecovered()
     {
         var root = CreateTemporaryDirectory();
         try
@@ -740,15 +1025,20 @@ public class UpdateInstallerTests
             File.WriteAllText(userDataPath, "do not delete");
             var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
 
-            Assert.That(
-                () => InstallUpdate(archivePath, installationDirectory, owned),
-                Throws.Exception);
+            InstallUpdate(archivePath, installationDirectory, owned);
 
             Assert.Multiple(() =>
             {
-                Assert.That(File.ReadAllText(userDataPath), Is.EqualTo("do not delete"));
-                Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "AssetEditor.CN.exe")), Is.EqualTo("old executable"));
-                Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")), Is.EqualTo("old file"));
+                Assert.That(File.Exists(userDataPath), Is.False);
+                Assert.That(Directory.Exists(stagingDirectory), Is.False);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "AssetEditor.CN.exe")),
+                    Is.EqualTo("new executable"));
+                Assert.That(
+                    File.Exists(Path.Combine(installationDirectory, "old-only.txt")),
+                    Is.False);
             });
         }
         finally
@@ -967,7 +1257,7 @@ public class UpdateInstallerTests
     }
 
     [Test]
-    public void Install_ExtractionCleanupRejectsReparseTargetAndPreservesPrimaryFailure()
+    public void Install_StagingLeaseRejectsReplacementAndPreservesPrimaryFailure()
     {
         var root = CreateTemporaryDirectory();
         string? stagingDirectory = null;
@@ -976,20 +1266,15 @@ public class UpdateInstallerTests
             var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
             var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
-            var externalDirectory = Directory.CreateDirectory(
-                Path.Combine(root, "external")).FullName;
-            var externalSentinel = Path.Combine(externalDirectory, "preserve.txt");
-            File.WriteAllText(externalSentinel, "preserve");
             var extractionFailure = new InvalidDataException(
                 "controlled extraction failure");
+            Exception? replacementFailure = null;
 
-            void ReplaceStagingWithReparseAndFail(string createdStagingDirectory)
+            void TryReplaceStagingAndFail(string createdStagingDirectory)
             {
                 stagingDirectory = createdStagingDirectory;
-                Directory.Delete(createdStagingDirectory);
-                TryCreateDirectorySymbolicLinkOrIgnore(
-                    createdStagingDirectory,
-                    externalDirectory);
+                replacementFailure = Assert.Catch(() =>
+                    Directory.Delete(createdStagingDirectory));
                 throw extractionFailure;
             }
 
@@ -1007,7 +1292,7 @@ public class UpdateInstallerTests
                         UpdateInstaller.CopyDirectory,
                         owned.LocalRoot,
                         owned.CommonRoot,
-                        ReplaceStagingWithReparseAndFail));
+                        TryReplaceStagingAndFail));
             }
             finally
             {
@@ -1019,9 +1304,9 @@ public class UpdateInstallerTests
                 Assert.That(actual, Is.SameAs(extractionFailure));
                 Assert.That(
                     cleanupLog.ToString(),
-                    Does.Contain("preserving the original failure"));
-                Assert.That(File.ReadAllText(externalSentinel), Is.EqualTo("preserve"));
-                Assert.That(Directory.Exists(stagingDirectory), Is.True);
+                    Is.Empty);
+                Assert.That(replacementFailure, Is.TypeOf<IOException>());
+                Assert.That(Directory.Exists(stagingDirectory), Is.False);
                 Assert.That(
                     File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")),
                     Is.EqualTo("old file"));
@@ -1029,8 +1314,59 @@ public class UpdateInstallerTests
         }
         finally
         {
-            if (stagingDirectory != null)
-                DeleteDirectoryLinkIfPresent(stagingDirectory);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_ArchiveLeaseRejectsReplacementDuringExtraction()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(
+                owned.Workspace.UpdateDirectory);
+            var movedArchivePath = Path.Combine(root, "moved-update.zip");
+            var extractionFailure = new InvalidDataException(
+                "controlled extraction failure");
+            Exception? moveFailure = null;
+
+            void TryMoveArchiveAndFail(string _)
+            {
+                moveFailure = Assert.Catch(() =>
+                    File.Move(archivePath, movedArchivePath));
+                throw extractionFailure;
+            }
+
+            var actual = Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.Install(
+                    archivePath,
+                    installationDirectory,
+                    owned.Workspace,
+                    UpdateInstaller.CopyDirectory,
+                    owned.LocalRoot,
+                    owned.CommonRoot,
+                    TryMoveArchiveAndFail));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual, Is.SameAs(extractionFailure));
+                Assert.That(moveFailure, Is.TypeOf<IOException>());
+                Assert.That(File.Exists(archivePath), Is.True);
+                Assert.That(File.Exists(movedArchivePath), Is.False);
+                Assert.That(
+                    Directory.Exists(
+                        UpdaterWorkspaceFactory
+                            .GetTransactionPaths(
+                                owned.Workspace.UpdateDirectory)
+                            .StagingDirectory),
+                    Is.False);
+            });
+        }
+        finally
+        {
             Directory.Delete(root, true);
         }
     }
@@ -1612,4 +1948,79 @@ public class UpdateInstallerTests
         string LocalRoot,
         string CommonRoot,
         UpdaterWorkspace Workspace);
+
+    private sealed class GatedReadStream(byte[] contents) : Stream
+    {
+        private readonly MemoryStream inner = new(contents);
+        private readonly TaskCompletionSource release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool hasWaited;
+
+        internal TaskCompletionSource ReadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal void Release()
+        {
+            release.TrySetResult();
+        }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => inner.Length;
+
+        public override long Position
+        {
+            get => inner.Position;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            return inner.Read(buffer, offset, count);
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            if (!hasWaited)
+            {
+                hasWaited = true;
+                ReadStarted.TrySetResult();
+                await release.Task.WaitAsync(cancellationToken);
+            }
+
+            return await inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
 }

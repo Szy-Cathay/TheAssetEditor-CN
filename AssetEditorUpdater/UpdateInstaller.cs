@@ -77,87 +77,155 @@ internal static class UpdateInstaller
             transactionIdentity,
             "The updater transaction root must not overlap the installation directory.");
 
-        ExtractToStaging(
-            archivePath,
-            validatedWorkspace,
-            paths,
-            installationDirectory,
-            installationIdentity,
-            transactionIdentity,
-            localApplicationDataRoot,
-            commonApplicationDataRoot,
-            afterStagingCreated);
-
-        ValidateRequiredPayload(paths.StagingDirectory);
-        var backupRootDirectory = EnsureBackupRoot(
-            validatedWorkspace,
-            paths,
-            transactionIdentity);
-        var backupDirectory = CreateBackupCandidate(
-            validatedWorkspace,
-            backupRootDirectory);
-
-        BackupInstallation(
-            installationDirectory,
-            paths.StagingDirectory,
-            backupDirectory,
-            validatedWorkspace,
-            installationIdentity,
-            transactionIdentity,
-            copyDirectory,
-            localApplicationDataRoot,
-            commonApplicationDataRoot);
-
+        WindowsDirectoryIdentityLease? stagingIdentity = null;
         try
         {
-            ValidateDestructivePhase(
+            using (var updateIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                       paths.UpdateDirectory,
+                       nameof(workspace),
+                       WindowsDirectoryLeaseMode.Pinned))
+            {
+                WindowsPathIdentity.RequireDirectChild(
+                    transactionIdentity,
+                    updateIdentity,
+                    "Update must be a direct child of the transaction root.");
+                using var archiveStream = new FileStream(
+                    archivePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.None,
+                    bufferSize: 4096,
+                    FileOptions.SequentialScan);
+                ValidateArchivePath(archivePath, paths.UpdateDirectory);
+
+                PrepareStagingForInstall(
+                    installationDirectory,
+                    validatedWorkspace,
+                    paths,
+                    installationIdentity,
+                    transactionIdentity,
+                    localApplicationDataRoot,
+                    commonApplicationDataRoot);
+                stagingIdentity = UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
+                    paths.StagingDirectory,
+                    validatedWorkspace.IsProtected,
+                    transactionIdentity,
+                    WindowsDirectoryLeaseMode.DeleteTarget);
+
+                ExtractToStaging(
+                    archiveStream,
+                    validatedWorkspace,
+                    paths,
+                    transactionIdentity,
+                    stagingIdentity,
+                    afterStagingCreated);
+            }
+
+            ValidateRequiredPayload(paths.StagingDirectory);
+            using var backupRootIdentity = OpenOrCreateBackupRoot(
+                validatedWorkspace,
+                paths,
+                transactionIdentity);
+            using var backupIdentity = CreateBackupCandidate(
+                validatedWorkspace,
+                paths.BackupRootDirectory,
+                backupRootIdentity,
+                out var backupDirectory);
+
+            BackupInstallation(
                 installationDirectory,
+                paths.StagingDirectory,
+                backupDirectory,
                 validatedWorkspace,
                 installationIdentity,
                 transactionIdentity,
+                stagingIdentity,
+                backupRootIdentity,
+                backupIdentity,
+                copyDirectory,
                 localApplicationDataRoot,
                 commonApplicationDataRoot);
-            ValidateOwnedDerivedDirectory(
-                paths.StagingDirectory,
-                paths.TransactionRoot,
-                validatedWorkspace.IsProtected);
-            using var stagingIdentity = WindowsPathIdentity.OpenExistingDirectory(
-                paths.StagingDirectory,
-                nameof(paths.StagingDirectory));
-            RequireDirectPhysicalChild(
-                transactionIdentity,
-                stagingIdentity,
-                "staging must be a direct child of the transaction root.");
-            CaptureTree(paths.StagingDirectory);
-            CaptureTree(installationDirectory);
-            copyDirectory(paths.StagingDirectory, installationDirectory);
-        }
-        catch (Exception installException)
-        {
+
             try
             {
-                RestoreBackupCore(
+                ValidateDestructivePhase(
                     installationDirectory,
                     validatedWorkspace,
-                    backupDirectory,
                     installationIdentity,
                     transactionIdentity,
-                    copyDirectory,
                     localApplicationDataRoot,
                     commonApplicationDataRoot);
+                ValidateHeldDerivedDirectory(
+                    paths.StagingDirectory,
+                    paths.TransactionRoot,
+                    validatedWorkspace.IsProtected,
+                    transactionIdentity,
+                    stagingIdentity,
+                    "staging must be a direct child of the transaction root.");
+                CaptureTree(paths.StagingDirectory);
+                CaptureTree(installationDirectory);
+                copyDirectory(paths.StagingDirectory, installationDirectory);
             }
-            catch (Exception restoreException)
+            catch (Exception installException)
             {
-                throw new AggregateException(
-                    "The update installation and rollback both failed.",
-                    installException,
-                    restoreException);
+                try
+                {
+                    RestoreBackupCore(
+                        installationDirectory,
+                        validatedWorkspace,
+                        backupDirectory,
+                        installationIdentity,
+                        transactionIdentity,
+                        backupRootIdentity,
+                        backupIdentity,
+                        copyDirectory,
+                        localApplicationDataRoot,
+                        commonApplicationDataRoot);
+                }
+                catch (Exception restoreException)
+                {
+                    throw new AggregateException(
+                        "The update installation and rollback both failed.",
+                        installException,
+                        restoreException);
+                }
+
+                throw;
             }
 
-            throw;
+            return backupDirectory;
         }
-
-        return backupDirectory;
+        finally
+        {
+            if (stagingIdentity != null)
+            {
+                try
+                {
+                    ValidateDestructivePhase(
+                        installationDirectory,
+                        validatedWorkspace,
+                        installationIdentity,
+                        transactionIdentity,
+                        localApplicationDataRoot,
+                        commonApplicationDataRoot);
+                    DeleteOwnedDerivedDirectory(
+                        paths.StagingDirectory,
+                        paths.TransactionRoot,
+                        validatedWorkspace.IsProtected,
+                        transactionIdentity,
+                        stagingIdentity);
+                }
+                catch (Exception cleanupException)
+                {
+                    Console.Error.WriteLine(
+                        $"Updater cleanup failed; preserving the primary result: {cleanupException}");
+                }
+                finally
+                {
+                    stagingIdentity.Dispose();
+                }
+            }
+        }
     }
 
     internal static void RestoreBackup(
@@ -186,6 +254,41 @@ internal static class UpdateInstaller
             installationIdentity,
             transactionIdentity,
             "The updater transaction root must not overlap the installation directory.");
+        var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+            validatedWorkspace.UpdateDirectory);
+        ValidateBackupCandidatePath(
+            backupDirectory,
+            paths.BackupRootDirectory);
+        ValidateOwnedDerivedDirectory(
+            paths.BackupRootDirectory,
+            paths.TransactionRoot,
+            validatedWorkspace.IsProtected);
+        ValidateOwnedDerivedDirectory(
+            backupDirectory,
+            paths.BackupRootDirectory,
+            validatedWorkspace.IsProtected);
+        using var backupRootIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            paths.BackupRootDirectory,
+            nameof(paths.BackupRootDirectory),
+            WindowsDirectoryLeaseMode.Pinned);
+        using var backupIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            backupDirectory,
+            nameof(backupDirectory),
+            WindowsDirectoryLeaseMode.Pinned);
+        ValidateHeldDerivedDirectory(
+            paths.BackupRootDirectory,
+            paths.TransactionRoot,
+            validatedWorkspace.IsProtected,
+            transactionIdentity,
+            backupRootIdentity,
+            "UpdateBackups must be a direct child of the transaction root.");
+        ValidateHeldDerivedDirectory(
+            backupDirectory,
+            paths.BackupRootDirectory,
+            validatedWorkspace.IsProtected,
+            backupRootIdentity,
+            backupIdentity,
+            "The update backup must be a direct child of UpdateBackups.");
 
         RestoreBackupCore(
             installationDirectory,
@@ -193,6 +296,8 @@ internal static class UpdateInstaller
             backupDirectory,
             installationIdentity,
             transactionIdentity,
+            backupRootIdentity,
+            backupIdentity,
             copyDirectory,
             localApplicationDataRoot,
             commonApplicationDataRoot);
@@ -279,15 +384,39 @@ internal static class UpdateInstaller
 
         using var transactionIdentity = WindowsPathIdentity.OpenExistingDirectory(
             paths.TransactionRoot,
-            nameof(workspace));
+            nameof(workspace),
+            WindowsDirectoryLeaseMode.Pinned);
         using var updateIdentity = WindowsPathIdentity.OpenExistingDirectory(
             paths.UpdateDirectory,
-            nameof(workspace));
-        RequireDirectPhysicalChild(
+            nameof(workspace),
+            WindowsDirectoryLeaseMode.Pinned);
+        WindowsPathIdentity.RequireDirectChild(
             transactionIdentity,
             updateIdentity,
             "Update must be a direct child of the transaction root.");
-        ValidateOrdinaryFile(archivePath);
+        DeleteOwnedArchive(
+            validatedWorkspace,
+            archivePath,
+            transactionIdentity,
+            updateIdentity);
+    }
+
+    internal static void DeleteOwnedArchive(
+        UpdaterWorkspace workspace,
+        string archivePath,
+        WindowsDirectoryIdentityLease transactionIdentity,
+        WindowsDirectoryIdentityLease updateIdentity)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(transactionIdentity);
+        ArgumentNullException.ThrowIfNull(updateIdentity);
+        var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+            workspace.UpdateDirectory);
+        ValidateArchivePath(archivePath, paths.UpdateDirectory);
+        WindowsPathIdentity.RequireDirectChild(
+            transactionIdentity,
+            updateIdentity,
+            "Update must be a direct child of the transaction root.");
         File.Delete(archivePath);
     }
 
@@ -300,102 +429,101 @@ internal static class UpdateInstaller
             destinationDirectory);
     }
 
-    private static void ExtractToStaging(
-        string archivePath,
+    private static void PrepareStagingForInstall(
+        string installationDirectory,
         UpdaterWorkspace workspace,
         UpdaterTransactionPaths paths,
-        string installationDirectory,
         WindowsDirectoryIdentityLease installationIdentity,
         WindowsDirectoryIdentityLease transactionIdentity,
         string? localApplicationDataRoot,
-        string? commonApplicationDataRoot,
-        Action<string>? afterStagingCreated)
+        string? commonApplicationDataRoot)
     {
-        UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
+        if (!PathEntryExists(paths.StagingDirectory))
+            return;
+
+        if (workspace.IsProtected)
+        {
+            throw new IOException(
+                $"The protected updater staging path already exists: {paths.StagingDirectory}");
+        }
+
+        ValidateDestructivePhase(
+            installationDirectory,
+            workspace,
+            installationIdentity,
+            transactionIdentity,
+            localApplicationDataRoot,
+            commonApplicationDataRoot);
+        using var stagingIdentity = WindowsPathIdentity.OpenExistingDirectory(
             paths.StagingDirectory,
-            workspace.IsProtected);
-        ValidateOwnedDerivedDirectory(
+            nameof(paths.StagingDirectory),
+            WindowsDirectoryLeaseMode.DeleteTarget);
+        DeleteOwnedDerivedDirectory(
             paths.StagingDirectory,
             paths.TransactionRoot,
-            workspace.IsProtected);
-        using (var stagingIdentity = WindowsPathIdentity.OpenExistingDirectory(
-                   paths.StagingDirectory,
-                   nameof(paths.StagingDirectory)))
+            requireProtectedAcl: false,
+            transactionIdentity,
+            stagingIdentity);
+    }
+
+    private static void ExtractToStaging(
+        Stream archiveStream,
+        UpdaterWorkspace workspace,
+        UpdaterTransactionPaths paths,
+        WindowsDirectoryIdentityLease transactionIdentity,
+        WindowsDirectoryIdentityLease stagingIdentity,
+        Action<string>? afterStagingCreated)
+    {
+        afterStagingCreated?.Invoke(paths.StagingDirectory);
+        ValidateHeldDerivedDirectory(
+            paths.StagingDirectory,
+            paths.TransactionRoot,
+            workspace.IsProtected,
+            transactionIdentity,
+            stagingIdentity,
+            "staging must be a direct child of the transaction root.");
+        var stagingRoot = EnsureTrailingSeparator(
+            Path.GetFullPath(paths.StagingDirectory));
+        using var archive = ZipArchive.OpenArchive(archiveStream);
+        foreach (var entry in archive.Entries)
         {
-            RequireDirectPhysicalChild(
+            ValidateHeldDerivedDirectory(
+                paths.StagingDirectory,
+                paths.TransactionRoot,
+                workspace.IsProtected,
                 transactionIdentity,
                 stagingIdentity,
                 "staging must be a direct child of the transaction root.");
-        }
-
-        try
-        {
-            afterStagingCreated?.Invoke(paths.StagingDirectory);
-            var stagingRoot = EnsureTrailingSeparator(
-                Path.GetFullPath(paths.StagingDirectory));
-            using var archive = ZipArchive.OpenArchive(archivePath);
-            foreach (var entry in archive.Entries)
+            var destinationPath = GetValidatedDestinationPath(
+                entry.Key,
+                entry.IsDirectory,
+                stagingRoot);
+            if (entry.IsDirectory)
             {
-                ValidateOwnedDerivedDirectory(
-                    paths.StagingDirectory,
-                    paths.TransactionRoot,
-                    workspace.IsProtected);
-                var destinationPath = GetValidatedDestinationPath(
-                    entry.Key,
-                    entry.IsDirectory,
-                    stagingRoot);
-                if (entry.IsDirectory)
-                {
-                    EnsureExtractedDirectory(
-                        paths.StagingDirectory,
-                        destinationPath,
-                        workspace.IsProtected);
-                    continue;
-                }
-
-                var parent = Path.GetDirectoryName(destinationPath)
-                    ?? throw new InvalidDataException(
-                        "The update entry has no staging parent.");
                 EnsureExtractedDirectory(
                     paths.StagingDirectory,
-                    parent,
-                    workspace.IsProtected);
-                ValidateParentChain(paths.StagingDirectory, destinationPath);
-
-                using var entryStream = entry.OpenEntryStream();
-                using var destinationStream = new FileStream(
                     destinationPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None);
-                entryStream.CopyTo(destinationStream);
-                destinationStream.Flush(flushToDisk: true);
-            }
-        }
-        catch
-        {
-            try
-            {
-                ValidateDestructivePhase(
-                    installationDirectory,
-                    workspace,
-                    installationIdentity,
-                    transactionIdentity,
-                    localApplicationDataRoot,
-                    commonApplicationDataRoot);
-                DeleteOwnedDerivedDirectory(
-                    paths.StagingDirectory,
-                    paths.TransactionRoot,
-                    workspace.IsProtected,
-                    transactionIdentity);
-            }
-            catch (Exception cleanupException)
-            {
-                Console.Error.WriteLine(
-                    $"Updater cleanup failed; preserving the original failure: {cleanupException}");
+                    workspace.IsProtected);
+                continue;
             }
 
-            throw;
+            var parent = Path.GetDirectoryName(destinationPath)
+                ?? throw new InvalidDataException(
+                    "The update entry has no staging parent.");
+            EnsureExtractedDirectory(
+                paths.StagingDirectory,
+                parent,
+                workspace.IsProtected);
+            ValidateParentChain(paths.StagingDirectory, destinationPath);
+
+            using var entryStream = entry.OpenEntryStream();
+            using var destinationStream = new FileStream(
+                destinationPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None);
+            entryStream.CopyTo(destinationStream);
+            destinationStream.Flush(flushToDisk: true);
         }
     }
 
@@ -423,9 +551,18 @@ internal static class UpdateInstaller
                 continue;
             }
 
-            UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
-                current,
-                isProtected);
+            var parent = Path.GetDirectoryName(current)
+                ?? throw new InvalidDataException(
+                    "The extracted updater directory has no parent.");
+            using var parentIdentity =
+                WindowsPathIdentity.OpenExistingDirectory(
+                    parent,
+                    nameof(directoryPath));
+            using var childIdentity =
+                UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
+                    current,
+                    isProtected,
+                    parentIdentity);
         }
     }
 
@@ -496,6 +633,9 @@ internal static class UpdateInstaller
         UpdaterWorkspace workspace,
         WindowsDirectoryIdentityLease installationIdentity,
         WindowsDirectoryIdentityLease transactionIdentity,
+        WindowsDirectoryIdentityLease stagingIdentity,
+        WindowsDirectoryIdentityLease backupRootIdentity,
+        WindowsDirectoryIdentityLease backupIdentity,
         Action<string, string> copyDirectory,
         string? localApplicationDataRoot,
         string? commonApplicationDataRoot)
@@ -509,31 +649,27 @@ internal static class UpdateInstaller
             commonApplicationDataRoot);
         var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
             workspace.UpdateDirectory);
-        ValidateOwnedDerivedDirectory(
+        ValidateHeldDerivedDirectory(
             stagingDirectory,
             paths.TransactionRoot,
-            workspace.IsProtected);
-        ValidateBackupCandidatePath(
-            backupDirectory,
-            paths.BackupRootDirectory);
-        ValidateOwnedDerivedDirectory(
-            backupDirectory,
-            paths.BackupRootDirectory,
-            workspace.IsProtected);
-        using var stagingIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            stagingDirectory,
-            nameof(stagingDirectory));
-        using var backupRootIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            paths.BackupRootDirectory,
-            nameof(paths.BackupRootDirectory));
-        using var backupIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            backupDirectory,
-            nameof(backupDirectory));
-        RequireDirectPhysicalChild(
+            workspace.IsProtected,
             transactionIdentity,
             stagingIdentity,
             "staging must be a direct child of the transaction root.");
-        RequireDirectPhysicalChild(
+        ValidateBackupCandidatePath(
+            backupDirectory,
+            paths.BackupRootDirectory);
+        ValidateHeldDerivedDirectory(
+            paths.BackupRootDirectory,
+            paths.TransactionRoot,
+            workspace.IsProtected,
+            transactionIdentity,
+            backupRootIdentity,
+            "UpdateBackups must be a direct child of the transaction root.");
+        ValidateHeldDerivedDirectory(
+            backupDirectory,
+            paths.BackupRootDirectory,
+            workspace.IsProtected,
             backupRootIdentity,
             backupIdentity,
             "The update backup must be a direct child of UpdateBackups.");
@@ -567,6 +703,8 @@ internal static class UpdateInstaller
                     backupDirectory,
                     installationIdentity,
                     transactionIdentity,
+                    backupRootIdentity,
+                    backupIdentity,
                     copyDirectory,
                     localApplicationDataRoot,
                     commonApplicationDataRoot);
@@ -589,6 +727,8 @@ internal static class UpdateInstaller
         string backupDirectory,
         WindowsDirectoryIdentityLease installationIdentity,
         WindowsDirectoryIdentityLease transactionIdentity,
+        WindowsDirectoryIdentityLease backupRootIdentity,
+        WindowsDirectoryIdentityLease backupIdentity,
         Action<string, string> copyDirectory,
         string? localApplicationDataRoot,
         string? commonApplicationDataRoot)
@@ -611,14 +751,17 @@ internal static class UpdateInstaller
             backupDirectory,
             paths.BackupRootDirectory,
             workspace.IsProtected);
-
-        using var backupRootIdentity = WindowsPathIdentity.OpenExistingDirectory(
+        ValidateHeldDerivedDirectory(
             paths.BackupRootDirectory,
-            nameof(paths.BackupRootDirectory));
-        using var backupIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            paths.TransactionRoot,
+            workspace.IsProtected,
+            transactionIdentity,
+            backupRootIdentity,
+            "UpdateBackups must be a direct child of the transaction root.");
+        ValidateHeldDerivedDirectory(
             backupDirectory,
-            nameof(backupDirectory));
-        RequireDirectPhysicalChild(
+            paths.BackupRootDirectory,
+            workspace.IsProtected,
             backupRootIdentity,
             backupIdentity,
             "The update backup must be a direct child of UpdateBackups.");
@@ -643,61 +786,80 @@ internal static class UpdateInstaller
         copyDirectory(backupDirectory, installationDirectory);
     }
 
-    private static string EnsureBackupRoot(
+    private static WindowsDirectoryIdentityLease OpenOrCreateBackupRoot(
         UpdaterWorkspace workspace,
         UpdaterTransactionPaths paths,
         WindowsDirectoryIdentityLease transactionIdentity)
     {
+        WindowsDirectoryIdentityLease backupRootIdentity;
         if (!PathEntryExists(paths.BackupRootDirectory))
         {
-            UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
+            backupRootIdentity = UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
                 paths.BackupRootDirectory,
-                workspace.IsProtected);
+                workspace.IsProtected,
+                transactionIdentity,
+                WindowsDirectoryLeaseMode.Pinned);
+        }
+        else
+        {
+            backupRootIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                paths.BackupRootDirectory,
+                nameof(paths.BackupRootDirectory),
+                WindowsDirectoryLeaseMode.Pinned);
         }
 
-        ValidateOwnedDerivedDirectory(
-            paths.BackupRootDirectory,
-            paths.TransactionRoot,
-            workspace.IsProtected);
-        using var backupRootIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            paths.BackupRootDirectory,
-            nameof(paths.BackupRootDirectory));
-        RequireDirectPhysicalChild(
-            transactionIdentity,
-            backupRootIdentity,
-            "UpdateBackups must be a direct child of the transaction root.");
-        return paths.BackupRootDirectory;
+        try
+        {
+            ValidateHeldDerivedDirectory(
+                paths.BackupRootDirectory,
+                paths.TransactionRoot,
+                workspace.IsProtected,
+                transactionIdentity,
+                backupRootIdentity,
+                "UpdateBackups must be a direct child of the transaction root.");
+            return backupRootIdentity;
+        }
+        catch
+        {
+            backupRootIdentity.Dispose();
+            throw;
+        }
     }
 
-    private static string CreateBackupCandidate(
+    private static WindowsDirectoryIdentityLease CreateBackupCandidate(
         UpdaterWorkspace workspace,
-        string backupRootDirectory)
+        string backupRootDirectory,
+        WindowsDirectoryIdentityLease backupRootIdentity,
+        out string backupDirectory)
     {
         var timestamp = DateTime.UtcNow.ToString(
             BackupTimestampFormat,
             CultureInfo.InvariantCulture);
-        var backupDirectory = Path.Combine(
+        backupDirectory = Path.Combine(
             backupRootDirectory,
             $"{BackupCandidatePrefix}{timestamp}-{Guid.NewGuid():N}");
-        UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
-            backupDirectory,
-            workspace.IsProtected);
         ValidateBackupCandidatePath(backupDirectory, backupRootDirectory);
-        ValidateOwnedDerivedDirectory(
+        var backupIdentity = UpdaterWorkspaceFactory.CreateOwnedDirectoryFresh(
             backupDirectory,
-            backupRootDirectory,
-            workspace.IsProtected);
-        using var backupRootIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            backupRootDirectory,
-            nameof(backupRootDirectory));
-        using var backupIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            backupDirectory,
-            nameof(backupDirectory));
-        RequireDirectPhysicalChild(
+            workspace.IsProtected,
             backupRootIdentity,
-            backupIdentity,
-            "The update backup must be a direct child of UpdateBackups.");
-        return backupDirectory;
+            WindowsDirectoryLeaseMode.Pinned);
+        try
+        {
+            ValidateHeldDerivedDirectory(
+                backupDirectory,
+                backupRootDirectory,
+                workspace.IsProtected,
+                backupRootIdentity,
+                backupIdentity,
+                "The update backup must be a direct child of UpdateBackups.");
+            return backupIdentity;
+        }
+        catch
+        {
+            backupIdentity.Dispose();
+            throw;
+        }
     }
 
     private static void ValidateRequiredPayload(string stagingDirectory)
@@ -900,43 +1062,61 @@ internal static class UpdateInstaller
             UpdaterWorkspaceSecurity.ValidateProtectedDirectory(fullDirectory);
     }
 
-    private static void DeleteOwnedDerivedDirectory(
+    private static void ValidateHeldDerivedDirectory(
         string directory,
         string expectedParent,
         bool requireProtectedAcl,
-        WindowsDirectoryIdentityLease parentIdentity)
+        WindowsDirectoryIdentityLease parentIdentity,
+        WindowsDirectoryIdentityLease directoryIdentity,
+        string relationshipMessage)
     {
         ValidateOwnedDerivedDirectory(
             directory,
             expectedParent,
             requireProtectedAcl);
-        using (var directoryIdentity = WindowsPathIdentity.OpenExistingDirectory(
-                   directory,
-                   nameof(directory)))
-        {
-            RequireDirectPhysicalChild(
-                parentIdentity,
+        using var currentIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            directory,
+            nameof(directory));
+        WindowsPathIdentity.RequireDirectChild(
+            parentIdentity,
+            directoryIdentity,
+            relationshipMessage);
+        WindowsPathIdentity.RequireDirectChild(
+            parentIdentity,
+            currentIdentity,
+            relationshipMessage);
+        if (!WindowsPathIdentity.IsSameDirectory(
                 directoryIdentity,
-                "The updater cleanup target is not the expected direct child.");
+                currentIdentity))
+        {
+            throw new InvalidOperationException(
+                "The updater derived directory changed after creation.");
         }
-
-        DeleteTree(directory);
     }
 
-    private static void RequireDirectPhysicalChild(
-        WindowsDirectoryIdentityLease parent,
-        WindowsDirectoryIdentityLease child,
-        string message)
+    internal static void DeleteOwnedDerivedDirectory(
+        string directory,
+        string expectedParent,
+        bool requireProtectedAcl,
+        WindowsDirectoryIdentityLease parentIdentity,
+        WindowsDirectoryIdentityLease directoryIdentity)
     {
-        if (WindowsPathIdentity.IsSameDirectory(parent, child)
-            || !WindowsPathIdentity.IsSameOrAncestor(parent, child)
-            || !string.Equals(
-                Path.GetDirectoryName(child.FinalVolumePath),
-                Path.TrimEndingDirectorySeparator(parent.FinalVolumePath),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(message);
-        }
+        ValidateHeldDerivedDirectory(
+            directory,
+            expectedParent,
+            requireProtectedAcl,
+            parentIdentity,
+            directoryIdentity,
+            "The updater cleanup target is not the expected direct child.");
+        ClearDirectory(directory);
+        ValidateHeldDerivedDirectory(
+            directory,
+            expectedParent,
+            requireProtectedAcl,
+            parentIdentity,
+            directoryIdentity,
+            "The updater cleanup target changed before deletion.");
+        directoryIdentity.MarkForDeletion();
     }
 
     private static SafeTree CaptureTree(string root)
@@ -1073,13 +1253,6 @@ internal static class UpdateInstaller
         ValidateOrdinaryDirectory(recheckedTree.Root);
         if (Directory.EnumerateFileSystemEntries(recheckedTree.Root).Any())
             throw new InvalidDataException("The updater directory was not cleared.");
-    }
-
-    private static void DeleteTree(string directory)
-    {
-        ClearDirectory(directory);
-        ValidateOrdinaryDirectory(directory);
-        Directory.Delete(directory, recursive: false);
     }
 
     private static string GetSafeRelativePath(string root, string path)

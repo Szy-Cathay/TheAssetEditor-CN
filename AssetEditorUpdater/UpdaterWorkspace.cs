@@ -164,7 +164,9 @@ internal static class UpdaterWorkspaceFactory
             {
                 try
                 {
-                    CleanupFreshProtectedTransaction(layout);
+                    CleanupFreshProtectedTransaction(
+                        layout,
+                        allowUpdatePayload: false);
                 }
                 catch (Exception cleanupException)
                 {
@@ -234,6 +236,39 @@ internal static class UpdaterWorkspaceFactory
             layout.TransactionRoot,
             layout.UpdateDirectory,
             layout.IsProtected);
+    }
+
+    internal static void CleanupFreshProtectedTransaction(
+        UpdaterWorkspace workspace,
+        string? localApplicationDataRoot = null,
+        string? commonApplicationDataRoot = null)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        if (!workspace.IsProtected)
+        {
+            throw new InvalidOperationException(
+                "Only a fresh protected updater transaction can be removed.");
+        }
+
+        var layout = GetExistingLayout(
+            true,
+            workspace.UpdateDirectory,
+            localApplicationDataRoot,
+            commonApplicationDataRoot);
+        if (!PathsEqual(
+                workspace.TransactionRoot,
+                layout.TransactionRoot)
+            || !PathsEqual(
+                workspace.UpdateDirectory,
+                layout.UpdateDirectory))
+        {
+            throw new InvalidOperationException(
+                "The supplied updater workspace does not match the protected transaction.");
+        }
+
+        CleanupFreshProtectedTransaction(
+            layout,
+            allowUpdatePayload: true);
     }
 
     internal static void CreateOwnedDirectoryFresh(
@@ -517,7 +552,8 @@ internal static class UpdaterWorkspaceFactory
     }
 
     private static void CleanupFreshProtectedTransaction(
-        UpdaterWorkspaceLayout layout)
+        UpdaterWorkspaceLayout layout,
+        bool allowUpdatePayload)
     {
         ValidateOwnedTransactionRoot(
             layout,
@@ -540,22 +576,58 @@ internal static class UpdaterWorkspaceFactory
                 "The fresh updater transaction contains an unexpected cleanup entry.");
         }
 
+        var protectedParent = Path.GetDirectoryName(paths.TransactionRoot)
+            ?? throw new InvalidDataException(
+                "The protected updater transaction has no parent.");
+        using var protectedParentIdentity =
+            WindowsPathIdentity.OpenExistingDirectory(
+                protectedParent,
+                nameof(layout),
+                WindowsDirectoryLeaseMode.Pinned);
+        using var transactionIdentity =
+            WindowsPathIdentity.OpenExistingDirectory(
+                paths.TransactionRoot,
+                nameof(layout),
+                WindowsDirectoryLeaseMode.DeleteTarget);
+        WindowsPathIdentity.RequireDirectChild(
+            protectedParentIdentity,
+            transactionIdentity,
+            "The updater cleanup transaction is not the expected direct child.");
+
         if (PathEntryExists(paths.UpdateDirectory))
         {
             UpdaterWorkspaceSecurity.ValidateProtectedDirectory(
                 paths.UpdateDirectory);
-            if (Directory.EnumerateFileSystemEntries(paths.UpdateDirectory).Any())
+            if (!allowUpdatePayload
+                && Directory.EnumerateFileSystemEntries(
+                    paths.UpdateDirectory).Any())
             {
                 throw new InvalidDataException(
                     "The fresh updater Update directory is not empty.");
             }
 
-            Directory.Delete(paths.UpdateDirectory, recursive: false);
+            using var updateIdentity =
+                WindowsPathIdentity.OpenExistingDirectory(
+                    paths.UpdateDirectory,
+                    nameof(layout),
+                    WindowsDirectoryLeaseMode.DeleteTarget);
+            UpdateInstaller.DeleteOwnedDerivedDirectory(
+                paths.UpdateDirectory,
+                paths.TransactionRoot,
+                requireProtectedAcl: true,
+                transactionIdentity,
+                updateIdentity);
         }
 
         ValidateTransactionMarker(layout, paths.MarkerPath);
         File.Delete(paths.MarkerPath);
-        Directory.Delete(paths.TransactionRoot, recursive: false);
+        if (Directory.EnumerateFileSystemEntries(paths.TransactionRoot).Any())
+        {
+            throw new InvalidDataException(
+                "The fresh updater transaction changed during cleanup.");
+        }
+
+        transactionIdentity.MarkForDeletion();
     }
 
     private static void ValidateOwnedTransactionRoot(

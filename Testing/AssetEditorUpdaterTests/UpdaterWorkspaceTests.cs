@@ -828,6 +828,72 @@ public class UpdaterWorkspaceTests
         }
     }
 
+    [Test]
+    public void CleanupFreshProtectedTransaction_DeletesOnlyCurrentPayloadTransaction()
+    {
+        if (!UpdaterWorkspaceFactory.IsProcessElevated())
+        {
+            Assert.Ignore(
+                "Protected workspace cleanup requires an elevated Windows token.");
+        }
+
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Path.Combine(root, "local");
+            var commonRoot = Directory.CreateDirectory(
+                Path.Combine(root, "common")).FullName;
+            var current = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    true,
+                    Guid.NewGuid(),
+                    localRoot,
+                    commonRoot));
+            var sibling = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    true,
+                    Guid.NewGuid(),
+                    localRoot,
+                    commonRoot));
+            var nestedDirectory = Directory.CreateDirectory(
+                Path.Combine(
+                    current.UpdateDirectory,
+                    "runtimes",
+                    "win-x64")).FullName;
+            File.WriteAllText(
+                Path.Combine(current.UpdateDirectory, "AssetEditor.CN.Updater.exe"),
+                "updater");
+            File.WriteAllText(
+                Path.Combine(nestedDirectory, "native.dll"),
+                "native");
+
+            UpdaterWorkspaceFactory.CleanupFreshProtectedTransaction(
+                current,
+                localRoot,
+                commonRoot);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    Directory.Exists(current.TransactionRoot),
+                    Is.False);
+                Assert.That(
+                    Directory.Exists(sibling.TransactionRoot),
+                    Is.True);
+                Assert.DoesNotThrow(() =>
+                    UpdaterWorkspaceFactory.ValidateExisting(
+                        true,
+                        sibling.UpdateDirectory,
+                        localRoot,
+                        commonRoot));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static bool IsInheritableFullControlAllow(FileSystemAccessRule rule)
     {
         return rule.AccessControlType == AccessControlType.Allow
