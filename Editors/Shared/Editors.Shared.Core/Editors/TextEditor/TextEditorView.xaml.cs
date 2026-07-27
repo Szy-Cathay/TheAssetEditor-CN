@@ -30,20 +30,41 @@ namespace CommonControls.Editors.TextEditor
     {
         FoldingManager _foldingManager;
         object _foldingStrategy;
+        private readonly DispatcherTimer _foldingUpdateTimer;
+
+        internal bool IsFoldingTimerEnabled => _foldingUpdateTimer.IsEnabled;
 
         public TextEditorView()
         {
             InitializeComponent();
 
             DataContextChanged += TextEditorView_DataContextChanged;
+            Loaded += TextEditorView_Loaded;
+            Unloaded += TextEditorView_Unloaded;
 
             SetValue(TextOptions.TextFormattingModeProperty, TextFormattingMode.Display);
             SearchPanel.Install(textEditor);
 
-            DispatcherTimer foldingUpdateTimer = new DispatcherTimer();
-            foldingUpdateTimer.Interval = TimeSpan.FromSeconds(2);
-            foldingUpdateTimer.Tick += delegate { UpdateFoldings(); };
-            foldingUpdateTimer.Start();
+            _foldingUpdateTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+            _foldingUpdateTimer.Tick += FoldingUpdateTimer_Tick;
+        }
+
+        private void TextEditorView_Loaded(object sender, RoutedEventArgs e)
+        {
+            _foldingUpdateTimer.Start();
+        }
+
+        private void TextEditorView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _foldingUpdateTimer.Stop();
+        }
+
+        private void FoldingUpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            UpdateFoldings();
         }
 
         public void ClearUndoStack()
