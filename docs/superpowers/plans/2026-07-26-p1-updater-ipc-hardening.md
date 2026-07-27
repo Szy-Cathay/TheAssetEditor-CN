@@ -349,6 +349,16 @@ Cleanup must enumerate only the fixed protected `UpdaterTransactions` parent.
 Before deleting a child, validate its GUID name, marker, canonical containment,
 owner, ACL, and non-reparse status. Invalid children are logged and preserved.
 
+**Tracked implementation amendment (Task 4a/4b):** Do not automatically
+enumerate or delete sibling protected transactions in either Task 4a or Task
+4b. The updater does not yet have a retention/completion policy, a
+per-transaction active lease, or a parent-wide lock, so age-based sibling
+cleanup cannot distinguish stale data from an active or recoverable
+transaction. These batches may perform only narrow cleanup of the current
+validated transaction or one of its derived children. Automatic stale
+transaction cleanup remains a separate Task 4c specification and must not be
+reported as implemented by Task 4a or Task 4b.
+
 - [ ] **Step 5: Run all updater tests GREEN**
 
 ```powershell

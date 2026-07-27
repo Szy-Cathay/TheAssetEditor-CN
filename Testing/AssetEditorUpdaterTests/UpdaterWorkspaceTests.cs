@@ -1,5 +1,6 @@
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text;
 using AssetEditorUpdater;
 using UpdaterProgram = AssetEditorUpdater.AssetEditorUpdater;
 
@@ -97,12 +98,12 @@ public class UpdaterWorkspaceTests
                 Guid.Empty,
                 localRoot,
                 commonRoot);
-            Directory.CreateDirectory(layout.UpdateDirectory);
+            var workspace = UpdaterWorkspaceFactory.Create(layout);
 
             Assert.DoesNotThrow(() =>
                 UpdateInstaller.ValidateDirectoryLayout(
                     installationDirectory,
-                    layout.UpdateDirectory,
+                    workspace.UpdateDirectory,
                     false,
                     localRoot,
                     commonRoot));
@@ -140,14 +141,14 @@ public class UpdaterWorkspaceTests
                 Guid.Empty,
                 localRoot,
                 commonRoot);
-            Directory.CreateDirectory(layout.UpdateDirectory);
+            var workspace = UpdaterWorkspaceFactory.Create(layout);
             var installationDirectory = Directory.CreateDirectory(
-                Path.Combine(layout.TransactionRoot, "installation")).FullName;
+                Path.Combine(workspace.TransactionRoot, "installation")).FullName;
 
             Assert.Throws<InvalidOperationException>(() =>
                 UpdateInstaller.ValidateDirectoryLayout(
                     installationDirectory,
-                    layout.UpdateDirectory,
+                    workspace.UpdateDirectory,
                     false,
                     localRoot,
                     commonRoot));
@@ -172,7 +173,7 @@ public class UpdaterWorkspaceTests
                 Guid.Empty,
                 localRoot,
                 commonRoot);
-            Directory.CreateDirectory(localLayout.UpdateDirectory);
+            var localWorkspace = UpdaterWorkspaceFactory.Create(localLayout);
             var lookalikeUpdateDirectory = Directory.CreateDirectory(
                 Path.Combine(
                     root,
@@ -187,7 +188,7 @@ public class UpdaterWorkspaceTests
                 Assert.Throws<ArgumentException>(() =>
                     UpdateInstaller.ValidateDirectoryLayout(
                         installationDirectory,
-                        localLayout.UpdateDirectory,
+                        localWorkspace.UpdateDirectory,
                         true,
                         localRoot,
                         commonRoot));
@@ -334,6 +335,14 @@ public class UpdaterWorkspaceTests
             {
                 Assert.That(Directory.Exists(workspace.TransactionRoot), Is.True);
                 Assert.That(Directory.Exists(workspace.UpdateDirectory), Is.True);
+                Assert.That(
+                    File.ReadAllBytes(Path.Combine(
+                        workspace.TransactionRoot,
+                        UpdaterWorkspaceFactory.TransactionMarkerFileName)),
+                    Is.EqualTo(Encoding.UTF8.GetBytes(
+                        "AssetEditor.CN updater transaction v1\n"
+                        + "mode=local\n"
+                        + "id=00000000000000000000000000000000\n")));
                 Assert.That(workspace.TransactionRoot, Is.EqualTo(layout.TransactionRoot));
                 Assert.That(workspace.UpdateDirectory, Is.EqualTo(layout.UpdateDirectory));
                 Assert.That(workspace.IsProtected, Is.False);
@@ -342,6 +351,333 @@ public class UpdaterWorkspaceTests
         finally
         {
             Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void GetTransactionPaths_DerivesUpdateStagingAndBackupsAsRootSiblings()
+    {
+        var transactionRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"transaction-{Guid.NewGuid():N}");
+        var updateDirectory = Path.Combine(transactionRoot, "Update");
+
+        var paths = UpdaterWorkspaceFactory.GetTransactionPaths(updateDirectory);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(paths.TransactionRoot, Is.EqualTo(Path.GetFullPath(transactionRoot)));
+            Assert.That(paths.UpdateDirectory, Is.EqualTo(Path.GetFullPath(updateDirectory)));
+            Assert.That(paths.StagingDirectory, Is.EqualTo(Path.Combine(transactionRoot, "staging")));
+            Assert.That(paths.BackupRootDirectory, Is.EqualTo(Path.Combine(transactionRoot, "UpdateBackups")));
+            Assert.That(
+                paths.MarkerPath,
+                Is.EqualTo(Path.Combine(
+                    transactionRoot,
+                    ".asset-editor-cn-updater-transaction")));
+            Assert.That(
+                UpdateInstaller.GetBackupRootDirectory(updateDirectory),
+                Is.EqualTo(paths.BackupRootDirectory));
+        });
+    }
+
+    [Test]
+    public void Create_LocalLegacyWorkspaceCreatesMissingMarkerOnce()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Path.Combine(root, "local");
+            var commonRoot = Path.Combine(root, "common");
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                localRoot,
+                commonRoot);
+            Directory.CreateDirectory(layout.UpdateDirectory);
+            var preservedPath = Path.Combine(layout.UpdateDirectory, "preserve.txt");
+            File.WriteAllText(preservedPath, "preserve");
+
+            var first = UpdaterWorkspaceFactory.Create(layout);
+            var markerPath = Path.Combine(
+                first.TransactionRoot,
+                UpdaterWorkspaceFactory.TransactionMarkerFileName);
+            var firstBytes = File.ReadAllBytes(markerPath);
+            var second = UpdaterWorkspaceFactory.Create(layout);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(second, Is.EqualTo(first));
+                Assert.That(File.ReadAllBytes(markerPath), Is.EqualTo(firstBytes));
+                Assert.That(File.ReadAllText(preservedPath), Is.EqualTo("preserve"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Create_LocalLegacyWorkspaceDoesNotRepairWrongMarker()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                Path.Combine(root, "local"),
+                Path.Combine(root, "common"));
+            Directory.CreateDirectory(layout.UpdateDirectory);
+            var markerPath = Path.Combine(
+                layout.TransactionRoot,
+                UpdaterWorkspaceFactory.TransactionMarkerFileName);
+            var wrongBytes = Encoding.UTF8.GetBytes("wrong marker\n");
+            File.WriteAllBytes(markerPath, wrongBytes);
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterWorkspaceFactory.Create(layout));
+
+            Assert.That(File.ReadAllBytes(markerPath), Is.EqualTo(wrongBytes));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateOwnedTransactionRoot_MissingMarkerIsRejected()
+    {
+        var owned = CreateLocalWorkspace();
+        try
+        {
+            File.Delete(owned.MarkerPath);
+            var sentinelPath = Path.Combine(owned.Workspace.UpdateDirectory, "preserve.txt");
+            File.WriteAllText(sentinelPath, "preserve");
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterWorkspaceFactory.ValidateOwnedTransactionRoot(
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [TestCase(
+        "AssetEditor.CN updater transaction v2\nmode=local\nid=00000000000000000000000000000000\n")]
+    [TestCase(
+        "AssetEditor.CN updater transaction v1\nmode=protected\nid=00000000000000000000000000000000\n")]
+    [TestCase(
+        "AssetEditor.CN updater transaction v1\nmode=local\nid=11111111111111111111111111111111\n")]
+    public void ValidateOwnedTransactionRoot_WrongVersionModeOrIdIsRejected(string markerContents)
+    {
+        var owned = CreateLocalWorkspace();
+        try
+        {
+            File.WriteAllBytes(owned.MarkerPath, Encoding.UTF8.GetBytes(markerContents));
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterWorkspaceFactory.ValidateOwnedTransactionRoot(
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateOwnedTransactionRoot_TruncatedMarkerIsRejected()
+    {
+        var owned = CreateLocalWorkspace();
+        try
+        {
+            var expectedBytes = File.ReadAllBytes(owned.MarkerPath);
+            File.WriteAllBytes(owned.MarkerPath, expectedBytes[..^1]);
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterWorkspaceFactory.ValidateOwnedTransactionRoot(
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateOwnedTransactionRoot_RequiresExclusiveMarkerRead()
+    {
+        var owned = CreateLocalWorkspace();
+        try
+        {
+            using var competingHandle = new FileStream(
+                owned.MarkerPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite);
+
+            Assert.Throws<IOException>(() =>
+                UpdaterWorkspaceFactory.ValidateOwnedTransactionRoot(
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateOwnedTransactionRoot_MarkerReparsePointIsRejected()
+    {
+        var owned = CreateLocalWorkspace();
+        var targetPath = Path.Combine(owned.Root, "marker-target");
+        try
+        {
+            var markerBytes = File.ReadAllBytes(owned.MarkerPath);
+            File.Delete(owned.MarkerPath);
+            File.WriteAllBytes(targetPath, markerBytes);
+            TryCreateFileSymbolicLinkOrIgnore(owned.MarkerPath, targetPath);
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterWorkspaceFactory.ValidateOwnedTransactionRoot(
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            if (File.Exists(owned.MarkerPath))
+                File.Delete(owned.MarkerPath);
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [TestCase("staging")]
+    [TestCase("UpdateBackups")]
+    public void ValidateOwnedTransactionRoot_DerivedDirectoryReparsePointIsRejected(
+        string directoryName)
+    {
+        var owned = CreateLocalWorkspace();
+        var linkedPath = Path.Combine(owned.Workspace.TransactionRoot, directoryName);
+        try
+        {
+            var targetPath = Directory.CreateDirectory(
+                Path.Combine(owned.Root, $"{directoryName}-target")).FullName;
+            TryCreateDirectorySymbolicLinkOrIgnore(linkedPath, targetPath);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdaterWorkspaceFactory.ValidateOwnedTransactionRoot(
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            if (Directory.Exists(linkedPath))
+                Directory.Delete(linkedPath);
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [Test]
+    public void GetExistingLayout_ProtectedTransactionLeafMustBeLowercaseGuidN()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Path.Combine(root, "local");
+            var commonRoot = Path.Combine(root, "common");
+            var transactionId = Guid.NewGuid();
+            var layout = UpdaterWorkspaceFactory.GetLayout(
+                true,
+                transactionId,
+                localRoot,
+                commonRoot);
+            var uppercaseUpdateDirectory = Path.Combine(
+                Path.GetDirectoryName(layout.TransactionRoot)!,
+                transactionId.ToString("N").ToUpperInvariant(),
+                "Update");
+
+            Assert.Throws<ArgumentException>(() =>
+                UpdaterWorkspaceFactory.GetExistingLayout(
+                    true,
+                    uppercaseUpdateDirectory,
+                    localRoot,
+                    commonRoot));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [TestCase("installation-inside-transaction")]
+    [TestCase("transaction-inside-installation")]
+    public void ValidateDirectoryLayout_LexicalOverlapIsRejectedBeforeMarkerRead(string overlap)
+    {
+        var owned = CreateLocalWorkspace();
+        try
+        {
+            var installationDirectory = overlap == "installation-inside-transaction"
+                ? Directory.CreateDirectory(
+                    Path.Combine(owned.Workspace.TransactionRoot, "installation")).FullName
+                : owned.LocalRoot;
+            File.WriteAllText(owned.MarkerPath, "wrong marker");
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdateInstaller.ValidateDirectoryLayout(
+                    installationDirectory,
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            Directory.Delete(owned.Root, true);
+        }
+    }
+
+    [Test]
+    public void ValidateDirectoryLayout_PhysicalOverlapIsRejectedBeforeMarkerRead()
+    {
+        var owned = CreateLocalWorkspace();
+        try
+        {
+            File.WriteAllText(owned.MarkerPath, "wrong marker");
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdateInstaller.ValidateDirectoryLayout(
+                    ToExtendedDosPath(owned.Workspace.TransactionRoot),
+                    owned.Workspace.UpdateDirectory,
+                    false,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+        }
+        finally
+        {
+            Directory.Delete(owned.Root, true);
         }
     }
 
@@ -459,14 +795,23 @@ public class UpdaterWorkspaceTests
                 commonRoot);
 
             var workspace = UpdaterWorkspaceFactory.Create(layout);
+            var expectedMarker = Encoding.UTF8.GetBytes(
+                "AssetEditor.CN updater transaction v1\n"
+                + "mode=protected\n"
+                + $"id={Path.GetFileName(workspace.TransactionRoot)}\n");
 
             Assert.Multiple(() =>
             {
                 Assert.That(Directory.Exists(workspace.UpdateDirectory), Is.True);
                 Assert.That(workspace.IsProtected, Is.True);
+                Assert.That(
+                    File.ReadAllBytes(Path.Combine(
+                        workspace.TransactionRoot,
+                        UpdaterWorkspaceFactory.TransactionMarkerFileName)),
+                    Is.EqualTo(expectedMarker));
                 Assert.DoesNotThrow(() =>
                     UpdateInstaller.ValidateDirectoryLayout(
-                        Path.Combine(root, "installation"),
+                        Directory.CreateDirectory(Path.Combine(root, "installation")).FullName,
                         workspace.UpdateDirectory,
                         true,
                         Path.Combine(root, "local"),
@@ -502,4 +847,75 @@ public class UpdaterWorkspaceTests
         return Directory.CreateDirectory(
             Path.Combine(Path.GetTempPath(), $"UpdaterWorkspaceTests-{Guid.NewGuid():N}")).FullName;
     }
+
+    private static OwnedLocalWorkspace CreateLocalWorkspace()
+    {
+        var root = CreateTemporaryDirectory();
+        var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+        var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+        var workspace = UpdaterWorkspaceFactory.Create(
+            UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                localRoot,
+                commonRoot));
+        var markerPath = Path.Combine(
+            workspace.TransactionRoot,
+            UpdaterWorkspaceFactory.TransactionMarkerFileName);
+        return new OwnedLocalWorkspace(
+            root,
+            localRoot,
+            commonRoot,
+            workspace,
+            markerPath);
+    }
+
+    private static void TryCreateFileSymbolicLinkOrIgnore(string path, string targetPath)
+    {
+        try
+        {
+            File.CreateSymbolicLink(path, targetPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("Creating file symbolic links is not permitted on this machine.");
+        }
+        catch (PlatformNotSupportedException)
+        {
+            Assert.Ignore("File symbolic links are not supported on this machine.");
+        }
+    }
+
+    private static void TryCreateDirectorySymbolicLinkOrIgnore(
+        string path,
+        string targetPath)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(path, targetPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("Creating directory symbolic links is not permitted on this machine.");
+        }
+        catch (PlatformNotSupportedException)
+        {
+            Assert.Ignore("Directory symbolic links are not supported on this machine.");
+        }
+    }
+
+    private static string ToExtendedDosPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return fullPath.StartsWith(@"\\", StringComparison.Ordinal)
+            ? @"\\?\UNC\" + fullPath[2..]
+            : @"\\?\" + fullPath;
+    }
+
+    private sealed record OwnedLocalWorkspace(
+        string Root,
+        string LocalRoot,
+        string CommonRoot,
+        UpdaterWorkspace Workspace,
+        string MarkerPath);
 }

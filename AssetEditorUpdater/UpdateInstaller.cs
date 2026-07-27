@@ -8,7 +8,6 @@ internal static class UpdateInstaller
     private const string UpdaterExe = "AssetEditor.CN.Updater.exe";
     private const string ArchiveRoot = "AssetEditor.CN/";
     private const string BackupDirectoryName = "UpdateBackup";
-    private const string BackupRootDirectoryName = "UpdateBackups";
     internal const string BackupRootMarkerFileName = ".asset-editor-cn-updater-backups";
     private const string BackupRootMarkerContents = "AssetEditor.CN updater backup root v1";
     private const string StagingDirectoryName = "staging";
@@ -73,12 +72,9 @@ internal static class UpdateInstaller
 
     internal static string GetBackupRootDirectory(string updateDirectory)
     {
-        var fullUpdatePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(updateDirectory));
-        var parentDirectory = Path.GetDirectoryName(fullUpdatePath);
-        if (string.IsNullOrEmpty(parentDirectory))
-            throw new InvalidOperationException("The update directory must have a parent directory.");
-
-        return Path.Combine(parentDirectory, BackupRootDirectoryName);
+        return UpdaterWorkspaceFactory
+            .GetTransactionPaths(updateDirectory)
+            .BackupRootDirectory;
     }
 
     internal static void ValidateDirectoryLayout(string installationDirectory, string updateDirectory)
@@ -96,17 +92,22 @@ internal static class UpdateInstaller
         string? localApplicationDataRoot = null,
         string? commonApplicationDataRoot = null)
     {
-        var workspace = UpdaterWorkspaceFactory.ValidateExisting(
+        var layout = UpdaterWorkspaceFactory.GetExistingLayout(
             isElevated,
             updateDirectory,
             localApplicationDataRoot,
             commonApplicationDataRoot);
+        var transactionPaths = UpdaterWorkspaceFactory.GetTransactionPaths(
+            layout.UpdateDirectory);
+
         ValidateDirectoryLayout(
             installationDirectory,
-            workspace.UpdateDirectory,
-            GetBackupRootDirectory(workspace.UpdateDirectory));
+            transactionPaths.UpdateDirectory,
+            transactionPaths.BackupRootDirectory);
 
-        if (DirectoriesOverlap(installationDirectory, workspace.TransactionRoot))
+        if (DirectoriesOverlap(
+                installationDirectory,
+                transactionPaths.TransactionRoot))
         {
             throw new InvalidOperationException(
                 "The updater transaction root must not overlap the installation directory.");
@@ -116,14 +117,14 @@ internal static class UpdateInstaller
             installationDirectory,
             nameof(installationDirectory));
         using var transactionIdentity = WindowsPathIdentity.OpenExistingDirectory(
-            workspace.TransactionRoot,
-            nameof(workspace.TransactionRoot));
+            transactionPaths.TransactionRoot,
+            nameof(transactionPaths.TransactionRoot));
         WindowsPathIdentity.RequireDisjoint(
             installationIdentity,
             transactionIdentity,
             "The updater transaction root must not overlap the installation directory.");
 
-        return workspace;
+        return UpdaterWorkspaceFactory.ValidateExisting(layout);
     }
 
     private static void ValidateDirectoryLayout(

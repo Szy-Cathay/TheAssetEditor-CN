@@ -37,11 +37,13 @@ namespace AssetEditorUpdater
             else
             {
                 var updateDirectory = invocation.UpdateDirectory!;
-                UpdateInstaller.ValidateDirectoryLayout(
+                var workspace = UpdateInstaller.ValidateDirectoryLayout(
                     invocation.InstallationDirectory,
                     updateDirectory,
                     UpdaterWorkspaceFactory.IsProcessElevated());
-                await UpdateAsync(invocation.InstallationDirectory, updateDirectory);
+                await UpdateAsync(
+                    invocation.InstallationDirectory,
+                    workspace.UpdateDirectory);
             }
         }
 
