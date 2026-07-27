@@ -807,24 +807,17 @@ namespace GameWorld.Core.Components.Gizmo
                         }
                         else
                         {
-                            switch (ActiveAxis)
-                            {
-                                case GizmoAxis.X:
-                                    direction = _rotationMatrix.Right;
-                                    break;
-                                case GizmoAxis.Y:
-                                    direction = _rotationMatrix.Up;
-                                    break;
-                                case GizmoAxis.Z:
-                                    direction = _rotationMatrix.Forward;
-                                    break;
-                                default:
-                                    direction = Vector3.UnitX;
-                                    break;
-                            }
+                            var translation = CreateNumericTranslation(
+                                _rotationMatrix.Right,
+                                _rotationMatrix.Up,
+                                _rotationMatrix.Forward,
+                                ActiveAxis,
+                                _numericValue);
+                            ApplyModalTranslationFromInitial(translation);
+                            break;
                         }
-                        Vector3 translation = direction * _numericValue;
-                        ApplyModalTranslationFromInitial(translation);
+
+                        ApplyModalTranslationFromInitial(direction * _numericValue);
                         break;
                     }
                 case GizmoMode.Rotate:
@@ -1209,39 +1202,14 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         private void ApplyModalScaleFromInitial(float scaleFactor)
         {
-            if (scaleFactor == 0)
+            if (!float.IsFinite(scaleFactor))
             {
                 ReplacePreviewFromInitialRequested?.Invoke(
                     ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
             }
 
-            // Ensure scale doesn't go negative or zero
-            scaleFactor = Math.Max(0.001f, scaleFactor);
-
-            Vector3 scale;
-            if (ActiveAxis == GizmoAxis.None)
-            {
-                // Uniform scale
-                scale = new Vector3(scaleFactor - 1.0f, scaleFactor - 1.0f, scaleFactor - 1.0f);
-            }
-            else
-            {
-                // Non-uniform scale on specific axis
-                scale = Vector3.Zero;
-                switch (ActiveAxis)
-                {
-                    case GizmoAxis.X:
-                        scale = new Vector3(scaleFactor - 1.0f, 0, 0);
-                        break;
-                    case GizmoAxis.Y:
-                        scale = new Vector3(0, scaleFactor - 1.0f, 0);
-                        break;
-                    case GizmoAxis.Z:
-                        scale = new Vector3(0, 0, scaleFactor - 1.0f);
-                        break;
-                }
-            }
+            var scale = CreateModalScaleDelta(scaleFactor, ActiveAxis);
 
             if (scale == Vector3.Zero)
             {
@@ -1252,6 +1220,41 @@ namespace GameWorld.Core.Components.Gizmo
 
             ReplacePreviewFromInitialRequested?.Invoke(
                 ModalPreviewReplacement.Scale(scale, ActivePivot));
+        }
+
+        internal static Vector3 CreateModalScaleDelta(float scaleFactor, GizmoAxis axis)
+        {
+            var delta = scaleFactor - 1f;
+            return axis switch
+            {
+                GizmoAxis.X => new Vector3(delta, 0, 0),
+                GizmoAxis.Y => new Vector3(0, delta, 0),
+                GizmoAxis.Z => new Vector3(0, 0, delta),
+                GizmoAxis.YZ => new Vector3(0, delta, delta),
+                GizmoAxis.XZ => new Vector3(delta, 0, delta),
+                GizmoAxis.XY => new Vector3(delta, delta, 0),
+                _ => new Vector3(delta)
+            };
+        }
+
+        internal static Vector3 CreateNumericTranslation(
+            Vector3 right,
+            Vector3 up,
+            Vector3 forward,
+            GizmoAxis axis,
+            float value)
+        {
+            var direction = axis switch
+            {
+                GizmoAxis.X => right,
+                GizmoAxis.Y => up,
+                GizmoAxis.Z => forward,
+                GizmoAxis.YZ => up + forward,
+                GizmoAxis.XZ => right + forward,
+                GizmoAxis.XY => right + up,
+                _ => right
+            };
+            return direction * value;
         }
 
         private void UpdateGizmoVisuals()

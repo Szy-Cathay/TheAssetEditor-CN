@@ -6,6 +6,7 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.Services;
+using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Serilog;
 using Shared.Core.ErrorHandling;
@@ -271,8 +272,12 @@ namespace GameWorld.Core.Components.Gizmo
                 CancelTransform();
 
             ResetGestureState();
-            if (_selectionState is FaceSelectionState or EdgeSelectionState)
+            if (_selectionState is FaceSelectionState or EdgeSelectionState &&
+                _falloffDistance > 0.0f &&
+                _falloffWeights == null)
+            {
                 ComputeFalloffWeights();
+            }
             if (_selectionState is BoneSelectionState)
             {
                 var boneCommand = _commandFactory.Create<TransformBoneCommand>()
@@ -1295,6 +1300,10 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         public void SetFalloffDistance(float distance)
         {
+            distance = Math.Max(0.0f, distance);
+            if (_falloffDistance == distance)
+                return;
+
             _falloffDistance = distance;
             if (!IsTransformActive)
                 ComputeFalloffWeights();
@@ -1306,6 +1315,7 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         void ComputeFalloffWeights()
         {
+            _falloffWeights = null;
             if (_faceVertexIndices == null || _faceVertexIndices.Count == 0 || _falloffDistance <= 0 || _effectedObjects == null || _effectedObjects.Count == 0)
                 return;
 
@@ -1314,17 +1324,17 @@ namespace GameWorld.Core.Components.Gizmo
             var vertexArray = geo.VertexArray;
             var vertCount = geo.VertexCount();
 
-            // Pre-compute selected vertex positions
             var selectedPositions = new Vector3[_faceVertexIndices.Count];
-            int idx = 0;
+            var selectedPositionIndex = 0;
             foreach (var vertIdx in _faceVertexIndices)
             {
                 var pos = vertexArray[vertIdx].Position;
-                selectedPositions[idx++] = new Vector3(pos.X, pos.Y, pos.Z);
+                selectedPositions[selectedPositionIndex++] =
+                    new Vector3(pos.X, pos.Y, pos.Z);
             }
 
-            // Compute weights for all vertices
-            for (int i = 0; i < vertCount; i++)
+            var nearestPointSearch = new NearestPointSearch(selectedPositions);
+            for (var i = 0; i < vertCount; i++)
             {
                 if (_faceVertexIndices.Contains(i))
                 {
@@ -1334,18 +1344,13 @@ namespace GameWorld.Core.Components.Gizmo
                 {
                     var pos = vertexArray[i].Position;
                     var currentPos = new Vector3(pos.X, pos.Y, pos.Z);
-                    float minDist = float.MaxValue;
-                    for (int j = 0; j < selectedPositions.Length; j++)
-                    {
-                        var dx = currentPos.X - selectedPositions[j].X;
-                        var dy = currentPos.Y - selectedPositions[j].Y;
-                        var dz = currentPos.Z - selectedPositions[j].Z;
-                        var distSq = dx * dx + dy * dy + dz * dz;
-                        if (distSq < minDist) minDist = distSq;
-                    }
-                    var dist = MathF.Sqrt(minDist);
-                    if (dist <= _falloffDistance)
-                        _falloffWeights[i] = 1.0f - dist / _falloffDistance;
+                    var distanceSquared =
+                        nearestPointSearch.FindNearestDistanceSquared(currentPos);
+                    var weight = ProportionalEditingMath.CalculateLinearWeight(
+                        distanceSquared,
+                        _falloffDistance);
+                    if (weight > 0.0f)
+                        _falloffWeights[i] = weight;
                 }
             }
         }

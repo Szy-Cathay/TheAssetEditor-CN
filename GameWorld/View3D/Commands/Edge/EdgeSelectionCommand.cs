@@ -17,7 +17,8 @@ namespace GameWorld.Core.Commands.Edge
         List<(int v0, int v1)> _selectedEdges;
 
         public string HintText { get => "Select Edge"; }
-        public bool IsMutation { get => false; }
+        public bool IsMutation { get => true; }
+        public bool AffectsDocument => false;
 
         public void Configure(List<(int v0, int v1)> selectedEdges, bool isAdd, bool isRemove)
         {

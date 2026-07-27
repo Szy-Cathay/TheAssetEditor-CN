@@ -146,8 +146,10 @@ namespace GameWorld.Core.WpfWindow.Input
                         _mouseState = new MouseState(_mouseState.X, _mouseState.Y, _mouseState.ScrollWheelValue,
                             (ButtonState)e.LeftButton, (ButtonState)e.MiddleButton, (ButtonState)e.RightButton, (ButtonState)e.XButton1,
                             (ButtonState)e.XButton2);
-                        // only release if LeftMouse is up
-                        if (e.LeftButton == MouseButtonState.Released)
+                        if (ShouldReleaseMouseCapture(
+                                _focusElement.IsMouseCaptured,
+                                e.LeftButton,
+                                e.MiddleButton))
                         {
                             _focusElement.ReleaseMouseCapture();
                         }
@@ -172,6 +174,24 @@ namespace GameWorld.Core.WpfWindow.Input
             var m = _mouseState;
             var w = e as MouseWheelEventArgs;
             _mouseState = new MouseState((int)pos.X, (int)pos.Y, m.ScrollWheelValue + (w?.Delta ?? 0), (ButtonState)e.LeftButton, (ButtonState)e.MiddleButton, (ButtonState)e.RightButton, (ButtonState)e.XButton1, (ButtonState)e.XButton2);
+
+            if (ShouldReleaseMouseCapture(
+                    _focusElement.IsMouseCaptured,
+                    e.LeftButton,
+                    e.MiddleButton))
+            {
+                _focusElement.ReleaseMouseCapture();
+            }
+        }
+
+        internal static bool ShouldReleaseMouseCapture(
+            bool isMouseCaptured,
+            MouseButtonState leftButton,
+            MouseButtonState middleButton)
+        {
+            return isMouseCaptured &&
+                   leftButton == MouseButtonState.Released &&
+                   middleButton == MouseButtonState.Released;
         }
 
         private static double Clamp(double v, int min, double max)

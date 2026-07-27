@@ -20,6 +20,8 @@ namespace KitbasherEditor.ViewModels.SaveDialog
         private readonly IPackFileService _pfs;
         private readonly IStandardDialogs _packFileUiProvider;
         private GeometrySaveSettings? _saveSettings;
+        private List<LodGenerationSettings> _draftLodSettings = [];
+        private bool _isInitializing;
 
         [ObservableProperty] ObservableCollection<LodGroupNodeViewModel> _lodNodes = [];
         [ObservableProperty] List<ComboBoxItem<GeometryStrategy>> _meshStrategies;
@@ -53,39 +55,53 @@ namespace KitbasherEditor.ViewModels.SaveDialog
         internal void Initialize(GeometrySaveSettings saveSettings)
         {
             _saveSettings = saveSettings;
-            _saveSettings.IsUserInitialized = true;
+            _draftLodSettings = saveSettings.LodSettingsPerLod
+                .Select(CloneLodSettings)
+                .ToList();
+            ResizeDraftLodSettings(saveSettings.NumberOfLodsToGenerate);
 
+            _isInitializing = true;
             OutputPath = _saveSettings.OutputName;
             SelectedMeshStrategy= MeshStrategies.First(x => x.Value == _saveSettings.GeometryOutputType);
             SelectedWsModelStrategy= WsStrategies.First(x => x.Value == _saveSettings.MaterialOutputType);
             SelectedLodStrategy = LodStrategies.First(x => x.Value == _saveSettings.LodGenerationMethod);
             OnlySaveVisible = _saveSettings.OnlySaveVisible;
             NumberOfLodsToGenerate = _saveSettings.NumberOfLodsToGenerate;
+            _isInitializing = false;
 
-            BuildLodOverview(_saveSettings);
+            BuildLodOverview();
         }
 
         partial void OnNumberOfLodsToGenerateChanged(int value) 
         {
-            Guard.IsNotNull(_saveSettings);
-            _saveSettings.NumberOfLodsToGenerate = value;
-            _saveSettings.RefreshLodSettings();
-            BuildLodOverview(_saveSettings);
+            if (_isInitializing || _saveSettings == null)
+                return;
+
+            ResizeDraftLodSettings(value);
+            BuildLodOverview();
         }
 
-        void BuildLodOverview(GeometrySaveSettings saveSettings)
+        partial void OnOnlySaveVisibleChanged(bool value)
+        {
+            if (_isInitializing || _saveSettings == null)
+                return;
+
+            BuildLodOverview();
+        }
+
+        void BuildLodOverview()
         {
             LodNodes.Clear();
             var lodNodesInModel = _sceneManager
                 .GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel)
                 .GetLodNodes();
 
-            for (var i = 0; i < saveSettings.NumberOfLodsToGenerate; i++)
+            for (var i = 0; i < NumberOfLodsToGenerate; i++)
             {
                 Rmv2LodNode? lodNode = null;
                 if(i < lodNodesInModel.Count)
                     lodNode = lodNodesInModel[i];
-                LodNodes.Add(new LodGroupNodeViewModel(lodNode, i, saveSettings));
+                LodNodes.Add(new LodGroupNodeViewModel(lodNode, i, _draftLodSettings[i], OnlySaveVisible));
             }
         }
       
@@ -98,6 +114,31 @@ namespace KitbasherEditor.ViewModels.SaveDialog
             _saveSettings.MaterialOutputType = SelectedWsModelStrategy.Value;
             _saveSettings.LodGenerationMethod = SelectedLodStrategy.Value;
             _saveSettings.NumberOfLodsToGenerate = NumberOfLodsToGenerate;
+            _saveSettings.LodSettingsPerLod = _draftLodSettings
+                .Select(CloneLodSettings)
+                .ToList();
+            _saveSettings.IsUserInitialized = true;
+        }
+
+        void ResizeDraftLodSettings(int lodCount)
+        {
+            var resizedSettings = GeometrySaveSettings.CreateDefaultLodSettings(lodCount);
+            var settingsToKeep = Math.Min(_draftLodSettings.Count, resizedSettings.Count);
+            for (var index = 0; index < settingsToKeep; index++)
+                resizedSettings[index] = _draftLodSettings[index];
+            _draftLodSettings = resizedSettings;
+        }
+
+        static LodGenerationSettings CloneLodSettings(LodGenerationSettings source)
+        {
+            return new LodGenerationSettings
+            {
+                LodRectionFactor = source.LodRectionFactor,
+                OptimizeAlpha = source.OptimizeAlpha,
+                OptimizeVertex = source.OptimizeVertex,
+                QualityLvl = source.QualityLvl,
+                CameraDistance = source.CameraDistance
+            };
         }
 
         [RelayCommand]
@@ -109,7 +150,7 @@ namespace KitbasherEditor.ViewModels.SaveDialog
             if (dialogResult.Result == true)
             {
                 var path = dialogResult.SelectedFilePath!;
-                if (path.Contains(extension) == false)
+                if (!path.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
                     path += extension;
 
                 OutputPath = path;

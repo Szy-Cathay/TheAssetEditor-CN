@@ -20,6 +20,7 @@ namespace GameWorld.Core.Commands.Object
 
         public string HintText { get => "Object Selected"; }
         public bool IsMutation { get => true; }
+        public bool AffectsDocument => false;
 
         public ObjectSelectionCommand(SelectionManager selectionManager)
         {

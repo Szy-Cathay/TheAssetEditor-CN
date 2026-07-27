@@ -72,6 +72,25 @@ namespace GameWorld.Core.Components.Navigation
             return null; // Not a preset view
         }
 
+        public static ViewPresetType ResolveRepeatedAxisView(
+            ViewPresetType requestedView,
+            ViewPresetType currentView)
+        {
+            if (requestedView != currentView)
+                return requestedView;
+
+            return requestedView switch
+            {
+                ViewPresetType.Front => ViewPresetType.Back,
+                ViewPresetType.Back => ViewPresetType.Front,
+                ViewPresetType.Right => ViewPresetType.Left,
+                ViewPresetType.Left => ViewPresetType.Right,
+                ViewPresetType.Top => ViewPresetType.Bottom,
+                ViewPresetType.Bottom => ViewPresetType.Top,
+                _ => requestedView
+            };
+        }
+
         /// <summary>
         /// Get the view preset for clicking on an axis endpoint
         /// +X -> Right view, -X -> Left view

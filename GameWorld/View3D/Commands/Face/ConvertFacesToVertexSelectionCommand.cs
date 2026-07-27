@@ -11,6 +11,7 @@ namespace GameWorld.Core.Commands.Face
 
         public string HintText { get => "Convert Faces To Vertex"; }
         public bool IsMutation { get => true; }
+        public bool AffectsDocument => false;
 
         public ConvertFacesToVertexSelectionCommand(SelectionManager selectionManager)
         {

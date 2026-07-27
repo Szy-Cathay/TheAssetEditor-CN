@@ -169,6 +169,28 @@ namespace GameWorld.Core.Components.Selection
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
                 return;
             }
+            else if (currentState.Mode == GeometrySelectionMode.Edge && currentState is EdgeSelectionState edgeState)
+            {
+                var edgeObject = edgeState.RenderObject as Rmv2MeshNode;
+                if (edgeObject != null &&
+                    IntersectionMath.IntersectEdges(
+                        unprojectedSelectionRect,
+                        edgeObject.Geometry,
+                        edgeObject.RenderMatrix,
+                        out var edges))
+                {
+                    _commandFactory.Create<EdgeSelectionCommand>()
+                        .Configure(x => x.Configure(edges, isSelectionModification, removeSelection))
+                        .BuildAndExecute();
+                }
+                else if (!isSelectionModification && !removeSelection && edgeState.SelectedEdges.Count > 0)
+                {
+                    _commandFactory.Create<EdgeSelectionCommand>()
+                        .Configure(x => x.Configure([], false, false))
+                        .BuildAndExecute();
+                }
+                return;
+            }
             else if (currentState.Mode == GeometrySelectionMode.Bone && currentState is BoneSelectionState boneState)
             {
                 if (boneState.RenderObject == null)
@@ -226,10 +248,40 @@ namespace GameWorld.Core.Components.Selection
                 var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
                 var viewport = _deviceResolverComponent.Device.Viewport;
                 if (IntersectionMath.IntersectVertex(mousePosition, vertexState.RenderObject.Geometry, vertexState.RenderObject.RenderMatrix,
-                    viewProjection, viewport.Width, viewport.Height, out var selecteVert) != null)
+                    viewProjection, viewport.Width, viewport.Height, out var selecteVert,
+                    new HashSet<int>(vertexState.SelectedVertices)) != null)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>() { selecteVert }, isSelectionModification, removeSelection)).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && vertexState.SelectedVertices.Count > 0)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
+                return;
+            }
+
+            if (currentState is EdgeSelectionState edgeState)
+            {
+                var edgeObject = edgeState.RenderObject as Rmv2MeshNode;
+                var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
+                var viewport = _deviceResolverComponent.Device.Viewport;
+                if (edgeObject != null &&
+                    IntersectionMath.IntersectEdge(
+                        mousePosition,
+                        edgeObject.Geometry,
+                        edgeObject.RenderMatrix,
+                        viewProjection,
+                        viewport.Width,
+                        viewport.Height,
+                        out var selectedEdge,
+                        edgeState.SelectedEdges) != null)
+                {
+                    _commandFactory.Create<EdgeSelectionCommand>()
+                        .Configure(x => x.Configure([selectedEdge], isSelectionModification, removeSelection))
+                        .BuildAndExecute();
+                }
+                else if (!isSelectionModification && !removeSelection && edgeState.SelectedEdges.Count > 0)
+                {
+                    _commandFactory.Create<EdgeSelectionCommand>()
+                        .Configure(x => x.Configure([], false, false))
+                        .BuildAndExecute();
+                }
                 return;
             }
 

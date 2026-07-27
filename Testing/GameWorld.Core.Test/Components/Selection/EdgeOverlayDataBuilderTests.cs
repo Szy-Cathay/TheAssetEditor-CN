@@ -53,6 +53,27 @@ public class EdgeOverlayDataBuilderTests
     }
 
     [Test]
+    public void FillSelected_UsesSelectionColorAndWiderScreenSpaceQuad()
+    {
+        var destination = new EdgeData[1];
+
+        EdgeOverlayDataBuilder.FillSelected(
+            destination,
+            CreateMesh(),
+            Matrix.Identity,
+            new[] { (0, 1) });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(destination[0].P0, Is.EqualTo(new Vector3(1.0f, 2.0f, 3.0f)));
+            Assert.That(destination[0].P1, Is.EqualTo(new Vector3(-1.0f, 0.0f, 2.0f)));
+            Assert.That(destination[0].C0, Is.EqualTo(new Vector3(1.0f, 0.47f, 0.0f)));
+            Assert.That(destination[0].C1, Is.EqualTo(new Vector3(1.0f, 0.47f, 0.0f)));
+            Assert.That(destination[0].Width, Is.EqualTo(1.5f));
+        });
+    }
+
+    [Test]
     public void Fill_DestinationLengthDoesNotMatchEdges_ThrowsArgumentException()
     {
         Assert.That(

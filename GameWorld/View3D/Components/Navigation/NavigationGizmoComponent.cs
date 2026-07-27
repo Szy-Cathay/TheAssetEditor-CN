@@ -1,3 +1,4 @@
+using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Services;
@@ -19,9 +20,12 @@ namespace GameWorld.Core.Components.Navigation
         private readonly RenderEngineComponent _renderEngine;
         private readonly IDeviceResolver _deviceResolver;
         private readonly FocusSelectableObjectService _focusService;
+        private readonly GizmoComponent _gizmoComponent;
 
         private NavigationGizmo _navigationGizmo;
         private CameraTransition _cameraTransition;
+        private bool _ownsMouseClick;
+        private bool _releaseMouseOnNextUpdate;
 
         // Orthographic view state
         private bool _isInOrthoView = false;
@@ -36,7 +40,8 @@ namespace GameWorld.Core.Components.Navigation
             IMouseComponent mouse,
             RenderEngineComponent renderEngine,
             IDeviceResolver deviceResolver,
-            FocusSelectableObjectService focusService)
+            FocusSelectableObjectService focusService,
+            GizmoComponent gizmoComponent)
         {
             _camera = camera;
             _keyboard = keyboard;
@@ -44,6 +49,7 @@ namespace GameWorld.Core.Components.Navigation
             _renderEngine = renderEngine;
             _deviceResolver = deviceResolver;
             _focusService = focusService;
+            _gizmoComponent = gizmoComponent;
 
             UpdateOrder = (int)ComponentUpdateOrderEnum.NavigationGizmo;
             DrawOrder = (int)ComponentDrawOrderEnum.NavigationGizmo;
@@ -66,6 +72,22 @@ namespace GameWorld.Core.Components.Navigation
 
         public override void Update(GameTime gameTime)
         {
+            if (_releaseMouseOnNextUpdate)
+            {
+                if (_mouse.MouseOwner == this)
+                {
+                    _mouse.MouseOwner = null;
+                    _mouse.ClearStates();
+                }
+                _releaseMouseOnNextUpdate = false;
+            }
+
+            if (_ownsMouseClick && _mouse.IsMouseButtonReleased(MouseButton.Left))
+            {
+                _ownsMouseClick = false;
+                _releaseMouseOnNextUpdate = true;
+            }
+
             // Update camera transition animation
             _cameraTransition.Update(gameTime);
 
@@ -73,24 +95,32 @@ namespace GameWorld.Core.Components.Navigation
             if (_cameraTransition.IsTransitioning)
                 return;
 
+            if (_isInOrthoView &&
+                _currentOrthoView != ViewPresetType.Perspective &&
+                _camera.CurrentProjectionType == ProjectionType.Perspective)
+            {
+                _isInOrthoView = false;
+                _currentOrthoView = ViewPresetType.Perspective;
+            }
+
             // Handle numpad shortcuts
-            HandleNumpadShortcuts();
+            if (_gizmoComponent.Gizmo?.IsInModalTransform != true)
+                HandleNumpadShortcuts();
 
             // Update gizmo hover state
             _navigationGizmo.Update(gameTime);
 
             // Handle mouse click on navigation gizmo
-            if (_mouse.IsMouseButtonPressed(MouseButton.Left))
+            if (_mouse.IsMouseButtonPressed(MouseButton.Left) &&
+                (_mouse.MouseOwner == null || _mouse.MouseOwner == this))
             {
                 if (_navigationGizmo.HandleClick(_mouse.Position()))
                 {
-                    // Clicked on gizmo - don't steal ownership, just trigger view switch
-                    // Mouse ownership should remain free for other components
+                    _mouse.MouseOwner = this;
+                    _ownsMouseClick = true;
                 }
             }
 
-            // Blender behavior: middle-mouse rotation in orthographic mode stays orthographic.
-            // No need to exit ortho view - the camera handles rotation naturally in both modes.
         }
 
         private void HandleNumpadShortcuts()
@@ -98,28 +128,37 @@ namespace GameWorld.Core.Components.Navigation
             // Numpad 1 - Front view / Ctrl+Numpad1 - Back view
             if (_keyboard.IsKeyReleased(Keys.NumPad1))
             {
-                var view = IsCtrlDown()
+                var isCtrlDown = IsCtrlDown();
+                var view = isCtrlDown
                     ? ViewPresetType.Back
                     : ViewPresetType.Front;
-                SwitchToView(view);
+                SwitchToView(isCtrlDown
+                    ? view
+                    : ViewPresets.ResolveRepeatedAxisView(view, _currentOrthoView));
             }
 
             // Numpad 3 - Right view / Ctrl+Numpad3 - Left view
             if (_keyboard.IsKeyReleased(Keys.NumPad3))
             {
-                var view = IsCtrlDown()
+                var isCtrlDown = IsCtrlDown();
+                var view = isCtrlDown
                     ? ViewPresetType.Left
                     : ViewPresetType.Right;
-                SwitchToView(view);
+                SwitchToView(isCtrlDown
+                    ? view
+                    : ViewPresets.ResolveRepeatedAxisView(view, _currentOrthoView));
             }
 
             // Numpad 7 - Top view / Ctrl+Numpad7 - Bottom view
             if (_keyboard.IsKeyReleased(Keys.NumPad7))
             {
-                var view = IsCtrlDown()
+                var isCtrlDown = IsCtrlDown();
+                var view = isCtrlDown
                     ? ViewPresetType.Bottom
                     : ViewPresetType.Top;
-                SwitchToView(view);
+                SwitchToView(isCtrlDown
+                    ? view
+                    : ViewPresets.ResolveRepeatedAxisView(view, _currentOrthoView));
             }
 
             // Numpad 5 - Toggle perspective/orthographic
@@ -144,6 +183,7 @@ namespace GameWorld.Core.Components.Navigation
         {
             _currentOrthoView = view;
             _isInOrthoView = (view != ViewPresetType.Perspective);
+            _camera.AutoPerspectiveOnOrbit = _isInOrthoView;
             _cameraTransition.StartTransition(view, _camera.LookAt);
         }
 
@@ -151,6 +191,7 @@ namespace GameWorld.Core.Components.Navigation
         {
             _isInOrthoView = false;
             _currentOrthoView = ViewPresetType.Perspective;
+            _camera.AutoPerspectiveOnOrbit = false;
             _cameraTransition.StartTransition(ViewPresetType.Perspective);
         }
 
@@ -161,6 +202,7 @@ namespace GameWorld.Core.Components.Navigation
                 // Exit ortho: switch to perspective, keep current camera angles (Blender behavior)
                 _isInOrthoView = false;
                 _currentOrthoView = ViewPresetType.Perspective;
+                _camera.AutoPerspectiveOnOrbit = false;
                 _camera.CurrentProjectionType = ProjectionType.Perspective;
             }
             else
@@ -169,6 +211,7 @@ namespace GameWorld.Core.Components.Navigation
                 // Blender's Numpad 5 only flips rv3d->persp without changing view rotation
                 _isInOrthoView = true;
                 _currentOrthoView = ViewPresetType.Perspective; // No specific axis view
+                _camera.AutoPerspectiveOnOrbit = false;
                 _camera.CurrentProjectionType = ProjectionType.Orthographic;
                 _camera.OrthoSize = _camera.Zoom * 0.5f;
             }
@@ -193,6 +236,11 @@ namespace GameWorld.Core.Components.Navigation
 
         public void Dispose()
         {
+            if (_mouse.MouseOwner == this)
+            {
+                _mouse.MouseOwner = null;
+                _mouse.ClearStates();
+            }
             _navigationGizmo?.Dispose();
         }
     }

@@ -6,6 +6,7 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Utility;
 using Shared.Core.ErrorHandling;
+using Shared.Core.Services;
 
 namespace GameWorld.Core.Services
 {
@@ -42,10 +43,16 @@ namespace GameWorld.Core.Services
 
         public bool CombineMeshes(ObjectSelectionState objectSelectionState, out ErrorList errorMessages)
         {
-            var objs = objectSelectionState.SelectedObjects()
-                .Cast<Rmv2MeshNode>()
-                .Where(x => x != null)
-                .ToList();
+            var selectedObjects = objectSelectionState.SelectedObjects();
+            var objs = selectedObjects.OfType<Rmv2MeshNode>().ToList();
+            if (objs.Count < 2 || objs.Count != selectedObjects.Count)
+            {
+                errorMessages = new ErrorList();
+                errorMessages.Error(
+                    LocalizationManager.Instance.Get("Kitbash.Combine.Title"),
+                    LocalizationManager.Instance.Get("Msg.Kitbash.CombineMeshesOnly"));
+                return false;
+            }
 
             var result = ModelCombiner.HasPotentialCombineMeshes(objs, out errorMessages);
             if (result)
@@ -91,12 +98,15 @@ namespace GameWorld.Core.Services
                 var groupParent = parents
                     .Where(x => x is GroupNode)
                     .Select(x => x as GroupNode)
-                    .FirstOrDefault(x => x.IsUngroupable);
+                    .FirstOrDefault(x => x?.IsUngroupable == true);
 
-                var itemsInGroup = groupParent.Children;
-                var itemsToAdd = selectedObjects.Where(x => itemsInGroup.Contains(x) == false).ToList();
-                _commandFactory.Create<AddObjectsToGroupCommand>().Configure(x => x.Configure(groupParent, itemsToAdd)).BuildAndExecute();
-                return;
+                if (groupParent != null)
+                {
+                    var itemsInGroup = groupParent.Children;
+                    var itemsToAdd = selectedObjects.Where(x => itemsInGroup.Contains(x) == false).ToList();
+                    _commandFactory.Create<AddObjectsToGroupCommand>().Configure(x => x.Configure(groupParent, itemsToAdd)).BuildAndExecute();
+                    return;
+                }
             }
 
 
@@ -110,20 +120,9 @@ namespace GameWorld.Core.Services
 
         public void SortMeshes(ISceneNode node)
         {
-            var children = new List<ISceneNode>(node.Children);
-            for (var i = 0; i < children.Count; i++)
-                node.RemoveObject(children[i]);
-
-            children.Sort((x, y) => x.Name.CompareTo(y.Name));
-
-            for (var i = 0; i < children.Count; i++)
-                node.AddObject(children[i]);
-
-            for (var i = 0; i < children.Count; i++)
-            {
-                if (children[i] is GroupNode)
-                    SortMeshes(children[i]);
-            }
+            _commandFactory.Create<SortSceneNodesCommand>()
+                .Configure(x => x.Configure(node))
+                .BuildAndExecute();
         }
     }
 }

@@ -24,7 +24,7 @@ namespace Editors.KitbasherEditor.UiCommands
         public void Execute()
         {
             var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-            var lod0 = rootNode.GetLodNodes().FirstOrDefault();
+            var lod0 = rootNode?.GetLodNodes().FirstOrDefault();
             if (lod0 != null)
                 _objectEditor.SortMeshes(lod0);
         }

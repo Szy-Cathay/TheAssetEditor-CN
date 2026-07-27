@@ -15,21 +15,36 @@ namespace GameWorld.Core.Components.Input
         void Update(GameTime t);
     }
 
-    public class KeyboardComponent : BaseComponent, IKeyboardComponent
+    public class KeyboardComponent : BaseComponent, IDisposable, IKeyboardComponent
     {
         KeyboardState _currentKeyboardState;
         KeyboardState _lastKeyboardState;
-        WpfKeyboard _wpfKeyboard;
+        readonly IWpfKeyboard _wpfKeyboard;
+        int? _inputContextVersion;
 
         public KeyboardComponent(IWpfGame game)
+            : this(new WpfKeyboard(game))
         {
-            _wpfKeyboard = new WpfKeyboard(game);
+        }
+
+        internal KeyboardComponent(IWpfKeyboard wpfKeyboard)
+        {
+            _wpfKeyboard = wpfKeyboard;
             UpdateOrder = (int)ComponentUpdateOrderEnum.Input;
         }
 
         public override void Update(GameTime t)
         {
             var keyboardState = _wpfKeyboard.GetState();
+            var inputContextVersion = _wpfKeyboard.InputContextVersion;
+
+            if (_inputContextVersion != inputContextVersion)
+            {
+                _currentKeyboardState = keyboardState;
+                _lastKeyboardState = keyboardState;
+                _inputContextVersion = inputContextVersion;
+                return;
+            }
 
             _lastKeyboardState = _currentKeyboardState;
             _currentKeyboardState = keyboardState;
@@ -64,6 +79,11 @@ namespace GameWorld.Core.Components.Input
         public bool IsKeyUp(Keys key)
         {
             return _currentKeyboardState.IsKeyUp(key);
+        }
+
+        public void Dispose()
+        {
+            _wpfKeyboard.Dispose();
         }
     }
 }

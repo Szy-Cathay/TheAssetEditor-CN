@@ -9,6 +9,7 @@ using GameWorld.Core.Components;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
 using Shared.Core.Events;
+using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu;
 
 namespace KitbasherEditor.ViewModels.SceneExplorerNodeViews
@@ -49,26 +50,26 @@ namespace KitbasherEditor.ViewModels.SceneExplorerNodeViews
                 return;
 
             if (CanMakeEditable(_activeNode))
-                Items.Add(new ContextMenuItem("Make Editable", new RelayCommand(MakeEditable)));
+                Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.MakeEditable"), new RelayCommand(MakeEditable)));
 
             if (IsUngroupable(_activeNode))
-                Items.Add(new ContextMenuItem("Ungroup", new RelayCommand(Ungroup)));
+                Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.Ungroup"), new RelayCommand(Ungroup)));
 
             if (IsLockable(_activeNode))
-                Items.Add(new ContextMenuItem("Lock", new RelayCommand(ToggleLock)));
+                Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.Lock"), new RelayCommand(ToggleLock)));
             else if (IsUnlockable(_activeNode))
-                Items.Add(new ContextMenuItem("Unlock", new RelayCommand(ToggleLock)));
+                Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.Unlock"), new RelayCommand(ToggleLock)));
 
             if (Items.Count != 0)
                 Items.Add(null);
-            Items.Add(new ContextMenuItem("Invert Selection", new RelayCommand(InvertSelection)));
-            Items.Add(new ContextMenuItem("Select Similarly Named", new RelayCommand(SelectSimilar)));
+            Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.InvertSelection"), new RelayCommand(InvertSelection)));
+            Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.SelectSimilarlyNamed"), new RelayCommand(SelectSimilar)));
 
             if (IsRemovable(_activeNode))
             {
                 if (Items.Count != 0)
                     Items.Add(null);
-                Items.Add(new ContextMenuItem("Remove", new RelayCommand(RemoveNode)));
+                Items.Add(new ContextMenuItem(LocalizationManager.Instance.Get("Kitbash.Context.Remove"), new RelayCommand(RemoveNode)));
             }
         }
 
@@ -173,21 +174,33 @@ namespace KitbasherEditor.ViewModels.SceneExplorerNodeViews
 
         void RemoveNode()
         {
-            _commandFactory.Create<DeleteObjectsCommand>().Configure(x => x.Configure(_activeNode as SceneNode)).BuildAndExecute();
+            _commandFactory.Create<DeleteObjectsCommand>()
+                .Configure(x => x.Configure([_activeNode]))
+                .BuildAndExecute();
         }
 
         void MakeEditable()
         {
             var mainNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-            SceneNodeHelper.MakeNodeEditable(mainNode, _activeNode);
+            if (mainNode == null)
+                return;
+            _commandFactory.Create<MakeNodeEditableCommand>()
+                .Configure(x => x.Configure(mainNode, _activeNode))
+                .BuildAndExecute();
         }
 
         void Ungroup()
         {
             if (_activeNode is GroupNode gn && gn.IsUngroupable)
-                _commandFactory.Create<UnGroupObjectsCommand>().Configure(x => x.Configure(_activeNode.Parent, _activeNode.Children.Select(x => x as ISelectable).ToList(), _activeNode)).BuildAndExecute();
-            else if (_activeNode.Parent is GroupNode g && g.IsUngroupable)
-                _commandFactory.Create<UnGroupObjectsCommand>().Configure(x => x.Configure(_activeNode.Parent.Parent, new List<ISelectable>() { _activeNode as ISelectable }, _activeNode.Parent)).BuildAndExecute();
+                _commandFactory.Create<UnGroupObjectsCommand>().Configure(x => x.Configure(_activeNode.Parent, _activeNode.Children.OfType<ISelectable>().ToList(), _activeNode)).BuildAndExecute();
+            else if (_activeNode.Parent is GroupNode g &&
+                     g.IsUngroupable &&
+                     _activeNode is ISelectable selectable)
+            {
+                _commandFactory.Create<UnGroupObjectsCommand>()
+                    .Configure(x => x.Configure(_activeNode.Parent.Parent, [selectable], _activeNode.Parent))
+                    .BuildAndExecute();
+            }
         }
 
         void InvertSelection()
@@ -197,9 +210,9 @@ namespace KitbasherEditor.ViewModels.SceneExplorerNodeViews
                 .Cast<ISelectable>()
                 .ToList();
 
-            var selection = new ObjectSelectionState();
-            selection.ModifySelection(nodesToSelect, false);
-            _selectionManager.SetState(selection);
+            _commandFactory.Create<ObjectSelectionCommand>()
+                .Configure(x => x.Configure(nodesToSelect, false, false))
+                .BuildAndExecute();
         }
 
         void SelectSimilar()
@@ -219,9 +232,9 @@ namespace KitbasherEditor.ViewModels.SceneExplorerNodeViews
                 .Cast<ISelectable>()
                 .ToList();
 
-            var selection = new ObjectSelectionState();
-            selection.ModifySelection(nodesToSelect, false);
-            _selectionManager.SetState(selection);
+            _commandFactory.Create<ObjectSelectionCommand>()
+                .Configure(x => x.Configure(nodesToSelect, false, false))
+                .BuildAndExecute();
         }
 
         void ToggleLock()

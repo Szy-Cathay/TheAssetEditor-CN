@@ -395,13 +395,10 @@ namespace GameWorld.Core.Commands.Vertex
                 {
                     if (vertexSelectionState.VertexWeights.Count > geometry.VertexCount())
                         return false;
-
-                    foreach (var weight in vertexSelectionState.VertexWeights)
-                    {
-                        if (!IsValidWeightedTransform(weight, operation))
-                            return false;
-                    }
                 }
+
+                if (!AreWeightsValid(vertexSelectionState.VertexWeights, operation))
+                    return false;
             }
             else if (affectedVertexIndices != null &&
                      falloffWeights != null &&
@@ -409,16 +406,18 @@ namespace GameWorld.Core.Commands.Vertex
             {
                 foreach (var geometry in geometryList)
                 {
-                    foreach (var (vertexIndex, weight) in falloffWeights)
+                    foreach (var vertexIndex in falloffWeights.Keys)
                     {
                         if (vertexIndex < 0 ||
-                            vertexIndex >= geometry.VertexCount() ||
-                            !IsValidWeightedTransform(weight, operation))
+                            vertexIndex >= geometry.VertexCount())
                         {
                             return false;
                         }
                     }
                 }
+
+                if (!AreWeightsValid(falloffWeights.Values, operation))
+                    return false;
             }
             else if (affectedVertexIndices != null)
             {
@@ -658,6 +657,23 @@ namespace GameWorld.Core.Commands.Vertex
                        weightedTransform,
                        operation.PivotPoint,
                        out _);
+        }
+
+        static bool AreWeightsValid(
+            IEnumerable<float> weights,
+            VertexTransformOperation operation)
+        {
+            var validatedWeights = new HashSet<float>();
+            foreach (var weight in weights)
+            {
+                if (validatedWeights.Add(weight) &&
+                    !IsValidWeightedTransform(weight, operation))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         static void ApplyToMesh(

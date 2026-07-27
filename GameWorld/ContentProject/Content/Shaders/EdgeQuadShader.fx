@@ -99,7 +99,7 @@ VSOutput EdgeQuadVS(VSInput input, VSInstanceInput instance)
     // side goes from -1 to +1, but we want 0 at center
     // The actual distance from center is |side| * halfWidthNdc
     // Normalize by the full width so edge is at 1.0
-    output.EdgeDist = abs(side);  // 0 at center, 1 at edge
+    output.EdgeDist = side;  // Interpolates from -1 through 0 to +1
 
     return output;
 }
@@ -108,7 +108,7 @@ VSOutput EdgeQuadVS(VSInput input, VSInstanceInput instance)
 float4 EdgeQuadPS(VSOutput input) : COLOR0
 {
     // Distance from edge center (0 = center, 1 = edge)
-    float dist = input.EdgeDist;
+    float dist = abs(input.EdgeDist);
 
     // Blender-style smooth AA: smoothstep from edge to transparent
     // LINE_SMOOTH_START ≈ 0.5 - 0.59 ≈ -0.09 (covered)

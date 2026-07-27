@@ -14,32 +14,28 @@ namespace GameWorld.Core.Services
     public class CommandStackUndoEvent
     {
         public string HintText { get; set; } = "";
+        public bool IsMutation { get; internal set; }
     }
 
     public class CommandExecutor
     {
         protected ILogger _logger = Logging.Create<CommandExecutor>();
-        private readonly Stack<ICommand> _commands = new Stack<ICommand>();
-        private readonly Stack<ICommand> _redoCommands = new Stack<ICommand>();
+        private readonly Stack<CommandHistoryEntry> _commands = new();
+        private readonly Stack<CommandHistoryEntry> _redoCommands = new();
         private readonly IEventHub _eventHub;
+        private long _nextDocumentStateId;
+
+        public long CurrentDocumentStateId { get; private set; }
 
         public CommandExecutor(IEventHub eventHub)
         {
             _eventHub = eventHub;
         }
 
-        public void ExecuteCommand(ICommand command, bool isUndoable = true)
+        public bool ExecuteCommand(ICommand command, bool isUndoable = true)
         {
             if (command == null)
                 throw new ArgumentNullException("Command is null");
-
-            // Only push mutation commands to the undo stack.
-            // Selection and mode-switch commands (IsMutation=false) are transient UI state.
-            if (isUndoable && command.IsMutation)
-            {
-                _redoCommands.Clear();  // New command invalidates redo history
-                _commands.Push(command);
-            }
 
             _logger.Here().Information($"Executing {command.GetType().Name}");
             try
@@ -49,48 +45,83 @@ namespace GameWorld.Core.Services
             catch (Exception e)
             {
                 _logger.Here().Error($"Failed to execute command : {e}");
+                return false;
             }
 
-            if (isUndoable)
+            var previousDocumentStateId = CurrentDocumentStateId;
+            var nextDocumentStateId = previousDocumentStateId;
+            if (command.AffectsDocument)
+            {
+                nextDocumentStateId = ++_nextDocumentStateId;
+                CurrentDocumentStateId = nextDocumentStateId;
+            }
+
+            // Only add successfully executed mutation commands to history.
+            if (isUndoable && command.IsMutation)
+            {
+                _redoCommands.Clear();
+                _commands.Push(new CommandHistoryEntry(
+                    command,
+                    previousDocumentStateId,
+                    nextDocumentStateId));
+            }
+            else if (command.AffectsDocument)
+            {
+                _redoCommands.Clear();
+            }
+
+            if (isUndoable || command.AffectsDocument)
             {
                 _eventHub.Publish(new CommandStackChangedEvent()
                 {
                     HintText = command.HintText,
-                    IsMutation = command.IsMutation,
+                    IsMutation = command.AffectsDocument,
                 });
             }
+
+            return true;
         }
 
         public bool CanUndo() => _commands.Count != 0;
 
-        public void Undo()
+        public bool Undo()
         {
-            if (CanUndo())
-            {
-                var command = _commands.Pop();
-                _logger.Here().Information($"Undoing {command.GetType().Name}");
-                try
-                {
-                    command.Undo();
-                }
-                catch (Exception e)
-                {
-                    _logger.Here().Error($"Failed to Undoing command : {e}");
-                }
+            if (!CanUndo())
+                return false;
 
-                _redoCommands.Push(command);
-                _eventHub.Publish(new CommandStackUndoEvent() { HintText = GetUndoHint() });
+            var historyEntry = _commands.Peek();
+            var command = historyEntry.Command;
+            _logger.Here().Information($"Undoing {command.GetType().Name}");
+            try
+            {
+                command.Undo();
             }
+            catch (Exception e)
+            {
+                _logger.Here().Error($"Failed to Undoing command : {e}");
+                return false;
+            }
+
+            _commands.Pop();
+            _redoCommands.Push(historyEntry);
+            CurrentDocumentStateId = historyEntry.PreviousDocumentStateId;
+            _eventHub.Publish(new CommandStackUndoEvent()
+            {
+                HintText = command.HintText,
+                IsMutation = command.AffectsDocument,
+            });
+            return true;
         }
 
         public bool CanRedo() => _redoCommands.Count != 0;
 
-        public void Redo()
+        public bool Redo()
         {
             if (!CanRedo())
-                return;
+                return false;
 
-            var command = _redoCommands.Pop();
+            var historyEntry = _redoCommands.Peek();
+            var command = historyEntry.Command;
             _logger.Here().Information($"Redoing {command.GetType().Name}");
             try
             {
@@ -102,14 +133,18 @@ namespace GameWorld.Core.Services
             catch (Exception e)
             {
                 _logger.Here().Error($"Failed to Redo command : {e}");
+                return false;
             }
 
-            _commands.Push(command);
+            _redoCommands.Pop();
+            _commands.Push(historyEntry);
+            CurrentDocumentStateId = historyEntry.NextDocumentStateId;
             _eventHub.Publish(new CommandStackChangedEvent()
             {
                 HintText = command.HintText,
-                IsMutation = command.IsMutation,
+                IsMutation = command.AffectsDocument,
             });
+            return true;
         }
 
         public string GetRedoHint()
@@ -117,7 +152,7 @@ namespace GameWorld.Core.Services
             if (!CanRedo())
                 return "No items to redo";
 
-            return _redoCommands.Peek().HintText;
+            return _redoCommands.Peek().Command.HintText;
         }
 
         public string GetUndoHint()
@@ -125,8 +160,13 @@ namespace GameWorld.Core.Services
             if (!CanUndo())
                 return "No items to undo";
 
-            return _commands.Peek().HintText;
+            return _commands.Peek().Command.HintText;
         }
+
+        private sealed record CommandHistoryEntry(
+            ICommand Command,
+            long PreviousDocumentStateId,
+            long NextDocumentStateId);
     }
 }
 

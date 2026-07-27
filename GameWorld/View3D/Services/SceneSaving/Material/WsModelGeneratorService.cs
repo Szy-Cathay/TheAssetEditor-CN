@@ -45,7 +45,10 @@ namespace GameWorld.Core.Services.SceneSaving.Material
                 var existingWsModelFile = _packFileService.FindFile(wsModelPath, _packFileService.GetEditablePack());
                 _packFileSaveService.Save(wsModelPath, Encoding.UTF8.GetBytes(wsModelData), false);
               
-                return new WsMaterialResult(false, wsModelPath, wsModelData);
+                return new WsMaterialResult(
+                    Result: true,
+                    Content: wsModelData,
+                    GeneratedFilePath: wsModelPath);
             }
             catch (Exception e)
             {

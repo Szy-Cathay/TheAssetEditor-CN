@@ -17,6 +17,7 @@ namespace GameWorld.Core.Commands.Object
 
         public string HintText { get => "Select Object"; }
         public bool IsMutation { get => true; }
+        public bool AffectsDocument => false;
 
         public void Configure(GeometrySelectionMode newMode)
         {

@@ -21,9 +21,10 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         AnimationClip _animationClip;
         AnimationPlayer _animationPlayer;
-        AnimationPlayer _oldAnimationPlayer;
+        List<AnimationPlayer?> _oldAnimationPlayers;
         List<Rmv2MeshNode> _meshNodes;
         SkeletonNode _currentSkeletonNode;
+        bool _isDisposed;
 
         public NotifyAttr<bool> RelativeScale { get; set; } = new NotifyAttr<bool>(false);
         public DoubleViewModel ScaleFactor { get; set; } = new DoubleViewModel(1);
@@ -80,7 +81,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
             _currentSkeletonNode.SelectedNodeColour = Color.White;
             _sceneManager.RootNode.AddObject(_currentSkeletonNode);
 
-            _oldAnimationPlayer = _meshNodes.First().AnimationPlayer;
+            _oldAnimationPlayers = _meshNodes.Select(x => x.AnimationPlayer).ToList();
             foreach (var mesh in _meshNodes)
                 mesh.AnimationPlayer = _animationPlayer;
         }
@@ -163,11 +164,12 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
             // Set the base scale for the mesh and apply the animation
             var baseScale = (float)ScaleFactor.Value;
+            if (!float.IsFinite(baseScale) || baseScale <= 0.00001f)
+                baseScale = 0.00001f;
             _animationClip.DynamicFrames[0].Scale[0] = new Vector3(baseScale);
             _animationPlayer.Refresh();
 
-            if (baseScale == 0)
-                return;
+            var fittedWorldTransforms = new Matrix[_fromSkeleton.BoneCount];
 
             for (var i = 0; i < _fromSkeleton.BoneCount; i++)
             {
@@ -212,7 +214,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                         var fromBone1 = _fromSkeleton.GetWorldTransform(fromParentBoneIndex);
                         var fromBoneLength = Vector3.Distance(fromBone0.Translation, fromBone1.Translation);
 
-                        relativeScale = fromBoneLength / targetBoneLength;
+                        relativeScale = CalculateRelativeScale(fromBoneLength, targetBoneLength);
                     }
                 }
 
@@ -220,12 +222,12 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                 var scale = boneValuesObject.BoneScaleOffset * relativeScale;
 
                 // To stop the calculations from exploding with NAN values
-                if (scale <= 0 || float.IsNaN(scale))
+                if (!float.IsFinite(scale) || scale <= 0)
                     scale = 0.00001f;
 
                 var parentWorld = Matrix.Identity;
                 if (fromParentBoneIndex != -1)
-                    parentWorld = _fromSkeleton.GetAnimatedWorldTranform(fromParentBoneIndex);
+                    parentWorld = fittedWorldTransforms[fromParentBoneIndex];
                 var bonePositionLocalSpace = desiredBonePosWorldWithOffsets * Matrix.Invert(parentWorld);
                 bonePositionLocalSpace.Decompose(out var _, out var boneRotation, out var bonePosition);
 
@@ -242,8 +244,27 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                     _animationClip.DynamicFrames[0].Scale[childBoneIndex] *= new Vector3(invScale);
                 }
 
-                _animationPlayer.Refresh();
+                fittedWorldTransforms[i] =
+                    Matrix.CreateScale(_animationClip.DynamicFrames[0].Scale[i]) *
+                    Matrix.CreateFromQuaternion(boneRotation) *
+                    Matrix.CreateTranslation(bonePosition) *
+                    parentWorld;
             }
+
+            _animationPlayer.Refresh();
+        }
+
+        internal static float CalculateRelativeScale(float sourceBoneLength, float targetBoneLength)
+        {
+            if (!float.IsFinite(sourceBoneLength) ||
+                !float.IsFinite(targetBoneLength) ||
+                sourceBoneLength <= 0.00001f ||
+                targetBoneLength <= 0.00001f)
+            {
+                return 1;
+            }
+
+            return targetBoneLength / sourceBoneLength;
         }
 
         public void ResetOffsetTransforms()
@@ -275,15 +296,25 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         public void Dispose()
         {
+            if (_isDisposed)
+                return;
+            _isDisposed = true;
+
             // Restore animation player
-            _animationsContainerComponent.Remove(_animationPlayer);
-            foreach (var mesh in _meshNodes)
-                mesh.AnimationPlayer = _oldAnimationPlayer;
+            if (_animationPlayer != null)
+                _animationsContainerComponent.Remove(_animationPlayer);
+            if (_meshNodes != null && _oldAnimationPlayers != null)
+            {
+                for (var index = 0; index < _meshNodes.Count; index++)
+                    _meshNodes[index].AnimationPlayer = _oldAnimationPlayers[index];
+            }
 
             // Remove the skeleton node
             var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-            rootNode.SkeletonNode.SelectedBoneIndex = null;
-            _sceneManager.RootNode.RemoveObject(_currentSkeletonNode);
+            if (rootNode?.SkeletonNode != null)
+                rootNode.SkeletonNode.SelectedBoneIndex = null;
+            if (_currentSkeletonNode != null)
+                _sceneManager.RootNode.RemoveObject(_currentSkeletonNode);
         }
 
 

@@ -125,7 +125,11 @@
             </Grid>
         </Grid>
 
-        <GridSplitter Grid.Row="0" Grid.RowSpan="5" Grid.Column="1"  HorizontalAlignment="Stretch">
+        <GridSplitter Grid.Row="0" Grid.RowSpan="5" Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      Cursor="SizeWE"
+                      ResizeDirection="Columns"
+                      ResizeBehavior="PreviousAndNext">
             <GridSplitter.Template>
                 <ControlTemplate TargetType="{x:Type GridSplitter}">
                     <Grid>

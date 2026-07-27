@@ -1,5 +1,6 @@
 ﻿using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
+using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,23 +27,23 @@ namespace GameWorld.Core.Components.Selection
 
         public void ModifySelection(IEnumerable<int> newSelectionItems, bool onlyRemove)
         {
+            var updatedSelection = new HashSet<int>(SelectedVertices);
             if (onlyRemove)
-            {
-                foreach (var newSelectionItem in newSelectionItems)
-                {
-                    if (SelectedVertices.Contains(newSelectionItem))
-                        SelectedVertices.Remove(newSelectionItem);
-                }
-            }
+                updatedSelection.ExceptWith(newSelectionItems);
             else
-            {
-                foreach (var newSelectionItem in newSelectionItems)
-                {
-                    if (!SelectedVertices.Contains(newSelectionItem))
-                        SelectedVertices.Add(newSelectionItem);
-                }
-            }
+                updatedSelection.UnionWith(newSelectionItems);
 
+            SelectedVertices = updatedSelection.OrderBy(index => index).ToList();
+            UpdateWeights(_selectionDistanceFallof);
+            SelectionChanged?.Invoke(this, true);
+        }
+
+        public void SetSelection(IEnumerable<int> newSelectionItems)
+        {
+            SelectedVertices = newSelectionItems
+                .Distinct()
+                .OrderBy(index => index)
+                .ToList();
             UpdateWeights(_selectionDistanceFallof);
             SelectionChanged?.Invoke(this, true);
         }
@@ -51,33 +52,36 @@ namespace GameWorld.Core.Components.Selection
         {
             _selectionDistanceFallof = distanceOffset;
             var geo = RenderObject.Geometry;
-            var vertexArray = geo.VertexArray;  // Direct access, no allocation
+            var vertexArray = geo.VertexArray;
             var vertCount = vertexArray.Length;
-
-            // Build HashSet for O(1) lookup instead of List.Contains O(n)
             var selectedSet = new HashSet<int>(SelectedVertices);
 
-            // Clear all weights
+            if (VertexWeights.Count != vertCount)
+                VertexWeights = Enumerable.Repeat(0.0f, vertCount).ToList();
+
             for (var i = 0; i < vertCount; i++)
                 VertexWeights[i] = 0;
 
-            // Fast path: no falloff needed
-            if (SelectedVertices.Count == 0 || SelectedVertices.Count == vertCount || distanceOffset == 0)
+            if (selectedSet.Count == 0)
+                return;
+
+            if (selectedSet.Count == vertCount || distanceOffset <= 0.0f)
             {
-                foreach (var vert in SelectedVertices)
+                foreach (var vert in selectedSet)
                     VertexWeights[vert] = 1.0f;
                 return;
             }
 
-            // Pre-compute selected vertex positions for distance calculation
-            var selectedPositions = new Vector3[SelectedVertices.Count];
-            for (int i = 0; i < SelectedVertices.Count; i++)
+            var selectedPositions = new Vector3[selectedSet.Count];
+            var selectedPositionIndex = 0;
+            foreach (var selectedVertex in selectedSet)
             {
-                var pos = vertexArray[SelectedVertices[i]].Position;
-                selectedPositions[i] = new Vector3(pos.X, pos.Y, pos.Z);
+                var position = vertexArray[selectedVertex].Position;
+                selectedPositions[selectedPositionIndex++] =
+                    new Vector3(position.X, position.Y, position.Z);
             }
 
-            // Compute weights with O(1) set lookup and direct array access
+            var nearestPointSearch = new NearestPointSearch(selectedPositions);
             for (var i = 0; i < vertCount; i++)
             {
                 if (selectedSet.Contains(i))
@@ -88,27 +92,13 @@ namespace GameWorld.Core.Components.Selection
                 {
                     var pos = vertexArray[i].Position;
                     var currentPos = new Vector3(pos.X, pos.Y, pos.Z);
-                    var dist = GetClosestVertexDist(currentPos, selectedPositions);
-                    if (dist <= distanceOffset)
-                        VertexWeights[i] = 1 - dist / distanceOffset;
+                    var distanceSquared =
+                        nearestPointSearch.FindNearestDistanceSquared(currentPos);
+                    VertexWeights[i] = ProportionalEditingMath.CalculateLinearWeight(
+                        distanceSquared,
+                        distanceOffset);
                 }
             }
-        }
-
-
-        float GetClosestVertexDist(Vector3 currentPos, Vector3[] selectedPositions)
-        {
-            var closest = float.MaxValue;
-            for (int i = 0; i < selectedPositions.Length; i++)
-            {
-                var dx = currentPos.X - selectedPositions[i].X;
-                var dy = currentPos.Y - selectedPositions[i].Y;
-                var dz = currentPos.Z - selectedPositions[i].Z;
-                var distSq = dx * dx + dy * dy + dz * dz;
-                if (distSq < closest)
-                    closest = distSq;
-            }
-            return MathF.Sqrt(closest);
         }
 
         public List<int> CurrentSelection()
@@ -119,12 +109,8 @@ namespace GameWorld.Core.Components.Selection
         public void Clear()
         {
             SelectedVertices.Clear();
+            UpdateWeights(_selectionDistanceFallof);
             SelectionChanged?.Invoke(this, true);
-        }
-
-        public void EnsureSorted()
-        {
-            SelectedVertices = SelectedVertices.Distinct().OrderBy(x => x).ToList();
         }
 
         public ISelectionState Clone()

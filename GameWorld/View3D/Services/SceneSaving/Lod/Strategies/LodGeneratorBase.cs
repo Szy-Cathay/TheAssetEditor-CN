@@ -16,17 +16,12 @@ namespace GameWorld.Core.Services.SceneSaving.Lod.Strategies
         {
             foreach (var lod in lodRootNodes)
             {
-                var itemsToDelete = new List<ISceneNode>();
-                foreach (var child in lod.Children)
-                    itemsToDelete.Add(child);
-
-                foreach (var child in itemsToDelete)
+                foreach (var child in lod.Children.ToList())
                     child.Parent.RemoveObject(child);
-
-                var numLods = lodRootNodes.Count;
-                for (var i = 0; i < numLods; i++)
-                    lodRootNodes[i].Parent.RemoveObject(lodRootNodes[i]);
             }
+
+            foreach (var lod in lodRootNodes)
+                lod.Parent.RemoveObject(lod);
         }
 
         private void DeleteAllMeshes(Rmv2LodNode meshNode)

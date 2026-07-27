@@ -10,13 +10,22 @@ using Keyboard = System.Windows.Input.Keyboard;
 
 namespace GameWorld.Core.WpfWindow.Input
 {
+    internal interface IWpfKeyboard : IDisposable
+    {
+        int InputContextVersion { get; }
+        KeyboardState GetState();
+    }
+
     /// <summary>
     /// Helper class that accesses a native API to get the current keystate.
     /// Required for any WPF hosted control.
     /// </summary>
-    public class WpfKeyboard
+    public class WpfKeyboard : IDisposable, IWpfKeyboard
     {
-        private readonly IWpfGame _focusElement;
+        private readonly FrameworkElement _focusElement;
+        private readonly Application? _application;
+
+        public int InputContextVersion { get; private set; }
 
         /// <summary>
         /// Creates a new instance of the keyboard helper.
@@ -27,7 +36,14 @@ namespace GameWorld.Core.WpfWindow.Input
             if (focusElement == null)
                 throw new ArgumentNullException(nameof(focusElement));
 
-            _focusElement = focusElement;
+            _focusElement = focusElement.GetFocusElement();
+
+            _application = Application.Current;
+            if (_application != null)
+            {
+                _application.Activated += Application_ActivationChanged;
+                _application.Deactivated += Application_ActivationChanged;
+            }
         }
 
         /// <summary>
@@ -36,12 +52,17 @@ namespace GameWorld.Core.WpfWindow.Input
         /// <returns></returns>
         public KeyboardState GetState()
         {
-            if (_focusElement.GetFocusElement().IsMouseDirectlyOver && Keyboard.FocusedElement != _focusElement)
+            if (_focusElement.IsMouseDirectlyOver && Keyboard.FocusedElement != _focusElement)
             {
                 if (System.Windows.Input.Mouse.Captured == _focusElement)
-                    _focusElement.GetFocusElement().Focus();
+                    _focusElement.Focus();
             }
-            return new KeyboardState(GetKeys(_focusElement.GetFocusElement()));
+            return new KeyboardState(GetKeys(_focusElement));
+        }
+
+        private void Application_ActivationChanged(object sender, EventArgs e)
+        {
+            InputContextVersion++;
         }
 
         private static Keys[] GetKeys(IInputElement focusElement)
@@ -77,5 +98,14 @@ namespace GameWorld.Core.WpfWindow.Input
 
         [DllImport("user32.dll", EntryPoint = "GetKeyboardState", SetLastError = true)]
         private static extern bool NativeGetKeyboardState([Out] byte[] keyStates);
+
+        public void Dispose()
+        {
+            if (_application != null)
+            {
+                _application.Activated -= Application_ActivationChanged;
+                _application.Deactivated -= Application_ActivationChanged;
+            }
+        }
     }
 }

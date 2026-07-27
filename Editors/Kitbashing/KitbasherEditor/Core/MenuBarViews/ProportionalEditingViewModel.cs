@@ -79,6 +79,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             var mode = notification.NewState?.Mode;
             // Visible only in edit modes (Vertex/Face/Edge), not Object mode
             IsVisible.Value = mode == GeometrySelectionMode.Vertex
+                           || mode == GeometrySelectionMode.Edge
                            || mode == GeometrySelectionMode.Face;
 
             // Persist falloff state across mode switches - don't reset IsEnabled
