@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Formats.Tar;
+using System.Diagnostics;
 using AssetEditorUpdater;
 using Shared.Core.Misc;
 using UpdaterProgram = AssetEditorUpdater.AssetEditorUpdater;
@@ -584,6 +585,122 @@ public class UpdateInstallerTests
     }
 
     [Test]
+    public void CopyUpdaterPayload_SourceRootLinkToLegacyDestinationIsRejectedBeforeCleanup()
+    {
+        var root = CreateTemporaryDirectory();
+        var sourceLink = Path.Combine(root, "source-link");
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    false,
+                    Guid.Empty,
+                    localRoot,
+                    commonRoot));
+            var sentinelPath = Path.Combine(workspace.UpdateDirectory, "AssetEditor.CN.Updater.exe");
+            File.WriteAllText(sentinelPath, "preserve");
+            TryCreateDirectorySymbolicLinkOrIgnore(sourceLink, workspace.UpdateDirectory);
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterProgram.CopyUpdaterPayload(
+                    sourceLink,
+                    workspace,
+                    installationDirectory,
+                    localRoot,
+                    commonRoot));
+
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            DeleteDirectoryLinkIfPresent(sourceLink);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void CopyUpdaterPayload_SourceAncestorJunctionAliasIsRejectedBeforeCleanup()
+    {
+        var root = CreateTemporaryDirectory();
+        var aliasParent = Path.Combine(root, "transaction-alias");
+        try
+        {
+            var installationDirectory = CreateInstallation(root);
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    false,
+                    Guid.Empty,
+                    localRoot,
+                    commonRoot));
+            var sentinelPath = Path.Combine(workspace.UpdateDirectory, "AssetEditor.CN.Updater.exe");
+            File.WriteAllText(sentinelPath, "preserve");
+            TryCreateJunctionOrIgnore(aliasParent, workspace.TransactionRoot);
+            var aliasedSource = Path.Combine(aliasParent, "Update");
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdaterProgram.CopyUpdaterPayload(
+                    aliasedSource,
+                    workspace,
+                    installationDirectory,
+                    localRoot,
+                    commonRoot));
+
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            DeleteDirectoryLinkIfPresent(aliasParent);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [TestCase("transaction")]
+    [TestCase("update")]
+    public void CopyUpdaterPayload_InstallationPhysicalAliasOfWorkspaceIsRejectedBeforeCleanup(
+        string aliasedDirectory)
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var payloadDirectory = Directory.CreateDirectory(Path.Combine(root, "payload")).FullName;
+            File.WriteAllText(Path.Combine(payloadDirectory, "AssetEditor.CN.Updater.exe"), "updater");
+            var localRoot = Directory.CreateDirectory(Path.Combine(root, "local")).FullName;
+            var commonRoot = Directory.CreateDirectory(Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    false,
+                    Guid.Empty,
+                    localRoot,
+                    commonRoot));
+            var sentinelPath = Path.Combine(workspace.UpdateDirectory, "preserve.txt");
+            File.WriteAllText(sentinelPath, "preserve");
+            var physicalInstallationDirectory = aliasedDirectory == "transaction"
+                ? workspace.TransactionRoot
+                : workspace.UpdateDirectory;
+            var installationAlias = ToExtendedDosPath(physicalInstallationDirectory);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdaterProgram.CopyUpdaterPayload(
+                    payloadDirectory,
+                    workspace,
+                    installationAlias,
+                    localRoot,
+                    commonRoot));
+
+            Assert.That(File.ReadAllText(sentinelPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
     public void CopyUpdaterPayload_ProtectedWorkspaceRejectsNonEmptyUpdateWithoutDeletingIt()
     {
         if (!UpdaterWorkspaceFactory.IsProcessElevated())
@@ -808,5 +925,62 @@ public class UpdateInstallerTests
             : Path.GetFullPath(parentDirectory) + Path.DirectorySeparatorChar;
         var candidate = Path.GetFullPath(candidatePath);
         return candidate.StartsWith(parentRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void TryCreateDirectorySymbolicLinkOrIgnore(string path, string targetPath)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(path, targetPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("Creating directory symbolic links is not permitted on this machine.");
+        }
+        catch (PlatformNotSupportedException)
+        {
+            Assert.Ignore("Directory symbolic links are not supported on this machine.");
+        }
+    }
+
+    private static void TryCreateJunctionOrIgnore(string path, string targetPath)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("/d");
+        startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add("mklink");
+        startInfo.ArgumentList.Add("/J");
+        startInfo.ArgumentList.Add(path);
+        startInfo.ArgumentList.Add(targetPath);
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Unable to start junction creation.");
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            Assert.Ignore(
+                $"Creating directory junctions is not permitted on this machine: {process.StandardError.ReadToEnd()}");
+        }
+    }
+
+    private static void DeleteDirectoryLinkIfPresent(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path);
+    }
+
+    private static string ToExtendedDosPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return fullPath.StartsWith(@"\\", StringComparison.Ordinal)
+            ? @"\\?\UNC\" + fullPath[2..]
+            : @"\\?\" + fullPath;
     }
 }

@@ -322,6 +322,99 @@ public class UpdaterPayloadCopierTests
             Is.EqualTo(new[] { "validate-1", "copy-and-verify", "validate-2", "start" }));
     }
 
+    [Test]
+    public void RelaunchFromUpdateDirectory_FirstValidationFailureDoesNotStart()
+    {
+        var workspace = CreateDummyWorkspace();
+        var expected = new InvalidDataException("initial validation");
+        var copyCalled = false;
+        var startCalled = false;
+
+        var actual = Assert.Throws<InvalidDataException>(() =>
+            UpdaterProgram.RelaunchFromUpdateDirectory(
+                "source",
+                workspace,
+                "installation",
+                (_, _, _) =>
+                {
+                    copyCalled = true;
+                    return new Dictionary<string, string>();
+                },
+                (_, _) => throw expected,
+                _ => startCalled = true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(expected));
+            Assert.That(copyCalled, Is.False);
+            Assert.That(startCalled, Is.False);
+        });
+    }
+
+    [Test]
+    public void RelaunchFromUpdateDirectory_CopyVerificationFailureDoesNotStart()
+    {
+        var workspace = CreateDummyWorkspace();
+        var expected = new InvalidDataException("copy verification");
+        var validationCount = 0;
+        var startCalled = false;
+
+        var actual = Assert.Throws<InvalidDataException>(() =>
+            UpdaterProgram.RelaunchFromUpdateDirectory(
+                "source",
+                workspace,
+                "installation",
+                (_, _, _) => throw expected,
+                (_, _) =>
+                {
+                    validationCount++;
+                    return workspace;
+                },
+                _ => startCalled = true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(expected));
+            Assert.That(validationCount, Is.EqualTo(1));
+            Assert.That(startCalled, Is.False);
+        });
+    }
+
+    [Test]
+    public void RelaunchFromUpdateDirectory_FinalValidationFailureDoesNotStart()
+    {
+        var workspace = CreateDummyWorkspace();
+        var expected = new InvalidDataException("final validation");
+        var validationCount = 0;
+        var copyCalled = false;
+        var startCalled = false;
+
+        var actual = Assert.Throws<InvalidDataException>(() =>
+            UpdaterProgram.RelaunchFromUpdateDirectory(
+                "source",
+                workspace,
+                "installation",
+                (_, _, _) =>
+                {
+                    copyCalled = true;
+                    return new Dictionary<string, string>();
+                },
+                (_, _) =>
+                {
+                    validationCount++;
+                    return validationCount == 2 ? throw expected : workspace;
+                },
+                _ => startCalled = true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(expected));
+            Assert.That(validationCount, Is.EqualTo(2));
+            Assert.That(copyCalled, Is.True);
+            Assert.That(startCalled, Is.False);
+        });
+    }
+
     private static string CreatePayloadSource(string root)
     {
         var sourceDirectory = Directory.CreateDirectory(Path.Combine(root, "source")).FullName;
@@ -330,6 +423,15 @@ public class UpdaterPayloadCopierTests
         File.WriteAllText(Path.Combine(sourceDirectory, "AssetEditor.CN.Updater.exe"), "updater");
         File.WriteAllBytes(Path.Combine(nativeDirectory, "native.dll"), [0, 1, 2, 255]);
         return sourceDirectory;
+    }
+
+    private static UpdaterWorkspace CreateDummyWorkspace()
+    {
+        var transactionRoot = Path.Combine(Path.GetTempPath(), "transaction");
+        return new UpdaterWorkspace(
+            transactionRoot,
+            Path.Combine(transactionRoot, "Update"),
+            true);
     }
 
     private static CopiedPayload CreateCopiedPayload()

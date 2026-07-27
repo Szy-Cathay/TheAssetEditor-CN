@@ -112,6 +112,17 @@ internal static class UpdateInstaller
                 "The updater transaction root must not overlap the installation directory.");
         }
 
+        using var installationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            installationDirectory,
+            nameof(installationDirectory));
+        using var transactionIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            workspace.TransactionRoot,
+            nameof(workspace.TransactionRoot));
+        WindowsPathIdentity.RequireDisjoint(
+            installationIdentity,
+            transactionIdentity,
+            "The updater transaction root must not overlap the installation directory.");
+
         return workspace;
     }
 

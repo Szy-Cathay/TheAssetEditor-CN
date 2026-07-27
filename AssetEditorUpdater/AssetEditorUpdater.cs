@@ -114,9 +114,30 @@ namespace AssetEditorUpdater
                     "The updater workspace does not match the validated update directory.");
             }
 
-            UpdaterPayloadCopier.ValidateNonOverlappingRoots(
+            using var installationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                installationDirectory,
+                nameof(installationDirectory));
+            using var transactionIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                validatedWorkspace.TransactionRoot,
+                nameof(validatedWorkspace.TransactionRoot));
+            WindowsPathIdentity.RequireDisjoint(
+                installationIdentity,
+                transactionIdentity,
+                "The updater transaction root must not overlap the installation directory.");
+
+            using var sourceIdentity = WindowsPathIdentity.OpenExistingDirectory(
                 updaterPayloadDirectory,
-                validatedWorkspace.UpdateDirectory);
+                nameof(updaterPayloadDirectory));
+            using var destinationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+                validatedWorkspace.UpdateDirectory,
+                nameof(validatedWorkspace.UpdateDirectory));
+            WindowsPathIdentity.RequireDisjoint(
+                sourceIdentity,
+                destinationIdentity,
+                "The updater payload source and destination must not overlap.");
+
+            // Root leases stay open through cleanup and copy. Same-integrity child
+            // mutation still requires the DFS rechecks below and remains out of scope.
 
             if (!validatedWorkspace.IsProtected)
             {

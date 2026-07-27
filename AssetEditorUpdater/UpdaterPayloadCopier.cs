@@ -13,9 +13,18 @@ internal static class UpdaterPayloadCopier
         string sourceDirectory,
         string destinationDirectory)
     {
-        var sourceRoot = GetCanonicalPath(sourceDirectory, nameof(sourceDirectory));
-        var destinationRoot = GetCanonicalPath(destinationDirectory, nameof(destinationDirectory));
-        ValidateNonOverlappingRoots(sourceRoot, destinationRoot);
+        using var sourceIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            sourceDirectory,
+            nameof(sourceDirectory));
+        using var destinationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            destinationDirectory,
+            nameof(destinationDirectory));
+        WindowsPathIdentity.RequireDisjoint(
+            sourceIdentity,
+            destinationIdentity,
+            "The updater payload source and destination must not overlap.");
+        var sourceRoot = sourceIdentity.InputPath;
+        var destinationRoot = destinationIdentity.InputPath;
 
         var sourceTree = CaptureTree(sourceRoot);
         var destinationTree = CaptureTree(destinationRoot);
@@ -64,9 +73,18 @@ internal static class UpdaterPayloadCopier
     {
         ArgumentNullException.ThrowIfNull(expectedHashes);
 
-        var sourceRoot = GetCanonicalPath(sourceDirectory, nameof(sourceDirectory));
-        var destinationRoot = GetCanonicalPath(destinationDirectory, nameof(destinationDirectory));
-        ValidateNonOverlappingRoots(sourceRoot, destinationRoot);
+        using var sourceIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            sourceDirectory,
+            nameof(sourceDirectory));
+        using var destinationIdentity = WindowsPathIdentity.OpenExistingDirectory(
+            destinationDirectory,
+            nameof(destinationDirectory));
+        WindowsPathIdentity.RequireDisjoint(
+            sourceIdentity,
+            destinationIdentity,
+            "The updater payload source and destination must not overlap.");
+        var sourceRoot = sourceIdentity.InputPath;
+        var destinationRoot = destinationIdentity.InputPath;
 
         var expected = NormalizeManifest(expectedHashes);
         var sourceTree = CaptureTree(sourceRoot, afterDirectoryEnumerated);
@@ -99,16 +117,6 @@ internal static class UpdaterPayloadCopier
                     $"Updater payload destination file failed verification: {sourceFile.RelativePath}");
             }
         }
-    }
-
-    internal static void ValidateNonOverlappingRoots(
-        string sourceDirectory,
-        string destinationDirectory)
-    {
-        var sourceRoot = GetCanonicalPath(sourceDirectory, nameof(sourceDirectory));
-        var destinationRoot = GetCanonicalPath(destinationDirectory, nameof(destinationDirectory));
-        if (DirectoriesOverlap(sourceRoot, destinationRoot))
-            throw new InvalidOperationException("The updater payload source and destination must not overlap.");
     }
 
     private static PayloadTree CaptureTree(
@@ -320,12 +328,6 @@ internal static class UpdaterPayloadCopier
             new Win32Exception(error));
     }
 
-    private static string GetCanonicalPath(string path, string parameterName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path, parameterName);
-        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-    }
-
     private static string GetNormalizedRelativePath(string root, string path)
     {
         var relativePath = Path.GetRelativePath(root, path);
@@ -379,13 +381,6 @@ internal static class UpdaterPayloadCopier
         return path.Count(character =>
             character == Path.DirectorySeparatorChar
             || character == Path.AltDirectorySeparatorChar);
-    }
-
-    private static bool DirectoriesOverlap(string firstDirectory, string secondDirectory)
-    {
-        return IsWithinDirectory(firstDirectory, secondDirectory)
-               || IsWithinDirectory(secondDirectory, firstDirectory)
-               || PathComparer.Equals(firstDirectory, secondDirectory);
     }
 
     private static bool IsWithinDirectory(string parentDirectory, string candidatePath)
