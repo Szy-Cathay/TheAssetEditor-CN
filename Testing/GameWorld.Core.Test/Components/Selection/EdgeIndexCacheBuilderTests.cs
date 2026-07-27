@@ -1,4 +1,5 @@
 using GameWorld.Core.Components.Selection;
+using System.Diagnostics;
 
 namespace GameWorld.Core.Test.Components.Selection;
 
@@ -101,5 +102,24 @@ public class EdgeIndexCacheBuilderTests
         var result = EdgeIndexCacheBuilder.Build(new ushort[] { 0, 1, 2 }, 0);
 
         Assert.That(result, Is.Empty);
+    }
+
+    [Test]
+    public void Build_ProductionLimit_StopsAtExactlyFiftyThousand()
+    {
+        var indices = Enumerable.Range(0, 50_001)
+            .Select(static value => (ushort)value)
+            .ToArray();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = EdgeIndexCacheBuilder.Build(indices, 50_000);
+
+        stopwatch.Stop();
+        var allocated =
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        TestContext.Progress.WriteLine(
+            $"50,000-edge build: {stopwatch.Elapsed.TotalMilliseconds:F2} ms, {allocated:N0} bytes");
+        Assert.That(result, Has.Length.EqualTo(50_000));
     }
 }
