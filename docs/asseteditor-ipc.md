@@ -6,13 +6,27 @@ This document describes the current IPC endpoint implemented by `AssetEditor`.
 - Transport: Windows named pipe
 - Pipe name: `AssetEditor.CN.Ipc`
 - Protocol: JSON line per request (`UTF-8`, newline-terminated)
+- Access: current Windows user only
 - Current supported actions: `open` only
 
 ## Pipe Path (Windows)
 - `\\.\pipe\AssetEditor.CN.Ipc`
 
+The pipe uses Windows `CurrentUserOnly` access. Clients must run as the same
+Windows user and in a compatible elevation context as Asset Editor.
+
 ## Request Format
 Send one JSON object followed by a newline.
+
+The request content limit is 65,536 decoded .NET `char` values. This is a
+UTF-16 character limit, not a UTF-8 wire-byte limit. LF terminates the request;
+an immediately preceding CR is treated as part of CRLF and is not content.
+Clients must send a newline, although a bounded partial request at EOF retains
+legacy compatibility.
+
+Reading a request and writing its response each have independent five-second
+deadlines. A silent, oversized, or timed-out connection is closed and may not
+receive a response; the server then accepts the next client.
 
 ### Supported action: `open`
 ```json

@@ -34,16 +34,85 @@ namespace Editors.Ipc
 
         private readonly ILogger _logger = Logging.Create<AssetEditorIpcServer>();
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly AssetEditorIpcServerOptions _options;
+        private readonly Func<NamedPipeServerStream> _pipeFactory;
+        private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
         private readonly object _syncLock = new();
 
-        private CancellationTokenSource _cancellationTokenSource;
-        private Task _serverTask;
-        private NamedPipeServerStream _activePipe;
+        private CancellationTokenSource? _cancellationTokenSource;
+        private Task? _serverTask;
+        private NamedPipeServerStream? _activePipe;
+        private FailureKey? _lastFailureKey;
+        private int _matchingFailureCount;
         private bool _disposed;
 
+        internal static PipeOptions ProductionPipeOptions { get; } =
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly;
+
         public AssetEditorIpcServer(IServiceScopeFactory scopeFactory)
+            : this(
+                scopeFactory,
+                AssetEditorIpcServerOptions.Default,
+                () => CreateProductionPipe(PipeName),
+                static (delay, cancellationToken) =>
+                    Task.Delay(delay, cancellationToken))
         {
+        }
+
+        internal AssetEditorIpcServer(
+            IServiceScopeFactory scopeFactory,
+            AssetEditorIpcServerOptions options,
+            Func<NamedPipeServerStream> pipeFactory,
+            Func<TimeSpan, CancellationToken, Task> delayAsync)
+        {
+            ArgumentNullException.ThrowIfNull(scopeFactory);
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(pipeFactory);
+            ArgumentNullException.ThrowIfNull(delayAsync);
+            if (options.RetryDelay < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    "The IPC retry delay cannot be negative.");
+            }
+
+            if (options.ReadTimeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    "The IPC read timeout must be positive.");
+            }
+
+            if (options.WriteTimeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    "The IPC write timeout must be positive.");
+            }
+
+            if (options.MaxRequestChars <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    "The IPC request character limit must be positive.");
+            }
+
             _scopeFactory = scopeFactory;
+            _options = options;
+            _pipeFactory = pipeFactory;
+            _delayAsync = delayAsync;
+        }
+
+        internal static NamedPipeServerStream CreateProductionPipe(
+            string pipeName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(pipeName);
+            return new NamedPipeServerStream(
+                pipeName,
+                PipeDirection.InOut,
+                maxNumberOfServerInstances: 1,
+                PipeTransmissionMode.Byte,
+                ProductionPipeOptions);
         }
 
         internal static async Task<string?> ReadBoundedLineAsync(
@@ -113,8 +182,12 @@ namespace Editors.Ipc
                 if (_serverTask != null)
                     return;
 
-                _cancellationTokenSource = new CancellationTokenSource();
-                _serverTask = Task.Run(() => RunServerLoopAsync(_cancellationTokenSource.Token));
+                var cancellationTokenSource =
+                    new CancellationTokenSource();
+                _cancellationTokenSource = cancellationTokenSource;
+                _serverTask = Task.Run(
+                    () => RunServerLoopAsync(
+                        cancellationTokenSource.Token));
             }
         }
 
@@ -124,16 +197,58 @@ namespace Editors.Ipc
 
             while (cancellationToken.IsCancellationRequested == false)
             {
-                NamedPipeServerStream pipe = null;
+                NamedPipeServerStream? pipe = null;
+                Exception? iterationFailure = null;
+                var failurePhase = FailurePhase.Create;
                 try
                 {
-                    pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                    pipe = _pipeFactory()
+                        ?? throw new InvalidOperationException(
+                            "The IPC pipe factory returned null.");
                     SetActivePipe(pipe);
 
+                    failurePhase = FailurePhase.AcceptOrRead;
                     await pipe.WaitForConnectionAsync(cancellationToken);
 
-                    var response = await ProcessRequestAsync(pipe, cancellationToken);
-                    await WriteResponseAsync(pipe, response);
+                    string? line;
+                    using (var readCancellationTokenSource =
+                           CancellationTokenSource.CreateLinkedTokenSource(
+                               cancellationToken))
+                    {
+                        readCancellationTokenSource.CancelAfter(
+                            _options.ReadTimeout);
+                        using var reader = new StreamReader(
+                            pipe,
+                            new UTF8Encoding(false),
+                            detectEncodingFromByteOrderMarks: false,
+                            bufferSize: 1024,
+                            leaveOpen: true);
+                        line = await ReadBoundedLineAsync(
+                            reader,
+                            _options.MaxRequestChars,
+                            readCancellationTokenSource.Token);
+                    }
+
+                    failurePhase = FailurePhase.Handler;
+                    var requestResult = await ProcessRequestAsync(
+                        line,
+                        cancellationToken);
+
+                    failurePhase = FailurePhase.Write;
+                    using (var writeCancellationTokenSource =
+                           CancellationTokenSource.CreateLinkedTokenSource(
+                               cancellationToken))
+                    {
+                        writeCancellationTokenSource.CancelAfter(
+                            _options.WriteTimeout);
+                        await WriteResponseAsync(
+                            pipe,
+                            requestResult.Response,
+                            writeCancellationTokenSource.Token);
+                    }
+
+                    if (requestResult.IsValidRequest)
+                        ResetFailureHistory();
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -145,66 +260,200 @@ namespace Editors.Ipc
                 }
                 catch (Exception ex)
                 {
-                    _logger.Here().Error(ex, "Unhandled exception in IPC server loop");
+                    iterationFailure = ex;
                 }
                 finally
                 {
                     ClearActivePipe(pipe);
-                    pipe?.Dispose();
+                    try
+                    {
+                        pipe?.Dispose();
+                    }
+                    catch (Exception disposeException)
+                    {
+                        iterationFailure ??= disposeException;
+                    }
+                }
+
+                if (iterationFailure == null)
+                    continue;
+
+                RecordIterationFailure(
+                    failurePhase,
+                    iterationFailure,
+                    cancellationToken);
+                try
+                {
+                    await _delayAsync(
+                        _options.RetryDelay,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
                 }
             }
 
             _logger.Here().Information("IPC named pipe server stopped");
         }
 
-        private async Task<IpcResponse> ProcessRequestAsync(NamedPipeServerStream pipe, CancellationToken cancellationToken)
+        private async Task<RequestResult> ProcessRequestAsync(
+            string? line,
+            CancellationToken cancellationToken)
         {
-            using var reader = new StreamReader(pipe, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: true);
-            var line = await reader.ReadLineAsync();
-
             if (string.IsNullOrWhiteSpace(line))
-                return IpcResponse.Failure("Empty request");
+            {
+                return new RequestResult(
+                    IpcResponse.Failure("Empty request"),
+                    false);
+            }
 
-            IpcRequest request;
+            IpcRequest? request;
             try
             {
                 request = JsonSerializer.Deserialize<IpcRequest>(line, SerializerOptions);
             }
             catch (JsonException)
             {
-                return IpcResponse.Failure("Invalid JSON");
+                return new RequestResult(
+                    IpcResponse.Failure("Invalid JSON"),
+                    false);
             }
 
             if (request == null)
-                return IpcResponse.Failure("Invalid JSON");
+            {
+                return new RequestResult(
+                    IpcResponse.Failure("Invalid JSON"),
+                    false);
+            }
 
             using var scope = _scopeFactory.CreateScope();
             var handler = scope.ServiceProvider.GetRequiredService<IIpcRequestHandler>();
 
             try
             {
-                return await handler.HandleAsync(request, cancellationToken);
+                return new RequestResult(
+                    await handler.HandleAsync(
+                        request,
+                        cancellationToken),
+                    true);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
             {
-                return IpcResponse.Failure("Canceled");
+                throw;
+            }
+            catch (OperationCanceledException)
+                when (!cancellationToken.IsCancellationRequested)
+            {
+                return new RequestResult(
+                    IpcResponse.Failure("Canceled"),
+                    true);
             }
             catch (Exception ex)
             {
                 _logger.Here().Error(ex, "IPC request handling failed");
-                return IpcResponse.Failure("Internal server error");
+                return new RequestResult(
+                    IpcResponse.Failure("Internal server error"),
+                    true);
             }
         }
 
-        private static async Task WriteResponseAsync(NamedPipeServerStream pipe, IpcResponse response)
+        private static async Task WriteResponseAsync(
+            NamedPipeServerStream pipe,
+            IpcResponse response,
+            CancellationToken cancellationToken)
         {
-            using var writer = new StreamWriter(pipe, new UTF8Encoding(false), bufferSize: 1024, leaveOpen: true)
+            StreamWriter? writer = null;
+            var explicitFlushCompleted = false;
+            try
             {
-                AutoFlush = true
-            };
+                writer = new StreamWriter(
+                    pipe,
+                    new UTF8Encoding(false),
+                    bufferSize: 1024,
+                    leaveOpen: true)
+                {
+                    AutoFlush = false
+                };
 
-            var json = JsonSerializer.Serialize(response, SerializerOptions);
-            await writer.WriteLineAsync(json);
+                var json = JsonSerializer.Serialize(
+                    response,
+                    SerializerOptions);
+                await writer.WriteLineAsync(
+                    json.AsMemory(),
+                    cancellationToken);
+                await writer.FlushAsync(cancellationToken);
+                explicitFlushCompleted = true;
+            }
+            catch
+            {
+                try
+                {
+                    pipe.Dispose();
+                }
+                catch
+                {
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (writer != null)
+                {
+                    try
+                    {
+                        writer.Dispose();
+                    }
+                    catch when (!explicitFlushCompleted)
+                    {
+                    }
+                }
+            }
+        }
+
+        private void RecordIterationFailure(
+            FailurePhase phase,
+            Exception exception,
+            CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            var key = new FailureKey(
+                phase,
+                exception.GetType().FullName
+                ?? exception.GetType().Name,
+                exception.HResult);
+            if (_lastFailureKey == key)
+            {
+                _matchingFailureCount++;
+            }
+            else
+            {
+                _lastFailureKey = key;
+                _matchingFailureCount = 1;
+            }
+
+            if (_matchingFailureCount != 1
+                && _matchingFailureCount % 10 != 0)
+            {
+                return;
+            }
+
+            _logger.Here().Error(
+                exception,
+                "IPC server iteration failed after {FailureCount} consecutive matching failures in {FailurePhase}",
+                _matchingFailureCount,
+                phase);
+        }
+
+        private void ResetFailureHistory()
+        {
+            _lastFailureKey = null;
+            _matchingFailureCount = 0;
         }
 
         private void SetActivePipe(NamedPipeServerStream pipe)
@@ -215,7 +464,7 @@ namespace Editors.Ipc
             }
         }
 
-        private void ClearActivePipe(NamedPipeServerStream pipe)
+        private void ClearActivePipe(NamedPipeServerStream? pipe)
         {
             lock (_syncLock)
             {
@@ -226,9 +475,9 @@ namespace Editors.Ipc
 
         public void Dispose()
         {
-            CancellationTokenSource cancellationTokenSource;
-            Task serverTask;
-            NamedPipeServerStream activePipe;
+            CancellationTokenSource? cancellationTokenSource;
+            Task? serverTask;
+            NamedPipeServerStream? activePipe;
 
             lock (_syncLock)
             {
@@ -261,18 +510,53 @@ namespace Editors.Ipc
             {
             }
 
+            var serverTaskCompleted = serverTask == null;
             if (serverTask != null)
             {
                 try
                 {
-                    _ = serverTask.Wait(TimeSpan.FromSeconds(2));
+                    serverTaskCompleted = serverTask.Wait(
+                        TimeSpan.FromSeconds(2));
                 }
                 catch
                 {
+                    serverTaskCompleted = serverTask.IsCompleted;
                 }
             }
 
-            cancellationTokenSource?.Dispose();
+            if (cancellationTokenSource == null)
+                return;
+
+            if (serverTaskCompleted)
+            {
+                cancellationTokenSource.Dispose();
+                return;
+            }
+
+            _logger.Here().Warning(
+                "IPC server did not stop within the bounded shutdown wait");
+            _ = serverTask!.ContinueWith(
+                _ => cancellationTokenSource.Dispose(),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
+        private readonly record struct RequestResult(
+            IpcResponse Response,
+            bool IsValidRequest);
+
+        private readonly record struct FailureKey(
+            FailurePhase Phase,
+            string ExceptionType,
+            int HResult);
+
+        private enum FailurePhase
+        {
+            Create,
+            AcceptOrRead,
+            Handler,
+            Write
         }
     }
 }
