@@ -43,7 +43,7 @@ namespace AssetEditorUpdater
                     UpdaterWorkspaceFactory.IsProcessElevated());
                 await UpdateAsync(
                     invocation.InstallationDirectory,
-                    workspace.UpdateDirectory);
+                    workspace);
             }
         }
 
@@ -194,8 +194,15 @@ namespace AssetEditorUpdater
             };
         }
 
-        private static async Task UpdateAsync(string installationDirectory, string updateDirectory)
+        private static async Task UpdateAsync(
+            string installationDirectory,
+            UpdaterWorkspace workspace)
         {
+            ArgumentNullException.ThrowIfNull(workspace);
+            workspace = UpdateInstaller.ValidateWorkspace(
+                installationDirectory,
+                workspace);
+            var updateDirectory = workspace.UpdateDirectory;
             var latestRelease = await GetLatestReleaseAsync();
             if (latestRelease == null)
                 return;
@@ -211,12 +218,20 @@ namespace AssetEditorUpdater
             Console.WriteLine($"正在将 Asset Editor 国区版从 {installedVersion} 更新到 {latestVersion}。");
 
             var asset = GetAsset(latestRelease);
-            var assetPath = Path.Combine(updateDirectory, asset.Name);
-            var downloadResult = await DownloadAssetAsync(asset.BrowserDownloadUrl, assetPath);
+            workspace = UpdateInstaller.ValidateWorkspace(
+                installationDirectory,
+                workspace);
+            updateDirectory = workspace.UpdateDirectory;
+            var assetPath = GetAssetDownloadPath(updateDirectory, asset.Name);
+            var downloadResult = await DownloadAssetAsync(
+                asset.BrowserDownloadUrl,
+                assetPath,
+                installationDirectory,
+                workspace);
             if (downloadResult == false)
                 return;
 
-            UpdateInstaller.Install(assetPath, installationDirectory, updateDirectory);
+            UpdateInstaller.Install(assetPath, installationDirectory, workspace);
 
             var assetEditorPath = Path.Combine(installationDirectory, AssetEditorExe);
             if (File.Exists(assetEditorPath))
@@ -281,6 +296,71 @@ namespace AssetEditorUpdater
             return string.Equals(Path.GetExtension(assetName), ".zip", StringComparison.OrdinalIgnoreCase);
         }
 
+        internal static string GetAssetDownloadPath(
+            string updateDirectory,
+            string assetName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(updateDirectory);
+
+            if (string.IsNullOrWhiteSpace(assetName)
+                || Path.IsPathRooted(assetName)
+                || Path.IsPathFullyQualified(assetName)
+                || assetName is "." or ".."
+                || assetName.Contains(Path.DirectorySeparatorChar)
+                || assetName.Contains(Path.AltDirectorySeparatorChar)
+                || assetName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || assetName.EndsWith('.')
+                || assetName.EndsWith(' ')
+                || !IsZipAssetName(assetName))
+            {
+                throw new InvalidDataException(
+                    $"The release asset name is not a safe .zip leaf: {assetName}");
+            }
+
+            var fullUpdateDirectory = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(updateDirectory));
+            var assetPath = Path.GetFullPath(
+                Path.Combine(fullUpdateDirectory, assetName));
+            if (!string.Equals(
+                    Path.GetDirectoryName(assetPath),
+                    fullUpdateDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"The release asset path escaped the Update directory: {assetName}");
+            }
+
+            return assetPath;
+        }
+
+        internal static async Task CopyAssetDownloadAsync(
+            Stream source,
+            string downloadPath)
+        {
+            await CopyAssetDownloadAsync(
+                source,
+                downloadPath,
+                null);
+        }
+
+        private static async Task CopyAssetDownloadAsync(
+            Stream source,
+            string downloadPath,
+            Action? afterDestinationCreated)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentException.ThrowIfNullOrWhiteSpace(downloadPath);
+
+            await using var fileStream = new FileStream(
+                downloadPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None);
+            afterDestinationCreated?.Invoke();
+            await source.CopyToAsync(fileStream);
+            fileStream.Flush(flushToDisk: true);
+        }
+
         internal static string GetUpdateDirectory()
         {
             return Path.Combine(
@@ -295,10 +375,15 @@ namespace AssetEditorUpdater
             return UpdateInstaller.GetBackupRootDirectory(GetUpdateDirectory());
         }
 
-        private static async Task<bool> DownloadAssetAsync(string downloadUrl, string downloadPath)
+        private static async Task<bool> DownloadAssetAsync(
+            string downloadUrl,
+            string downloadPath,
+            string installationDirectory,
+            UpdaterWorkspace workspace)
         {
             Console.WriteLine("正在下载最新版本……");
 
+            var destinationCreated = false;
             try
             {
                 using var client = new HttpClient();
@@ -308,13 +393,43 @@ namespace AssetEditorUpdater
                 response.EnsureSuccessStatusCode();
 
                 await using var responseStream = await response.Content.ReadAsStreamAsync();
-                await using var fileStream = new FileStream(downloadPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await responseStream.CopyToAsync(fileStream);
+                var validatedWorkspace = UpdateInstaller.ValidateWorkspace(
+                    installationDirectory,
+                    workspace);
+                var canonicalDownloadPath = GetAssetDownloadPath(
+                    validatedWorkspace.UpdateDirectory,
+                    Path.GetFileName(downloadPath));
+                if (!PathsEqual(downloadPath, canonicalDownloadPath))
+                {
+                    throw new InvalidDataException(
+                        "The release asset path is outside the validated Update directory.");
+                }
+
+                await CopyAssetDownloadAsync(
+                    responseStream,
+                    canonicalDownloadPath,
+                    () => destinationCreated = true);
                 
                 return true;
             }
             catch
             {
+                if (destinationCreated)
+                {
+                    try
+                    {
+                        UpdateInstaller.DeleteOwnedArchive(
+                            installationDirectory,
+                            workspace,
+                            downloadPath);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Console.Error.WriteLine(
+                            $"Updater cleanup failed; preserving the original failure: {cleanupException}");
+                    }
+                }
+
                 Console.WriteLine("无法从 GitHub 下载最新版本。");
                 return false;
             }

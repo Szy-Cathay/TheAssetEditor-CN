@@ -10,17 +10,138 @@ namespace AssetEditorUpdaterTests;
 public class UpdateInstallerTests
 {
     [Test]
+    public void Install_UsesOwnedWorkspaceAndSiblingStagingDirectory()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var transactionPaths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                owned.Workspace.UpdateDirectory);
+            var copySources = new List<string>();
+
+            void CopyAndRecord(string sourceDirectory, string destinationDirectory)
+            {
+                copySources.Add(sourceDirectory);
+                UpdateInstaller.CopyDirectory(sourceDirectory, destinationDirectory);
+            }
+
+            UpdateInstaller.Install(
+                archivePath,
+                installationDirectory,
+                owned.Workspace,
+                CopyAndRecord,
+                owned.LocalRoot,
+                owned.CommonRoot);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    copySources.Any(path => PathsEqual(path, transactionPaths.StagingDirectory)),
+                    Is.True);
+                Assert.That(
+                    Directory.Exists(Path.Combine(owned.Workspace.UpdateDirectory, "staging")),
+                    Is.False);
+                Assert.That(
+                    Directory.Exists(transactionPaths.StagingDirectory),
+                    Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_MissingMarkerIsRejectedBeforeExtractionOrCopy()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                owned.Workspace.UpdateDirectory);
+            File.Delete(paths.MarkerPath);
+            var copyCount = 0;
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.Install(
+                    archivePath,
+                    installationDirectory,
+                    owned.Workspace,
+                    (_, _) => copyCount++,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(copyCount, Is.Zero);
+                Assert.That(Directory.Exists(paths.StagingDirectory), Is.False);
+                Assert.That(Directory.Exists(paths.BackupRootDirectory), Is.False);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_ArchiveOutsideUpdateIsRejectedBeforeExtractionOrCopy()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(root);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                owned.Workspace.UpdateDirectory);
+            var copyCount = 0;
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.Install(
+                    archivePath,
+                    installationDirectory,
+                    owned.Workspace,
+                    (_, _) => copyCount++,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(copyCount, Is.Zero);
+                Assert.That(Directory.Exists(paths.StagingDirectory), Is.False);
+                Assert.That(Directory.Exists(paths.BackupRootDirectory), Is.False);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
     public void Install_ValidZip_ReplacesInstallationAndKeepsExternalBackup()
     {
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateUpdateZip(root,
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateUpdateZip(updateDirectory,
                 (@"AssetEditor.CN\data\config.json", "new config"));
 
-            var backupDirectory = UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory);
+            var backupDirectory = InstallUpdate(
+                archivePath,
+                installationDirectory,
+                owned);
             var backupRoot = UpdateInstaller.GetBackupRootDirectory(updateDirectory);
 
             Assert.Multiple(() =>
@@ -33,7 +154,69 @@ public class UpdateInstallerTests
                 Assert.That(File.ReadAllText(Path.Combine(backupDirectory, "old-only.txt")), Is.EqualTo("old file"));
                 Assert.That(IsWithinDirectory(installationDirectory, backupDirectory), Is.False);
                 Assert.That(IsWithinDirectory(backupRoot, backupDirectory), Is.True);
-                Assert.That(File.Exists(Path.Combine(backupRoot, UpdateInstaller.BackupRootMarkerFileName)), Is.True);
+                Assert.That(
+                    Path.GetDirectoryName(backupDirectory),
+                    Is.EqualTo(backupRoot));
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        backupRoot,
+                        ".asset-editor-cn-updater-backups")),
+                    Is.False);
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        owned.Workspace.TransactionRoot,
+                        UpdaterWorkspaceFactory.TransactionMarkerFileName)),
+                    Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_ProtectedDerivedDirectoriesUseExactProtectedDescriptor()
+    {
+        if (!UpdaterWorkspaceFactory.IsProcessElevated())
+            Assert.Ignore("Protected installer verification requires an elevated Windows token.");
+
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var localRoot = Path.Combine(root, "local");
+            var commonRoot = Directory.CreateDirectory(
+                Path.Combine(root, "common")).FullName;
+            var workspace = UpdaterWorkspaceFactory.Create(
+                UpdaterWorkspaceFactory.GetLayout(
+                    true,
+                    Guid.NewGuid(),
+                    localRoot,
+                    commonRoot));
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(workspace.UpdateDirectory);
+
+            var backupDirectory = UpdateInstaller.Install(
+                archivePath,
+                installationDirectory,
+                workspace,
+                UpdateInstaller.CopyDirectory,
+                localRoot,
+                commonRoot);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                workspace.UpdateDirectory);
+
+            Assert.Multiple(() =>
+            {
+                Assert.DoesNotThrow(() =>
+                    UpdaterWorkspaceSecurity.ValidateProtectedDirectory(
+                        paths.StagingDirectory));
+                Assert.DoesNotThrow(() =>
+                    UpdaterWorkspaceSecurity.ValidateProtectedDirectory(
+                        paths.BackupRootDirectory));
+                Assert.DoesNotThrow(() =>
+                    UpdaterWorkspaceSecurity.ValidateProtectedDirectory(
+                        backupDirectory));
             });
         }
         finally
@@ -55,12 +238,13 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateUpdateZip(root, (unsafeEntry, "unsafe"));
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateUpdateZip(updateDirectory, (unsafeEntry, "unsafe"));
 
             Assert.Throws<InvalidDataException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+                InstallUpdate(archivePath, installationDirectory, owned));
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
         }
@@ -76,12 +260,15 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateZip(root, ("AssetEditor.CN/readme.txt", "missing executable"));
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateZip(
+                updateDirectory,
+                ("AssetEditor.CN/readme.txt", "missing executable"));
 
             Assert.Throws<InvalidDataException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+                InstallUpdate(archivePath, installationDirectory, owned));
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
         }
@@ -97,12 +284,15 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateZip(root, ("AssetEditor.CN/AssetEditor.CN.exe", "new executable"));
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateZip(
+                updateDirectory,
+                ("AssetEditor.CN/AssetEditor.CN.exe", "new executable"));
 
             Assert.Throws<InvalidDataException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+                InstallUpdate(archivePath, installationDirectory, owned));
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
         }
@@ -119,13 +309,14 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateUpdateZip(root,
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateUpdateZip(updateDirectory,
                 ($"AssetEditor.CN/{backupDirectoryName}/injected.txt", "injected"));
 
             Assert.Throws<InvalidDataException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+                InstallUpdate(archivePath, installationDirectory, owned));
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
         }
@@ -141,12 +332,13 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateZipWithDirectory(root, "AnotherRoot/");
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateZipWithDirectory(updateDirectory, "AnotherRoot/");
 
             Assert.Throws<InvalidDataException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+                InstallUpdate(archivePath, installationDirectory, owned));
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
         }
@@ -162,12 +354,13 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateTarWithZipExtension(root);
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateTarWithZipExtension(updateDirectory);
 
             Assert.That(
-                () => UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory),
+                () => InstallUpdate(archivePath, installationDirectory, owned),
                 Throws.Exception);
 
             AssertInstallationWasNotTouched(installationDirectory, updateDirectory);
@@ -184,12 +377,16 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateUpdateZip(root,
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateUpdateZip(updateDirectory,
                 ("AssetEditor.CN/UPDATE~1/injected.txt", "payload file"));
 
-            var backupDirectory = UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory);
+            var backupDirectory = InstallUpdate(
+                archivePath,
+                installationDirectory,
+                owned);
 
             Assert.Multiple(() =>
             {
@@ -211,10 +408,15 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateUpdateZip(root, ("AssetEditor.CN/new-only.txt", "new file"));
-            var stagingDirectory = Path.Combine(updateDirectory, "staging");
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateUpdateZip(
+                updateDirectory,
+                ("AssetEditor.CN/new-only.txt", "new file"));
+            var stagingDirectory = UpdaterWorkspaceFactory
+                .GetTransactionPaths(updateDirectory)
+                .StagingDirectory;
             var backupRoot = UpdateInstaller.GetBackupRootDirectory(updateDirectory);
             var installFailure = new IOException("controlled install copy failure");
             var rollbackWasAttempted = false;
@@ -236,7 +438,11 @@ public class UpdateInstallerTests
             }
 
             var exception = Assert.Throws<IOException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory, CopyWithInstallFailure));
+                InstallUpdate(
+                    archivePath,
+                    installationDirectory,
+                    owned,
+                    CopyWithInstallFailure));
 
             Assert.Multiple(() =>
             {
@@ -260,14 +466,17 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var firstArchivePath = CreateUpdateZip(root);
-            var existingBackup = UpdateInstaller.Install(firstArchivePath, installationDirectory, updateDirectory);
+            var updateDirectory = owned.Workspace.UpdateDirectory;
             File.WriteAllText(Path.Combine(installationDirectory, "current-only.txt"), "current file");
 
-            var archivePath = CreateUpdateZip(root, ("AssetEditor.CN/next-only.txt", "next file"));
-            var stagingDirectory = Path.Combine(updateDirectory, "staging");
+            var archivePath = CreateUpdateZip(
+                updateDirectory,
+                ("AssetEditor.CN/next-only.txt", "next file"));
+            var stagingDirectory = UpdaterWorkspaceFactory
+                .GetTransactionPaths(updateDirectory)
+                .StagingDirectory;
             var backupRoot = UpdateInstaller.GetBackupRootDirectory(updateDirectory);
             var installFailure = new IOException("controlled install copy failure");
             var rollbackFailure = new UnauthorizedAccessException("controlled rollback copy failure");
@@ -288,16 +497,20 @@ public class UpdateInstallerTests
             }
 
             var exception = Assert.Throws<AggregateException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory, CopyWithBothFailures));
+                InstallUpdate(
+                    archivePath,
+                    installationDirectory,
+                    owned,
+                    CopyWithBothFailures));
 
             var backupCandidates = GetBackupCandidates(updateDirectory);
-            var failedTransactionBackup = backupCandidates.Single(path => !PathsEqual(path, existingBackup));
+            var failedTransactionBackup = backupCandidates.Single();
             Assert.Multiple(() =>
             {
                 Assert.That(exception!.InnerExceptions, Is.EqualTo(new Exception[] { installFailure, rollbackFailure }));
                 Assert.That(File.Exists(Path.Combine(installationDirectory, "partial-new.txt")), Is.False);
-                Assert.That(backupCandidates, Has.Count.EqualTo(2));
-                Assert.That(File.ReadAllText(Path.Combine(existingBackup, "old-only.txt")), Is.EqualTo("old file"));
+                Assert.That(backupCandidates, Has.Count.EqualTo(1));
+                Assert.That(File.ReadAllText(Path.Combine(failedTransactionBackup, "old-only.txt")), Is.EqualTo("old file"));
                 Assert.That(File.ReadAllText(Path.Combine(failedTransactionBackup, "current-only.txt")), Is.EqualTo("current file"));
             });
         }
@@ -313,9 +526,10 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var archivePath = CreateUpdateZip(root);
+            var updateDirectory = owned.Workspace.UpdateDirectory;
+            var archivePath = CreateUpdateZip(updateDirectory);
             var backupFailure = new IOException("controlled backup copy failure");
 
             void CopyWithBackupFailure(string sourceDirectory, string destinationDirectory)
@@ -331,7 +545,11 @@ public class UpdateInstallerTests
             }
 
             var exception = Assert.Throws<IOException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory, CopyWithBackupFailure));
+                InstallUpdate(
+                    archivePath,
+                    installationDirectory,
+                    owned,
+                    CopyWithBackupFailure));
 
             var backupCandidate = GetBackupCandidates(updateDirectory).Single();
             Assert.Multiple(() =>
@@ -356,6 +574,79 @@ public class UpdateInstallerTests
             Assert.That(UpdaterProgram.IsZipAssetName("AssetEditor.CN.ZIP"), Is.True);
             Assert.That(UpdaterProgram.IsZipAssetName("AssetEditor.CN.rar"), Is.False);
         });
+    }
+
+    [TestCase("")]
+    [TestCase(" ")]
+    [TestCase(".")]
+    [TestCase("..")]
+    [TestCase(@"C:\release.zip")]
+    [TestCase(@"folder\release.zip")]
+    [TestCase("folder/release.zip")]
+    [TestCase("release.zip.")]
+    [TestCase("release.zip ")]
+    [TestCase("invalid|name.zip")]
+    [TestCase("release.rar")]
+    public void GetAssetDownloadPath_UnsafeAssetLeafIsRejected(string assetName)
+    {
+        var updateDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"asset-download-{Guid.NewGuid():N}",
+            "Update");
+
+        Assert.Throws<InvalidDataException>(() =>
+            UpdaterProgram.GetAssetDownloadPath(updateDirectory, assetName));
+    }
+
+    [Test]
+    public void GetAssetDownloadPath_NullAssetLeafIsRejected()
+    {
+        Assert.Throws<InvalidDataException>(() =>
+            UpdaterProgram.GetAssetDownloadPath(Path.GetTempPath(), null!));
+    }
+
+    [Test]
+    public void GetAssetDownloadPath_ValidZipLeafStaysDirectlyInsideUpdate()
+    {
+        var updateDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"asset-download-{Guid.NewGuid():N}",
+            "Update");
+
+        var assetPath = UpdaterProgram.GetAssetDownloadPath(
+            updateDirectory,
+            "AssetEditor.CN-1.2.3.ZIP");
+
+        Assert.That(
+            assetPath,
+            Is.EqualTo(Path.Combine(
+                Path.GetFullPath(updateDirectory),
+                "AssetEditor.CN-1.2.3.ZIP")));
+    }
+
+    [Test]
+    public async Task CopyAssetDownloadAsync_PreExistingArchiveIsNotOverwritten()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var updateDirectory = Directory.CreateDirectory(
+                Path.Combine(root, "Update")).FullName;
+            var assetPath = UpdaterProgram.GetAssetDownloadPath(
+                updateDirectory,
+                "AssetEditor.CN.zip");
+            File.WriteAllText(assetPath, "preserve");
+            await using var source = new MemoryStream("replacement"u8.ToArray());
+
+            Assert.ThrowsAsync<IOException>(async () =>
+                await UpdaterProgram.CopyAssetDownloadAsync(source, assetPath));
+
+            Assert.That(File.ReadAllText(assetPath), Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     [Test]
@@ -387,40 +678,44 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
-            var transactionRoot = Path.Combine(root, "transactions");
+            OwnedLocalWorkspace owned;
             string installationDirectory;
-            string updateDirectory;
             switch (layout)
             {
                 case "update-inside-installation":
                     installationDirectory = CreateInstallationAt(Path.Combine(root, "installation"));
-                    updateDirectory = Directory.CreateDirectory(Path.Combine(installationDirectory, "Update")).FullName;
+                    owned = CreateOwnedLocalWorkspace(
+                        root,
+                        Path.Combine(installationDirectory, "local"));
                     break;
                 case "installation-inside-update":
-                    updateDirectory = Directory.CreateDirectory(Path.Combine(transactionRoot, "Update")).FullName;
-                    installationDirectory = CreateInstallationAt(Path.Combine(updateDirectory, "installation"));
+                    owned = CreateOwnedLocalWorkspace(root);
+                    installationDirectory = CreateInstallationAt(
+                        Path.Combine(owned.Workspace.UpdateDirectory, "installation"));
                     break;
                 case "installation-inside-backup":
-                    updateDirectory = Directory.CreateDirectory(Path.Combine(transactionRoot, "Update")).FullName;
+                    owned = CreateOwnedLocalWorkspace(root);
                     var backupRoot = Directory.CreateDirectory(
-                        UpdateInstaller.GetBackupRootDirectory(updateDirectory)).FullName;
+                        UpdateInstaller.GetBackupRootDirectory(
+                            owned.Workspace.UpdateDirectory)).FullName;
                     installationDirectory = CreateInstallationAt(Path.Combine(backupRoot, "installation"));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(layout));
             }
 
-            var archiveRoot = Directory.CreateDirectory(Path.Combine(root, "archives")).FullName;
-            var archivePath = CreateUpdateZip(archiveRoot);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var paths = UpdaterWorkspaceFactory.GetTransactionPaths(
+                owned.Workspace.UpdateDirectory);
 
             Assert.Throws<InvalidOperationException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+                InstallUpdate(archivePath, installationDirectory, owned));
 
             Assert.Multiple(() =>
             {
                 Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "AssetEditor.CN.exe")), Is.EqualTo("old executable"));
                 Assert.That(File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")), Is.EqualTo("old file"));
-                Assert.That(Directory.Exists(Path.Combine(updateDirectory, "staging")), Is.False);
+                Assert.That(Directory.Exists(paths.StagingDirectory), Is.False);
             });
         }
         finally
@@ -430,21 +725,24 @@ public class UpdateInstallerTests
     }
 
     [Test]
-    public void Install_UnownedBackupRoot_RejectsWithoutDeletingUserData()
+    public void Install_PreExistingStagingIsRejectedWithoutDeletingUnknownData()
     {
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = CreateInstallation(root);
-            var updateDirectory = Directory.CreateDirectory(Path.Combine(root, "update")).FullName;
-            var backupRoot = Directory.CreateDirectory(
-                UpdateInstaller.GetBackupRootDirectory(updateDirectory)).FullName;
-            var userDataPath = Path.Combine(backupRoot, "user-data.txt");
+            var stagingDirectory = Directory.CreateDirectory(
+                UpdaterWorkspaceFactory
+                    .GetTransactionPaths(owned.Workspace.UpdateDirectory)
+                    .StagingDirectory).FullName;
+            var userDataPath = Path.Combine(stagingDirectory, "user-data.txt");
             File.WriteAllText(userDataPath, "do not delete");
-            var archivePath = CreateUpdateZip(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
 
-            Assert.Throws<InvalidOperationException>(() =>
-                UpdateInstaller.Install(archivePath, installationDirectory, updateDirectory));
+            Assert.That(
+                () => InstallUpdate(archivePath, installationDirectory, owned),
+                Throws.Exception);
 
             Assert.Multiple(() =>
             {
@@ -544,6 +842,195 @@ public class UpdateInstallerTests
         }
         finally
         {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_DoesNotDeleteOtherGuidTransaction()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var siblingTransaction = Directory.CreateDirectory(
+                Path.Combine(
+                    Path.GetDirectoryName(owned.Workspace.TransactionRoot)!,
+                    Guid.NewGuid().ToString("N"))).FullName;
+            var siblingSentinel = Path.Combine(
+                siblingTransaction,
+                "recovery-evidence.txt");
+            File.WriteAllText(siblingSentinel, "preserve");
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+
+            InstallUpdate(archivePath, installationDirectory, owned);
+
+            Assert.That(
+                File.ReadAllText(siblingSentinel),
+                Is.EqualTo("preserve"));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_InstallationTreeReparseIsRejectedBeforeBackupOrClear()
+    {
+        var root = CreateTemporaryDirectory();
+        var linkedPath = Path.Combine(root, "installation", "linked");
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var externalDirectory = Directory.CreateDirectory(
+                Path.Combine(root, "external")).FullName;
+            var externalSentinel = Path.Combine(externalDirectory, "preserve.txt");
+            File.WriteAllText(externalSentinel, "preserve");
+            TryCreateDirectorySymbolicLinkOrIgnore(linkedPath, externalDirectory);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var copyCount = 0;
+
+            Assert.Throws<InvalidDataException>(() =>
+                InstallUpdate(
+                    archivePath,
+                    installationDirectory,
+                    owned,
+                    (_, _) => copyCount++));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(copyCount, Is.Zero);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")),
+                    Is.EqualTo("old file"));
+                Assert.That(File.ReadAllText(externalSentinel), Is.EqualTo("preserve"));
+            });
+        }
+        finally
+        {
+            DeleteDirectoryLinkIfPresent(linkedPath);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_RevalidatesMarkerAfterBackupBeforeClearingInstallation()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var markerPath = UpdaterWorkspaceFactory
+                .GetTransactionPaths(owned.Workspace.UpdateDirectory)
+                .MarkerPath;
+
+            void CopyAndCorruptMarker(
+                string sourceDirectory,
+                string destinationDirectory)
+            {
+                UpdateInstaller.CopyDirectory(sourceDirectory, destinationDirectory);
+                if (PathsEqual(sourceDirectory, installationDirectory))
+                    File.WriteAllText(markerPath, "wrong marker");
+            }
+
+            Assert.Throws<InvalidDataException>(() =>
+                InstallUpdate(
+                    archivePath,
+                    installationDirectory,
+                    owned,
+                    CopyAndCorruptMarker));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "AssetEditor.CN.exe")),
+                    Is.EqualTo("old executable"));
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "old-only.txt")),
+                    Is.EqualTo("old file"));
+                Assert.That(GetBackupCandidates(owned.Workspace.UpdateDirectory), Has.Count.EqualTo(1));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void Install_ExtractionCleanupRejectsReparseTargetAndPreservesPrimaryFailure()
+    {
+        var root = CreateTemporaryDirectory();
+        string? stagingDirectory = null;
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var archivePath = CreateUpdateZip(owned.Workspace.UpdateDirectory);
+            var externalDirectory = Directory.CreateDirectory(
+                Path.Combine(root, "external")).FullName;
+            var externalSentinel = Path.Combine(externalDirectory, "preserve.txt");
+            File.WriteAllText(externalSentinel, "preserve");
+            var extractionFailure = new InvalidDataException(
+                "controlled extraction failure");
+
+            void ReplaceStagingWithReparseAndFail(string createdStagingDirectory)
+            {
+                stagingDirectory = createdStagingDirectory;
+                Directory.Delete(createdStagingDirectory);
+                TryCreateDirectorySymbolicLinkOrIgnore(
+                    createdStagingDirectory,
+                    externalDirectory);
+                throw extractionFailure;
+            }
+
+            var previousError = Console.Error;
+            using var cleanupLog = new StringWriter();
+            InvalidDataException? actual;
+            try
+            {
+                Console.SetError(cleanupLog);
+                actual = Assert.Throws<InvalidDataException>(() =>
+                    UpdateInstaller.Install(
+                        archivePath,
+                        installationDirectory,
+                        owned.Workspace,
+                        UpdateInstaller.CopyDirectory,
+                        owned.LocalRoot,
+                        owned.CommonRoot,
+                        ReplaceStagingWithReparseAndFail));
+            }
+            finally
+            {
+                Console.SetError(previousError);
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual, Is.SameAs(extractionFailure));
+                Assert.That(
+                    cleanupLog.ToString(),
+                    Does.Contain("preserving the original failure"));
+                Assert.That(File.ReadAllText(externalSentinel), Is.EqualTo("preserve"));
+                Assert.That(Directory.Exists(stagingDirectory), Is.True);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(installationDirectory, "old-only.txt")),
+                    Is.EqualTo("old file"));
+            });
+        }
+        finally
+        {
+            if (stagingDirectory != null)
+                DeleteDirectoryLinkIfPresent(stagingDirectory);
             Directory.Delete(root, true);
         }
     }
@@ -796,15 +1283,25 @@ public class UpdateInstallerTests
         var root = CreateTemporaryDirectory();
         try
         {
+            var owned = CreateOwnedLocalWorkspace(root);
             var installationDirectory = Directory.CreateDirectory(Path.Combine(root, "installation")).FullName;
             var backupDirectory = Directory.CreateDirectory(
-                Path.Combine(root, "UpdateBackups", "backup-test")).FullName;
+                Path.Combine(
+                    UpdateInstaller.GetBackupRootDirectory(
+                        owned.Workspace.UpdateDirectory),
+                    $"backup-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}")).FullName;
             File.WriteAllText(Path.Combine(backupDirectory, "AssetEditor.CN.exe"), "old executable");
             File.WriteAllText(Path.Combine(backupDirectory, "old-only.txt"), "old file");
             File.WriteAllText(Path.Combine(installationDirectory, "AssetEditor.CN.exe"), "partial executable");
             File.WriteAllText(Path.Combine(installationDirectory, "partial-new.txt"), "partial file");
 
-            UpdateInstaller.RestoreBackup(installationDirectory, backupDirectory);
+            UpdateInstaller.RestoreBackup(
+                installationDirectory,
+                owned.Workspace,
+                backupDirectory,
+                UpdateInstaller.CopyDirectory,
+                owned.LocalRoot,
+                owned.CommonRoot);
 
             Assert.Multiple(() =>
             {
@@ -836,6 +1333,36 @@ public class UpdateInstallerTests
         File.WriteAllText(Path.Combine(installationDirectory, "AssetEditor.CN.exe"), "old executable");
         File.WriteAllText(Path.Combine(installationDirectory, "old-only.txt"), "old file");
         return installationDirectory;
+    }
+
+    private static OwnedLocalWorkspace CreateOwnedLocalWorkspace(
+        string root,
+        string? localRoot = null)
+    {
+        localRoot ??= Path.Combine(root, "local");
+        var commonRoot = Path.Combine(root, "common");
+        var workspace = UpdaterWorkspaceFactory.Create(
+            UpdaterWorkspaceFactory.GetLayout(
+                false,
+                Guid.Empty,
+                localRoot,
+                commonRoot));
+        return new OwnedLocalWorkspace(localRoot, commonRoot, workspace);
+    }
+
+    private static string InstallUpdate(
+        string archivePath,
+        string installationDirectory,
+        OwnedLocalWorkspace owned,
+        Action<string, string>? copyDirectory = null)
+    {
+        return UpdateInstaller.Install(
+            archivePath,
+            installationDirectory,
+            owned.Workspace,
+            copyDirectory ?? UpdateInstaller.CopyDirectory,
+            owned.LocalRoot,
+            owned.CommonRoot);
     }
 
     private static string CreateZip(string root, params (string Path, string Contents)[] entries)
@@ -943,6 +1470,103 @@ public class UpdateInstallerTests
         }
     }
 
+    [TestCase("backup-test")]
+    [TestCase("backup-20260727010203004-00000000000000000000000000000000")]
+    [TestCase("backup-20260727010203004-0123456789ABCDEF0123456789ABCDEF")]
+    public void RestoreBackup_InvalidCandidateNameIsRejectedBeforeClear(
+        string candidateName)
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var backupDirectory = Directory.CreateDirectory(
+                Path.Combine(
+                    UpdateInstaller.GetBackupRootDirectory(
+                        owned.Workspace.UpdateDirectory),
+                    candidateName)).FullName;
+            File.WriteAllText(
+                Path.Combine(backupDirectory, "AssetEditor.CN.exe"),
+                "old executable");
+            var copyCount = 0;
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.RestoreBackup(
+                    installationDirectory,
+                    owned.Workspace,
+                    backupDirectory,
+                    (_, _) => copyCount++,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(copyCount, Is.Zero);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "old-only.txt")),
+                    Is.EqualTo("old file"));
+                Assert.That(Directory.Exists(backupDirectory), Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
+    public void RestoreBackup_ReparseCandidateIsRejectedBeforeClear()
+    {
+        var root = CreateTemporaryDirectory();
+        string? backupLink = null;
+        try
+        {
+            var owned = CreateOwnedLocalWorkspace(root);
+            var installationDirectory = CreateInstallation(root);
+            var externalBackup = Directory.CreateDirectory(
+                Path.Combine(root, "external-backup")).FullName;
+            var externalSentinel = Path.Combine(externalBackup, "preserve.txt");
+            File.WriteAllText(externalSentinel, "preserve");
+            var backupRoot = Directory.CreateDirectory(
+                UpdateInstaller.GetBackupRootDirectory(
+                    owned.Workspace.UpdateDirectory)).FullName;
+            backupLink = Path.Combine(
+                backupRoot,
+                $"backup-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}");
+            TryCreateDirectorySymbolicLinkOrIgnore(backupLink, externalBackup);
+            var copyCount = 0;
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdateInstaller.RestoreBackup(
+                    installationDirectory,
+                    owned.Workspace,
+                    backupLink,
+                    (_, _) => copyCount++,
+                    owned.LocalRoot,
+                    owned.CommonRoot));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(copyCount, Is.Zero);
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        installationDirectory,
+                        "old-only.txt")),
+                    Is.EqualTo("old file"));
+                Assert.That(File.ReadAllText(externalSentinel), Is.EqualTo("preserve"));
+            });
+        }
+        finally
+        {
+            if (backupLink != null)
+                DeleteDirectoryLinkIfPresent(backupLink);
+            Directory.Delete(root, true);
+        }
+    }
+
     private static void TryCreateJunctionOrIgnore(string path, string targetPath)
     {
         var startInfo = new ProcessStartInfo
@@ -983,4 +1607,9 @@ public class UpdateInstallerTests
             ? @"\\?\UNC\" + fullPath[2..]
             : @"\\?\" + fullPath;
     }
+
+    private sealed record OwnedLocalWorkspace(
+        string LocalRoot,
+        string CommonRoot,
+        UpdaterWorkspace Workspace);
 }

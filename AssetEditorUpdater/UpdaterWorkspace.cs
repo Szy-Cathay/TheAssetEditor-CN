@@ -228,6 +228,38 @@ internal static class UpdaterWorkspaceFactory
             layout.IsProtected);
     }
 
+    internal static void CreateOwnedDirectoryFresh(
+        string path,
+        bool requireProtectedAcl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var parent = Path.GetDirectoryName(fullPath)
+            ?? throw new ArgumentException(
+                "The updater directory must have a parent.",
+                nameof(path));
+        ValidateExistingDirectory(parent);
+
+        if (requireProtectedAcl)
+        {
+            CreateDirectoryAtomically(
+                fullPath,
+                UpdaterWorkspaceSecurity.CreateProtectedDescriptor());
+            UpdaterWorkspaceSecurity.ValidateProtectedDirectory(fullPath);
+            return;
+        }
+
+        if (!CreateDirectoryWithoutSecurity(fullPath, IntPtr.Zero))
+        {
+            var error = Marshal.GetLastWin32Error();
+            throw new IOException(
+                $"Unable to create a fresh updater directory: {fullPath}",
+                new Win32Exception(error));
+        }
+
+        ValidateExistingDirectory(fullPath);
+    }
+
     private static string GetCanonicalRoot(string? configuredRoot, Environment.SpecialFolder specialFolder)
     {
         var root = configuredRoot ?? Environment.GetFolderPath(specialFolder);
@@ -683,6 +715,12 @@ internal static class UpdaterWorkspaceFactory
     private static extern bool CreateDirectory(
         string path,
         ref SecurityAttributes securityAttributes);
+
+    [DllImport("kernel32.dll", EntryPoint = "CreateDirectoryW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateDirectoryWithoutSecurity(
+        string path,
+        IntPtr securityAttributes);
 }
 
 internal static class UpdaterWorkspaceSecurity
