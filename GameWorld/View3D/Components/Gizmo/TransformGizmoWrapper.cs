@@ -58,6 +58,7 @@ namespace GameWorld.Core.Components.Gizmo
         private HashSet<int> _gestureAffectedVertexIndices;
         private Dictionary<int, float> _gestureFalloffWeights;
         private VertexUploadRange?[] _displayedPreviewRanges;
+        private VertexUploadRange?[] _nextPreviewRanges;
         private bool _previewSynchronizationFaulted;
 
         private readonly record struct VertexUploadRange(
@@ -78,6 +79,24 @@ namespace GameWorld.Core.Components.Gizmo
                 return new VertexUploadRange(
                     Math.Min(first.FirstModifiedVertex, second.FirstModifiedVertex),
                     Math.Max(first.LastModifiedVertex, second.LastModifiedVertex));
+            }
+        }
+
+        private readonly record struct PreviewApplyResult(
+            bool Accepted,
+            IReadOnlyList<VertexTransformMeshResult> MeshResults)
+        {
+            public static PreviewApplyResult Rejected()
+            {
+                return new PreviewApplyResult(
+                    false,
+                    Array.Empty<VertexTransformMeshResult>());
+            }
+
+            public static PreviewApplyResult Applied(
+                IReadOnlyList<VertexTransformMeshResult> meshResults)
+            {
+                return new PreviewApplyResult(true, meshResults);
             }
         }
 
@@ -252,6 +271,8 @@ namespace GameWorld.Core.Components.Gizmo
                 CancelTransform();
 
             ResetGestureState();
+            if (_selectionState is FaceSelectionState or EdgeSelectionState)
+                ComputeFalloffWeights();
             if (_selectionState is BoneSelectionState)
             {
                 var boneCommand = _commandFactory.Create<TransformBoneCommand>()
@@ -288,6 +309,12 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void CommitTransform(CommandExecutor commandExecutor)
         {
+            if (_previewSynchronizationFaulted)
+            {
+                throw new InvalidOperationException(
+                    "The transform preview is not synchronized. Cancel the transform before continuing.");
+            }
+
             EndTransform(() =>
             {
                 if (_activeCommand is TransformVertexCommand transformVertexCommand)
@@ -342,7 +369,141 @@ namespace GameWorld.Core.Components.Gizmo
             if (_activeCommand is not TransformVertexCommand || !_hasBackup)
                 return;
 
-            RestoreVertexBaseline();
+            if (_previewSynchronizationFaulted)
+            {
+                throw new InvalidOperationException(
+                    "The transform preview is not synchronized. Cancel the transform before continuing.");
+            }
+
+            try
+            {
+                RestoreVertexBaseline();
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
+            }
+        }
+
+        internal void ReplaceInitialPreview(
+            ModalPreviewReplacement replacement)
+        {
+            if (_activeCommand is TransformBoneCommand transformBoneCommand)
+            {
+                ReplaceBoneInitialPreview(
+                    transformBoneCommand,
+                    replacement);
+                return;
+            }
+
+            if (_activeCommand is not TransformVertexCommand || !_hasBackup)
+                return;
+            if (_previewSynchronizationFaulted)
+            {
+                throw new InvalidOperationException(
+                    "The transform preview is not synchronized. Cancel the transform before continuing.");
+            }
+
+            try
+            {
+                var restoreError = RestoreVertexBaselineCpuAndIndex();
+                restoreError?.Throw();
+                ResetGestureCandidateToBaseline();
+
+                var result = ApplyReplacement(replacement);
+                if (result.Accepted)
+                    SynchronizeVertexPreview(result.MeshResults);
+                else
+                    SynchronizeBaselinePreview();
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
+            }
+        }
+
+        private PreviewApplyResult ApplyReplacement(
+            ModalPreviewReplacement replacement)
+        {
+            return replacement.Kind switch
+            {
+                ModalPreviewReplacementKind.RestoreOnly =>
+                    PreviewApplyResult.Rejected(),
+                ModalPreviewReplacementKind.Translate =>
+                    TryTranslatePreview(
+                        replacement.VectorValue,
+                        replacement.Pivot),
+                ModalPreviewReplacementKind.Rotate =>
+                    TryRotatePreview(
+                        replacement.RotationValue,
+                        replacement.Pivot),
+                ModalPreviewReplacementKind.Scale =>
+                    TryScalePreview(
+                        replacement.VectorValue,
+                        replacement.Pivot),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(replacement))
+            };
+        }
+
+        private void ReplaceBoneInitialPreview(
+            TransformBoneCommand transformBoneCommand,
+            ModalPreviewReplacement replacement)
+        {
+            ExceptionDispatchInfo primaryError = null;
+            try
+            {
+                transformBoneCommand.RestoreInitialFrame();
+                ResetBonePreviewToBaseline();
+                ApplyBoneReplacement(replacement);
+                return;
+            }
+            catch (Exception exception)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                transformBoneCommand.RestoreInitialFrame();
+                ResetBonePreviewToBaseline();
+            }
+            catch (Exception recoveryException)
+            {
+                _logger.Error(
+                    recoveryException,
+                    "Failed to recover the initial bone transform preview");
+            }
+
+            primaryError.Throw();
+        }
+
+        private void ApplyBoneReplacement(
+            ModalPreviewReplacement replacement)
+        {
+            switch (replacement.Kind)
+            {
+                case ModalPreviewReplacementKind.RestoreOnly:
+                    return;
+                case ModalPreviewReplacementKind.Translate:
+                    GizmoTranslateEvent(
+                        replacement.VectorValue,
+                        replacement.Pivot);
+                    return;
+                case ModalPreviewReplacementKind.Rotate:
+                    GizmoRotateEvent(
+                        replacement.RotationValue,
+                        replacement.Pivot);
+                    return;
+                case ModalPreviewReplacementKind.Scale:
+                    GizmoScaleEvent(
+                        replacement.VectorValue,
+                        replacement.Pivot);
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(replacement));
+            }
         }
 
         private void EndTransform(Action transformEnd)
@@ -413,6 +574,7 @@ namespace GameWorld.Core.Components.Gizmo
             _gestureAffectedVertexIndices = null;
             _gestureFalloffWeights = null;
             _displayedPreviewRanges = null;
+            _nextPreviewRanges = null;
             _previewSynchronizationFaulted = false;
         }
 
@@ -481,16 +643,8 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
-            if (!TryApplyTransform(
-                    Matrix.CreateTranslation(translation),
-                    pivot,
-                    GizmoMode.Translate,
-                    out var results))
-                return;
-
-            SynchronizeVertexPreview(results);
-            Position += translation;
-            _totalGizomTransform *= Matrix.CreateTranslation(translation);
+            RunDirectVertexPreview(
+                () => TryTranslatePreview(translation, pivot));
         }
 
         public void GizmoRotateEvent(Matrix rotation, PivotType pivot)
@@ -510,19 +664,8 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
-            if (!TryApplyTransform(
-                    rotation,
-                    pivot,
-                    GizmoMode.Rotate,
-                    out var results))
-                return;
-
-            SynchronizeVertexPreview(results);
-            _totalGizomTransform *= rotation;
-
-            var fixedTransform = FixRotationAxis2(_totalGizomTransform);
-            fixedTransform.Decompose(out var _, out var quat, out var _);
-            Orientation = quat;
+            RunDirectVertexPreview(
+                () => TryRotatePreview(rotation, pivot));
         }
 
         public void GizmoScaleEvent(Vector3 scale, PivotType pivot)
@@ -544,17 +687,81 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
+            RunDirectVertexPreview(
+                () => TryScalePreview(scale, pivot));
+        }
+
+        private PreviewApplyResult TryTranslatePreview(
+            Vector3 translation,
+            PivotType pivot)
+        {
+            var transform = Matrix.CreateTranslation(translation);
+            if (!TryApplyTransform(
+                    transform,
+                    pivot,
+                    GizmoMode.Translate,
+                    out var results))
+            {
+                return PreviewApplyResult.Rejected();
+            }
+
+            Position += translation;
+            _totalGizomTransform *= transform;
+            return PreviewApplyResult.Applied(results);
+        }
+
+        private PreviewApplyResult TryRotatePreview(
+            Matrix rotation,
+            PivotType pivot)
+        {
+            if (!TryApplyTransform(
+                    rotation,
+                    pivot,
+                    GizmoMode.Rotate,
+                    out var results))
+            {
+                return PreviewApplyResult.Rejected();
+            }
+
+            _totalGizomTransform *= rotation;
+            var fixedTransform = FixRotationAxis2(_totalGizomTransform);
+            fixedTransform.Decompose(out var _, out var quat, out var _);
+            Orientation = quat;
+            return PreviewApplyResult.Applied(results);
+        }
+
+        private PreviewApplyResult TryScalePreview(
+            Vector3 scale,
+            PivotType pivot)
+        {
+            var scaleMatrix = Matrix.CreateScale(scale + Vector3.One);
             if (!TryApplyTransform(
                     scaleMatrix,
                     pivot,
                     GizmoMode.UniformScale,
                     out var results))
-                return;
+            {
+                return PreviewApplyResult.Rejected();
+            }
 
-            SynchronizeVertexPreview(results);
             Scale += scale;
-
             _totalGizomTransform *= scaleMatrix;
+            return PreviewApplyResult.Applied(results);
+        }
+
+        private void RunDirectVertexPreview(
+            Func<PreviewApplyResult> applyPreview)
+        {
+            try
+            {
+                var result = applyPreview();
+                if (result.Accepted)
+                    SynchronizeVertexPreview(result.MeshResults);
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
+            }
         }
 
         bool TryApplyTransform(
@@ -638,7 +845,14 @@ namespace GameWorld.Core.Components.Gizmo
                     "Vertex preview results do not match the captured mesh set.");
             }
 
-            var nextRanges = new VertexUploadRange?[results.Count];
+            if (_nextPreviewRanges == null ||
+                _nextPreviewRanges.Length != results.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview scratch ranges do not match the captured mesh set.");
+            }
+
+            var nextRanges = _nextPreviewRanges;
             for (var meshIndex = 0; meshIndex < results.Count; meshIndex++)
             {
                 var result = results[meshIndex];
@@ -653,16 +867,65 @@ namespace GameWorld.Core.Components.Gizmo
                     ? VertexUploadRange.From(result)
                     : (VertexUploadRange?)null;
                 nextRanges[meshIndex] = nextRange;
+            }
+
+            SynchronizePreviewRanges(nextRanges);
+        }
+
+        private void SynchronizeBaselinePreview()
+        {
+            if (_effectedObjects == null)
+                return;
+            if (_nextPreviewRanges == null ||
+                _nextPreviewRanges.Length != _effectedObjects.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview scratch ranges do not match the captured mesh set.");
+            }
+
+            Array.Clear(
+                _nextPreviewRanges,
+                0,
+                _nextPreviewRanges.Length);
+            SynchronizePreviewRanges(_nextPreviewRanges);
+        }
+
+        private void SynchronizePreviewRanges(
+            VertexUploadRange?[] nextRanges)
+        {
+            if (_displayedPreviewRanges == null ||
+                _effectedObjects == null ||
+                nextRanges.Length != _effectedObjects.Count ||
+                _displayedPreviewRanges.Length != _effectedObjects.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview ranges do not match the captured mesh set.");
+            }
+
+            ExceptionDispatchInfo uploadError = null;
+            for (var meshIndex = 0; meshIndex < nextRanges.Length; meshIndex++)
+            {
+                var mesh = _effectedObjects[meshIndex];
                 var uploadRange = UnionPreviewRanges(
                     _displayedPreviewRanges[meshIndex],
-                    nextRange);
+                    nextRanges[meshIndex]);
                 if (!uploadRange.HasValue)
                     continue;
 
-                UploadVertexRange(mesh, uploadRange.Value);
+                try
+                {
+                    UploadVertexRange(mesh, uploadRange.Value);
+                }
+                catch (Exception exception)
+                {
+                    uploadError ??= ExceptionDispatchInfo.Capture(exception);
+                }
             }
 
+            uploadError?.Throw();
+            var previousRanges = _displayedPreviewRanges;
             _displayedPreviewRanges = nextRanges;
+            _nextPreviewRanges = previousRanges;
         }
 
         private void UploadVertexRange(
@@ -780,6 +1043,8 @@ namespace GameWorld.Core.Components.Gizmo
                 _gestureFalloffWeights = gestureFalloffWeights;
                 _displayedPreviewRanges =
                     new VertexUploadRange?[_effectedObjects.Count];
+                _nextPreviewRanges =
+                    new VertexUploadRange?[_effectedObjects.Count];
                 _vertexTransformReplayPlan = replayPlan;
                 _hasBackup = true;
             }
@@ -800,27 +1065,17 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
-            ExceptionDispatchInfo primaryError = null;
-            var meshCount = Math.Min(
-                _effectedObjects.Count,
-                Math.Min(_backupVertexArrays.Count, _backupIndexArrays.Count));
-            for (var meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            var primaryError = RestoreVertexBaselineCpuAndIndex();
+            if (_previewSynchronizationFaulted)
+            {
+                var uploadError = UploadFullVertexBuffers();
+                primaryError ??= uploadError;
+            }
+            else
             {
                 try
                 {
-                    var mesh = _effectedObjects[meshIndex];
-                    var vertexBackup = _backupVertexArrays[meshIndex];
-                    var indexBackup = _backupIndexArrays[meshIndex];
-                    Array.Copy(vertexBackup, mesh.VertexArray, vertexBackup.Length);
-                    Array.Copy(indexBackup, mesh.IndexArray, indexBackup.Length);
-                    mesh.RebuildIndexBuffer();
-                    var displayedRange =
-                        _displayedPreviewRanges != null &&
-                        meshIndex < _displayedPreviewRanges.Length
-                            ? _displayedPreviewRanges[meshIndex]
-                            : null;
-                    if (displayedRange.HasValue)
-                        UploadVertexRange(mesh, displayedRange.Value);
+                    SynchronizeBaselinePreview();
                 }
                 catch (Exception exception)
                 {
@@ -828,8 +1083,140 @@ namespace GameWorld.Core.Components.Gizmo
                 }
             }
 
-            ResetGestureCandidateToBaseline();
+            try
+            {
+                ResetGestureCandidateToBaseline();
+            }
+            catch (Exception exception)
+            {
+                primaryError ??= ExceptionDispatchInfo.Capture(exception);
+            }
+            ClearDisplayedPreviewRanges();
             primaryError?.Throw();
+        }
+
+        private ExceptionDispatchInfo RestoreVertexBaselineCpuAndIndex()
+        {
+            if (!_hasBackup || _effectedObjects == null ||
+                _backupVertexArrays == null || _backupIndexArrays == null)
+            {
+                return null;
+            }
+
+            ExceptionDispatchInfo primaryError = null;
+            if (_effectedObjects.Count != _backupVertexArrays.Count ||
+                _effectedObjects.Count != _backupIndexArrays.Count)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(
+                    new InvalidOperationException(
+                        "The transform baseline does not match the captured mesh set."));
+            }
+
+            var meshCount = Math.Min(
+                _effectedObjects.Count,
+                Math.Min(_backupVertexArrays.Count, _backupIndexArrays.Count));
+            for (var meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            {
+                var mesh = _effectedObjects[meshIndex];
+                var vertexBackup = _backupVertexArrays[meshIndex];
+                var indexBackup = _backupIndexArrays[meshIndex];
+                try
+                {
+                    Array.Copy(vertexBackup, mesh.VertexArray, vertexBackup.Length);
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    Array.Copy(indexBackup, mesh.IndexArray, indexBackup.Length);
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+
+                try
+                {
+                    mesh.RebuildIndexBuffer();
+                }
+                catch (Exception exception)
+                {
+                    primaryError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            return primaryError;
+        }
+
+        private ExceptionDispatchInfo UploadFullVertexBuffers()
+        {
+            ExceptionDispatchInfo uploadError = null;
+            if (_effectedObjects == null)
+                return null;
+
+            foreach (var mesh in _effectedObjects)
+            {
+                try
+                {
+                    mesh.RebuildVertexBuffer();
+                }
+                catch (Exception exception)
+                {
+                    uploadError ??= ExceptionDispatchInfo.Capture(exception);
+                }
+            }
+
+            return uploadError;
+        }
+
+        private void RecoverVertexPreviewAndRethrow(Exception exception)
+        {
+            var primaryError = ExceptionDispatchInfo.Capture(exception);
+            var recoveryError = RestoreVertexBaselineCpuAndIndex();
+            var uploadError = UploadFullVertexBuffers();
+            recoveryError ??= uploadError;
+
+            try
+            {
+                ResetGestureCandidateToBaseline();
+            }
+            catch (Exception recoveryException)
+            {
+                recoveryError ??=
+                    ExceptionDispatchInfo.Capture(recoveryException);
+            }
+            ClearDisplayedPreviewRanges();
+
+            _previewSynchronizationFaulted = recoveryError != null;
+            if (recoveryError != null)
+            {
+                _logger.Error(
+                    recoveryError.SourceException,
+                    "Failed to synchronize the transform preview with its baseline");
+            }
+
+            primaryError.Throw();
+        }
+
+        private void ClearDisplayedPreviewRanges()
+        {
+            if (_displayedPreviewRanges == null)
+                return;
+
+            Array.Clear(
+                _displayedPreviewRanges,
+                0,
+                _displayedPreviewRanges.Length);
+            if (_nextPreviewRanges != null)
+            {
+                Array.Clear(
+                    _nextPreviewRanges,
+                    0,
+                    _nextPreviewRanges.Length);
+            }
         }
 
         private void ResetGestureCandidateToBaseline()
@@ -840,13 +1227,6 @@ namespace GameWorld.Core.Components.Gizmo
                 VertexTransformOperationApplier.CreateEmptyReplayPlan(
                     GestureSelectionState,
                     GestureFalloffWeights);
-            if (_displayedPreviewRanges != null)
-            {
-                Array.Clear(
-                    _displayedPreviewRanges,
-                    0,
-                    _displayedPreviewRanges.Length);
-            }
             _pos = _backupPosition;
             _orientation = _backupOrientation;
             _scale = _backupScale;
@@ -916,7 +1296,8 @@ namespace GameWorld.Core.Components.Gizmo
         public void SetFalloffDistance(float distance)
         {
             _falloffDistance = distance;
-            ComputeFalloffWeights();
+            if (!IsTransformActive)
+                ComputeFalloffWeights();
         }
 
         /// <summary>

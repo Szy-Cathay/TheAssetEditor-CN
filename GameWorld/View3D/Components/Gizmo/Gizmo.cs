@@ -512,7 +512,6 @@ namespace GameWorld.Core.Components.Gizmo
                 case GizmoMode.Translate:
                     {
                         // For translation, use absolute displacement from initial position
-                        RequestRestoreInitialState?.Invoke();
                         Vector3 totalTranslation = CalculateAbsoluteTranslation(finalDisplacement);
                         ApplyModalTranslationFromInitial(totalTranslation);
                         break;
@@ -522,7 +521,6 @@ namespace GameWorld.Core.Components.Gizmo
                         // For rotation, use absolute angle from initial position
                         const float radiansPerPixel = 0.002f;
                         float totalRotation = finalDisplacement.X * radiansPerPixel;
-                        RequestRestoreInitialState?.Invoke();
                         ApplyModalRotationFromInitial(totalRotation);
                         break;
                     }
@@ -530,7 +528,6 @@ namespace GameWorld.Core.Components.Gizmo
                 case GizmoMode.UniformScale:
                     {
                         // For scale, use absolute scale factor from initial position
-                        RequestRestoreInitialState?.Invoke();
                         float totalScaleFactor;
                         if (IsInNumericInput && _numericInput.Length > 0)
                         {
@@ -653,9 +650,6 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         private void ApplyModalTranslationFromInitial(Vector3 totalTranslation)
         {
-            if (totalTranslation == Vector3.Zero)
-                return;
-
             // Apply translation snap (increment snap)
             if (SnapEnabled && TranslationSnapValue > 0)
             {
@@ -666,10 +660,17 @@ namespace GameWorld.Core.Components.Gizmo
                 );
             }
 
-            foreach (var entity in Selection)
+            if (totalTranslation == Vector3.Zero)
             {
-                OnTranslateEvent(entity, totalTranslation);
+                ReplacePreviewFromInitialRequested?.Invoke(
+                    ModalPreviewReplacement.RestoreOnly(ActivePivot));
+                return;
             }
+
+            ReplacePreviewFromInitialRequested?.Invoke(
+                ModalPreviewReplacement.Translate(
+                    totalTranslation,
+                    ActivePivot));
         }
 
         /// <summary>
@@ -788,8 +789,6 @@ namespace GameWorld.Core.Components.Gizmo
             if (!IsInNumericInput || _numericInput.Length == 0)
                 return;
 
-            RequestRestoreInitialState?.Invoke();
-
             switch (ActiveMode)
             {
                 case GizmoMode.Translate:
@@ -825,7 +824,7 @@ namespace GameWorld.Core.Components.Gizmo
                             }
                         }
                         Vector3 translation = direction * _numericValue;
-                        ApplyModalTranslation(translation);
+                        ApplyModalTranslationFromInitial(translation);
                         break;
                     }
                 case GizmoMode.Rotate:
@@ -1157,104 +1156,17 @@ namespace GameWorld.Core.Components.Gizmo
         }
 
         /// <summary>
-        /// Apply translation using the standard event system
-        /// This ensures vertices are properly transformed
-        /// </summary>
-        private void ApplyModalTranslation(Vector3 delta)
-        {
-            if (delta == Vector3.Zero)
-                return;
-
-            // Trigger the translation event (same as normal gizmo drag)
-            foreach (var entity in Selection)
-            {
-                OnTranslateEvent(entity, delta);
-            }
-        }
-
-        /// <summary>
-        /// Apply rotation using the standard event system
-        /// </summary>
-        private void ApplyModalRotation(float deltaAngle, GameTime gameTime)
-        {
-            if (deltaAngle == 0)
-                return;
-
-            Matrix rotMatrix;
-            if (ActiveAxis == GizmoAxis.None)
-            {
-                rotMatrix = Matrix.CreateFromAxisAngle(Vector3.Up, deltaAngle);
-            }
-            else
-            {
-                Vector3 axis;
-                switch (ActiveAxis)
-                {
-                    case GizmoAxis.X:
-                        axis = _rotationMatrix.Right;
-                        break;
-                    case GizmoAxis.Y:
-                        axis = _rotationMatrix.Up;
-                        break;
-                    case GizmoAxis.Z:
-                        axis = _rotationMatrix.Forward;
-                        break;
-                    default:
-                        return;
-                }
-                rotMatrix = Matrix.CreateFromAxisAngle(axis, deltaAngle);
-            }
-
-            foreach (var entity in Selection)
-            {
-                OnRotateEvent(entity, rotMatrix);
-            }
-        }
-
-        /// <summary>
-        /// Apply scale using the standard event system
-        /// </summary>
-        private void ApplyModalScale(float scaleFactor)
-        {
-            if (scaleFactor == 0)
-                return;
-
-            Vector3 scale;
-            if (ActiveAxis == GizmoAxis.None)
-            {
-                scale = new Vector3(scaleFactor, scaleFactor, scaleFactor);
-            }
-            else
-            {
-                scale = Vector3.Zero;
-                switch (ActiveAxis)
-                {
-                    case GizmoAxis.X:
-                        scale = new Vector3(scaleFactor, 0, 0);
-                        break;
-                    case GizmoAxis.Y:
-                        scale = new Vector3(0, scaleFactor, 0);
-                        break;
-                    case GizmoAxis.Z:
-                        scale = new Vector3(0, 0, scaleFactor);
-                        break;
-                }
-            }
-
-            foreach (var entity in Selection)
-            {
-                OnScaleEvent(entity, scale);
-            }
-        }
-
-        /// <summary>
         /// Apply rotation from initial state (called each frame with total rotation angle)
         /// Uses the event to transform from initial position around pivot
         /// </summary>
         private void ApplyModalRotationFromInitial(float totalAngle)
         {
             if (totalAngle == 0)
+            {
+                ReplacePreviewFromInitialRequested?.Invoke(
+                    ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
+            }
 
             // Calculate rotation matrix based on axis
             Vector3 axis;
@@ -1280,63 +1192,16 @@ namespace GameWorld.Core.Components.Gizmo
                         axis = _rotationMatrix.Forward;
                         break;
                     default:
+                        ReplacePreviewFromInitialRequested?.Invoke(
+                            ModalPreviewReplacement.RestoreOnly(ActivePivot));
                         return;
                 }
             }
 
             Matrix rotMatrix = Matrix.CreateFromAxisAngle(axis, totalAngle);
 
-            foreach (var entity in Selection)
-            {
-                OnRotateEvent(entity, rotMatrix);
-            }
-        }
-
-        /// <summary>
-        /// Apply incremental rotation (called each frame with frame delta)
-        /// This provides smooth, responsive rotation without restoring initial state
-        /// </summary>
-        private void ApplyModalRotationIncremental(float deltaAngle)
-        {
-            if (deltaAngle == 0)
-                return;
-
-            // Calculate rotation axis (Blender-style)
-            // Reference: Blender transform_mode.cc:1270-1285
-            Vector3 axis;
-            if (ActiveAxis == GizmoAxis.None)
-            {
-                // Blender: Use view matrix inverse's Z-axis (perpendicular to screen)
-                // In XNA, ViewMatrix.Backward is the direction from lookAt to camera
-                // This is the correct rotation axis for screen-plane rotation
-                axis = _camera.ViewMatrix.Backward;
-                axis.Normalize();
-            }
-            else
-            {
-                switch (ActiveAxis)
-                {
-                    case GizmoAxis.X:
-                        axis = _rotationMatrix.Right;
-                        break;
-                    case GizmoAxis.Y:
-                        axis = _rotationMatrix.Up;
-                        break;
-                    case GizmoAxis.Z:
-                        axis = _rotationMatrix.Forward;
-                        break;
-                    default:
-                        return;
-                }
-            }
-
-            axis.Normalize();
-            Matrix rotMatrix = Matrix.CreateFromAxisAngle(axis, deltaAngle);
-
-            foreach (var entity in Selection)
-            {
-                OnRotateEvent(entity, rotMatrix);
-            }
+            ReplacePreviewFromInitialRequested?.Invoke(
+                ModalPreviewReplacement.Rotate(rotMatrix, ActivePivot));
         }
 
         /// <summary>
@@ -1345,7 +1210,11 @@ namespace GameWorld.Core.Components.Gizmo
         private void ApplyModalScaleFromInitial(float scaleFactor)
         {
             if (scaleFactor == 0)
+            {
+                ReplacePreviewFromInitialRequested?.Invoke(
+                    ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
+            }
 
             // Ensure scale doesn't go negative or zero
             scaleFactor = Math.Max(0.001f, scaleFactor);
@@ -1374,10 +1243,15 @@ namespace GameWorld.Core.Components.Gizmo
                 }
             }
 
-            foreach (var entity in Selection)
+            if (scale == Vector3.Zero)
             {
-                OnScaleEvent(entity, scale);
+                ReplacePreviewFromInitialRequested?.Invoke(
+                    ModalPreviewReplacement.RestoreOnly(ActivePivot));
+                return;
             }
+
+            ReplacePreviewFromInitialRequested?.Invoke(
+                ModalPreviewReplacement.Scale(scale, ActivePivot));
         }
 
         private void UpdateGizmoVisuals()
@@ -2101,11 +1975,8 @@ namespace GameWorld.Core.Components.Gizmo
         public event TransformationStartDelegate StartEvent;
         public event TransformationStopDelegate StopEvent;
 
-        /// <summary>
-        /// Event to request restoring initial state (for Blender-style modal transform)
-        /// GizmoComponent handles this through the wrapper's gesture baseline
-        /// </summary>
-        public event Action RequestRestoreInitialState;
+        internal event Action<ModalPreviewReplacement>
+            ReplacePreviewFromInitialRequested;
 
         private void OnTranslateEvent(ITransformable transformable, Vector3 delta)
         {
@@ -2142,6 +2013,76 @@ namespace GameWorld.Core.Components.Gizmo
 
 
     #region Gizmo EventHandlers
+
+    internal enum ModalPreviewReplacementKind
+    {
+        RestoreOnly,
+        Translate,
+        Rotate,
+        Scale
+    }
+
+    internal readonly record struct ModalPreviewReplacement
+    {
+        public ModalPreviewReplacementKind Kind { get; }
+        public Vector3 VectorValue { get; }
+        public Matrix RotationValue { get; }
+        public PivotType Pivot { get; }
+
+        private ModalPreviewReplacement(
+            ModalPreviewReplacementKind kind,
+            Vector3 vectorValue,
+            Matrix rotationValue,
+            PivotType pivot)
+        {
+            Kind = kind;
+            VectorValue = vectorValue;
+            RotationValue = rotationValue;
+            Pivot = pivot;
+        }
+
+        public static ModalPreviewReplacement RestoreOnly(PivotType pivot)
+        {
+            return new ModalPreviewReplacement(
+                ModalPreviewReplacementKind.RestoreOnly,
+                Vector3.Zero,
+                Matrix.Identity,
+                pivot);
+        }
+
+        public static ModalPreviewReplacement Translate(
+            Vector3 value,
+            PivotType pivot)
+        {
+            return new ModalPreviewReplacement(
+                ModalPreviewReplacementKind.Translate,
+                value,
+                Matrix.Identity,
+                pivot);
+        }
+
+        public static ModalPreviewReplacement Rotate(
+            Matrix value,
+            PivotType pivot)
+        {
+            return new ModalPreviewReplacement(
+                ModalPreviewReplacementKind.Rotate,
+                Vector3.Zero,
+                value,
+                pivot);
+        }
+
+        public static ModalPreviewReplacement Scale(
+            Vector3 value,
+            PivotType pivot)
+        {
+            return new ModalPreviewReplacement(
+                ModalPreviewReplacementKind.Scale,
+                value,
+                Matrix.Identity,
+                pivot);
+        }
+    }
 
     public class TransformationEventArgs
     {

@@ -8,7 +8,9 @@ using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Serilog;
 using Shared.Core.Events;
+using Shared.Core.ErrorHandling;
 using System.Runtime.ExceptionServices;
 
 namespace GameWorld.Core.Components.Gizmo
@@ -17,6 +19,7 @@ namespace GameWorld.Core.Components.Gizmo
     {
         private readonly IMouseComponent _mouse;
         private readonly IEventHub _eventHub;
+        private readonly ILogger _logger = Logging.Create<GizmoComponent>();
 
         private readonly IKeyboardComponent _keyboard;
         private readonly SelectionManager _selectionManager;
@@ -65,7 +68,8 @@ namespace GameWorld.Core.Components.Gizmo
             _gizmo.ScaleEvent += GizmoScaleEvent;
             _gizmo.StartEvent += GizmoTransformStart;
             _gizmo.StopEvent += GizmoTransformEnd;
-            _gizmo.RequestRestoreInitialState += OnRequestRestoreInitialState;
+            _gizmo.ReplacePreviewFromInitialRequested +=
+                OnReplacePreviewFromInitial;
         }
 
         /// <summary>
@@ -143,13 +147,60 @@ namespace GameWorld.Core.Components.Gizmo
             primaryError?.Throw();
         }
 
-        /// <summary>
-        /// Called when Gizmo needs to restore initial state for Blender-style modal transform
-        /// (for rotation and scale, which calculate from initial state each frame)
-        /// </summary>
-        private void OnRequestRestoreInitialState()
+        private void OnReplacePreviewFromInitial(
+            ModalPreviewReplacement replacement)
         {
-            _activeTransformation?.RestoreInitialPreviewState();
+            if (_activeTransformation == null)
+                return;
+
+            replacement = ApplyCtrlScaleConstraint(
+                replacement,
+                _isCtrlPressed);
+            ExceptionDispatchInfo primaryError;
+            try
+            {
+                _activeTransformation.ReplaceInitialPreview(replacement);
+                return;
+            }
+            catch (Exception exception)
+            {
+                primaryError = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                _activeTransformation.CancelTransform();
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(
+                    exception,
+                    "Failed to cancel a rejected modal transform preview");
+            }
+
+            try
+            {
+                _gizmo.AbortTransformInteraction();
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(
+                    exception,
+                    "Failed to abort a rejected modal transform interaction");
+            }
+
+            try
+            {
+                ReleaseMouseOwnership();
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(
+                    exception,
+                    "Failed to release mouse ownership after a modal transform error");
+            }
+
+            primaryError.Throw();
         }
 
         private void GizmoTransformStart()
@@ -203,18 +254,41 @@ namespace GameWorld.Core.Components.Gizmo
 
         private void GizmoScaleEvent(ITransformable transformable, TransformationEventArgs e)
         {
-            var value = (Vector3)e.Value;
-            if (_isCtrlPressed)
+            var value = ApplyCtrlScaleConstraint(
+                (Vector3)e.Value,
+                _isCtrlPressed);
+            _activeTransformation?.GizmoScaleEvent(value, e.Pivot);
+        }
+
+        private static ModalPreviewReplacement ApplyCtrlScaleConstraint(
+            ModalPreviewReplacement replacement,
+            bool isCtrlPressed)
+        {
+            if (replacement.Kind != ModalPreviewReplacementKind.Scale)
             {
-                if (value.X != 0)
-                    value = new Vector3(value.X);
-                else if (value.Y != 0)
-                    value = new Vector3(value.Y);
-                else if (value.Z != 0)
-                    value = new Vector3(value.Z);
+                return replacement;
             }
 
-            _activeTransformation?.GizmoScaleEvent(value, e.Pivot);
+            return ModalPreviewReplacement.Scale(
+                ApplyCtrlScaleConstraint(
+                    replacement.VectorValue,
+                    isCtrlPressed),
+                replacement.Pivot);
+        }
+
+        private static Vector3 ApplyCtrlScaleConstraint(
+            Vector3 value,
+            bool isCtrlPressed)
+        {
+            if (!isCtrlPressed)
+                return value;
+            if (value.X != 0)
+                return new Vector3(value.X);
+            if (value.Y != 0)
+                return new Vector3(value.Y);
+            if (value.Z != 0)
+                return new Vector3(value.Z);
+            return value;
         }
 
         public override void Update(GameTime gameTime)
@@ -291,7 +365,10 @@ namespace GameWorld.Core.Components.Gizmo
             if (_gizmo.IsInModalTransform)
             {
                 // Ctrl key toggles snap during modal transform
-                _gizmo.SnapEnabled = _keyboard.IsKeyDown(Keys.LeftControl) || _keyboard.IsKeyDown(Keys.RightControl);
+                _isCtrlPressed =
+                    _keyboard.IsKeyDown(Keys.LeftControl) ||
+                    _keyboard.IsKeyDown(Keys.RightControl);
+                _gizmo.SnapEnabled = _isCtrlPressed;
 
                 var isCameraMoving = _keyboard.IsKeyDown(Keys.LeftAlt);
                 _gizmo.Update(gameTime, !isCameraMoving);
@@ -301,7 +378,9 @@ namespace GameWorld.Core.Components.Gizmo
             if (!_isEnabled)
                 return;
 
-            _isCtrlPressed = _keyboard.IsKeyDown(Keys.LeftControl);
+            _isCtrlPressed =
+                _keyboard.IsKeyDown(Keys.LeftControl) ||
+                _keyboard.IsKeyDown(Keys.RightControl);
             if (_gizmo.ActiveMode == GizmoMode.NonUniformScale && _isCtrlPressed)
                 _gizmo.ActiveMode = GizmoMode.UniformScale;
             else if (_gizmo.ActiveMode == GizmoMode.UniformScale && !_isCtrlPressed)
