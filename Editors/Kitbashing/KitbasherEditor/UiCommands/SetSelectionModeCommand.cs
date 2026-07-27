@@ -29,6 +29,8 @@ namespace Editors.KitbasherEditor.UiCommands
                 _selectionComponent.SetFaceSelectionMode();
             else if (mode == GeometrySelectionMode.Vertex)
                 _selectionComponent.SetVertexSelectionMode();
+            else if (mode == GeometrySelectionMode.Edge)
+                _selectionComponent.SetEdgeSelectionMode();
             else
                 throw new NotImplementedException("Unknown state");
         }
@@ -70,5 +72,17 @@ namespace Editors.KitbasherEditor.UiCommands
         }
 
         public override void Execute() => UpdateSelectionMode(GeometrySelectionMode.Vertex);
+    }
+
+    public class EdgeSelectionModeCommand : SetSelectionModeCommand
+    {
+        public override string ToolTip { get; set; } = "Edge mode";
+        public override Hotkey? HotKey { get; } = null;
+
+        public EdgeSelectionModeCommand(SelectionComponent selectionComponent) : base(selectionComponent)
+        {
+        }
+
+        public override void Execute() => UpdateSelectionMode(GeometrySelectionMode.Edge);
     }
 }

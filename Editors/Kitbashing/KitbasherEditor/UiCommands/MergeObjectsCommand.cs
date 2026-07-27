@@ -3,6 +3,7 @@ using CommonControls.BaseDialogs.ErrorListDialog;
 using Editors.KitbasherEditor.Core.MenuBarViews;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
+using Shared.Core.Services;
 using Shared.Ui.Common.MenuSystem;
 
 namespace Editors.KitbasherEditor.UiCommands
@@ -29,7 +30,7 @@ namespace Editors.KitbasherEditor.UiCommands
                 if (objectSelectionState.CurrentSelection().Count >= 2)
                 {
                     if (!_objectEditor.CombineMeshes(objectSelectionState, out var errorList))
-                        ErrorListWindow.ShowDialog("Combine Errors", errorList, false);
+                        ErrorListWindow.ShowDialog(LocalizationManager.Instance.Get("Kitbash.Combine.Errors"), errorList, false);
                 }
             }
         }

@@ -41,15 +41,25 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                 return;
             }
 
-            var meshesToFit = _selectionManager
-                .GetState<ObjectSelectionState>()
-                .CurrentSelection();
+            var selectionState = _selectionManager.GetState<ObjectSelectionState>();
+            if (selectionState == null)
+            {
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.Kitbash.SelectMesh"));
+                return;
+            }
+
+            var meshesToFit = selectionState.CurrentSelection();
 
             var meshNodes = meshesToFit
                 .Where(x => x is Rmv2MeshNode)
                 .Select(x => x as Rmv2MeshNode)
                 .Cast<Rmv2MeshNode>()
                 .ToList();
+            if (meshNodes.Count == 0 || meshNodes.Count != meshesToFit.Count)
+            {
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.Kitbash.SelectOnlyMeshes"));
+                return;
+            }
 
             var allSkeltonNames = meshNodes
                 .Select(x => x.Geometry.SkeletonName)
@@ -64,6 +74,11 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
             var currentSkeletonName = allSkeltonNames.First();
             var currentSkeletonFile = _skeletonHelper.GetSkeletonFileFromName(currentSkeletonName);
+            if (currentSkeletonFile == null)
+            {
+                MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.Kitbash.SourceSkeletonNotFound", currentSkeletonName));
+                return;
+            }
 
             var usedBoneIndexes = meshNodes
                 .SelectMany(x => x.Geometry.GetUniqeBlendIndices())
@@ -72,8 +87,19 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                 .ToList();
 
             var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-            var targetSkeleton = rootNode.SkeletonNode;
+            var targetSkeleton = rootNode?.SkeletonNode;
+            if (targetSkeleton?.Skeleton == null)
+            {
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.Kitbash.TargetSkeletonUnavailable"));
+                return;
+            }
+
             var targetSkeletonFile = _skeletonHelper.GetSkeletonFileFromName(targetSkeleton.Name);
+            if (targetSkeletonFile == null)
+            {
+                MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.Kitbash.SourceSkeletonNotFound", targetSkeleton.Name));
+                return;
+            }
 
             var config = new RemappedAnimatedBoneConfiguration();
             config.ParnetModelSkeletonName = targetSkeleton.Name;
@@ -84,9 +110,8 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
             _windowHandle = _formFactory.Create();
             _windowHandle.ViewModel.Initialize(config, meshNodes, targetSkeleton.Skeleton, currentSkeletonFile);
-            _windowHandle.Show();
-
             _windowHandle.Closed += OnWindowClosed;
+            _windowHandle.Show();
         }
 
         private void OnWindowClosed(object? sender, EventArgs e)

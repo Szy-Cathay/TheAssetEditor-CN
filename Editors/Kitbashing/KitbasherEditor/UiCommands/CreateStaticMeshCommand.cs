@@ -43,26 +43,29 @@ namespace Editors.KitbasherEditor.UiCommands
             }
 
             var state = _selectionManager.GetState<ObjectSelectionState>();
-            var selectedObjects = state.SelectedObjects();
-            var meshes = new List<Rmv2MeshNode>();
-
-            var groupNodeContainer = new GroupNode("staticMesh");
-            var root = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-            var lod0 = root.GetLodNodes()[0];
-            lod0.AddObject(groupNodeContainer);
-            foreach (var obj in selectedObjects)
+            if (state == null)
             {
-                if (obj is Rmv2MeshNode meshNode)
-                {
-                    var cpy = SceneNodeHelper.CloneNode(meshNode);
-                    groupNodeContainer.AddObject(cpy);
-                    meshes.Add(cpy);
-                }
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.Kitbash.SelectMesh"));
+                return;
+            }
+            var selectedObjects = state.SelectedObjects();
+            var meshes = selectedObjects.OfType<Rmv2MeshNode>().ToList();
+            if (meshes.Count == 0 || meshes.Count != selectedObjects.Count)
+            {
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.Kitbash.SelectOnlyMeshes"));
+                return;
             }
 
-            _commandFactory.Create<CreateAnimatedMeshPoseCommand>()
-                .IsUndoable(false)
-                .Configure(x => x.Configure(meshes, frame, true))
+            var root = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+            var lod0 = root?.GetLodNodes().FirstOrDefault();
+            if (lod0 == null)
+            {
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.Kitbash.NoEditableLod"));
+                return;
+            }
+
+            _commandFactory.Create<CreateStaticMeshFromAnimationCommand>()
+                .Configure(x => x.Configure(lod0, meshes, frame))
                 .BuildAndExecute();
         }
     }

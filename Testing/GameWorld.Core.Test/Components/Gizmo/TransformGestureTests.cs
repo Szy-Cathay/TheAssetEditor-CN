@@ -112,6 +112,40 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             });
         }
 
+        [TestCase(Keys.LeftAlt)]
+        [TestCase(Keys.RightAlt)]
+        public void AltTabRelease_DoesNotToggleEditMode(Keys altKey)
+        {
+            using var context = CreateComponentContext();
+            context.Keyboard
+                .Setup(component => component.IsKeyReleased(Keys.Tab))
+                .Returns(true);
+            context.Keyboard
+                .Setup(component => component.IsKeyDownOrReleased(altKey))
+                .Returns(true);
+
+            context.Component.Update(new GameTime());
+
+            Assert.That(
+                context.SelectionManager.GetState().Mode,
+                Is.EqualTo(GeometrySelectionMode.Object));
+        }
+
+        [Test]
+        public void TabReleaseWithoutAlt_TogglesEditMode()
+        {
+            using var context = CreateComponentContext();
+            context.Keyboard
+                .Setup(component => component.IsKeyReleased(Keys.Tab))
+                .Returns(true);
+
+            context.Component.Update(new GameTime());
+
+            Assert.That(
+                context.SelectionManager.GetState().Mode,
+                Is.EqualTo(GeometrySelectionMode.Vertex));
+        }
+
         [Test]
         public void ComponentDispose_DuringVertexPreviewRestoresCpuGpuAndGestureOwnership()
         {
@@ -1419,6 +1453,9 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             serviceProvider
                 .Setup(provider => provider.GetService(typeof(TransformVertexCommand)))
                 .Returns(() => new TransformVertexCommand(selectionManager));
+            serviceProvider
+                .Setup(provider => provider.GetService(typeof(ObjectSelectionModeCommand)))
+                .Returns(() => new ObjectSelectionModeCommand(selectionManager));
             var commandFactory = new CommandFactory(serviceProvider.Object, commandExecutor);
 
             var mouse = new Mock<IMouseComponent>();
@@ -1470,6 +1507,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 commandExecutor,
                 eventHub,
                 mouse,
+                keyboard,
                 mesh,
                 graphics);
         }
@@ -1908,6 +1946,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             CommandExecutor CommandExecutor,
             TestEventHub EventHub,
             Mock<IMouseComponent> Mouse,
+            Mock<IKeyboardComponent> Keyboard,
             MeshObject Mesh,
             TestGraphicsCardGeometry Graphics) : IDisposable
         {

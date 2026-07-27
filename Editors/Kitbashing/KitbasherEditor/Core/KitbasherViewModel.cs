@@ -5,6 +5,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.EventHandlers;
 using Editors.KitbasherEditor.Services;
+using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.Components;
@@ -33,6 +34,9 @@ namespace Editors.KitbasherEditor.ViewModels
         private readonly KitbashViewDropHandler _dropHandler;
         private readonly KitbashSceneCreator _kitbashSceneCreator;
         private readonly FocusSelectableObjectService _focusSelectableObjectComponent;
+        private readonly IUiCommandFactory _uiCommandFactory;
+        private readonly CommandExecutor _commandExecutor;
+        private long _savedDocumentStateId;
 
         public IWpfGame Scene { get; set; }
         public SceneExplorerViewModel SceneExplorer { get; set; }
@@ -58,6 +62,8 @@ namespace Editors.KitbasherEditor.ViewModels
             KitbashViewDropHandler dropHandler,
             KitbashSceneCreator kitbashSceneCreator,
             FocusSelectableObjectService focusSelectableObjectComponent,
+            IUiCommandFactory uiCommandFactory,
+            CommandExecutor commandExecutor,
             IComponentInserter componentInserter,
             SkeletonChangedHandler skeletonChangedHandler, 
             SceneNodeEditorViewModel sceneNodeEditorView)
@@ -65,6 +71,9 @@ namespace Editors.KitbasherEditor.ViewModels
             _dropHandler = dropHandler;
             _kitbashSceneCreator = kitbashSceneCreator;
             _focusSelectableObjectComponent = focusSelectableObjectComponent;
+            _uiCommandFactory = uiCommandFactory;
+            _commandExecutor = commandExecutor;
+            _savedDocumentStateId = commandExecutor.CurrentDocumentStateId;
             Scene = gameWorld;
             Animation = animationControllerViewModel;
             SceneExplorer = sceneExplorerViewModel;
@@ -74,6 +83,7 @@ namespace Editors.KitbasherEditor.ViewModels
             // Events
             eventHub.Register<ScopedFileSavedEvent>(this, OnFileSaved);
             eventHub.Register<CommandStackChangedEvent>(this, OnCommandStackChanged);
+            eventHub.Register<CommandStackUndoEvent>(this, OnCommandStackUndo);
             skeletonChangedHandler.Subscribe(eventHub);
             
             // Ensure all game components are added to the editor
@@ -90,6 +100,8 @@ namespace Editors.KitbasherEditor.ViewModels
                 if (shouldFocusScene)
                     _focusSelectableObjectComponent.FocusScene();
                 DisplayName = fileToLoad.Name;
+                _savedDocumentStateId = _commandExecutor.CurrentDocumentStateId;
+                HasUnsavedChanges = false;
             }
             catch (Exception e)
             {
@@ -98,7 +110,11 @@ namespace Editors.KitbasherEditor.ViewModels
             }
         }
 
-        public bool Save() => true;
+        public bool Save()
+        {
+            var command = _uiCommandFactory.Create<SaveCommand>();
+            return command.Result?.Status == true;
+        }
 
         public void Close() { }
 
@@ -117,14 +133,24 @@ namespace Editors.KitbasherEditor.ViewModels
 
         void OnFileSaved(ScopedFileSavedEvent notification)
         {
+            _savedDocumentStateId = _commandExecutor.CurrentDocumentStateId;
             HasUnsavedChanges = false;
             DisplayName = Path.GetFileName(notification.NewPath);
         }
 
         void OnCommandStackChanged(CommandStackChangedEvent notification)
         {
-            if (notification.IsMutation)
-                HasUnsavedChanges = true;
+            UpdateUnsavedState();
+        }
+
+        void OnCommandStackUndo(CommandStackUndoEvent notification)
+        {
+            UpdateUnsavedState();
+        }
+
+        void UpdateUnsavedState()
+        {
+            HasUnsavedChanges = _commandExecutor.CurrentDocumentStateId != _savedDocumentStateId;
         }
     }
 }

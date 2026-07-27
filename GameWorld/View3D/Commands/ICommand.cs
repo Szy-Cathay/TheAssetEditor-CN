@@ -9,6 +9,7 @@ namespace GameWorld.Core.Commands
         void Execute();
         string HintText { get; }
         bool IsMutation { get; }
+        bool AffectsDocument => IsMutation;
     }
 
     public interface IRedoableCommand : ICommand
@@ -30,7 +31,7 @@ namespace GameWorld.Core.Commands
 
         public T Build() => _command;
 
-        public void BuildAndExecute() => _commandExecutor.ExecuteCommand(_command, _isUndoable);
+        public bool BuildAndExecute() => _commandExecutor.ExecuteCommand(_command, _isUndoable);
 
         public CommandBuilder<T> Configure(Action<T> predicate)
         {

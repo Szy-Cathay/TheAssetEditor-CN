@@ -32,17 +32,22 @@ namespace GameWorld.Core.Commands.Object
             foreach (var node in _meshNodes)
                 _originalGeometries.Add(node.Geometry.Clone());
 
-            foreach (var node in _meshNodes)
+            ApplyFrame(_meshNodes, _frame, _convertToStaticFrame);
+        }
+
+        internal static void ApplyFrame(IEnumerable<Rmv2MeshNode> meshNodes, AnimationFrame frame, bool convertToStaticFrame)
+        {
+            foreach (var node in meshNodes)
             {
                 var meshHelper = new MeshAnimationHelper(node, Matrix.Identity);
 
                 for (var i = 0; i < node.Geometry.VertexCount(); i++)
                 {
-                    var vert = meshHelper.GetVertexTransform(_frame, i);
+                    var vert = meshHelper.GetVertexTransform(frame, i);
                     node.Geometry.TransformVertex(i, vert);
                 }
 
-                if (_convertToStaticFrame)
+                if (convertToStaticFrame)
                 {
                     node.Geometry.ChangeVertexType(UiVertexFormat.Static);
                     node.Geometry.UpdateSkeletonName(string.Empty);

@@ -52,6 +52,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             MenuItems = CreateToolbarMenu();
 
             eventHub.Register<CommandStackChangedEvent>(this, OnUndoStackChanged);
+            eventHub.Register<CommandStackUndoEvent>(this, OnUndoStackChanged);
             eventHub.Register<SelectionChangedEvent>(this, OnSelectionChanged);
 
         }
@@ -81,6 +82,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RegisterUiCommand<ObjectSelectionModeCommand>();
             RegisterUiCommand<FaceSelectionModeCommand>();
             RegisterUiCommand<VertexSelectionModeCommand>();
+            RegisterUiCommand<EdgeSelectionModeCommand>();
 
             RegisterUiCommand<ToggleViewSelectedCommand>();
             RegisterUiCommand<ResetCameraCommand>();
@@ -95,7 +97,6 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RegisterUiCommand<CreateStaticMeshCommand>();
 
             RegisterUiCommand<ReduceMeshCommand>();
-            RegisterUiCommand<OpenBmiToolCommand>();
             RegisterUiCommand<OpenSkeletonReshaperToolCommand>();
             RegisterUiCommand<OpenReriggingToolCommand>();
             RegisterUiCommand<OpenPinToolCommand>();
@@ -192,6 +193,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             // Selection modes - Object mode always visible, sub-modes only in edit mode
             builder.CreateGroupedButton<ObjectSelectionModeCommand>("SelectionMode", true, IconLibrary.Selection_Object_Icon);
             builder.CreateGroupedButton<VertexSelectionModeCommand>("SelectionMode", false, IconLibrary.Selection_Vertex_Icon, ButtonVisibilityRule.EditMode);
+            builder.CreateGroupedButton<EdgeSelectionModeCommand>("SelectionMode", false, IconLibrary.Selection_Edge_Icon, ButtonVisibilityRule.EditMode);
             builder.CreateGroupedButton<FaceSelectionModeCommand>("SelectionMode", false, IconLibrary.Selection_Face_Icon, ButtonVisibilityRule.EditMode);
 
             return builder.Build();
@@ -232,14 +234,30 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 
         void OnUndoStackChanged(CommandStackChangedEvent notification)
         {
+            UpdateUndoRedoActions();
+        }
+
+        void OnUndoStackChanged(CommandStackUndoEvent notification)
+        {
+            UpdateUndoRedoActions();
+        }
+
+        void UpdateUndoRedoActions()
+        {
             var undoAction = GetMenuAction<UndoCommand>();
             var redoAction = GetMenuAction<RedoCommand>();
 
-            undoAction.ToolTip = notification.HintText;
-            undoAction.IsActionEnabled.Value = _commandExecutor.CanUndo();
+            var canUndo = _commandExecutor.CanUndo();
+            undoAction.ToolTip = canUndo
+                ? _commandExecutor.GetUndoHint()
+                : LocalizationManager.Instance.Get("Kitbash.ToolTip.UndoCommand");
+            undoAction.IsActionEnabled.Value = canUndo;
 
-            redoAction.ToolTip = _commandExecutor.GetRedoHint();
-            redoAction.IsActionEnabled.Value = _commandExecutor.CanRedo();
+            var canRedo = _commandExecutor.CanRedo();
+            redoAction.ToolTip = canRedo
+                ? _commandExecutor.GetRedoHint()
+                : LocalizationManager.Instance.Get("Kitbash.ToolTip.RedoCommand");
+            redoAction.IsActionEnabled.Value = canRedo;
         }
 
         void OnSelectionChanged(SelectionChangedEvent notification)
@@ -252,6 +270,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
                 GetMenuAction<FaceSelectionModeCommand>().TriggerAction();
             else if (state.Mode == GeometrySelectionMode.Vertex)
                 GetMenuAction<VertexSelectionModeCommand>().TriggerAction();
+            else if (state.Mode == GeometrySelectionMode.Edge)
+                GetMenuAction<EdgeSelectionModeCommand>().TriggerAction();
             else if (state.Mode == GeometrySelectionMode.Bone)
             {
                 // Bone mode - no sidebar button for this, just skip trigger

@@ -46,7 +46,12 @@ namespace GameWorld.Core.Services.SceneSaving
             var outputPath = settings.OutputName;
             _lodStrategyProvider.GetStrategy(settings.LodGenerationMethod).Generate(mainNode, settings.LodSettingsPerLod);
             var generatedRmvFile = _geometryStrategyProvider.GetStrategy(settings.GeometryOutputType).Generate(mainNode, settings);
+            if (settings.GeometryOutputType != GeometryStrategy.None && generatedRmvFile == null)
+                return new SaveResult(false, outputPath, null, null, null);
+
             var materialResult = _materialStrategyProvider.GetStrategy(settings.MaterialOutputType).Generate(mainNode, outputPath, settings.OnlySaveVisible);
+            if (!materialResult.Result)
+                return new SaveResult(false, outputPath, generatedRmvFile, materialResult.GeneratedFilePath, materialResult.Content);
 
             _eventHub.Publish(new ScopedFileSavedEvent() { NewPath = outputPath });
 

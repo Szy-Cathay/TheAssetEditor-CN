@@ -48,14 +48,26 @@ namespace Editors.KitbasherEditor.UiCommands
         public string ToolTip { get; set; } = "Save";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
         public Hotkey? HotKey { get; } = null;
+        public SaveResult? Result { get; private set; }
+        bool _hasExecuted;
 
         public SaveCommand(GeometrySaveSettings settings, SceneManager sceneManager, SaveService saveService, IAbstractFormFactory<SaveDialogWindow> saveWindowFactory)
             : base(settings, sceneManager, saveService, saveWindowFactory)
         {
         }
 
-        public void Execute() => Save(false);
-        public SaveResult? ExecuteWithResult() => Save(false);
+        public void Execute()
+        {
+            _hasExecuted = true;
+            Result = Save(false);
+        }
+
+        public SaveResult? ExecuteWithResult()
+        {
+            if (!_hasExecuted)
+                Execute();
+            return Result;
+        }
     }
 
     public class SaveAsCommand : SaveCommandBase, ITransientKitbasherUiCommand

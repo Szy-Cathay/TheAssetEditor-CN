@@ -45,17 +45,49 @@ namespace Editors.KitbasherEditor.ChildEditors.ReRiggingTool
                 return;
             }
 
-            var targetSkeletonName = _kitbasherRootScene.Skeleton.SkeletonName;
+            var targetSkeleton = _kitbasherRootScene.Skeleton;
+            if (targetSkeleton == null)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.TargetSkeletonUnavailable"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
+
+            var targetSkeletonName = targetSkeleton.SkeletonName;
             var state = _selectionManager.GetState<ObjectSelectionState>();
+            if (state == null)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectMesh"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
 
             var existingSkeletonFile = _skeletonHelper.GetSkeletonFileFromName(targetSkeletonName);
             if (existingSkeletonFile == null)
-                throw new Exception("TargetSkeleton not found -" + targetSkeletonName);
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat("Msg.Kitbash.SourceSkeletonNotFound", targetSkeletonName),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
 
-            var selectedMeshes = state.SelectedObjects<Rmv2MeshNode>();
+            var selectedObjects = state.SelectedObjects();
+            var selectedMeshes = selectedObjects.OfType<Rmv2MeshNode>().ToList();
+            if (selectedMeshes.Count == 0 || selectedMeshes.Count != selectedObjects.Count)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectOnlyMeshes"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
+
             if (selectedMeshes.Count(x => x.Geometry.VertexFormat == UiVertexFormat.Static) != 0)
             {
-                _standardDialogs.ShowDialogBox($"A static mesh is selected, which can not be remapped", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.StaticMeshCannotRerig"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
 
@@ -65,26 +97,43 @@ namespace Editors.KitbasherEditor.ChildEditors.ReRiggingTool
 
             if (selectedMeshSkeletons.Count() != 1)
             {
-                _standardDialogs.ShowDialogBox($"{selectedMeshSkeletons.Count()} skeleton types selected, the tool only works when a single skeleton types is selected", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat("Msg.UnexpectedSkeletonCount", selectedMeshSkeletons.Count()),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
 
             var selectedMeshSkeleton = selectedMeshSkeletons.First();
             var newSkeletonFile = _skeletonHelper.GetSkeletonFileFromName(selectedMeshSkeleton);
+            if (newSkeletonFile == null)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat("Msg.Kitbash.SourceSkeletonNotFound", selectedMeshSkeleton),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
+
+            if (targetSkeletonName == selectedMeshSkeleton)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SameSkeleton"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
 
             // Ensure all the bones have valid stuff
             var allUsedBoneIndexes = new List<byte>();
+            var sourceBonesById = newSkeletonFile.Bones.ToDictionary(x => x.Id);
             foreach (var mesh in selectedMeshes)
             {
                 var boneIndexes = mesh.Geometry.GetUniqeBlendIndices();
-                var activeBonesMin = boneIndexes.Min(x => x);
-                var activeBonesMax = boneIndexes.Max(x => x);
-
-                var skeletonBonesMax = newSkeletonFile.Bones.Max(x => x.Id);
-                var hasValidBoneMapping = activeBonesMin >= 0 && skeletonBonesMax >= activeBonesMax;
+                var hasValidBoneMapping = boneIndexes.Count != 0 &&
+                    boneIndexes.All(x => sourceBonesById.ContainsKey(x));
                 if (!hasValidBoneMapping)
                 {
-                    _standardDialogs.ShowDialogBox($"Mesh {mesh.Name} has an invalid bones, this might cause issues. Its a result of an invalid re-rigging most of the time", "Error");
+                    _standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.GetFormat("Msg.Kitbash.InvalidBoneMapping", mesh.Name),
+                        LocalizationManager.Instance.Get("General.Error"));
                     return;
                 }
                 allUsedBoneIndexes.AddRange(boneIndexes);
@@ -92,7 +141,7 @@ namespace Editors.KitbasherEditor.ChildEditors.ReRiggingTool
 
             var animatedBoneIndexes = allUsedBoneIndexes
                 .Distinct()
-                .Select(x => new AnimatedBone(x, newSkeletonFile.Bones[x].Name))
+                .Select(x => new AnimatedBone(x, sourceBonesById[x].Name))
                 .OrderBy(x => x.BoneIndex.Value).
                 ToList();
 
@@ -105,13 +154,10 @@ namespace Editors.KitbasherEditor.ChildEditors.ReRiggingTool
                 ParentModelBones = AnimatedBoneHelper.CreateFromSkeleton(existingSkeletonFile)
             };
 
-            if (targetSkeletonName == selectedMeshSkeleton)
-                _standardDialogs.ShowDialogBox("Trying to map to and from the same skeleton. This does not really make any sense if you are trying to make the mesh fit an other skeleton.", "Error");
-
             _windowHandle = _formFactory.Create();
             _windowHandle.ViewModel.Initialize(selectedMeshes, config);
-            _windowHandle.Show();
             _windowHandle.Closed += OnWindowClosed;
+            _windowHandle.Show();
         }
 
         private void OnWindowClosed(object? sender, EventArgs e)

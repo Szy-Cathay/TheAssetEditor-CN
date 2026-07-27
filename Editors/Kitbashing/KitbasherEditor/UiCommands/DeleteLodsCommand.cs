@@ -1,5 +1,7 @@
 ﻿using Editors.KitbasherEditor.Core.MenuBarViews;
 using GameWorld.Core.Components;
+using GameWorld.Core.Commands;
+using GameWorld.Core.Commands.Object;
 using GameWorld.Core.SceneNodes;
 using Shared.Ui.Common.MenuSystem;
 
@@ -13,32 +15,33 @@ namespace Editors.KitbasherEditor.UiCommands
 
 
         private readonly SceneManager _sceneManager;
+        private readonly CommandFactory _commandFactory;
 
-        public DeleteLodsCommand(SceneManager sceneManager)
+        public DeleteLodsCommand(
+            SceneManager sceneManager,
+            CommandFactory commandFactory)
         {
             _sceneManager = sceneManager;
+            _commandFactory = commandFactory;
         }
 
         public void Execute()
         {
             var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+            if (rootNode == null)
+                return;
             var lods = rootNode.GetLodNodes();
 
-            var lodsToGenerate = lods
+            var itemsToDelete = lods
                 .Skip(1)
-                .Take(rootNode.Children.Count - 1)
+                .Cast<ISceneNode>()
                 .ToList();
+            if (itemsToDelete.Count == 0)
+                return;
 
-            // Delete all the lods
-            foreach (var lod in lodsToGenerate)
-            {
-                var itemsToDelete = new List<ISceneNode>();
-                foreach (var child in lod.Children)
-                    itemsToDelete.Add(child);
-
-                foreach (var child in itemsToDelete)
-                    child.Parent.RemoveObject(child);
-            }
+            _commandFactory.Create<DeleteObjectsCommand>()
+                .Configure(command => command.Configure(itemsToDelete))
+                .BuildAndExecute();
         }
     }
 }

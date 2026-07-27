@@ -14,27 +14,33 @@
 
         <Expander Header="{loc:Loc PinTool.Instructions}" DockPanel.Dock="Top">
             <TextBlock Margin="10,0,0,10">
-                1. Select mode: 
+                <Run Text="{loc:Loc PinTool.Step1}"/>
                 <LineBreak/>
-                'Pin': for things which should not bend
+                <Run Text="{loc:Loc PinTool.PinDesc}"/>
                 <LineBreak/>
-                'Skin wrap': for things which should deform
-                <LineBreak/>           
-                2. Select meshes which should get new animation
                 <LineBreak/>
-                3. Select the meshes to take animation from
+                <Run Text="{loc:Loc PinTool.SkinWrapDesc}"/>
                 <LineBreak/>
-                'Pin': go into vertex mode and press button with a vertex selected
+                <Run Text="{loc:Loc PinTool.Step2}"/>
                 <LineBreak/>
-                'Skin wrap': select mesh
+                <Run Text="{loc:Loc PinTool.Step3}"/>
                 <LineBreak/>
-                4. Press Apply
+                <Run Text="{loc:Loc PinTool.Step3Pin}"/>
+                <LineBreak/>
+                <Run Text="{loc:Loc PinTool.Step3SkinWrap}"/>
+                <LineBreak/>
+                <Run Text="{loc:Loc PinTool.Step4}"/>
             </TextBlock>
         </Expander>
 
         <DockPanel DockPanel.Dock="Top">
             <Label Content="{loc:Loc PinTool.AnimationTransferMode}"/>
-            <ComboBox Margin="10,0,0,0" ItemsSource="{Binding PossibleRiggingModes, UpdateSourceTrigger=PropertyChanged}" SelectedItem="{Binding SelectedRiggingMode, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <ComboBox Margin="10,0,0,0"
+                      SelectedValue="{Binding SelectedRiggingMode, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                      SelectedValuePath="Tag">
+                <ComboBoxItem Tag="{x:Static pintool:RiggingMode.Pin}" Content="{loc:Loc PinTool.Mode.Pin}"/>
+                <ComboBoxItem Tag="{x:Static pintool:RiggingMode.SkinWrap}" Content="{loc:Loc PinTool.Mode.SkinWrap}"/>
+            </ComboBox>
         </DockPanel>
 
         <GroupBox Header="{loc:Loc PinTool.ApplyAnimationTo}" Margin="0,5,0,0" DockPanel.Dock="Top">

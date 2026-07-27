@@ -88,7 +88,7 @@
                 <Button Width="100" Margin="0,0,2,0" Click="SaveButton_Click" Content="{loc:Loc General.Save}"/>
             </StackPanel>
 
-            <CheckBox Margin="2" DockPanel.Dock="Bottom" FlowDirection="RightToLeft" IsChecked="{Binding OnlySaveVisible.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Content="{loc:Loc SaveDialog.OnlySaveVisibleNodes}"/>
+            <CheckBox Margin="2" DockPanel.Dock="Bottom" FlowDirection="RightToLeft" IsChecked="{Binding OnlySaveVisible, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Content="{loc:Loc SaveDialog.OnlySaveVisibleNodes}"/>
         </DockPanel>
     </Grid>
 </Window>

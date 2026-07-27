@@ -129,10 +129,13 @@ namespace GameWorld.Core
             serviceCollection.AddTransient<ObjectSelectionCommand>();
             serviceCollection.AddTransient<DeleteFaceCommand>();
             serviceCollection.AddTransient<DeleteObjectsCommand>();
+            serviceCollection.AddTransient<MakeNodeEditableCommand>();
+            serviceCollection.AddTransient<SortSceneNodesCommand>();
             serviceCollection.AddTransient<ReduceMeshCommand>();
             serviceCollection.AddTransient<TransformVertexCommand>();
             serviceCollection.AddTransient<CombineMeshCommand>();
             serviceCollection.AddTransient<CreateAnimatedMeshPoseCommand>();
+            serviceCollection.AddTransient<CreateStaticMeshFromAnimationCommand>();
             serviceCollection.AddTransient<DivideObjectIntoSubmeshesCommand>();
             serviceCollection.AddTransient<DuplicateObjectCommand>();
             serviceCollection.AddTransient<AddObjectsToGroupCommand>();

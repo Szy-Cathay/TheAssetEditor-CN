@@ -3,6 +3,7 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
+using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 {
@@ -12,6 +13,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
         SelectionManager _selectionManager;
 
         List<MeshObject> _originalGeos;
+        List<Vector3> _originalPivots;
 
         List<Rmv2MeshNode> _meshesToPin;
         Rmv2MeshNode _source;
@@ -24,7 +26,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
             _vertexId = vertexId;
         }
 
-        public string HintText { get => "Pin meshes to vertex"; }
+        public string HintText => LocalizationManager.Instance.Get("Kitbash.CommandHint.PinMeshesToVertex");
         public bool IsMutation { get => true; }
 
         public PinMeshToVertexCommand(SelectionManager selectionManager)
@@ -34,25 +36,32 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 
         public void Execute()
         {
-            // Create undo state
-            _originalGeos = _meshesToPin.Select(x => x.Geometry.Clone()).ToList();
+            var sourceVert = _source.Geometry.GetVertexExtented(_vertexId);
+            var updatedGeometries = new List<MeshObject>(_meshesToPin.Count);
+            _originalGeos = _meshesToPin.Select(x => x.Geometry).ToList();
+            _originalPivots = _meshesToPin.Select(x => x.PivotPoint).ToList();
             _selectionOldState = _selectionManager.GetStateCopy();
 
-            // Update the meshes
-            var sourceVert = _source.Geometry.GetVertexExtented(_vertexId);
             foreach (var currentMesh in _meshesToPin)
             {
-                currentMesh.Geometry.ChangeVertexType(_source.Geometry.VertexFormat, false);
-                currentMesh.Geometry.UpdateSkeletonName(_source.Geometry.SkeletonName);
+                var updatedGeometry = currentMesh.Geometry.Clone();
+                updatedGeometry.ChangeVertexType(_source.Geometry.VertexFormat, false);
+                updatedGeometry.UpdateSkeletonName(_source.Geometry.SkeletonName);
 
-                for (var i = 0; i < currentMesh.Geometry.VertexCount(); i++)
+                for (var i = 0; i < updatedGeometry.VertexCount(); i++)
                 {
-                    currentMesh.PivotPoint = Vector3.Zero;
-                    currentMesh.Geometry.SetVertexBlendIndex(i, sourceVert.BlendIndices);
-                    currentMesh.Geometry.SetVertexWeights(i, sourceVert.BlendWeights);
+                    updatedGeometry.SetVertexBlendIndex(i, sourceVert.BlendIndices);
+                    updatedGeometry.SetVertexWeights(i, sourceVert.BlendWeights);
                 }
 
-                currentMesh.Geometry.RebuildVertexBuffer();
+                updatedGeometry.RebuildVertexBuffer();
+                updatedGeometries.Add(updatedGeometry);
+            }
+
+            for (var index = 0; index < _meshesToPin.Count; index++)
+            {
+                _meshesToPin[index].Geometry = updatedGeometries[index];
+                _meshesToPin[index].PivotPoint = Vector3.Zero;
             }
         }
 
@@ -61,7 +70,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
             for (var i = 0; i < _meshesToPin.Count; i++)
             {
                 _meshesToPin[i].Geometry = _originalGeos[i];
-                _meshesToPin[i].PivotPoint = Vector3.Zero;
+                _meshesToPin[i].PivotPoint = _originalPivots[i];
             }
 
             _selectionManager.SetState(_selectionOldState);

@@ -2,6 +2,8 @@
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
+using Microsoft.Xna.Framework;
+using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 {
@@ -15,7 +17,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
         List<Rmv2MeshNode> _giveAnimationToList;
         Rmv2MeshNode _takeAnimationFrom;
 
-        public string HintText { get => "Skin wrap re-rigging"; }
+        public string HintText => LocalizationManager.Instance.Get("Kitbash.CommandHint.SkinWrapRigging");
         public bool IsMutation { get => true; }
 
 
@@ -33,28 +35,39 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 
         public void Execute()
         {
-            // Create undo state
-            _originalGeometries = _giveAnimationToList.Select(x => x.Geometry.Clone()).ToList();
+            if (_takeAnimationFrom == null)
+                throw new InvalidOperationException("必须先选择源网格。");
+
+            var weightTransfer = RegiggingHelper.CreateWeightTransfer(
+                _takeAnimationFrom.Geometry,
+                _takeAnimationFrom.ModelMatrix);
+            var updatedGeometries = new List<MeshObject>(_giveAnimationToList.Count);
+            _originalGeometries = _giveAnimationToList.Select(x => x.Geometry).ToList();
             _selectionOldState = _selectionManager.GetStateCopy();
 
-            // Update the meshes
             foreach (var giveAnimationTo in _giveAnimationToList)
             {
-                // Set skeleton and vertex type from first source object
-                giveAnimationTo.Geometry.ChangeVertexType(_takeAnimationFrom.Geometry.VertexFormat, false);
-                giveAnimationTo.Geometry.UpdateSkeletonName(_takeAnimationFrom.Geometry.SkeletonName);
+                var updatedGeometry = giveAnimationTo.Geometry.Clone();
+                updatedGeometry.ChangeVertexType(_takeAnimationFrom.Geometry.VertexFormat, false);
+                updatedGeometry.UpdateSkeletonName(_takeAnimationFrom.Geometry.SkeletonName);
 
-                for (var i = 0; i < giveAnimationTo.Geometry.VertexCount(); i++)
+                for (var i = 0; i < updatedGeometry.VertexCount(); i++)
                 {
-                    var inputVertexPos = giveAnimationTo.Geometry.VertexArray[i].Position3();
-                    var res = RegiggingHelper.FindClosestUV(inputVertexPos, _takeAnimationFrom.Geometry, _takeAnimationFrom.Position);
+                    var inputVertexPosition = Vector3.Transform(
+                        updatedGeometry.VertexArray[i].Position3(),
+                        giveAnimationTo.ModelMatrix);
+                    var result = weightTransfer.FindClosestWeights(inputVertexPosition);
 
-                    giveAnimationTo.Geometry.VertexArray[i].BlendIndices = res.Bones;
-                    giveAnimationTo.Geometry.VertexArray[i].BlendWeights = res.BlendWeights;
+                    updatedGeometry.VertexArray[i].BlendIndices = result.Bones;
+                    updatedGeometry.VertexArray[i].BlendWeights = result.BlendWeights;
                 }
 
-                giveAnimationTo.Geometry.RebuildVertexBuffer();
+                updatedGeometry.RebuildVertexBuffer();
+                updatedGeometries.Add(updatedGeometry);
             }
+
+            for (var index = 0; index < _giveAnimationToList.Count; index++)
+                _giveAnimationToList[index].Geometry = updatedGeometries[index];
         }
 
         public void Undo()

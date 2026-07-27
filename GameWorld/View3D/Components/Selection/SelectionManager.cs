@@ -52,6 +52,12 @@ namespace GameWorld.Core.Components.Selection
 
         const int MaxRenderEdges = 50000;
         private EdgeData[] _edgeDataCache = Array.Empty<EdgeData>();
+        private (int v0, int v1)[] _selectedEdgeIndicesCache = Array.Empty<(int, int)>();
+        private EdgeData[] _selectedEdgeDataCache = Array.Empty<EdgeData>();
+        private Matrix _cachedSelectedEdgeRenderMatrix;
+        private Vector3 _selectedEdgeSamplePos0;
+        private Vector3 _selectedEdgeSamplePos1;
+        private bool _selectedEdgeDataDirty = true;
 
         public SelectionManager(IEventHub eventHub, RenderEngineComponent renderEngine, IScopedResourceLibrary resourceLib, IDeviceResolver deviceResolverComponent)
         {
@@ -144,6 +150,7 @@ namespace GameWorld.Core.Components.Selection
         private void SelectionManager_SelectionChanged(ISelectionState state, bool sendEvent)
         {
             _edgeDataDirty = true;
+            _selectedEdgeDataDirty = true;
             _eventHub.Publish(new SelectionChangedEvent { NewState = state });
         }
 
@@ -276,19 +283,23 @@ namespace GameWorld.Core.Components.Selection
             if (selectionState is EdgeSelectionState selectionEdgeState && selectionEdgeState.RenderObject is Rmv2MeshNode edgeNode)
             {
                 _renderEngine.AddRenderItem(RenderBuckedId.Wireframe, new GeometryRenderItem(edgeNode.Geometry, _wireframeEffect, edgeNode.RenderMatrix));
-                // Render selected edges as highlighted line segments
-                var geometry = edgeNode.Geometry;
-                var matrix = edgeNode.RenderMatrix;
-                foreach (var edge in selectionEdgeState.SelectedEdges)
+
+                if (!_selectedEdgeDataDirty && _selectedEdgeIndicesCache.Length > 0)
                 {
-                    var p0 = Vector3.Transform(geometry.GetVertexById(edge.v0), matrix);
-                    var p1 = Vector3.Transform(geometry.GetVertexById(edge.v1), matrix);
-                    _renderEngine.AddRenderLines(new VertexPositionColor[]
+                    var sampleEdge = _selectedEdgeIndicesCache[0];
+                    if (_cachedSelectedEdgeRenderMatrix != edgeNode.RenderMatrix ||
+                        _selectedEdgeSamplePos0 != edgeNode.Geometry.GetVertexById(sampleEdge.v0) ||
+                        _selectedEdgeSamplePos1 != edgeNode.Geometry.GetVertexById(sampleEdge.v1))
                     {
-                        new VertexPositionColor(p0, Color.Orange),
-                        new VertexPositionColor(p1, Color.Orange)
-                    });
+                        _selectedEdgeDataDirty = true;
+                    }
                 }
+
+                if (_selectedEdgeDataDirty)
+                    UpdateSelectedEdgeQuadData(edgeNode, selectionEdgeState);
+
+                if (_selectedEdgeDataCache.Length > 0)
+                    _renderEngine.AddRenderItem(RenderBuckedId.Selection, _edgeQuadRenderItem);
             }
 
             if (selectionState is BoneSelectionState selectionBoneState && selectionBoneState.RenderObject != null)
@@ -361,7 +372,11 @@ namespace GameWorld.Core.Components.Selection
 
         public void UpdateVertexSelectionFallof(float newValue)
         {
-            _vertexSelectionFalloff = Math.Clamp(newValue, 0, float.MaxValue);
+            var clampedValue = Math.Clamp(newValue, 0, float.MaxValue);
+            if (_vertexSelectionFalloff == clampedValue)
+                return;
+
+            _vertexSelectionFalloff = clampedValue;
             var vertexSelectionState = GetState<VertexSelectionState>();
             if (vertexSelectionState != null)
             {
@@ -390,6 +405,37 @@ namespace GameWorld.Core.Components.Selection
 
             _edgeQuadRenderItem.Edges = _edgeDataCache;
             _edgeQuadRenderItem.MarkDirty();
+        }
+
+        private void UpdateSelectedEdgeQuadData(
+            Rmv2MeshNode meshNode,
+            EdgeSelectionState selectionState)
+        {
+            var selectedEdgeCount = selectionState.SelectedEdges.Count;
+            if (_selectedEdgeIndicesCache.Length != selectedEdgeCount)
+            {
+                _selectedEdgeIndicesCache = new (int, int)[selectedEdgeCount];
+                _selectedEdgeDataCache = new EdgeData[selectedEdgeCount];
+            }
+
+            selectionState.SelectedEdges.CopyTo(_selectedEdgeIndicesCache);
+            EdgeOverlayDataBuilder.FillSelected(
+                _selectedEdgeDataCache,
+                meshNode.Geometry,
+                meshNode.RenderMatrix,
+                _selectedEdgeIndicesCache);
+
+            _cachedSelectedEdgeRenderMatrix = meshNode.RenderMatrix;
+            if (selectedEdgeCount > 0)
+            {
+                var sampleEdge = _selectedEdgeIndicesCache[0];
+                _selectedEdgeSamplePos0 = meshNode.Geometry.GetVertexById(sampleEdge.v0);
+                _selectedEdgeSamplePos1 = meshNode.Geometry.GetVertexById(sampleEdge.v1);
+            }
+
+            _edgeQuadRenderItem.Edges = _selectedEdgeDataCache;
+            _edgeQuadRenderItem.MarkDirty();
+            _selectedEdgeDataDirty = false;
         }
 
         private void ResetEdgeCache()

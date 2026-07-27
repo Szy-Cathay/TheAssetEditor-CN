@@ -106,6 +106,8 @@ namespace GameWorld.Core.Components.Rendering
         private ProjectionType _projectionType = ProjectionType.Perspective;
         private float _orthoSize = 10f;
 
+        internal bool AutoPerspectiveOnOrbit { get; set; }
+
         // Track viewport size changes to update projection matrix
         private int _lastViewportWidth = 0;
         private int _lastViewportHeight = 0;
@@ -278,14 +280,16 @@ namespace GameWorld.Core.Components.Rendering
             }
 
             // Check for middle mouse button (Blender-style navigation)
-            // Middle mouse navigation has priority and can take ownership from other components
             var isMiddleMouseDown = mouse.IsMouseButtonDown(MouseButton.Middle);
             var isShiftDown = keyboard.IsKeyDown(Keys.LeftShift);
 
             // Blender-style: Middle mouse button navigation (no Alt required)
             if (isMiddleMouseDown)
             {
-                // Take ownership for camera navigation (overrides other components)
+                // Wait until the component handling the previous click releases the mouse.
+                if (!mouse.IsMouseOwner(this) && mouse.MouseOwner != null)
+                    return;
+
                 mouse.MouseOwner = this;
 
                 if (isShiftDown)
@@ -297,6 +301,12 @@ namespace GameWorld.Core.Components.Rendering
                 else
                 {
                     // Middle mouse only = Rotate view
+                    if (_projectionType == ProjectionType.Orthographic && AutoPerspectiveOnOrbit)
+                    {
+                        CurrentProjectionType = ProjectionType.Perspective;
+                        AutoPerspectiveOnOrbit = false;
+                    }
+
                     Yaw += deltaMouseX * 0.01f;
                     Pitch += deltaMouseY * 0.01f;
                 }

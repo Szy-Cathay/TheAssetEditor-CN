@@ -34,7 +34,6 @@ namespace GameWorld.Core.Components.Gizmo
         bool _isCtrlPressed = false;
 
         // Edit mode state (Tab to toggle, 1/2/3 for sub-modes)
-        private bool _isInEditMode = false;
         private GeometrySelectionMode _lastEditSubMode = GeometrySelectionMode.Vertex;
 
 
@@ -153,9 +152,6 @@ namespace GameWorld.Core.Components.Gizmo
             if (_activeTransformation == null)
                 return;
 
-            replacement = ApplyCtrlScaleConstraint(
-                replacement,
-                _isCtrlPressed);
             ExceptionDispatchInfo primaryError;
             try
             {
@@ -254,41 +250,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         private void GizmoScaleEvent(ITransformable transformable, TransformationEventArgs e)
         {
-            var value = ApplyCtrlScaleConstraint(
-                (Vector3)e.Value,
-                _isCtrlPressed);
-            _activeTransformation?.GizmoScaleEvent(value, e.Pivot);
-        }
-
-        private static ModalPreviewReplacement ApplyCtrlScaleConstraint(
-            ModalPreviewReplacement replacement,
-            bool isCtrlPressed)
-        {
-            if (replacement.Kind != ModalPreviewReplacementKind.Scale)
-            {
-                return replacement;
-            }
-
-            return ModalPreviewReplacement.Scale(
-                ApplyCtrlScaleConstraint(
-                    replacement.VectorValue,
-                    isCtrlPressed),
-                replacement.Pivot);
-        }
-
-        private static Vector3 ApplyCtrlScaleConstraint(
-            Vector3 value,
-            bool isCtrlPressed)
-        {
-            if (!isCtrlPressed)
-                return value;
-            if (value.X != 0)
-                return new Vector3(value.X);
-            if (value.Y != 0)
-                return new Vector3(value.Y);
-            if (value.Z != 0)
-                return new Vector3(value.Z);
-            return value;
+            _activeTransformation?.GizmoScaleEvent((Vector3)e.Value, e.Pivot);
         }
 
         public override void Update(GameTime gameTime)
@@ -323,14 +285,17 @@ namespace GameWorld.Core.Components.Gizmo
 
             // Tab = Toggle edit mode (Object <-> last sub-mode)
             // Only when not in modal transform
-            if (!_gizmo.IsInModalTransform && _keyboard.IsKeyReleased(Keys.Tab))
+            if (!_gizmo.IsInModalTransform &&
+                _keyboard.IsKeyReleased(Keys.Tab) &&
+                !_keyboard.IsKeyDownOrReleased(Keys.LeftAlt) &&
+                !_keyboard.IsKeyDownOrReleased(Keys.RightAlt))
             {
                 HandleEditModeToggle();
                 return;
             }
 
-            // 1/3 = Switch sub-mode in edit mode (Blender: 1=Vertex, 3=Face)
-            if (_isInEditMode && !_gizmo.IsInModalTransform)
+            // 1/2/3 = Switch sub-mode in edit mode (Blender: Vertex/Edge/Face)
+            if (IsMeshEditMode(selectionMode) && !_gizmo.IsInModalTransform)
             {
                 if (_keyboard.IsKeyReleased(Keys.D1))
                 {
@@ -338,6 +303,11 @@ namespace GameWorld.Core.Components.Gizmo
                     return;
                 }
                 if (_keyboard.IsKeyReleased(Keys.D2))
+                {
+                    SwitchEditSubMode(GeometrySelectionMode.Edge);
+                    return;
+                }
+                if (_keyboard.IsKeyReleased(Keys.D3))
                 {
                     SwitchEditSubMode(GeometrySelectionMode.Face);
                     return;
@@ -381,10 +351,7 @@ namespace GameWorld.Core.Components.Gizmo
             _isCtrlPressed =
                 _keyboard.IsKeyDown(Keys.LeftControl) ||
                 _keyboard.IsKeyDown(Keys.RightControl);
-            if (_gizmo.ActiveMode == GizmoMode.NonUniformScale && _isCtrlPressed)
-                _gizmo.ActiveMode = GizmoMode.UniformScale;
-            else if (_gizmo.ActiveMode == GizmoMode.UniformScale && !_isCtrlPressed)
-                _gizmo.ActiveMode = GizmoMode.NonUniformScale;
+            _gizmo.SnapEnabled = _isCtrlPressed;
 
             var isCameraMoving2 = _keyboard.IsKeyDown(Keys.LeftAlt);
             _gizmo.Update(gameTime, !isCameraMoving2);
@@ -409,18 +376,17 @@ namespace GameWorld.Core.Components.Gizmo
                 _commandFactory.Create<ObjectSelectionModeCommand>()
                     .Configure(x => x.Configure(selectedObj, _lastEditSubMode))
                     .BuildAndExecute();
-                _isInEditMode = true;
             }
             else if (currentMode == GeometrySelectionMode.Face || currentMode == GeometrySelectionMode.Edge || currentMode == GeometrySelectionMode.Vertex || currentMode == GeometrySelectionMode.Bone)
             {
                 // Save current sub-mode for next time
-                _lastEditSubMode = currentMode;
+                if (IsMeshEditMode(currentMode))
+                    _lastEditSubMode = currentMode;
                 // Exit to object mode
                 var selectedObj = _selectionManager.GetState().GetSingleSelectedObject();
                 _commandFactory.Create<ObjectSelectionModeCommand>()
                     .Configure(x => x.Configure(selectedObj, GeometrySelectionMode.Object))
                     .BuildAndExecute();
-                _isInEditMode = false;
             }
         }
 
@@ -502,6 +468,14 @@ namespace GameWorld.Core.Components.Gizmo
                 GeometrySelectionMode.Edge or
                 GeometrySelectionMode.Vertex or
                 GeometrySelectionMode.Bone;
+        }
+
+        private static bool IsMeshEditMode(GeometrySelectionMode mode)
+        {
+            return mode is
+                GeometrySelectionMode.Vertex or
+                GeometrySelectionMode.Edge or
+                GeometrySelectionMode.Face;
         }
 
         public void Dispose()

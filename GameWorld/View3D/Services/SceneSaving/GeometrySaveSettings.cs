@@ -46,12 +46,7 @@ namespace GameWorld.Core.Services.SceneSaving
 
         public void RefreshLodSettings()
         {
-            LodSettingsPerLod.Clear();
-            for (var i = 0; i < NumberOfLodsToGenerate; i++)
-            {
-                var settings = GenerateLodSettingsForIndex(i, NumberOfLodsToGenerate, null);
-                LodSettingsPerLod.Add(settings);
-            }
+            LodSettingsPerLod = CreateDefaultLodSettings(NumberOfLodsToGenerate);
         }
 
         public void InitializeLodSettings(RmvLodHeader[] lodHeaders)
@@ -66,13 +61,21 @@ namespace GameWorld.Core.Services.SceneSaving
             }
         }
 
-        LodGenerationSettings GenerateLodSettingsForIndex(int lodIndex, int lodCount, RmvLodHeader[]? lodHeaders)
+        public static List<LodGenerationSettings> CreateDefaultLodSettings(int lodCount)
+        {
+            var settings = new List<LodGenerationSettings>(lodCount);
+            for (var lodIndex = 0; lodIndex < lodCount; lodIndex++)
+                settings.Add(GenerateLodSettingsForIndex(lodIndex, lodCount, null));
+            return settings;
+        }
+
+        static LodGenerationSettings GenerateLodSettingsForIndex(int lodIndex, int lodCount, RmvLodHeader[]? lodHeaders)
         {
             int[] possibleCameraDistances = [20, 80, 100, 10000, 10000, 10000];
             byte[] possibleQualityValues = [2, 0, 0, 0, 0, 0, 0];
 
-            float cameraDistance = possibleCameraDistances[lodIndex];
-            var qualityLvl = possibleQualityValues[lodIndex];
+            float cameraDistance = possibleCameraDistances[Math.Min(lodIndex, possibleCameraDistances.Length - 1)];
+            var qualityLvl = possibleQualityValues[Math.Min(lodIndex, possibleQualityValues.Length - 1)];
 
             if (lodHeaders != null)
             {

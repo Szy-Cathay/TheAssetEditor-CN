@@ -9,6 +9,11 @@ namespace GameWorld.Core.Utility
 {
     public static class IntersectionMath
     {
+        const float ElementSelectionDistancePixels = 25.0f;
+        // Blender gives already selected elements a small disadvantage when picking nearby items.
+        const float SelectedElementBiasPixels = 5.0f;
+        const float DepthComparisonEpsilon = 0.00001f;
+
         public static float? IntersectObject(Ray ray, MeshObject geometry, Matrix matrix)
         {
             // BoundingBox pre-check: skip expensive per-triangle test if ray misses the whole mesh
@@ -23,60 +28,58 @@ namespace GameWorld.Core.Utility
             return res;
         }
 
-        /// <summary>
-        /// Pick a vertex using screen-space projection (Blender-style).
-        /// Projects all vertices to 2D screen coordinates and compares Manhattan distance
-        /// to the mouse position. This matches exactly what the user sees on screen.
-        /// </summary>
-        /// <param name="mouseScreenPos">Mouse position in screen pixels</param>
-        /// <param name="geometry">Mesh geometry</param>
-        /// <param name="modelMatrix">Object world matrix</param>
-        /// <param name="viewProjection">Camera View * Projection matrix</param>
-        /// <param name="viewportWidth">Viewport width in pixels</param>
-        /// <param name="viewportHeight">Viewport height in pixels</param>
-        /// <param name="selectedVertex">Output: index of closest vertex, or -1</param>
-        /// <returns>Screen-space Manhattan distance to the closest vertex, or null if none within threshold</returns>
         public static float? IntersectVertex(Vector2 mouseScreenPos, MeshObject geometry, Matrix modelMatrix,
-            Matrix viewProjection, float viewportWidth, float viewportHeight, out int selectedVertex)
+            Matrix viewProjection, float viewportWidth, float viewportHeight, out int selectedVertex,
+            IReadOnlySet<int>? selectedVertices = null)
         {
+            var projectedVertices = ProjectVertices(
+                geometry,
+                modelMatrix,
+                viewProjection,
+                viewportWidth,
+                viewportHeight);
+            var depthBuffer = BuildLocalDepthBuffer(
+                mouseScreenPos,
+                ElementSelectionDistancePixels,
+                projectedVertices,
+                geometry.IndexArray,
+                viewportWidth,
+                viewportHeight);
+
             selectedVertex = -1;
-            var bestDist = float.MaxValue;
+            var bestDistance = float.MaxValue;
+            var bestBiasedDistance = float.MaxValue;
+            var bestDepth = float.MaxValue;
 
-            // Manhattan distance threshold in pixels (Blender uses 75, AE points are smaller)
-            const float pixelThreshold = 25.0f;
-
-            for (var i = 0; i < geometry.VertexArray.Length; i++)
+            for (var i = 0; i < projectedVertices.Length; i++)
             {
-                // Transform vertex to world space, then to clip space
-                var worldPos = Vector3.Transform(geometry.GetVertexById(i), modelMatrix);
-                var clipPos = Vector4.Transform(new Vector4(worldPos, 1.0f), viewProjection);
-
-                // Skip vertices behind the camera
-                if (clipPos.W <= 0.0f)
+                var projectedVertex = projectedVertices[i];
+                if (!projectedVertex.IsValid ||
+                    !IsInsideViewport(projectedVertex.ScreenPosition, viewportWidth, viewportHeight))
                     continue;
 
-                // Project to NDC, then to screen pixels
-                var invW = 1.0f / clipPos.W;
-                var screenX = (clipPos.X * invW + 1.0f) * 0.5f * viewportWidth;
-                var screenY = (1.0f - clipPos.Y * invW) * 0.5f * viewportHeight;
+                var distance = ManhattanDistance(mouseScreenPos, projectedVertex.ScreenPosition);
+                if (distance > ElementSelectionDistancePixels ||
+                    !depthBuffer.IsVisible(projectedVertex.ScreenPosition, projectedVertex.Depth))
+                    continue;
 
-                // Manhattan distance (like Blender)
-                var dist = MathF.Abs(screenX - mouseScreenPos.X) + MathF.Abs(screenY - mouseScreenPos.Y);
+                var biasedDistance = distance +
+                    (selectedVertices?.Contains(i) == true ? SelectedElementBiasPixels : 0.0f);
+                if (biasedDistance > ElementSelectionDistancePixels)
+                    continue;
 
-                if (dist < bestDist)
+                if (biasedDistance < bestBiasedDistance ||
+                    MathF.Abs(biasedDistance - bestBiasedDistance) <= DepthComparisonEpsilon &&
+                    projectedVertex.Depth < bestDepth)
                 {
-                    bestDist = dist;
+                    bestDistance = distance;
+                    bestBiasedDistance = biasedDistance;
+                    bestDepth = projectedVertex.Depth;
                     selectedVertex = i;
                 }
             }
 
-            if (selectedVertex == -1 || bestDist > pixelThreshold)
-            {
-                selectedVertex = -1;
-                return null;
-            }
-
-            return bestDist;
+            return selectedVertex == -1 ? null : bestDistance;
         }
 
         public static float? IntersectFace(Ray ray, MeshObject geometry, Matrix matrix, out int? face)
@@ -177,18 +180,21 @@ namespace GameWorld.Core.Utility
         public static bool IntersectVertices(BoundingFrustum boundingFrustum, MeshObject geometry, Matrix matrix, out List<int> vertices)
         {
             vertices = new List<int>();
+            var visitedVertices = new bool[geometry.VertexArray.Length];
 
             for (var i = 0; i < geometry.IndexArray.Length; i++)
             {
                 var index = geometry.IndexArray[i];
-                if (boundingFrustum.Contains(Vector3.Transform(geometry.GetVertexById(index), matrix)) != ContainmentType.Disjoint)
+                if (!visitedVertices[index] &&
+                    boundingFrustum.Contains(Vector3.Transform(geometry.GetVertexById(index), matrix)) != ContainmentType.Disjoint)
+                {
+                    visitedVertices[index] = true;
                     vertices.Add(index);
+                }
             }
 
             if (vertices.Count == 0)
                 vertices = null;
-            else
-                vertices = vertices.Distinct().ToList();
             return vertices != null;
         }
 
@@ -292,58 +298,90 @@ namespace GameWorld.Core.Utility
         }
 
         /// <summary>
-        /// Pick an edge by ray-to-line-segment distance test.
-        /// Returns the closest edge as ordered pair (min(v0,v1), max(v0,v1)).
+        /// Pick an edge using a stable screen-space threshold in both perspective
+        /// and orthographic projections.
         /// </summary>
-        public static float? IntersectEdge(Ray ray, MeshObject geometry, Vector3 cameraPos, Matrix matrix, out (int v0, int v1) selectedEdge)
+        public static float? IntersectEdge(Vector2 mouseScreenPos, MeshObject geometry, Matrix modelMatrix,
+            Matrix viewProjection, float viewportWidth, float viewportHeight, out (int v0, int v1) selectedEdge,
+            IReadOnlySet<(int v0, int v1)>? selectedEdges = null)
         {
-            selectedEdge = (-1, -1);
-            var inverseTransform = Matrix.Invert(matrix);
-            ray.Position = Vector3.Transform(ray.Position, inverseTransform);
-            ray.Direction = Vector3.TransformNormal(ray.Direction, inverseTransform);
-            cameraPos = Vector3.Transform(cameraPos, inverseTransform);
-
-            var bestDistance = float.MaxValue;
-            var edgeThreshold = 0.0025f; // Base threshold
-
-            // Build unique edges from triangle index buffer
+            var projectedVertices = ProjectVertices(
+                geometry,
+                modelMatrix,
+                viewProjection,
+                viewportWidth,
+                viewportHeight);
+            var depthBuffer = BuildLocalDepthBuffer(
+                mouseScreenPos,
+                ElementSelectionDistancePixels,
+                projectedVertices,
+                geometry.IndexArray,
+                viewportWidth,
+                viewportHeight);
             var processedEdges = new HashSet<(int, int)>();
-            var indexBuffer = geometry.IndexArray;
+            var bestEdge = (-1, -1);
+            var bestDistance = float.MaxValue;
+            var bestBiasedDistance = float.MaxValue;
+            var bestDepth = float.MaxValue;
 
-            for (var i = 0; i < indexBuffer.Length; i += 3)
+            void TestEdge(int firstIndex, int secondIndex)
             {
-                var i0 = indexBuffer[i];
-                var i1 = indexBuffer[i + 1];
-                var i2 = indexBuffer[i + 2];
+                var edge = (
+                    Math.Min(firstIndex, secondIndex),
+                    Math.Max(firstIndex, secondIndex));
+                if (!processedEdges.Add(edge))
+                    return;
 
-                var edges = new[] { (Math.Min(i0, i1), Math.Max(i0, i1)), (Math.Min(i1, i2), Math.Max(i1, i2)), (Math.Min(i0, i2), Math.Max(i0, i2)) };
+                var firstProjected = projectedVertices[edge.Item1];
+                var secondProjected = projectedVertices[edge.Item2];
+                if (!firstProjected.IsValid || !secondProjected.IsValid)
+                    return;
 
-                foreach (var edge in edges)
+                var distance = PointToLineSegmentManhattanDistance(
+                    mouseScreenPos,
+                    firstProjected.ScreenPosition,
+                    secondProjected.ScreenPosition,
+                    out var amount,
+                    out var closestPoint);
+                if (distance > ElementSelectionDistancePixels ||
+                    !IsInsideViewport(closestPoint, viewportWidth, viewportHeight))
+                    return;
+
+                var depth = MathHelper.Lerp(firstProjected.Depth, secondProjected.Depth, amount);
+                if (!depthBuffer.IsVisible(closestPoint, depth))
+                    return;
+
+                var biasedDistance = distance +
+                    (selectedEdges?.Contains(edge) == true ? SelectedElementBiasPixels : 0.0f);
+                if (biasedDistance > ElementSelectionDistancePixels)
+                    return;
+
+                if (biasedDistance < bestBiasedDistance ||
+                    MathF.Abs(biasedDistance - bestBiasedDistance) <= DepthComparisonEpsilon &&
+                    depth < bestDepth)
                 {
-                    if (processedEdges.Contains(edge))
-                        continue;
-                    processedEdges.Add(edge);
-
-                    var p0 = geometry.GetVertexById(edge.Item1);
-                    var p1 = geometry.GetVertexById(edge.Item2);
-
-                    var midPoint = (p0 + p1) * 0.5f;
-                    var distToCamera = (cameraPos - midPoint).Length();
-                    var scaledThreshold = edgeThreshold * distToCamera * 1.5f;
-
-                    var dist = RayToLineSegmentDistance(ray, p0, p1);
-                    if (dist < scaledThreshold && dist < bestDistance)
-                    {
-                        bestDistance = dist;
-                        selectedEdge = edge;
-                    }
+                    bestDistance = distance;
+                    bestBiasedDistance = biasedDistance;
+                    bestDepth = depth;
+                    bestEdge = edge;
                 }
             }
 
-            if (selectedEdge.Item1 == -1)
-                return null;
+            var indexBuffer = geometry.IndexArray;
+            for (var i = 0; i < indexBuffer.Length; i += 3)
+            {
+                var first = indexBuffer[i];
+                var second = indexBuffer[i + 1];
+                var third = indexBuffer[i + 2];
+                TestEdge(first, second);
+                TestEdge(second, third);
+                TestEdge(first, third);
+            }
 
-            return bestDistance;
+            selectedEdge = bestEdge;
+            return bestEdge.Item1 == -1
+                ? null
+                : bestDistance;
         }
 
         /// <summary>
@@ -389,57 +427,240 @@ namespace GameWorld.Core.Utility
             return true;
         }
 
-        /// <summary>
-        /// Calculate minimum distance from a ray to a line segment in 3D.
-        /// Uses the closest approach of two lines, clamped to segment endpoints.
-        /// </summary>
-        static float RayToLineSegmentDistance(Ray ray, Vector3 segStart, Vector3 segEnd)
+        static ProjectedVertex[] ProjectVertices(
+            MeshObject geometry,
+            Matrix modelMatrix,
+            Matrix viewProjection,
+            float viewportWidth,
+            float viewportHeight)
         {
-            var rayDir = ray.Direction;
-            var segDir = segEnd - segStart;
-            var segLength = segDir.Length();
-
-            if (segLength < 0.0001f)
+            var projectedVertices = new ProjectedVertex[geometry.VertexArray.Length];
+            for (var i = 0; i < projectedVertices.Length; i++)
             {
-                // Degenerate edge (zero-length)
-                var toPoint = segStart - ray.Position;
-                var projection = Vector3.Dot(toPoint, rayDir);
-                var closestOnRay = ray.Position + rayDir * projection;
-                return (closestOnRay - segStart).Length();
+                var worldPosition = Vector3.Transform(geometry.GetVertexById(i), modelMatrix);
+                var clipPosition = Vector4.Transform(new Vector4(worldPosition, 1.0f), viewProjection);
+                if (clipPosition.W <= 0.0f)
+                    continue;
+
+                var inverseW = 1.0f / clipPosition.W;
+                var depth = clipPosition.Z * inverseW;
+                var screenPosition = new Vector2(
+                    (clipPosition.X * inverseW + 1.0f) * 0.5f * viewportWidth,
+                    (1.0f - clipPosition.Y * inverseW) * 0.5f * viewportHeight);
+                if (!float.IsFinite(screenPosition.X) ||
+                    !float.IsFinite(screenPosition.Y) ||
+                    !float.IsFinite(depth) ||
+                    depth < 0.0f ||
+                    depth > 1.0f)
+                    continue;
+
+                projectedVertices[i] = new ProjectedVertex(screenPosition, depth);
             }
 
-            segDir /= segLength; // Normalize
+            return projectedVertices;
+        }
 
-            var w0 = ray.Position - segStart;
-            var a = Vector3.Dot(rayDir, rayDir);     // 1 (ray direction is normalized)
-            var b = Vector3.Dot(rayDir, segDir);
-            var c = Vector3.Dot(segDir, segDir);      // 1 (seg direction is normalized)
-            var d = Vector3.Dot(rayDir, w0);
-            var e = Vector3.Dot(segDir, w0);
+        static LocalDepthBuffer BuildLocalDepthBuffer(
+            Vector2 mouseScreenPosition,
+            float selectionDistance,
+            ProjectedVertex[] projectedVertices,
+            ushort[] indices,
+            float viewportWidth,
+            float viewportHeight)
+        {
+            // Blender uses a depth-tested selection buffer. A small CPU window avoids GPU readback.
+            var radius = (int)MathF.Ceiling(selectionDistance);
+            var viewportPixelWidth = (int)viewportWidth;
+            var viewportPixelHeight = (int)viewportHeight;
+            var centerX = (int)MathF.Floor(mouseScreenPosition.X);
+            var centerY = (int)MathF.Floor(mouseScreenPosition.Y);
+            var left = Math.Max(0, centerX - radius);
+            var top = Math.Max(0, centerY - radius);
+            var right = Math.Min(viewportPixelWidth - 1, centerX + radius);
+            var bottom = Math.Min(viewportPixelHeight - 1, centerY + radius);
+            if (right < left || bottom < top)
+                return LocalDepthBuffer.Empty;
 
-            var denom = a * c - b * b;
-
-            float s, t;
-            if (denom < 0.0001f)
+            var depthBuffer = new LocalDepthBuffer(left, top, right - left + 1, bottom - top + 1);
+            for (var i = 0; i + 2 < indices.Length; i += 3)
             {
-                // Lines are nearly parallel
-                s = 0f;
-                t = d / b;
+                var first = projectedVertices[indices[i]];
+                var second = projectedVertices[indices[i + 1]];
+                var third = projectedVertices[indices[i + 2]];
+                if (!first.IsValid || !second.IsValid || !third.IsValid)
+                    continue;
+
+                depthBuffer.RasterizeTriangle(first, second, third);
             }
-            else
+
+            return depthBuffer;
+        }
+
+        static bool IsInsideViewport(Vector2 point, float viewportWidth, float viewportHeight)
+        {
+            return point.X >= 0.0f &&
+                   point.Y >= 0.0f &&
+                   point.X < viewportWidth &&
+                   point.Y < viewportHeight;
+        }
+
+        static float ManhattanDistance(Vector2 first, Vector2 second)
+        {
+            return MathF.Abs(first.X - second.X) + MathF.Abs(first.Y - second.Y);
+        }
+
+        static float PointToLineSegmentManhattanDistance(
+            Vector2 point,
+            Vector2 segmentStart,
+            Vector2 segmentEnd,
+            out float amount,
+            out Vector2 closestPoint)
+        {
+            var segment = segmentEnd - segmentStart;
+            var segmentLengthSquared = segment.LengthSquared();
+            if (segmentLengthSquared == 0.0f)
             {
-                s = (b * e - c * d) / denom;
-                t = (a * e - b * d) / denom;
+                amount = 0.0f;
+                closestPoint = segmentStart;
+                return ManhattanDistance(point, closestPoint);
             }
 
-            // Clamp t to segment
-            t = MathHelper.Clamp(t, 0f, segLength);
+            amount = Vector2.Dot(point - segmentStart, segment) / segmentLengthSquared;
+            amount = MathHelper.Clamp(amount, 0.0f, 1.0f);
+            closestPoint = segmentStart + segment * amount;
+            return ManhattanDistance(point, closestPoint);
+        }
 
-            // Calculate closest points on ray and segment
-            var rayPt = ray.Position + rayDir * s;
-            var segPt = segStart + segDir * t;
+        readonly struct ProjectedVertex
+        {
+            public bool IsValid { get; }
+            public Vector2 ScreenPosition { get; }
+            public float Depth { get; }
 
-            return (rayPt - segPt).Length();
+            public ProjectedVertex(Vector2 screenPosition, float depth)
+            {
+                IsValid = true;
+                ScreenPosition = screenPosition;
+                Depth = depth;
+            }
+        }
+
+        sealed class LocalDepthBuffer
+        {
+            public static LocalDepthBuffer Empty { get; } = new(0, 0, 0, 0);
+
+            readonly int _left;
+            readonly int _top;
+            readonly int _width;
+            readonly int _height;
+            readonly float[] _depths;
+
+            public LocalDepthBuffer(int left, int top, int width, int height)
+            {
+                _left = left;
+                _top = top;
+                _width = width;
+                _height = height;
+                _depths = new float[width * height];
+                Array.Fill(_depths, float.PositiveInfinity);
+            }
+
+            public void RasterizeTriangle(
+                ProjectedVertex first,
+                ProjectedVertex second,
+                ProjectedVertex third)
+            {
+                var area = EdgeFunction(
+                    first.ScreenPosition,
+                    second.ScreenPosition,
+                    third.ScreenPosition);
+                if (MathF.Abs(area) <= DepthComparisonEpsilon)
+                    return;
+
+                var minX = Math.Max(
+                    _left,
+                    (int)MathF.Floor(MathF.Min(
+                        first.ScreenPosition.X,
+                        MathF.Min(second.ScreenPosition.X, third.ScreenPosition.X))));
+                var maxX = Math.Min(
+                    _left + _width - 1,
+                    (int)MathF.Ceiling(MathF.Max(
+                        first.ScreenPosition.X,
+                        MathF.Max(second.ScreenPosition.X, third.ScreenPosition.X))));
+                var minY = Math.Max(
+                    _top,
+                    (int)MathF.Floor(MathF.Min(
+                        first.ScreenPosition.Y,
+                        MathF.Min(second.ScreenPosition.Y, third.ScreenPosition.Y))));
+                var maxY = Math.Min(
+                    _top + _height - 1,
+                    (int)MathF.Ceiling(MathF.Max(
+                        first.ScreenPosition.Y,
+                        MathF.Max(second.ScreenPosition.Y, third.ScreenPosition.Y))));
+
+                for (var y = minY; y <= maxY; y++)
+                {
+                    for (var x = minX; x <= maxX; x++)
+                    {
+                        var pixelCenter = new Vector2(x + 0.5f, y + 0.5f);
+                        var firstWeight = EdgeFunction(
+                            second.ScreenPosition,
+                            third.ScreenPosition,
+                            pixelCenter) / area;
+                        var secondWeight = EdgeFunction(
+                            third.ScreenPosition,
+                            first.ScreenPosition,
+                            pixelCenter) / area;
+                        var thirdWeight = 1.0f - firstWeight - secondWeight;
+                        if (firstWeight < -DepthComparisonEpsilon ||
+                            secondWeight < -DepthComparisonEpsilon ||
+                            thirdWeight < -DepthComparisonEpsilon)
+                            continue;
+
+                        var depth =
+                            first.Depth * firstWeight +
+                            second.Depth * secondWeight +
+                            third.Depth * thirdWeight;
+                        var bufferIndex = (y - _top) * _width + x - _left;
+                        if (depth < _depths[bufferIndex])
+                            _depths[bufferIndex] = depth;
+                    }
+                }
+            }
+
+            public bool IsVisible(Vector2 screenPosition, float depth)
+            {
+                if (_width == 0 || _height == 0)
+                    return true;
+
+                var centerX = (int)MathF.Floor(screenPosition.X);
+                var centerY = (int)MathF.Floor(screenPosition.Y);
+                var farthestSurfaceDepth = float.NegativeInfinity;
+                for (var y = centerY - 1; y <= centerY + 1; y++)
+                {
+                    if (y < _top || y >= _top + _height)
+                        continue;
+
+                    for (var x = centerX - 1; x <= centerX + 1; x++)
+                    {
+                        if (x < _left || x >= _left + _width)
+                            continue;
+
+                        var surfaceDepth = _depths[(y - _top) * _width + x - _left];
+                        if (float.IsFinite(surfaceDepth))
+                            farthestSurfaceDepth = MathF.Max(farthestSurfaceDepth, surfaceDepth);
+                    }
+                }
+
+                return !float.IsFinite(farthestSurfaceDepth) ||
+                       depth <= farthestSurfaceDepth + DepthComparisonEpsilon;
+            }
+
+            static float EdgeFunction(Vector2 first, Vector2 second, Vector2 point)
+            {
+                return (point.X - first.X) * (second.Y - first.Y) -
+                       (point.Y - first.Y) * (second.X - first.X);
+            }
         }
     }
 }

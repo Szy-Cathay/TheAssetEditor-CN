@@ -7,53 +7,57 @@ namespace KitbasherEditor.ViewModels.SaveDialog
     public class LodGroupNodeViewModel : NotifyPropertyChangedImpl
     {
         private readonly Rmv2LodNode? _node;
-        private readonly GeometrySaveSettings _saveSettings;
+        private readonly LodGenerationSettings _lodSettings;
 
         public NotifyAttr<int> PolygonCount { get; set; } = new NotifyAttr<int>(0);
         public NotifyAttr<int> TextureCount { get; set; } = new NotifyAttr<int>(0);
         public NotifyAttr<int> MeshCount { get; set; } = new NotifyAttr<int>(0);
         public int LodIndex { get; private set; }
 
-        public LodGroupNodeViewModel(Rmv2LodNode? node, int lodIndex, GeometrySaveSettings saveSettings)
+        public LodGroupNodeViewModel(
+            Rmv2LodNode? node,
+            int lodIndex,
+            LodGenerationSettings lodSettings,
+            bool onlySaveVisible)
         {
             _node = node;
-            _saveSettings = saveSettings;
+            _lodSettings = lodSettings;
             LodIndex = lodIndex;
 
             if (_node != null)
             {
-                PolygonCount.Value = _node.GetAllModels(_saveSettings.OnlySaveVisible).Sum(x => x.Geometry.VertexCount() / 3);
-                TextureCount.Value = _node.GetAllModels(_saveSettings.OnlySaveVisible).SelectMany(x => x.RmvMaterial.GetAllTextures().Select(x => x.Path)).Distinct().Count();
-                MeshCount.Value = _node.GetAllModels(_saveSettings.OnlySaveVisible).Count();
+                PolygonCount.Value = _node.GetAllModels(onlySaveVisible).Sum(x => x.Geometry.VertexCount() / 3);
+                TextureCount.Value = _node.GetAllModels(onlySaveVisible).SelectMany(x => x.RmvMaterial.GetAllTextures().Select(x => x.Path)).Distinct().Count();
+                MeshCount.Value = _node.GetAllModels(onlySaveVisible).Count();
             }
         }
 
         public float CameraDistance
         {
-            get => _saveSettings.LodSettingsPerLod[LodIndex].CameraDistance;
+            get => _lodSettings.CameraDistance;
             set
             {
-                _saveSettings.LodSettingsPerLod[LodIndex].CameraDistance = value;
+                _lodSettings.CameraDistance = value;
                 NotifyPropertyChanged();
             }
         }
 
         public byte QualityLvl
         {
-            get => _saveSettings.LodSettingsPerLod[LodIndex].QualityLvl;
+            get => _lodSettings.QualityLvl;
             set
             {
-                _saveSettings.LodSettingsPerLod[LodIndex].QualityLvl = value;
+                _lodSettings.QualityLvl = value;
                 NotifyPropertyChanged();
             }
         }
 
         public float LodReductionFactor
         {
-            get => _saveSettings.LodSettingsPerLod[LodIndex].LodRectionFactor;
+            get => _lodSettings.LodRectionFactor;
             set
             {
-                _saveSettings.LodSettingsPerLod[LodIndex].LodRectionFactor = value;
+                _lodSettings.LodRectionFactor = value;
                 NotifyPropertyChanged();
             }
         }
@@ -61,20 +65,20 @@ namespace KitbasherEditor.ViewModels.SaveDialog
     
         public bool OptimizeLod_Alpha
         {
-            get => _saveSettings.LodSettingsPerLod[LodIndex].OptimizeAlpha;
+            get => _lodSettings.OptimizeAlpha;
             set
             {
-                _saveSettings.LodSettingsPerLod[LodIndex].OptimizeAlpha = value;
+                _lodSettings.OptimizeAlpha = value;
                 NotifyPropertyChanged();
             }
         }
 
         public bool OptimizeLod_Vertex 
         {
-            get => _saveSettings.LodSettingsPerLod[LodIndex].OptimizeVertex;
+            get => _lodSettings.OptimizeVertex;
             set
             {
-                _saveSettings.LodSettingsPerLod[LodIndex].OptimizeVertex = value;
+                _lodSettings.OptimizeVertex = value;
                 NotifyPropertyChanged();
             }
         }

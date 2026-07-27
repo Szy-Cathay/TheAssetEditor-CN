@@ -15,6 +15,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
             InitializeComponent();
             ViewModel = viewModel;
             DataContext = viewModel;
+            Closed += (_, _) => ViewModel.Dispose();
         }
 
         private void OkButtonClick(object sender, RoutedEventArgs e)

@@ -39,7 +39,7 @@
                 <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Tint.TintColour}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
                     <DockPanel>
                         <colourpickerbutton:ColourPickerButtonView DataContext="{Binding TintColour}" HorizontalAlignment="Left" Width="20" Height="20"/>
-                        <Label>Variation:</Label>
+                        <Label Content="{loc:Loc Tint.Variation}"/>
                         <TextBox Margin="3" Text="{Binding TintVariation, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
                     </DockPanel>
                 </basedialogs:AeAttribute>

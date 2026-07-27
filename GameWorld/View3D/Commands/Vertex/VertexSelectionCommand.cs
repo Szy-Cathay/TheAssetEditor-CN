@@ -20,6 +20,7 @@ namespace GameWorld.Core.Commands.Vertex
 
         public string HintText { get => "Select Vertex"; }
         public bool IsMutation { get => true; }
+        public bool AffectsDocument => false;
 
 
         public void Configure(List<int> selectedVertices, bool isAdd, bool isRemove)
@@ -40,12 +41,10 @@ namespace GameWorld.Core.Commands.Vertex
             var currentState = _selectionManager.GetState() as VertexSelectionState;
             _logger.Here().Information($"Command info - Add[{_isAdd}] Item[{currentState.RenderObject.Name}] Vertices[{_selectedVertices.Count}]");
 
-            if (!(_isAdd || _isRemove))
-                currentState.Clear();
-
-            currentState.ModifySelection(_selectedVertices, _isRemove);
-
-            currentState.EnsureSorted();
+            if (_isAdd || _isRemove)
+                currentState.ModifySelection(_selectedVertices, _isRemove);
+            else
+                currentState.SetSelection(_selectedVertices);
         }
 
         public void Undo()

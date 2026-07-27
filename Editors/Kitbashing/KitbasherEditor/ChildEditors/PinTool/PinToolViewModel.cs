@@ -23,7 +23,6 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
         [ObservableProperty] PinRiggingAlgorithm _pinMode;
         [ObservableProperty] SkinWrapAlgorithm _skinWrapMode;
-        [ObservableProperty] RiggingMode[] _possibleRiggingModes = Enum.GetValues<RiggingMode>();
         [ObservableProperty] RiggingMode _selectedRiggingMode = RiggingMode.Pin;
         [ObservableProperty] ObservableCollection<Rmv2MeshNode> _affectedMeshCollection = [];
         [ObservableProperty] ObservableCollection<Rmv2MeshNode> _sourceMeshCollection = [];
@@ -46,18 +45,35 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
             var selectionState = _selectionManager.GetState<ObjectSelectionState>();
             if (selectionState == null)
             {
-                _standardDialogs.ShowDialogBox("Please select objects", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectMesh"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
 
-            var selectedObjects = selectionState.SelectedObjects()
-                .Select(x => x as Rmv2MeshNode)
-                .Where(x => x != null)
-                .ToList();
+            var selectedItems = selectionState.SelectedObjects();
+            if (selectedItems.Count == 0)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectMesh"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
+
+            var selectedObjects = selectedItems.OfType<Rmv2MeshNode>().ToList();
+            if (selectedObjects.Count != selectedItems.Count)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectOnlyMeshes"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
 
             if (selectedObjects.Any(x => x.PivotPoint != Vector3.Zero))
             {
-                _standardDialogs.ShowDialogBox("Mesh(s) has a pivot point, the tool will not work correctly", "error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.PivotUnsupported"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
 
@@ -77,7 +93,9 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
         {
             if (AffectedMeshCollection.Count == 0)
             {
-                _standardDialogs.ShowDialogBox("No meshes to be affected seleceted", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectTargetMeshes"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return false;
             }
 

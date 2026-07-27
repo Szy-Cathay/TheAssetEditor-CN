@@ -10,8 +10,8 @@ using System.Collections.Generic;
 namespace GameWorld.Core.Test.BlenderFeatures
 {
     /// <summary>
-    /// Comprehensive tests for Blender-style 3D view features.
-    /// These tests are designed to be extreme and thorough to catch all possible bugs.
+    /// Lightweight arithmetic and enum smoke checks used alongside production
+    /// component tests for Blender-style viewport behavior.
     /// </summary>
     [TestFixture]
     public class BlenderFeatureTests
@@ -112,6 +112,8 @@ namespace GameWorld.Core.Test.BlenderFeatures
             // Verify wrapped positions are within safe bounds
             Assert.That(wrappedLeft.X, Is.GreaterThanOrEqualTo(safeZoneMargin), "Wrapped left position should be in safe zone");
             Assert.That(wrappedRight.X, Is.LessThanOrEqualTo(viewportWidth - safeZoneMargin), "Wrapped right position should be in safe zone");
+            Assert.That(wrappedLeft.Y, Is.InRange(0, viewportHeight), "Wrapped left Y should stay in the viewport");
+            Assert.That(wrappedRight.Y, Is.InRange(0, viewportHeight), "Wrapped right Y should stay in the viewport");
         }
 
         #endregion
@@ -239,6 +241,32 @@ namespace GameWorld.Core.Test.BlenderFeatures
             // Random angles that don't match any preset
             var result = ViewPresets.DetectViewPreset(0.5f, 0.3f);
             Assert.That(result, Is.Null, "Should return null for non-preset angles");
+        }
+
+        [TestCase(ViewPresetType.Front, ViewPresetType.Front, ViewPresetType.Back)]
+        [TestCase(ViewPresetType.Front, ViewPresetType.Back, ViewPresetType.Front)]
+        [TestCase(ViewPresetType.Right, ViewPresetType.Right, ViewPresetType.Left)]
+        [TestCase(ViewPresetType.Right, ViewPresetType.Left, ViewPresetType.Right)]
+        [TestCase(ViewPresetType.Top, ViewPresetType.Top, ViewPresetType.Bottom)]
+        [TestCase(ViewPresetType.Top, ViewPresetType.Bottom, ViewPresetType.Top)]
+        public void ViewPresets_ResolveRepeatedAxisView_TogglesOppositeView(
+            ViewPresetType requested,
+            ViewPresetType current,
+            ViewPresetType expected)
+        {
+            var result = ViewPresets.ResolveRepeatedAxisView(requested, current);
+
+            Assert.That(result, Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void ViewPresets_ResolveRepeatedAxisView_FromAnotherAxis_UsesRequestedView()
+        {
+            var result = ViewPresets.ResolveRepeatedAxisView(
+                ViewPresetType.Front,
+                ViewPresetType.Top);
+
+            Assert.That(result, Is.EqualTo(ViewPresetType.Front));
         }
 
         #endregion

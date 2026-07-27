@@ -16,7 +16,8 @@ namespace GameWorld.Core.Commands.Bone
 
         public string HintText => "Select Bones";
 
-        bool ICommand.IsMutation => false;
+        public bool IsMutation => true;
+        public bool AffectsDocument => false;
 
         public void Configure(List<int> selectedBones, bool isAdd, bool isRemove)
         {

@@ -16,7 +16,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
         private readonly CommandFactory _commandFactory;
 
         [ObservableProperty] List<int> _selectedVertex =[];
-        [ObservableProperty] Rmv2MeshNode _selectedMesh;
+        [ObservableProperty] Rmv2MeshNode? _selectedMesh;
         [ObservableProperty] string _description = "";
 
         public PinRiggingAlgorithm(CommandFactory commandFactory, IStandardDialogs standardDialogs, SelectionManager selectionManager)
@@ -30,18 +30,30 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
         {
             if (SelectedMesh == null || SelectedVertex.Count == 0)
             {
-                _standardDialogs.ShowDialogBox("No mesh or vertex selected", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.PinSourceRequired"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return false;
             }
 
             if (meshesToAffect.Any(x => x == SelectedMesh))
             {
-                _standardDialogs.ShowDialogBox("Source mesh is also in the list of target meshes", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SourceAlsoTarget"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return false;
             }
 
-            _commandFactory.Create<PinMeshToVertexCommand>().Configure(x => x.Configure(meshesToAffect, SelectedMesh, SelectedVertex.First())).BuildAndExecute();
-            return true;
+            var result = _commandFactory.Create<PinMeshToVertexCommand>()
+                .Configure(x => x.Configure(meshesToAffect, SelectedMesh, SelectedVertex.First()))
+                .BuildAndExecute();
+            if (!result)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.RiggingFailed"),
+                    LocalizationManager.Instance.Get("General.Error"));
+            }
+            return result;
         }
 
         [RelayCommand] void SetSelection()
@@ -49,28 +61,40 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
             SelectedVertex.Clear();
             SelectedMesh = null;
 
-            var description = "No Mesh selected";
+            var description = LocalizationManager.Instance.Get("Msg.Kitbash.NoMeshSelected");
             var selectionState = _selectionManager.GetState<VertexSelectionState>();
             if (selectionState == null || selectionState.SelectionCount() == 0)
             {
-                _standardDialogs.ShowDialogBox("No vertex selected", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.NoVertexSelected"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
             
             var selectionAsMeshNode = selectionState.GetSingleSelectedObject() as Rmv2MeshNode;
             if (selectionAsMeshNode == null)
-                throw new Exception($"Unexpected result for selection. State = {selectionState}");
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectionIsNotMesh"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
 
             if (selectionAsMeshNode.PivotPoint != Vector3.Zero)
             {
-                _standardDialogs.ShowDialogBox("Selected mesh has a pivot point, the tool will not work correctly", "error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.PivotUnsupported"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
             
             SelectedMesh = selectionAsMeshNode;
             SelectedVertex = selectionState.SelectedVertices.ToList();
 
-            description = $"Mesh:{SelectedMesh.Name}', Num Verts: {SelectedVertex.Count}";
+            description = LocalizationManager.Instance.GetFormat(
+                "Msg.Kitbash.PinSourceDescription",
+                SelectedMesh.Name,
+                SelectedVertex.Count);
             Description = description;
         }
     }

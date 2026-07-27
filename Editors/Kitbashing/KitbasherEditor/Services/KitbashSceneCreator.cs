@@ -65,6 +65,7 @@ namespace Editors.KitbasherEditor.Services
                 if (string.IsNullOrEmpty(openedFileDirectory) == false)
                     _saveSettings.OutputName = openedFileDirectory + "\\";
                 _saveSettings.OutputName += Path.GetFileNameWithoutExtension(openedFilePath) + ".rigid_model_v2";
+                _saveSettings.RefreshLodSettings();
                 return;
             }
 
