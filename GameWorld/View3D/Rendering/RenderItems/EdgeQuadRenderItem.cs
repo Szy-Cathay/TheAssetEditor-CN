@@ -1,3 +1,4 @@
+using System;
 using GameWorld.Core.Components.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -18,16 +19,21 @@ namespace GameWorld.Core.Rendering.RenderItems
             if (renderingTechnique != RenderingTechnique.Normal)
                 return;
 
-            if (Edges == null || Edges.Length == 0 || EdgeQuadRenderer == null)
+            if (EdgeQuadRenderer == null)
                 return;
 
+            var edges = Edges ?? Array.Empty<EdgeData>();
+
             // Only upload to GPU when edge data changed
-            if (_needsUpload || _lastUploadedEdges != Edges)
+            if (_needsUpload || _lastUploadedEdges != edges)
             {
-                EdgeQuadRenderer.Update(Edges);
-                _lastUploadedEdges = Edges;
+                EdgeQuadRenderer.Update(edges);
+                _lastUploadedEdges = edges;
                 _needsUpload = false;
             }
+
+            if (EdgeQuadRenderer.CurrentInstanceCount == 0)
+                return;
 
             var viewportHeight = parameters.ViewportHeight > 0 ? parameters.ViewportHeight : device.Viewport.Height;
             var viewportWidth = parameters.ViewportWidth > 0 ? parameters.ViewportWidth : device.Viewport.Width;
