@@ -54,10 +54,32 @@ namespace GameWorld.Core.Components.Gizmo
         private Vector3 _backupScale;
         private bool _hasBackup = false;
 
-        // -- Partial VBO upload tracking -- //
-        private int _modifiedMin = int.MaxValue;
-        private int _modifiedMax = -1;
-        private bool _hasModifications = false;
+        private ISelectionState _gestureSelectionState;
+        private HashSet<int> _gestureAffectedVertexIndices;
+        private Dictionary<int, float> _gestureFalloffWeights;
+        private VertexUploadRange?[] _displayedPreviewRanges;
+        private bool _previewSynchronizationFaulted;
+
+        private readonly record struct VertexUploadRange(
+            int FirstModifiedVertex,
+            int LastModifiedVertex)
+        {
+            public static VertexUploadRange From(VertexTransformMeshResult result)
+            {
+                return new VertexUploadRange(
+                    result.FirstModifiedVertex,
+                    result.LastModifiedVertex);
+            }
+
+            public static VertexUploadRange Union(
+                VertexUploadRange first,
+                VertexUploadRange second)
+            {
+                return new VertexUploadRange(
+                    Math.Min(first.FirstModifiedVertex, second.FirstModifiedVertex),
+                    Math.Max(first.LastModifiedVertex, second.LastModifiedVertex));
+            }
+        }
 
         public TransformGizmoWrapper(CommandFactory commandFactory, List<MeshObject> effectedObjects, ISelectionState vertexSelectionState)
         {
@@ -245,12 +267,15 @@ namespace GameWorld.Core.Components.Gizmo
             var command = _commandFactory.Create<TransformVertexCommand>()
                 .Configure(x => x.Configure(_effectedObjects, Position))
                 .Build();
-            if (_faceVertexIndices != null)
-                command.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
 
             try
             {
                 CaptureVertexBaseline();
+                if (_gestureAffectedVertexIndices != null)
+                {
+                    command.AffectedVertexIndices =
+                        new HashSet<int>(_gestureAffectedVertexIndices);
+                }
                 _activeCommand = command;
             }
             catch
@@ -295,7 +320,7 @@ namespace GameWorld.Core.Components.Gizmo
                     }
                 }
                 else if (_activeCommand is TransformVertexCommand || _hasBackup)
-                    RestoreVertexBaseline(skipVertexUpload: false);
+                    RestoreVertexBaseline();
             });
         }
 
@@ -317,7 +342,7 @@ namespace GameWorld.Core.Components.Gizmo
             if (_activeCommand is not TransformVertexCommand || !_hasBackup)
                 return;
 
-            RestoreVertexBaseline(skipVertexUpload: false);
+            RestoreVertexBaseline();
         }
 
         private void EndTransform(Action transformEnd)
@@ -384,9 +409,11 @@ namespace GameWorld.Core.Components.Gizmo
             _totalGizomTransform = Matrix.Identity;
             _invertedWindingOrder = false;
             _vertexTransformReplayPlan = null;
-            _modifiedMin = int.MaxValue;
-            _modifiedMax = -1;
-            _hasModifications = false;
+            _gestureSelectionState = null;
+            _gestureAffectedVertexIndices = null;
+            _gestureFalloffWeights = null;
+            _displayedPreviewRanges = null;
+            _previewSynchronizationFaulted = false;
         }
 
         private void ResetBonePreviewToBaseline()
@@ -405,12 +432,18 @@ namespace GameWorld.Core.Components.Gizmo
             command.SetReplayPlan(
                 _vertexTransformReplayPlan ??
                 VertexTransformOperationApplier.CreateEmptyReplayPlan(
-                    _selectionState,
-                    _falloffDistance > 0 ? _falloffWeights : null));
-            if (_faceVertexIndices != null)
-                command.AffectedVertexIndices = new HashSet<int>(_faceVertexIndices);
-            if (_falloffWeights != null && _falloffDistance > 0)
-                command.FalloffWeights = new Dictionary<int, float>(_falloffWeights);
+                    GestureSelectionState,
+                    GestureFalloffWeights));
+            if (_gestureAffectedVertexIndices != null)
+            {
+                command.AffectedVertexIndices =
+                    new HashSet<int>(_gestureAffectedVertexIndices);
+            }
+            if (_gestureFalloffWeights != null)
+            {
+                command.FalloffWeights =
+                    new Dictionary<int, float>(_gestureFalloffWeights);
+            }
         }
 
         Matrix FixRotationAxis2(Matrix transform)
@@ -448,9 +481,14 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
-            if (!ApplyTransform(Matrix.CreateTranslation(translation), pivot, GizmoMode.Translate))
+            if (!TryApplyTransform(
+                    Matrix.CreateTranslation(translation),
+                    pivot,
+                    GizmoMode.Translate,
+                    out var results))
                 return;
 
+            SynchronizeVertexPreview(results);
             Position += translation;
             _totalGizomTransform *= Matrix.CreateTranslation(translation);
         }
@@ -472,9 +510,14 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
-            if (!ApplyTransform(rotation, pivot, GizmoMode.Rotate))
+            if (!TryApplyTransform(
+                    rotation,
+                    pivot,
+                    GizmoMode.Rotate,
+                    out var results))
                 return;
 
+            SynchronizeVertexPreview(results);
             _totalGizomTransform *= rotation;
 
             var fixedTransform = FixRotationAxis2(_totalGizomTransform);
@@ -501,16 +544,29 @@ namespace GameWorld.Core.Components.Gizmo
                 return;
             }
 
-            if (!ApplyTransform(scaleMatrix, pivot, GizmoMode.UniformScale))
+            if (!TryApplyTransform(
+                    scaleMatrix,
+                    pivot,
+                    GizmoMode.UniformScale,
+                    out var results))
                 return;
 
+            SynchronizeVertexPreview(results);
             Scale += scale;
 
             _totalGizomTransform *= scaleMatrix;
         }
 
-        bool ApplyTransform(Matrix transform, PivotType pivotType, GizmoMode gizmoMode)
+        bool TryApplyTransform(
+            Matrix transform,
+            PivotType pivotType,
+            GizmoMode gizmoMode,
+            out IReadOnlyList<VertexTransformMeshResult> results)
         {
+            results = Array.Empty<VertexTransformMeshResult>();
+            if (_previewSynchronizationFaulted)
+                return false;
+
             var operationMode = gizmoMode switch
             {
                 GizmoMode.Translate => VertexTransformOperationMode.Translate,
@@ -519,23 +575,22 @@ namespace GameWorld.Core.Components.Gizmo
             };
             var pivotPoint = pivotType == PivotType.ObjectCenter ? Position : Vector3.Zero;
             var operation = new VertexTransformOperation(operationMode, transform, pivotPoint);
-            var falloffWeights = _falloffDistance > 0 ? _falloffWeights : null;
             if (_vertexTransformReplayPlan == null ||
                 _backupVertexArrays == null ||
                 !VertexTransformOperationApplier.TryAppendOperation(
                     _effectedObjects,
-                    _selectionState,
-                    _faceVertexIndices,
-                    falloffWeights,
+                    GestureSelectionState,
+                    GestureAffectedVertexIndices,
+                    GestureFalloffWeights,
                     _vertexTransformReplayPlan,
                     operation,
                     out var candidatePlan) ||
                 !VertexTransformOperationApplier.IsReplayPlanReversibleFromBaseline(
                     _effectedObjects,
                     _backupVertexArrays,
-                    _selectionState,
-                    _faceVertexIndices,
-                    falloffWeights,
+                    GestureSelectionState,
+                    GestureAffectedVertexIndices,
+                    GestureFalloffWeights,
                     candidatePlan))
             {
                 return false;
@@ -544,17 +599,17 @@ namespace GameWorld.Core.Components.Gizmo
             VertexTransformOperationApplier.RestoreAffectedVerticesFromBaseline(
                 _effectedObjects,
                 _backupVertexArrays,
-                _selectionState,
-                _faceVertexIndices,
-                falloffWeights);
-            var results = VertexTransformOperationApplier.ApplyReplayPlan(
+                GestureSelectionState,
+                GestureAffectedVertexIndices,
+                GestureFalloffWeights);
+            results = VertexTransformOperationApplier.ApplyReplayPlan(
                 _effectedObjects,
-                _selectionState,
-                _faceVertexIndices,
-                falloffWeights,
+                GestureSelectionState,
+                GestureAffectedVertexIndices,
+                GestureFalloffWeights,
                 candidatePlan,
                 inverse: false);
-            var isObjectSelection = _selectionState is ObjectSelectionState;
+            var isObjectSelection = GestureSelectionState is ObjectSelectionState;
             var wasInverted =
                 isObjectSelection &&
                 _vertexTransformReplayPlan.RawMatrices.Forward.Determinant() < 0;
@@ -569,22 +624,71 @@ namespace GameWorld.Core.Components.Gizmo
 
             _invertedWindingOrder = isInverted;
             _vertexTransformReplayPlan = candidatePlan;
-            foreach (var result in results)
-            {
-                if (_selectionState is VertexSelectionState && result.HasModifiedVertices)
-                {
-                    _modifiedMin = Math.Min(_modifiedMin, result.FirstModifiedVertex);
-                    _modifiedMax = Math.Max(_modifiedMax, result.LastModifiedVertex);
-                    _hasModifications = true;
-                }
+            return true;
+        }
 
-                if (_hasModifications && _selectionState is not ObjectSelectionState)
-                    result.Geometry.RebuildVertexBufferPartial(_modifiedMin, _modifiedMax);
-                else
-                    result.Geometry.RebuildVertexBuffer();
+        private void SynchronizeVertexPreview(
+            IReadOnlyList<VertexTransformMeshResult> results)
+        {
+            if (_displayedPreviewRanges == null ||
+                results.Count != _effectedObjects.Count ||
+                _displayedPreviewRanges.Length != _effectedObjects.Count)
+            {
+                throw new InvalidOperationException(
+                    "Vertex preview results do not match the captured mesh set.");
             }
 
-            return true;
+            var nextRanges = new VertexUploadRange?[results.Count];
+            for (var meshIndex = 0; meshIndex < results.Count; meshIndex++)
+            {
+                var result = results[meshIndex];
+                var mesh = _effectedObjects[meshIndex];
+                if (!ReferenceEquals(result.Geometry, mesh))
+                {
+                    throw new InvalidOperationException(
+                        "Vertex preview result geometry changed during the gesture.");
+                }
+
+                var nextRange = result.HasModifiedVertices
+                    ? VertexUploadRange.From(result)
+                    : (VertexUploadRange?)null;
+                nextRanges[meshIndex] = nextRange;
+                var uploadRange = UnionPreviewRanges(
+                    _displayedPreviewRanges[meshIndex],
+                    nextRange);
+                if (!uploadRange.HasValue)
+                    continue;
+
+                UploadVertexRange(mesh, uploadRange.Value);
+            }
+
+            _displayedPreviewRanges = nextRanges;
+        }
+
+        private void UploadVertexRange(
+            MeshObject mesh,
+            VertexUploadRange uploadRange)
+        {
+            if (GestureSelectionState is ObjectSelectionState)
+            {
+                mesh.RebuildVertexBuffer();
+                return;
+            }
+
+            mesh.RebuildVertexBufferPartial(
+                uploadRange.FirstModifiedVertex,
+                uploadRange.LastModifiedVertex);
+        }
+
+        private static VertexUploadRange? UnionPreviewRanges(
+            VertexUploadRange? first,
+            VertexUploadRange? second)
+        {
+            if (!first.HasValue)
+                return second;
+            if (!second.HasValue)
+                return first;
+            return VertexUploadRange.Union(first.Value, second.Value);
         }
 
         bool TransformBone(BoneTransformDelta delta)
@@ -641,6 +745,14 @@ namespace GameWorld.Core.Components.Gizmo
             var indexArrays = new List<ushort[]>(_effectedObjects.Count);
             try
             {
+                var gestureSelectionState = _selectionState.Clone();
+                var gestureAffectedVertexIndices = _faceVertexIndices == null
+                    ? null
+                    : new HashSet<int>(_faceVertexIndices);
+                var gestureFalloffWeights =
+                    _falloffDistance > 0 && _falloffWeights != null
+                        ? new Dictionary<int, float>(_falloffWeights)
+                        : null;
                 foreach (var mesh in _effectedObjects)
                 {
                     var vertexBackup = new VertexPositionNormalTextureCustom[mesh.VertexCount()];
@@ -653,8 +765,8 @@ namespace GameWorld.Core.Components.Gizmo
                 }
 
                 var replayPlan = VertexTransformOperationApplier.CreateEmptyReplayPlan(
-                    _selectionState,
-                    _falloffDistance > 0 ? _falloffWeights : null);
+                    gestureSelectionState,
+                    gestureFalloffWeights);
                 foreach (var mesh in _effectedObjects)
                     mesh.DeferBoundingBoxRebuild = true;
 
@@ -663,6 +775,11 @@ namespace GameWorld.Core.Components.Gizmo
                 _backupPosition = _pos;
                 _backupOrientation = _orientation;
                 _backupScale = _scale;
+                _gestureSelectionState = gestureSelectionState;
+                _gestureAffectedVertexIndices = gestureAffectedVertexIndices;
+                _gestureFalloffWeights = gestureFalloffWeights;
+                _displayedPreviewRanges =
+                    new VertexUploadRange?[_effectedObjects.Count];
                 _vertexTransformReplayPlan = replayPlan;
                 _hasBackup = true;
             }
@@ -675,7 +792,7 @@ namespace GameWorld.Core.Components.Gizmo
             }
         }
 
-        private void RestoreVertexBaseline(bool skipVertexUpload)
+        private void RestoreVertexBaseline()
         {
             if (!_hasBackup || _effectedObjects == null ||
                 _backupVertexArrays == null || _backupIndexArrays == null)
@@ -697,8 +814,13 @@ namespace GameWorld.Core.Components.Gizmo
                     Array.Copy(vertexBackup, mesh.VertexArray, vertexBackup.Length);
                     Array.Copy(indexBackup, mesh.IndexArray, indexBackup.Length);
                     mesh.RebuildIndexBuffer();
-                    if (!skipVertexUpload)
-                        mesh.RebuildVertexBuffer();
+                    var displayedRange =
+                        _displayedPreviewRanges != null &&
+                        meshIndex < _displayedPreviewRanges.Length
+                            ? _displayedPreviewRanges[meshIndex]
+                            : null;
+                    if (displayedRange.HasValue)
+                        UploadVertexRange(mesh, displayedRange.Value);
                 }
                 catch (Exception exception)
                 {
@@ -716,15 +838,28 @@ namespace GameWorld.Core.Components.Gizmo
             _invertedWindingOrder = false;
             _vertexTransformReplayPlan =
                 VertexTransformOperationApplier.CreateEmptyReplayPlan(
-                    _selectionState,
-                    _falloffDistance > 0 ? _falloffWeights : null);
-            _modifiedMin = int.MaxValue;
-            _modifiedMax = -1;
-            _hasModifications = false;
+                    GestureSelectionState,
+                    GestureFalloffWeights);
+            if (_displayedPreviewRanges != null)
+            {
+                Array.Clear(
+                    _displayedPreviewRanges,
+                    0,
+                    _displayedPreviewRanges.Length);
+            }
             _pos = _backupPosition;
             _orientation = _backupOrientation;
             _scale = _backupScale;
         }
+
+        private ISelectionState GestureSelectionState =>
+            _gestureSelectionState ?? _selectionState;
+
+        private HashSet<int> GestureAffectedVertexIndices =>
+            _gestureAffectedVertexIndices;
+
+        private IReadOnlyDictionary<int, float> GestureFalloffWeights =>
+            _gestureFalloffWeights;
 
         private void ReleaseVertexBaseline()
         {
