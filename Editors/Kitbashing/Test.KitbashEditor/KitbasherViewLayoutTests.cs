@@ -38,6 +38,147 @@ namespace Test.KitbashEditor
         }
 
         [Test]
+        public void MenuBar_MenuItemsBindEnabledState()
+        {
+            var document = XDocument.Load(GetRepositoryFilePath(
+                "Editors",
+                "Kitbashing",
+                "KitbasherEditor",
+                "Core",
+                "MenuBarViews",
+                "MenuBarView.xaml"));
+            XNamespace presentation =
+                "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+            var menuItemStyle = document
+                .Descendants(presentation + "Menu.Resources")
+                .Descendants(presentation + "Style")
+                .Single();
+            var enabledSetter = menuItemStyle
+                .Elements(presentation + "Setter")
+                .SingleOrDefault(element =>
+                    (string?)element.Attribute("Property") == "IsEnabled");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(enabledSetter, Is.Not.Null);
+                Assert.That(
+                    (string?)enabledSetter?.Attribute("Value"),
+                    Is.EqualTo(
+                        "{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}"));
+            });
+        }
+
+        [Test]
+        public void MenuBar_ToolbarControlsPreserveViewportFocus()
+        {
+            var document = XDocument.Load(GetRepositoryFilePath(
+                "Editors",
+                "Kitbashing",
+                "KitbasherEditor",
+                "Core",
+                "MenuBarViews",
+                "MenuBarView.xaml"));
+            XNamespace presentation =
+                "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+            var toolbarButtons = document
+                .Descendants()
+                .Where(element =>
+                    element.Name == presentation + "Button" ||
+                    element.Name == presentation + "RadioButton")
+                .Where(element =>
+                    element.Descendants(presentation + "Image").Any())
+                .ToList();
+
+            Assert.That(toolbarButtons, Is.Not.Empty);
+            Assert.That(
+                toolbarButtons.All(element =>
+                    (string?)element.Attribute("Focusable") == "False"),
+                Is.True);
+            Assert.That(
+                toolbarButtons.All(element =>
+                    (string?)element.Attribute(
+                        "AutomationProperties.Name") ==
+                    "{Binding Action.ToolTipAttribute.Value}"),
+                Is.True);
+        }
+
+        [Test]
+        public void MenuBar_FalloffInputAcceptsOnlyPositiveDecimals()
+        {
+            var document = XDocument.Load(GetRepositoryFilePath(
+                "Editors",
+                "Kitbashing",
+                "KitbasherEditor",
+                "Core",
+                "MenuBarViews",
+                "MenuBarView.xaml"));
+            XNamespace presentation =
+                "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+            XNamespace behaviors =
+                "clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui";
+            var falloffTextBox = document
+                .Descendants(presentation + "TextBox")
+                .Single(element =>
+                    (string?)element.Attribute(
+                        XName.Get("Name",
+                            "http://schemas.microsoft.com/winfx/2006/xaml")) ==
+                    "FalloffTextBox");
+            var inputBehavior = falloffTextBox
+                .Descendants(behaviors + "TextBoxInputBehavior")
+                .SingleOrDefault();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(inputBehavior, Is.Not.Null);
+                Assert.That(
+                    (string?)inputBehavior?.Attribute("InputMode"),
+                    Is.EqualTo("DecimalInput"));
+                Assert.That(
+                    (string?)inputBehavior?.Attribute(
+                        "JustPositivDecimalInput"),
+                    Is.EqualTo("True"));
+            });
+        }
+
+        [Test]
+        public void MenuBar_UnloadedHandlerReleasesWindowKeyboardEvents()
+        {
+            var document = XDocument.Load(GetRepositoryFilePath(
+                "Editors",
+                "Kitbashing",
+                "KitbasherEditor",
+                "Core",
+                "MenuBarViews",
+                "MenuBarView.xaml"));
+
+            Assert.That(
+                (string?)document.Root?.Attribute("Unloaded"),
+                Is.EqualTo("UserControl_Unloaded"));
+        }
+
+        [Test]
+        public void MenuBar_FalloffCommitDefersViewportFocus()
+        {
+            var source = File.ReadAllText(GetRepositoryFilePath(
+                "Editors",
+                "Kitbashing",
+                "KitbasherEditor",
+                "Core",
+                "MenuBarViews",
+                "MenuBarView.xaml.cs"));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    source,
+                    Does.Contain("Dispatcher.BeginInvoke("));
+                Assert.That(
+                    source,
+                    Does.Contain("DispatcherPriority.Input"));
+            });
+        }
+
+        [Test]
         public void SceneNodeEditor_ShowsEmptyStateWhenNoEditorIsSelected()
         {
             var document = XDocument.Load(GetRepositoryFilePath(

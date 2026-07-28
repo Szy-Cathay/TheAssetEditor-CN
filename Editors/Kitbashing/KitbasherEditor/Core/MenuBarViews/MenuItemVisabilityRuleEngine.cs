@@ -32,6 +32,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             _actionEnabledRules[ActionEnabledRule.AnythingSelected] = AnythingSelectedRule;
             _actionEnabledRules[ActionEnabledRule.ObjectOrVertexSelected] = ObjectOrVertexSelectedRule;
             _actionEnabledRules[ActionEnabledRule.ObjectOrFaceSelected] = ObjectOrFaceSelectedReule;
+            _actionEnabledRules[ActionEnabledRule.OneObjectOrFaceSelected] = OneObjectOrFaceSelectedRule;
         }
 
         bool IsObjectMode() => _selectionManager.GetState().Mode == GeometrySelectionMode.Object;
@@ -47,6 +48,11 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         bool AnythingSelectedRule() => _selectionManager.GetState().SelectionCount() >= 1;
         bool ObjectOrFaceSelectedReule() => (IsObjectMode() || IsFaceMode()) && _selectionManager.GetState().SelectionCount() >= 1;
         bool ObjectOrVertexSelectedRule() => (IsObjectMode() || IsVertexMode()) && _selectionManager.GetState().SelectionCount() >= 1;
+        bool OneObjectOrFaceSelectedRule() =>
+            (IsObjectMode() &&
+             _selectionManager.GetState().SelectionCount() == 1) ||
+            (IsFaceMode() &&
+             _selectionManager.GetState().SelectionCount() >= 1);
 
         bool FaceSelectedRule() => IsFaceMode() && _selectionManager.GetState().SelectionCount() >= 1;
         bool VertexSelectedRule() => IsVertexMode() && _selectionManager.GetState().SelectionCount() >= 1;

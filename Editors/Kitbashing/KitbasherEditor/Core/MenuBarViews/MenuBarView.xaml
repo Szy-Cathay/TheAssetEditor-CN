@@ -3,9 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
              xmlns:viewmodel="clr-namespace:KitbasherEditor.ViewModels.MenuBarViews"
              xmlns:menusystem="clr-namespace:Shared.Ui.Common.MenuSystem;assembly=Shared.Ui"
-             mc:Ignorable="d" Loaded="UserControl_Loaded" >
+             mc:Ignorable="d"
+             Loaded="UserControl_Loaded"
+             Unloaded="UserControl_Unloaded">
     <UserControl.Resources>
 
         <Style x:Key="VerticalSeparatorStyle" 
@@ -36,6 +40,8 @@
 
         <DataTemplate x:Key="defaultButtonTemplate">
             <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" BorderThickness="0" Background="Transparent" Margin="1" 
+                    AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
+                    Focusable="False"
                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                     Command="{Binding Path=Action.Command}" 
                     ToolTipService.ShowOnDisabled="True"
@@ -47,6 +53,8 @@
 
         <DataTemplate x:Key="radioButtonTemplate">
             <RadioButton    ToolTip="{Binding  Action.ToolTipAttribute.Value}"  BorderThickness="0" Background="Transparent" Margin="1"
+                            AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
+                            Focusable="False"
                             IsChecked="{Binding IsChecked.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                             Command="{Binding Path=Action.Command}"
                             GroupName="{Binding GroupName}" 
@@ -59,7 +67,8 @@
         </DataTemplate>
 
         <DataTemplate x:Key="seperatorButtonTemplate">
-            <Separator Style="{DynamicResource VerticalSeparatorStyle}" />
+            <Separator Style="{DynamicResource VerticalSeparatorStyle}"
+                       Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}"/>
         </DataTemplate>
 
         <viewmodel:ButtonDataTemplateSelector x:Key="buttonStyleSelector"
@@ -74,6 +83,7 @@
                 <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
                     <Setter Property="Header" Value="{Binding NameAttribute.Value}" />
                     <Setter Property="Command" Value="{Binding Action.Command}" />
+                    <Setter Property="IsEnabled" Value="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsSeparator}" Value="True">
                             <Setter Property="Template">
@@ -104,6 +114,7 @@
                         <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
                         <ToggleButton x:Name="PropToggleBtn"
                                       ToolTip="衰减编辑 (Proportional Editing)"
+                                      AutomationProperties.Name="衰减编辑"
                                       IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       Focusable="False"
                                       BorderThickness="0" Background="Transparent" Padding="4,2">
@@ -113,6 +124,7 @@
                         <ToggleButton x:Name="PropArrowBtn" Content="▾" FontSize="10" FontWeight="Bold"
                                       BorderThickness="0" Background="Transparent" Padding="2,0,4,0"
                                       Focusable="False"
+                                      AutomationProperties.Name="调整衰减距离"
                                       ToolTip="调整衰减距离"/>
                     </StackPanel>
                 </Border>
@@ -126,7 +138,13 @@
                             <TextBox x:Name="FalloffTextBox"
                                      Text="{Binding ProportionalEditing.FalloffDistance, UpdateSourceTrigger=LostFocus, Mode=TwoWay, StringFormat='{}{0:0.###}'}"
                                      Width="100" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
-                                     PreviewKeyDown="FalloffTextBox_PreviewKeyDown"/>
+                                     PreviewKeyDown="FalloffTextBox_PreviewKeyDown">
+                                <b:Interaction.Behaviors>
+                                    <behaviors:TextBoxInputBehavior
+                                        InputMode="DecimalInput"
+                                        JustPositivDecimalInput="True"/>
+                                </b:Interaction.Behaviors>
+                            </TextBox>
                         </StackPanel>
                     </Border>
                 </Popup>

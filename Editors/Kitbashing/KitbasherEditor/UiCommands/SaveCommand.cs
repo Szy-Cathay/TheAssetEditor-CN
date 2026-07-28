@@ -1,4 +1,5 @@
 ﻿using System.Runtime;
+using System.Windows.Input;
 using Editors.KitbasherEditor.Core.MenuBarViews;
 using Editors.KitbasherEditor.ViewModels.SaveDialog;
 using GameWorld.Core.Components;
@@ -47,7 +48,8 @@ namespace Editors.KitbasherEditor.UiCommands
     {
         public string ToolTip { get; set; } = "Save";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
-        public Hotkey? HotKey { get; } = null;
+        public Hotkey? HotKey { get; } =
+            new Hotkey(Key.S, ModifierKeys.Control);
         public SaveResult? Result { get; private set; }
         bool _hasExecuted;
 

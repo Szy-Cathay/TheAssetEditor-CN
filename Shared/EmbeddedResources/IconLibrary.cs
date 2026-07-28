@@ -22,6 +22,7 @@ namespace Shared.EmbeddedResources
         [AllowNull]public static BitmapImage SaveFileIcon { get; private set; } 
         [AllowNull]public static BitmapImage OpenReferenceMeshIcon { get; private set; } 
         [AllowNull]public static BitmapImage UndoIcon { get; private set; } 
+        [AllowNull]public static BitmapImage RedoIcon { get; private set; }
 
         [AllowNull]public static BitmapImage Gizmo_CursorIcon { get; private set; }
         [AllowNull]public static BitmapImage Gizmo_MoveIcon { get; private set; }
@@ -80,6 +81,7 @@ namespace Shared.EmbeddedResources
             SaveFileIcon = BitmapToImageSource(@"Kitbasher.icons8-save-all-50.png");
             OpenReferenceMeshIcon = BitmapToImageSource(@"Kitbasher.OpenRef.png");
             UndoIcon = BitmapToImageSource(@"Kitbasher.Undo.png");
+            RedoIcon = BitmapToImageSource("Redo.png");
 
             Gizmo_CursorIcon = BitmapToImageSource(@"Kitbasher.icons8-cursor-256.png");
             Gizmo_MoveIcon = BitmapToImageSource(@"Kitbasher.Gizmo_move.png");

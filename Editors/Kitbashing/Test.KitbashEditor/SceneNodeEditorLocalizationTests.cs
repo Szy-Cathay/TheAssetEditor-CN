@@ -89,5 +89,25 @@ namespace Test.KitbashEditor
                     Does.Contain("不会写入模型"));
             });
         }
+
+        [Test]
+        public void AssignMaterialDialog_UsesChineseCopy()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    LocalizationManager.Instance.Get(
+                        "Kitbash.AssignMaterial.SelectSource"),
+                    Is.EqualTo("选择要复制材质的网格"));
+                Assert.That(
+                    LocalizationManager.Instance.Get(
+                        "Kitbash.AssignMaterial.NoSourceSelected"),
+                    Is.EqualTo("未选择要复制材质的网格"));
+                Assert.That(
+                    LocalizationManager.Instance.Get(
+                        "Kitbash.AssignMaterial.MultipleSourcesSelected"),
+                    Is.EqualTo("选择了多个网格，请只选择一个材质来源"));
+            });
+        }
     }
 }

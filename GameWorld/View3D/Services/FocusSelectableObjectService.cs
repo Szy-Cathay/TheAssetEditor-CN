@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
@@ -111,6 +112,75 @@ namespace GameWorld.Core.Services
                 }
                 averageFacePos = averageFacePos / faceList.Count;
                 _arcBallCamera.LookAt = averageFacePos + objectPos;
+            }
+            else if (selectionState is EdgeSelectionState edgeSelection)
+            {
+                var vertexIndices =
+                    edgeSelection.GetSelectedVertexIndices();
+                var objectPos = _sceneManager
+                    .GetWorldPosition(edgeSelection.RenderObject)
+                    .Translation;
+                if (vertexIndices.Count == 0)
+                {
+                    _arcBallCamera.LookAt = objectPos;
+                    return;
+                }
+
+                var averageVertexPos = Vector3.Zero;
+                foreach (var vertexIndex in vertexIndices)
+                {
+                    averageVertexPos += edgeSelection.RenderObject
+                        .Geometry
+                        .GetVertexById(vertexIndex);
+                }
+
+                _arcBallCamera.LookAt =
+                    averageVertexPos / vertexIndices.Count + objectPos;
+            }
+            else if (selectionState is BoneSelectionState boneSelection)
+            {
+                var objectPos = _sceneManager
+                    .GetWorldPosition(boneSelection.RenderObject)
+                    .Translation;
+                if (boneSelection.SelectedBones.Count == 0)
+                {
+                    _arcBallCamera.LookAt = objectPos;
+                    return;
+                }
+
+                var currentFrame = AnimationSampler.Sample(
+                    boneSelection.CurrentFrame,
+                    0,
+                    boneSelection.Skeleton,
+                    boneSelection.CurrentAnimation,
+                    freezeFrame: true);
+                if (currentFrame == null)
+                {
+                    _arcBallCamera.LookAt = objectPos;
+                    return;
+                }
+
+                var averageBonePos = Vector3.Zero;
+                var selectedBoneCount = 0;
+                foreach (var boneIndex in boneSelection.SelectedBones)
+                {
+                    if (boneIndex < 0 ||
+                        boneIndex >= currentFrame.BoneTransforms.Count)
+                    {
+                        continue;
+                    }
+
+                    averageBonePos += currentFrame
+                        .GetSkeletonAnimatedWorld(
+                            boneSelection.Skeleton,
+                            boneIndex)
+                        .Translation;
+                    selectedBoneCount++;
+                }
+
+                _arcBallCamera.LookAt = selectedBoneCount == 0
+                    ? objectPos
+                    : averageBonePos / selectedBoneCount + objectPos;
             }
         }
 
