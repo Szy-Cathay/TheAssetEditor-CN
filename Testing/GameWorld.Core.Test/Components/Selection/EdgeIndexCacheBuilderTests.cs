@@ -105,6 +105,26 @@ public class EdgeIndexCacheBuilderTests
     }
 
     [Test]
+    public void BuildLineIndices_SharedTriangleEdge_ReturnsUniqueLineList()
+    {
+        var result = EdgeIndexCacheBuilder.BuildLineIndices(
+            new ushort[] { 0, 1, 2, 2, 1, 3 },
+            50_000);
+
+        Assert.That(
+            result,
+            Is.EqualTo(
+                new ushort[]
+                {
+                    0, 1,
+                    1, 2,
+                    0, 2,
+                    1, 3,
+                    2, 3
+                }));
+    }
+
+    [Test]
     public void Build_ProductionLimit_StopsAtExactlyFiftyThousand()
     {
         var indices = Enumerable.Range(0, 50_001)

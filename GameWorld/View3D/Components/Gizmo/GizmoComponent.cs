@@ -259,6 +259,9 @@ namespace GameWorld.Core.Components.Gizmo
             if (!IsSupportedSelectionMode(selectionMode))
                 return;
 
+            _activeTransformation?
+                .RefreshDisplayForAnimationState();
+
             // Blender-style hotkey triggers for modal transform
             // G = Translate, R = Rotate, S = Scale
             // Active whenever there is a selection (no need to enable Gizmo first)

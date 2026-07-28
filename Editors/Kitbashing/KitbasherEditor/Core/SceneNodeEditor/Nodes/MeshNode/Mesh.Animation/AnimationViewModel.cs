@@ -1,6 +1,7 @@
-﻿using System.Windows;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.Core;
+using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
@@ -14,22 +15,28 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
     {
         private readonly KitbasherRootScene _kitbasherRootScene;
         private readonly ISkeletonAnimationLookUpHelper _animLookUp;
+        private readonly SceneNodePropertyEditor _propertyEditor;
         Rmv2MeshNode? _meshNode;
 
         [ObservableProperty] public partial string SkeletonName { get; set; } = string.Empty;
-        [ObservableProperty] public partial List<AnimatedBone> AnimatedBones  { get; set; }
+        [ObservableProperty] public partial List<AnimatedBone> AnimatedBones { get; set; } = [];
         [ObservableProperty] public partial FilterCollection<AnimatedBone> AttachableBones { get; set; } = new(null);
         [ObservableProperty] public partial int AnimationMatrixOverride { get; set; } = -1;
 
-        public AnimationViewModel(KitbasherRootScene kitbasherRootScene, ISkeletonAnimationLookUpHelper animLookUp)
+        public AnimationViewModel(
+            KitbasherRootScene kitbasherRootScene,
+            ISkeletonAnimationLookUpHelper animLookUp,
+            SceneNodePropertyEditor propertyEditor)
         {
             _kitbasherRootScene = kitbasherRootScene;
             _animLookUp = animLookUp;
+            _propertyEditor = propertyEditor;
         }
 
         public void Initialize(Rmv2MeshNode meshNode)
         {
             _meshNode = meshNode;
+            AnimatedBones = [];
 
             AnimationMatrixOverride = _meshNode.AnimationMatrixOverride;
             SkeletonName = _meshNode.Geometry.SkeletonName;
@@ -38,9 +45,9 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
             var bones = _meshNode.Geometry.GetUniqeBlendIndices();
 
             if (skeletonFile == null)
-                SkeletonName = SkeletonName + "[MISSING from packs]";
+                SkeletonName += GetText("Kitbash.Sidebar.MissingFromPacks");
 
-            // Make sure the bones are valid, mapping can cause issues! 
+            // Make sure the bones are valid, mapping can cause issues!
             if (bones.Count != 0 && skeletonFile != null)
             {
                 var activeBonesMin = bones.Min(x => x);
@@ -53,7 +60,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
 
                 var boneList = AnimatedBoneHelper.CreateFlatSkeletonList(skeletonFile);
 
-                if (skeletonFile != null && hasValidBoneMapping)
+                if (hasValidBoneMapping)
                 {
                     AnimatedBones = boneList
                         .OrderBy(x => x.BoneIndex.Value)
@@ -65,38 +72,61 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
             var meshNodes = SceneNodeHelper.GetChildrenOfType<Rmv2MeshNode>(existingSkeletonMeshNode);
             var existingSkeltonName = meshNodes.First().Geometry.SkeletonName;
 
-            var existingSkeletonFile = _animLookUp.GetSkeletonFileFromName(existingSkeltonName);
+            var existingSkeletonFile = string.Equals(
+                    existingSkeltonName,
+                    _meshNode.Geometry.SkeletonName,
+                    StringComparison.OrdinalIgnoreCase)
+                ? skeletonFile
+                : _animLookUp.GetSkeletonFileFromName(existingSkeltonName);
             if (existingSkeletonFile != null)
-                AttachableBones.UpdatePossibleValues(AnimatedBoneHelper.CreateFlatSkeletonList(existingSkeletonFile), new AnimatedBone(-1, "none"));
+                AttachableBones.UpdatePossibleValues(
+                    AnimatedBoneHelper.CreateFlatSkeletonList(existingSkeletonFile),
+                    new AnimatedBone(-1, GetText("Kitbash.Sidebar.None")));
 
+            AttachableBones.SearchFilter = (value, rx) => rx.Match(value.Name.Value).Success;
+            AttachableBones.SelectedItem = AttachableBones.PossibleValues.FirstOrDefault(
+                x => x.Name.Value == _meshNode.AttachmentPointName);
             AttachableBones.SelectedItemChanged += ModelBoneList_SelectedItemChanged;
-            AttachableBones.SearchFilter = (value, rx) => { return rx.Match(value.Name.Value).Success; };
-            AttachableBones.SelectedItem = AttachableBones.PossibleValues.FirstOrDefault(x => x.Name.Value == _meshNode.AttachmentPointName);
         }
 
         private void ModelBoneList_SelectedItemChanged(AnimatedBone newValue)
         {
-            var mainNode = _meshNode.GetParentModel() as MainEditableNode;
-            if (mainNode == null)
+            if (_meshNode?.GetParentModel() is not MainEditableNode)
                 return;
 
-            if (newValue != null && newValue.BoneIndex.Value != -1)
-            {
-                _meshNode.AttachmentPointName = newValue.Name.Value;
-                _meshNode.AttachmentBoneResolver = new SkeletonBoneAnimationResolver(_kitbasherRootScene, newValue.BoneIndex.Value);
-            }
-            else
-            {
-                _meshNode.AttachmentPointName = null;
-                _meshNode.AttachmentBoneResolver = null;
-            }
+            var oldState = new AttachmentState(
+                _meshNode.AttachmentPointName,
+                _meshNode.AttachmentBoneResolver,
+                AttachableBones.PossibleValues.FirstOrDefault(
+                    value => value.Name.Value == _meshNode.AttachmentPointName));
+            var newState = newValue != null && newValue.BoneIndex.Value != -1
+                ? new AttachmentState(
+                    newValue.Name.Value,
+                    new SkeletonBoneAnimationResolver(_kitbasherRootScene, newValue.BoneIndex.Value),
+                    newValue)
+                : new AttachmentState(null, null, newValue);
+
+            _propertyEditor.Update(
+                oldState,
+                newState,
+                state =>
+                {
+                    _meshNode.AttachmentPointName = state.Name;
+                    _meshNode.AttachmentBoneResolver = state.Resolver;
+                },
+                state => AttachableBones.SelectedItem = state.SelectedBone);
         }
 
         partial void OnAnimationMatrixOverrideChanged(int value)
         {
-            if(_meshNode==null) 
+            if (_meshNode == null)
                 return;
-            _meshNode.AnimationMatrixOverride = value;
+
+            _propertyEditor.Update(
+                _meshNode.AnimationMatrixOverride,
+                value,
+                newValue => _meshNode.AnimationMatrixOverride = newValue,
+                newValue => AnimationMatrixOverride = newValue);
         }
 
         public void Dispose()
@@ -104,5 +134,12 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
             AttachableBones.SelectedItemChanged -= ModelBoneList_SelectedItemChanged;
         }
 
+        private static string GetText(string key) =>
+            LocalizationManager.Instance?.Get(key) ?? key;
+
+        private sealed record AttachmentState(
+            string? Name,
+            SkeletonBoneAnimationResolver? Resolver,
+            AnimatedBone? SelectedBone);
     }
 }

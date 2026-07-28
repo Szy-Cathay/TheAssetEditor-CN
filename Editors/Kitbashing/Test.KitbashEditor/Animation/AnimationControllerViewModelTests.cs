@@ -64,6 +64,14 @@ namespace Test.KitbashEditor.Animation
         #region Bug fix: Show panel when skeleton exists but no animation selected
 
         [Test]
+        public void KitbasherPlayer_DisablesRedundantPausedRefresh()
+        {
+            var (_, scene) = CreateViewModel();
+
+            Assert.That(scene.Player.RefreshWhilePaused, Is.False);
+        }
+
+        [Test]
         public void OnEnableChanged_PanelVisible_WhenSkeletonExistsButNoAnimation()
         {
             // Bug fix: models with skeletons but without "stand_idle" default animation

@@ -67,6 +67,7 @@ namespace GameWorld.Core.Animation
 
         public bool IsPlaying { get; private set; } = true;
         public bool IsEnabled { get; set; } = false;
+        public bool RefreshWhilePaused { get; set; } = true;
         public bool LoopAnimation { get; set; } = true;
         public bool MarkedForRemoval { get; set; } = false;
 
@@ -125,8 +126,18 @@ namespace GameWorld.Core.Animation
 
         public void Update(GameTime gameTime)
         {
+            if (!IsEnabled)
+            {
+                if (_currentAnimFrame != null)
+                    Refresh();
+                return;
+            }
+
+            if (!IsPlaying && !RefreshWhilePaused)
+                return;
+
             var animationLengthUs = GetAnimationLengthUs();
-            if (animationLengthUs != 0 && IsPlaying && IsEnabled)
+            if (animationLengthUs != 0 && IsPlaying)
             {
                 _timeSinceStart.TimeSpan += gameTime.ElapsedGameTime;
                 if (_timeSinceStart.TotalMicrosecondsAsLong >= animationLengthUs)

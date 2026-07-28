@@ -38,7 +38,7 @@
         <Button Content="{materialIcons:MaterialIconExt Kind=Delete}" Margin="1" Command="{Binding HandleClearTextureCommand}" DockPanel.Dock="Right" Width="20" ToolTip="{loc:Loc ShaderTexture.RemoveTexture}"/>
         <Button Content="{materialIcons:MaterialIconExt Kind=Folder}" Margin="1" Command="{Binding HandleBrowseTextureCommand}" DockPanel.Dock="Right" Width="20" ToolTip="{loc:Loc ShaderTexture.BrowseFile}" />
         <Button Content="{materialIcons:MaterialIconExt Kind=Eye}" Margin="1" Command="{Binding HandlePreviewTextureCommand}" DockPanel.Dock="Right" Width="20" ToolTip="{loc:Loc ShaderTexture.PreviewTexture}"/>
-        <TextBox Margin="2,2,2,2" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center">
+        <TextBox Margin="2,2,2,2" Text="{Binding Path, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center">
             <TextBox.Style>
                 <Style TargetType="TextBox"  BasedOn="{StaticResource {x:Type TextBox}}">
                     <Setter Property="Validation.ErrorTemplate" Value="{StaticResource ValidationErrorTemplate}"/>
@@ -52,4 +52,3 @@
         </TextBox>
     </DockPanel>
 </UserControl>
- 

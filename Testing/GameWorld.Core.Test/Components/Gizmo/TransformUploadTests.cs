@@ -83,6 +83,39 @@ public class TransformUploadTests
         AssertGpuMatchesCpu(new[] { context.Graphics }, context.Mesh);
     }
 
+    [TestCase(GizmoMode.Translate, GeometrySelectionMode.Object)]
+    [TestCase(GizmoMode.Translate, GeometrySelectionMode.Vertex)]
+    [TestCase(GizmoMode.Translate, GeometrySelectionMode.Face)]
+    [TestCase(GizmoMode.Translate, GeometrySelectionMode.Edge)]
+    [TestCase(GizmoMode.Rotate, GeometrySelectionMode.Object)]
+    [TestCase(GizmoMode.Rotate, GeometrySelectionMode.Vertex)]
+    [TestCase(GizmoMode.Rotate, GeometrySelectionMode.Face)]
+    [TestCase(GizmoMode.Rotate, GeometrySelectionMode.Edge)]
+    [TestCase(GizmoMode.NonUniformScale, GeometrySelectionMode.Object)]
+    [TestCase(GizmoMode.NonUniformScale, GeometrySelectionMode.Vertex)]
+    [TestCase(GizmoMode.NonUniformScale, GeometrySelectionMode.Face)]
+    [TestCase(GizmoMode.NonUniformScale, GeometrySelectionMode.Edge)]
+    public void StationaryModalFrame_DoesNotUploadAgain(
+        GizmoMode transformMode,
+        GeometrySelectionMode selectionMode)
+    {
+        using var context = CreateModalContext(selectionMode);
+        context.Component.Gizmo.StartModalTransform(transformMode);
+        context.SetMousePosition(GetModalMousePosition(transformMode, 40.0f));
+        context.Component.Update(new GameTime());
+        context.Graphics.ResetRebuildCounts();
+
+        context.Component.Update(new GameTime());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.Graphics.IndexBufferRebuildCount, Is.Zero);
+            Assert.That(context.Graphics.VertexBufferRebuildCount, Is.Zero);
+            Assert.That(context.Graphics.PartialUploads, Is.Empty);
+        });
+        AssertGpuMatchesCpu(new[] { context.Graphics }, context.Mesh);
+    }
+
     [TestCase(GeometrySelectionMode.Object)]
     [TestCase(GeometrySelectionMode.Vertex)]
     public void ModalReturnToOrigin_UploadsPreviousPreviewToBaselineOnce(
@@ -137,6 +170,78 @@ public class TransformUploadTests
         Assert.That(context.Mesh.VertexArray, Is.EqualTo(baseline));
         AssertEditUpload(context.Graphics, new PartialUpload(1, 6));
         AssertGpuMatchesCpu(new[] { context.Graphics }, context.Mesh);
+    }
+
+    [Test]
+    public void NonInvertingModalReplacement_DoesNotRebuildIndexBuffer()
+    {
+        var factory = new TestGeometryGraphicsContextFactory();
+        var mesh = CreateMesh(factory);
+        var selection = new ObjectSelectionState();
+        selection.ModifySelectionSingleObject(
+            new TestSelectableNode { Geometry = mesh },
+            onlyRemove: false);
+        using var context = CreateContext(selection, mesh);
+        context.Wrapper.BeginTransform();
+        factory.CreatedContexts[0].ResetRebuildCounts();
+
+        context.Wrapper.ReplaceInitialPreview(
+            ModalPreviewReplacement.Rotate(
+                Matrix.CreateRotationY(0.25f),
+                PivotType.ObjectCenter));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(factory.CreatedContexts[0].IndexBufferRebuildCount, Is.Zero);
+            Assert.That(factory.CreatedContexts[0].VertexBufferRebuildCount, Is.EqualTo(1));
+            Assert.That(factory.CreatedContexts[0].PartialUploads, Is.Empty);
+        });
+        AssertGpuMatchesCpu(factory.CreatedContexts, mesh);
+    }
+
+    [Test]
+    public void ModalReplacement_RebuildsIndexOnlyWhenInversionChanges()
+    {
+        var factory = new TestGeometryGraphicsContextFactory();
+        var mesh = CreateMesh(factory);
+        var baselineIndices = mesh.IndexArray.ToArray();
+        var selection = new ObjectSelectionState();
+        selection.ModifySelectionSingleObject(
+            new TestSelectableNode { Geometry = mesh },
+            onlyRemove: false);
+        using var context = CreateContext(selection, mesh);
+        context.Wrapper.BeginTransform();
+
+        context.Wrapper.ReplaceInitialPreview(
+            ModalPreviewReplacement.Scale(
+                new Vector3(-2.0f, 0.0f, 0.0f),
+                PivotType.ObjectCenter));
+        Assert.That(mesh.IndexArray, Is.Not.EqualTo(baselineIndices));
+        factory.CreatedContexts[0].ResetRebuildCounts();
+
+        context.Wrapper.ReplaceInitialPreview(
+            ModalPreviewReplacement.Scale(
+                new Vector3(-3.0f, 0.0f, 0.0f),
+                PivotType.ObjectCenter));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mesh.IndexArray, Is.Not.EqualTo(baselineIndices));
+            Assert.That(factory.CreatedContexts[0].IndexBufferRebuildCount, Is.Zero);
+        });
+        factory.CreatedContexts[0].ResetRebuildCounts();
+
+        context.Wrapper.ReplaceInitialPreview(
+            ModalPreviewReplacement.Scale(
+                new Vector3(0.5f, 0.0f, 0.0f),
+                PivotType.ObjectCenter));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mesh.IndexArray, Is.EqualTo(baselineIndices));
+            Assert.That(factory.CreatedContexts[0].IndexBufferRebuildCount, Is.EqualTo(1));
+        });
+        AssertGpuMatchesCpu(factory.CreatedContexts, mesh);
     }
 
     [Test]

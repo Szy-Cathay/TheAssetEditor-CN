@@ -6,10 +6,12 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.Services;
+using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Serilog;
 using Shared.Core.ErrorHandling;
+using Shared.GameFormats.RigidModel;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,6 +35,7 @@ namespace GameWorld.Core.Components.Gizmo
         ICommand _activeCommand;
 
         List<MeshObject> _effectedObjects;
+        List<Rmv2MeshNode>? _effectedMeshNodes;
         List<int> _selectedBones;
         BoneSelectionState _boneSelectionState;
         private readonly CommandFactory _commandFactory;
@@ -58,6 +61,10 @@ namespace GameWorld.Core.Components.Gizmo
         private ISelectionState _gestureSelectionState;
         private HashSet<int> _gestureAffectedVertexIndices;
         private Dictionary<int, float> _gestureFalloffWeights;
+        private IReadOnlyDictionary<MeshObject, MeshPoseSnapshot>?
+            _gesturePoseSnapshots;
+        private int[]? _displayedAnimationFrames;
+        private bool _wasAnimatedPosePlaying;
         private VertexUploadRange?[] _displayedPreviewRanges;
         private VertexUploadRange?[] _nextPreviewRanges;
         private bool _previewSynchronizationFaulted;
@@ -159,6 +166,21 @@ namespace GameWorld.Core.Components.Gizmo
                 if (_faceVertexIndices.Count > 0)
                     Position = Position / _faceVertexIndices.Count;
             }
+        }
+
+        public TransformGizmoWrapper(
+            CommandFactory commandFactory,
+            List<Rmv2MeshNode> effectedNodes,
+            ISelectionState selectionState)
+            : this(
+                commandFactory,
+                effectedNodes
+                    .Select(node => node.Geometry)
+                    .ToList(),
+                selectionState)
+        {
+            _effectedMeshNodes = effectedNodes;
+            RefreshMeshPoseDisplay();
         }
 
         public TransformGizmoWrapper(CommandFactory commandFactory, List<int> selectedBones, BoneSelectionState boneSelectionState)
@@ -272,6 +294,8 @@ namespace GameWorld.Core.Components.Gizmo
                 CancelTransform();
 
             ResetGestureState();
+            _gesturePoseSnapshots =
+                CaptureEditablePoseSnapshots();
             if (_selectionState is FaceSelectionState or EdgeSelectionState &&
                 _falloffDistance > 0.0f &&
                 _falloffWeights == null)
@@ -324,6 +348,7 @@ namespace GameWorld.Core.Components.Gizmo
             {
                 if (_activeCommand is TransformVertexCommand transformVertexCommand)
                 {
+                    FinalizeVertexPreviewForCommit();
                     ConfigureTransformCommandForCommit(transformVertexCommand);
                     if (HasVertexMutation())
                         commandExecutor.ExecuteCommand(transformVertexCommand);
@@ -411,15 +436,20 @@ namespace GameWorld.Core.Components.Gizmo
 
             try
             {
-                var restoreError = RestoreVertexBaselineCpuAndIndex();
-                restoreError?.Throw();
+                var displayedWindingOrderWasInverted =
+                    _invertedWindingOrder;
                 ResetGestureCandidateToBaseline();
+                _invertedWindingOrder =
+                    displayedWindingOrderWasInverted;
 
                 var result = ApplyReplacement(replacement);
                 if (result.Accepted)
                     SynchronizeVertexPreview(result.MeshResults);
                 else
+                {
+                    RestoreVertexCandidateToBaseline();
                     SynchronizeBaselinePreview();
+                }
             }
             catch (Exception exception)
             {
@@ -578,6 +608,7 @@ namespace GameWorld.Core.Components.Gizmo
             _gestureSelectionState = null;
             _gestureAffectedVertexIndices = null;
             _gestureFalloffWeights = null;
+            _gesturePoseSnapshots = null;
             _displayedPreviewRanges = null;
             _nextPreviewRanges = null;
             _previewSynchronizationFaulted = false;
@@ -600,7 +631,8 @@ namespace GameWorld.Core.Components.Gizmo
                 _vertexTransformReplayPlan ??
                 VertexTransformOperationApplier.CreateEmptyReplayPlan(
                     GestureSelectionState,
-                    GestureFalloffWeights));
+                    GestureFalloffWeights,
+                    GesturePoseSnapshots));
             if (_gestureAffectedVertexIndices != null)
             {
                 command.AffectedVertexIndices =
@@ -611,6 +643,58 @@ namespace GameWorld.Core.Components.Gizmo
                 command.FalloffWeights =
                     new Dictionary<int, float>(_gestureFalloffWeights);
             }
+        }
+
+        private void FinalizeVertexPreviewForCommit()
+        {
+            var replayPlan = _vertexTransformReplayPlan;
+            if (replayPlan == null ||
+                replayPlan.OperationCount <= 0 ||
+                !RequiresPosePreviewFinalization(replayPlan) ||
+                _backupVertexArrays == null)
+            {
+                return;
+            }
+
+            try
+            {
+                VertexTransformOperationApplier
+                    .RestoreAffectedVerticesFromBaseline(
+                        _effectedObjects,
+                        _backupVertexArrays,
+                        GestureSelectionState,
+                        GestureAffectedVertexIndices,
+                        GestureFalloffWeights);
+                var results =
+                    VertexTransformOperationApplier.ApplyReplayPlan(
+                        _effectedObjects,
+                        GestureSelectionState,
+                        GestureAffectedVertexIndices,
+                        GestureFalloffWeights,
+                        replayPlan,
+                        inverse: false);
+                SynchronizeVertexPreview(results);
+            }
+            catch (Exception exception)
+            {
+                RecoverVertexPreviewAndRethrow(exception);
+            }
+        }
+
+        private bool RequiresPosePreviewFinalization(
+            VertexTransformReplayPlan replayPlan)
+        {
+            if (replayPlan.PoseMappings.Count == 0)
+                return false;
+
+            if (GestureSelectionState is VertexSelectionState ||
+                _gestureFalloffWeights?.Count > 0)
+            {
+                return true;
+            }
+
+            return replayPlan.PoseMappings.Values
+                .Any(mappings => mappings.Length != 1);
         }
 
         Matrix FixRotationAxis2(Matrix transform)
@@ -797,13 +881,16 @@ namespace GameWorld.Core.Components.Gizmo
                     _vertexTransformReplayPlan,
                     operation,
                     out var candidatePlan) ||
-                !VertexTransformOperationApplier.IsReplayPlanReversibleFromBaseline(
-                    _effectedObjects,
-                    _backupVertexArrays,
-                    GestureSelectionState,
-                    GestureAffectedVertexIndices,
-                    GestureFalloffWeights,
-                    candidatePlan))
+                (operationMode ==
+                    VertexTransformOperationMode.Scale &&
+                 !VertexTransformOperationApplier
+                    .IsReplayPlanReversibleFromBaseline(
+                        _effectedObjects,
+                        _backupVertexArrays,
+                        GestureSelectionState,
+                        GestureAffectedVertexIndices,
+                        GestureFalloffWeights,
+                        candidatePlan)))
             {
                 return false;
             }
@@ -814,17 +901,16 @@ namespace GameWorld.Core.Components.Gizmo
                 GestureSelectionState,
                 GestureAffectedVertexIndices,
                 GestureFalloffWeights);
-            results = VertexTransformOperationApplier.ApplyReplayPlan(
+            results = VertexTransformOperationApplier.ApplyReplayPlanPreview(
                 _effectedObjects,
                 GestureSelectionState,
                 GestureAffectedVertexIndices,
                 GestureFalloffWeights,
-                candidatePlan,
-                inverse: false);
+                candidatePlan);
             var isObjectSelection = GestureSelectionState is ObjectSelectionState;
             var wasInverted =
                 isObjectSelection &&
-                _vertexTransformReplayPlan.RawMatrices.Forward.Determinant() < 0;
+                _invertedWindingOrder;
             var isInverted =
                 isObjectSelection &&
                 candidatePlan.RawMatrices.Forward.Determinant() < 0;
@@ -837,6 +923,23 @@ namespace GameWorld.Core.Components.Gizmo
             _invertedWindingOrder = isInverted;
             _vertexTransformReplayPlan = candidatePlan;
             return true;
+        }
+
+        private void RestoreVertexCandidateToBaseline()
+        {
+            VertexTransformOperationApplier.RestoreAffectedVerticesFromBaseline(
+                _effectedObjects,
+                _backupVertexArrays,
+                GestureSelectionState,
+                GestureAffectedVertexIndices,
+                GestureFalloffWeights);
+            if (_invertedWindingOrder)
+            {
+                foreach (var geometry in _effectedObjects)
+                    TransformVertexCommand.ReverseWindingOrder(geometry);
+            }
+
+            ResetGestureCandidateToBaseline();
         }
 
         private void SynchronizeVertexPreview(
@@ -1034,7 +1137,8 @@ namespace GameWorld.Core.Components.Gizmo
 
                 var replayPlan = VertexTransformOperationApplier.CreateEmptyReplayPlan(
                     gestureSelectionState,
-                    gestureFalloffWeights);
+                    gestureFalloffWeights,
+                    GesturePoseSnapshots);
                 foreach (var mesh in _effectedObjects)
                     mesh.DeferBoundingBoxRebuild = true;
 
@@ -1231,7 +1335,8 @@ namespace GameWorld.Core.Components.Gizmo
             _vertexTransformReplayPlan =
                 VertexTransformOperationApplier.CreateEmptyReplayPlan(
                     GestureSelectionState,
-                    GestureFalloffWeights);
+                    GestureFalloffWeights,
+                    GesturePoseSnapshots);
             _pos = _backupPosition;
             _orientation = _backupOrientation;
             _scale = _backupScale;
@@ -1245,6 +1350,11 @@ namespace GameWorld.Core.Components.Gizmo
 
         private IReadOnlyDictionary<int, float> GestureFalloffWeights =>
             _gestureFalloffWeights;
+
+        private IReadOnlyDictionary<MeshObject, MeshPoseSnapshot>
+            GesturePoseSnapshots =>
+                _gesturePoseSnapshots ??
+                new Dictionary<MeshObject, MeshPoseSnapshot>();
 
         private void ReleaseVertexBaseline()
         {
@@ -1355,30 +1465,265 @@ namespace GameWorld.Core.Components.Gizmo
             }
         }
 
+        private IReadOnlyDictionary<MeshObject, MeshPoseSnapshot>
+            CaptureEditablePoseSnapshots()
+        {
+            var snapshots =
+                new Dictionary<MeshObject, MeshPoseSnapshot>();
+            if (_effectedMeshNodes == null)
+                return snapshots;
+
+            foreach (var node in _effectedMeshNodes)
+            {
+                var pose = MeshPoseSnapshot.Capture(node);
+                if (IsAnimatedPosePlaying(node))
+                    continue;
+
+                snapshots[node.Geometry] = pose;
+            }
+
+            return snapshots;
+        }
+
+        private void RefreshMeshPoseDisplay()
+        {
+            if (_effectedMeshNodes == null ||
+                _effectedMeshNodes.Count == 0)
+            {
+                return;
+            }
+
+            var poses = _effectedMeshNodes
+                .Select(MeshPoseSnapshot.Capture)
+                .ToList();
+            var position = Vector3.Zero;
+            var positionCount = 0;
+
+            if (_selectionState is ObjectSelectionState)
+            {
+                foreach (var pose in poses)
+                {
+                    var worldPositions = pose.GetWorldPositions();
+                    if (worldPositions.Length == 0)
+                        continue;
+
+                    var bounds =
+                        BoundingBox.CreateFromPoints(worldPositions);
+                    position +=
+                        (bounds.Min + bounds.Max) * 0.5f;
+                    positionCount++;
+                }
+            }
+            else
+            {
+                var pose = poses[0];
+                IEnumerable<int> vertexIndices =
+                    _selectionState switch
+                    {
+                        VertexSelectionState vertexState =>
+                            vertexState.SelectedVertices,
+                        FaceSelectionState or EdgeSelectionState =>
+                            _faceVertexIndices ??
+                            Enumerable.Empty<int>(),
+                        _ => Enumerable.Empty<int>()
+                    };
+                foreach (var vertexIndex in vertexIndices)
+                {
+                    if (vertexIndex < 0 ||
+                        vertexIndex >= pose.Geometry.VertexCount())
+                    {
+                        continue;
+                    }
+
+                    position += pose.GetWorldPosition(vertexIndex);
+                    positionCount++;
+                }
+            }
+
+            if (positionCount != 0)
+                Position = position / positionCount;
+
+            RememberAnimationDisplayState();
+        }
+
+        internal void RefreshDisplayForAnimationState()
+        {
+            if (_effectedMeshNodes == null ||
+                _hasBackup)
+            {
+                return;
+            }
+
+            var isPlaying = HasAnimatedPosePlaying();
+            if (isPlaying)
+            {
+                _wasAnimatedPosePlaying = true;
+                return;
+            }
+
+            if (_wasAnimatedPosePlaying ||
+                HaveDisplayedAnimationFramesChanged())
+            {
+                RefreshMeshPoseDisplay();
+            }
+        }
+
+        private bool HasAnimatedPosePlaying()
+        {
+            return _effectedMeshNodes?.Any(
+                IsAnimatedPosePlaying) == true;
+        }
+
+        private bool HaveDisplayedAnimationFramesChanged()
+        {
+            if (_effectedMeshNodes == null ||
+                _displayedAnimationFrames == null ||
+                _displayedAnimationFrames.Length !=
+                    _effectedMeshNodes.Count)
+            {
+                return true;
+            }
+
+            for (var i = 0;
+                 i < _effectedMeshNodes.Count;
+                 i++)
+            {
+                if (_displayedAnimationFrames[i] !=
+                    GetDisplayedAnimationFrame(
+                        _effectedMeshNodes[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void RememberAnimationDisplayState()
+        {
+            if (_effectedMeshNodes == null)
+                return;
+
+            _displayedAnimationFrames =
+                _effectedMeshNodes
+                    .Select(GetDisplayedAnimationFrame)
+                    .ToArray();
+            _wasAnimatedPosePlaying =
+                HasAnimatedPosePlaying();
+        }
+
+        private static int GetDisplayedAnimationFrame(
+            Rmv2MeshNode node)
+        {
+            var player = node.AnimationPlayer;
+            return
+                UsesAnimatedPose(node) &&
+                player?.IsEnabled == true &&
+                player.GetCurrentAnimationFrame() != null
+                    ? player.CurrentFrame
+                    : -1;
+        }
+
+        private static bool UsesAnimatedPose(
+            Rmv2MeshNode node)
+        {
+            return
+                node.Geometry.VertexFormat is
+                    UiVertexFormat.Weighted or
+                    UiVertexFormat.Cinematic ||
+                node.AttachmentBoneResolver != null;
+        }
+
+        private static bool IsAnimatedPosePlaying(
+            Rmv2MeshNode node)
+        {
+            var player = node.AnimationPlayer;
+            return
+                UsesAnimatedPose(node) &&
+                player?.IsEnabled == true &&
+                player.IsPlaying &&
+                player.GetCurrentAnimationFrame() != null;
+        }
+
         #endregion
 
         public static TransformGizmoWrapper CreateFromSelectionState(ISelectionState state, CommandFactory commandFactory)
         {
             if (state is ObjectSelectionState objectSelectionState)
             {
-                var transformables = objectSelectionState.CurrentSelection().Where(x => x is ITransformable).Select(x => x.Geometry);
+                var selectedMeshNodes = objectSelectionState
+                    .CurrentSelection()
+                    .OfType<Rmv2MeshNode>()
+                    .ToList();
+                var transformables = objectSelectionState
+                    .CurrentSelection()
+                    .Where(x => x is ITransformable)
+                    .Select(x => x.Geometry)
+                    .ToList();
                 if (transformables.Any())
-                    return new TransformGizmoWrapper(commandFactory, transformables.ToList(), state);
+                {
+                    if (selectedMeshNodes.Count ==
+                        transformables.Count)
+                    {
+                        return new TransformGizmoWrapper(
+                            commandFactory,
+                            selectedMeshNodes,
+                            state);
+                    }
+
+                    return new TransformGizmoWrapper(
+                        commandFactory,
+                        transformables,
+                        state);
+                }
             }
             else if (state is VertexSelectionState vertexSelectionState)
             {
                 if (vertexSelectionState.SelectedVertices.Count != 0)
+                {
+                    if (vertexSelectionState.RenderObject is
+                        Rmv2MeshNode meshNode)
+                    {
+                        return new TransformGizmoWrapper(
+                            commandFactory,
+                            [meshNode],
+                            vertexSelectionState);
+                    }
+
                     return new TransformGizmoWrapper(commandFactory, new List<MeshObject>() { vertexSelectionState.RenderObject.Geometry }, vertexSelectionState);
+                }
             }
             else if (state is FaceSelectionState faceSelectionState)
             {
                 if (faceSelectionState.SelectedFaces.Count != 0 && faceSelectionState.RenderObject != null)
+                {
+                    if (faceSelectionState.RenderObject is
+                        Rmv2MeshNode meshNode)
+                    {
+                        return new TransformGizmoWrapper(
+                            commandFactory,
+                            [meshNode],
+                            faceSelectionState);
+                    }
+
                     return new TransformGizmoWrapper(commandFactory, new List<MeshObject>() { faceSelectionState.RenderObject.Geometry }, faceSelectionState);
+                }
             }
             else if (state is EdgeSelectionState edgeSelectionState)
             {
                 if (edgeSelectionState.SelectedEdges.Count != 0 && edgeSelectionState.RenderObject != null)
+                {
+                    if (edgeSelectionState.RenderObject is
+                        Rmv2MeshNode meshNode)
+                    {
+                        return new TransformGizmoWrapper(
+                            commandFactory,
+                            [meshNode],
+                            edgeSelectionState);
+                    }
+
                     return new TransformGizmoWrapper(commandFactory, new List<MeshObject>() { edgeSelectionState.RenderObject.Geometry }, edgeSelectionState);
+                }
             }
             else if (state is BoneSelectionState boneSelectionState)
             {

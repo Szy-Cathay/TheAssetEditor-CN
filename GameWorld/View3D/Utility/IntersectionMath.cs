@@ -28,6 +28,26 @@ namespace GameWorld.Core.Utility
             return res;
         }
 
+        public static float? IntersectObject(
+            Ray ray,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            if (worldPositions.Count == 0 ||
+                ray.Intersects(
+                    BoundingBox.CreateFromPoints(worldPositions)) == null)
+            {
+                return null;
+            }
+
+            return IntersectFace(
+                ray,
+                geometry,
+                worldPositions,
+                out _);
+        }
+
         public static float? IntersectVertex(Vector2 mouseScreenPos, MeshObject geometry, Matrix modelMatrix,
             Matrix viewProjection, float viewportWidth, float viewportHeight, out int selectedVertex,
             IReadOnlySet<int>? selectedVertices = null)
@@ -38,6 +58,50 @@ namespace GameWorld.Core.Utility
                 viewProjection,
                 viewportWidth,
                 viewportHeight);
+            return IntersectVertex(
+                mouseScreenPos,
+                geometry,
+                projectedVertices,
+                viewportWidth,
+                viewportHeight,
+                out selectedVertex,
+                selectedVertices);
+        }
+
+        public static float? IntersectVertex(
+            Vector2 mouseScreenPos,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions,
+            Matrix viewProjection,
+            float viewportWidth,
+            float viewportHeight,
+            out int selectedVertex,
+            IReadOnlySet<int>? selectedVertices = null)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            return IntersectVertex(
+                mouseScreenPos,
+                geometry,
+                ProjectVertices(
+                    worldPositions,
+                    viewProjection,
+                    viewportWidth,
+                    viewportHeight),
+                viewportWidth,
+                viewportHeight,
+                out selectedVertex,
+                selectedVertices);
+        }
+
+        static float? IntersectVertex(
+            Vector2 mouseScreenPos,
+            MeshObject geometry,
+            ProjectedVertex[] projectedVertices,
+            float viewportWidth,
+            float viewportHeight,
+            out int selectedVertex,
+            IReadOnlySet<int>? selectedVertices)
+        {
             var depthBuffer = BuildLocalDepthBuffer(
                 mouseScreenPos,
                 ElementSelectionDistancePixels,
@@ -125,6 +189,50 @@ namespace GameWorld.Core.Utility
             return bestDistance;
         }
 
+        public static float? IntersectFace(
+            Ray ray,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions,
+            out int? face)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            face = null;
+            if (worldPositions.Count == 0 ||
+                ray.Intersects(
+                    BoundingBox.CreateFromPoints(worldPositions)) == null)
+            {
+                return null;
+            }
+
+            var faceIndex = -1;
+            var bestDistance = float.MaxValue;
+            for (var i = 0; i < geometry.GetIndexCount(); i += 3)
+            {
+                var index0 = geometry.GetIndex(i);
+                var index1 = geometry.GetIndex(i + 1);
+                var index2 = geometry.GetIndex(i + 2);
+                if (!MollerTrumboreIntersection(
+                        ray,
+                        worldPositions[index0],
+                        worldPositions[index1],
+                        worldPositions[index2],
+                        out var distance) ||
+                    distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                faceIndex = i;
+                bestDistance = distance.Value;
+            }
+
+            if (faceIndex == -1)
+                return null;
+
+            face = faceIndex;
+            return bestDistance;
+        }
+
         public static bool IntersectObject(BoundingFrustum boundingFrustum, MeshObject geometry, Matrix matrix)
         {
             // BoundingBox pre-check: transform mesh bounds to world space and test against frustum
@@ -137,6 +245,32 @@ namespace GameWorld.Core.Utility
             {
                 if (boundingFrustum.Contains(Vector3.Transform(geometry.GetVertexById(i), matrix)) != ContainmentType.Disjoint)
                     return true;
+            }
+
+            return false;
+        }
+
+        public static bool IntersectObject(
+            BoundingFrustum boundingFrustum,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            if (worldPositions.Count == 0 ||
+                boundingFrustum.Contains(
+                    BoundingBox.CreateFromPoints(worldPositions)) ==
+                    ContainmentType.Disjoint)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < worldPositions.Count; i++)
+            {
+                if (boundingFrustum.Contains(worldPositions[i]) !=
+                    ContainmentType.Disjoint)
+                {
+                    return true;
+                }
             }
 
             return false;
@@ -177,6 +311,44 @@ namespace GameWorld.Core.Utility
             return faces != null;
         }
 
+        public static bool IntersectFaces(
+            BoundingFrustum boundingFrustum,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions,
+            out List<int> faces)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            faces = new List<int>();
+            if (worldPositions.Count == 0 ||
+                boundingFrustum.Contains(
+                    BoundingBox.CreateFromPoints(worldPositions)) ==
+                    ContainmentType.Disjoint)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < geometry.IndexArray.Length; i += 3)
+            {
+                var index0 = geometry.IndexArray[i];
+                var index1 = geometry.IndexArray[i + 1];
+                var index2 = geometry.IndexArray[i + 2];
+
+                if (boundingFrustum.Contains(worldPositions[index0]) !=
+                        ContainmentType.Disjoint ||
+                    boundingFrustum.Contains(worldPositions[index1]) !=
+                        ContainmentType.Disjoint ||
+                    boundingFrustum.Contains(worldPositions[index2]) !=
+                        ContainmentType.Disjoint)
+                {
+                    faces.Add(i);
+                }
+            }
+
+            if (faces.Count == 0)
+                faces = null;
+            return faces != null;
+        }
+
         public static bool IntersectVertices(BoundingFrustum boundingFrustum, MeshObject geometry, Matrix matrix, out List<int> vertices)
         {
             vertices = new List<int>();
@@ -187,6 +359,33 @@ namespace GameWorld.Core.Utility
                 var index = geometry.IndexArray[i];
                 if (!visitedVertices[index] &&
                     boundingFrustum.Contains(Vector3.Transform(geometry.GetVertexById(index), matrix)) != ContainmentType.Disjoint)
+                {
+                    visitedVertices[index] = true;
+                    vertices.Add(index);
+                }
+            }
+
+            if (vertices.Count == 0)
+                vertices = null;
+            return vertices != null;
+        }
+
+        public static bool IntersectVertices(
+            BoundingFrustum boundingFrustum,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions,
+            out List<int> vertices)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            vertices = new List<int>();
+            var visitedVertices =
+                new bool[geometry.VertexArray.Length];
+            for (var i = 0; i < geometry.IndexArray.Length; i++)
+            {
+                var index = geometry.IndexArray[i];
+                if (!visitedVertices[index] &&
+                    boundingFrustum.Contains(worldPositions[index]) !=
+                        ContainmentType.Disjoint)
                 {
                     visitedVertices[index] = true;
                     vertices.Add(index);
@@ -311,77 +510,39 @@ namespace GameWorld.Core.Utility
                 viewProjection,
                 viewportWidth,
                 viewportHeight);
-            var depthBuffer = BuildLocalDepthBuffer(
+            return IntersectEdge(
                 mouseScreenPos,
-                ElementSelectionDistancePixels,
+                geometry,
                 projectedVertices,
-                geometry.IndexArray,
                 viewportWidth,
-                viewportHeight);
-            var processedEdges = new HashSet<(int, int)>();
-            var bestEdge = (-1, -1);
-            var bestDistance = float.MaxValue;
-            var bestBiasedDistance = float.MaxValue;
-            var bestDepth = float.MaxValue;
+                viewportHeight,
+                out selectedEdge,
+                selectedEdges);
+        }
 
-            void TestEdge(int firstIndex, int secondIndex)
-            {
-                var edge = (
-                    Math.Min(firstIndex, secondIndex),
-                    Math.Max(firstIndex, secondIndex));
-                if (!processedEdges.Add(edge))
-                    return;
-
-                var firstProjected = projectedVertices[edge.Item1];
-                var secondProjected = projectedVertices[edge.Item2];
-                if (!firstProjected.IsValid || !secondProjected.IsValid)
-                    return;
-
-                var distance = PointToLineSegmentManhattanDistance(
-                    mouseScreenPos,
-                    firstProjected.ScreenPosition,
-                    secondProjected.ScreenPosition,
-                    out var amount,
-                    out var closestPoint);
-                if (distance > ElementSelectionDistancePixels ||
-                    !IsInsideViewport(closestPoint, viewportWidth, viewportHeight))
-                    return;
-
-                var depth = MathHelper.Lerp(firstProjected.Depth, secondProjected.Depth, amount);
-                if (!depthBuffer.IsVisible(closestPoint, depth))
-                    return;
-
-                var biasedDistance = distance +
-                    (selectedEdges?.Contains(edge) == true ? SelectedElementBiasPixels : 0.0f);
-                if (biasedDistance > ElementSelectionDistancePixels)
-                    return;
-
-                if (biasedDistance < bestBiasedDistance ||
-                    MathF.Abs(biasedDistance - bestBiasedDistance) <= DepthComparisonEpsilon &&
-                    depth < bestDepth)
-                {
-                    bestDistance = distance;
-                    bestBiasedDistance = biasedDistance;
-                    bestDepth = depth;
-                    bestEdge = edge;
-                }
-            }
-
-            var indexBuffer = geometry.IndexArray;
-            for (var i = 0; i < indexBuffer.Length; i += 3)
-            {
-                var first = indexBuffer[i];
-                var second = indexBuffer[i + 1];
-                var third = indexBuffer[i + 2];
-                TestEdge(first, second);
-                TestEdge(second, third);
-                TestEdge(first, third);
-            }
-
-            selectedEdge = bestEdge;
-            return bestEdge.Item1 == -1
-                ? null
-                : bestDistance;
+        public static float? IntersectEdge(
+            Vector2 mouseScreenPos,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions,
+            Matrix viewProjection,
+            float viewportWidth,
+            float viewportHeight,
+            out (int v0, int v1) selectedEdge,
+            IReadOnlySet<(int v0, int v1)>? selectedEdges = null)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            return IntersectEdge(
+                mouseScreenPos,
+                geometry,
+                ProjectVertices(
+                    worldPositions,
+                    viewProjection,
+                    viewportWidth,
+                    viewportHeight),
+                viewportWidth,
+                viewportHeight,
+                out selectedEdge,
+                selectedEdges);
         }
 
         /// <summary>
@@ -427,6 +588,48 @@ namespace GameWorld.Core.Utility
             return true;
         }
 
+        public static bool IntersectEdges(
+            BoundingFrustum boundingFrustum,
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions,
+            out List<(int v0, int v1)> edges)
+        {
+            ValidateWorldPositions(geometry, worldPositions);
+            edges = new List<(int, int)>();
+            var processedEdges = new HashSet<(int, int)>();
+            var indexBuffer = geometry.IndexArray;
+            for (var i = 0; i < indexBuffer.Length; i += 3)
+            {
+                var i0 = indexBuffer[i];
+                var i1 = indexBuffer[i + 1];
+                var i2 = indexBuffer[i + 2];
+                var edgeList = new[]
+                {
+                    (Math.Min(i0, i1), Math.Max(i0, i1)),
+                    (Math.Min(i1, i2), Math.Max(i1, i2)),
+                    (Math.Min(i0, i2), Math.Max(i0, i2))
+                };
+
+                foreach (var edge in edgeList)
+                {
+                    if (!processedEdges.Add(edge))
+                        continue;
+
+                    if (boundingFrustum.Contains(
+                            worldPositions[edge.Item1]) !=
+                            ContainmentType.Disjoint &&
+                        boundingFrustum.Contains(
+                            worldPositions[edge.Item2]) !=
+                            ContainmentType.Disjoint)
+                    {
+                        edges.Add(edge);
+                    }
+                }
+            }
+
+            return edges.Count != 0;
+        }
+
         static ProjectedVertex[] ProjectVertices(
             MeshObject geometry,
             Matrix modelMatrix,
@@ -458,6 +661,156 @@ namespace GameWorld.Core.Utility
             }
 
             return projectedVertices;
+        }
+
+        static ProjectedVertex[] ProjectVertices(
+            IReadOnlyList<Vector3> worldPositions,
+            Matrix viewProjection,
+            float viewportWidth,
+            float viewportHeight)
+        {
+            var projectedVertices =
+                new ProjectedVertex[worldPositions.Count];
+            for (var i = 0; i < projectedVertices.Length; i++)
+            {
+                var clipPosition = Vector4.Transform(
+                    new Vector4(worldPositions[i], 1.0f),
+                    viewProjection);
+                if (clipPosition.W <= 0.0f)
+                    continue;
+
+                var inverseW = 1.0f / clipPosition.W;
+                var depth = clipPosition.Z * inverseW;
+                var screenPosition = new Vector2(
+                    (clipPosition.X * inverseW + 1.0f) *
+                        0.5f * viewportWidth,
+                    (1.0f - clipPosition.Y * inverseW) *
+                        0.5f * viewportHeight);
+                if (!float.IsFinite(screenPosition.X) ||
+                    !float.IsFinite(screenPosition.Y) ||
+                    !float.IsFinite(depth) ||
+                    depth < 0.0f ||
+                    depth > 1.0f)
+                {
+                    continue;
+                }
+
+                projectedVertices[i] =
+                    new ProjectedVertex(screenPosition, depth);
+            }
+
+            return projectedVertices;
+        }
+
+        static float? IntersectEdge(
+            Vector2 mouseScreenPos,
+            MeshObject geometry,
+            ProjectedVertex[] projectedVertices,
+            float viewportWidth,
+            float viewportHeight,
+            out (int v0, int v1) selectedEdge,
+            IReadOnlySet<(int v0, int v1)>? selectedEdges)
+        {
+            var depthBuffer = BuildLocalDepthBuffer(
+                mouseScreenPos,
+                ElementSelectionDistancePixels,
+                projectedVertices,
+                geometry.IndexArray,
+                viewportWidth,
+                viewportHeight);
+            var processedEdges = new HashSet<(int, int)>();
+            var bestEdge = (-1, -1);
+            var bestDistance = float.MaxValue;
+            var bestBiasedDistance = float.MaxValue;
+            var bestDepth = float.MaxValue;
+
+            void TestEdge(int firstIndex, int secondIndex)
+            {
+                var edge = (
+                    Math.Min(firstIndex, secondIndex),
+                    Math.Max(firstIndex, secondIndex));
+                if (!processedEdges.Add(edge))
+                    return;
+
+                var firstProjected = projectedVertices[edge.Item1];
+                var secondProjected = projectedVertices[edge.Item2];
+                if (!firstProjected.IsValid ||
+                    !secondProjected.IsValid)
+                {
+                    return;
+                }
+
+                var distance = PointToLineSegmentManhattanDistance(
+                    mouseScreenPos,
+                    firstProjected.ScreenPosition,
+                    secondProjected.ScreenPosition,
+                    out var amount,
+                    out var closestPoint);
+                if (distance > ElementSelectionDistancePixels ||
+                    !IsInsideViewport(
+                        closestPoint,
+                        viewportWidth,
+                        viewportHeight))
+                {
+                    return;
+                }
+
+                var depth = MathHelper.Lerp(
+                    firstProjected.Depth,
+                    secondProjected.Depth,
+                    amount);
+                if (!depthBuffer.IsVisible(closestPoint, depth))
+                    return;
+
+                var biasedDistance = distance +
+                    (selectedEdges?.Contains(edge) == true
+                        ? SelectedElementBiasPixels
+                        : 0.0f);
+                if (biasedDistance > ElementSelectionDistancePixels)
+                    return;
+
+                if (biasedDistance < bestBiasedDistance ||
+                    MathF.Abs(
+                        biasedDistance - bestBiasedDistance) <=
+                        DepthComparisonEpsilon &&
+                    depth < bestDepth)
+                {
+                    bestDistance = distance;
+                    bestBiasedDistance = biasedDistance;
+                    bestDepth = depth;
+                    bestEdge = edge;
+                }
+            }
+
+            var indexBuffer = geometry.IndexArray;
+            for (var i = 0; i < indexBuffer.Length; i += 3)
+            {
+                var first = indexBuffer[i];
+                var second = indexBuffer[i + 1];
+                var third = indexBuffer[i + 2];
+                TestEdge(first, second);
+                TestEdge(second, third);
+                TestEdge(first, third);
+            }
+
+            selectedEdge = bestEdge;
+            return bestEdge.Item1 == -1
+                ? null
+                : bestDistance;
+        }
+
+        static void ValidateWorldPositions(
+            MeshObject geometry,
+            IReadOnlyList<Vector3> worldPositions)
+        {
+            ArgumentNullException.ThrowIfNull(geometry);
+            ArgumentNullException.ThrowIfNull(worldPositions);
+            if (worldPositions.Count != geometry.VertexCount())
+            {
+                throw new ArgumentException(
+                    "The evaluated position count must match the mesh vertex count.",
+                    nameof(worldPositions));
+            }
         }
 
         static LocalDepthBuffer BuildLocalDepthBuffer(

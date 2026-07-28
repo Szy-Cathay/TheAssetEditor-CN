@@ -33,12 +33,6 @@ namespace Editors.KitbasherEditor
     {
         public override void Register(IServiceCollection serviceCollection)
         {
-            // Node views
-            serviceCollection.AddTransient<MainEditableNodeViewModel>();
-            serviceCollection.AddTransient<MeshEditorViewModel>();
-            serviceCollection.AddTransient<SkeletonSceneNodeViewModel>();
-            serviceCollection.AddTransient<GroupNodeViewModel>();
-
             // Creators
             serviceCollection.AddScoped<KitbashSceneCreator>();
 
@@ -51,11 +45,9 @@ namespace Editors.KitbasherEditor
             serviceCollection.AddScoped<AnimationControllerViewModel>();
 
             // View models - scene node editors
-            serviceCollection.AddTransient<SceneNodeEditorViewModel>();
-            serviceCollection.AddTransient<MeshViewModel>();
-            serviceCollection.AddTransient<AnimationViewModel>();
-            serviceCollection.AddTransient<WeightedMaterialViewModel>();
-            serviceCollection.AddTransient<WsMaterialViewModel>();
+            serviceCollection.AddScoped<SceneNodeEditorViewModel>();
+            serviceCollection.AddScoped<ISceneNodeEditorFactory, SceneNodeEditorFactory>();
+            serviceCollection.AddScoped<SceneNodePropertyEditor>();
 
             // Commands
             serviceCollection.AddTransient<AssignMaterialFromOtherMeshCommand>();

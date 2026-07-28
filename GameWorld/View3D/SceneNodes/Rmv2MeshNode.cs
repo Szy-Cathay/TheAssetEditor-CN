@@ -64,6 +64,7 @@ namespace GameWorld.Core.SceneNodes
         // Pooled buffers to avoid per-frame allocations
         private readonly Matrix[] _animationBuffer = new Matrix[256];
         private GeometryRenderItem? _pooledRenderItem;
+        private bool _selectionOutlineEnabled;
 
         public Rmv2MeshNode(MeshObject meshObject, IRmvMaterial material, CapabilityMaterial shader, AnimationPlayer animationPlayer)
         {
@@ -117,6 +118,8 @@ namespace GameWorld.Core.SceneNodes
                 _pooledRenderItem = new GeometryRenderItem(Geometry, Material, worldMatrix);
             else
                 _pooledRenderItem.UpdateWorldMatrix(worldMatrix);
+            _pooledRenderItem.SetSelectionMask(
+                _selectionOutlineEnabled);
 
             renderEngine.AddRenderItem(RenderBuckedId.Normal, _pooledRenderItem);
 
@@ -125,6 +128,40 @@ namespace GameWorld.Core.SceneNodes
 
             if (DisplayBoundingBox)
                 renderEngine.AddRenderLines(LineHelper.AddBoundingBox(Geometry.BoundingBox, Color.Red, PivotPoint));
+        }
+
+        internal void SetSelectionOutline(bool enabled)
+        {
+            _selectionOutlineEnabled = enabled;
+            _pooledRenderItem?.SetSelectionMask(enabled);
+        }
+
+        public Matrix GetRenderWorldMatrix()
+        {
+            var parentWorld =
+                GetAncestorWorldMatrix(Parent);
+
+            if (AttachmentBoneResolver != null)
+            {
+                parentWorld *=
+                    AttachmentBoneResolver
+                        .GetWorldTransformIfAnimating();
+            }
+
+            return
+                ModelMatrix *
+                Matrix.CreateTranslation(PivotPoint) *
+                parentWorld;
+        }
+
+        private static Matrix GetAncestorWorldMatrix(
+            ISceneNode? ancestor)
+        {
+            return ancestor == null
+                ? Matrix.Identity
+                : GetAncestorWorldMatrix(
+                      ancestor.Parent) *
+                  ancestor.ModelMatrix;
         }
 
         public Rmv2ModelNode? GetParentModel()

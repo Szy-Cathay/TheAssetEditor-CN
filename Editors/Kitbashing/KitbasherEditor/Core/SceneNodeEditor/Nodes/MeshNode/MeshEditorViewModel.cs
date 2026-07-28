@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2;
@@ -21,7 +21,9 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
         [ObservableProperty] WeightedMaterialViewModel? _material;
         [ObservableProperty] WsMaterialViewModel? _wsMaterial;
 
-        public MeshEditorViewModel(IServiceProvider serviceProvider, ApplicationSettingsService applicationSettingsService)
+        public MeshEditorViewModel(
+            IServiceProvider serviceProvider,
+            ApplicationSettingsService applicationSettingsService)
         {
             _serviceProvider = serviceProvider;
             _applicationSettingsService = applicationSettingsService;
@@ -32,18 +34,18 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
             var typedNode = node as Rmv2MeshNode;
             Guard.IsNotNull(typedNode);
 
-            Mesh = _serviceProvider.GetRequiredService<MeshViewModel>();
+            Mesh = ActivatorUtilities.CreateInstance<MeshViewModel>(_serviceProvider);
             Mesh.Initialize(typedNode);
 
-            Animation = _serviceProvider.GetRequiredService<AnimationViewModel>();
+            Animation = ActivatorUtilities.CreateInstance<AnimationViewModel>(_serviceProvider);
             Animation.Initialize(typedNode);
 
-            WsMaterial = _serviceProvider.GetRequiredService<WsMaterialViewModel>();
+            WsMaterial = ActivatorUtilities.CreateInstance<WsMaterialViewModel>(_serviceProvider);
             WsMaterial.Initialize(typedNode);
             
             if (typedNode.RmvMaterial is WeightedMaterial)
             {
-                Material = _serviceProvider.GetRequiredService<WeightedMaterialViewModel>();
+                Material = ActivatorUtilities.CreateInstance<WeightedMaterialViewModel>(_serviceProvider);
                 Material.Initialize(typedNode);
             }
         }

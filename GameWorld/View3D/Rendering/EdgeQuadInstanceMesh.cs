@@ -129,7 +129,11 @@ namespace GameWorld.Core.Rendering
                 _instanceData[i].InstanceWidth = edge.Width > 0 ? edge.Width : DefaultEdgeHalfWidth;
             }
 
-            _instanceBuffer.SetData(_instanceData, 0, _currentInstanceCount, SetDataOptions.None);
+            _instanceBuffer.SetData(
+                _instanceData,
+                0,
+                _currentInstanceCount,
+                SetDataOptions.Discard);
         }
 
         public void Draw(Matrix view, Matrix projection, float viewportHeight, float viewportWidth, GraphicsDevice device)

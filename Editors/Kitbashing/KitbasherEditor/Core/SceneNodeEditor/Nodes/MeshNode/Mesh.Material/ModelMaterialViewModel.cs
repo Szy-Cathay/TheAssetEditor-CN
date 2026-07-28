@@ -1,9 +1,12 @@
-﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.DirtAndDecal;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Emissive;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.SpecGloss;
+using Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Tint;
 using GameWorld.Core.Components;
+using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Materials;
 using GameWorld.Core.Rendering.Materials.Capabilities;
@@ -25,6 +28,8 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
         private readonly IScopedResourceLibrary _resourceLibrary;
         private readonly CapabilityMaterialFactory _materialFactory;
         private readonly IStandardDialogs _packFileUiProvider;
+        private readonly SceneNodePropertyEditor _propertyEditor;
+        private readonly SceneRenderParametersStore _sceneRenderParameters;
         Rmv2MeshNode? _currentNode;
 
         [ObservableProperty] List<CapabilityMaterialsEnum> _possibleMaterialTypes;
@@ -38,13 +43,16 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
 
         [ObservableProperty] public partial TintViewModel? Tint { get; set; }
 
-        public WsMaterialViewModel(IUiCommandFactory uiCommandFactory, 
-            SelectionManager selectionManager, 
-            SceneManager sceneManager, 
-            IPackFileService packFileService, 
-            IScopedResourceLibrary resourceLibrary, 
-            CapabilityMaterialFactory abstractMaterialFactory, 
-            IStandardDialogs packFileUiProvider)
+        public WsMaterialViewModel(
+            IUiCommandFactory uiCommandFactory,
+            SelectionManager selectionManager,
+            SceneManager sceneManager,
+            IPackFileService packFileService,
+            IScopedResourceLibrary resourceLibrary,
+            CapabilityMaterialFactory abstractMaterialFactory,
+            IStandardDialogs packFileUiProvider,
+            SceneNodePropertyEditor propertyEditor,
+            SceneRenderParametersStore sceneRenderParameters)
         {
             _uiCommandFactory = uiCommandFactory;
             _selectionManager = selectionManager;
@@ -53,38 +61,107 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
             _resourceLibrary = resourceLibrary;
             _materialFactory = abstractMaterialFactory;
             _packFileUiProvider = packFileUiProvider;
+            _propertyEditor = propertyEditor;
+            _sceneRenderParameters = sceneRenderParameters;
             _possibleMaterialTypes = _materialFactory.GetPossibleMaterials();
         }
+
         internal void Initialize(Rmv2MeshNode node)
         {
             _currentNode = node;
-            var material = _currentNode.Material;
-            CurrentMaterialType = material.Type;
-
-            MetalRough = CreateCapabilityView<MetalRoughCapability, MetalRoughViewModel>(material, (cap) => new MetalRoughViewModel(cap, _uiCommandFactory, _packFileService, _resourceLibrary, _packFileUiProvider));
-            SpecGloss = CreateCapabilityView<SpecGlossCapability, SpecGlossViewModel>(material, (cap) => new SpecGlossViewModel(cap, _uiCommandFactory, _packFileService, _resourceLibrary, _packFileUiProvider));
-            AdvanceRvmMaterial = CreateCapabilityView<AdvancedMaterialCapability, AdvancedRmvMaterialViewModel>(material, (cap) => new AdvancedRmvMaterialViewModel(cap, _uiCommandFactory, _packFileService, _resourceLibrary, _packFileUiProvider));
-            Blood = CreateCapabilityView<BloodCapability, BloodViewModel>(material, (cap) => new BloodViewModel(cap, _uiCommandFactory, _packFileService, _resourceLibrary, _packFileUiProvider));
-            Emissive = CreateCapabilityView<EmissiveCapability, EmissiveViewModel>(material, (cap) => new EmissiveViewModel(cap, _uiCommandFactory, _packFileService, _resourceLibrary, _packFileUiProvider));
-            Tint = CreateCapabilityView<TintCapability, TintViewModel>(material, (cap) => new TintViewModel(cap));
+            CurrentMaterialType = node.Material.Type;
+            CreateCapabilityViews(node.Material);
         }
 
-        partial void OnCurrentMaterialTypeChanged(CapabilityMaterialsEnum? oldValue, CapabilityMaterialsEnum? newValue)
+        partial void OnCurrentMaterialTypeChanged(
+            CapabilityMaterialsEnum? oldValue,
+            CapabilityMaterialsEnum? newValue)
         {
             Guard.IsNotNull(_currentNode);
-            if (oldValue == newValue || newValue == null || oldValue == null)
+            if (newValue == null || _currentNode.Material.Type == newValue.Value)
                 return;
 
-            var newMaterial = _materialFactory.ChangeMaterial(_currentNode.Material, newValue.Value);
-            _currentNode.Material = newMaterial;
+            var newMaterial = _materialFactory.ChangeMaterial(
+                _currentNode.Material,
+                newValue.Value);
+            _propertyEditor.Update(
+                _currentNode.Material,
+                newMaterial,
+                ApplyMaterial);
+        }
 
-            // Hack to refresh selection and re-render the UI with the new material type selected
+        private void ApplyMaterial(CapabilityMaterial material)
+        {
+            if (_currentNode == null)
+                return;
+
+            _currentNode.Material = material;
+            CurrentMaterialType = material.Type;
+            CreateCapabilityViews(material);
+
+            // Refresh selection so the renderer and capability panels use the new material.
             var oldState = _selectionManager.GetStateCopy();
             _selectionManager.CreateSelectionSate(GeometrySelectionMode.Object, null);
             _selectionManager.SetState(oldState);
         }
 
-        TViewModel? CreateCapabilityView<T, TViewModel>(CapabilityMaterial material, Func<T, TViewModel> creator)
+        private void CreateCapabilityViews(CapabilityMaterial material)
+        {
+            MetalRough = CreateCapabilityView<MetalRoughCapability, MetalRoughViewModel>(
+                material,
+                capability => new MetalRoughViewModel(
+                    capability,
+                    _uiCommandFactory,
+                    _packFileService,
+                    _resourceLibrary,
+                    _packFileUiProvider,
+                    _propertyEditor));
+            SpecGloss = CreateCapabilityView<SpecGlossCapability, SpecGlossViewModel>(
+                material,
+                capability => new SpecGlossViewModel(
+                    capability,
+                    _uiCommandFactory,
+                    _packFileService,
+                    _resourceLibrary,
+                    _packFileUiProvider,
+                    _propertyEditor));
+            AdvanceRvmMaterial = CreateCapabilityView<AdvancedMaterialCapability, AdvancedRmvMaterialViewModel>(
+                material,
+                capability => new AdvancedRmvMaterialViewModel(
+                    capability,
+                    _uiCommandFactory,
+                    _packFileService,
+                    _resourceLibrary,
+                    _packFileUiProvider,
+                    _propertyEditor));
+            Blood = CreateCapabilityView<BloodCapability, BloodViewModel>(
+                material,
+                capability => new BloodViewModel(
+                    capability,
+                    _uiCommandFactory,
+                    _packFileService,
+                    _resourceLibrary,
+                    _packFileUiProvider,
+                    _propertyEditor));
+            Emissive = CreateCapabilityView<EmissiveCapability, EmissiveViewModel>(
+                material,
+                capability => new EmissiveViewModel(
+                    capability,
+                    _uiCommandFactory,
+                    _packFileService,
+                    _resourceLibrary,
+                    _packFileUiProvider,
+                    _propertyEditor));
+            Tint = CreateCapabilityView<TintCapability, TintViewModel>(
+                material,
+                capability => new TintViewModel(
+                    capability,
+                    _sceneRenderParameters));
+        }
+
+        TViewModel? CreateCapabilityView<T, TViewModel>(
+            CapabilityMaterial material,
+            Func<T, TViewModel> creator)
             where T : class, ICapability
             where TViewModel : class
         {

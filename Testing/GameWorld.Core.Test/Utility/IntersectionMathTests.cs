@@ -185,6 +185,85 @@ public class IntersectionMathTests
         });
     }
 
+    [Test]
+    public void IntersectObject_EvaluatedWorldPositionsPickVisiblePoseInsteadOfBindPose()
+    {
+        var mesh = CreateTriangle();
+        var evaluatedPositions = mesh
+            .GetVertexList()
+            .Select(position => position + new Vector3(2, 0, 0))
+            .ToArray();
+
+        var visiblePoseHit = IntersectionMath.IntersectObject(
+            new Ray(
+                new Vector3(2, 0.2f, 1),
+                -Vector3.UnitZ),
+            mesh,
+            evaluatedPositions);
+        var bindPoseHit = IntersectionMath.IntersectObject(
+            new Ray(
+                new Vector3(0, 0.2f, 1),
+                -Vector3.UnitZ),
+            mesh,
+            evaluatedPositions);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(visiblePoseHit, Is.Not.Null);
+            Assert.That(bindPoseHit, Is.Null);
+        });
+    }
+
+    [Test]
+    public void IntersectVertex_EvaluatedWorldPositionsPickVisibleVertex()
+    {
+        var mesh = CreateTriangle();
+        var evaluatedPositions = mesh
+            .GetVertexList()
+            .Select(position => position + new Vector3(0.8f, 0, 0))
+            .ToArray();
+
+        var result = IntersectionMath.IntersectVertex(
+            new Vector2(65, 50),
+            mesh,
+            evaluatedPositions,
+            Matrix.Identity,
+            100,
+            100,
+            out var selectedVertex);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(0).Within(0.001f));
+            Assert.That(selectedVertex, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void IntersectEdge_EvaluatedWorldPositionsPickVisibleEdge()
+    {
+        var mesh = CreateTriangle();
+        var evaluatedPositions = mesh
+            .GetVertexList()
+            .Select(position => position + new Vector3(0.8f, 0, 0))
+            .ToArray();
+
+        var result = IntersectionMath.IntersectEdge(
+            new Vector2(80, 50),
+            mesh,
+            evaluatedPositions,
+            Matrix.Identity,
+            100,
+            100,
+            out var selectedEdge);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(0).Within(0.001f));
+            Assert.That(selectedEdge, Is.EqualTo((0, 1)));
+        });
+    }
+
     private static MeshObject CreateTriangle()
     {
         return CreateMesh(

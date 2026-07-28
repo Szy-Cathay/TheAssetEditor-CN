@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using GameWorld.Core.Commands;
 using GameWorld.Core.Rendering.Materials.Capabilities;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility.UserInterface;
@@ -14,6 +15,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
     public partial class EmissiveViewModel : ObservableObject
     {
         private readonly EmissiveCapability _emissiveCapability;
+        private readonly IDocumentPropertyEditor _propertyEditor;
 
         [ObservableProperty] ShaderTextureViewModel _emissiveTexture;
         [ObservableProperty] ShaderTextureViewModel _emissiveDistortionTexture;
@@ -36,23 +38,54 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
         [ObservableProperty] float _emissiveStrength;
         [ObservableProperty] Vector2ViewModel _emissiveTiling;
 
-        public EmissiveViewModel(EmissiveCapability emissiveCapability, IUiCommandFactory uiCommandFactory, IPackFileService packFileService, IScopedResourceLibrary resourceLibrary, IStandardDialogs packFileUiProvider)
+        public EmissiveViewModel(
+            EmissiveCapability emissiveCapability,
+            IUiCommandFactory uiCommandFactory,
+            IPackFileService packFileService,
+            IScopedResourceLibrary resourceLibrary,
+            IStandardDialogs packFileUiProvider,
+            IDocumentPropertyEditor propertyEditor)
         {
             _emissiveCapability = emissiveCapability;
+            _propertyEditor = propertyEditor;
 
-            _emissiveTexture = new ShaderTextureViewModel(emissiveCapability.Emissive, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _emissiveDistortionTexture = new ShaderTextureViewModel(emissiveCapability.EmissiveDistortion, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
+            _emissiveTexture = new ShaderTextureViewModel(
+                emissiveCapability.Emissive,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _emissiveDistortionTexture = new ShaderTextureViewModel(
+                emissiveCapability.EmissiveDistortion,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
 
-            _emissiveDirection = new Vector2ViewModel(emissiveCapability.EmissiveDirection, OnEmissiveDirectionChanged);
+            _emissiveDirection = new Vector2ViewModel(
+                emissiveCapability.EmissiveDirection,
+                OnEmissiveDirectionChanged);
             _emissiveDistortStrength = emissiveCapability.EmissiveDistortStrength;
             _emissiveFresnelStrength = emissiveCapability.EmissiveFresnelStrength;
 
-            _emissiveTint = new ColourPickerViewModel(emissiveCapability.EmissiveTint, OnEmissiveTintChanged);
+            _emissiveTint = new ColourPickerViewModel(
+                emissiveCapability.EmissiveTint,
+                OnEmissiveTintChanged);
 
-            _gradient0 = new ColourPickerViewModel(emissiveCapability.GradientColours[0], OnGradientColour0Changed);
-            _gradient1 = new ColourPickerViewModel(emissiveCapability.GradientColours[1], OnGradientColour1Changed);
-            _gradient2 = new ColourPickerViewModel(emissiveCapability.GradientColours[2], OnGradientColour2Changed);
-            _gradient3 = new ColourPickerViewModel(emissiveCapability.GradientColours[3], OnGradientColour3Changed);
+            _gradient0 = new ColourPickerViewModel(
+                emissiveCapability.GradientColours[0],
+                value => OnGradientColourChanged(0, value));
+            _gradient1 = new ColourPickerViewModel(
+                emissiveCapability.GradientColours[1],
+                value => OnGradientColourChanged(1, value));
+            _gradient2 = new ColourPickerViewModel(
+                emissiveCapability.GradientColours[2],
+                value => OnGradientColourChanged(2, value));
+            _gradient3 = new ColourPickerViewModel(
+                emissiveCapability.GradientColours[3],
+                value => OnGradientColourChanged(3, value));
 
             _gradientTime0 = emissiveCapability.GradientTimes[0];
             _gradientTime1 = emissiveCapability.GradientTimes[1];
@@ -64,28 +97,126 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
             _emissivePulseStrength = emissiveCapability.EmissivePulseStrength;
             _emissiveStrength = emissiveCapability.EmissiveStrength;
 
-            _emissiveTiling = new Vector2ViewModel(emissiveCapability.EmissiveTiling, OnEmissiveTilingChanged);
+            _emissiveTiling = new Vector2ViewModel(
+                emissiveCapability.EmissiveTiling,
+                OnEmissiveTilingChanged);
         }
 
-        partial void OnEmissiveDistortStrengthChanged(float value) => _emissiveCapability.EmissiveDistortStrength = value;
-        partial void OnEmissiveSpeedChanged(float value) => _emissiveCapability.EmissiveSpeed = value;
-        partial void OnEmissivePulseStrengthChanged(float value) => _emissiveCapability.EmissivePulseStrength = value;
-        partial void OnEmissivePulseSpeedChanged(float value) => _emissiveCapability.EmissivePulseSpeed = value;
-        void OnEmissiveDirectionChanged(Vector2 value) => _emissiveCapability.EmissiveDirection = value;
-        void OnEmissiveTintChanged(Vector3 value) => _emissiveCapability.EmissiveTint = value;
-        partial void OnEmissiveStrengthChanged(float value) => _emissiveCapability.EmissiveStrength = value;
-        partial void OnEmissiveFresnelStrengthChanged(float value) => _emissiveCapability.EmissiveFresnelStrength = value;
+        partial void OnEmissiveDistortStrengthChanged(float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveDistortStrength,
+                value,
+                newValue => _emissiveCapability.EmissiveDistortStrength = newValue,
+                newValue => EmissiveDistortStrength = newValue);
 
-        void OnEmissiveTilingChanged(Vector2 value) => _emissiveCapability.EmissiveTiling = value;
-        void OnGradientColour0Changed(Vector3 color) => _emissiveCapability.GradientColours[0] = color;
-        void OnGradientColour1Changed(Vector3 color) => _emissiveCapability.GradientColours[1] = color;
-        void OnGradientColour2Changed(Vector3 color) => _emissiveCapability.GradientColours[2] = color;
-        void OnGradientColour3Changed(Vector3 color) => _emissiveCapability.GradientColours[3] = color;
+        partial void OnEmissiveSpeedChanged(float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveSpeed,
+                value,
+                newValue => _emissiveCapability.EmissiveSpeed = newValue,
+                newValue => EmissiveSpeed = newValue);
 
-        partial void OnGradientTime0Changed(float value) => _emissiveCapability.GradientTimes[0] = value;
-        partial void OnGradientTime1Changed(float value) => _emissiveCapability.GradientTimes[1] = value;
-        partial void OnGradientTime2Changed(float value) => _emissiveCapability.GradientTimes[2] = value;
-        partial void OnGradientTime3Changed(float value) => _emissiveCapability.GradientTimes[3] = value;
+        partial void OnEmissivePulseStrengthChanged(float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissivePulseStrength,
+                value,
+                newValue => _emissiveCapability.EmissivePulseStrength = newValue,
+                newValue => EmissivePulseStrength = newValue);
 
+        partial void OnEmissivePulseSpeedChanged(float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissivePulseSpeed,
+                value,
+                newValue => _emissiveCapability.EmissivePulseSpeed = newValue,
+                newValue => EmissivePulseSpeed = newValue);
+
+        partial void OnEmissiveStrengthChanged(float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveStrength,
+                value,
+                newValue => _emissiveCapability.EmissiveStrength = newValue,
+                newValue => EmissiveStrength = newValue);
+
+        partial void OnEmissiveFresnelStrengthChanged(float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveFresnelStrength,
+                value,
+                newValue => _emissiveCapability.EmissiveFresnelStrength = newValue,
+                newValue => EmissiveFresnelStrength = newValue);
+
+        partial void OnGradientTime0Changed(float value) =>
+            OnGradientTimeChanged(0, value);
+
+        partial void OnGradientTime1Changed(float value) =>
+            OnGradientTimeChanged(1, value);
+
+        partial void OnGradientTime2Changed(float value) =>
+            OnGradientTimeChanged(2, value);
+
+        partial void OnGradientTime3Changed(float value) =>
+            OnGradientTimeChanged(3, value);
+
+        void OnEmissiveDirectionChanged(Vector2 value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveDirection,
+                value,
+                newValue => _emissiveCapability.EmissiveDirection = newValue,
+                newValue => EmissiveDirection.Set(newValue));
+
+        void OnEmissiveTintChanged(Vector3 value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveTint,
+                value,
+                newValue => _emissiveCapability.EmissiveTint = newValue,
+                newValue => EmissiveTint.Set(newValue));
+
+        void OnEmissiveTilingChanged(Vector2 value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.EmissiveTiling,
+                value,
+                newValue => _emissiveCapability.EmissiveTiling = newValue,
+                newValue => EmissiveTiling.Set(newValue));
+
+        private void OnGradientColourChanged(int index, Vector3 value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.GradientColours[index],
+                value,
+                newValue => _emissiveCapability.GradientColours[index] = newValue,
+                newValue => GetGradient(index).Set(newValue));
+
+        private void OnGradientTimeChanged(int index, float value) =>
+            _propertyEditor.Update(
+                _emissiveCapability.GradientTimes[index],
+                value,
+                newValue => _emissiveCapability.GradientTimes[index] = newValue,
+                newValue => SetGradientTime(index, newValue));
+
+        private ColourPickerViewModel GetGradient(int index) =>
+            index switch
+            {
+                0 => Gradient0,
+                1 => Gradient1,
+                2 => Gradient2,
+                _ => Gradient3
+            };
+
+        private void SetGradientTime(int index, float value)
+        {
+            switch (index)
+            {
+                case 0:
+                    GradientTime0 = value;
+                    break;
+                case 1:
+                    GradientTime1 = value;
+                    break;
+                case 2:
+                    GradientTime2 = value;
+                    break;
+                default:
+                    GradientTime3 = value;
+                    break;
+            }
+        }
     }
 }

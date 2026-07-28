@@ -7,9 +7,30 @@
              xmlns:sceneexplorer="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneExplorer"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <ScrollViewer>
-        <ContentControl Grid.Row="2" 
-                        Content="{Binding Path=CurrentEditor, UpdateSourceTrigger=PropertyChanged}" 
-                        ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
-    </ScrollViewer>
+    <Grid>
+        <ScrollViewer>
+            <ContentControl Content="{Binding CurrentEditor}"
+                            ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
+        </ScrollViewer>
+
+        <TextBlock Text="{Binding EmptyStateText}"
+                   Margin="16"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                   IsHitTestVisible="False">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding CurrentEditor}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
 </UserControl>

@@ -15,7 +15,7 @@
 
     <Expander DockPanel.Dock="Top" IsExpanded="False">
         <Expander.Header>
-            <StackPanel Orientation="Horizontal" >
+            <StackPanel Orientation="Horizontal" ToolTip="{loc:Loc WeightedMaterial.ToolTip}">
                 <TextBlock Text="{loc:Loc WeightedMaterial.Header}" FontWeight="Bold" Margin="3"/>
             </StackPanel>
         </Expander.Header>
@@ -30,14 +30,12 @@
             <DockPanel DockPanel.Dock="Top">
                 <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.MatrixIndex}"/>
                 <Label>:</Label>
-                <Button Content="{loc:Loc WeightedMaterial.SetToDefault}" Command="{Binding Material.SetDefaultMatrixIndexCommand}" Margin="2" DockPanel.Dock="Right"/>
                 <TextBlock  Text="{Binding Material.MatrixIndex.Value}"  VerticalAlignment="Center"/>
             </DockPanel>
 
             <DockPanel DockPanel.Dock="Top">
                 <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.ParentMatrixIndex}"/>
                 <Label>:</Label>
-                <Button Content="{loc:Loc WeightedMaterial.SetToDefault}" Command="{Binding Material.SetDefaultParentMatrixIndexCommand}" Margin="2" DockPanel.Dock="Right"/>
                 <TextBlock  Text="{Binding Material.ParentMatrixIndex.Value}"  VerticalAlignment="Center"/>
             </DockPanel>
 

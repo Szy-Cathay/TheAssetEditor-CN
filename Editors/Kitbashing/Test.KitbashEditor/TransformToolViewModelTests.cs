@@ -62,6 +62,22 @@ public class TransformToolViewModelTests
     }
 
     [Test]
+    public void TypedBoneTransform_RefreshesPausedDisplayedPose()
+    {
+        var context = CreateContext();
+        context.ViewModel.SetMode(TransformToolViewModel.TransformMode.Translate);
+        context.ViewModel.Vector3.Set(1);
+        var displayedPose =
+            context.Node.AnimationPlayer!.GetCurrentAnimationFrame();
+
+        context.ViewModel.ApplyCommand.Execute(null);
+
+        Assert.That(
+            context.Node.AnimationPlayer.GetCurrentAnimationFrame(),
+            Is.Not.SameAs(displayedPose));
+    }
+
+    [Test]
     public void TypedBoneTransform_WhenPreviewApplyThrows_CancelsAndDisposesWrapper()
     {
         var context = CreateContext();

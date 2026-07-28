@@ -25,7 +25,12 @@ namespace Editors.KitbasherEditor.Core
             _animationsContainerComponent = animationsContainerComponent;
             _packFileService = packFileService;
             _eventHub = eventHub;
-            Player = _animationsContainerComponent.RegisterAnimationPlayer(new AnimationPlayer(), "MainPlayer");
+            Player = _animationsContainerComponent.RegisterAnimationPlayer(
+                new AnimationPlayer
+                {
+                    RefreshWhilePaused = false
+                },
+                "MainPlayer");
         }
 
         public void SetSkeletonFromName(string skeletonName)

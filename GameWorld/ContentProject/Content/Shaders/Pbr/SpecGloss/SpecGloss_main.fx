@@ -7,6 +7,9 @@
 
 #include "../TextureSamplers.hlsli"
 #include "../inputlayouts.hlsli"
+#include "../Capabilites/Tint.hlsli"
+
+bool SelectionMaskEnabled;
 
 // -------------------------------------------------------------------------------------------------------------
 //  Fetch Data needed to render 1 pixel
@@ -21,6 +24,7 @@ GBufferMaterial GetMaterial(in PixelInputType input)
     material.roughness = 1.0f;
     material.metalness = 0.0f;
     material.pixelNormal = input.normal;
+    material.maskValue = float4(0, 0, 0, 0);
     
     float2 texCord = float2(nfmod(input.tex.x, 1), nfmod(input.tex.y, 1));
         
@@ -46,17 +50,32 @@ GBufferMaterial GetMaterial(in PixelInputType input)
     {
         material.pixelNormal = GetPixelNormal(input);
     }
+
+    if (UseMask)
+    {
+        material.maskValue = MaskTexture.Sample(SampleType, texCord);
+    }
     
     return material;
 }
 
-float4 mainPS(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace) : SV_TARGET0
+struct MainPixelOutput
+{
+    float4 Colour : SV_TARGET0;
+    float4 SelectionMask : SV_TARGET1;
+};
+
+MainPixelOutput mainPS(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace)
 {    
     // -- fetch data needed to light pixel
     GBufferMaterial material = GetMaterial(input);
 
     if (UseAlpha == 1)    
         alpha_test(material.diffuse.a);
+
+    material.diffuse.rgb = ApplyTintAndFactionColours(
+        material.diffuse.rgb,
+        material.maskValue);
     
     float3 normalizedViewDirection = -normalize(CameraPos - input.worldPosition);
     float3 rotatedNormalizedLightDirection = normalize(mul(light_Direction_Constant, (float3x3) DirLightTransform));
@@ -84,8 +103,12 @@ float4 mainPS(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace) : SV_
     //  Tone-map the pixel...            
     float3 ldr_linear_col = saturate(tone_map_linear_hdr_pixel_value(hdr_linear_col*exposure));        
     
-	//  Return gamma corrected value...
-    return float4( _gamma(ldr_linear_col), 1.0f);
+    MainPixelOutput output;
+    output.Colour = float4(_gamma(ldr_linear_col), 1.0f);
+    output.SelectionMask = SelectionMaskEnabled
+        ? float4(1.0f, 1.0f, 1.0f, 1.0f)
+        : float4(0.0f, 0.0f, 0.0f, 0.0f);
+    return output;
 }
 
 

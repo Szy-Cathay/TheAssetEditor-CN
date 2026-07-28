@@ -22,7 +22,7 @@
         <Expander DockPanel.Dock="Top" IsExpanded="True">
             <Expander.Header>
                 <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}">
-                    <Label Content="{loc:Loc Blood.Header}" FontSize="{StaticResource HeaderFontSize}" Width="{StaticResource HeaderLabelLength}"/>
+                    <Label Content="{loc:Loc Blood.Header}" FontSize="{StaticResource HeaderFontSize}"/>
                     <Separator/>
                 </DockPanel>
             </Expander.Header>

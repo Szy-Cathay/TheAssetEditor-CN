@@ -13,7 +13,7 @@
         <DockPanel DockPanel.Dock="Top">
             <Label Width="100" DockPanel.Dock="Left" Content="{loc:Loc Group.GroupName}"/>
             <Label DockPanel.Dock="Left">:</Label>
-            <TextBox Text="{Binding GroupName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalAlignment="Center"/>
+            <TextBox Text="{Binding GroupName, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalAlignment="Center"/>
         </DockPanel>
     </DockPanel>
 </UserControl>

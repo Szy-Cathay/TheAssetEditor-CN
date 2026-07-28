@@ -11,6 +11,7 @@ namespace GameWorld.Core.Animation
     public class GameSkeleton
     {
         List<Matrix> _worldTransform { get; set; }
+        List<Matrix> _inverseWorldTransform { get; set; }
         List<int> _parentBoneIds { get; set; }
 
         public List<Vector3> Translation { get; private set; }
@@ -61,6 +62,8 @@ namespace GameWorld.Core.Animation
         public void RebuildSkeletonMatrix()
         {
             _worldTransform = new List<Matrix>(new Matrix[BoneCount]);
+            _inverseWorldTransform =
+                new List<Matrix>(new Matrix[BoneCount]);
             for (var i = 0; i < BoneCount; i++)
             {
                 var translationMatrix = Matrix.CreateTranslation(Translation[i]);
@@ -77,6 +80,12 @@ namespace GameWorld.Core.Animation
                     continue;
                 _worldTransform[i] = _worldTransform[i] * _worldTransform[parentIndex];
             }
+
+            for (var i = 0; i < BoneCount; i++)
+            {
+                _inverseWorldTransform[i] =
+                    Matrix.Invert(_worldTransform[i]);
+            }
         }
 
         public GameSkeleton Clone()
@@ -84,6 +93,8 @@ namespace GameWorld.Core.Animation
             var clone = new GameSkeleton()
             {
                 _worldTransform = _worldTransform.ToList(),
+                _inverseWorldTransform =
+                    _inverseWorldTransform.ToList(),
                 _parentBoneIds = _parentBoneIds.ToList(),
                 Translation = Translation.ToList(),
                 Rotation = Rotation.ToList(),
@@ -134,6 +145,11 @@ namespace GameWorld.Core.Animation
         public Matrix GetWorldTransform(int boneIndex)
         {
             return _worldTransform[boneIndex];
+        }
+
+        internal Matrix GetInverseWorldTransform(int boneIndex)
+        {
+            return _inverseWorldTransform[boneIndex];
         }
 
         public Matrix GetAnimatedWorldTranform(int boneIndex)

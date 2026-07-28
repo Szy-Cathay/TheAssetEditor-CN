@@ -1,8 +1,11 @@
+using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
 using Microsoft.Xna.Framework;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace GameWorld.Core.Commands.Vertex
 {
@@ -30,6 +33,11 @@ namespace GameWorld.Core.Commands.Vertex
         Matrix Forward,
         Matrix Reverse);
 
+    internal readonly record struct VertexPoseMapping(
+        Matrix VertexToWorld,
+        Matrix WorldToVertex,
+        bool IsValid);
+
     internal sealed class VertexTransformReplayPlan
     {
         public VertexTransformMatrixPair RawMatrices { get; }
@@ -37,19 +45,30 @@ namespace GameWorld.Core.Commands.Vertex
         public bool ContainsScale { get; }
         public bool TransformsBasis { get; }
         public int OperationCount { get; }
+        public IReadOnlyDictionary<MeshObject, MeshPoseSnapshot> PoseSnapshots { get; }
+        public IReadOnlyDictionary<MeshObject, VertexPoseMapping[]> PoseMappings { get; }
+        public bool HasInvalidPoseMappings { get; }
 
         public VertexTransformReplayPlan(
             VertexTransformMatrixPair rawMatrices,
             IReadOnlyDictionary<float, VertexTransformMatrixPair> weightedMatrices,
             bool containsScale,
             bool transformsBasis,
-            int operationCount)
+            int operationCount,
+            IReadOnlyDictionary<MeshObject, MeshPoseSnapshot>? poseSnapshots = null,
+            IReadOnlyDictionary<MeshObject, VertexPoseMapping[]>? poseMappings = null,
+            bool hasInvalidPoseMappings = false)
         {
             RawMatrices = rawMatrices;
             WeightedMatrices = weightedMatrices;
             ContainsScale = containsScale;
             TransformsBasis = transformsBasis;
             OperationCount = operationCount;
+            PoseSnapshots = poseSnapshots ??
+                new Dictionary<MeshObject, MeshPoseSnapshot>();
+            PoseMappings = poseMappings ??
+                new Dictionary<MeshObject, VertexPoseMapping[]>();
+            HasInvalidPoseMappings = hasInvalidPoseMappings;
         }
     }
 
@@ -59,10 +78,12 @@ namespace GameWorld.Core.Commands.Vertex
         internal const float MaximumScaleAxisSafetyConditionNumber = 1000.0f;
         internal const float MaximumScalePositionRoundTripError = 0.00001f;
         internal const float MaximumPositionRoundTripError = 0.0001f;
+        const int ParallelPoseMappingVertexThreshold = 4096;
 
         public static VertexTransformReplayPlan CreateEmptyReplayPlan(
             ISelectionState selectionState,
-            IReadOnlyDictionary<int, float>? falloffWeights)
+            IReadOnlyDictionary<int, float>? falloffWeights,
+            IReadOnlyDictionary<MeshObject, MeshPoseSnapshot>? poseSnapshots = null)
         {
             var identity = new VertexTransformMatrixPair(
                 Matrix.Identity,
@@ -85,12 +106,18 @@ namespace GameWorld.Core.Commands.Vertex
                 }
             }
 
+            var poseMappings = CreatePoseMappings(
+                poseSnapshots,
+                out var hasInvalidPoseMappings);
             return new VertexTransformReplayPlan(
                 identity,
                 weightedMatrices,
                 containsScale: false,
                 transformsBasis: false,
-                operationCount: 0);
+                operationCount: 0,
+                poseSnapshots,
+                poseMappings,
+                hasInvalidPoseMappings);
         }
 
         public static bool TryAppendOperation(
@@ -103,7 +130,8 @@ namespace GameWorld.Core.Commands.Vertex
             out VertexTransformReplayPlan candidatePlan)
         {
             candidatePlan = currentPlan;
-            if (!IsStructurallyValid(
+            if (currentPlan.HasInvalidPoseMappings ||
+                !IsStructurallyValid(
                     geometryList,
                     selectionState,
                     affectedVertexIndices,
@@ -146,7 +174,10 @@ namespace GameWorld.Core.Commands.Vertex
                 weightedMatrices,
                 currentPlan.ContainsScale || operation.Mode == VertexTransformOperationMode.Scale,
                 currentPlan.TransformsBasis || operation.Mode != VertexTransformOperationMode.Translate,
-                currentPlan.OperationCount + 1);
+                currentPlan.OperationCount + 1,
+                currentPlan.PoseSnapshots,
+                currentPlan.PoseMappings,
+                currentPlan.HasInvalidPoseMappings);
             // Keep the stricter single-step scale guard in addition to baseline aggregate validation.
             if (operation.Mode == VertexTransformOperationMode.Scale &&
                 !AreAffectedCurrentPositionsReversible(
@@ -155,7 +186,10 @@ namespace GameWorld.Core.Commands.Vertex
                     affectedVertexIndices,
                     falloffWeights,
                     rawStepMatrices,
-                    weightedStepMatrices))
+                    weightedStepMatrices,
+                    currentPlan.PoseSnapshots,
+                    currentPlan.PoseMappings,
+                    currentPlan.HasInvalidPoseMappings))
             {
                 return false;
             }
@@ -199,7 +233,13 @@ namespace GameWorld.Core.Commands.Vertex
                         if (weight == 0)
                             continue;
 
-                        if (!replayPlan.WeightedMatrices.TryGetValue(weight, out var matrices) ||
+                        if (!replayPlan.WeightedMatrices.TryGetValue(weight, out var poseMatrices) ||
+                            !TryGetVertexMatrices(
+                                replayPlan,
+                                geometry,
+                                vertexIndex,
+                                poseMatrices,
+                                out var matrices) ||
                             !IsPositionReversible(
                                 baseline[vertexIndex].Position,
                                 matrices,
@@ -220,7 +260,13 @@ namespace GameWorld.Core.Commands.Vertex
 
                         if (vertexIndex < 0 ||
                             vertexIndex >= baseline.Length ||
-                            !replayPlan.WeightedMatrices.TryGetValue(weight, out var matrices) ||
+                            !replayPlan.WeightedMatrices.TryGetValue(weight, out var poseMatrices) ||
+                            !TryGetVertexMatrices(
+                                replayPlan,
+                                geometry,
+                                vertexIndex,
+                                poseMatrices,
+                                out var matrices) ||
                             !IsPositionReversible(
                                 baseline[vertexIndex].Position,
                                 matrices,
@@ -236,9 +282,15 @@ namespace GameWorld.Core.Commands.Vertex
                     {
                         if (vertexIndex < 0 ||
                             vertexIndex >= baseline.Length ||
+                            !TryGetVertexMatrices(
+                                replayPlan,
+                                geometry,
+                                vertexIndex,
+                                replayPlan.RawMatrices,
+                                out var matrices) ||
                             !IsPositionReversible(
                                 baseline[vertexIndex].Position,
-                                replayPlan.RawMatrices,
+                                matrices,
                                 MaximumPositionRoundTripError))
                         {
                             return false;
@@ -249,9 +301,15 @@ namespace GameWorld.Core.Commands.Vertex
                 {
                     for (var vertexIndex = 0; vertexIndex < baseline.Length; vertexIndex++)
                     {
-                        if (!IsPositionReversible(
+                        if (!TryGetVertexMatrices(
+                                replayPlan,
+                                geometry,
+                                vertexIndex,
+                                replayPlan.RawMatrices,
+                                out var matrices) ||
+                            !IsPositionReversible(
                             baseline[vertexIndex].Position,
-                            replayPlan.RawMatrices,
+                            matrices,
                             MaximumPositionRoundTripError))
                         {
                             return false;
@@ -301,6 +359,44 @@ namespace GameWorld.Core.Commands.Vertex
             VertexTransformReplayPlan replayPlan,
             bool inverse)
         {
+            return ApplyReplayPlanCore(
+                geometryList,
+                selectionState,
+                affectedVertexIndices,
+                falloffWeights,
+                replayPlan,
+                inverse,
+                useFastPosePath: false);
+        }
+
+        internal static IReadOnlyList<VertexTransformMeshResult>
+            ApplyReplayPlanPreview(
+                IReadOnlyList<MeshObject> geometryList,
+                ISelectionState selectionState,
+                HashSet<int>? affectedVertexIndices,
+                IReadOnlyDictionary<int, float>? falloffWeights,
+                VertexTransformReplayPlan replayPlan)
+        {
+            return ApplyReplayPlanCore(
+                geometryList,
+                selectionState,
+                affectedVertexIndices,
+                falloffWeights,
+                replayPlan,
+                inverse: false,
+                useFastPosePath: true);
+        }
+
+        static IReadOnlyList<VertexTransformMeshResult>
+            ApplyReplayPlanCore(
+                IReadOnlyList<MeshObject> geometryList,
+                ISelectionState selectionState,
+                HashSet<int>? affectedVertexIndices,
+                IReadOnlyDictionary<int, float>? falloffWeights,
+                VertexTransformReplayPlan replayPlan,
+                bool inverse,
+                bool useFastPosePath)
+        {
             if (replayPlan.OperationCount == 0)
                 return Array.Empty<VertexTransformMeshResult>();
 
@@ -316,6 +412,7 @@ namespace GameWorld.Core.Commands.Vertex
                     falloffWeights,
                     replayPlan,
                     inverse,
+                    useFastPosePath,
                     ref firstModifiedVertex,
                     ref lastModifiedVertex);
                 results.Add(new VertexTransformMeshResult(
@@ -534,8 +631,20 @@ namespace GameWorld.Core.Commands.Vertex
             HashSet<int>? affectedVertexIndices,
             IReadOnlyDictionary<int, float>? falloffWeights,
             VertexTransformMatrixPair rawStepMatrices,
-            IReadOnlyDictionary<float, VertexTransformMatrixPair> weightedStepMatrices)
+            IReadOnlyDictionary<float, VertexTransformMatrixPair> weightedStepMatrices,
+            IReadOnlyDictionary<MeshObject, MeshPoseSnapshot> poseSnapshots,
+            IReadOnlyDictionary<MeshObject, VertexPoseMapping[]> poseMappings,
+            bool hasInvalidPoseMappings)
         {
+            var stepPlan = new VertexTransformReplayPlan(
+                rawStepMatrices,
+                weightedStepMatrices,
+                containsScale: false,
+                transformsBasis: false,
+                operationCount: 1,
+                poseSnapshots,
+                poseMappings,
+                hasInvalidPoseMappings);
             foreach (var geometry in geometryList)
             {
                 if (selectionState.Mode == GeometrySelectionMode.Vertex)
@@ -547,7 +656,13 @@ namespace GameWorld.Core.Commands.Vertex
                         if (weight == 0)
                             continue;
 
-                        if (!weightedStepMatrices.TryGetValue(weight, out var matrices) ||
+                        if (!weightedStepMatrices.TryGetValue(weight, out var poseMatrices) ||
+                            !TryGetVertexMatrices(
+                                stepPlan,
+                                geometry,
+                                vertexIndex,
+                                poseMatrices,
+                                out var matrices) ||
                             !IsPositionReversible(
                                 geometry.VertexArray[vertexIndex].Position,
                                 matrices,
@@ -566,7 +681,13 @@ namespace GameWorld.Core.Commands.Vertex
                         if (weight == 0)
                             continue;
 
-                        if (!weightedStepMatrices.TryGetValue(weight, out var matrices) ||
+                        if (!weightedStepMatrices.TryGetValue(weight, out var poseMatrices) ||
+                            !TryGetVertexMatrices(
+                                stepPlan,
+                                geometry,
+                                vertexIndex,
+                                poseMatrices,
+                                out var matrices) ||
                             !IsPositionReversible(
                                 geometry.VertexArray[vertexIndex].Position,
                                 matrices,
@@ -580,9 +701,15 @@ namespace GameWorld.Core.Commands.Vertex
                 {
                     foreach (var vertexIndex in affectedVertexIndices)
                     {
-                        if (!IsPositionReversible(
+                        if (!TryGetVertexMatrices(
+                                stepPlan,
+                                geometry,
+                                vertexIndex,
+                                rawStepMatrices,
+                                out var matrices) ||
+                            !IsPositionReversible(
                             geometry.VertexArray[vertexIndex].Position,
-                            rawStepMatrices,
+                            matrices,
                             MaximumScalePositionRoundTripError))
                         {
                             return false;
@@ -591,11 +718,19 @@ namespace GameWorld.Core.Commands.Vertex
                 }
                 else
                 {
-                    foreach (var vertex in geometry.VertexArray)
+                    for (var vertexIndex = 0;
+                         vertexIndex < geometry.VertexArray.Length;
+                         vertexIndex++)
                     {
-                        if (!IsPositionReversible(
-                            vertex.Position,
-                            rawStepMatrices,
+                        if (!TryGetVertexMatrices(
+                                stepPlan,
+                                geometry,
+                                vertexIndex,
+                                rawStepMatrices,
+                                out var matrices) ||
+                            !IsPositionReversible(
+                            geometry.VertexArray[vertexIndex].Position,
+                            matrices,
                             MaximumScalePositionRoundTripError))
                         {
                             return false;
@@ -683,9 +818,32 @@ namespace GameWorld.Core.Commands.Vertex
             IReadOnlyDictionary<int, float>? falloffWeights,
             VertexTransformReplayPlan replayPlan,
             bool inverse,
+            bool useFastPosePath,
             ref int firstModifiedVertex,
             ref int lastModifiedVertex)
         {
+            replayPlan.PoseMappings.TryGetValue(
+                geometry,
+                out var poseMappings);
+            Matrix? sharedRawPoseTransform = null;
+            if (useFastPosePath &&
+                poseMappings?.Length == 1 &&
+                TryGetPoseMapping(
+                    poseMappings,
+                    0,
+                    out var sharedPoseMapping))
+            {
+                var rawTransform = inverse
+                    ? replayPlan.RawMatrices.Reverse
+                    : replayPlan.RawMatrices.Forward;
+                var mappedTransform =
+                    sharedPoseMapping.VertexToWorld *
+                    rawTransform *
+                    sharedPoseMapping.WorldToVertex;
+                if (IsFinite(mappedTransform))
+                    sharedRawPoseTransform = mappedTransform;
+            }
+
             if (selectionState.Mode == GeometrySelectionMode.Vertex)
             {
                 var vertexSelectionState = (VertexSelectionState)selectionState;
@@ -700,7 +858,10 @@ namespace GameWorld.Core.Commands.Vertex
                         vertexIndex,
                         replayPlan.WeightedMatrices[weight],
                         replayPlan,
-                        inverse);
+                        poseMappings,
+                        inverse,
+                        useFastPosePath,
+                        precomputedPoseTransform: null);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
             }
@@ -718,7 +879,10 @@ namespace GameWorld.Core.Commands.Vertex
                         vertexIndex,
                         replayPlan.WeightedMatrices[weight],
                         replayPlan,
-                        inverse);
+                        poseMappings,
+                        inverse,
+                        useFastPosePath,
+                        precomputedPoseTransform: null);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
             }
@@ -731,7 +895,10 @@ namespace GameWorld.Core.Commands.Vertex
                         vertexIndex,
                         replayPlan.RawMatrices,
                         replayPlan,
-                        inverse);
+                        poseMappings,
+                        inverse,
+                        useFastPosePath,
+                        sharedRawPoseTransform);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
             }
@@ -744,7 +911,10 @@ namespace GameWorld.Core.Commands.Vertex
                         vertexIndex,
                         replayPlan.RawMatrices,
                         replayPlan,
-                        inverse);
+                        poseMappings,
+                        inverse,
+                        useFastPosePath,
+                        sharedRawPoseTransform);
                     IncludeVertex(vertexIndex, ref firstModifiedVertex, ref lastModifiedVertex);
                 }
             }
@@ -755,16 +925,81 @@ namespace GameWorld.Core.Commands.Vertex
             int vertexIndex,
             VertexTransformMatrixPair matrices,
             VertexTransformReplayPlan replayPlan,
-            bool inverse)
+            VertexPoseMapping[]? poseMappings,
+            bool inverse,
+            bool useFastPosePath,
+            Matrix? precomputedPoseTransform)
         {
-            var replayMatrix = inverse ? matrices.Reverse : matrices.Forward;
+            var replayMatrix = inverse
+                ? matrices.Reverse
+                : matrices.Forward;
+            if (poseMappings != null)
+            {
+                if (!TryGetPoseMapping(
+                        poseMappings,
+                        vertexIndex,
+                        out var poseMapping))
+                {
+                    throw new InvalidOperationException(
+                        "The paused pose cannot be mapped back to bind geometry.");
+                }
+
+                var inversePoseTransform = inverse
+                    ? matrices.Forward
+                    : matrices.Reverse;
+                if (precomputedPoseTransform.HasValue)
+                {
+                    TransformPoseMappedVertexExact(
+                        geometry,
+                        vertexIndex,
+                        precomputedPoseTransform.Value,
+                        inversePoseTransform,
+                        poseMapping,
+                        replayPlan.TransformsBasis);
+                }
+                else if (useFastPosePath)
+                {
+                    TransformPoseMappedVertexPreview(
+                        geometry,
+                        vertexIndex,
+                        replayMatrix,
+                        inversePoseTransform,
+                        poseMapping,
+                        replayPlan.TransformsBasis);
+                }
+                else
+                {
+                    var mappedTransform =
+                        poseMapping.VertexToWorld *
+                        replayMatrix *
+                        poseMapping.WorldToVertex;
+                    if (!IsFinite(mappedTransform))
+                    {
+                        throw new InvalidOperationException(
+                            "The paused pose transform is invalid.");
+                    }
+
+                    TransformPoseMappedVertexExact(
+                        geometry,
+                        vertexIndex,
+                        mappedTransform,
+                        inversePoseTransform,
+                        poseMapping,
+                        replayPlan.TransformsBasis);
+                }
+                return;
+            }
+
             if (!replayPlan.TransformsBasis)
             {
                 geometry.TransformVertexTranslation(vertexIndex, replayMatrix);
                 return;
             }
 
-            var normalMatrix = Matrix.Transpose(Matrix.Invert(replayMatrix));
+            var normalMatrix = Matrix.Transpose(
+                inverse
+                    ? matrices.Forward
+                    : matrices.Reverse);
             if (replayPlan.ContainsScale)
             {
                 TransformScaleVertexPreservingBasisMagnitude(
@@ -777,6 +1012,328 @@ namespace GameWorld.Core.Commands.Vertex
             {
                 geometry.TransformVertexRotation(vertexIndex, replayMatrix, normalMatrix);
             }
+        }
+
+        static void TransformPoseMappedVertexExact(
+            MeshObject geometry,
+            int vertexIndex,
+            Matrix positionTransform,
+            Matrix inversePoseTransform,
+            VertexPoseMapping poseMapping,
+            bool transformsBasis)
+        {
+            var vertex = geometry.VertexArray[vertexIndex];
+            vertex.Position = Vector4.Transform(
+                vertex.Position,
+                positionTransform);
+            NormalizePosition(ref vertex.Position);
+            TransformPoseMappedBasis(
+                ref vertex,
+                inversePoseTransform,
+                poseMapping,
+                transformsBasis);
+            geometry.VertexArray[vertexIndex] = vertex;
+        }
+
+        static void TransformPoseMappedVertexPreview(
+            MeshObject geometry,
+            int vertexIndex,
+            Matrix positionTransform,
+            Matrix inversePoseTransform,
+            VertexPoseMapping poseMapping,
+            bool transformsBasis)
+        {
+            var vertex = geometry.VertexArray[vertexIndex];
+            vertex.Position = Vector4.Transform(
+                vertex.Position,
+                poseMapping.VertexToWorld);
+            vertex.Position = Vector4.Transform(
+                vertex.Position,
+                positionTransform);
+            vertex.Position = Vector4.Transform(
+                vertex.Position,
+                poseMapping.WorldToVertex);
+            NormalizePosition(ref vertex.Position);
+            TransformPoseMappedBasis(
+                ref vertex,
+                inversePoseTransform,
+                poseMapping,
+                transformsBasis);
+            geometry.VertexArray[vertexIndex] = vertex;
+        }
+
+        static void TransformPoseMappedBasis(
+            ref VertexPositionNormalTextureCustom vertex,
+            Matrix inversePoseTransform,
+            VertexPoseMapping poseMapping,
+            bool transformsBasis)
+        {
+            if (!transformsBasis)
+                return;
+
+            var poseNormalTransform =
+                Matrix.Transpose(inversePoseTransform);
+            vertex.Normal = TransformBasisPreservingMagnitude(
+                vertex.Normal,
+                poseMapping.VertexToWorld,
+                poseNormalTransform,
+                poseMapping.WorldToVertex);
+            vertex.Tangent = TransformBasisPreservingMagnitude(
+                vertex.Tangent,
+                poseMapping.VertexToWorld,
+                poseNormalTransform,
+                poseMapping.WorldToVertex);
+            vertex.BiNormal = TransformBasisPreservingMagnitude(
+                vertex.BiNormal,
+                poseMapping.VertexToWorld,
+                poseNormalTransform,
+                poseMapping.WorldToVertex);
+        }
+
+        static void NormalizePosition(ref Vector4 position)
+        {
+            position.X /= position.W;
+            position.Y /= position.W;
+            position.Z /= position.W;
+            position.W = 1;
+        }
+
+        static Vector3 TransformBasisPreservingMagnitude(
+            Vector3 basis,
+            Matrix linearVertexToWorld,
+            Matrix poseNormalTransform,
+            Matrix linearWorldToVertex)
+        {
+            var magnitude = basis.Length();
+            if (magnitude == 0)
+                return Vector3.Zero;
+
+            var transformed = Vector3.TransformNormal(
+                basis,
+                linearVertexToWorld);
+            transformed = Vector3.TransformNormal(
+                transformed,
+                poseNormalTransform);
+            transformed = Vector3.TransformNormal(
+                transformed,
+                linearWorldToVertex);
+            if (transformed == Vector3.Zero)
+                return Vector3.Zero;
+            transformed.Normalize();
+            return transformed * magnitude;
+        }
+
+        static bool TryGetVertexMatrices(
+            VertexTransformReplayPlan replayPlan,
+            MeshObject geometry,
+            int vertexIndex,
+            VertexTransformMatrixPair poseMatrices,
+            out VertexTransformMatrixPair vertexMatrices)
+        {
+            if (!TryGetVertexMatrix(
+                    replayPlan,
+                    geometry,
+                    vertexIndex,
+                    poseMatrices.Forward,
+                    out var forward) ||
+                !TryGetVertexMatrix(
+                    replayPlan,
+                    geometry,
+                    vertexIndex,
+                    poseMatrices.Reverse,
+                    out var reverse))
+            {
+                vertexMatrices = default;
+                return false;
+            }
+
+            vertexMatrices = new VertexTransformMatrixPair(
+                forward,
+                reverse);
+            return true;
+        }
+
+        static bool TryGetVertexMatrix(
+            VertexTransformReplayPlan replayPlan,
+            MeshObject geometry,
+            int vertexIndex,
+            Matrix poseMatrix,
+            out Matrix vertexMatrix)
+        {
+            if (!replayPlan.PoseSnapshots.ContainsKey(
+                    geometry))
+            {
+                vertexMatrix = poseMatrix;
+                return true;
+            }
+
+            if (!replayPlan.PoseMappings.TryGetValue(
+                    geometry,
+                    out var poseMappings))
+            {
+                vertexMatrix = default;
+                return false;
+            }
+
+            if (!TryGetPoseMapping(
+                    poseMappings,
+                    vertexIndex,
+                    out var poseMapping))
+            {
+                vertexMatrix = default;
+                return false;
+            }
+
+            vertexMatrix =
+                poseMapping.VertexToWorld *
+                poseMatrix *
+                poseMapping.WorldToVertex;
+            return IsFinite(vertexMatrix);
+        }
+
+        static bool TryGetPoseMapping(
+            VertexPoseMapping[] poseMappings,
+            int vertexIndex,
+            out VertexPoseMapping poseMapping)
+        {
+            if (poseMappings.Length == 1)
+            {
+                poseMapping = poseMappings[0];
+                return poseMapping.IsValid;
+            }
+
+            if (vertexIndex < 0 ||
+                vertexIndex >= poseMappings.Length)
+            {
+                poseMapping = default;
+                return false;
+            }
+
+            poseMapping = poseMappings[vertexIndex];
+            return poseMapping.IsValid;
+        }
+
+        static IReadOnlyDictionary<MeshObject, VertexPoseMapping[]>
+            CreatePoseMappings(
+                IReadOnlyDictionary<MeshObject, MeshPoseSnapshot>?
+                    poseSnapshots,
+                out bool hasInvalidPoseMappings)
+        {
+            var result =
+                new Dictionary<MeshObject, VertexPoseMapping[]>();
+            hasInvalidPoseMappings = false;
+            if (poseSnapshots == null)
+                return result;
+
+            foreach (var (geometry, poseSnapshot) in poseSnapshots)
+            {
+                if (!ReferenceEquals(
+                        poseSnapshot.Geometry,
+                        geometry))
+                {
+                    hasInvalidPoseMappings = true;
+                    result.Add(
+                        geometry,
+                        Array.Empty<VertexPoseMapping>());
+                    continue;
+                }
+
+                if (!poseSnapshot.ApplyAnimation)
+                {
+                    if (!TryCreatePoseMapping(
+                            poseSnapshot.WorldTransform,
+                            out var rigidMapping))
+                    {
+                        hasInvalidPoseMappings = true;
+                    }
+
+                    result.Add(
+                        geometry,
+                        [rigidMapping]);
+                    continue;
+                }
+
+                var mappings =
+                    new VertexPoseMapping[
+                        geometry.VertexCount()];
+                var invalidMappingFound = 0;
+                void CreateMapping(int vertexIndex)
+                {
+                    if (!TryCreatePoseMapping(
+                            poseSnapshot
+                                .GetVertexToWorldTransform(
+                                    vertexIndex),
+                            out mappings[vertexIndex]))
+                    {
+                        Interlocked.Exchange(
+                            ref invalidMappingFound,
+                            1);
+                    }
+                }
+
+                if (mappings.Length >=
+                    ParallelPoseMappingVertexThreshold)
+                {
+                    Parallel.For(
+                        0,
+                        mappings.Length,
+                        CreateMapping);
+                }
+                else
+                {
+                    for (var vertexIndex = 0;
+                         vertexIndex < mappings.Length;
+                         vertexIndex++)
+                    {
+                        CreateMapping(vertexIndex);
+                    }
+                }
+
+                if (invalidMappingFound != 0)
+                    hasInvalidPoseMappings = true;
+
+                result.Add(geometry, mappings);
+            }
+
+            return result;
+        }
+
+        static bool TryCreatePoseMapping(
+            Matrix vertexToWorld,
+            out VertexPoseMapping mapping)
+        {
+            if (!TryInvert(
+                    vertexToWorld,
+                    out var worldToVertex))
+            {
+                mapping = default;
+                return false;
+            }
+
+            mapping = new VertexPoseMapping(
+                vertexToWorld,
+                worldToVertex,
+                true);
+            return true;
+        }
+
+        static bool TryInvert(
+            Matrix transform,
+            out Matrix inverse)
+        {
+            inverse = default;
+            if (!IsFinite(transform))
+                return false;
+
+            var determinant = transform.Determinant();
+            if (!float.IsFinite(determinant) ||
+                determinant == 0)
+            {
+                return false;
+            }
+
+            inverse = Matrix.Invert(transform);
+            return IsFinite(inverse);
         }
 
         static void TransformScaleVertexPreservingBasisMagnitude(

@@ -25,6 +25,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
         protected readonly IScopedResourceLibrary _resourceLibrary;
         protected readonly ShaderTypes _shaderType;
         protected Dictionary<RenderingTechnique, string> _renderingTechniqueMap = [];
+        private bool _selectionMaskEnabled;
 
         public ICapability[] Capabilities { get; protected set; } = [];
         public CapabilityMaterialsEnum Type { get; protected set; }
@@ -73,6 +74,11 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
             return false;
         }
 
+        public void SetSelectionMask(bool enabled)
+        {
+            _selectionMaskEnabled = enabled;
+        }
+
         protected Effect GetEffect() => _resourceLibrary.GetStaticEffect(_shaderType);
 
         public void Apply(CommonShaderParameters commonShaderParameters, Matrix modelMatrix)
@@ -86,6 +92,8 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
 
             var effect = GetEffect();
             OnApply(effect);
+            effect.Parameters["SelectionMaskEnabled"]
+                .SetValue(_selectionMaskEnabled);
 
             foreach (var capability in Capabilities)
                 capability.Apply(effect, _resourceLibrary);

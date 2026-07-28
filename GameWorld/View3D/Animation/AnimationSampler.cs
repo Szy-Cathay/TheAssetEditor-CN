@@ -33,8 +33,16 @@ namespace GameWorld.Core.Animation
                     currentFrame.BoneTransforms[boneIndex].ComputeWorldMatrixFromComponents();
                     if (animationChangeRules != null)
                     {
-                        foreach (var rule in animationChangeRules.OfType<ILocalSpaceAnimationRule>())
-                            rule.TransformFrameLocalSpace(currentFrame, boneIndex, animationClip.PlayTimeInSec);
+                        foreach (var rule in animationChangeRules)
+                        {
+                            if (rule is ILocalSpaceAnimationRule localRule)
+                            {
+                                localRule.TransformFrameLocalSpace(
+                                    currentFrame,
+                                    boneIndex,
+                                    animationClip.PlayTimeInSec);
+                            }
+                        }
                     }
 
                     var parentindex = currentFrame.BoneTransforms[boneIndex].ParentBoneIndex;
@@ -55,7 +63,8 @@ namespace GameWorld.Core.Animation
                 // This is applied again in the animation shader.
                 for (var boneIndex = 0; boneIndex < skeleton.BoneCount; boneIndex++)
                 {
-                    var inv = Matrix.Invert(skeleton.GetWorldTransform(boneIndex));
+                    var inv =
+                        skeleton.GetInverseWorldTransform(boneIndex);
                     currentFrame.BoneTransforms[boneIndex].WorldTransform = Matrix.Multiply(inv, currentFrame.BoneTransforms[boneIndex].WorldTransform);
                 }
 
@@ -96,8 +105,16 @@ namespace GameWorld.Core.Animation
                     currentFrame.BoneTransforms[boneIndex].ComputeWorldMatrixFromComponents();
                     if (animationChangeRules != null)
                     {
-                        foreach (var rule in animationChangeRules.OfType<ILocalSpaceAnimationRule>())
-                            rule.TransformFrameLocalSpace(currentFrame, boneIndex, animationClip.PlayTimeInSec);
+                        foreach (var rule in animationChangeRules)
+                        {
+                            if (rule is ILocalSpaceAnimationRule localRule)
+                            {
+                                localRule.TransformFrameLocalSpace(
+                                    currentFrame,
+                                    boneIndex,
+                                    animationClip.PlayTimeInSec);
+                            }
+                        }
                     }
 
                     var parentindex = currentFrame.BoneTransforms[boneIndex].ParentBoneIndex;
@@ -118,7 +135,8 @@ namespace GameWorld.Core.Animation
                 // This is applied again in the animation shader.
                 for (var boneIndex = 0; boneIndex < skeleton.BoneCount; boneIndex++)
                 {
-                    var inv = Matrix.Invert(skeleton.GetWorldTransform(boneIndex));
+                    var inv =
+                        skeleton.GetInverseWorldTransform(boneIndex);
                     currentFrame.BoneTransforms[boneIndex].WorldTransform = Matrix.Multiply(inv, currentFrame.BoneTransforms[boneIndex].WorldTransform);
                 }
 

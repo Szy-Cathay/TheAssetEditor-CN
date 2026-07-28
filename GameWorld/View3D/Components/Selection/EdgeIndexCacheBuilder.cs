@@ -5,6 +5,23 @@ namespace GameWorld.Core.Components.Selection;
 
 internal static class EdgeIndexCacheBuilder
 {
+    public static ushort[] BuildLineIndices(
+        ReadOnlySpan<ushort> indices,
+        int maxEdges)
+    {
+        var edges = Build(indices, maxEdges);
+        var lineIndices = new ushort[edges.Length * 2];
+        for (var i = 0; i < edges.Length; i++)
+        {
+            lineIndices[i * 2] =
+                (ushort)edges[i].v0;
+            lineIndices[i * 2 + 1] =
+                (ushort)edges[i].v1;
+        }
+
+        return lineIndices;
+    }
+
     public static (int v0, int v1)[] Build(ReadOnlySpan<ushort> indices, int maxEdges)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maxEdges);

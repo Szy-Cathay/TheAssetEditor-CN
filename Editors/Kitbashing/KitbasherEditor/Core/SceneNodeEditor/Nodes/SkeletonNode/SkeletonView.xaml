@@ -21,7 +21,7 @@
             <Label Content="{loc:Loc SkeletonInfo.NodeScale}" Width ="{StaticResource labelWidth}"  />
             <Label Content=":" DockPanel.Dock="Left"/>
 
-            <TextBox Text="{Binding BoneScale, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
+            <TextBox Text="{Binding BoneScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                 <TextBox.ToolTip>
                     <ToolTip Content="{loc:Loc SkeletonInfo.ScaleToolTip}"/>
                 </TextBox.ToolTip>
@@ -40,7 +40,7 @@
 
             <TreeView.ItemContainerStyle>
                 <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource {x:Type TreeViewItem}}">
-                    <Setter Property="IsExpanded" Value="True" />
+                    <Setter Property="IsExpanded" Value="False" />
                     
                 </Style>
             </TreeView.ItemContainerStyle>
@@ -59,4 +59,3 @@
     </DockPanel>
 </UserControl>
 
-    

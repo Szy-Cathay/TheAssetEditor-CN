@@ -3,7 +3,6 @@ using GameWorld.Core.Rendering.Materials.Serialization;
 using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.WsModel;
 
@@ -40,15 +39,18 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
         {
             return new TintCapability()
             {
+                ApplyCapability = ApplyCapability,
                 DiffuseTintMask = DiffuseTintMask,
                 DiffuseTintColour = DiffuseTintColour,
                 DiffuseTintVariation = DiffuseTintVariation,
                 UseFactionColours = UseFactionColours,
+                UseTinting = UseTinting,
                 Faction3Mask = Faction3Mask,
                 Faction1_TintVariation = Faction1_TintVariation,
                 Faction2_TintVariation = Faction2_TintVariation,
                 Faction3_TintVariation = Faction3_TintVariation,
-                FactionColours = [FactionColours[0], FactionColours[1], FactionColours[2]]
+                FactionColours = [FactionColours[0], FactionColours[1], FactionColours[2]],
+                TintColours = [TintColours[0], TintColours[1], TintColours[2]]
             };
         }
 
@@ -60,7 +62,9 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
             return (true, "");
         }
 
-        public void Initialize(WsModelMaterialFile? wsModelMaterial, RmvModel model)
+        public void Initialize(
+            WsModelMaterialFile? wsModelMaterial,
+            IRmvMaterial rmvMaterial)
         {
         }
 

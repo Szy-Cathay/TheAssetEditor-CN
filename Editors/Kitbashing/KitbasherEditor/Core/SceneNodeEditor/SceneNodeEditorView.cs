@@ -1,75 +1,83 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.Events;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes;
-using GameWorld.Core.Components;
 using GameWorld.Core.SceneNodes;
-using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Events;
+using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
 {
     public partial class SceneNodeEditorViewModel : ObservableObject, IDisposable
     {
         private readonly IEventHub _eventHub;
-        private readonly IServiceProvider _serviceProvider;
-        private readonly Dictionary<Type, Type> _map = [];
+        private readonly ISceneNodeEditorFactory _editorFactory;
+        private ISceneNode? _currentNode;
 
         [ObservableProperty] ISceneNodeEditor? _currentEditor;
+        [ObservableProperty] string _emptyStateText;
 
-        public SceneNodeEditorViewModel(IEventHub eventHub, IServiceProvider serviceProvider)
+        public SceneNodeEditorViewModel(
+            IEventHub eventHub,
+            ISceneNodeEditorFactory editorFactory)
         {
             _eventHub = eventHub;
-            _serviceProvider = serviceProvider;
-
-            _map[typeof(MainEditableNode)] = typeof(MainEditableNodeViewModel);
-            _map[typeof(Rmv2MeshNode)] = typeof(MeshEditorViewModel);
-            _map[typeof(SkeletonNode)] = typeof(SkeletonSceneNodeViewModel);
-            _map[typeof(GroupNode)] = typeof(GroupNodeViewModel);
+            _editorFactory = editorFactory;
+            _emptyStateText = GetText("Kitbash.Sidebar.SelectNode");
 
             _eventHub.Register<SceneNodeSelectedEvent>(this, OnSelectionChanged);
         }
 
         void OnSelectionChanged(SceneNodeSelectedEvent selectionChangedEvent)
         {
-            if (selectionChangedEvent.SelectedObjects.Count != 1)
+            var selectedNode =
+                selectionChangedEvent.SelectedObjects.Count == 1
+                    ? selectionChangedEvent.SelectedObjects[0]
+                    : null;
+            if (ReferenceEquals(_currentNode, selectedNode))
+                return;
+
+            ClearCurrentEditor();
+
+            if (selectionChangedEvent.SelectedObjects.Count == 0)
             {
-                CurrentEditor = null;
+                EmptyStateText = GetText("Kitbash.Sidebar.SelectNode");
                 return;
             }
 
-            var selectedNode = selectionChangedEvent.SelectedObjects.First();
-
-            CurrentEditor?.Dispose();
-            CurrentEditor = null;
-            CurrentEditor = CreateNodeEditor(selectedNode);
-        }
-
-        ISceneNodeEditor? CreateNodeEditor(ISceneNode node)
-        {
-            if (node is GroupNode groupNode)
+            if (selectionChangedEvent.SelectedObjects.Count > 1)
             {
-                if(groupNode.Name == SpecialNodes.ReferenceMeshs)
-                    return null;
-
-                if (groupNode.Name == SpecialNodes.Root)
-                    return null;
+                EmptyStateText = GetFormat(
+                    "Kitbash.Sidebar.MultipleSelected",
+                    selectionChangedEvent.SelectedObjects.Count);
+                return;
             }
 
-            var found = _map.TryGetValue(node.GetType(), out var viewModelType);
-            if (found == false)
-                return null;
-
-            var viewModel = _serviceProvider.GetRequiredService(viewModelType!) as ISceneNodeEditor;
-            if (viewModel == null)
-                throw new Exception($"{viewModelType} is not of type ISceneNodeViewModel");
-            viewModel.Initialize(node);
-            return viewModel;
+            _currentNode = selectedNode;
+            CurrentEditor = _editorFactory.Create(
+                selectedNode!);
+            EmptyStateText = CurrentEditor == null
+                ? GetText("Kitbash.Sidebar.NoDetails")
+                : string.Empty;
         }
+
+        private void ClearCurrentEditor()
+        {
+            _currentNode = null;
+            var editor = CurrentEditor;
+            CurrentEditor = null;
+            editor?.Dispose();
+        }
+
+        private static string GetText(string key) =>
+            LocalizationManager.Instance?.Get(key) ?? key;
+
+        private static string GetFormat(string key, params object[] args) =>
+            LocalizationManager.Instance?.GetFormat(key, args) ?? key;
 
         public void Dispose()
         {
             _eventHub.UnRegister(this);
-            CurrentEditor?.Dispose();
+            ClearCurrentEditor();
         }
     }
 }
