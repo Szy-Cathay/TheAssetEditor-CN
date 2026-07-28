@@ -23,7 +23,8 @@ namespace GameWorld.Core.Services
         BloomFilter,
         OutlinePostProcess,
         Grid,
-        EdgeQuad
+        EdgeQuad,
+        AnimatedSelection
     }
 
     public class ResourceLibrary
@@ -67,6 +68,7 @@ namespace GameWorld.Core.Services
                 LoadEffect("Shaders\\VertexPointShader", ShaderTypes.VertexPoint);
                 LoadEffect("Shaders\\GridShader", ShaderTypes.Grid);
                 LoadEffect("Shaders\\EdgeQuadShader", ShaderTypes.EdgeQuad);
+                LoadEffect("Shaders\\AnimatedSelection", ShaderTypes.AnimatedSelection);
 
                 _pbrDiffuse = _content.Load<TextureCube>("textures\\phazer\\DiffuseAmbientLightCubeMap");
                 _pbrSpecular= _content.Load<TextureCube>("textures\\phazer\\SpecularAmbientLightCubemap");

@@ -43,6 +43,8 @@ namespace GameWorld.Core.Components.Rendering
         RenderTarget2D _defaultRenderTarget;
         RenderTarget2D _glowRenderTarget;
         RenderTarget2D _selectionMaskTarget;
+        RenderTargetBinding[] _mainRenderTargets;
+        bool _selectionOutlineRequested;
 
         public SpriteBatch CommonSpriteBatch { get; private set; }
         public SpriteFont DefaultFont { get; private set; }
@@ -127,6 +129,11 @@ namespace GameWorld.Core.Components.Rendering
             _renderItems[id].Add(item);
         }
 
+        public void RequestSelectionOutline()
+        {
+            _selectionOutlineRequested = true;
+        }
+
         public void AddRenderLines(VertexPositionColor[] lineVertices)
         {
             Guard.IsTrue(lineVertices.Length % 2 == 0);
@@ -146,6 +153,7 @@ namespace GameWorld.Core.Components.Rendering
 
             _renderLines.Clear();
             _overlayLines.Clear();
+            _selectionOutlineRequested = false;
         }
 
         public override void Draw(GameTime gameTime)
@@ -168,7 +176,24 @@ namespace GameWorld.Core.Components.Rendering
 
             // Configure render targets
             var backBufferRenderTarget = device.GetRenderTargets()[0].RenderTarget as RenderTarget2D;
-            device.SetRenderTarget(_defaultRenderTarget);
+            if (_selectionOutlineRequested)
+            {
+                EnsureSelectionMaskTarget(
+                    device,
+                    screenWidth,
+                    screenHeight);
+                device.SetRenderTargets(_mainRenderTargets);
+                device.Clear(
+                    ClearOptions.Target |
+                        ClearOptions.DepthBuffer,
+                    Color.Transparent,
+                    1,
+                    0);
+            }
+            else
+            {
+                device.SetRenderTarget(_defaultRenderTarget);
+            }
 
             // 2D drawing
             Render2DObjects(device, commonShaderParameters);
@@ -183,6 +208,7 @@ namespace GameWorld.Core.Components.Rendering
 
             // 3D drawing - Normal scene
             device.DepthStencilState = DepthStencilState.Default;
+            device.BlendState = BlendState.Opaque;
             Render3DObjects(commonShaderParameters, RenderingTechnique.Normal);
 
             // 3D drawing - Emissive (only if scene contains emissive-capable objects)
@@ -195,10 +221,8 @@ namespace GameWorld.Core.Components.Rendering
             }
 
             // Screen-space selection outline
-            var outlineItems = _renderItems[RenderBuckedId.Outline];
-            if (outlineItems.Count > 0)
+            if (_selectionOutlineRequested)
             {
-                RenderSelectionMask(device, commonShaderParameters, screenWidth, screenHeight);
                 _outlineFilter.Draw(_selectionMaskTarget, screenWidth, screenHeight);
 
                 // Composite scene
@@ -312,22 +336,37 @@ namespace GameWorld.Core.Components.Rendering
                 item.Draw(device, commonShaderParameters, renderingTechnique);
         }
 
-        void RenderSelectionMask(GraphicsDevice device, CommonShaderParameters commonShaderParameters, int screenWidth, int screenHeight)
+        void EnsureSelectionMaskTarget(
+            GraphicsDevice device,
+            int screenWidth,
+            int screenHeight)
         {
-            // Ensure mask target matches screen size
-            if (_selectionMaskTarget == null || _selectionMaskTarget.Width != screenWidth || _selectionMaskTarget.Height != screenHeight)
+            var msaaCount =
+                _defaultRenderTarget.MultiSampleCount;
+            if (_selectionMaskTarget == null ||
+                _selectionMaskTarget.Width != screenWidth ||
+                _selectionMaskTarget.Height != screenHeight ||
+                _selectionMaskTarget.MultiSampleCount !=
+                    msaaCount)
             {
                 _selectionMaskTarget?.Dispose();
-                _selectionMaskTarget = new RenderTarget2D(device, screenWidth, screenHeight, false, SurfaceFormat.Color, DepthFormat.Depth24);
+                _selectionMaskTarget = new RenderTarget2D(
+                    device,
+                    screenWidth,
+                    screenHeight,
+                    false,
+                    SurfaceFormat.Color,
+                    DepthFormat.None,
+                    msaaCount,
+                    RenderTargetUsage.DiscardContents);
+                _mainRenderTargets =
+                [
+                    new RenderTargetBinding(
+                        _defaultRenderTarget),
+                    new RenderTargetBinding(
+                        _selectionMaskTarget)
+                ];
             }
-
-            device.SetRenderTarget(_selectionMaskTarget);
-            device.Clear(Color.Transparent);
-            device.DepthStencilState = DepthStencilState.Default;
-            device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
-
-            foreach (var item in _renderItems[RenderBuckedId.Outline])
-                item.Draw(device, commonShaderParameters, RenderingTechnique.Normal);
         }
 
         public void Dispose()

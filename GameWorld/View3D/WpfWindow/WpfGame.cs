@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Input;
 using GameWorld.Core.Services;
 using GameWorld.Core.WpfWindow.Events;
 using Microsoft.Xna.Framework;
@@ -29,6 +30,28 @@ namespace GameWorld.Core.WpfWindow
 
 
         public FrameworkElement GetFocusElement() { return this; }
+
+        protected override void OnPreviewKeyDown(
+            KeyEventArgs e)
+        {
+            base.OnPreviewKeyDown(e);
+
+            if (ShouldPreserveViewportFocus(
+                    e.Key,
+                    e.KeyboardDevice.Modifiers))
+            {
+                e.Handled = true;
+            }
+        }
+
+        internal static bool ShouldPreserveViewportFocus(
+            Key key,
+            ModifierKeys modifiers)
+        {
+            return
+                key == Key.Tab &&
+                !modifiers.HasFlag(ModifierKeys.Alt);
+        }
 
         /// <summary>
         /// Creates a new instance of a game host panel.

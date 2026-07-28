@@ -128,6 +128,7 @@ namespace GameWorld.Core.Components.Gizmo
         private string _numericInput = "";            // Current numeric input string
         public bool IsInNumericInput = false;         // Whether user is typing a number
         private float _numericValue = 0f;             // Parsed numeric value
+        private ModalPreviewReplacement? _lastModalPreviewReplacement;
 
 
         #region BoundingSpheres
@@ -218,6 +219,8 @@ namespace GameWorld.Core.Components.Gizmo
             ActiveAxis = GizmoAxis.None;
             IsInModalTransform = true;
             IsModalCancelled = false;
+            _lastModalPreviewReplacement =
+                ModalPreviewReplacement.RestoreOnly(ActivePivot);
 
             // Save initial mouse position (Blender: imval)
             _modalTransformStartMousePos = _mouse.Position();
@@ -258,6 +261,7 @@ namespace GameWorld.Core.Components.Gizmo
             ActiveAxis = GizmoAxis.None;
             IsModalCancelled = false;
             JustFinishedModalTransform = true;  // Prevent next selection
+            _lastModalPreviewReplacement = null;
 
             // Reset cursor to default
             _mouse.ResetCursor();
@@ -278,6 +282,7 @@ namespace GameWorld.Core.Components.Gizmo
             IsModalCancelled = true;
             JustFinishedModalTransform = true;  // Prevent next selection
             ResetDeltas();
+            _lastModalPreviewReplacement = null;
 
             // Reset cursor to default
             _mouse.ResetCursor();
@@ -299,6 +304,7 @@ namespace GameWorld.Core.Components.Gizmo
             _numericInput = "";
             IsInNumericInput = false;
             _numericValue = 0f;
+            _lastModalPreviewReplacement = null;
             ResetDeltas();
 
             if (wasModalTransform)
@@ -555,7 +561,7 @@ namespace GameWorld.Core.Components.Gizmo
                 Vector3 viewDir = _camera.LookAt - _camera.Position;
                 viewDir.Normalize();
 
-                float distanceToObject = (_position - _camera.Position).Length();
+                float distanceToObject = (_modalStartPivot - _camera.Position).Length();
                 float sensitivity = 0.001f * distanceToObject;
 
                 Vector3 cameraRight = Vector3.Cross(viewDir, Vector3.Up);
@@ -573,7 +579,7 @@ namespace GameWorld.Core.Components.Gizmo
                 Vector3 viewDir = _camera.LookAt - _camera.Position;
                 viewDir.Normalize();
 
-                float distanceToObject = (_position - _camera.Position).Length();
+                float distanceToObject = (_modalStartPivot - _camera.Position).Length();
                 float sensitivity = 0.001f * distanceToObject;
 
                 Vector3 cameraRight = Vector3.Cross(viewDir, Vector3.Up);
@@ -662,15 +668,28 @@ namespace GameWorld.Core.Components.Gizmo
 
             if (totalTranslation == Vector3.Zero)
             {
-                ReplacePreviewFromInitialRequested?.Invoke(
+                RequestModalPreviewReplacement(
                     ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
             }
 
-            ReplacePreviewFromInitialRequested?.Invoke(
+            RequestModalPreviewReplacement(
                 ModalPreviewReplacement.Translate(
                     totalTranslation,
                     ActivePivot));
+        }
+
+        private void RequestModalPreviewReplacement(
+            ModalPreviewReplacement replacement)
+        {
+            if (_lastModalPreviewReplacement.HasValue &&
+                _lastModalPreviewReplacement.Value == replacement)
+            {
+                return;
+            }
+
+            ReplacePreviewFromInitialRequested?.Invoke(replacement);
+            _lastModalPreviewReplacement = replacement;
         }
 
         /// <summary>
@@ -1156,7 +1175,7 @@ namespace GameWorld.Core.Components.Gizmo
         {
             if (totalAngle == 0)
             {
-                ReplacePreviewFromInitialRequested?.Invoke(
+                RequestModalPreviewReplacement(
                     ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
             }
@@ -1185,7 +1204,7 @@ namespace GameWorld.Core.Components.Gizmo
                         axis = _rotationMatrix.Forward;
                         break;
                     default:
-                        ReplacePreviewFromInitialRequested?.Invoke(
+                        RequestModalPreviewReplacement(
                             ModalPreviewReplacement.RestoreOnly(ActivePivot));
                         return;
                 }
@@ -1193,7 +1212,7 @@ namespace GameWorld.Core.Components.Gizmo
 
             Matrix rotMatrix = Matrix.CreateFromAxisAngle(axis, totalAngle);
 
-            ReplacePreviewFromInitialRequested?.Invoke(
+            RequestModalPreviewReplacement(
                 ModalPreviewReplacement.Rotate(rotMatrix, ActivePivot));
         }
 
@@ -1204,7 +1223,7 @@ namespace GameWorld.Core.Components.Gizmo
         {
             if (!float.IsFinite(scaleFactor))
             {
-                ReplacePreviewFromInitialRequested?.Invoke(
+                RequestModalPreviewReplacement(
                     ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
             }
@@ -1213,12 +1232,12 @@ namespace GameWorld.Core.Components.Gizmo
 
             if (scale == Vector3.Zero)
             {
-                ReplacePreviewFromInitialRequested?.Invoke(
+                RequestModalPreviewReplacement(
                     ModalPreviewReplacement.RestoreOnly(ActivePivot));
                 return;
             }
 
-            ReplacePreviewFromInitialRequested?.Invoke(
+            RequestModalPreviewReplacement(
                 ModalPreviewReplacement.Scale(scale, ActivePivot));
         }
 

@@ -11,23 +11,35 @@
 #define PS_SHADERMODEL ps_4_0_level_9_1
 #endif
 
-float4x4 View;
 float4x4 ViewProjection;
-float3 CameraPosition;
+float4x4 World;
+float2 ViewportSize;
+bool CapabilityFlag_ApplyAnimation = false;
+float4x4 Animation_Tranforms[256];
+int Animation_WeightCount = 0;
 
-// Instance data: position, scale, color, and selection weight
-struct VSInstanceInput
+struct VSQuadInput
 {
-    float3 InstancePosition : POSITION1;
+    float4 Position : POSITION1;
+    float2 TexCoord : TEXCOORD2;
+};
+
+struct VSStaticInstanceInput
+{
+    float3 InstancePosition : POSITION2;
     float InstanceScale : NORMAL1;
     float3 InstanceColor : NORMAL2;
     float InstanceWeight : NORMAL3;
 };
 
-struct VSInput
+struct VSAnimatedInstanceInput
 {
-    float4 Position : POSITION0;
-    float2 TexCoord : TEXCOORD0;
+    float4 BindPosition : POSITION0;
+    float4 Weights : COLOR0;
+    float4 BoneIndices : BLENDINDICES0;
+    float InstanceScale : NORMAL1;
+    float3 InstanceColor : NORMAL2;
+    float InstanceWeight : NORMAL3;
 };
 
 struct VSOutput
@@ -38,43 +50,98 @@ struct VSOutput
     float Weight : TEXCOORD1;
 };
 
-// Vertex shader: billboard quad with screen-space size
-VSOutput VertexPointVS(VSInput input, VSInstanceInput instance)
+VSOutput CreateVertexPointOutput(
+    VSQuadInput input,
+    float4 clipCenter,
+    float instanceScale,
+    float3 instanceColor,
+    float instanceWeight)
 {
     VSOutput output = (VSOutput)0;
 
-    // Get camera right and up vectors from view matrix for billboard orientation
-    float3 cameraRight = float3(View[0][0], View[1][0], View[2][0]);
-    float3 cameraUp = float3(View[0][1], View[1][1], View[2][1]);
-
-    // Offset billboard center slightly toward camera (in world space)
-    // This prevents the quad from extending behind the surface and being half-clipped
-    float3 toCamera = normalize(CameraPosition - instance.InstancePosition);
-    float3 adjustedPos = instance.InstancePosition + toCamera * 0.02 * instance.InstanceScale;
-
-    // Billboard offset from center
-    float3 offset = (input.Position.xyz * instance.InstanceScale);
-
-    // Apply billboard rotation (already in camera space)
-    float3 worldPos = adjustedPos
-        + cameraRight * offset.x
-        + cameraUp * offset.y;
-
-    // Transform to clip space
-    output.Position = mul(float4(worldPos, 1.0), ViewProjection);
+    float2 clipOffset =
+        input.Position.xy *
+        instanceScale *
+        2.0f /
+        ViewportSize *
+        clipCenter.w;
+    output.Position = clipCenter;
+    output.Position.xy += clipOffset;
     output.TexCoord = input.TexCoord;
-    output.Color = float4(instance.InstanceColor, 1.0);
-    output.Weight = instance.InstanceWeight;
+    output.Color = float4(instanceColor, 1.0);
+    output.Weight = instanceWeight;
 
-    // Z-bias for ALL vertices to render on top of mesh surface
-    // Blender: gl_Position.z -= ndc_offset_factor * vert_ndc_offset (applied to all)
-    output.Position.z -= 1e-6 * abs(output.Position.w);
+    output.Position.z = max(
+        0.0f,
+        output.Position.z -
+            2e-5 * abs(output.Position.w));
 
-    // Extra Z-bias for selected vertices (Blender: 5e-7 * abs(w) for selected/active)
-    if (instance.InstanceWeight > 0.5)
-        output.Position.z -= 5e-7 * abs(output.Position.w);
+    if (instanceWeight > 0.5)
+    {
+        output.Position.z = max(
+            0.0f,
+            output.Position.z -
+                1e-5 * abs(output.Position.w));
+    }
 
     return output;
+}
+
+VSOutput VertexPointVS(
+    VSQuadInput input,
+    VSStaticInstanceInput instance)
+{
+    float4 clipCenter = mul(
+        float4(instance.InstancePosition, 1.0),
+        ViewProjection);
+    return CreateVertexPointOutput(
+        input,
+        clipCenter,
+        instance.InstanceScale,
+        instance.InstanceColor,
+        instance.InstanceWeight);
+}
+
+float4 GetAnimatedPosition(
+    VSAnimatedInstanceInput instance)
+{
+    if (!CapabilityFlag_ApplyAnimation)
+        return instance.BindPosition;
+
+    float4 position = 0;
+    [unroll]
+    for (int weightIndex = 0;
+         weightIndex < Animation_WeightCount;
+         weightIndex++)
+    {
+        int boneIndex =
+            (int)instance.BoneIndices[weightIndex];
+        position +=
+            instance.Weights[weightIndex] *
+            mul(
+                float4(instance.BindPosition.xyz, 1.0),
+                Animation_Tranforms[boneIndex]);
+    }
+
+    return position;
+}
+
+VSOutput AnimatedVertexPointVS(
+    VSQuadInput input,
+    VSAnimatedInstanceInput instance)
+{
+    float4 worldPosition = mul(
+        GetAnimatedPosition(instance),
+        World);
+    float4 clipCenter = mul(
+        worldPosition,
+        ViewProjection);
+    return CreateVertexPointOutput(
+        input,
+        clipCenter,
+        instance.InstanceScale,
+        instance.InstanceColor,
+        instance.InstanceWeight);
 }
 
 // Pixel shader: circle clipping with anti-aliasing
@@ -102,5 +169,16 @@ technique VertexPoint
     {
         VertexShader = compile VS_SHADERMODEL VertexPointVS();
         PixelShader = compile PS_SHADERMODEL VertexPointPS();
+    }
+}
+
+technique AnimatedVertexPoint
+{
+    pass Pass0
+    {
+        VertexShader =
+            compile vs_5_0 AnimatedVertexPointVS();
+        PixelShader =
+            compile ps_5_0 VertexPointPS();
     }
 }

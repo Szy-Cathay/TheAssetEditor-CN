@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using GameWorld.Core.Commands;
 using GameWorld.Core.Rendering.Materials.Capabilities;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility.UserInterface;
@@ -14,6 +15,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
     public partial class AdvancedRmvMaterialViewModel : ObservableObject
     {
         private readonly AdvancedMaterialCapability _capability;
+        private readonly IDocumentPropertyEditor _propertyEditor;
 
         [ObservableProperty] ShaderTextureViewModel _dirtMap;
         [ObservableProperty] ShaderTextureViewModel _dirtMask;
@@ -36,44 +38,107 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
         [ObservableProperty] bool _showSkinMask;
         [ObservableProperty] bool _showUvScale;
         [ObservableProperty] bool _showTextureTransform;
-        public AdvancedRmvMaterialViewModel(AdvancedMaterialCapability capability, IUiCommandFactory uiCommandFactory, IPackFileService packFileService, IScopedResourceLibrary resourceLibrary, IStandardDialogs packFileUiProvider)
+
+        public AdvancedRmvMaterialViewModel(
+            AdvancedMaterialCapability capability,
+            IUiCommandFactory uiCommandFactory,
+            IPackFileService packFileService,
+            IScopedResourceLibrary resourceLibrary,
+            IStandardDialogs packFileUiProvider,
+            IDocumentPropertyEditor propertyEditor)
         {
             _capability = capability;
+            _propertyEditor = propertyEditor;
 
             _useDecal = capability.UseDecal;
             _useDirt = capability.UseDirt;
             _useSkin = capability.UseSkin;
 
-            _dirtMap = new ShaderTextureViewModel(_capability.DirtMap, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _dirtMask = new ShaderTextureViewModel(_capability.DirtMask, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _decalMask = new ShaderTextureViewModel(_capability.DecalMask, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _skinMask = new ShaderTextureViewModel(_capability.SkinMask, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
+            _dirtMap = new ShaderTextureViewModel(
+                _capability.DirtMap,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _dirtMask = new ShaderTextureViewModel(
+                _capability.DirtMask,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _decalMask = new ShaderTextureViewModel(
+                _capability.DecalMask,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _skinMask = new ShaderTextureViewModel(
+                _capability.SkinMask,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
 
-            _uvScale = new Vector2ViewModel(_capability.UvScale, OnUvScaleChanged);
-            _textureTransform = new Vector4ViewModel(_capability.TextureTransform, OnTextureTransformChanged);
+            _uvScale = new Vector2ViewModel(
+                _capability.UvScale,
+                OnUvScaleChanged);
+            _textureTransform = new Vector4ViewModel(
+                _capability.TextureTransform,
+                OnTextureTransformChanged);
 
             UpdateVisability();
         }
 
-        void OnUvScaleChanged(Vector2 value) => _capability.UvScale = value;
-        void OnTextureTransformChanged(Vector4 value) => _capability.TextureTransform = value;
-        partial void OnUseDecalChanged(bool value)
-        {
-            _capability.UseDecal = value;
-            UpdateVisability();
-        }
+        void OnUvScaleChanged(Vector2 value) =>
+            _propertyEditor.Update(
+                _capability.UvScale,
+                value,
+                newValue => _capability.UvScale = newValue,
+                newValue => UvScale.Set(newValue));
 
-        partial void OnUseDirtChanged(bool value)
-        {
-            _capability.UseDirt = value;
-            UpdateVisability();
-        }
+        void OnTextureTransformChanged(Vector4 value) =>
+            _propertyEditor.Update(
+                _capability.TextureTransform,
+                value,
+                newValue => _capability.TextureTransform = newValue,
+                newValue => TextureTransform.Set(newValue));
 
-        partial void OnUseSkinChanged(bool value)
-        {
-            _capability.UseSkin = value;
-            UpdateVisability();
-        }
+        partial void OnUseDecalChanged(bool value) =>
+            _propertyEditor.Update(
+                _capability.UseDecal,
+                value,
+                newValue => _capability.UseDecal = newValue,
+                newValue =>
+                {
+                    UseDecal = newValue;
+                    UpdateVisability();
+                });
+
+        partial void OnUseDirtChanged(bool value) =>
+            _propertyEditor.Update(
+                _capability.UseDirt,
+                value,
+                newValue => _capability.UseDirt = newValue,
+                newValue =>
+                {
+                    UseDirt = newValue;
+                    UpdateVisability();
+                });
+
+        partial void OnUseSkinChanged(bool value) =>
+            _propertyEditor.Update(
+                _capability.UseSkin,
+                value,
+                newValue => _capability.UseSkin = newValue,
+                newValue =>
+                {
+                    UseSkin = newValue;
+                    UpdateVisability();
+                });
 
         void UpdateVisability()
         {
@@ -103,7 +168,5 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
                 ShowUvScale = true;
             }
         }
-
-        
     }
 }

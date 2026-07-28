@@ -12,6 +12,8 @@
 #include "../Capabilites/Emissive.hlsli"
 #include "../Capabilites/Tint.hlsli"
 
+bool SelectionMaskEnabled;
+
 //#include "Helpers.hlsli"
 
 // **************************************************************************************************************************************
@@ -64,7 +66,13 @@ GBufferMaterial GetMaterial(in PixelInputType input)
     return material;
 }
 
-float4 DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace) : SV_TARGET0
+struct MainPixelOutput
+{
+    float4 Colour : SV_TARGET0;
+    float4 SelectionMask : SV_TARGET1;
+};
+
+MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace)
 {
     GBufferMaterial material = GetMaterial(input);
 
@@ -121,7 +129,12 @@ float4 DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : SV_IsFron
     // Combine all colours
     float3 color = ldr_linear_col + emissiveColour;
 
-    return float4(_gamma(color), 1.0f);
+    MainPixelOutput output;
+    output.Colour = float4(_gamma(color), 1.0f);
+    output.SelectionMask = SelectionMaskEnabled
+        ? float4(1.0f, 1.0f, 1.0f, 1.0f)
+        : float4(0.0f, 0.0f, 0.0f, 0.0f);
+    return output;
 }
 
 float4 EmissiveLayerPixelShader(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace) : SV_TARGET0

@@ -1,10 +1,12 @@
 ﻿using GameWorld.Core.Components.Rendering;
+using GameWorld.Core.Animation;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.GameFormats.RigidModel;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -116,12 +118,25 @@ namespace GameWorld.Core.Components
             {
                 if (root is ISelectable selectableNode && selectableNode.IsSelectable)
                 {
-                    var pivotPoint = Vector3.Zero;
                     if (selectableNode is Rmv2MeshNode meshNode)
-                        pivotPoint = meshNode.PivotPoint;
-
-                    if (IntersectionMath.IntersectObject(frustrum, selectableNode.Geometry, selectableNode.ModelMatrix * Matrix.CreateTranslation(pivotPoint)))
+                    {
+                        var pose =
+                            MeshPoseSnapshot.Capture(meshNode);
+                        if (IntersectionMath.IntersectObject(
+                                frustrum,
+                                selectableNode.Geometry,
+                                pose.GetWorldPositions()))
+                        {
+                            output_selectedNodes.Add(selectableNode);
+                        }
+                    }
+                    else if (IntersectionMath.IntersectObject(
+                                 frustrum,
+                                 selectableNode.Geometry,
+                                 selectableNode.ModelMatrix))
+                    {
                         output_selectedNodes.Add(selectableNode);
+                    }
                 }
 
                 var isUnselectableGroup = root is GroupNode groupNode && groupNode.IsLockable == true && groupNode.IsSelectable == false;
@@ -139,11 +154,24 @@ namespace GameWorld.Core.Components
             {
                 if (root is ISelectable selectableNode && selectableNode.IsSelectable)
                 {
-                    var pivotPoint = Vector3.Zero;
+                    float? distance;
                     if (selectableNode is Rmv2MeshNode meshNode)
-                        pivotPoint = meshNode.PivotPoint;
+                    {
+                        var pose =
+                            MeshPoseSnapshot.Capture(meshNode);
+                        distance = IntersectionMath.IntersectObject(
+                            ray,
+                            selectableNode.Geometry,
+                            pose.GetWorldPositions());
+                    }
+                    else
+                    {
+                        distance = IntersectionMath.IntersectObject(
+                            ray,
+                            selectableNode.Geometry,
+                            selectableNode.ModelMatrix);
+                    }
 
-                    var distance = IntersectionMath.IntersectObject(ray, selectableNode.Geometry, selectableNode.ModelMatrix * Matrix.CreateTranslation(pivotPoint));
                     if (distance != null)
                     {
                         if (distance < bestDistance)
@@ -215,6 +243,15 @@ namespace GameWorld.Core.Components
                 // If BoundingBox rebuild is deferred, always render (conservative)
                 if (mesh.DeferBoundingBoxRebuild)
                     return true;
+
+                // Bind-pose bounds do not contain GPU-skinned or bone-attached animation poses.
+                if (node is Rmv2MeshNode meshNode &&
+                    meshNode.AnimationPlayer?.IsEnabled == true &&
+                    (mesh.VertexFormat != UiVertexFormat.Static ||
+                     meshNode.AttachmentBoneResolver != null))
+                {
+                    return true;
+                }
 
                 var worldMatrix = node.ModelMatrix * parentMatrix;
                 var transformedBox = TransformBoundingBox(mesh.BoundingBox, worldMatrix);

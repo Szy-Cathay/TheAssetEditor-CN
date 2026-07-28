@@ -15,6 +15,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders.SpecGloss
                 new SpecGlossCapability(),
                 new AnimationCapability(),
                 new AdvancedMaterialCapability(),
+                new TintCapability(),
             ];
 
             _renderingTechniqueMap[RenderingTechnique.Normal] = "BasicColorDrawing";

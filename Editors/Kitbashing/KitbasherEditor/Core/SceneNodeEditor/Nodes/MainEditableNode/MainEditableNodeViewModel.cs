@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.KitbasherEditor.Core;
 using Editors.KitbasherEditor.UiCommands;
+using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
@@ -33,8 +34,10 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly IStandardDialogs _standardDialogs;
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
+        private readonly SceneNodePropertyEditor _propertyEditor;
 
         MainEditableNode? _mainNode;
+        private bool _isInitializing;
 
         [ObservableProperty] public partial ObservableCollection<string> SkeletonNameList { get; set; }
         [ObservableProperty] public partial ObservableCollection<AttachmentPoint> AttachmentPointList { get; set; } = [];
@@ -44,13 +47,15 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
             RenderEngineComponent renderEngineComponent, 
             IUiCommandFactory uiCommandFactory,
-            IStandardDialogs standardDialogs)
+            IStandardDialogs standardDialogs,
+            SceneNodePropertyEditor propertyEditor)
         {
             _kitbasherRootScene = kitbasherRootScene;
             _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
             _renderEngineComponent = renderEngineComponent;
             _uiCommandFactory = uiCommandFactory;
             _standardDialogs = standardDialogs;
+            _propertyEditor = propertyEditor;
             SkeletonNameList = _skeletonAnimationLookUpHelper.GetAllSkeletonFileNames();
      
         }
@@ -78,22 +83,23 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
         {
             if (_mainNode != null)
             {
-                _mainNode.SetAttachmentPoints([], true);
-                AttachmentPointList = CreateAttachmentPointList(_mainNode.AttachmentPoints);
+                var currentState = new AttachmentPointState(CloneAttachmentPoints(_mainNode.AttachmentPoints), false);
+                var resetState = new AttachmentPointState([], true);
+                _propertyEditor.Update(currentState, resetState, ApplyAttachmentPointState);
             }
         }
 
         partial void OnSkeletonNameChanged(string? oldValue, string? newValue)
         {
-            var cleanSkeletonName = "";
-            if (!string.IsNullOrWhiteSpace(newValue))
-                cleanSkeletonName = Path.GetFileNameWithoutExtension(newValue);
-            _kitbasherRootScene.SetSkeletonFromName(cleanSkeletonName);
+            if (_isInitializing || _mainNode == null)
+                return;
 
-            // Changing the skeleton can cause the current attachment points to be invalid. 
-            // If we change skeleton, reset the list
-            if (oldValue != null && oldValue != newValue)
-                ResetAttachmentPointList();
+            var currentState = new SkeletonState(
+                oldValue,
+                CloneAttachmentPoints(_mainNode.AttachmentPoints),
+                false);
+            var newState = new SkeletonState(newValue, [], true);
+            _propertyEditor.Update(currentState, newState, ApplySkeletonState);
         }
 
         public void Initialize(ISceneNode node)
@@ -101,8 +107,16 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
             if (node is MainEditableNode mainEditableNode)
             {
                 _mainNode = mainEditableNode;
-                if (_mainNode.SkeletonNode != null && _mainNode.SkeletonNode.Skeleton != null)
-                    SkeletonName = SkeletonNameList.FirstOrDefault(x => Path.GetFileNameWithoutExtension(x).ToLower() == _mainNode.SkeletonNode.Skeleton.SkeletonName.ToLower());
+                _isInitializing = true;
+                try
+                {
+                    if (_mainNode.SkeletonNode != null && _mainNode.SkeletonNode.Skeleton != null)
+                        SkeletonName = SkeletonNameList.FirstOrDefault(x => Path.GetFileNameWithoutExtension(x).ToLower() == _mainNode.SkeletonNode.Skeleton.SkeletonName.ToLower());
+                }
+                finally
+                {
+                    _isInitializing = false;
+                }
 
                 AttachmentPointList = CreateAttachmentPointList(_mainNode.AttachmentPoints);
             }
@@ -114,5 +128,40 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes
 
         public void CopyTexturesToOutputPack() => _uiCommandFactory.Create<CopyTexturesToPackCommand>().Execute(_mainNode);
         public void Dispose() { }
+
+        private static List<RmvAttachmentPoint> CloneAttachmentPoints(IEnumerable<RmvAttachmentPoint> attachmentPoints)
+            => attachmentPoints.Select(attachmentPoint => attachmentPoint.Clone()).ToList();
+
+        private void ApplyAttachmentPointState(AttachmentPointState state)
+        {
+            if (_mainNode == null)
+                return;
+
+            _mainNode.SetAttachmentPoints(CloneAttachmentPoints(state.AttachmentPoints), state.GenerateFromSkeleton);
+            AttachmentPointList = CreateAttachmentPointList(_mainNode.AttachmentPoints);
+        }
+
+        private void ApplySkeletonState(SkeletonState state)
+        {
+            if (_mainNode == null)
+                return;
+
+            SkeletonName = state.Name;
+            var cleanSkeletonName = string.IsNullOrWhiteSpace(state.Name)
+                ? string.Empty
+                : Path.GetFileNameWithoutExtension(state.Name);
+            _kitbasherRootScene.SetSkeletonFromName(cleanSkeletonName);
+            _mainNode.SetAttachmentPoints(CloneAttachmentPoints(state.AttachmentPoints), state.GenerateFromSkeleton);
+            AttachmentPointList = CreateAttachmentPointList(_mainNode.AttachmentPoints);
+        }
+
+        private sealed record AttachmentPointState(
+            List<RmvAttachmentPoint> AttachmentPoints,
+            bool GenerateFromSkeleton);
+
+        private sealed record SkeletonState(
+            string? Name,
+            List<RmvAttachmentPoint> AttachmentPoints,
+            bool GenerateFromSkeleton);
     }
 }

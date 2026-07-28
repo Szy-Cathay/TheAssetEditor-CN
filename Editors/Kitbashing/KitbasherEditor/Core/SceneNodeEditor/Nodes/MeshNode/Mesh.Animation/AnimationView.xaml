@@ -13,7 +13,7 @@
 
     <Expander DockPanel.Dock="Top" IsExpanded="False">
         <Expander.Header>
-            <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal" ToolTip="{loc:Loc MeshAnim.AnimationMatrix.ToolTip}">
                 <TextBlock Text="{loc:Loc MeshAnim.Header}" FontWeight="Bold" Margin="3"/>
             </StackPanel>
         </Expander.Header>
@@ -70,7 +70,7 @@
                
             </DockPanel>
 
-            <DockPanel DockPanel.Dock="Top"  >
+            <DockPanel DockPanel.Dock="Top">
                 <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AnimationMatrix}"/>
                 <Label>:</Label>
                 <TextBox DockPanel.Dock="Top" Margin="0,2,0,2"  Text="{Binding Animation.AnimationMatrixOverride, UpdateSourceTrigger=LostFocus}" MaxLength="8"  VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>

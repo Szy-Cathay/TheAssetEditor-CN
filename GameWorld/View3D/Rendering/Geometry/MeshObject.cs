@@ -27,6 +27,7 @@ namespace GameWorld.Core.Rendering.Geometry
         public int WeightCount { get => GetWeightCount(); } // reduce the use of this
         public UiVertexFormat VertexFormat { get; private set; } = UiVertexFormat.Unknown;
         public string SkeletonName { get; private set; }  // SkeletonName
+        public int TopologyVersion { get; private set; }
 
 
         public IGraphicsCardGeometry GetGeometryContext() => Context;
@@ -506,6 +507,7 @@ namespace GameWorld.Core.Rendering.Geometry
         public void RebuildIndexBuffer()
         {
             Context.RebuildIndexBuffer(IndexArray);
+            TopologyVersion++;
         }
     }
 }

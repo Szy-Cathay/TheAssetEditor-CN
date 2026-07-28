@@ -14,9 +14,17 @@ namespace Shared.Ui.BaseDialogs.ColourPickerButton
 
         public ColourPickerViewModel(Vector3 colour, Action<Vector3>? OnColourChangedCallback = null)
         {
-            SelectedColour = colour;
             _onColourChangedCallback = OnColourChangedCallback;
-            _pickedColor = System.Windows.Media.Color.FromRgb((byte)(colour.X * 255f), (byte)(colour.Y * 255f), (byte)(colour.Z * 255f));
+            Set(colour);
+        }
+
+        public void Set(Vector3 colour)
+        {
+            SelectedColour = colour;
+            PickedColor = System.Windows.Media.Color.FromRgb(
+                (byte)(colour.X * 255f),
+                (byte)(colour.Y * 255f),
+                (byte)(colour.Z * 255f));
         }
 
         [RelayCommand]

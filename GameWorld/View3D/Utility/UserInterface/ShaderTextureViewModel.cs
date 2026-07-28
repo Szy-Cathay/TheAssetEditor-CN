@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GameWorld.Core.Commands;
 using GameWorld.Core.Rendering.Materials.Capabilities.Utility;
 using GameWorld.Core.Services;
 using Shared.Core.Events;
@@ -22,29 +23,51 @@ namespace GameWorld.Core.Utility.UserInterface
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly IScopedResourceLibrary _resourceLibrary;
         private readonly IStandardDialogs _packFileUiProvider;
+        private readonly IDocumentPropertyEditor? _propertyEditor;
 
         [ObservableProperty] string _path;
         [ObservableProperty] bool _shouldRenderTexture;
 
-        public ShaderTextureViewModel(TextureInput shaderTextureReference, IPackFileService packFileService, IUiCommandFactory uiCommandFactory, IScopedResourceLibrary resourceLibrary, IStandardDialogs packFileUiProvider) 
+        public ShaderTextureViewModel(
+            TextureInput shaderTextureReference,
+            IPackFileService packFileService,
+            IUiCommandFactory uiCommandFactory,
+            IScopedResourceLibrary resourceLibrary,
+            IStandardDialogs packFileUiProvider,
+            IDocumentPropertyEditor? propertyEditor = null)
         {
             _shaderTextureReference = shaderTextureReference;
             _packFileService = packFileService;
             _uiCommandFactory = uiCommandFactory;
             _resourceLibrary = resourceLibrary;
             _packFileUiProvider = packFileUiProvider;
+            _propertyEditor = propertyEditor;
             Path = _shaderTextureReference.TexturePath;
             _shouldRenderTexture = _shaderTextureReference.UseTexture;
         }
 
         partial void OnShouldRenderTextureChanged(bool value) 
         {
-            _shaderTextureReference.UseTexture = value;
+            if (_propertyEditor == null)
+                _shaderTextureReference.UseTexture = value;
+            else
+                _propertyEditor.Update(
+                    _shaderTextureReference.UseTexture,
+                    value,
+                    newValue => _shaderTextureReference.UseTexture = newValue,
+                    newValue => ShouldRenderTexture = newValue);
         }
 
         partial void OnPathChanged(string value)
         {
-            _shaderTextureReference.TexturePath = value;
+            if (_propertyEditor == null)
+                _shaderTextureReference.TexturePath = value;
+            else
+                _propertyEditor.Update(
+                    _shaderTextureReference.TexturePath,
+                    value,
+                    newValue => _shaderTextureReference.TexturePath = newValue,
+                    newValue => Path = newValue);
             ValidatePath();
         }
 
@@ -88,7 +111,8 @@ namespace GameWorld.Core.Utility.UserInterface
             _errorsByPropertyName[nameof(Path)] = new List<string>();
             if (string.IsNullOrWhiteSpace(Path))
             {
-                _errorsByPropertyName[nameof(Path)].Add("Path is required. If none is wanted, use 'test_mask.dds'");
+                _errorsByPropertyName[nameof(Path)].Add(
+                    GetText("Kitbash.Texture.PathRequired"));
             }
             else
             {
@@ -97,13 +121,17 @@ namespace GameWorld.Core.Utility.UserInterface
                     var isFileFound = _packFileService.FindFile(Path) != null;
                     if (isFileFound == false)
                     {
-                        _errorsByPropertyName[nameof(Path)].Add("Invalid texture path. Path is not found in loaded packfiles");
+                        _errorsByPropertyName[nameof(Path)].Add(
+                            GetText("Kitbash.Texture.PathNotFound"));
                     }
                 }
             }
 
             ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(Path)));
         }
+
+        private static string GetText(string key) =>
+            LocalizationManager.Instance?.Get(key) ?? key;
 
         private readonly Dictionary<string, List<string>> _errorsByPropertyName = [];
         public bool HasErrors => _errorsByPropertyName.Sum(x=>x.Value.Count) != 0;

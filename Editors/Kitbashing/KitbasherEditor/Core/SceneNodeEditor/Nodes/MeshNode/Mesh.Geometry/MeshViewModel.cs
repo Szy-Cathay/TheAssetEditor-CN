@@ -1,6 +1,7 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.KitbasherEditor.Core;
+using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.Components;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
@@ -14,6 +15,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
         Rmv2MeshNode _meshNode;
         private readonly SceneManager _sceneManager;
         private readonly KitbasherRootScene _kitbasherRootScene;
+        private readonly SceneNodePropertyEditor _propertyEditor;
 
         public Vector3ViewModel Pivot { get; set; }
 
@@ -26,10 +28,14 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
         [ObservableProperty] UiVertexFormat _vertexType;
         [ObservableProperty] IEnumerable<UiVertexFormat> _possibleVertexTypes = [UiVertexFormat.Static, UiVertexFormat.Weighted, UiVertexFormat.Cinematic];
 
-        public MeshViewModel(KitbasherRootScene kitbasherRootScene, SceneManager sceneManager)
+        public MeshViewModel(
+            KitbasherRootScene kitbasherRootScene,
+            SceneManager sceneManager,
+            SceneNodePropertyEditor propertyEditor)
         {
             _kitbasherRootScene = kitbasherRootScene;
             _sceneManager = sceneManager;
+            _propertyEditor = propertyEditor;
         }
 
         public void Initialize(Rmv2MeshNode node)
@@ -48,22 +54,71 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
             ReduceMeshOnLodGeneration = _meshNode.ReduceMeshOnLodGeneration;
         }
 
-        partial void OnModelNameChanged(string value) => _meshNode.Name = value;
+        partial void OnModelNameChanged(string value) =>
+            _propertyEditor.Update(
+                _meshNode.Name,
+                value,
+                newValue => _meshNode.Name = newValue,
+                newValue => ModelName = newValue);
+
         partial void OnDrawBoundingBoxChanged(bool value) => _meshNode.DisplayBoundingBox = value;
         partial void OnDrawPivotPointChanged(bool value) => _meshNode.DisplayPivotPoint = value;
-        partial void OnReduceMeshOnLodGenerationChanged(bool value) => _meshNode.ReduceMeshOnLodGeneration = value;
-        partial void OnVertexTypeChanged(UiVertexFormat value) => _meshNode.Geometry.ChangeVertexType(value);
-        private void Pivot_OnValueChanged(Vector3 newValue) => _meshNode.PivotPoint = newValue;
-        
+
+        partial void OnReduceMeshOnLodGenerationChanged(bool value) =>
+            _propertyEditor.Update(
+                _meshNode.ReduceMeshOnLodGeneration,
+                value,
+                newValue => _meshNode.ReduceMeshOnLodGeneration = newValue,
+                newValue => ReduceMeshOnLodGeneration = newValue);
+
+        partial void OnVertexTypeChanged(UiVertexFormat value) =>
+            _propertyEditor.Update(
+                _meshNode.Geometry.VertexFormat,
+                value,
+                newValue => _meshNode.Geometry.ChangeVertexType(newValue),
+                newValue => VertexType = newValue);
+
+        private void Pivot_OnValueChanged(Vector3 newValue) =>
+            _propertyEditor.Update(
+                _meshNode.PivotPoint,
+                newValue,
+                value => _meshNode.PivotPoint = value,
+                value => Pivot.Set(value));
 
         [RelayCommand]
         void CopyPivotToAllMeshes()
         {
-            var newPiv = new Vector3((float)Pivot.X.Value, (float)Pivot.Y.Value, (float)Pivot.Z.Value);
+            var newPivot = new Vector3(
+                (float)Pivot.X.Value,
+                (float)Pivot.Y.Value,
+                (float)Pivot.Z.Value);
             var root = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
             var allMeshes = root.GetMeshesInLod(0, false);
-            foreach (var mesh in allMeshes)
-                mesh.PivotPoint = newPiv;
+            if (allMeshes.Count == 0)
+                return;
+
+            var oldState = new PivotCollectionState(
+                allMeshes
+                    .Select(mesh => new PivotValue(mesh, mesh.PivotPoint))
+                    .ToArray());
+            var newState = new PivotCollectionState(
+                allMeshes
+                    .Select(mesh => new PivotValue(mesh, newPivot))
+                    .ToArray());
+            _propertyEditor.Update(oldState, newState, ApplyPivotCollection);
         }
+
+        private void ApplyPivotCollection(PivotCollectionState state)
+        {
+            foreach (var item in state.Values)
+            {
+                item.Mesh.PivotPoint = item.Pivot;
+                if (ReferenceEquals(item.Mesh, _meshNode))
+                    Pivot.Set(item.Pivot);
+            }
+        }
+
+        private sealed record PivotCollectionState(IReadOnlyList<PivotValue> Values);
+        private sealed record PivotValue(Rmv2MeshNode Mesh, Vector3 Pivot);
     }
 }

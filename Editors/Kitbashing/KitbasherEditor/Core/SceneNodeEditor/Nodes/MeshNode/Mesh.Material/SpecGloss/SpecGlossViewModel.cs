@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using GameWorld.Core.Commands;
 using GameWorld.Core.Rendering.Materials.Capabilities;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility.UserInterface;
@@ -11,6 +12,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
     public partial class SpecGlossViewModel : ObservableObject
     {
         private readonly SpecGlossCapability _capability;
+        private readonly IDocumentPropertyEditor _propertyEditor;
 
         [ObservableProperty] bool _useAlpha;
 
@@ -20,19 +22,61 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh
         [ObservableProperty] ShaderTextureViewModel _normalMap;
         [ObservableProperty] ShaderTextureViewModel _mask;
 
-        public SpecGlossViewModel(SpecGlossCapability capability, IUiCommandFactory uiCommandFactory, IPackFileService packFileService, IScopedResourceLibrary resourceLibrary, IStandardDialogs packFileUiProvider)
+        public SpecGlossViewModel(
+            SpecGlossCapability capability,
+            IUiCommandFactory uiCommandFactory,
+            IPackFileService packFileService,
+            IScopedResourceLibrary resourceLibrary,
+            IStandardDialogs packFileUiProvider,
+            IDocumentPropertyEditor propertyEditor)
         {
             _capability = capability;
+            _propertyEditor = propertyEditor;
 
-            _specularMap = new ShaderTextureViewModel(capability.SpecularMap, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _glossMap = new ShaderTextureViewModel(capability.GlossMap, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _diffuseMap = new ShaderTextureViewModel(capability.DiffuseMap, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _normalMap = new ShaderTextureViewModel(capability.NormalMap, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
-            _mask = new ShaderTextureViewModel(capability.Mask, packFileService, uiCommandFactory, resourceLibrary, packFileUiProvider);
+            _specularMap = new ShaderTextureViewModel(
+                capability.SpecularMap,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _glossMap = new ShaderTextureViewModel(
+                capability.GlossMap,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _diffuseMap = new ShaderTextureViewModel(
+                capability.DiffuseMap,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _normalMap = new ShaderTextureViewModel(
+                capability.NormalMap,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
+            _mask = new ShaderTextureViewModel(
+                capability.Mask,
+                packFileService,
+                uiCommandFactory,
+                resourceLibrary,
+                packFileUiProvider,
+                propertyEditor);
 
             _useAlpha = _capability.UseAlpha;
         }
 
-        partial void OnUseAlphaChanged(bool value) => _capability.UseAlpha = value;
+        partial void OnUseAlphaChanged(bool value) =>
+            _propertyEditor.Update(
+                _capability.UseAlpha,
+                value,
+                newValue => _capability.UseAlpha = newValue,
+                newValue => UseAlpha = newValue);
     }
 }

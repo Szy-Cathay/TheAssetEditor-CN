@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Resources;
 using System.Windows.Forms;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Commands;
 using GameWorld.Core.Commands.Bone;
 using GameWorld.Core.Commands.Edge;
@@ -155,7 +156,20 @@ namespace GameWorld.Core.Components.Selection
             var currentState = _selectionManager.GetState();
             if (currentState.Mode == GeometrySelectionMode.Face && currentState is FaceSelectionState faceState)
             {
-                if (IntersectionMath.IntersectFaces(unprojectedSelectionRect, faceState.RenderObject.Geometry, faceState.RenderObject.RenderMatrix, out var faces))
+                var worldPositions =
+                    GetEvaluatedWorldPositions(faceState.RenderObject);
+                var hasIntersection = worldPositions != null
+                    ? IntersectionMath.IntersectFaces(
+                        unprojectedSelectionRect,
+                        faceState.RenderObject.Geometry,
+                        worldPositions,
+                        out var faces)
+                    : IntersectionMath.IntersectFaces(
+                        unprojectedSelectionRect,
+                        faceState.RenderObject.Geometry,
+                        faceState.RenderObject.RenderMatrix,
+                        out faces);
+                if (hasIntersection)
                     _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(faces, isSelectionModification, removeSelection)).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && faceState.SelectedFaces.Count > 0)
                     _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
@@ -163,7 +177,20 @@ namespace GameWorld.Core.Components.Selection
             }
             else if (currentState.Mode == GeometrySelectionMode.Vertex && currentState is VertexSelectionState vertexState)
             {
-                if (IntersectionMath.IntersectVertices(unprojectedSelectionRect, vertexState.RenderObject.Geometry, vertexState.RenderObject.RenderMatrix, out var vertices))
+                var worldPositions =
+                    GetEvaluatedWorldPositions(vertexState.RenderObject);
+                var hasIntersection = worldPositions != null
+                    ? IntersectionMath.IntersectVertices(
+                        unprojectedSelectionRect,
+                        vertexState.RenderObject.Geometry,
+                        worldPositions,
+                        out var vertices)
+                    : IntersectionMath.IntersectVertices(
+                        unprojectedSelectionRect,
+                        vertexState.RenderObject.Geometry,
+                        vertexState.RenderObject.RenderMatrix,
+                        out vertices);
+                if (hasIntersection)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(vertices, isSelectionModification, removeSelection)).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && vertexState.SelectedVertices.Count > 0)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
@@ -172,12 +199,23 @@ namespace GameWorld.Core.Components.Selection
             else if (currentState.Mode == GeometrySelectionMode.Edge && currentState is EdgeSelectionState edgeState)
             {
                 var edgeObject = edgeState.RenderObject as Rmv2MeshNode;
+                var worldPositions = edgeObject == null
+                    ? null
+                    : MeshPoseSnapshot
+                        .Capture(edgeObject)
+                        .GetWorldPositions();
                 if (edgeObject != null &&
-                    IntersectionMath.IntersectEdges(
-                        unprojectedSelectionRect,
-                        edgeObject.Geometry,
-                        edgeObject.RenderMatrix,
-                        out var edges))
+                    (worldPositions != null
+                        ? IntersectionMath.IntersectEdges(
+                            unprojectedSelectionRect,
+                            edgeObject.Geometry,
+                            worldPositions,
+                            out var edges)
+                        : IntersectionMath.IntersectEdges(
+                            unprojectedSelectionRect,
+                            edgeObject.Geometry,
+                            edgeObject.RenderMatrix,
+                            out edges)))
                 {
                     _commandFactory.Create<EdgeSelectionCommand>()
                         .Configure(x => x.Configure(edges, isSelectionModification, removeSelection))
@@ -236,7 +274,20 @@ namespace GameWorld.Core.Components.Selection
             // Edit mode: handle mode-specific selection, never fall through to object picking
             if (currentState is FaceSelectionState faceState)
             {
-                if (IntersectionMath.IntersectFace(ray, faceState.RenderObject.Geometry, faceState.RenderObject.RenderMatrix, out var selectedFace) != null)
+                var worldPositions =
+                    GetEvaluatedWorldPositions(faceState.RenderObject);
+                var distance = worldPositions != null
+                    ? IntersectionMath.IntersectFace(
+                        ray,
+                        faceState.RenderObject.Geometry,
+                        worldPositions,
+                        out var selectedFace)
+                    : IntersectionMath.IntersectFace(
+                        ray,
+                        faceState.RenderObject.Geometry,
+                        faceState.RenderObject.RenderMatrix,
+                        out selectedFace);
+                if (distance != null)
                     _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(selectedFace.Value, isSelectionModification, removeSelection)).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && faceState.SelectedFaces.Count > 0)
                     _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
@@ -247,9 +298,30 @@ namespace GameWorld.Core.Components.Selection
             {
                 var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
                 var viewport = _deviceResolverComponent.Device.Viewport;
-                if (IntersectionMath.IntersectVertex(mousePosition, vertexState.RenderObject.Geometry, vertexState.RenderObject.RenderMatrix,
-                    viewProjection, viewport.Width, viewport.Height, out var selecteVert,
-                    new HashSet<int>(vertexState.SelectedVertices)) != null)
+                var worldPositions =
+                    GetEvaluatedWorldPositions(vertexState.RenderObject);
+                var distance = worldPositions != null
+                    ? IntersectionMath.IntersectVertex(
+                        mousePosition,
+                        vertexState.RenderObject.Geometry,
+                        worldPositions,
+                        viewProjection,
+                        viewport.Width,
+                        viewport.Height,
+                        out var selecteVert,
+                        new HashSet<int>(
+                            vertexState.SelectedVertices))
+                    : IntersectionMath.IntersectVertex(
+                        mousePosition,
+                        vertexState.RenderObject.Geometry,
+                        vertexState.RenderObject.RenderMatrix,
+                        viewProjection,
+                        viewport.Width,
+                        viewport.Height,
+                        out selecteVert,
+                        new HashSet<int>(
+                            vertexState.SelectedVertices));
+                if (distance != null)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>() { selecteVert }, isSelectionModification, removeSelection)).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && vertexState.SelectedVertices.Count > 0)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
@@ -261,16 +333,31 @@ namespace GameWorld.Core.Components.Selection
                 var edgeObject = edgeState.RenderObject as Rmv2MeshNode;
                 var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
                 var viewport = _deviceResolverComponent.Device.Viewport;
+                var worldPositions = edgeObject == null
+                    ? null
+                    : MeshPoseSnapshot
+                        .Capture(edgeObject)
+                        .GetWorldPositions();
                 if (edgeObject != null &&
-                    IntersectionMath.IntersectEdge(
-                        mousePosition,
-                        edgeObject.Geometry,
-                        edgeObject.RenderMatrix,
-                        viewProjection,
-                        viewport.Width,
-                        viewport.Height,
-                        out var selectedEdge,
-                        edgeState.SelectedEdges) != null)
+                    (worldPositions != null
+                        ? IntersectionMath.IntersectEdge(
+                            mousePosition,
+                            edgeObject.Geometry,
+                            worldPositions,
+                            viewProjection,
+                            viewport.Width,
+                            viewport.Height,
+                            out var selectedEdge,
+                            edgeState.SelectedEdges)
+                        : IntersectionMath.IntersectEdge(
+                            mousePosition,
+                            edgeObject.Geometry,
+                            edgeObject.RenderMatrix,
+                            viewProjection,
+                            viewport.Width,
+                            viewport.Height,
+                            out selectedEdge,
+                            edgeState.SelectedEdges)) != null)
                 {
                     _commandFactory.Create<EdgeSelectionCommand>()
                         .Configure(x => x.Configure([selectedEdge], isSelectionModification, removeSelection))
@@ -297,6 +384,16 @@ namespace GameWorld.Core.Components.Selection
             {
                 _commandFactory.Create<ObjectSelectionCommand>().Configure(x => x.Configure(selectedObject, isSelectionModification, removeSelection)).BuildAndExecute();
             }
+        }
+
+        static Vector3[]? GetEvaluatedWorldPositions(
+            ISelectable selectable)
+        {
+            return selectable is Rmv2MeshNode meshNode
+                ? MeshPoseSnapshot
+                    .Capture(meshNode)
+                    .GetWorldPositions()
+                : null;
         }
 
         public bool SetObjectSelectionMode()

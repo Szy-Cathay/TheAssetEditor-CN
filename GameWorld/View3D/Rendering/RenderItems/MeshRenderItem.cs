@@ -11,6 +11,7 @@ namespace GameWorld.Core.Rendering.RenderItems
         private readonly MeshObject _geometry;
         private readonly IShader _shader;
         private Matrix _modelMatrix;
+        private bool _selectionMaskEnabled;
 
         public GeometryRenderItem(MeshObject geometry, IShader shader, Matrix modelMatrix)
         {
@@ -25,6 +26,11 @@ namespace GameWorld.Core.Rendering.RenderItems
             _modelMatrix = modelMatrix;
         }
 
+        public void SetSelectionMask(bool enabled)
+        {
+            _selectionMaskEnabled = enabled;
+        }
+
         public bool SupportsTechnique(RenderingTechnique technique) => _shader.SupportsTechnique(technique);
 
         public void Draw(GraphicsDevice device, CommonShaderParameters parameters, RenderingTechnique renderingTechnique)
@@ -33,6 +39,9 @@ namespace GameWorld.Core.Rendering.RenderItems
                 return;
 
             _shader.SetTechnique(renderingTechnique);
+            _shader.SetSelectionMask(
+                renderingTechnique == RenderingTechnique.Normal &&
+                _selectionMaskEnabled);
             _shader.Apply(parameters, _modelMatrix);
 
             ApplyMesh(_shader, device, _geometry.GetGeometryContext());

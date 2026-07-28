@@ -19,10 +19,10 @@
 
     <ContentControl DockPanel.Dock="Top">
 
-        <Expander DockPanel.Dock="Top" IsExpanded="True">
+        <Expander DockPanel.Dock="Top" IsExpanded="False">
             <Expander.Header>
-                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}">
-                    <Label Content="{loc:Loc AdvancedRmvMaterial.Header}" FontSize="{StaticResource HeaderFontSize}" Width="{StaticResource HeaderLabelLength}"/>
+                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}" ToolTip="{loc:Loc AdvancedRmvMaterial.ToolTip}">
+                    <Label Content="{loc:Loc AdvancedRmvMaterial.Header}" FontSize="{StaticResource HeaderFontSize}"/>
                     <Separator/>
                 </DockPanel>
             </Expander.Header>

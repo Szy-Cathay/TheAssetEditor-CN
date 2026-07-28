@@ -74,6 +74,61 @@ public class EdgeOverlayDataBuilderTests
     }
 
     [Test]
+    public void Fill_EvaluatedWorldPositionsUseCurrentPoseEndpoints()
+    {
+        var destination = new EdgeData[1];
+        var worldPositions = new[]
+        {
+            new Vector3(20, 21, 22),
+            new Vector3(30, 31, 32),
+            new Vector3(40, 41, 42)
+        };
+
+        EdgeOverlayDataBuilder.Fill(
+            destination,
+            worldPositions,
+            new[] { (0, 1) },
+            new[] { 0.0f, 1.0f, 0.0f });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                destination[0].P0,
+                Is.EqualTo(worldPositions[0]));
+            Assert.That(
+                destination[0].P1,
+                Is.EqualTo(worldPositions[1]));
+        });
+    }
+
+    [Test]
+    public void FillSelected_EvaluatedWorldPositionsUseCurrentPoseEndpoints()
+    {
+        var destination = new EdgeData[1];
+        var worldPositions = new[]
+        {
+            new Vector3(20, 21, 22),
+            new Vector3(30, 31, 32),
+            new Vector3(40, 41, 42)
+        };
+
+        EdgeOverlayDataBuilder.FillSelected(
+            destination,
+            worldPositions,
+            new[] { (1, 2) });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                destination[0].P0,
+                Is.EqualTo(worldPositions[1]));
+            Assert.That(
+                destination[0].P1,
+                Is.EqualTo(worldPositions[2]));
+        });
+    }
+
+    [Test]
     public void Fill_DestinationLengthDoesNotMatchEdges_ThrowsArgumentException()
     {
         Assert.That(

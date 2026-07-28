@@ -41,7 +41,7 @@ namespace Shared.Ui.BaseDialogs.MathViews
             X.Value = x;
             Y.Value = y;
             Z.Value = z;
-            W.Value = z;
+            W.Value = w;
         }
 
         public void Set(Vector4 value) => Set(value.X, value.Y, value.Z, value.W);

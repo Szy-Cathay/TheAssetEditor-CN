@@ -413,6 +413,12 @@ namespace GameWorld.Core.Commands.Bone
 
         private void PublishModified()
         {
+            if (_boneSelectionState.RenderObject is
+                Rmv2MeshNode meshNode)
+            {
+                meshNode.AnimationPlayer?.Refresh();
+            }
+
             _boneSelectionState.TriggerModifiedBoneEvent(
                 (BoneSelectionState)_selectionSnapshot.Clone(),
                 _selectedBones);
