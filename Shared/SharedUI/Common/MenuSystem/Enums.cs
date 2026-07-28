@@ -12,6 +12,7 @@
         AnythingSelected,
         ObjectOrVertexSelected,
         ObjectOrFaceSelected,
+        OneObjectOrFaceSelected,
         Custom
     }
 

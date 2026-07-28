@@ -63,17 +63,24 @@ namespace Editors.KitbasherEditor.UiCommands
                 meshList.Add(selectionItem);
             }
 
-            var window = SelectionListWindow.ShowDialog("Select mesh to copy material from", meshList);
+            var window = SelectionListWindow.ShowDialog(
+                LocalizationManager.Instance.Get(
+                    "Kitbash.AssignMaterial.SelectSource"),
+                meshList);
             var selected = meshList.Where(x => x.IsChecked.Value).ToList();
             if (!window.Result || selected.Count == 0)
             {
-                _dialogProvider.ShowDialogBox("No mesh selected to copy from");
+                _dialogProvider.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "Kitbash.AssignMaterial.NoSourceSelected"));
                 return;
             }
 
             if (selected.Count > 1)
             {
-                _dialogProvider.ShowDialogBox("Multiple meshes selected, please select only one to copy from");
+                _dialogProvider.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "Kitbash.AssignMaterial.MultipleSourcesSelected"));
                 return;
             }
 

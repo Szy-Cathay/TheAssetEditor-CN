@@ -7,7 +7,7 @@ namespace Editors.KitbasherEditor.UiCommands
 {
     internal class ScaleGizmoUpCommand : ITransientKitbasherUiCommand
     {
-        public string ToolTip { get; set; } = "Decrease Gizmo size";
+        public string ToolTip { get; set; } = "Increase Gizmo size";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
         public Hotkey? HotKey { get; } = new Hotkey(Key.Add, ModifierKeys.None);
 
@@ -19,14 +19,15 @@ namespace Editors.KitbasherEditor.UiCommands
             _gizmoComponent = gizmoComponent;
         }
 
-        public void Execute() => _gizmoComponent.ModifyGizmoScale(-0.5f);
+        public void Execute() => _gizmoComponent.ModifyGizmoScale(0.5f);
     }
 
     internal class ScaleGizmoDownCommand : ITransientKitbasherUiCommand
     {
-        public string ToolTip { get; set; } = "Increase Gizmo size";
+        public string ToolTip { get; set; } = "Decrease Gizmo size";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
-        public Hotkey HotKey { get; } = new Hotkey(Key.Add, ModifierKeys.None);
+        public Hotkey HotKey { get; } =
+            new Hotkey(Key.Subtract, ModifierKeys.None);
 
         private readonly GizmoComponent _gizmoComponent;
 
@@ -36,6 +37,6 @@ namespace Editors.KitbasherEditor.UiCommands
             _gizmoComponent = gizmoComponent;
         }
 
-        public void Execute() => _gizmoComponent.ModifyGizmoScale(0.5f);
+        public void Execute() => _gizmoComponent.ModifyGizmoScale(-0.5f);
     }
 }

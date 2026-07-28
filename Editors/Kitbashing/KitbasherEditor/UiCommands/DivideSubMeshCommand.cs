@@ -9,8 +9,9 @@ namespace Editors.KitbasherEditor.UiCommands
     public class DivideSubMeshCommand : ITransientKitbasherUiCommand
     {
         public string ToolTip { get; set; } = "Split mesh into logical parts. Hold left Alt to not combine logical sub-parts";
-        public ActionEnabledRule EnabledRule => ActionEnabledRule.OneObjectSelected;
-        public Hotkey? HotKey { get; } = new Hotkey(Key.Add, ModifierKeys.None);
+        public ActionEnabledRule EnabledRule =>
+            ActionEnabledRule.OneObjectOrFaceSelected;
+        public Hotkey? HotKey { get; } = null;
 
         private readonly SelectionManager _selectionManager;
         private readonly ObjectEditor _objectEditor;

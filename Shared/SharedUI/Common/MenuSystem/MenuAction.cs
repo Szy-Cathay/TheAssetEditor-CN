@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Shared.Core.Misc;
@@ -49,9 +50,27 @@ namespace Shared.Ui.Common.MenuSystem
                 return "";
 
             if (Hotkey.ModifierKeys == ModifierKeys.None)
-                return $" ({Hotkey.Key})";
-            return $" ({Hotkey.Key} + {Hotkey.ModifierKeys})";
+                return $" ({FormatKey(Hotkey.Key)})";
+
+            var keys = new List<string>();
+            if (Hotkey.ModifierKeys.HasFlag(ModifierKeys.Control))
+                keys.Add("Ctrl");
+            if (Hotkey.ModifierKeys.HasFlag(ModifierKeys.Shift))
+                keys.Add("Shift");
+            if (Hotkey.ModifierKeys.HasFlag(ModifierKeys.Alt))
+                keys.Add("Alt");
+            if (Hotkey.ModifierKeys.HasFlag(ModifierKeys.Windows))
+                keys.Add("Win");
+            keys.Add(FormatKey(Hotkey.Key));
+            return $" ({string.Join("+", keys)})";
         }
+
+        static string FormatKey(Key key) => key switch
+        {
+            Key.Add => "Num+",
+            Key.Subtract => "Num-",
+            _ => key.ToString()
+        };
 
         public void UpdateToolTip()
         {

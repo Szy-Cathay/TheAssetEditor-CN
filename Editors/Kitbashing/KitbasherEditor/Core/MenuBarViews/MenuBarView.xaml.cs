@@ -1,9 +1,12 @@
 ﻿using Shared.Ui.Common.MenuSystem;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
+using KitbasherEditor.ViewModels.MenuBarViews;
 
 namespace KitbasherEditor.Views
 {
@@ -12,6 +15,8 @@ namespace KitbasherEditor.Views
     /// </summary>
     public partial class MenuBarView : UserControl
     {
+        private Window? _hostWindow;
+
         public MenuBarView()
         {
             InitializeComponent();
@@ -19,12 +24,28 @@ namespace KitbasherEditor.Views
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
+            DetachWindowHandlers();
             var window = Window.GetWindow(this);
             if (window != null)
             {
+                _hostWindow = window;
                 window.KeyUp += HandleKeyPress;
                 window.KeyDown += HandleKeyDown;
             }
+        }
+
+        private void UserControl_Unloaded(
+            object sender,
+            RoutedEventArgs e) => DetachWindowHandlers();
+
+        private void DetachWindowHandlers()
+        {
+            if (_hostWindow == null)
+                return;
+
+            _hostWindow.KeyUp -= HandleKeyPress;
+            _hostWindow.KeyDown -= HandleKeyDown;
+            _hostWindow = null;
         }
 
         private void HandleKeyPress(object sender, KeyEventArgs e)
@@ -35,6 +56,8 @@ namespace KitbasherEditor.Views
 
             if (e.OriginalSource is TextBox)
             {
+                if (DataContext is MenuBarViewModel viewModel)
+                    viewModel.ClearKeyState(e.Key, e.SystemKey);
                 e.Handled = true;
                 return;
             }
@@ -53,6 +76,9 @@ namespace KitbasherEditor.Views
             if (!IsEditorVisible())
                 return;
 
+            if (e.OriginalSource is TextBox)
+                return;
+
             if (DataContext is IKeyboardHandler keyboardHandler)
             {
                 keyboardHandler.OnKeyDown(e.Key, e.SystemKey, Keyboard.Modifiers);
@@ -60,7 +86,7 @@ namespace KitbasherEditor.Views
         }
 
         /// <summary>
-        /// Close falloff popup on Enter key and return focus to the main window
+        /// Close falloff popup on Enter key and return focus to the 3D viewport
         /// </summary>
         private void FalloffTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
@@ -74,9 +100,14 @@ namespace KitbasherEditor.Views
                     binding?.UpdateSource();
                 }
                 PropArrowBtn.IsChecked = false;
-                // Move focus away from TextBox back to the window
-                Keyboard.Focus(null);
                 e.Handled = true;
+                if (DataContext is MenuBarViewModel viewModel)
+                {
+                    // Let the Popup finish closing before moving keyboard focus.
+                    Dispatcher.BeginInvoke(
+                        DispatcherPriority.Input,
+                        new Action(viewModel.FocusScene));
+                }
             }
         }
 

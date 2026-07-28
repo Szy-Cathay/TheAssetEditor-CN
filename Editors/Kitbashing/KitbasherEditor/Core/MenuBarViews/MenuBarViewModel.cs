@@ -34,14 +34,24 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         private readonly MenuItemVisibilityRuleEngine _menuItemVisibilityRuleEngine;
         private readonly ActionHotkeyHandler _hotKeyHandler = new ActionHotkeyHandler();
         private readonly WindowKeyboard _keyboard;
+        private readonly IWpfGame _scene;
         private readonly Dictionary<Type, MenuAction> _uiCommands = new();
 
-        public MenuBarViewModel(CommandExecutor commandExecutor, IEventHub eventHub, MenuItemVisibilityRuleEngine menuItemVisibilityRuleEngine, TransformToolViewModel transformToolViewModel, IUiCommandFactory uiCommandFactory, WindowKeyboard windowKeyboard, SelectionManager selectionManager)
+        public MenuBarViewModel(
+            CommandExecutor commandExecutor,
+            IEventHub eventHub,
+            MenuItemVisibilityRuleEngine menuItemVisibilityRuleEngine,
+            TransformToolViewModel transformToolViewModel,
+            IUiCommandFactory uiCommandFactory,
+            WindowKeyboard windowKeyboard,
+            SelectionManager selectionManager,
+            IWpfGame scene)
         {
             _commandExecutor = commandExecutor;
             _menuItemVisibilityRuleEngine = menuItemVisibilityRuleEngine;
             _uiCommandFactory = uiCommandFactory;
             _keyboard = windowKeyboard;
+            _scene = scene;
             TransformTool = transformToolViewModel;
             ProportionalEditing = new ProportionalEditingViewModel(selectionManager, eventHub);
 
@@ -63,10 +73,11 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RegisterUiCommand<SaveAsCommand>();
 
             RegisterUiCommand<BrowseForReferenceCommand>();
+#if DEBUG
             RegisterUiCommand<ImportGeneralReferenceCommand>();
             RegisterUiCommand<ImportKarlHammerReferenceCommand>();
-            
             RegisterUiCommand<DeleteLodsCommand>();
+#endif
             RegisterUiCommand<UndoCommand>();
             RegisterUiCommand<RedoCommand>();
             RegisterUiCommand<SortMeshesCommand>();
@@ -117,10 +128,12 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateToolBarSeparator(fileToolbar);
             builder.CreateToolBarItem<BrowseForReferenceCommand>(fileToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.File.ImportReference"));
 
+#if DEBUG
             var debugToolbar = builder.CreateRootToolBar(LocalizationManager.Instance.Get("Kitbash.Menu.Debug"));
             builder.CreateToolBarItem<ImportGeneralReferenceCommand>(debugToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Debug.ImportGeneral"));
             builder.CreateToolBarItem<ImportKarlHammerReferenceCommand>(debugToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Debug.ImportHammer"));
             builder.CreateToolBarItem<DeleteLodsCommand>(debugToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Debug.DeleteLods"));
+#endif
 
             var toolsToolbar = builder.CreateRootToolBar(LocalizationManager.Instance.Get("Kitbash.Menu.Tools"));
             builder.CreateToolBarItem<GroupItemsCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.GroupSelection"));
@@ -144,11 +157,10 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateButton<SaveCommand>(IconLibrary.SaveFileIcon);
             builder.CreateButton<BrowseForReferenceCommand>(IconLibrary.OpenReferenceMeshIcon);
             builder.CreateButton<UndoCommand>(IconLibrary.UndoIcon);
-            builder.CreateButton<RedoCommand>(IconLibrary.UndoIcon);  // TODO: Create dedicated Redo icon
+            builder.CreateButton<RedoCommand>(IconLibrary.RedoIcon);
             builder.CreateButtonSeparator();
 
             builder.CreateButton<ToggleViewSelectedCommand>(IconLibrary.ViewSelectedIcon);
-            builder.CreateButtonSeparator();
 
             // Object buttons
             builder.CreateButton<DivideSubMeshCommand>(IconLibrary.DivideIntoSubMeshIcon, ButtonVisibilityRule.ObjectMode);
@@ -156,7 +168,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateButton<DuplicateObjectCommand>(IconLibrary.DuplicateIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<DeleteObjectCommand>(IconLibrary.DeleteIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<CreateStaticMeshCommand>(IconLibrary.FreezeAnimationIcon, ButtonVisibilityRule.ObjectMode);
-            builder.CreateButtonSeparator();
+            builder.CreateButtonSeparator(ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<ReduceMeshCommand>(IconLibrary.ReduceMeshIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<OpenSkeletonReshaperToolCommand>(IconLibrary.SkeletonReshaperIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<OpenReriggingToolCommand>(IconLibrary.ReRiggingIcon, ButtonVisibilityRule.ObjectMode);
@@ -221,8 +233,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 
         public bool OnKeyReleased(Key key, Key systemKey, ModifierKeys modifierKeys)
         {
-            _keyboard.SetKeyDown(key, false);
-            _keyboard.SetKeyDown(systemKey, false);
+            ClearKeyState(key, systemKey);
             return _hotKeyHandler.TriggerCommand(key, modifierKeys);
         }
 
@@ -231,6 +242,14 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             _keyboard.SetKeyDown(systemKey, true);
             _keyboard.SetKeyDown(key, true);
         }
+
+        public void ClearKeyState(Key key, Key systemKey)
+        {
+            _keyboard.SetKeyDown(key, false);
+            _keyboard.SetKeyDown(systemKey, false);
+        }
+
+        public void FocusScene() => _scene.GetFocusElement().Focus();
 
         void OnUndoStackChanged(CommandStackChangedEvent notification)
         {

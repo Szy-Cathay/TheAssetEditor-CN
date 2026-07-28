@@ -14,6 +14,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
     /// </summary>
     public class ProportionalEditingViewModel : NotifyPropertyChangedImpl
     {
+        private const double MinimumFalloffDistance = 0.001;
         private readonly SelectionManager _selectionManager;
 
         private bool _isEnabled = false;
@@ -35,7 +36,15 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             get => _falloffDistance;
             set
             {
-                _falloffDistance = value;
+                var normalizedValue =
+                    double.IsFinite(value) &&
+                    value >= MinimumFalloffDistance
+                        ? value
+                        : MinimumFalloffDistance;
+                if (_falloffDistance == normalizedValue)
+                    return;
+
+                _falloffDistance = normalizedValue;
                 NotifyPropertyChanged();
                 UpdateSelectionManagerFalloff();
             }
