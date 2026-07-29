@@ -130,3 +130,17 @@
 - 用户要求“修复、复测并推送”时，完成标准包括本地验证、必要提交、推送和 GitHub Actions 最终状态。
 - 用户要求创建或合并 PR 时，必须报告 PR 状态、目标分支和远端最终结果。
 - 未执行、无法确认或依赖旧记录的步骤必须明确标注，不得推测为成功。
+
+## Agent skills
+
+### Issue tracker
+
+本仓库使用 GitHub Issues 管理需求和问题。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+问题分流使用五种标准角色及其默认英文标签名。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+本仓库采用 single-context（单上下文）领域文档结构。详见 `docs/agents/domain.md`。
