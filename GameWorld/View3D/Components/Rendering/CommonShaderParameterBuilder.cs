@@ -25,6 +25,7 @@ namespace GameWorld.Core.Components.Rendering
                 sceneLightParameters.DirLightRotationRadians_X,
                 sceneLightParameters.DirLightRotationRadians_Y,
                 sceneLightParameters.LightIntensityMult,
+                sceneLightParameters.LightColour,
 
                 _cachedFactionColours,
                 viewportHeight,

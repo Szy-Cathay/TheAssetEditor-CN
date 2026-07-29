@@ -8,6 +8,7 @@ namespace GameWorld.Core.Components.Rendering
         public float DirLightRotationDegrees_X { get; set; } = 0;
         public float DirLightRotationDegrees_Y { get; set; } = 0;
         public float LightIntensityMult { get; set; } = 1;
+        public Vector3 LightColour { get; set; } = Vector3.One;
 
         // Pre-computed radians (updated with degree properties if needed)
         public float EnvLightRotationRadians_Y => MathHelper.ToRadians(EnvLightRotationDegrees_Y);

@@ -12,6 +12,7 @@ namespace GameWorld.Core.Rendering
         float DirLightRotationRadians_X,
         float DirLightRotationRadians_Y,
         float LightIntensityMult,
+        Vector3 LightColour,
         Vector3[] FactionColours,
         float ViewportHeight = 0,
         float ViewportWidth = 0
