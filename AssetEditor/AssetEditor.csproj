@@ -50,7 +50,7 @@
         <PackageProjectUrl>https://github.com/Szy-Cathay/TheAssetEditor-CN</PackageProjectUrl>
         <RepositoryUrl>https://github.com/Szy-Cathay/TheAssetEditor-CN</RepositoryUrl>
         <PackageId>AssetEditor.CN</PackageId>
-        <Version>1.1.0</Version>
+        <Version>1.1.1</Version>
         <AssemblyVersion>$(Version)</AssemblyVersion>
         <AnalysisLevel>6.0</AnalysisLevel>
     </PropertyGroup>
