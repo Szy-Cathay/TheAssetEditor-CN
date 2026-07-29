@@ -93,3 +93,17 @@
 - 最终回复列出修改文件、行为变化、验证结果和剩余风险。
 - 用户要求“修复、复测并推送”时，完成标准包括本地测试、提交、推送及 GitHub Actions 最终状态。
 - 未实际执行或无法确认的步骤必须明确标注，不得推测为成功。
+
+## Agent skills
+
+### Issue tracker
+
+本仓库使用 GitHub Issues 管理需求和问题。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+问题分流使用五种标准角色及其默认英文标签名。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+本仓库采用 single-context（单上下文）领域文档结构。详见 `docs/agents/domain.md`。
