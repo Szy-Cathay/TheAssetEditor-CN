@@ -51,53 +51,26 @@
             <Button 
                 Grid.Column="0"
                 Margin="5, 0, 0, 0" 
-                Width="70" 
+                Width="80"
                 VerticalAlignment="Center" 
                 HorizontalAlignment="Left"
                 Content="{loc:Loc AudioProjectViewer.EditRow}"
                 ToolTipService.ShowOnDisabled="True"
+                ToolTip="{loc:Loc AudioProjectViewer.EditRow.ToolTip}"
                 Command="{Binding EditRowCommand}" 
-                IsEnabled="{Binding IsUpdateRowButtonEnabled}">
-
-                <Button.ToolTip>
-                    <ToolTip>
-                        <TextBlock 
-                            TextWrapping="Wrap">
-                            <Run 
-                                Text="Removes the selected row from the Audio Project and adds it to the Audio Project Editor."/>
-                            <LineBreak/>
-                            <LineBreak/>
-                            <Run 
-                                Text="Shortcut: Ctrl + E"/>
-                        </TextBlock>
-                    </ToolTip>
-                </Button.ToolTip>
-            </Button>
+                IsEnabled="{Binding IsUpdateRowButtonEnabled}"/>
             
             <Button 
                 Grid.Column="1"
                 Margin="5, 0, 0, 0" 
-                Width="93" 
+                Width="80"
                 VerticalAlignment="Center"
                 HorizontalAlignment="Left"
                 Content="{loc:Loc AudioProjectViewer.RemoveRow}"
                 ToolTipService.ShowOnDisabled="True"
+                ToolTip="{loc:Loc AudioProjectViewer.RemoveRow.ToolTip}"
                 Command="{Binding RemoveRowCommand}" 
-                IsEnabled="{Binding IsRemoveRowButtonEnabled}">
-
-                <Button.ToolTip>
-                    <ToolTip>
-                        <TextBlock TextWrapping="Wrap">
-                            <Run 
-                                Text="Removes the selected row(s) from the Audio Project."/>
-                            <LineBreak/>
-                            <LineBreak/>
-                            <Run 
-                                Text="Shortcuts: Delete / Backspace"/>
-                        </TextBlock>
-                    </ToolTip>
-                </Button.ToolTip>
-            </Button>
+                IsEnabled="{Binding IsRemoveRowButtonEnabled}"/>
         </Grid>
 
         <!-- Setting CanUserAddRows to false ensures that data won't go missing from the last row when a new row is added. Wtf WPF. -->
@@ -110,9 +83,10 @@
             Behaviours:DataGridColumnsBehavior.Columns ="{Binding DataGridColumns}"
             CanUserAddRows="False"
             ItemsSource="{Binding Table.DefaultView}"
+            MinColumnWidth="160"
             EnableRowVirtualization="True" 
             EnableColumnVirtualization="True"
-            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
             <DataGrid.RowStyle>
                 <Style 
@@ -124,20 +98,9 @@
 
                     <Setter Property="ToolTip">
                         <Setter.Value>
-                            <TextBlock TextWrapping="Wrap">
-                                <Run 
-                                    Text="To edit or remove rows select them."/>
-                                <LineBreak/>
-                                <LineBreak/>
-                                <Run 
-                                    Text="To copy and paste rows (Dialogue Events rows only) select them and right-click or use the shortcuts:"/>
-                                <LineBreak/>
-                                <Run 
-                                    Text="Copy: Ctrl + C"/>
-                                <LineBreak/>
-                                <Run 
-                                    Text="Paste: Ctrl + V"/>
-                            </TextBlock>
+                            <TextBlock
+                                TextWrapping="Wrap"
+                                Text="{loc:Loc AudioProjectViewer.RowToolTip}"/>
                         </Setter.Value>
                     </Setter>
                     
@@ -158,7 +121,7 @@
                                 Value="False" />
                             <Setter 
                                 Property="ToolTip"
-                                Value="This row cannot be selected directly, it is controlled by the corresponding &quot;Play_...&quot; Action Event." />
+                                Value="{loc:Loc AudioProjectViewer.DisabledRowToolTip}" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>

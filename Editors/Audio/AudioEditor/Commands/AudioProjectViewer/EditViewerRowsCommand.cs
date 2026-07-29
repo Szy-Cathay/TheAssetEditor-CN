@@ -10,21 +10,21 @@ namespace Editors.Audio.AudioEditor.Commands.AudioProjectViewer
 {
     public class EditViewerRowsCommand(
         IAudioEditorStateService audioEditorStateService,
-        IUiCommandFactory uiCommandFactory,
         IEventHub eventHub) : IUiCommand
     {
         private readonly IAudioEditorStateService _audioEditorStateService = audioEditorStateService;
-        private readonly IUiCommandFactory _uiCommandFactory = uiCommandFactory;
         private readonly IEventHub _eventHub = eventHub;
 
         private readonly ILogger _logger = Logging.Create<EditViewerRowsCommand>();
 
         public void Execute(List<DataRow> rows)
         {
-            // Publish before removing to ensure that an item is still selected
-            _eventHub.Publish(new ViewerTableRowEditedEvent(rows[0]));
+            if (rows == null || rows.Count == 0)
+                return;
 
-            _uiCommandFactory.Create<RemoveViewerRowsCommand>().Execute(rows);
+            _audioEditorStateService.StorePendingEditedViewerRows(
+                new List<DataRow>(rows));
+            _eventHub.Publish(new ViewerTableRowEditedEvent(rows[0]));
 
             var selectedAudioProjectExplorerNode = _audioEditorStateService.SelectedAudioProjectExplorerNode;
             _logger.Here().Information($"Editing {selectedAudioProjectExplorerNode.Type} row in Audio Project Viewer table for {selectedAudioProjectExplorerNode.Name}");

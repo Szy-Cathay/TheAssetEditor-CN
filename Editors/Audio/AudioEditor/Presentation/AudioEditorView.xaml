@@ -40,36 +40,54 @@
                 <RowDefinition 
                     Height="Auto"/>
             </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition
+                    Width="*"/>
+                <ColumnDefinition
+                    Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
             <Menu 
                 Grid.Row="0" 
+                Grid.Column="0"
                 Margin="0, 5, 5, 0">
                 <MenuItem 
                     Header="{loc:Loc AudioEditor.Menu.File}"
                     HorizontalAlignment="Left">
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.File.NewAudioProject}"
-                        Command="{Binding NewAudioProjectCommand}"/>
+                        Command="{Binding NewAudioProjectCommand}"
+                        IsEnabled="{Binding IsEditorIdle}"/>
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.File.OpenAudioProject}"
-                        Command="{Binding LoadAudioProjectCommand}"/>
+                        Command="{Binding LoadAudioProjectCommand}"
+                        IsEnabled="{Binding IsEditorIdle}"/>
+                    <MenuItem
+                        Header="{loc:Loc AudioEditor.Menu.File.CancelLoad}"
+                        Command="{Binding LoadAudioProjectCancelCommand}"
+                        IsEnabled="{Binding IsLoading}"/>
                     <Separator/>
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.File.SaveAudioProject}"
                         Command="{Binding SaveAudioProjectCommand}"
-                        IsEnabled="{Binding IsAudioProjectLoaded}"/>
+                        IsEnabled="{Binding CanEditAudioProject}"/>
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.File.CompileAudioProject}"
                         Command="{Binding CompileAudioProjectCommand}"
-                        IsEnabled="{Binding IsAudioProjectLoaded}"/>
+                        IsEnabled="{Binding CanEditAudioProject}"/>
+                    <MenuItem
+                        Header="{loc:Loc AudioEditor.Menu.File.CancelCompile}"
+                        Command="{Binding CompileAudioProjectCancelCommand}"
+                        IsEnabled="{Binding IsCompiling}"/>
                     <Separator/>
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.File.RefreshSourceIds}"
                         Command="{Binding RefreshSourceIdsCommand}"
-                        IsEnabled="{Binding IsAudioProjectLoaded}"/>
+                        IsEnabled="{Binding CanEditAudioProject}"/>
                 </MenuItem>
                 <MenuItem 
                     Header="{loc:Loc AudioEditor.Menu.Tools}"
+                    IsEnabled="{Binding IsEditorIdle}"
                     HorizontalAlignment="Left">
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.Tools.DialogueEventMerger}"
@@ -82,6 +100,27 @@
                         Command="{Binding OpenAudioProjectConverterCommand}"/>
                 </MenuItem>
             </Menu>
+
+            <StackPanel
+                Grid.Row="0"
+                Grid.Column="1"
+                Margin="10, 5, 10, 0"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+                <ProgressBar
+                    Width="110"
+                    Height="4"
+                    Margin="0, 0, 8, 0"
+                    IsIndeterminate="True"
+                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBlock
+                    MinWidth="72"
+                    MaxWidth="360"
+                    VerticalAlignment="Center"
+                    Text="{Binding CompileStatus}"
+                    TextTrimming="CharacterEllipsis"
+                    ToolTip="{Binding CompileStatus}"/>
+            </StackPanel>
         </Grid>
 
         <Border 
@@ -95,11 +134,13 @@
             
             <Grid.ColumnDefinitions>
                 <ColumnDefinition 
-                    Width="490"/>
+                    Width="2*"
+                    MinWidth="300"/>
                 <ColumnDefinition 
                     Width="Auto"/>
                 <ColumnDefinition 
-                    Width="*"/>
+                    Width="3*"
+                    MinWidth="380"/>
             </Grid.ColumnDefinitions>
 
             <Grid 
@@ -122,7 +163,7 @@
                         <RowDefinition 
                             Height="Auto"/>
                         <RowDefinition 
-                            Height="161"/>
+                            Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <AudioProjectExplorer:AudioProjectExplorerView
@@ -151,12 +192,14 @@
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"
-                        ResizeDirection="Rows"/>
+                        ResizeDirection="Rows"
+                        Visibility="{Binding WaveformVisualiserViewModel.HasSelectedAudio, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                     <WaveformVisualiser:WaveformVisualiserView 
                         Grid.Row="4"
                         Grid.Column="0"
-                        DataContext="{Binding WaveformVisualiserViewModel}"/>
+                        DataContext="{Binding WaveformVisualiserViewModel}"
+                        Visibility="{Binding HasSelectedAudio, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </Grid>
             </Grid>
 
@@ -205,5 +248,31 @@
                     DataContext="{Binding AudioProjectViewerViewModel}"/>
             </Grid>
         </Grid>
+
+        <Border
+            Grid.Row="2"
+            Panel.ZIndex="2"
+            Background="{DynamicResource TreeView.Static.Background}">
+            <Border.Style>
+                <Style TargetType="{x:Type Border}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger
+                            Binding="{Binding IsAudioProjectLoaded}"
+                            Value="False">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock
+                Margin="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Text="{Binding EmptyStateText}"
+                TextAlignment="Center"
+                TextWrapping="Wrap"/>
+        </Border>
     </Grid>
 </UserControl>

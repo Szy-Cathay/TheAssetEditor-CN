@@ -113,7 +113,6 @@ namespace Editors.Audio.AudioEditor.Core.AudioProjectMutation
 
             var soundBank = _audioEditorStateService.AudioProject.GetSoundBank(soundBankName);
             var actionEvent = soundBank.GetActionEvent(actionEventName);
-            soundBank.ActionEvents.Remove(actionEvent);
 
             // We let the Play Action Event remove the target objects rather than Pause / Resume / Stop Action Events as otherwise they'd
             // be removing objects that the Play Action Event removal process has already removed.
@@ -127,11 +126,18 @@ namespace Editors.Audio.AudioEditor.Core.AudioProjectMutation
                 // in the View Model when we send the rows to remove to the command we put the Play Action Events at the top of the list
                 // so this should always be null but in case it somehow isn't we check here.
                 if (playActionEvent != null)
-                    throw new InvalidOperationException("Cannot remove Pause / Resume / Stop Action Event target objects while the Play Action Event still exists.");
+                {
+                    throw new InvalidOperationException(
+                        global::Shared.Core.Services.LocalizationManager
+                            .Instance.Get(
+                                "Msg.AudioActionEventDependency"));
+                }
                 
+                soundBank.ActionEvents.Remove(actionEvent);
                 return;
             }
 
+            soundBank.ActionEvents.Remove(actionEvent);
             foreach (var action in actionEvent.Actions)
             {
                 if (action.TargetHircTypeIsSound())

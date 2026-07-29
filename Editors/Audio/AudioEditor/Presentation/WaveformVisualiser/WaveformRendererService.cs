@@ -33,6 +33,11 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
                 throw new ArgumentNullException(nameof(filePathKey));
 
             var packFile = _packFileService.FindFile(filePathKey);
+            if (packFile == null)
+                throw new FileNotFoundException(
+                    $"Waveform source file was not found: {filePathKey}",
+                    filePathKey);
+
             var data = packFile.DataSource.ReadData();
             return await RenderAsync(data, targetWidth, cancellationToken).ConfigureAwait(false);
         }
@@ -48,15 +53,18 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
                 () => RenderWaveformFromBytes(
                     wavData,
                     baseSettings,
-                    overlaySettings),
+                    overlaySettings,
+                    cancellationToken),
                 cancellationToken).ConfigureAwait(false);
         }
 
         private static WaveformRenderResult RenderWaveformFromBytes(
             byte[] data,
             WaveFormRendererSettings baseSettings,
-            WaveFormRendererSettings overlaySettings)
+            WaveFormRendererSettings overlaySettings,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using var memoryStream = new MemoryStream(data, writable: false);
             using var waveStream = new WaveFileReader(memoryStream);
             using var alignedWaveStream = new BlockAlignReductionStream(waveStream);
@@ -64,8 +72,10 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             var waveFormRenderer = new WaveFormRenderer();
 
             using var baseImageDrawing = waveFormRenderer.Render(alignedWaveStream, baseSettings);
+            cancellationToken.ThrowIfCancellationRequested();
             alignedWaveStream.Position = 0;
             using var overlayImageDrawing = waveFormRenderer.Render(alignedWaveStream, overlaySettings);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var baseBitmap = ToBitmapImage(baseImageDrawing);
             var overlayBitmap = ToBitmapImage(overlayImageDrawing);

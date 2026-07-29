@@ -14,11 +14,14 @@ using Editors.Audio.AudioEditor.Events.AudioProjectExplorer;
 using Editors.Audio.AudioEditor.Presentation.Shared.Models;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Shared.Core.Events;
+using Shared.Core.Services;
 using Shared.Ui.Common;
 
 namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
 {
-    public partial class AudioProjectExplorerViewModel : ObservableObject
+    public partial class AudioProjectExplorerViewModel :
+        ObservableObject,
+        IDisposable
     {
         private readonly IEventHub _eventHub;
         private readonly IAudioEditorStateService _audioEditorStateService;
@@ -50,7 +53,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
             _audioProjectTreeBuilder = audioProjectTreeBuilder;
             _audioProjectTreeFilterService = audioProjectTreeFilterService;
 
-            AudioProjectExplorerLabel = $"Audio Project Explorer";
+            AudioProjectExplorerLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectExplorer");
 
             _eventHub.Register<AudioProjectLoadedEvent>(this, OnAudioProjectInitialised);
         }
@@ -62,18 +65,21 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
             AudioProjectTree = _audioProjectTreeBuilder.BuildTree(_audioEditorStateService.AudioProject, ShowEditedItemsOnly);
 
             var audioProjectFileName = Path.GetFileNameWithoutExtension(_audioEditorStateService.AudioProjectFileName);
-            AudioProjectExplorerLabel = $"Audio Project Explorer - {WpfHelpers.DuplicateUnderscores(audioProjectFileName)}";
+            AudioProjectExplorerLabel =
+                $"{LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectExplorer")} - {WpfHelpers.DuplicateUnderscores(audioProjectFileName)}";
         }
 
         partial void OnSelectedNodeChanged(AudioProjectTreeNode value)
         {
-            _audioEditorStateService.StoreSelectedAudioProjectExplorerNode(SelectedNode);
-
-            _eventHub.Publish(new AudioProjectExplorerNodeSelectedEvent(SelectedNode));
-
+            _audioEditorStateService
+                .StoreSelectedAudioProjectExplorerNode(value);
             IsDialogueEventFilterEnabled = false;
+            _eventHub.Publish(
+                new AudioProjectExplorerNodeSelectedEvent(value));
+            if (value == null)
+                return;
 
-            if (SelectedNode.IsDialogueEvents())
+            if (value.IsDialogueEvents())
                 InitialiseDialogueEventFilters();
         }
 
@@ -88,6 +94,9 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
 
         partial void OnSelectedDialogueEventTypeChanged(Wh3DialogueEventType? value)
         {
+            if (SelectedNode == null)
+                return;
+
             SelectedNode.DialogueEventTypeFilter = value ?? Wh3DialogueEventType.TypeShowAll;
             SetDialogueEventFilterDisplayText();
             FilterAudioProjectTree();
@@ -95,6 +104,9 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
 
         partial void OnSelectedDialogueEventProfileChanged(Wh3DialogueEventUnitProfile? value)
         {
+            if (SelectedNode == null)
+                return;
+
             SelectedNode.DialogueEventProfileFilter = value ?? Wh3DialogueEventUnitProfile.ProfileShowAll;
             SetDialogueEventFilterDisplayText();
             FilterAudioProjectTree();
@@ -140,13 +152,25 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
                 {
                     await Task.Delay(250, cancellationToken);
 
-                    var application = Application.Current;
-                    if (application is not null && application.Dispatcher is not null)
-                        application.Dispatcher.Invoke(FilterAudioProjectTree);
-                    else
+                    var dispatcher = Application.Current?.Dispatcher;
+                    if (dispatcher == null)
+                    {
                         FilterAudioProjectTree();
+                    }
+                    else if (!dispatcher.HasShutdownStarted &&
+                             !dispatcher.HasShutdownFinished)
+                    {
+                        dispatcher.Invoke(FilterAudioProjectTree);
+                    }
                 }
                 catch (OperationCanceledException) { }
+                catch (InvalidOperationException)
+                    when (Application.Current?.Dispatcher
+                              .HasShutdownStarted == true ||
+                          Application.Current?.Dispatcher
+                              .HasShutdownFinished == true)
+                {
+                }
             }, cancellationToken);
         }
 
@@ -236,5 +260,12 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
         public void ResetDialogueEventTypeFilterComboBoxSelectedItem() => SelectedDialogueEventType = null;
 
         public void ResetDialogueEventProfileFilterComboBoxSelectedItem() => SelectedDialogueEventProfile = null;
+
+        public void Dispose()
+        {
+            _searchQueryDebounceCancellationTokenSource?.Cancel();
+            _searchQueryDebounceCancellationTokenSource?.Dispose();
+            _eventHub.UnRegister(this);
+        }
     }
 }

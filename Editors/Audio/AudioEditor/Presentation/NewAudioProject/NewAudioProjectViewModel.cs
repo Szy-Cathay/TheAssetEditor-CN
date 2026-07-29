@@ -1,10 +1,14 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.Audio.AudioEditor.Core;
+using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Models;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
+using Editors.Audio.Shared.Storage;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles;
@@ -16,13 +20,13 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
     public partial class NewAudioProjectViewModel : ObservableObject
     {
         private readonly IPackFileService _packFileService;
-        private readonly IAudioEditorStateService _audioEditorStateService;
         private readonly IAudioEditorFileService _audioEditorFileService;
         private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly IStandardDialogs _standardDialogs;
 
         readonly ILogger _logger = Logging.Create<NewAudioProjectViewModel>();
         private System.Action _closeAction;
+        private bool _closeWhenIdle;
 
         [ObservableProperty] private string _audioProjectFileName;
         [ObservableProperty] private string _audioProjectDirectory;
@@ -33,16 +37,17 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
         [ObservableProperty] private bool _isAudioProjectDirectorySet;
         [ObservableProperty] private bool _isLanguageSelected;
         [ObservableProperty] private bool _isOkButtonEnabled;
+        [ObservableProperty] private bool _isCreating;
+        [ObservableProperty] private string _validationMessage = string.Empty;
+        [ObservableProperty] private string _creationStatus = string.Empty;
 
         public NewAudioProjectViewModel(
             IPackFileService packFileService,
-            IAudioEditorStateService audioEditorStateService,
             IAudioEditorFileService audioEditorFileService,
             ApplicationSettingsService applicationSettingsService,
             IStandardDialogs standardDialogs)
         {
             _packFileService = packFileService;
-            _audioEditorStateService = audioEditorStateService;
             _audioEditorFileService = audioEditorFileService;
             _applicationSettingsService = applicationSettingsService;
             _standardDialogs = standardDialogs;
@@ -53,15 +58,19 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
 
         partial void OnAudioProjectFileNameChanged(string value)
         {
-            var audioProjectFileNameWithoutSpaces = value.Replace(" ", "_");
-            AudioProjectFileName = audioProjectFileNameWithoutSpaces;
-            IsAudioProjectFileNameSet = !string.IsNullOrEmpty(AudioProjectFileName);
+            IsAudioProjectFileNameSet =
+                AudioProjectNameValidator.TryNormalize(value, out _);
+            ValidationMessage = IsAudioProjectFileNameSet
+                ? string.Empty
+                : LocalizationManager.Instance.Get(
+                    "NewAudioProject.InvalidName");
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnAudioProjectDirectoryChanged(string value)
         {
-            IsAudioProjectDirectorySet = !string.IsNullOrEmpty(value);
+            IsAudioProjectDirectorySet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
@@ -73,8 +82,15 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
 
         private void UpdateOkButtonIsEnabled()
         {
-            IsOkButtonEnabled = IsAudioProjectFileNameSet && IsAudioProjectDirectorySet && IsLanguageSelected;
+            IsOkButtonEnabled =
+                IsAudioProjectFileNameSet &&
+                IsAudioProjectDirectorySet &&
+                IsLanguageSelected &&
+                !IsCreating;
         }
+
+        partial void OnIsCreatingChanged(bool value) =>
+            UpdateOkButtonIsEnabled();
 
         [RelayCommand] public void SetNewFileLocation()
         {
@@ -87,31 +103,109 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
             }
         }
 
-        [RelayCommand] public void CreateAudioProject()
+        [RelayCommand(IncludeCancelCommand = true)]
+        public async Task CreateAudioProject(
+            CancellationToken cancellationToken = default)
         {
             if (_packFileService.GetEditablePack() == null)
             {
-                CloseWindowAction();
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.NoEditablePack"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
                 return;
             }
 
             var currentGame = _applicationSettingsService.CurrentSettings.CurrentGame;
             if (currentGame != GameTypeEnum.Warhammer3)
-                throw new NotImplementedException($"The Audio Editor does not support the selected game.");
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "Msg.AudioEditorUnsupportedGame"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
 
-            var audioProjectFileNameWithoutSpaces = AudioProjectFileName.Replace(" ", "_");
-            var fileName = $"{audioProjectFileNameWithoutSpaces}.aproj";
+            if (!AudioProjectNameValidator.TryNormalize(
+                    AudioProjectFileName,
+                    out var normalizedName))
+            {
+                ValidationMessage = LocalizationManager.Instance.Get(
+                    "NewAudioProject.InvalidName");
+                return;
+            }
+
+            var fileName = $"{normalizedName}.aproj";
             var filePath = $"{AudioProjectDirectory}\\{fileName}";
             var language = Wh3LanguageInformation.GetLanguageAsString(SelectedLanguage);
 
-            var audioProject = AudioProjectFile.CreateNew(language, audioProjectFileNameWithoutSpaces);
+            var audioProject = AudioProjectFile.CreateNew(
+                language,
+                normalizedName);
+            var closeWhenComplete = false;
+            IsCreating = true;
+            CreationStatus = LocalizationManager.Instance.Get(
+                "NewAudioProject.Creating");
+            var progress = new Progress<AudioLoadProgress>(
+                loadProgress =>
+                    CreationStatus = LocalizationManager.Instance.GetFormat(
+                        "AudioEditor.Load.Progress",
+                        loadProgress.Completed,
+                        loadProgress.Total,
+                        loadProgress.CurrentFile));
+            try
+            {
+                if (!_audioEditorFileService.Save(
+                        audioProject,
+                        fileName,
+                        filePath,
+                        true))
+                {
+                    return;
+                }
 
-            _audioEditorStateService.StoreAudioProject(audioProject);
-            _audioEditorStateService.StoreAudioProjectFileName(fileName);
-            _audioEditorStateService.StoreAudioProjectFilePath(filePath);
+                closeWhenComplete = await _audioEditorFileService.LoadAsync(
+                    audioProject,
+                    fileName,
+                    filePath,
+                    false,
+                    progress,
+                    cancellationToken);
+                if (closeWhenComplete)
+                {
+                    CreationStatus = LocalizationManager.Instance.Get(
+                        "AudioEditor.Load.Completed");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                CreationStatus = LocalizationManager.Instance.Get(
+                    "AudioEditor.Load.Cancelled");
+            }
+            catch (Exception exception)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "Msg.AudioProjectCreateFailed",
+                        exception.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+            }
+            finally
+            {
+                IsCreating = false;
+                if (closeWhenComplete || _closeWhenIdle)
+                    CloseWindowAction();
+            }
+        }
 
-            _audioEditorFileService.Save(audioProject, fileName, filePath);
-            _audioEditorFileService.Load(audioProject, fileName, filePath);
+        [RelayCommand]
+        public void CancelOrClose()
+        {
+            if (IsCreating)
+            {
+                _closeWhenIdle = true;
+                CreateAudioProjectCommand.Cancel();
+                return;
+            }
 
             CloseWindowAction();
         }

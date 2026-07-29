@@ -24,7 +24,7 @@ namespace Editors.Audio.Shared.Wwise.Generators.Hirc.V136
             randomSequenceContainerHirc.LoopModMax = 0;
 
             if (audioProjectRandomSequenceContainer.HircSettings.TransitionDuration != 1)
-                randomSequenceContainerHirc.TransitionTime = (ushort)audioProjectRandomSequenceContainer.HircSettings.TransitionDuration * 1000;
+                randomSequenceContainerHirc.TransitionTime = (float)(audioProjectRandomSequenceContainer.HircSettings.TransitionDuration * 1000);
             else
                 randomSequenceContainerHirc.TransitionTime = 1 * 1000;
 

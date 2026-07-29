@@ -443,6 +443,38 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void ConvertFileUsingVgStream_PreCancelled_PreservesExistingTarget()
+        {
+            var directory = Path.Combine(
+                Path.GetTempPath(),
+                $"AssetEditorAudioTests-{Guid.NewGuid():N}");
+            var sourcePath = Path.Combine(directory, "input.wem");
+            var targetPath = Path.Combine(directory, "existing.wav");
+            Directory.CreateDirectory(directory);
+            File.WriteAllBytes(sourcePath, [0]);
+            File.WriteAllBytes(targetPath, [1, 2, 3]);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            try
+            {
+                Assert.ThrowsException<OperationCanceledException>(() =>
+                    new VgStreamWrapper().ConvertFileUsingVgStream(
+                        sourcePath,
+                        targetPath,
+                        cancellation.Token));
+
+                CollectionAssert.AreEqual(
+                    new byte[] { 1, 2, 3 },
+                    File.ReadAllBytes(targetPath));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [TestMethod]
         public void ExportFileToAEFolder_ReportsWriteFailure()
         {
             var packFileService = new Mock<IPackFileService>();

@@ -1,21 +1,25 @@
 ﻿using System.Collections.Generic;
 using Editors.Audio.Shared.AudioProject.Models;
+using Editors.Audio.Shared.AudioProject;
 using Shared.Core.PackFiles.Models;
-using Shared.Core.Services;
 using Shared.GameFormats.Dat;
 
 namespace Editors.Audio.Shared.Dat
 {
     public interface IDatGeneratorService
     {
-        void GenerateEventDatFile(string audioProjectNameWithoutExtension, List<ActionEvent> actionEvents = null, List<StateGroup> stateGroups = null);
+        AudioPackOutput GenerateEventDatFile(
+            string audioProjectNameWithoutExtension,
+            List<ActionEvent> actionEvents = null,
+            List<StateGroup> stateGroups = null);
     }
 
-    public class DatGeneratorService(IFileSaveService fileSaveService) : IDatGeneratorService
+    public class DatGeneratorService : IDatGeneratorService
     {
-        private readonly IFileSaveService _fileSaveService = fileSaveService;
-
-        public void GenerateEventDatFile(string audioProjectNameWithoutExtension, List<ActionEvent> actionEvents = null, List<StateGroup> stateGroups = null)
+        public AudioPackOutput GenerateEventDatFile(
+            string audioProjectNameWithoutExtension,
+            List<ActionEvent> actionEvents = null,
+            List<StateGroup> stateGroups = null)
         {
             var datFile = new SoundDatFile();
 
@@ -40,15 +44,21 @@ namespace Editors.Audio.Shared.Dat
 
             var datFileName = $"event_data__{audioProjectNameWithoutExtension}.dat";
             var datFilePath = $"audio\\wwise\\{datFileName}";
-            SaveDatFileToPack(datFile, datFileName, datFilePath);
+            return CreateDatOutput(datFile, datFileName, datFilePath);
         }
 
-        private void SaveDatFileToPack(SoundDatFile datFile, string datFileName, string datFilePath)
+        private static AudioPackOutput CreateDatOutput(
+            SoundDatFile datFile,
+            string datFileName,
+            string datFilePath)
         {
             var bytes = DatFileParser.WriteData(datFile);
             var packFile = new PackFile(datFileName, new MemorySource(bytes));
             var reparsedSanityFile = DatFileParser.Parse(packFile, false);
-            _fileSaveService.Save(datFilePath, packFile.DataSource.ReadData(), false);
+            return new AudioPackOutput(
+                datFileName,
+                datFilePath,
+                packFile.DataSource.ReadData());
         }
     }
 }

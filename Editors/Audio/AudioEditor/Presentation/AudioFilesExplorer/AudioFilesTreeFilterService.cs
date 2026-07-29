@@ -8,6 +8,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
     public interface IAudioFilesTreeSearchFilterService
     {
         void FilterTree(ObservableCollection<AudioFilesTreeNode> audioFilesTree, string query);
+        void Reset();
     }
 
     public record AudioFilesNodeState(bool IsVisible, bool IsExpanded);
@@ -40,6 +41,14 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
 
             foreach (var root in audioFilesTree)
                 FilterNode(root);
+        }
+
+        public void Reset()
+        {
+            _query = string.Empty;
+            _hasSearchQuery = false;
+            _wasSearching = false;
+            ClearSavedPreSearchState();
         }
 
         private void SavePreSearchState(ObservableCollection<AudioFilesTreeNode> roots)

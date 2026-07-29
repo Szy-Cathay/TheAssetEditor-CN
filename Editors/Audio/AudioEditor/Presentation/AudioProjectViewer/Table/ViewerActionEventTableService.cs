@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.AudioEditor.Events.AudioProjectViewer.Table;
 using Editors.Audio.AudioEditor.Presentation.Shared.Models;
@@ -62,7 +63,9 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer.Table
             var audioProjectNameWithoutExtension = Path.GetFileNameWithoutExtension(_audioEditorStateService.AudioProjectFileName);
             var soundBankName = $"{gameSoundBank}_{audioProjectNameWithoutExtension}";
             var soundBank = _audioEditorStateService.AudioProject.GetSoundBank(soundBankName);
-            foreach (var actionEvent in soundBank.ActionEvents)
+            var actionEventType = Wh3ActionEventInformation.GetActionEventType(actionEventName);
+            foreach (var actionEvent in soundBank.ActionEvents.Where(
+                actionEvent => actionEvent.ActionEventType == actionEventType))
             {
                 var row = table.NewRow();
                 row[TableInformation.ActionEventColumnName] = actionEvent.Name;

@@ -170,7 +170,12 @@ namespace AssetEditor.ViewModels
                 .ToList();
 
             foreach (var item in infos)
-                Editors.Add(new EditorShortcutViewModel(item, _uiCommandFactory));   
+            {
+                Editors.Add(new EditorShortcutViewModel(
+                    item,
+                    _uiCommandFactory,
+                    _settingsService));
+            }
         }
     }
 }

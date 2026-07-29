@@ -5,6 +5,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using Serilog;
 using Shared.Core.ErrorHandling;
@@ -20,19 +22,15 @@ namespace Editors.Audio.Shared.Wwise
 
         private readonly ILogger _logger = Logging.Create<WSourcesWrapper>();
 
-        private readonly string _wavToWemFolderPath = $"{DirectoryHelper.Temp}\\WavToWem";
-        private readonly string _audioFolderPath = $"{DirectoryHelper.Temp}\\Audio";
-        private readonly string _excessFilesFolderPath = $"{DirectoryHelper.Temp}\\Audio\\Windows";
-        private readonly string _wsourcesPath = $"{DirectoryHelper.Temp}\\WavToWem\\wav_to_wem.wsources";
-        private readonly string _wwiseCliPath;
-
         public WSourcesWrapper(ApplicationSettingsService applicationSettingsService)
         {
             _applicationSettingsService = applicationSettingsService;
-            _wwiseCliPath = _applicationSettingsService.CurrentSettings.WwisePath;
         }
 
-        public void CreateWsourcesFile(List<string> wavFilesNames)
+        public void CreateWsourcesFile(
+            List<string> wavFilesNames,
+            string audioFolderPath,
+            string wsourcesPath)
         {
             var sources = from wavFileName in wavFilesNames 
                           select new XElement("Source", new XAttribute("Path", wavFileName), new XAttribute("Conversion", "Vorbis Quality High"));
@@ -41,66 +39,123 @@ namespace Editors.Audio.Shared.Wwise
                 new XDeclaration("1.0", "UTF-8", null), 
                 new XElement("ExternalSourcesList", 
                 new XAttribute("SchemaVersion", "1"), 
-                new XAttribute("Root", _audioFolderPath), 
+                new XAttribute("Root", audioFolderPath),
                 sources));
 
-            document.Save(_wsourcesPath);
+            document.Save(wsourcesPath);
 
-            _logger.Here().Information($"Saved WSources file to {_wsourcesPath}");
+            _logger.Here().Information(
+                $"Saved WSources file to {wsourcesPath}");
         }
 
-        public void RunExternalCommand(string arguments)
+        public async Task RunExternalCommandAsync(
+            string arguments,
+            CancellationToken cancellationToken = default)
         {
             _logger.Here().Information($"Running WwiseCLI.exe with arguments {arguments}");
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                var wwiseCliPath =
+                    _applicationSettingsService.CurrentSettings.WwisePath;
+                if (string.IsNullOrWhiteSpace(wwiseCliPath) ||
+                    !File.Exists(wwiseCliPath))
+                {
+                    throw new FileNotFoundException(
+                        "WwiseCLI.exe was not found. Configure a valid Wwise path in Settings.",
+                        wwiseCliPath);
+                }
+
                 var startInfo = new ProcessStartInfo()
                 {
-                    FileName = _wwiseCliPath,
+                    FileName = wwiseCliPath,
                     Arguments = arguments,
                     UseShellExecute = false,
-                    CreateNoWindow = false,
+                    CreateNoWindow = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
                 };
 
-                using var process = Process.Start(startInfo);
-                process.WaitForExit();
+                using var process = Process.Start(startInfo) ??
+                    throw new InvalidOperationException("WwiseCLI.exe failed to start.");
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
 
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
+                try
+                {
+                    await process.WaitForExitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+
+                        using var cleanupCancellation =
+                            new CancellationTokenSource(
+                                TimeSpan.FromSeconds(2));
+                        await process.WaitForExitAsync(
+                            cleanupCancellation.Token);
+                        await Task.WhenAll(outputTask, errorTask);
+                    }
+                    catch
+                    {
+                        // Preserve the original cancellation during best-effort cleanup.
+                    }
+
+                    throw;
+                }
+
+                var output = await outputTask;
+                var error = await errorTask;
 
                 _logger.Here().Information($"{output}");
                 if (!string.IsNullOrEmpty(error))
                     _logger.Here().Error($"{error}");
+
+                if (process.ExitCode != 0)
+                    throw new InvalidOperationException($"WwiseCLI.exe exited with code {process.ExitCode}.");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception e)
             {
-                throw new InvalidOperationException($"Error running command: {e.Message}");
+                throw new InvalidOperationException($"Error running command: {e.Message}", e);
             }
         }
 
-        public void DeleteExcessStuff()
+        public void DeleteExcessStuff(string audioFolderPath)
         {
-            if (Directory.Exists(_excessFilesFolderPath))
+            var excessFilesFolderPath = Path.Combine(
+                audioFolderPath,
+                "Windows");
+            if (Directory.Exists(excessFilesFolderPath))
             {
-                var wemFiles = Directory.GetFiles(_excessFilesFolderPath, "*.wem");
+                var wemFiles = Directory.GetFiles(
+                    excessFilesFolderPath,
+                    "*.wem");
                 foreach (var file in wemFiles)
                 {
                     var fileName = Path.GetFileName(file);
-                    var fileDestination = Path.Combine(_audioFolderPath, fileName);
+                    var fileDestination = Path.Combine(
+                        audioFolderPath,
+                        fileName);
 
                     if (!File.Exists(fileDestination))
                         File.Move(file, fileDestination);
                 }
 
-                var remainingFiles = Directory.GetFiles(_excessFilesFolderPath);
+                var remainingFiles =
+                    Directory.GetFiles(excessFilesFolderPath);
                 foreach (var file in remainingFiles)
                     File.Delete(file);
 
                 try
                 {
-                    Directory.Delete(_excessFilesFolderPath, true);
+                    Directory.Delete(excessFilesFolderPath, true);
                 }
                 catch (IOException e)
                 {
@@ -109,23 +164,30 @@ namespace Editors.Audio.Shared.Wwise
             }
             else
             {
-                _logger.Here().Information($"The directory {_excessFilesFolderPath} does not exist.");
+                _logger.Here().Information(
+                    $"The directory {excessFilesFolderPath} does not exist.");
             }
         }
 
-        public void InitialiseWwiseProject()
+        public void InitialiseWwiseProject(
+            string wavToWemFolderPath)
         {
             var assemblyName = "Shared.EmbeddedResources";
             var assembly = Assembly.Load(assemblyName);
             var resourceRootNamespace = $"{assemblyName}.Resources.AudioConversion";
-            var wavToWemWwiseProjectPath = Path.Combine(_wavToWemFolderPath, "WavToWemWwiseProjectPath");
+            var wavToWemWwiseProjectPath = Path.Combine(
+                wavToWemFolderPath,
+                "WavToWemWwiseProject");
 
             if (Directory.Exists(wavToWemWwiseProjectPath))
                 return;
 
             // TODO: Update this for game abstraction, currently it's set to the WH3 Wwise Project resource but for future games will need abstraction.
             var resourceFolderPath = $"{resourceRootNamespace}.Wh3WavToWemWwiseProject.Wh3WavToWemWwiseProject.zip";
-            var tempZipPath = Path.Combine(Path.GetTempPath(), "Wh3WavToWemWwiseProject.zip");
+            DirectoryHelper.EnsureCreated(wavToWemFolderPath);
+            var tempZipPath = Path.Combine(
+                wavToWemFolderPath,
+                $"Wh3WavToWemWwiseProject-{Guid.NewGuid():N}.zip");
 
             using (var resourceStream = assembly.GetManifestResourceStream(resourceFolderPath))
             {
@@ -136,7 +198,10 @@ namespace Editors.Audio.Shared.Wwise
                 resourceStream.CopyTo(fileStream);
             }
 
-            ZipFile.ExtractToDirectory(tempZipPath, _wavToWemFolderPath, overwriteFiles: true);
+            ZipFile.ExtractToDirectory(
+                tempZipPath,
+                wavToWemFolderPath,
+                overwriteFiles: true);
             File.Delete(tempZipPath);
         }
     }

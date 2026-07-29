@@ -14,6 +14,7 @@ using Editors.Audio.AudioEditor.Events.WaveformVisualiser;
 using Editors.Audio.Shared.Wwise;
 using NAudio.Wave;
 using Shared.Core.Events;
+using Shared.Core.Services;
 using Shared.Ui.Common;
 
 namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
@@ -29,6 +30,8 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
 
         private readonly SemaphoreSlim _waveformRenderGate = new(1, 1);
         private readonly List<string> _currentPlaylistFilePaths = [];
+        private readonly CancellationTokenSource
+            _lifetimeCancellationTokenSource = new();
 
         private bool _isWaveformPlayheadRenderingEnabled;
         private DateTime _lastFrameUtc;
@@ -40,6 +43,7 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
         private DateTime _lastPlaybackTimerTextUpdateUtc = DateTime.MinValue;
 
         private string _currentFilePathKey;
+        private string _loadedFilePath;
         private int _currentPlaylistIndex = -1;
         private bool _isExplicitStopRequested;
         
@@ -52,6 +56,10 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
         [ObservableProperty] private double _hostWidth;
         [ObservableProperty] private TimeSpan _currentPlaybackTime = TimeSpan.Zero;
         [ObservableProperty] private TimeSpan _totalPlaybackTime = TimeSpan.Zero;
+        [ObservableProperty] private bool _hasSelectedAudio;
+        [ObservableProperty] private string _playPauseLabel =
+            LocalizationManager.Instance.Get("WaveformVisualiser.Play");
+        [ObservableProperty] private string _playbackStatus = string.Empty;
 
         public WaveformVisualiserViewModel(
             IEventHub eventHub,
@@ -69,6 +77,7 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             _eventHub.Register<PlayAudioRequestedEvent>(this, OnPlayAudioRequested);
             _eventHub.Register<CacheWaveformRequestedEvent>(this, OnCacheWaveformRequested);
             _eventHub.Register<DecacheWaveformRequestedEvent>(this, OnDecacheWaveformRequested);
+            _eventHub.Register<WaveformCacheInvalidatedEvent>(this, OnWaveformCacheInvalidated);
 
             _soundEngine.PlaybackStopped += OnPlaybackStopped;
 
@@ -117,12 +126,22 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             }
         }
 
+        public void OnWaveformCacheInvalidated(WaveformCacheInvalidatedEvent e)
+        {
+            ClearWaveformPreview();
+            if (!string.IsNullOrWhiteSpace(_currentFilePathKey))
+                _ = RenderWaveformPreviewAsync();
+        }
+
         public void SetSelectedPlaylist(List<string> filePaths)
         {
             StopWaveformPlayheadRendering();
-            _soundEngine.Stop();
+            StopPlaybackExplicitly();
+            ClearWaveformPreview();
 
             _currentPlaylistFilePaths.Clear();
+            _loadedFilePath = string.Empty;
+            PlaybackStatus = string.Empty;
             if (filePaths != null)
             {
                 var validDistinctPaths = filePaths
@@ -137,16 +156,16 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
                 _currentPlaylistIndex = 0;
             else
                 _currentPlaylistIndex = -1;
+            HasSelectedAudio = _currentPlaylistIndex >= 0;
 
             _visualSeconds = 0;
 
             CurrentPlaybackTime = TimeSpan.Zero;
 
-            LoadWaveformImagesIntoCacheForCurrentWidth(_currentPlaylistFilePaths);
-
             if (_currentPlaylistIndex >= 0)
             {
                 _currentFilePathKey = _currentPlaylistFilePaths[_currentPlaylistIndex];
+                LoadWaveformImagesIntoCacheForCurrentWidth(_currentPlaylistFilePaths);
                 UpdateWaveformVisualiserLabel();
                 UpdateTotalPlaybackTimeFromFilePath(_currentFilePathKey);
                 ResetWaveformPlayheadAndProgress();
@@ -206,21 +225,96 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             if (string.IsNullOrWhiteSpace(_currentFilePathKey))
                 return;
 
-            if (_soundEngine.PlaybackState == PlaybackState.Stopped)
+            try
             {
-                _soundEngine.LoadFromFilePath(_currentFilePathKey);
+                EnsureCurrentAudioLoaded();
 
-                _visualSeconds = 0;
-                CurrentPlaybackTime = TimeSpan.Zero;
-                ResetWaveformPlayheadAndProgress();
+                _soundEngine.PlayPause();
+
+                if (_soundEngine.PlaybackState == PlaybackState.Playing)
+                    StartWaveformPlayheadRendering();
+                else
+                    StopWaveformPlayheadRendering();
+
+                PlaybackStatus = string.Empty;
+                UpdatePlayPauseLabel();
+            }
+            catch (Exception exception)
+            {
+                StopWaveformPlayheadRendering();
+                PlaybackStatus = LocalizationManager.Instance.GetFormat(
+                    "WaveformVisualiser.PlaybackFailed",
+                    exception.Message);
+                UpdatePlayPauseLabel();
+            }
+        }
+
+        [RelayCommand]
+        private void Stop()
+        {
+            StopWaveformPlayheadRendering();
+            StopPlaybackExplicitly();
+            _visualSeconds = 0;
+            CurrentPlaybackTime = TimeSpan.Zero;
+            ResetWaveformPlayheadAndProgress();
+            UpdatePlayPauseLabel();
+        }
+
+        public void SeekToRatio(double ratio)
+        {
+            if (string.IsNullOrWhiteSpace(_currentFilePathKey) ||
+                TotalPlaybackTime <= TimeSpan.Zero)
+            {
+                return;
             }
 
-            _soundEngine.PlayPause();
+            try
+            {
+                EnsureCurrentAudioLoaded();
+                var clampedRatio = Math.Clamp(ratio, 0, 1);
+                var targetTime = TimeSpan.FromTicks(
+                    (long)(TotalPlaybackTime.Ticks * clampedRatio));
+                _soundEngine.SetPlaybackTime(targetTime);
+                _visualSeconds = targetTime.TotalSeconds;
+                CurrentPlaybackTime = targetTime;
+                AudioWaveformOverlayClip = new Rect(
+                    0,
+                    0,
+                    WaveformPixelWidth * clampedRatio,
+                    WaveformPixelHeight);
+                PlaybackStatus = string.Empty;
+            }
+            catch (Exception exception)
+            {
+                PlaybackStatus = LocalizationManager.Instance.GetFormat(
+                    "WaveformVisualiser.PlaybackFailed",
+                    exception.Message);
+            }
+        }
 
-            if (_soundEngine.PlaybackState == PlaybackState.Playing)
-                StartWaveformPlayheadRendering();
-            else
-                StopWaveformPlayheadRendering();
+        private void EnsureCurrentAudioLoaded()
+        {
+            if (string.Equals(
+                    _loadedFilePath,
+                    _currentFilePathKey,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _soundEngine.LoadFromFilePath(_currentFilePathKey);
+            _loadedFilePath = _currentFilePathKey;
+            _visualSeconds = 0;
+            CurrentPlaybackTime = TimeSpan.Zero;
+            ResetWaveformPlayheadAndProgress();
+        }
+
+        private void UpdatePlayPauseLabel()
+        {
+            PlayPauseLabel = LocalizationManager.Instance.Get(
+                _soundEngine.PlaybackState == PlaybackState.Playing
+                    ? "WaveformVisualiser.Pause"
+                    : "WaveformVisualiser.Play");
         }
 
         private async Task RenderWaveformPreviewAsync()
@@ -233,54 +327,111 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             }
 
             var cancellationToken = _waveformRenderCancellationTokenSource.Token;
+            var filePathKey = _currentFilePathKey;
 
-            if (string.IsNullOrWhiteSpace(_currentFilePathKey))
+            if (string.IsNullOrWhiteSpace(filePathKey))
                 return;
 
-            await _waveformRenderGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var gateEntered = false;
             try
             {
+                await _waveformRenderGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                gateEntered = true;
+
                 var targetWidth = GetTargetWidth();
 
-                var cachedResult = _waveformVisualisationCacheService.GetWaveformVisualisation(_currentFilePathKey, targetWidth);
+                var cachedResult = _waveformVisualisationCacheService.GetWaveformVisualisation(filePathKey, targetWidth);
                 if (cachedResult != null)
                 {
-                    ApplyWaveformBitmaps(cachedResult.Visualisation.BaseImage, cachedResult.Visualisation.OverlayImage);
-                    TotalPlaybackTime = cachedResult.TotalTime;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!IsCurrentFilePath(filePathKey))
+                        return;
+
+                    ApplyWaveformResult(cachedResult);
                     return;
                 }
 
-                var result = await _waveformRendererService.RenderAsync(_currentFilePathKey, targetWidth, cancellationToken).ConfigureAwait(false);
-                _waveformVisualisationCacheService.Store(_currentFilePathKey, result);
+                var result = await _waveformRendererService.RenderAsync(filePathKey, targetWidth, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsCurrentFilePath(filePathKey))
+                    return;
 
-                ApplyWaveformBitmaps(result.Visualisation.BaseImage, result.Visualisation.OverlayImage);
-                TotalPlaybackTime = result.TotalTime;
+                _waveformVisualisationCacheService.Store(filePathKey, result);
+
+                ApplyWaveformResult(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+            catch (Exception exception)
+            {
+                if (IsCurrentFilePath(filePathKey))
+                {
+                    RunOnUiThread(() =>
+                        PlaybackStatus = LocalizationManager.Instance.GetFormat(
+                            "WaveformVisualiser.RenderFailed",
+                            exception.Message));
+                }
             }
             finally
             {
-                _waveformRenderGate.Release();
+                if (gateEntered)
+                    _waveformRenderGate.Release();
             }
         }
 
+        private bool IsCurrentFilePath(string filePath) =>
+            string.Equals(filePath, _currentFilePathKey, StringComparison.OrdinalIgnoreCase);
 
-        private void ApplyWaveformBitmaps(BitmapImage baseImage, BitmapImage overlayImage)
+
+        private void ApplyWaveformResult(
+            WaveformRenderResult waveformRenderResult)
         {
             void Apply()
             {
+                var baseImage =
+                    waveformRenderResult.Visualisation.BaseImage;
+                var overlayImage =
+                    waveformRenderResult.Visualisation.OverlayImage;
                 AudioWaveformBaseImageSource = baseImage;
                 AudioWaveformOverlayImageSource = overlayImage;
 
                 WaveformPixelWidth = baseImage.PixelWidth;
                 WaveformPixelHeight = baseImage.PixelHeight;
+                TotalPlaybackTime = waveformRenderResult.TotalTime;
+                PlaybackStatus = string.Empty;
 
                 AudioWaveformOverlayClip = new Rect(0, 0, 0, WaveformPixelHeight);
             }
 
+            RunOnUiThread(Apply);
+        }
+
+        private static void RunOnUiThread(Action action)
+        {
             var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-                dispatcher.Invoke(Apply);
-            else
-                Apply();
+            if (dispatcher == null || dispatcher.CheckAccess())
+            {
+                action();
+                return;
+            }
+
+            if (dispatcher.HasShutdownStarted ||
+                dispatcher.HasShutdownFinished)
+            {
+                return;
+            }
+
+            try
+            {
+                dispatcher.Invoke(action);
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            catch (InvalidOperationException)
+                when (dispatcher.HasShutdownStarted ||
+                      dispatcher.HasShutdownFinished)
+            {
+            }
         }
 
         private int GetTargetWidth()
@@ -353,11 +504,15 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
         public void SetSelectedFilePath(string filePath)
         {
             StopWaveformPlayheadRendering();
-            _soundEngine.Stop();
+            StopPlaybackExplicitly();
+            ClearWaveformPreview();
 
             _visualSeconds = 0;
 
             _currentFilePathKey = filePath;
+            _loadedFilePath = string.Empty;
+            HasSelectedAudio = !string.IsNullOrWhiteSpace(filePath);
+            PlaybackStatus = string.Empty;
             UpdateWaveformVisualiserLabel();
             UpdateTotalPlaybackTimeFromFilePath(_currentFilePathKey);
 
@@ -369,83 +524,144 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
 
         private void OnPlaybackStopped(object sender, StoppedEventArgs e)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            void HandlePlaybackStopped()
             {
+                var wasExplicitStop = _isExplicitStopRequested;
+                _isExplicitStopRequested = false;
+
+                ResetWaveformPlayheadAndProgress();
+                StopWaveformPlayheadRendering();
+                CurrentPlaybackTime = TimeSpan.Zero;
+
+                if (wasExplicitStop)
+                {
+                    UpdatePlayPauseLabel();
+                    return;
+                }
+
+                if (e != null && e.Exception != null)
+                {
+                    PlaybackStatus = LocalizationManager.Instance.GetFormat(
+                        "WaveformVisualiser.PlaybackFailed",
+                        e.Exception.Message);
+                    UpdatePlayPauseLabel();
+                    return;
+                }
+
+                if (_currentPlaylistFilePaths.Count == 0)
+                {
+                    UpdatePlayPauseLabel();
+                    return;
+                }
+
+                var nextIndex = _currentPlaylistIndex + 1;
+                if (nextIndex >= 0 && nextIndex < _currentPlaylistFilePaths.Count)
+                {
+                    _currentPlaylistIndex = nextIndex;
+                    var nextPath = _currentPlaylistFilePaths[_currentPlaylistIndex];
+
+                    SetSelectedFilePath(nextPath);
+                    PlayPause();
+                }
+                else
+                    UpdatePlayPauseLabel();
+            }
+
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                if (dispatcher.HasShutdownStarted ||
+                    dispatcher.HasShutdownFinished)
+                {
+                    return;
+                }
+
                 try
                 {
-                    var wasExplicitStop = _isExplicitStopRequested;
-                    _isExplicitStopRequested = false;
-
-                    ResetWaveformPlayheadAndProgress();
-                    StopWaveformPlayheadRendering();
-                    CurrentPlaybackTime = TimeSpan.Zero;
-
-                    if (wasExplicitStop)
-                        return;
-
-                    if (e != null && e.Exception != null)
-                        return;
-
-                    if (_currentPlaylistFilePaths.Count == 0)
-                        return;
-
-                    var nextIndex = _currentPlaylistIndex + 1;
-                    if (nextIndex >= 0 && nextIndex < _currentPlaylistFilePaths.Count)
-                    {
-                        _currentPlaylistIndex = nextIndex;
-                        var nextPath = _currentPlaylistFilePaths[_currentPlaylistIndex];
-
-                        SetSelectedFilePath(nextPath);
-                        PlayPause();
-                    }
+                    dispatcher.Invoke(HandlePlaybackStopped);
                 }
-                finally { }
-            });
+                catch (TaskCanceledException)
+                {
+                }
+                catch (InvalidOperationException)
+                    when (dispatcher.HasShutdownStarted ||
+                          dispatcher.HasShutdownFinished)
+                {
+                }
+
+                return;
+            }
+
+            HandlePlaybackStopped();
+        }
+
+        private void StopPlaybackExplicitly()
+        {
+            _isExplicitStopRequested =
+                _soundEngine.PlaybackState != PlaybackState.Stopped;
+            _soundEngine.Stop();
         }
 
         private void ResetWaveformPlayheadAndProgress() => AudioWaveformOverlayClip = new Rect(0, 0, 0, WaveformPixelHeight);
 
         private void LoadWaveformImagesIntoCacheForCurrentWidth(IEnumerable<string> filePaths)
         {
-            var targetWidth = GetTargetWidth();
+            var filePathsToPreload = (filePaths ?? [])
+                .Where(filePath => !string.Equals(
+                    filePath,
+                    _currentFilePathKey,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (filePathsToPreload.Length == 0)
+                return;
 
-            var cancellationTokenSource = new CancellationTokenSource();
-            _ = _waveformVisualisationCacheService.PreloadWaveformVisualisationsAsync(filePaths, targetWidth, _waveformRendererService, cancellationTokenSource.Token);
+            var targetWidth = GetTargetWidth();
+            _ = _waveformVisualisationCacheService.PreloadWaveformVisualisationsAsync(
+                filePathsToPreload,
+                targetWidth,
+                _waveformRendererService,
+                _lifetimeCancellationTokenSource.Token);
+        }
+
+        private void ClearWaveformPreview()
+        {
+            AudioWaveformBaseImageSource = null;
+            AudioWaveformOverlayImageSource = null;
+            WaveformPixelWidth = 0;
+            WaveformPixelHeight = 0;
+            CurrentPlaybackTime = TimeSpan.Zero;
+            TotalPlaybackTime = TimeSpan.Zero;
+            AudioWaveformOverlayClip = new Rect(0, 0, 0, 0);
         }
 
         private void UpdateWaveformVisualiserLabel()
         {
             if (string.IsNullOrWhiteSpace(_currentFilePathKey))
-                WaveformVisualiserLabel = "Sound Engine";
+                WaveformVisualiserLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.WaveformVisualiser");
             else
             {
                 var fileName = Path.GetFileName(_currentFilePathKey);
-                WaveformVisualiserLabel = $"Sound Engine – {WpfHelpers.DuplicateUnderscores(fileName)}";
+                WaveformVisualiserLabel =
+                    $"{LocalizationManager.Instance.Get("AudioEditor.Panel.WaveformVisualiser")} - {WpfHelpers.DuplicateUnderscores(fileName)}";
             }
         }
 
         private void UpdateTotalPlaybackTimeFromFilePath(string filePath)
         {
-            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
-            {
-                TotalPlaybackTime = TimeSpan.Zero;
-                return;
-            }
-
-            try
-            {
-                using var reader = new WaveFileReader(filePath);
-                TotalPlaybackTime = reader.TotalTime;
-            }
-            catch
-            {
-                TotalPlaybackTime = TimeSpan.Zero;
-            }
+            var cachedResult = string.IsNullOrWhiteSpace(filePath)
+                ? null
+                : _waveformVisualisationCacheService.GetWaveformVisualisation(
+                    filePath,
+                    GetTargetWidth());
+            TotalPlaybackTime = cachedResult?.TotalTime ?? TimeSpan.Zero;
         }
 
         public void Dispose()
         {
+            _lifetimeCancellationTokenSource.Cancel();
             StopWaveformPlayheadRendering();
+            _eventHub.UnRegister(this);
+            _soundEngine.PlaybackStopped -= OnPlaybackStopped;
             _soundEngine.Dispose();
 
             if (_waveformRenderCancellationTokenSource != null)
@@ -459,6 +675,8 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
                 _waveformResizeDebounceCancellationTokenSource.Cancel();
                 _waveformResizeDebounceCancellationTokenSource.Dispose();
             }
+
+            _lifetimeCancellationTokenSource.Dispose();
         }
 
         public void SetSelectedHostWidth(double width) => HostWidth = width;

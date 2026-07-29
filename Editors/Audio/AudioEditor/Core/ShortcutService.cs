@@ -6,61 +6,133 @@ using Shared.Core.Events;
 
 namespace Editors.Audio.AudioEditor.Core
 {
+    public enum AudioEditorFocusTarget
+    {
+        Unknown,
+        AudioProjectExplorer,
+        AudioFilesExplorer,
+        AudioProjectEditor,
+        AudioProjectViewer,
+        Settings,
+        WaveformVisualiser
+    }
+
+    public enum AudioEditorShortcut
+    {
+        None,
+        AddRow,
+        EditRow,
+        SetRecommendedSettings,
+        CopyRows,
+        PasteRows,
+        RemoveRows,
+        RemoveSettingsAudioFiles
+    }
+
     public interface IShortcutService
     {
-        void HandleShortcut(KeyEventArgs e, bool isTextInputFocussed, bool isSettingsAudioFilesListViewFocussed);
+        void HandleShortcut(
+            KeyEventArgs e,
+            AudioEditorFocusTarget focusTarget,
+            bool isTextInputFocussed,
+            bool isSettingsAudioFilesListViewFocussed);
     }
 
     public class ShortcutService(IEventHub eventHub) : IShortcutService
     {
         private readonly IEventHub _eventHub = eventHub;
 
-        public void HandleShortcut(KeyEventArgs e, bool isTextInputFocussed, bool isSettingsAudioFilesListViewFocussed)
+        public void HandleShortcut(
+            KeyEventArgs e,
+            AudioEditorFocusTarget focusTarget,
+            bool isTextInputFocussed,
+            bool isSettingsAudioFilesListViewFocussed)
         {
-            // We want these triggered regardless of focus
-            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Q)
+            var shortcut = ResolveShortcut(
+                e.Key,
+                Keyboard.Modifiers,
+                focusTarget,
+                isTextInputFocussed,
+                isSettingsAudioFilesListViewFocussed);
+            switch (shortcut)
             {
-                _eventHub.Publish(new EditorAddRowShortcutActivatedEvent());
-                e.Handled = true;
-            }
-            else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.E)
-            {
-                _eventHub.Publish(new ViewerEditRowShortcutActivatedEvent());
-                e.Handled = true;
-            }
-            else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.R)
-            {
-                _eventHub.Publish(new EditorSetRecommendedVOSettingsShortcutActivatedEvent());
-                e.Handled = true;
-            }
-            // We want to allow normal copy / paste / delete / backspace functionality when AudioProjectEditor text input is focussed
-            else if (!isTextInputFocussed && !isSettingsAudioFilesListViewFocussed)
-            {
-                if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.C)
-                {
+                case AudioEditorShortcut.AddRow:
+                    _eventHub.Publish(
+                        new EditorAddRowShortcutActivatedEvent());
+                    break;
+                case AudioEditorShortcut.EditRow:
+                    _eventHub.Publish(
+                        new ViewerEditRowShortcutActivatedEvent());
+                    break;
+                case AudioEditorShortcut.SetRecommendedSettings:
+                    _eventHub.Publish(
+                        new EditorSetRecommendedVOSettingsShortcutActivatedEvent());
+                    break;
+                case AudioEditorShortcut.CopyRows:
                     _eventHub.Publish(new ViewerCopyRowsShortcutActivatedEvent());
-                    e.Handled = true;
-                }
-                else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
-                {
+                    break;
+                case AudioEditorShortcut.PasteRows:
                     _eventHub.Publish(new ViewerPasteRowsShortcutActivatedEvent());
-                    e.Handled = true;
-                }
-                else if (e.Key == Key.Delete || e.Key == Key.Back)
-                {
+                    break;
+                case AudioEditorShortcut.RemoveRows:
                     _eventHub.Publish(new ViewerRemoveRowsShortcutActivatedEvent());
-                    e.Handled = true;
-                }
+                    break;
+                case AudioEditorShortcut.RemoveSettingsAudioFiles:
+                    _eventHub.Publish(
+                        new SettingsRemoveSelectedAudioFilesShortcutActivatedEvent());
+                    break;
+                default:
+                    return;
             }
-            // We want the Audio Files list in Settings to have its own delete / backspace functionality
-            else if (isSettingsAudioFilesListViewFocussed)
+
+            e.Handled = true;
+        }
+
+        public static AudioEditorShortcut ResolveShortcut(
+            Key key,
+            ModifierKeys modifiers,
+            AudioEditorFocusTarget focusTarget,
+            bool isTextInputFocussed,
+            bool isSettingsAudioFilesListViewFocussed)
+        {
+            if (isTextInputFocussed)
+                return AudioEditorShortcut.None;
+
+            if (focusTarget == AudioEditorFocusTarget.AudioProjectEditor &&
+                modifiers == ModifierKeys.Control &&
+                key == Key.Q)
             {
-                if (e.Key == Key.Delete || e.Key == Key.Back)
+                return AudioEditorShortcut.AddRow;
+            }
+
+            if (focusTarget == AudioEditorFocusTarget.AudioProjectViewer)
+            {
+                if (modifiers == ModifierKeys.Control && key == Key.E)
+                    return AudioEditorShortcut.EditRow;
+                if (modifiers == ModifierKeys.Control && key == Key.C)
+                    return AudioEditorShortcut.CopyRows;
+                if (modifiers == ModifierKeys.Control && key == Key.V)
+                    return AudioEditorShortcut.PasteRows;
+                if (modifiers == ModifierKeys.None &&
+                    (key == Key.Delete || key == Key.Back))
                 {
-                    _eventHub.Publish(new SettingsRemoveSelectedAudioFilesShortcutActivatedEvent());
-                    e.Handled = true;
+                    return AudioEditorShortcut.RemoveRows;
                 }
             }
+
+            if (focusTarget == AudioEditorFocusTarget.Settings)
+            {
+                if (modifiers == ModifierKeys.Control && key == Key.R)
+                    return AudioEditorShortcut.SetRecommendedSettings;
+                if (isSettingsAudioFilesListViewFocussed &&
+                    modifiers == ModifierKeys.None &&
+                    (key == Key.Delete || key == Key.Back))
+                {
+                    return AudioEditorShortcut.RemoveSettingsAudioFiles;
+                }
+            }
+
+            return AudioEditorShortcut.None;
         }
     }
 }
