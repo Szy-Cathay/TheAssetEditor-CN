@@ -149,7 +149,7 @@ public class FactionTintTests
         effect.Parameters["View"].SetValue(Matrix.Identity);
         effect.Parameters["Projection"].SetValue(Matrix.Identity);
         effect.Parameters["CameraPos"].SetValue(
-            new Vector3(0, 0, -2));
+            new Vector3(0, 0, 2));
         effect.Parameters["DirLightTransform"].SetValue(
             Matrix.Identity);
         effect.Parameters["CapabilityFlag_ApplyAnimation"]

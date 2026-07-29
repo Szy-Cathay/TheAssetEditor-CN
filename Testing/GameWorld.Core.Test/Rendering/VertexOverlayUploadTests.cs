@@ -63,6 +63,7 @@ public class VertexOverlayUploadTests
             0,
             0,
             1,
+            Vector3.One,
             [],
             64,
             64);
@@ -219,6 +220,7 @@ public class VertexOverlayUploadTests
             0,
             0,
             1,
+            Vector3.One,
             [],
             64,
             64);

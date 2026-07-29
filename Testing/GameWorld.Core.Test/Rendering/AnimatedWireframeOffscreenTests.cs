@@ -56,6 +56,7 @@ public class AnimatedWireframeOffscreenTests
             0,
             0,
             1,
+            Vector3.One,
             []);
 
         try
@@ -241,6 +242,7 @@ public class AnimatedWireframeOffscreenTests
             0,
             0,
             1,
+            Vector3.One,
             []);
 
         try

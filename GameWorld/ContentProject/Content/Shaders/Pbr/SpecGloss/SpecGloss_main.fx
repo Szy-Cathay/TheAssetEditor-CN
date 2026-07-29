@@ -78,7 +78,6 @@ MainPixelOutput mainPS(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFa
         material.maskValue);
     
     float3 normalizedViewDirection = -normalize(CameraPos - input.worldPosition);
-    float3 rotatedNormalizedLightDirection = normalize(mul(light_Direction_Constant, (float3x3) DirLightTransform));
 
     // no SSAO + no shadows    
     float occlusion = 1.0f;
@@ -94,14 +93,28 @@ MainPixelOutput mainPS(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFa
         shadow,
         occlusion);    
 
-    const float directlightIntensity = 3.0f;
-    const float3 diretLightColor = float3(1, 1, 1); // TODO: make cpu side constant    
-    
-    // Light the pixel...
-    float3 hdr_linear_col = standard_lighting_model_directional_light(diretLightColor * directlightIntensity, rotatedNormalizedLightDirection, normalizedViewDirection, standard_mat);
-    
-    //  Tone-map the pixel...            
-    float3 ldr_linear_col = saturate(tone_map_linear_hdr_pixel_value(hdr_linear_col*exposure));        
+    float3 reflected_view_vec = reflect(normalizedViewDirection, standard_mat.Normal);
+
+    float3 env_light = standard_lighting_model_environment_light_SM4_private(
+        normalizedViewDirection,
+        reflected_view_vec,
+        standard_mat);
+
+    float unchartedSunFactor = 3.0f;
+    float3 L_main = normalize(CameraPos - input.worldPosition);
+    float3 lightCol_main = get_sun_colour() * unchartedSunFactor;
+
+    float3 combined_dir_light = standard_lighting_model_directional_light_SM4_private(
+        lightCol_main,
+        L_main,
+        normalizedViewDirection,
+        reflected_view_vec,
+        standard_mat);
+
+    float3 hdr_linear_col = env_light + combined_dir_light;
+    hdr_linear_col *= Constant_LightColour;
+
+    float3 ldr_linear_col = saturate(Uncharted2ToneMapping(hdr_linear_col));
     
     MainPixelOutput output;
     output.Colour = float4(_gamma(ldr_linear_col), 1.0f);

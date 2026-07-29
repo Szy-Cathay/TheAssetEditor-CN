@@ -78,6 +78,7 @@ public class AnimatedSelectionOffscreenTests
                     0,
                     0,
                     1,
+                    Vector3.One,
                     []),
                 RenderingTechnique.Normal);
         }

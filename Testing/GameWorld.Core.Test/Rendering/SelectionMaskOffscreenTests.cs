@@ -57,6 +57,7 @@ public class SelectionMaskOffscreenTests
                 0,
                 0,
                 1,
+                Vector3.One,
                 []),
             Matrix.Identity);
 
