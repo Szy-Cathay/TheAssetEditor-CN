@@ -10,8 +10,26 @@ namespace Editors.Audio.AudioExplorer
         public AudioExplorerView()
         {
             InitializeComponent();
+            Loaded += OnLoaded;
         }
 
-        private void OnNodeDoubleClick(object sender, MouseButtonEventArgs e) => ViewModel.PlayAudio();
+        private async void OnLoaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (ViewModel == null)
+                return;
+
+            Loaded -= OnLoaded;
+            await ViewModel.InitializeAsync();
+        }
+
+        private async void OnNodeDoubleClick(
+            object sender,
+            MouseButtonEventArgs e) =>
+            await ViewModel.PlayAudioAsync();
+
+        private void OnAudioWaveformGridSizeChanged(
+            object sender,
+            System.Windows.SizeChangedEventArgs e) =>
+            ViewModel?.SetWaveformDisplayWidth(e.NewSize.Width);
     }
 }

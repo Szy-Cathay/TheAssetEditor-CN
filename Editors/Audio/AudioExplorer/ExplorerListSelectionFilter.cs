@@ -68,7 +68,9 @@ namespace Editors.Audio.AudioExplorer
             }
             else if (searchByVOActor)
             {
-                var states = _audioRepository.StatesByStateGroup["VO_Actor"];
+                if (!_audioRepository.StatesByStateGroup.TryGetValue("VO_Actor", out var states))
+                    states = [];
+
                 selectedList = states
                     .Select(state => new ExplorerListItem
                     {

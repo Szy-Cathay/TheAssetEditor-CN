@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Editors.Audio.AudioExplorer;
 using Editors.Audio.Shared.Storage;
+using Shared.Core.Services;
 using Shared.GameFormats.Wwise.Enums;
 using Shared.GameFormats.Wwise.Hirc;
 
@@ -49,7 +50,15 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                 func(item, parent);
             else
             {
-                var unknownNode = new HircTreeNode() { DisplayName = $"Unknown node type {item.HircType} for ID {item.Id} in {item.BnkFilePath}", Hirc = item };
+                var unknownNode = new HircTreeNode()
+                {
+                    DisplayName = LocalizationManager.Instance.GetFormat(
+                        "AudioExplorer.Tree.Unknown",
+                        item.HircType,
+                        item.Id,
+                        item.BnkFilePath),
+                    Hirc = item
+                };
                 parent.Children.Add(unknownNode);
             }
         }
@@ -60,9 +69,25 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                 return;
 
             var hircs = AudioRepository.GetHircs(hircId);
-            var hirc = hircs.FirstOrDefault();
+            var context = parent.Hirc;
+            var hirc = hircs.FirstOrDefault(candidate =>
+                    candidate.LanguageId == context?.LanguageId &&
+                    string.Equals(candidate.BnkFilePath, context?.BnkFilePath, StringComparison.OrdinalIgnoreCase))
+                ?? hircs.FirstOrDefault(candidate => candidate.LanguageId == context?.LanguageId)
+                ?? hircs.FirstOrDefault(candidate =>
+                    string.Equals(candidate.BnkFilePath, context?.BnkFilePath, StringComparison.OrdinalIgnoreCase))
+                ?? hircs.FirstOrDefault();
             if (hirc == null)
-                parent.Children.Add(new HircTreeNode() { DisplayName = $"Error: Unable to find Hirc with ID {hircId}" });
+            {
+                parent.Children.Add(new HircTreeNode()
+                {
+                    DisplayName = LocalizationManager.Instance.GetFormat(
+                        "AudioExplorer.Tree.MissingHirc",
+                        hircId),
+                    MissingHircId = hircId,
+                    IsMetaNode = true
+                });
+            }
             else
                 ProcessHircObject(hirc, parent);
         }

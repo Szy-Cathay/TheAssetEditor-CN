@@ -10,12 +10,15 @@ namespace Editors.Audio.Shared.Wwise
     public interface ISoundEngine : IDisposable
     {
         TimeSpan TotalPlaybackTime { get; }
+        TimeSpan CurrentPlaybackTime { get; }
         TimeSpan ReaderTimeAtLastPlayOrResume { get; }
         long DeviceBytesAtLastPlayOrResume { get; }
         PlaybackState PlaybackState { get; }
         void LoadFromFilePath(string filePath);
+        void LoadFromWavData(byte[] data);
         void Stop();
         void PlayPause();
+        void SetPlaybackTime(TimeSpan playbackTime);
         TimeSpan GetDeviceAlignedTimeNow();
         int GetDeviceBytesPerSecond();
         long GetDeviceBytes();
@@ -31,6 +34,19 @@ namespace Editors.Audio.Shared.Wwise
         private MemoryStream _memoryStream;
 
         public TimeSpan TotalPlaybackTime { get; private set; } = TimeSpan.Zero;
+        public TimeSpan CurrentPlaybackTime
+        {
+            get
+            {
+                if (_waveFileReader == null)
+                    return TimeSpan.Zero;
+
+                var currentTime = PlaybackState == PlaybackState.Playing
+                    ? GetDeviceAlignedTimeNow()
+                    : ReaderTimeAtLastPlayOrResume;
+                return ClampPlaybackTime(currentTime);
+            }
+        }
         public TimeSpan ReaderTimeAtLastPlayOrResume { get; private set; } = TimeSpan.Zero;
         public long DeviceBytesAtLastPlayOrResume { get; private set; } = 0;
 
@@ -48,13 +64,20 @@ namespace Editors.Audio.Shared.Wwise
 
         public void LoadFromFilePath(string filePath)
         {
-            DisposeReaderOnly();
-
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentNullException(nameof(filePath));
 
             var packFile = _packFileService.FindFile(filePath);
-            var data = packFile.DataSource.ReadData();
+            if (packFile == null)
+                throw new FileNotFoundException($"Unable to find audio file '{filePath}'.", filePath);
+
+            LoadFromWavData(packFile.DataSource.ReadData());
+        }
+
+        public void LoadFromWavData(byte[] data)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ResetPlayback();
 
             _memoryStream = new MemoryStream(data, writable: false);
             _waveFileReader = new WaveFileReader(_memoryStream);
@@ -62,13 +85,6 @@ namespace Editors.Audio.Shared.Wwise
             TotalPlaybackTime = _waveFileReader.TotalTime;
             ReaderTimeAtLastPlayOrResume = _waveFileReader.CurrentTime;
             DeviceBytesAtLastPlayOrResume = 0;
-
-            if (_wavePlayer != null)
-            {
-                _wavePlayer.PlaybackStopped -= OnPlaybackStoppedForward;
-                _wavePlayer.Dispose();
-                _wavePlayer = null;
-            }
         }
 
         public void PlayPause()
@@ -101,8 +117,10 @@ namespace Editors.Audio.Shared.Wwise
             }
             else if (_wavePlayer.PlaybackState == PlaybackState.Stopped)
             {
-                _waveFileReader.Position = 0;
-                ReaderTimeAtLastPlayOrResume = TimeSpan.Zero;
+                if (_waveFileReader.Position >= _waveFileReader.Length)
+                    _waveFileReader.Position = 0;
+
+                ReaderTimeAtLastPlayOrResume = _waveFileReader.CurrentTime;
                 DeviceBytesAtLastPlayOrResume = GetDeviceBytes();
                 _wavePlayer.Play();
             }
@@ -110,15 +128,23 @@ namespace Editors.Audio.Shared.Wwise
 
         public void Stop()
         {
-            if (_wavePlayer == null)
-                return;
-
-            _wavePlayer.Stop();
+            if (_wavePlayer != null)
+                _wavePlayer.Stop();
             if (_waveFileReader != null)
                 _waveFileReader.Position = 0;
 
             ReaderTimeAtLastPlayOrResume = TimeSpan.Zero;
             DeviceBytesAtLastPlayOrResume = 0;
+        }
+
+        public void SetPlaybackTime(TimeSpan playbackTime)
+        {
+            if (_waveFileReader == null)
+                return;
+
+            _waveFileReader.CurrentTime = ClampPlaybackTime(playbackTime);
+            ReaderTimeAtLastPlayOrResume = _waveFileReader.CurrentTime;
+            DeviceBytesAtLastPlayOrResume = GetDeviceBytes();
         }
 
         public TimeSpan GetDeviceAlignedTimeNow()
@@ -143,6 +169,15 @@ namespace Editors.Audio.Shared.Wwise
             if (_waveFileReader != null)
                 return _waveFileReader.WaveFormat.AverageBytesPerSecond;
             return 1;
+        }
+
+        private TimeSpan ClampPlaybackTime(TimeSpan playbackTime)
+        {
+            if (playbackTime < TimeSpan.Zero)
+                return TimeSpan.Zero;
+            if (playbackTime > TotalPlaybackTime)
+                return TotalPlaybackTime;
+            return playbackTime;
         }
 
         private void EnsureOutputDeviceCreated()
@@ -184,7 +219,7 @@ namespace Editors.Audio.Shared.Wwise
             }
         }
 
-        public void Dispose()
+        private void ResetPlayback()
         {
             if (_wavePlayer != null)
             {
@@ -196,5 +231,7 @@ namespace Editors.Audio.Shared.Wwise
 
             DisposeReaderOnly();
         }
+
+        public void Dispose() => ResetPlayback();
     }
 }

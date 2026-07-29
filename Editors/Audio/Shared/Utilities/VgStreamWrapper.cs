@@ -28,13 +28,15 @@ namespace Editors.Audio.Shared.Utilities
             }
         }
 
-        public Result<string> ConvertFileUsingVgStream(string sourceFileName, string targetFileName)
+        public virtual Result<string> ConvertFileUsingVgStream(string sourceFileName, string targetFileName)
         {
             try
             {
                 var cliPath = GetCliPath();
                 _logger.Here().Information($"VgSteam path is '{cliPath}'");
                 _logger.Here().Information($"Trying to convert {sourceFileName} to {targetFileName}");
+                if (File.Exists(targetFileName))
+                    File.Delete(targetFileName);
 
                 var arguments = $"-o \"{targetFileName}\" \"{sourceFileName}\"";
                 _logger.Here().Information($"{cliPath} {arguments}");
@@ -44,18 +46,31 @@ namespace Editors.Audio.Shared.Utilities
                 process.StartInfo.Arguments = arguments;
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                process.StartInfo.CreateNoWindow = false;
+                process.StartInfo.CreateNoWindow = true;
                 process.Start();
-                var output = process.StandardOutput.ReadToEnd();
-                _logger.Here().Information(output);
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
                 process.WaitForExit();
+                var output = outputTask.GetAwaiter().GetResult();
+                var error = errorTask.GetAwaiter().GetResult();
+                _logger.Here().Information(output);
 
                 var outputSoundFilePath = targetFileName;
-                var doesFileExist = File.Exists(outputSoundFilePath);
-                _logger.Here().Information($"File readback result for converted file {outputSoundFilePath} is : {doesFileExist}");
-                if (doesFileExist == false)
-                    return Result<string>.FromError("VgSteam", $"Failed to convert file - File {outputSoundFilePath} not found on disk");
+                var isValidOutput = process.ExitCode == 0 &&
+                    File.Exists(outputSoundFilePath) &&
+                    new FileInfo(outputSoundFilePath).Length > 0;
+                _logger.Here().Information($"File readback result for converted file {outputSoundFilePath} is : {isValidOutput}");
+                if (!isValidOutput)
+                {
+                    if (File.Exists(outputSoundFilePath))
+                        File.Delete(outputSoundFilePath);
+
+                    return Result<string>.FromError(
+                        "VgSteam",
+                        $"Failed to convert file. Exit code: {process.ExitCode}. {error}".Trim());
+                }
                 return Result<string>.FromOk(outputSoundFilePath);
             }
 

@@ -15,6 +15,8 @@
     d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter
+            x:Key="BooleanToVisibilityConverter"/>
         <ValueConverters:EnumConverter 
             x:Key="EnumConverter"/>
         <DataTemplate 
@@ -60,6 +62,8 @@
                     Height="Auto"/>
                 <RowDefinition
                     Height="*"/>
+                <RowDefinition
+                    Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Grid
@@ -73,11 +77,18 @@
                         Height="Auto"/>
                 </Grid.RowDefinitions>
 
+                <TextBox
+                    Grid.Row="0"
+                    Height="25"
+                    Margin="0, 0, 0, 5"
+                    Text="{Binding ExplorerFilter.ExplorerList.Filter, UpdateSourceTrigger=PropertyChanged}"
+                    ToolTip="{loc:Loc AudioExplorer.FilterToolTip}"/>
+
                 <ComboBox
                     Grid.Row="1"
                     Height="25"
-                    IsEditable="True"
-                    IsTextSearchEnabled="true"
+                    IsEditable="False"
+                    IsTextSearchEnabled="False"
                     DisplayMemberPath="DisplayName"
                     ItemsSource="{Binding ExplorerFilter.ExplorerList.Values}"
                     SelectedItem="{Binding ExplorerFilter.ExplorerList.SelectedItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
@@ -133,6 +144,73 @@
                     IsChecked="{Binding SearchByHircId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             </Grid>
 
+            <Grid
+                Grid.Row="2"
+                Margin="5, 5, 5, 0">
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition
+                        Width="*"/>
+                    <ColumnDefinition
+                        Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Grid.Row="0"
+                    Grid.ColumnSpan="2"
+                    Margin="0, 0, 0, 3"
+                    Text="{Binding LoadStatus}"
+                    TextWrapping="Wrap"/>
+
+                <ProgressBar
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Height="16"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="{Binding LoadProgress}"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <Button
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    MinWidth="60"
+                    Height="25"
+                    Margin="5, 0, 0, 0"
+                    Content="{loc:Loc AudioExplorer.CancelLoading}"
+                    Command="{Binding LoadAudioRepositoryForSelectedLanguagesCancelCommand}"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <ProgressBar
+                    Grid.Row="2"
+                    Grid.Column="0"
+                    Height="16"
+                    Margin="0, 3, 0, 0"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="{Binding ExportProgress}"
+                    Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <Button
+                    Grid.Row="2"
+                    Grid.Column="1"
+                    MinWidth="60"
+                    Height="25"
+                    Margin="5, 3, 0, 0"
+                    Content="{loc:Loc AudioExplorer.CancelExport}"
+                    Command="{Binding ExportAudioCancelCommand}"
+                    Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
+
             <Expander
                 Grid.Row="3"
                 Margin="4, 5, 4, 0"
@@ -176,13 +254,54 @@
                 </Grid>
             </Expander>
 
-            <Button
+            <Grid
                 Grid.Row="4"
-                Margin="5, 5, 5, 5"
-                Content="{loc:Loc AudioExplorer.PlayAudio}"
-                Height="25"
-                Command="{Binding PlayAudioCommand}" 
-                IsEnabled="{Binding IsPlayAudioButtonEnabled, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                Margin="5, 5, 5, 5">
+                <Menu
+                    Height="25"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center">
+                    <MenuItem
+                        Header="{loc:Loc AudioExplorer.Export}">
+                        <MenuItem
+                            Header="{loc:Loc AudioExplorer.ExportSelectedAudio}"
+                            IsEnabled="{Binding IsExportSelectedAudioEnabled}">
+                            <MenuItem
+                                Header="WAV"
+                                Command="{Binding ExportAudioCommand}"
+                                CommandParameter="{Binding ExportSelectedAudioWav}"/>
+                            <MenuItem
+                                Header="WEM"
+                                Command="{Binding ExportAudioCommand}"
+                                CommandParameter="{Binding ExportSelectedAudioWem}"/>
+                        </MenuItem>
+                        <MenuItem
+                            Header="{loc:Loc AudioExplorer.ExportSelectedBranch}"
+                            IsEnabled="{Binding IsExportSelectedBranchEnabled}">
+                            <MenuItem
+                                Header="WAV"
+                                Command="{Binding ExportAudioCommand}"
+                                CommandParameter="{Binding ExportSelectedBranchWav}"/>
+                            <MenuItem
+                                Header="WEM"
+                                Command="{Binding ExportAudioCommand}"
+                                CommandParameter="{Binding ExportSelectedBranchWem}"/>
+                        </MenuItem>
+                        <MenuItem
+                            Header="{loc:Loc AudioExplorer.ExportCurrentResults}"
+                            IsEnabled="{Binding IsExportCurrentResultsEnabled}">
+                            <MenuItem
+                                Header="WAV"
+                                Command="{Binding ExportAudioCommand}"
+                                CommandParameter="{Binding ExportCurrentResultsWav}"/>
+                            <MenuItem
+                                Header="WEM"
+                                Command="{Binding ExportAudioCommand}"
+                                CommandParameter="{Binding ExportCurrentResultsWem}"/>
+                        </MenuItem>
+                    </MenuItem>
+                </Menu>
+            </Grid>
 
             <Border 
                 Grid.Row="5"
@@ -339,6 +458,109 @@
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>
+
+            <Border
+                Grid.Row="8"
+                Padding="8, 7, 8, 8"
+                BorderBrush="{DynamicResource App.Border}"
+                BorderThickness="0, 1, 0, 0"
+                Background="{DynamicResource TreeView.Static.Background}"
+                Visibility="{Binding IsAudioPlaybackVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition
+                            Height="64"/>
+                        <RowDefinition
+                            Height="Auto"/>
+                        <RowDefinition
+                            Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid
+                        x:Name="AudioWaveformGrid"
+                        Grid.Row="0"
+                        Height="64"
+                        ClipToBounds="True"
+                        SizeChanged="OnAudioWaveformGridSizeChanged">
+                        <Image
+                            Stretch="Fill"
+                            SnapsToDevicePixels="True"
+                            Source="{Binding AudioWaveformBaseImageSource}"/>
+                        <Image
+                            Stretch="Fill"
+                            SnapsToDevicePixels="True"
+                            Source="{Binding AudioWaveformOverlayImageSource}">
+                            <Image.Clip>
+                                <RectangleGeometry
+                                    Rect="{Binding AudioWaveformOverlayClip}"/>
+                            </Image.Clip>
+                        </Image>
+                        <ProgressBar
+                            Height="3"
+                            Margin="20, 0, 20, 0"
+                            IsIndeterminate="True"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding IsAudioPreviewLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </Grid>
+
+                    <Grid
+                        Grid.Row="1"
+                        Margin="0, 6, 0, 5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition
+                                Width="Auto"/>
+                            <ColumnDefinition
+                                Width="*"/>
+                            <ColumnDefinition
+                                Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock
+                            Grid.Column="0"
+                            MinWidth="42"
+                            VerticalAlignment="Center"
+                            Text="{Binding CurrentPlaybackTime, StringFormat={}{0:mm\\:ss}}"/>
+
+                        <Slider
+                            Grid.Column="1"
+                            Height="20"
+                            Margin="8, 0, 8, 0"
+                            Minimum="0"
+                            Maximum="{Binding TotalPlaybackSeconds}"
+                            Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            IsMoveToPointEnabled="True"
+                            IsEnabled="{Binding IsPlayAudioButtonEnabled}"
+                            SmallChange="0.1"
+                            LargeChange="5"/>
+
+                        <TextBlock
+                            Grid.Column="2"
+                            MinWidth="42"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Text="{Binding TotalPlaybackTime, StringFormat={}{0:mm\\:ss}}"/>
+                    </Grid>
+
+                    <StackPanel
+                        Grid.Row="2"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal">
+                        <Button
+                            MinWidth="95"
+                            Height="25"
+                            Content="{loc:Loc AudioExplorer.PlayPauseAudio}"
+                            Command="{Binding PlayAudioCommand}"
+                            IsEnabled="{Binding IsPlayAudioButtonEnabled}"/>
+                        <Button
+                            MinWidth="60"
+                            Height="25"
+                            Margin="5, 0, 0, 0"
+                            Content="{loc:Loc AudioExplorer.StopAudio}"
+                            Command="{Binding StopAudioCommand}"
+                            IsEnabled="{Binding IsStopAudioButtonEnabled}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Grid>
 
         <GridSplitter

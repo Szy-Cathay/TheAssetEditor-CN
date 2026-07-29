@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Editors.Audio.Shared.Storage;
+using Shared.Core.Services;
 using Shared.GameFormats.Wwise.Hirc;
 using Shared.GameFormats.Wwise.Hirc.V112;
 using Shared.GameFormats.Wwise.Hirc.V136;
@@ -69,7 +70,9 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                 for (var i = 1; i < nodes.Count; i++)
                 {
                     var key = nodes[i].GetKey();
-                    var name = key == 0 ? "Any" : _audioRepository.GetNameFromId(key);
+                    var name = key == 0
+                        ? LocalizationManager.Instance.Get("AudioExplorer.Any")
+                        : _audioRepository.GetNameFromId(key);
                     decisionPath.Items.Add(new StatePathItem { DisplayName = name, Value = key });
                 }
 

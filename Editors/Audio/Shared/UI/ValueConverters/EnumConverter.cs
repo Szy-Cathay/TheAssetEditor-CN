@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Editors.Audio.Shared.Wwise;
+using Shared.Core.Services;
 
 namespace Editors.Audio.Shared.UI.ValueConverters
 {
@@ -13,7 +14,7 @@ namespace Editors.Audio.Shared.UI.ValueConverters
             if (value == null)
                 return value;
             else if (value is Wh3Language language)
-                return Wh3LanguageInformation.GetLanguageAsString(language);
+                return LocalizationManager.Instance.Get($"AudioExplorer.Language.{language}");
             else if (value is Wh3DialogueEventType dialogueEventType)
                 return Wh3DialogueEventInformation.GetDialogueEventTypeDisplayName(dialogueEventType);
             else if (value is Wh3DialogueEventUnitProfile dialogueEventProfile)
