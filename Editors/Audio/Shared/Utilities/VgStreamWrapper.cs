@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Misc;
@@ -30,8 +31,20 @@ namespace Editors.Audio.Shared.Utilities
 
         public virtual Result<string> ConvertFileUsingVgStream(string sourceFileName, string targetFileName)
         {
+            return ConvertFileUsingVgStream(
+                sourceFileName,
+                targetFileName,
+                CancellationToken.None);
+        }
+
+        public virtual Result<string> ConvertFileUsingVgStream(
+            string sourceFileName,
+            string targetFileName,
+            CancellationToken cancellationToken)
+        {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var cliPath = GetCliPath();
                 _logger.Here().Information($"VgSteam path is '{cliPath}'");
                 _logger.Here().Information($"Trying to convert {sourceFileName} to {targetFileName}");
@@ -52,7 +65,19 @@ namespace Editors.Audio.Shared.Utilities
                 process.Start();
                 var outputTask = process.StandardOutput.ReadToEndAsync();
                 var errorTask = process.StandardError.ReadToEndAsync();
-                process.WaitForExit();
+                try
+                {
+                    process.WaitForExitAsync(cancellationToken)
+                        .GetAwaiter()
+                        .GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                    TryTerminate(process);
+                    TryDelete(targetFileName);
+                    throw;
+                }
+
                 var output = outputTask.GetAwaiter().GetResult();
                 var error = errorTask.GetAwaiter().GetResult();
                 _logger.Here().Information(output);
@@ -73,11 +98,43 @@ namespace Editors.Audio.Shared.Utilities
                 }
                 return Result<string>.FromOk(outputSoundFilePath);
             }
-
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception e)
             {
                 _logger.Here().Error(e.Message);
                 return Result<string>.FromError("Convert error", e.Message);
+            }
+        }
+
+        private static void TryTerminate(System.Diagnostics.Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit(2000);
+                }
+            }
+            catch
+            {
+                // The process may have exited between the checks.
+            }
+        }
+
+        private static void TryDelete(string filePath)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+            }
+            catch
+            {
+                // Cleanup failure must not hide the cancellation request.
             }
         }
 

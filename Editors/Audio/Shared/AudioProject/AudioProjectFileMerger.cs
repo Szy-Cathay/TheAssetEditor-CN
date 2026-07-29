@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Editors.Audio.Shared.AudioProject.Models;
+using Shared.Core.Services;
 
 namespace Editors.Audio.Shared.AudioProject
 {
@@ -11,6 +13,15 @@ namespace Editors.Audio.Shared.AudioProject
         {
             ArgumentNullException.ThrowIfNull(baseAudioProject);
             ArgumentNullException.ThrowIfNull(mergingAudioProject);
+
+            if (!string.Equals(
+                    baseAudioProject.Language,
+                    mergingAudioProject.Language,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Audio Projects with different languages cannot be merged.");
+            }
 
             MergeSoundBanks(baseAudioProject.SoundBanks, mergingAudioProject.SoundBanks, baseFileName, mergingFileName);
             MergeStateGroups(baseAudioProject.StateGroups, mergingAudioProject.StateGroups);
@@ -36,10 +47,33 @@ namespace Editors.Audio.Shared.AudioProject
                 MergeActionEvents(baseSoundBank, mergingSoundBank);
 
                 foreach (var sound in mergingSoundBank.Sounds)
-                    baseSoundBank.Sounds.TryAdd(sound);
+                {
+                    var existingSound = baseSoundBank.Sounds
+                        .FirstOrDefault(item => item.Id == sound.Id);
+                    if (existingSound == null)
+                        baseSoundBank.Sounds.TryAdd(sound);
+                    else
+                        EnsureEquivalent(existingSound, sound);
+                }
 
                 foreach (var randomSequenceContainer in mergingSoundBank.RandomSequenceContainers)
-                    baseSoundBank.RandomSequenceContainers.TryAdd(randomSequenceContainer);
+                {
+                    var existingContainer = baseSoundBank
+                        .RandomSequenceContainers
+                        .FirstOrDefault(item =>
+                            item.Id == randomSequenceContainer.Id);
+                    if (existingContainer == null)
+                    {
+                        baseSoundBank.RandomSequenceContainers
+                            .TryAdd(randomSequenceContainer);
+                    }
+                    else
+                    {
+                        EnsureEquivalent(
+                            existingContainer,
+                            randomSequenceContainer);
+                    }
+                }
 
                 SortAudioProjectItems(baseSoundBank);
             }
@@ -76,8 +110,37 @@ namespace Editors.Audio.Shared.AudioProject
                     continue;
                 }
 
+                EnsureSameName(
+                    baseDialogueEvent.Name,
+                    mergingDialogueEvent.Name,
+                    baseDialogueEvent.Id);
                 foreach (var mergingStatePath in mergingDialogueEvent.StatePaths)
-                    baseDialogueEvent.StatePaths.TryAdd(mergingStatePath);
+                {
+                    var existingStatePath = baseDialogueEvent.StatePaths
+                        .FirstOrDefault(statePath =>
+                            string.Equals(
+                                statePath.Name,
+                                mergingStatePath.Name,
+                                StringComparison.OrdinalIgnoreCase));
+                    if (existingStatePath == null)
+                    {
+                        baseDialogueEvent.StatePaths
+                            .TryAdd(mergingStatePath);
+                    }
+                    else if (existingStatePath.TargetHircId !=
+                                 mergingStatePath.TargetHircId ||
+                             existingStatePath.TargetHircType !=
+                                 mergingStatePath.TargetHircType ||
+                             !HaveEquivalentNodes(
+                                 existingStatePath,
+                                 mergingStatePath))
+                    {
+                        throw new InvalidOperationException(
+                            LocalizationManager.Instance.GetFormat(
+                                "AudioProjectMerger.StatePathConflict",
+                                mergingStatePath.Name));
+                    }
+                }
 
                 SortStatePaths(baseDialogueEvent);
             }
@@ -85,12 +148,57 @@ namespace Editors.Audio.Shared.AudioProject
             SortDialogueEvents(baseSoundBank);
         }
 
+        private static bool HaveEquivalentNodes(
+            StatePath baseStatePath,
+            StatePath mergingStatePath)
+        {
+            if (baseStatePath.Nodes.Count !=
+                mergingStatePath.Nodes.Count)
+            {
+                return false;
+            }
+
+            for (var index = 0;
+                 index < baseStatePath.Nodes.Count;
+                 index++)
+            {
+                var baseNode = baseStatePath.Nodes[index];
+                var mergingNode = mergingStatePath.Nodes[index];
+                if (baseNode.StateGroup.Id !=
+                        mergingNode.StateGroup.Id ||
+                    baseNode.State.Id != mergingNode.State.Id)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static void MergeActionEvents(SoundBank baseSoundBank, SoundBank mergingSoundBank)
         {
             foreach (var mergingActionEvent in mergingSoundBank.ActionEvents)
             {
-                if (!baseSoundBank.ActionEvents.Any(actionEvent => actionEvent.Id == mergingActionEvent.Id))
+                foreach (var action in mergingActionEvent.Actions)
+                    action.BankId = baseSoundBank.Id;
+
+                var existingActionEvent = baseSoundBank.ActionEvents
+                    .FirstOrDefault(actionEvent =>
+                        actionEvent.Id == mergingActionEvent.Id);
+                if (existingActionEvent == null)
+                {
                     baseSoundBank.ActionEvents.TryAdd(mergingActionEvent);
+                }
+                else
+                {
+                    EnsureSameName(
+                        existingActionEvent.Name,
+                        mergingActionEvent.Name,
+                        existingActionEvent.Id);
+                    EnsureEquivalent(
+                        existingActionEvent,
+                        mergingActionEvent);
+                }
             }
 
             SortActionEvents(baseSoundBank);
@@ -107,8 +215,25 @@ namespace Editors.Audio.Shared.AudioProject
                     continue;
                 }
 
+                EnsureSameName(
+                    baseStateGroup.Name,
+                    mergingStateGroup.Name,
+                    baseStateGroup.Id);
                 foreach (var mergingState in mergingStateGroup.States)
-                    baseStateGroup.States.TryAdd(mergingState);
+                {
+                    var existingState = baseStateGroup.States
+                        .FirstOrDefault(state =>
+                            state.Id == mergingState.Id);
+                    if (existingState == null)
+                        baseStateGroup.States.TryAdd(mergingState);
+                    else
+                    {
+                        EnsureSameName(
+                            existingState.Name,
+                            mergingState.Name,
+                            existingState.Id);
+                    }
+                }
             }
         }
 
@@ -175,7 +300,37 @@ namespace Editors.Audio.Shared.AudioProject
                 return;
 
             foreach (var mergingAudioFile in mergingAudioFiles)
-                baseAudioFiles.TryAdd(mergingAudioFile);
+            {
+                var existingAudioFile = baseAudioFiles
+                    .FirstOrDefault(audioFile =>
+                        audioFile.Id == mergingAudioFile.Id);
+                if (existingAudioFile == null)
+                {
+                    baseAudioFiles.TryAdd(mergingAudioFile);
+                    continue;
+                }
+
+                if (!string.Equals(
+                        existingAudioFile.WavPackFilePath,
+                        mergingAudioFile.WavPackFilePath,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(
+                        existingAudioFile.WavPackFileName,
+                        mergingAudioFile.WavPackFileName,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    existingAudioFile.Guid != mergingAudioFile.Guid)
+                {
+                    ThrowIdConflict(existingAudioFile.Id);
+                }
+
+                foreach (var soundId in mergingAudioFile.Sounds)
+                {
+                    if (!existingAudioFile.Sounds.Contains(soundId))
+                        existingAudioFile.Sounds.Add(soundId);
+                }
+
+                existingAudioFile.Sounds.Sort();
+            }
 
             var sortedAudioFiles = baseAudioFiles
                 .OrderBy(audioFile => audioFile.Id)
@@ -183,6 +338,45 @@ namespace Editors.Audio.Shared.AudioProject
 
             baseAudioFiles.Clear();
             baseAudioFiles.AddRange(sortedAudioFiles);
+        }
+
+        private static void EnsureSameName(
+            string baseName,
+            string mergingName,
+            uint id)
+        {
+            if (!string.Equals(
+                    baseName,
+                    mergingName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                ThrowIdConflict(id);
+            }
+        }
+
+        private static void EnsureEquivalent<T>(
+            T baseItem,
+            T mergingItem)
+            where T : AudioProjectItem
+        {
+            var baseElement =
+                JsonSerializer.SerializeToElement(baseItem);
+            var mergingElement =
+                JsonSerializer.SerializeToElement(mergingItem);
+            if (!JsonElement.DeepEquals(
+                    baseElement,
+                    mergingElement))
+            {
+                ThrowIdConflict(baseItem.Id);
+            }
+        }
+
+        private static void ThrowIdConflict(uint id)
+        {
+            throw new InvalidOperationException(
+                LocalizationManager.Instance.GetFormat(
+                    "AudioProjectMerger.IdConflict",
+                    id));
         }
     }
 }

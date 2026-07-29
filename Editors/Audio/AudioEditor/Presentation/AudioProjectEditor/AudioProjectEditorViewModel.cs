@@ -25,6 +25,7 @@ using Editors.Audio.Shared.Storage;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.Services;
 using Shared.Ui.Common;
 
 namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
@@ -48,6 +49,12 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
         [ObservableProperty] private bool _isShowModdedStatesCheckBoxEnabled = false;
         [ObservableProperty] private bool _isShowModdedStatesCheckBoxVisible = false;
         [ObservableProperty] private bool _isEditorVisible = false;
+        [ObservableProperty] private bool _isEditing;
+        [ObservableProperty] private string _commitButtonLabel =
+            LocalizationManager.Instance.Get("AudioProjectEditor.AddRow");
+        [ObservableProperty] private string _commitButtonToolTip =
+            LocalizationManager.Instance.Get(
+                "AudioProjectEditor.AddRow.ToolTip");
 
         public AudioProjectEditorViewModel (
             IUiCommandFactory uiCommandFactory,
@@ -62,7 +69,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
             _tableServiceFactory = tableServiceFactory;
             _audioRepository = audioRepository;
 
-            EditorLabel = $"Audio Project Editor";
+            EditorLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectEditor");
 
             _eventHub.Register<AudioProjectLoadedEvent>(this, OnAudioProjectInitialised);
             _eventHub.Register<AudioProjectExplorerNodeSelectedEvent>(this, OnAudioProjectExplorerNodeSelected);
@@ -80,6 +87,8 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
 
         private void OnAudioProjectInitialised(AudioProjectLoadedEvent e)
         {
+            _audioEditorStateService.StorePendingEditedViewerRows([]);
+            ResetEditMode();
             ResetEditorVisibility();
             ResetEditorLabel();
             ResetButtonEnablement();
@@ -88,12 +97,17 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
 
         private void OnAudioProjectExplorerNodeSelected(AudioProjectExplorerNodeSelectedEvent e)
         {
+            _audioEditorStateService.StorePendingEditedViewerRows([]);
+            ResetEditMode();
             ResetEditorVisibility();
             ResetEditorLabel();
             ResetButtonEnablement();
             ResetTable();
 
             var selectedAudioProjectExplorerNode = e.TreeNode;
+            if (selectedAudioProjectExplorerNode == null)
+                return;
+
             if (selectedAudioProjectExplorerNode.IsActionEvent())
             {
                 MakeEditorVisible();
@@ -175,6 +189,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
 
         private void OnEditorTableRowAddedToViewer(EditorTableRowAddedToViewerEvent e)
         {
+            ResetEditMode();
             // Clear rows to ensure there will only one row
             Table.Rows.Clear();
 
@@ -189,33 +204,19 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
 
         private void OnViewerTableRowEdited(ViewerTableRowEditedEvent e)
         {
+            IsEditing = true;
+            CommitButtonLabel = LocalizationManager.Instance.Get(
+                "AudioProjectEditor.SaveEdit");
+            CommitButtonToolTip = LocalizationManager.Instance.Get(
+                "AudioProjectEditor.SaveEdit.ToolTip");
             // Clear rows to ensure there will only one row
             Table.Rows.Clear();
 
             _eventHub.Publish(new EditorTableRowAddRequestedEvent(e.Row));
         }
 
-        private void OnAudioFilesChanged(AudioFilesChangedEvent e) => SetEventNameFromAudioFile(e.AudioFiles, e.AddToExistingAudioFiles, e.IsSetFromEditedViewerItem);
-
-        private void SetEventNameFromAudioFile(List<AudioFile> audioFiles, bool addToExistingAudioFiles, bool isSetFromEditedViewerItem)
-        {
-            var selectedAudioProjectExplorerNode = _audioEditorStateService.SelectedAudioProjectExplorerNode;
-            var hasExistingAudioFiles = _audioEditorStateService.AudioFiles.Count > 0;
-
-            if (selectedAudioProjectExplorerNode.IsActionEvent()
-                && !selectedAudioProjectExplorerNode.IsMovieActionEvent()
-                && isSetFromEditedViewerItem
-                && audioFiles.Count == 1
-                && ((hasExistingAudioFiles && !addToExistingAudioFiles) || (!hasExistingAudioFiles && addToExistingAudioFiles)))
-            {
-                var row = Table.Rows[0];
-                var wavFileName = Path.GetFileNameWithoutExtension(audioFiles[0].WavPackFileName);
-                var eventName = $"Play_{wavFileName}";
-                row[TableInformation.ActionEventColumnName] = eventName;
-            }
-
+        private void OnAudioFilesChanged(AudioFilesChangedEvent e) =>
             SetAddRowButtonEnablement();
-        }
 
         private void OnEditorDataGridTextboxTextChanged(EditorDataGridTextboxTextChangedEvent e) => SetAddRowButtonEnablement();
 
@@ -242,7 +243,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
 
         private void OnEditorAddRowShortcutActivated(EditorAddRowShortcutActivatedEvent e)
         {
-            if (_audioEditorStateService.EditorRow != null)
+            if (IsAddRowButtonEnabled && _audioEditorStateService.EditorRow != null)
                 AddRowsToViewer();
         }
 
@@ -282,6 +283,23 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
             _uiCommandFactory.Create<AddRowsToViewerCommand>().Execute(rows);
         }
 
+        [RelayCommand]
+        public void CancelEdit()
+        {
+            if (!IsEditing)
+                return;
+
+            _audioEditorStateService.StorePendingEditedViewerRows([]);
+            _audioEditorStateService.StoreEditorRow(null);
+            ResetEditMode();
+            ResetTable();
+            LoadTable(
+                _audioEditorStateService
+                    .SelectedAudioProjectExplorerNode.Type);
+            SetAddRowButtonEnablement();
+            _eventHub.Publish(new AudioProjectEditCancelledEvent());
+        }
+
         partial void OnShowModdedStatesOnlyChanged(bool value)
         {
             _audioEditorStateService.StoreModdedStatesOnly(ShowModdedStatesOnly);
@@ -299,6 +317,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
         private void SetAddRowButtonEnablement()
         {
             IsAddRowButtonEnabled = false;
+            _audioEditorStateService.StoreEditorRow(null);
 
             if (Table.Rows.Count == 0)
                 return;
@@ -348,7 +367,12 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
             {
                 var actionEventName = TableHelpers.GetActionEventNameFromRow(row);
                 var actionEvent = _audioEditorStateService.AudioProject.GetActionEvent(actionEventName);
-                if (actionEvent != null)
+                var isPendingEditedRow = _audioEditorStateService.PendingEditedViewerRows
+                    .Any(pendingRow => string.Equals(
+                        TableHelpers.GetActionEventNameFromRow(pendingRow),
+                        actionEventName,
+                        StringComparison.Ordinal));
+                if (actionEvent != null && !isPendingEditedRow)
                     return true;
             }
             else if (selectedAudioProjectExplorerNode.IsDialogueEvent())
@@ -356,7 +380,15 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
                 var dialogueEvent = _audioEditorStateService.AudioProject.GetDialogueEvent(selectedAudioProjectExplorerNode.Name);
                 var statePathName = TableHelpers.GetStatePathNameFromRow(row, _audioRepository, dialogueEvent.Name);
                 var statePath = dialogueEvent.GetStatePath(statePathName);
-                if (statePath != null)
+                var isPendingEditedRow = _audioEditorStateService.PendingEditedViewerRows
+                    .Any(pendingRow => string.Equals(
+                        TableHelpers.GetStatePathNameFromRow(
+                            pendingRow,
+                            _audioRepository,
+                            dialogueEvent.Name),
+                        statePathName,
+                        StringComparison.Ordinal));
+                if (statePath != null && !isPendingEditedRow)
                     return true;
             }
             else if (selectedAudioProjectExplorerNode.IsStateGroup())
@@ -364,7 +396,12 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
                 var stateGroup = _audioEditorStateService.AudioProject.GetStateGroup(selectedAudioProjectExplorerNode.Name);
                 var stateName = TableHelpers.GetStateNameFromRow(row);
                 var state = stateGroup.GetState(stateName);
-                if (state != null)
+                var isPendingEditedRow = _audioEditorStateService.PendingEditedViewerRows
+                    .Any(pendingRow => string.Equals(
+                        TableHelpers.GetStateNameFromRow(pendingRow),
+                        stateName,
+                        StringComparison.Ordinal));
+                if (state != null && !isPendingEditedRow)
                     return true;
             }
             return false;
@@ -412,9 +449,20 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
             IsShowModdedStatesCheckBoxEnabled = false;
         }
 
-        private void SetEditorLabel(string label) => EditorLabel = $"Audio Project Editor - {label}";
+        private void ResetEditMode()
+        {
+            IsEditing = false;
+            CommitButtonLabel = LocalizationManager.Instance.Get(
+                "AudioProjectEditor.AddRow");
+            CommitButtonToolTip = LocalizationManager.Instance.Get(
+                "AudioProjectEditor.AddRow.ToolTip");
+        }
 
-        private void ResetEditorLabel() => EditorLabel = $"Audio Project Editor";
+        private void SetEditorLabel(string label) =>
+            EditorLabel = $"{LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectEditor")} - {label}";
+
+        private void ResetEditorLabel() =>
+            EditorLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectEditor");
 
         private void MakeEditorVisible() => IsEditorVisible = true;
 

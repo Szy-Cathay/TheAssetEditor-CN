@@ -12,6 +12,18 @@ using Shared.GameFormats.Wwise.Hirc;
 
 namespace Editors.Audio.Shared.Storage
 {
+    public sealed record AudioRepositorySnapshot(
+        Dictionary<uint, List<HircItem>> HircsById,
+        Dictionary<uint, List<DidxAudio>> DidxAudioListById,
+        Dictionary<string, PackFile> PackFileByBnkName,
+        Dictionary<uint, string> NameById,
+        Dictionary<string, List<string>> StateGroupsByDialogueEvent,
+        Dictionary<string, Dictionary<string, string>>
+            QualifiedStateGroupByStateGroupByDialogueEvent,
+        Dictionary<string, List<string>> StatesByStateGroup,
+        HashSet<string> LoadedBnkDataLanguages,
+        bool IsDatDataLoaded);
+
     public interface IAudioRepository
     {
         Dictionary<uint, List<HircItem>> HircsById { get; }
@@ -28,6 +40,8 @@ namespace Editors.Audio.Shared.Storage
             IProgress<AudioLoadProgress> progress = null,
             CancellationToken cancellationToken = default);
         void Clear();
+        AudioRepositorySnapshot CreateSnapshot();
+        void Restore(AudioRepositorySnapshot snapshot);
         List<T> GetHircsByType<T>() where T : class;
         List<HircItem> GetHircsByHircType(AkBkHircType type);
         List<HircItem> GetHircs(uint id);
@@ -287,6 +301,41 @@ namespace Editors.Audio.Shared.Storage
 
             MemoryOptimiser.Optimise();
             MemoryOptimiser.LogMemory("After clearing AudioRepository");
+        }
+
+        public AudioRepositorySnapshot CreateSnapshot()
+        {
+            return new AudioRepositorySnapshot(
+                HircsById,
+                DidxAudioListById,
+                PackFileByBnkName,
+                NameById,
+                StateGroupsByDialogueEvent,
+                QualifiedStateGroupByStateGroupByDialogueEvent,
+                StatesByStateGroup,
+                new HashSet<string>(
+                    _loadedBnkDataLanguages,
+                    StringComparer.OrdinalIgnoreCase),
+                _isDatDataLoaded);
+        }
+
+        public void Restore(AudioRepositorySnapshot snapshot)
+        {
+            ArgumentNullException.ThrowIfNull(snapshot);
+
+            HircsById = snapshot.HircsById;
+            DidxAudioListById = snapshot.DidxAudioListById;
+            PackFileByBnkName = snapshot.PackFileByBnkName;
+            NameById = snapshot.NameById;
+            StateGroupsByDialogueEvent =
+                snapshot.StateGroupsByDialogueEvent;
+            QualifiedStateGroupByStateGroupByDialogueEvent =
+                snapshot.QualifiedStateGroupByStateGroupByDialogueEvent;
+            StatesByStateGroup = snapshot.StatesByStateGroup;
+            _loadedBnkDataLanguages.Clear();
+            _loadedBnkDataLanguages.UnionWith(
+                snapshot.LoadedBnkDataLanguages);
+            _isDatDataLoaded = snapshot.IsDatDataLoaded;
         }
 
         public void Dispose() => Clear();

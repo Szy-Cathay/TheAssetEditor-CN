@@ -2,6 +2,7 @@
 using Editors.Audio.DialogueEventMerger;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Events;
+using System.Windows;
 
 namespace Editors.Audio.AudioEditor.Commands.Dialogs
 {
@@ -11,10 +12,14 @@ namespace Editors.Audio.AudioEditor.Commands.Dialogs
 
         public void Execute()
         {
-            var window = _serviceProvider.GetRequiredService<DialogueEventMergerWindow>();
-            var viewModel = _serviceProvider.GetRequiredService<DialogueEventMergerViewModel>();
+            using var scope = _serviceProvider.CreateScope();
+            var window = scope.ServiceProvider
+                .GetRequiredService<DialogueEventMergerWindow>();
+            var viewModel = scope.ServiceProvider
+                .GetRequiredService<DialogueEventMergerViewModel>();
             viewModel.SetCloseAction(window.Close);
             window.DataContext = viewModel;
+            window.Owner = Application.Current?.MainWindow;
             window.ShowDialog();
         }
     }

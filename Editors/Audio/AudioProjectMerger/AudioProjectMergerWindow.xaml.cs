@@ -20,10 +20,5 @@ namespace Editors.Audio.AudioProjectMerger
                 viewModel.SetCloseAction(Close);
         }
 
-        private void OnClosed(object sender, EventArgs e)
-        {
-            if (DataContext is AudioProjectMergerViewModel viewModel)
-                viewModel.CloseWindowAction();
-        }
     }
 }

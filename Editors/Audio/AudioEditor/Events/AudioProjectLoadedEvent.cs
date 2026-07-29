@@ -1,4 +1,4 @@
 ﻿namespace Editors.Audio.AudioEditor.Events
 {
-    public record AudioProjectLoadedEvent();
+    public record AudioProjectLoadedEvent(bool IsRecovery = false);
 }

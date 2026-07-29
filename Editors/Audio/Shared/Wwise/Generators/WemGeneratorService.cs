@@ -2,20 +2,24 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Models;
-using Serilog;
-using Shared.Core.ErrorHandling;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
-using Shared.Core.PackFiles.Utility;
+using Shared.Core.Services;
 
 namespace Editors.Audio.Shared.Wwise.Generators
 {
     public interface IWemGeneratorService
     {
-        void RemoveExistingAudioFilesAndSounds(List<AudioFile> audioFiles, List<Sound> sounds);
-        void GenerateWems(List<AudioFile> audioFiles);
-        void SaveWemsToPack(List<AudioFile> audioFiles);
+        Task GenerateWemsAsync(
+            List<AudioFile> audioFiles,
+            string workspacePath,
+            CancellationToken cancellationToken = default);
+        List<AudioPackOutput> CreateWemOutputs(
+            List<AudioFile> audioFiles);
     }
 
     public class WemGeneratorService(IPackFileService packFileService, WSourcesWrapper wSourcesWrapper) : IWemGeneratorService
@@ -23,71 +27,113 @@ namespace Editors.Audio.Shared.Wwise.Generators
         private readonly IPackFileService _packFileService = packFileService;
         private readonly WSourcesWrapper _wSourcesWrapper = wSourcesWrapper;
 
-        private readonly ILogger _logger = Logging.Create<WemGeneratorService>();
-
-        public void RemoveExistingAudioFilesAndSounds(List<AudioFile> audioFiles, List<Sound> sounds)
+        public async Task GenerateWemsAsync(
+            List<AudioFile> audioFiles,
+            string workspacePath,
+            CancellationToken cancellationToken = default)
         {
-            // Make a copy so we remove from the original
-            foreach (var audioFile in audioFiles.ToList())
-            {
-                var wemFile = _packFileService.FindFile(audioFile.WemPackFilePath);
-                if (wemFile != null)
-                {
-                    audioFiles.Remove(audioFile);
-                    sounds.Remove(sounds.FirstOrDefault(sound => sound.SourceId == audioFile.Id));
-                }
-            }
-        }
-        public void GenerateWems(List<AudioFile> audioFiles)
-        {
-            var wavToWemFolderPath = $"{DirectoryHelper.Temp}\\WavToWem";
-            var audioFolderPath = $"{DirectoryHelper.Temp}\\Audio";
-            var wprojPath = $"{DirectoryHelper.Temp}\\WavToWem\\WavToWemWwiseProject\\WavToWem.wproj";
-            var wsourcesPath = $"{DirectoryHelper.Temp}\\WavToWem\\wav_to_wem.wsources";
+            if (cancellationToken.IsCancellationRequested)
+                return;
 
-            var wavFileNames = new List<string>();
+            var wavToWemFolderPath = Path.Combine(
+                workspacePath,
+                "WavToWem");
+            var wprojPath = Path.Combine(
+                wavToWemFolderPath,
+                "WavToWemWwiseProject",
+                "WavToWem.wproj");
+            var wsourcesPath = Path.Combine(
+                wavToWemFolderPath,
+                "wav_to_wem.wsources");
+
+            var wavFiles = new List<(string FileName, byte[] Bytes)>();
             foreach (var audioFile in audioFiles)
             {
-                var wavFile = _packFileService.FindFile(audioFile.WavPackFilePath);
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                var wavFile =
+                    _packFileService.FindFile(
+                        audioFile.WavPackFilePath) ??
+                    throw new FileNotFoundException(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.PackFileNotFound",
+                            audioFile.WavPackFilePath),
+                        audioFile.WavPackFilePath);
                 var wavFileName = $"{audioFile.Id}.wav";
-                var wavFilePath = $"{audioFolderPath}\\{wavFileName}";
-
-                ExportWav(wavFilePath, wavFile.DataSource.ReadData());
-
-                wavFileNames.Add(wavFileName);
+                wavFiles.Add((wavFileName, wavFile.DataSource.ReadData()));
             }
 
-            _wSourcesWrapper.InitialiseWwiseProject();
+            var preparationCompleted = await Task.Run(() =>
+            {
+                foreach (var wavFile in wavFiles)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        return false;
 
-            DirectoryHelper.EnsureCreated(wavToWemFolderPath);
+                    var wavFilePath = Path.Combine(
+                        workspacePath,
+                        wavFile.FileName);
+                    ExportWav(wavFilePath, wavFile.Bytes);
+                }
 
-            _wSourcesWrapper.CreateWsourcesFile(wavFileNames);
+                if (cancellationToken.IsCancellationRequested)
+                    return false;
 
-            var arguments = $"\"{wprojPath}\" -ConvertExternalSources \"{wsourcesPath}\" -ExternalSourcesOutput \"{audioFolderPath}\"";
-            _wSourcesWrapper.RunExternalCommand(arguments);
-            _wSourcesWrapper.DeleteExcessStuff();
+                _wSourcesWrapper.InitialiseWwiseProject(
+                    wavToWemFolderPath);
+                if (cancellationToken.IsCancellationRequested)
+                    return false;
+
+                _wSourcesWrapper.CreateWsourcesFile(
+                    wavFiles.Select(wavFile => wavFile.FileName).ToList(),
+                    workspacePath,
+                    wsourcesPath);
+                return true;
+            });
+            if (!preparationCompleted)
+                return;
+
+            var arguments = $"\"{wprojPath}\" -ConvertExternalSources \"{wsourcesPath}\" -ExternalSourcesOutput \"{workspacePath}\"";
+            try
+            {
+                await _wSourcesWrapper.RunExternalCommandAsync(
+                    arguments,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            await Task.Run(
+                () => _wSourcesWrapper.DeleteExcessStuff(workspacePath));
         }
 
-        public void SaveWemsToPack(List<AudioFile> audioFiles)
+        public List<AudioPackOutput> CreateWemOutputs(
+            List<AudioFile> audioFiles)
         {
-            var wemFiles = new List<PackFileUtil.FileRef>();
+            var outputs = new List<AudioPackOutput>();
             foreach (var audioFile in audioFiles)
-                wemFiles.Add(new PackFileUtil.FileRef(audioFile.WemDiskFilePath, Path.GetDirectoryName(audioFile.WemPackFilePath)));
+            {
+                outputs.Add(
+                    new AudioPackOutput(
+                        audioFile.WemPackFileName,
+                        audioFile.WemPackFilePath,
+                        File.ReadAllBytes(audioFile.WemDiskFilePath)));
+            }
 
-            PackFileUtil.LoadFilesFromDisk(_packFileService, wemFiles);
+            return outputs;
         }
 
         private void ExportWav(string filePath, byte[] bytes)
         {
-            try
-            {
-                DirectoryHelper.EnsureFileFolderCreated(filePath);
-                File.WriteAllBytes(filePath, bytes);
-            }
-            catch (Exception e)
-            {
-                _logger.Here().Error(e.Message);
-            }
+            DirectoryHelper.EnsureFileFolderCreated(filePath);
+            File.WriteAllBytes(filePath, bytes);
         }
     }
 }

@@ -11,7 +11,7 @@
     mc:Ignorable="d"
     Width="850"
     SizeToContent="Height"
-    Closed="OnClosed"
+    WindowStartupLocation="CenterOwner"
     Title="{loc:Loc AudioProjectMerger.Title}" Background="#FF1C1C1C">
 
     <Grid>
@@ -179,12 +179,14 @@
                 Width="75"
                 Margin="0, 0, 5, 0"
                 Command="{Binding MergeAudioProjectsCommand}" 
+                IsDefault="True"
                 IsEnabled="{Binding IsOkButtonEnabled}"/>
 
             <Button 
                 Content="{loc:Loc General.Cancel}"
                 Width="75"
                 Margin="5, 0, 0, 0"
+                IsCancel="True"
                 Command="{Binding CloseWindowActionCommand}"/>
         </StackPanel>
     </Grid>

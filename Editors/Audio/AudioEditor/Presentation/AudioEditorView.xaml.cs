@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer;
 using Editors.Audio.AudioEditor.Presentation.AudioProjectEditor;
 using Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer;
@@ -12,17 +13,6 @@ using Editors.Audio.AudioEditor.Presentation.WaveformVisualiser;
 
 namespace Editors.Audio.AudioEditor.Presentation
 {
-    public enum FocussedViewModel
-    {
-        Unknown,
-        AudioProjectExplorer,
-        AudioFilesExplorer,
-        AudioProjectEditor,
-        AudioProjectViewer,
-        Settings,
-        WaveformVisualiser
-    }
-
     public partial class AudioEditorView : UserControl
     {
         public AudioEditorViewModel ViewModel => DataContext as AudioEditorViewModel;
@@ -64,10 +54,14 @@ namespace Editors.Audio.AudioEditor.Presentation
             var isTextInputFocussed = Keyboard.FocusedElement is ComboBox comboBox && comboBox.IsEditable || Keyboard.FocusedElement is TextBox textBox && !textBox.IsReadOnly;
 
             var isSettingsAudioFilesListViewFocussed = false;
-            if (focussedViewModel == FocussedViewModel.Settings)
+            if (focussedViewModel == AudioEditorFocusTarget.Settings)
                 isSettingsAudioFilesListViewFocussed = IsAudioFilesListViewFocussed(e.OriginalSource as DependencyObject);
 
-            ViewModel?.OnPreviewKeyDown(e, isTextInputFocussed, isSettingsAudioFilesListViewFocussed);
+            ViewModel?.OnPreviewKeyDown(
+                e,
+                focussedViewModel,
+                isTextInputFocussed,
+                isSettingsAudioFilesListViewFocussed);
         }
 
         private static bool IsAudioFilesListViewFocussed(DependencyObject source)
@@ -83,7 +77,7 @@ namespace Editors.Audio.AudioEditor.Presentation
             return false;
         }
 
-        private static FocussedViewModel GetFocussedViewModel()
+        private static AudioEditorFocusTarget GetFocussedViewModel()
         {
             var currentElement = Keyboard.FocusedElement as DependencyObject;
             while (currentElement != null)
@@ -92,23 +86,23 @@ namespace Editors.Audio.AudioEditor.Presentation
                 {
                     var dataContext = userControl.DataContext;
                     if (dataContext is AudioProjectExplorerViewModel)
-                        return FocussedViewModel.AudioProjectExplorer;
+                        return AudioEditorFocusTarget.AudioProjectExplorer;
                     else if (dataContext is AudioFilesExplorerViewModel)
-                        return FocussedViewModel.AudioFilesExplorer;
+                        return AudioEditorFocusTarget.AudioFilesExplorer;
                     else if (dataContext is AudioProjectEditorViewModel)
-                        return FocussedViewModel.AudioProjectEditor;
+                        return AudioEditorFocusTarget.AudioProjectEditor;
                     else if (dataContext is AudioProjectViewerViewModel)
-                        return FocussedViewModel.AudioProjectViewer;
+                        return AudioEditorFocusTarget.AudioProjectViewer;
                     else if (dataContext is SettingsViewModel)
-                        return FocussedViewModel.Settings;
+                        return AudioEditorFocusTarget.Settings;
                     else if (dataContext is WaveformVisualiserViewModel)
-                        return FocussedViewModel.WaveformVisualiser;
+                        return AudioEditorFocusTarget.WaveformVisualiser;
                     else 
-                        return FocussedViewModel.Unknown;
+                        return AudioEditorFocusTarget.Unknown;
                 }
                 currentElement = VisualTreeHelper.GetParent(currentElement);
             }
-            return FocussedViewModel.Unknown;
+            return AudioEditorFocusTarget.Unknown;
         }
     }
 }

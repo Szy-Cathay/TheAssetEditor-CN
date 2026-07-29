@@ -54,7 +54,10 @@ namespace Editors.Audio.Shared.AudioProject.Models
             ArgumentNullException.ThrowIfNull(existingStatePaths);
             ArgumentNullException.ThrowIfNull(statePath);
 
-            if (existingStatePaths.Any(existingStatePath => StringComparer.OrdinalIgnoreCase.Equals(existingStatePath, statePath.Name)))
+            if (existingStatePaths.Any(existingStatePath =>
+                    StringComparer.OrdinalIgnoreCase.Equals(
+                        existingStatePath.Name,
+                        statePath.Name)))
                 throw new ArgumentException($"Cannot add StatePath with Name {statePath.Name} as it already exists.");
 
             var index = existingStatePaths.BinarySearch(statePath, s_nameComparerIgnoreCase);

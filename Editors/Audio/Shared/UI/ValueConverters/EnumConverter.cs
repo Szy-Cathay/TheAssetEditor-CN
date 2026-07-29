@@ -20,19 +20,28 @@ namespace Editors.Audio.Shared.UI.ValueConverters
             else if (value is Wh3DialogueEventUnitProfile dialogueEventProfile)
                 return Wh3DialogueEventInformation.GetDialogueEventProfileDisplayName(dialogueEventProfile);
             else if (value is ContainerType containerType)
-                return HircSettings.GetEnumDisplayName(containerType);
+                return GetHircEnumDisplayName(containerType);
             else if (value is RandomType randomType)
-                return HircSettings.GetEnumDisplayName(randomType);
+                return GetHircEnumDisplayName(randomType);
             else if (value is PlayMode containerMode)
-                return HircSettings.GetEnumDisplayName(containerMode);
+                return GetHircEnumDisplayName(containerMode);
             else if (value is PlaylistEndBehaviour endBehaviour)
-                return HircSettings.GetEnumDisplayName(endBehaviour);
+                return GetHircEnumDisplayName(endBehaviour);
             else if (value is LoopingType loopingType)
-                return HircSettings.GetEnumDisplayName(loopingType);
+                return GetHircEnumDisplayName(loopingType);
             else if (value is TransitionType transitionType)
-                return HircSettings.GetEnumDisplayName(transitionType);
+                return GetHircEnumDisplayName(transitionType);
             else
                 return null;
+        }
+
+        private static string GetHircEnumDisplayName<TEnum>(TEnum value) where TEnum : struct, Enum
+        {
+            var key = $"AudioSettings.Enum.{typeof(TEnum).Name}.{value}";
+            var localizedName = LocalizationManager.Instance.Get(key);
+            return localizedName == key
+                ? HircSettings.GetEnumDisplayName(value)
+                : localizedName;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

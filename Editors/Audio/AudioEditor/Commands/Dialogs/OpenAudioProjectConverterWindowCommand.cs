@@ -2,6 +2,7 @@
 using Editors.Audio.AudioProjectConverter;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Events;
+using System.Windows;
 
 namespace Editors.Audio.AudioEditor.Commands.Dialogs
 {
@@ -11,10 +12,14 @@ namespace Editors.Audio.AudioEditor.Commands.Dialogs
 
         public void Execute()
         {
-            var window = _serviceProvider.GetRequiredService<AudioProjectConverterWindow>();
-            var viewModel = _serviceProvider.GetRequiredService<AudioProjectConverterViewModel>();
+            using var scope = _serviceProvider.CreateScope();
+            var window = scope.ServiceProvider
+                .GetRequiredService<AudioProjectConverterWindow>();
+            var viewModel = scope.ServiceProvider
+                .GetRequiredService<AudioProjectConverterViewModel>();
             viewModel.SetCloseAction(window.Close);
             window.DataContext = viewModel;
+            window.Owner = Application.Current?.MainWindow;
             window.ShowDialog();
         }
     }

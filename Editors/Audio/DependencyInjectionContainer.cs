@@ -90,7 +90,7 @@ namespace Editors.Audio
 
             // Audio Files Explorer services
             serviceCollection.AddSingleton<IAudioFilesTreeBuilderService, AudioFilesTreeBuilderService>();
-            serviceCollection.AddSingleton<IAudioFilesTreeSearchFilterService, AudioFilesTreeFilterService>();
+            serviceCollection.AddScoped<IAudioFilesTreeSearchFilterService, AudioFilesTreeFilterService>();
 
             // Audio Project Editor table
             serviceCollection.AddScoped<IEditorTableServiceFactory, EditorTableServiceFactory>();
@@ -113,6 +113,9 @@ namespace Editors.Audio
 
             // Audio Project
             serviceCollection.AddScoped<IAudioProjectFileService, AudioProjectFileService>();
+            serviceCollection.AddScoped<
+                IAudioPackOutputService,
+                AudioPackOutputService>();
             serviceCollection.AddSingleton<ISoundFactory, SoundFactory>();
             serviceCollection.AddSingleton<IRandomSequenceContainerFactory, RandomSequenceContainerFactory>();
             serviceCollection.AddSingleton<IActionEventFactory, ActionEventFactory>();
@@ -148,6 +151,7 @@ namespace Editors.Audio
         {
             EditorInfoBuilder
                 .Create<AudioEditorViewModel, AudioEditorView>(EditorEnums.Audio_Editor)
+                .ForGames(global::Shared.Core.Settings.GameTypeEnum.Warhammer3)
                 .AddToToolbar("DisplayName.AudioEditor")
                 .Build(factory);
 

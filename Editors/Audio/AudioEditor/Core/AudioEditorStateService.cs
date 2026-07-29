@@ -27,6 +27,7 @@ namespace Editors.Audio.AudioEditor.Core
         DataRow EditorRow { get; set; }
         List<DataRow> SelectedViewerRows { get; set; }
         List<DataRow> CopiedViewerRows { get; set; }
+        List<DataRow> PendingEditedViewerRows { get; set; }
 
         public void StoreAudioProject(AudioProjectFile audioProject);
         public void StoreAudioProjectFileName(string audioProjectFileName);
@@ -39,6 +40,7 @@ namespace Editors.Audio.AudioEditor.Core
         void StoreEditorRow(DataRow row);
         void StoreSelectedViewerRows(List<DataRow> selectedViewerRows);
         void StoreCopiedViewerRows(List<DataRow> copiedViewerRows);
+        void StorePendingEditedViewerRows(List<DataRow> pendingEditedViewerRows);
         void Reset();
     }
 
@@ -55,6 +57,7 @@ namespace Editors.Audio.AudioEditor.Core
         public DataRow EditorRow { get; set; }
         public List<DataRow> SelectedViewerRows { get; set; }
         public List<DataRow> CopiedViewerRows { get; set; }
+        public List<DataRow> PendingEditedViewerRows { get; set; } = [];
 
         public void StoreAudioProject(AudioProjectFile audioProject) => AudioProject = audioProject;
 
@@ -78,6 +81,9 @@ namespace Editors.Audio.AudioEditor.Core
 
         public void StoreCopiedViewerRows(List<DataRow> copiedViewerRows) => CopiedViewerRows = copiedViewerRows;
 
+        public void StorePendingEditedViewerRows(List<DataRow> pendingEditedViewerRows) =>
+            PendingEditedViewerRows = pendingEditedViewerRows;
+
         public void Reset()
         {
             AudioProject = null;
@@ -91,6 +97,7 @@ namespace Editors.Audio.AudioEditor.Core
             EditorRow = null;
             SelectedViewerRows = null;
             CopiedViewerRows = null;
+            PendingEditedViewerRows.Clear();
         }
     }
 }

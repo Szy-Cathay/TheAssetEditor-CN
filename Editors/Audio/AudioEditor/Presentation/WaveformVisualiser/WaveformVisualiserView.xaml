@@ -27,7 +27,10 @@
 
         <Grid
             Grid.Row="1"
-            x:Name="AudioWaveformGrid">
+            x:Name="AudioWaveformGrid"
+            Cursor="Hand"
+            ToolTip="{loc:Loc WaveformVisualiser.Seek.ToolTip}"
+            MouseLeftButtonDown="OnWaveformMouseLeftButtonDown">
 
             <Image
                 Stretch="None"
@@ -58,7 +61,21 @@
             Grid.Row="2"
             Margin="0, 5, 0, 0">
 
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Margin="5,0,5,4"
+                HorizontalAlignment="Center"
+                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Text="{Binding PlaybackStatus}"
+                TextTrimming="CharacterEllipsis"/>
+
             <Grid
+                Grid.Row="1"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Bottom"
                 Margin="5, 0, 0, 5"
@@ -68,15 +85,27 @@
                     Text="{Binding CurrentPlaybackTime, StringFormat={}{0:mm\\:ss\\.ff}}"/>
             </Grid>
 
-            <Button
-                Margin="0, 0, 0, 5"
+            <StackPanel
+                Grid.Row="1"
+                Orientation="Horizontal"
                 HorizontalAlignment="Center"
-                VerticalAlignment="Bottom"
-                Width="70"
-                Content="{loc:Loc WaveformVisualiser.Play}"
-                Command="{Binding PlayPauseCommand}"/>
+                VerticalAlignment="Bottom">
+                <Button
+                    Margin="0, 0, 4, 5"
+                    Width="70"
+                    Content="{Binding PlayPauseLabel}"
+                    IsEnabled="{Binding HasSelectedAudio}"
+                    Command="{Binding PlayPauseCommand}"/>
+                <Button
+                    Margin="4, 0, 0, 5"
+                    Width="55"
+                    Content="{loc:Loc WaveformVisualiser.Stop}"
+                    IsEnabled="{Binding HasSelectedAudio}"
+                    Command="{Binding StopCommand}"/>
+            </StackPanel>
 
             <Grid
+                Grid.Row="1"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
                 Margin="0, 0, 5, 5"

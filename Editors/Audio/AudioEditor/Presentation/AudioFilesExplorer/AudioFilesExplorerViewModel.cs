@@ -14,15 +14,19 @@ using Editors.Audio.AudioEditor.Events.AudioFilesExplorer;
 using Editors.Audio.AudioEditor.Events.AudioProjectExplorer;
 using Editors.Audio.AudioEditor.Events.WaveformVisualiser;
 using Editors.Audio.AudioEditor.Presentation.Shared.Models;
+using Editors.Audio.AudioEditor.Presentation.WaveformVisualiser;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Ui.Common;
 
 namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
 {
-    public partial class AudioFilesExplorerViewModel : ObservableObject
+    public partial class AudioFilesExplorerViewModel :
+        ObservableObject,
+        IDisposable
     {
         private readonly IGlobalEventHub _globalEventHub;
         private readonly IEventHub _eventHub;
@@ -31,15 +35,17 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
         private readonly IAudioEditorStateService _audioEditorStateService;
         private readonly IAudioFilesTreeBuilderService _audioFilesTreeBuilder;
         private readonly IAudioFilesTreeSearchFilterService _audioFilesTreeFilter;
+        private readonly IWaveformVisualisationCacheService _waveformVisualisationCacheService;
 
         [ObservableProperty] private string _audioFilesExplorerLabel;
         [ObservableProperty] private bool _isSetAudioFilesButtonEnabled = false;
         [ObservableProperty] private bool _isAddAudioFilesButtonEnabled = false;
         [ObservableProperty] private bool _isPlayAudioButtonEnabled = false;
         [ObservableProperty] private string _filterQuery;
-        [ObservableProperty] private ObservableCollection<AudioFilesTreeNode> _audioFilesTree;
+        [ObservableProperty] private ObservableCollection<AudioFilesTreeNode> _audioFilesTree = [];
         [ObservableProperty] private ObservableCollection<AudioFilesTreeNode> _selectedTreeNodes = [];
         private CancellationTokenSource _filterQueryDebounceCancellationTokenSource;
+        private PackFileContainer _editablePack;
 
         public AudioFilesExplorerViewModel(
             IGlobalEventHub globalEventHub,
@@ -48,7 +54,8 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
             IPackFileService packFileService,
             IAudioEditorStateService audioEditorStateService,
             IAudioFilesTreeBuilderService audioFilesTreeBuilder,
-            IAudioFilesTreeSearchFilterService audioFilesTreeFilter)
+            IAudioFilesTreeSearchFilterService audioFilesTreeFilter,
+            IWaveformVisualisationCacheService waveformVisualisationCacheService)
         {
             _globalEventHub = globalEventHub;
             _eventHub = eventHub;
@@ -57,24 +64,29 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
             _audioEditorStateService = audioEditorStateService;
             _audioFilesTreeBuilder = audioFilesTreeBuilder;
             _audioFilesTreeFilter = audioFilesTreeFilter;
+            _waveformVisualisationCacheService = waveformVisualisationCacheService;
 
             SelectedTreeNodes.CollectionChanged += OnSelectedTreeNodesChanged;
 
             _eventHub.Register<AudioProjectExplorerNodeSelectedEvent>(this, OnAudioProjectExplorerNodeSelected);
             _eventHub.Register<AudioFilesChangedEvent>(this, OnAudioFilesChanged);
             _globalEventHub.Register<PackFileContainerSetAsMainEditableEvent>(this, x => OnPackFileContainerSetAsMainEditable(x.Container));
-            _globalEventHub.Register<PackFileContainerFilesAddedEvent>(this, x => RefreshAudioFilesTree(x.Container));
-            _globalEventHub.Register<PackFileContainerFilesRemovedEvent>(this, x => RefreshAudioFilesTree(x.Container));
-            _globalEventHub.Register<PackFileContainerFilesUpdatedEvent>(this, x => RefreshAudioFilesTree(x.Container));
-            _globalEventHub.Register<PackFileContainerFolderRemovedEvent>(this, x => RefreshAudioFilesTree(x.Container));
+            _globalEventHub.Register<PackFileContainerFilesAddedEvent>(this, x => RefreshAudioFilesTreeIfWavChanged(x.Container, x.AddedFiles));
+            _globalEventHub.Register<PackFileContainerFilesRemovedEvent>(this, x => RefreshAudioFilesTreeIfWavChanged(x.Container, x.RemovedFiles));
+            _globalEventHub.Register<PackFileContainerFilesUpdatedEvent>(this, x => RefreshAudioFilesTreeIfWavChanged(x.Container, x.ChangedFiles));
+            _globalEventHub.Register<PackFileContainerFolderRemovedEvent>(
+                this,
+                x => RefreshAudioFilesTreeIfCurrent(x.Container));
 
-            AudioFilesExplorerLabel = $"Audio Files Explorer";
+            AudioFilesExplorerLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.AudioFilesExplorer");
 
             var editablePack = _packFileService.GetEditablePack();
             if (editablePack == null)
                 return;
 
-            AudioFilesExplorerLabel = $"Audio Files Explorer - {WpfHelpers.DuplicateUnderscores(editablePack.Name)}";
+            _editablePack = editablePack;
+            AudioFilesExplorerLabel =
+                $"{LocalizationManager.Instance.Get("AudioEditor.Panel.AudioFilesExplorer")} - {WpfHelpers.DuplicateUnderscores(editablePack.Name)}";
 
             AudioFilesTree = _audioFilesTreeBuilder.BuildTree(editablePack);
             SetupIsExpandedHandlers(AudioFilesTree);
@@ -138,27 +150,91 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
         private void OnPackFileContainerSetAsMainEditable(PackFileContainer packFileContainer)
         {
             if (packFileContainer == null)
+            {
+                _editablePack = null;
+                SelectedTreeNodes.Clear();
+                AudioFilesTree = [];
+                AudioFilesExplorerLabel = LocalizationManager.Instance.Get(
+                    "AudioEditor.Panel.AudioFilesExplorer");
                 return;
+            }
 
-            AudioFilesExplorerLabel = $"Audio Files Explorer - {WpfHelpers.DuplicateUnderscores(packFileContainer.Name)}";
+            _editablePack = packFileContainer;
+            AudioFilesExplorerLabel =
+                $"{LocalizationManager.Instance.Get("AudioEditor.Panel.AudioFilesExplorer")} - {WpfHelpers.DuplicateUnderscores(packFileContainer.Name)}";
             RefreshAudioFilesTree(packFileContainer);
         }
 
         private void RefreshAudioFilesTree(PackFileContainer packFileContainer)
         {
+            if (!ReferenceEquals(packFileContainer, _editablePack))
+                return;
+
+            RemoveIsExpandedHandlers(AudioFilesTree);
+            SelectedTreeNodes.Clear();
+            _waveformVisualisationCacheService.Clear();
+            _eventHub.Publish(new WaveformCacheInvalidatedEvent());
             AudioFilesTree = _audioFilesTreeBuilder.BuildTree(packFileContainer);
+            SetupIsExpandedHandlers(AudioFilesTree);
+            _audioFilesTreeFilter.Reset();
+            if (!string.IsNullOrWhiteSpace(FilterQuery))
+                _audioFilesTreeFilter.FilterTree(AudioFilesTree, FilterQuery);
             CacheRootWaveformVisualisations();
+        }
+
+        private void RefreshAudioFilesTreeIfCurrent(
+            PackFileContainer packFileContainer)
+        {
+            if (ReferenceEquals(packFileContainer, _editablePack))
+                RefreshAudioFilesTree(packFileContainer);
+        }
+
+        private void RefreshAudioFilesTreeIfWavChanged(
+            PackFileContainer packFileContainer,
+            IEnumerable<PackFile> changedFiles)
+        {
+            if (!ReferenceEquals(packFileContainer, _editablePack))
+                return;
+
+            if (changedFiles.Any(file => string.Equals(
+                file.Extension,
+                ".wav",
+                StringComparison.OrdinalIgnoreCase)))
+            {
+                RefreshAudioFilesTree(packFileContainer);
+            }
+        }
+
+        private void RemoveIsExpandedHandlers(
+            IEnumerable<AudioFilesTreeNode> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                node.NodeIsExpandedChanged -= OnNodeIsExpandedChanged;
+                if (node.Children is { Count: > 0 })
+                    RemoveIsExpandedHandlers(node.Children);
+            }
+        }
+
+        public void Dispose()
+        {
+            _filterQueryDebounceCancellationTokenSource?.Cancel();
+            _filterQueryDebounceCancellationTokenSource?.Dispose();
+            SelectedTreeNodes.CollectionChanged -=
+                OnSelectedTreeNodesChanged;
+            RemoveIsExpandedHandlers(AudioFilesTree);
+            _eventHub.UnRegister(this);
+            _globalEventHub.UnRegister(this);
         }
 
         private void OnSelectedTreeNodesChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             var selectedWavNodes = GetSelectedWavNodes();
 
-            if (selectedWavNodes != null && selectedWavNodes.Count == 1)
-            {
-                var wavFilePaths = new List<string> { selectedWavNodes[0].FilePath };
-                _eventHub.Publish(new AudioFilesExplorerNodeSelectedEvent(wavFilePaths));
-            }
+            var wavFilePaths = selectedWavNodes.Count == 1
+                ? new List<string> { selectedWavNodes[0].FilePath }
+                : [];
+            _eventHub.Publish(new AudioFilesExplorerNodeSelectedEvent(wavFilePaths));
 
             SetButtonEnablement();
         }
@@ -215,13 +291,28 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
                 {
                     await Task.Delay(250, cancellationToken);
 
-                    var application = Application.Current;
-                    if (application is not null && application.Dispatcher is not null)
-                        application.Dispatcher.Invoke(() => _audioFilesTreeFilter.FilterTree(AudioFilesTree, FilterQuery));
-                    else
+                    var dispatcher = Application.Current?.Dispatcher;
+                    if (dispatcher == null)
+                    {
                         _audioFilesTreeFilter.FilterTree(AudioFilesTree, FilterQuery);
+                    }
+                    else if (!dispatcher.HasShutdownStarted &&
+                             !dispatcher.HasShutdownFinished)
+                    {
+                        dispatcher.Invoke(() =>
+                            _audioFilesTreeFilter.FilterTree(
+                                AudioFilesTree,
+                                FilterQuery));
+                    }
                 }
                 catch (OperationCanceledException) { }
+                catch (InvalidOperationException)
+                    when (Application.Current?.Dispatcher
+                              .HasShutdownStarted == true ||
+                          Application.Current?.Dispatcher
+                              .HasShutdownFinished == true)
+                {
+                }
             }, cancellationToken);
         }
 

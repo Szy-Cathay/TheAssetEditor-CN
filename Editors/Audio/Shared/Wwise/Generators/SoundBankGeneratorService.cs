@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Editors.Audio.AudioEditor.Core;
+using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Models;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Editors.Audio.Shared.Storage;
@@ -25,15 +28,20 @@ namespace Editors.Audio.Shared.Wwise.Generators
 {
     public interface ISoundBankGeneratorService
     {
-        void GenerateSoundBankWithoutDialogueEvents(SoundBank soundBank);
-        void GenerateDialogueEventsForTestingSoundBank(SoundBank soundBank);
-        void GenerateMergingSoundBank(SoundBank soundBank);
-        void GenerateMergedDialogueEventSoundBanks(List<string> moddedSoundBanks, string soundBankSuffix);
+        AudioPackOutput GenerateSoundBankWithoutDialogueEvents(
+            SoundBank soundBank);
+        AudioPackOutput GenerateDialogueEventsForTestingSoundBank(
+            SoundBank soundBank);
+        AudioPackOutput GenerateMergingSoundBank(SoundBank soundBank);
+        Task<bool> GenerateMergedDialogueEventSoundBanksAsync(
+            List<string> moddedSoundBanks,
+            string soundBankSuffix,
+            CancellationToken cancellationToken);
     }
 
     public class SoundBankGeneratorService : ISoundBankGeneratorService
     {
-        private readonly IFileSaveService _fileSaveService;
+        private readonly IAudioPackOutputService _audioPackOutputService;
         private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly IAudioRepository _audioRepository;
         private readonly HircGeneratorServiceFactory _hircGeneratorServiceFactory;
@@ -42,12 +50,12 @@ namespace Editors.Audio.Shared.Wwise.Generators
         private readonly ILogger _logger = Logging.Create<SoundBankGeneratorService>();
 
         public SoundBankGeneratorService(
-            IFileSaveService fileSaveService,
+            IAudioPackOutputService audioPackOutputService,
             ApplicationSettingsService applicationSettingsService,
             IAudioRepository audioRepository,
             IAudioEditorIntegrityService audioEditorIntegrityService)
         {
-            _fileSaveService = fileSaveService;
+            _audioPackOutputService = audioPackOutputService;
             _applicationSettingsService = applicationSettingsService;
             _audioRepository = audioRepository;
             _audioEditorIntegrityService = audioEditorIntegrityService;
@@ -56,7 +64,8 @@ namespace Editors.Audio.Shared.Wwise.Generators
             _hircGeneratorServiceFactory = HircGeneratorServiceFactory.CreateFactory(bankGeneratorVersion);
         }
 
-        public void GenerateSoundBankWithoutDialogueEvents(SoundBank soundBank)
+        public AudioPackOutput GenerateSoundBankWithoutDialogueEvents(
+            SoundBank soundBank)
         {
             var actionEventToHircLookup = new Dictionary<ActionEvent, HircItem>();
             var hircItems = new List<HircItem>();
@@ -82,10 +91,16 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
             SortHircs(hircItems);
 
-            WriteSoundBank(soundBank.Id, soundBank.LanguageId, soundBank.FileName, soundBank.FilePath, hircItems);
+            return WriteSoundBank(
+                soundBank.Id,
+                soundBank.LanguageId,
+                soundBank.FileName,
+                soundBank.FilePath,
+                hircItems);
         }
 
-        public void GenerateDialogueEventsForTestingSoundBank(SoundBank soundBank)
+        public AudioPackOutput GenerateDialogueEventsForTestingSoundBank(
+            SoundBank soundBank)
         {
             var hircItems = new List<HircItem>();
 
@@ -119,10 +134,16 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
             SortHircs(hircItems);
 
-            WriteSoundBank(soundBank.TestingId, soundBank.LanguageId, soundBank.TestingFileName, soundBank.TestingFilePath, hircItems);
+            return WriteSoundBank(
+                soundBank.TestingId,
+                soundBank.LanguageId,
+                soundBank.TestingFileName,
+                soundBank.TestingFilePath,
+                hircItems);
         }
 
-        public void GenerateMergingSoundBank(SoundBank soundBank)
+        public AudioPackOutput GenerateMergingSoundBank(
+            SoundBank soundBank)
         {
             // We generate all hircs in the merging SoundBank as when merging we check for ID clashes so we can report them to modders
             var actionEventToHircLookup = new Dictionary<ActionEvent, HircItem>();
@@ -151,15 +172,49 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
             SortHircs(hircItems);
 
-            WriteSoundBank(soundBank.MergingId, soundBank.LanguageId, soundBank.MergingFileName, soundBank.MergingFilePath, hircItems);
+            return WriteSoundBank(
+                soundBank.MergingId,
+                soundBank.LanguageId,
+                soundBank.MergingFileName,
+                soundBank.MergingFilePath,
+                hircItems);
         }
 
-        public void GenerateMergedDialogueEventSoundBanks(List<string> moddedSoundBanks, string soundBankSuffix)
+        public async Task<bool> GenerateMergedDialogueEventSoundBanksAsync(
+            List<string> moddedSoundBanks,
+            string soundBankSuffix,
+            CancellationToken cancellationToken)
         {
-            _audioEditorIntegrityService.CheckMergingSoundBanksIdIntegrity();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_audioEditorIntegrityService
+                    .CheckMergingSoundBanksIdIntegrity(moddedSoundBanks))
+            {
+                return false;
+            }
 
+            var outputs = await Task.Run(
+                () => CreateMergedDialogueEventSoundBankOutputs(
+                    moddedSoundBanks,
+                    soundBankSuffix,
+                    cancellationToken),
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return outputs.Count > 0 &&
+                _audioPackOutputService.SaveBatch(
+                    outputs,
+                    promptOnConflict: true);
+        }
+
+        private List<AudioPackOutput> CreateMergedDialogueEventSoundBankOutputs(
+            List<string> moddedSoundBanks,
+            string soundBankSuffix,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var vanillaDialogueEventsByBnkByLanguage = _audioRepository.GetVanillaDialogueEventsByBnkByLanguage();
             var moddedDialogueEventsByLanguage = _audioRepository.GetModdedDialogueEventsByLanguage(moddedSoundBanks);
+            var outputs = new List<AudioPackOutput>();
 
             var soundBanksToGenerateByLanguage = moddedDialogueEventsByLanguage
                 .ToDictionary(
@@ -172,6 +227,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
             foreach (var bnkByLanguage in vanillaDialogueEventsByBnkByLanguage)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var language = bnkByLanguage.Key;
                 if (!moddedDialogueEventsByLanguage.ContainsKey(language))
                     continue;
@@ -179,6 +235,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 var soundBanksToGenerate = soundBanksToGenerateByLanguage[language];
                 foreach (var hircsByBnk in bnkByLanguage.Value)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var firstDialogueEventName = hircsByBnk.Value.Select(hircItem => _audioRepository.GetNameFromId(hircItem.Id)).FirstOrDefault();
                     var currentSoundBank = Wh3DialogueEventInformation.GetSoundBank(firstDialogueEventName);
                     if (!soundBanksToGenerate.Contains(currentSoundBank))
@@ -186,9 +243,18 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
                     _logger.Here().Information($"Merging SoundBanks for language {language}");
 
-                    GenerateMergedDialogueEventSoundBank(hircsByBnk.Value, moddedDialogueEventsByLanguage, language, currentSoundBank, soundBankSuffix);
+                    outputs.Add(
+                        GenerateMergedDialogueEventSoundBank(
+                            hircsByBnk.Value,
+                            moddedDialogueEventsByLanguage,
+                            language,
+                            currentSoundBank,
+                            soundBankSuffix,
+                            cancellationToken));
                 }
             }
+
+            return outputs;
         }
 
         private List<HircItem> GenerateActionEventHircs(SoundBank soundBank, Dictionary<ActionEvent, HircItem> actionEventToHircLookup)
@@ -327,12 +393,13 @@ namespace Editors.Audio.Shared.Wwise.Generators
             return hircItems;
         }
 
-        private void GenerateMergedDialogueEventSoundBank(
+        private AudioPackOutput GenerateMergedDialogueEventSoundBank(
             List<HircItem> vanillaHircs,
             Dictionary<string, List<HircItem>> moddedDialogueEventsByLanguage,
             string language,
             Wh3SoundBank currentSoundBank, 
-            string soundBankSuffix)
+            string soundBankSuffix,
+            CancellationToken cancellationToken)
         {
             var dialogueEvents = new List<HircItem>();
 
@@ -351,6 +418,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
             foreach (var vanillaHirc in vanillaHircs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 // Clone it as we shouldn't modify the original
                 var vanillaDialogueEvent = vanillaHirc as CAkDialogueEvent_V136;
                 var mergedDialogueEvent = vanillaDialogueEvent.Clone();
@@ -366,6 +434,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
                 foreach (var moddedDialogueEventHirc in matchingModdedDialogueEvents)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     _logger.Here().Information($"Merging decision tree from {Path.GetFileName(moddedDialogueEventHirc.BnkFilePath)}");
 
                     var currentDecisionTree = mergedDialogueEvent.AkDecisionTree as AkDecisionTree_V136;
@@ -386,7 +455,12 @@ namespace Editors.Audio.Shared.Wwise.Generators
 
             SortHircs(dialogueEvents);
 
-            WriteSoundBank(soundBankId, languageId, soundBankFileName, soundBankFilePath, dialogueEvents);
+            return WriteSoundBank(
+                soundBankId,
+                languageId,
+                soundBankFileName,
+                soundBankFilePath,
+                dialogueEvents);
         }
 
         private static void SortHircs(List<HircItem> hircItems)
@@ -429,7 +503,12 @@ namespace Editors.Audio.Shared.Wwise.Generators
             hircItems.AddRange(sortedHircItems);
         }
 
-        private void WriteSoundBank(uint id, uint languageId, string fileName, string filePath, List<HircItem> hircItems)
+        private AudioPackOutput WriteSoundBank(
+            uint id,
+            uint languageId,
+            string fileName,
+            string filePath,
+            List<HircItem> hircItems)
         {
             var gameInformation = GameInformationDatabase.GetGameById(_applicationSettingsService.CurrentSettings.CurrentGame);
             var bankGeneratorVersion = (uint)gameInformation.BankGeneratorVersion;
@@ -449,7 +528,10 @@ namespace Editors.Audio.Shared.Wwise.Generators
             var bnkPackFile = new PackFile(fileName, new MemorySource(bytes));
             var reparsedSanityFile = BnkParser.Parse(bnkPackFile, "test\\fakefilename.bnk", true);
 
-            _fileSaveService.Save(filePath, bnkPackFile.DataSource.ReadData(), false);
+            return new AudioPackOutput(
+                fileName,
+                filePath,
+                bnkPackFile.DataSource.ReadData());
         }
     }
 }

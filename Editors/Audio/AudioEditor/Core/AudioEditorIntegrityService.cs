@@ -22,7 +22,8 @@ namespace Editors.Audio.AudioEditor.Core
         void CheckAudioProjectDialogueEventIntegrity(AudioProjectFile audioProject);
         void CheckAudioProjectWavFilesIntegrity(AudioProjectFile audioProject);
         void CheckAudioProjectDataIntegrity(AudioProjectFile audioProject, string audioProjectNameWithoutExtension);
-        void CheckMergingSoundBanksIdIntegrity();
+        bool CheckMergingSoundBanksIdIntegrity(
+            List<string> selectedModdedSoundBanks);
     }
 
     public class AudioEditorIntegrityService(IPackFileService packFileService, IAudioRepository audioRepository) : IAudioEditorIntegrityService
@@ -79,11 +80,13 @@ namespace Editors.Audio.AudioEditor.Core
                 var dialogueEventsOnlyInGameText = string.Join("\n - ", dialogueEventsOnlyInGame);
                 var dialogueEventsOnlyInAudioEditorText = string.Join("\n - ", dialogueEventsOnlyInAudioEditor);
 
-                var message = $"Dialogue Event integrity check failed." +
-                    $"\n\nThis is due to a change in the game's Dialogue Events by CA." +
-                    $"\n\nPlease report this error to the AssetEditor development team.";
-                var dialogueEventsOnlyInGameMessage = $"\n\nGame Dialogue Events not in the Audio Editor:\n - {dialogueEventsOnlyInGameText}";
-                var dialogueEventsOnlyInAudioEditorMessage = $"\n\nAudio Editor Dialogue Events not in the game:\n - {dialogueEventsOnlyInAudioEditorText}";
+                var message = LocalizationManager.Instance.Get("Msg.DialogueEventInformationIntegrityFailed");
+                var dialogueEventsOnlyInGameMessage = LocalizationManager.Instance.GetFormat(
+                    "Msg.DialogueEventsOnlyInGame",
+                    dialogueEventsOnlyInGameText);
+                var dialogueEventsOnlyInAudioEditorMessage = LocalizationManager.Instance.GetFormat(
+                    "Msg.DialogueEventsOnlyInAudioEditor",
+                    dialogueEventsOnlyInAudioEditorText);
 
                 if (dialogueEventsOnlyInGame.Count > 0)
                     message += dialogueEventsOnlyInGameMessage;
@@ -101,11 +104,7 @@ namespace Editors.Audio.AudioEditor.Core
             var dialogueEventsWithStateGroupsWithIntegrityError = new Dictionary<string, List<string>>();
             var hasIntegrityError = false;
 
-            var message = $"Dialogue Events State Groups integrity check failed." +
-                $"\n\nThis is likely due to a change in the State Groups by a recent update to the game or you've done something silly with the file." +
-                $"\n\nWhen browsing the affected Dialogue Events you will see the rows have been updated to accommodate for the new State Groups, and if any of the old State Groups are no longer used they will have been removed." +
-                $" The new State Group(s) will have no State set in them so you need to click Update Row and add the State(s). " +
-                $"\n\nAffected Dialogue Events:";
+            var message = LocalizationManager.Instance.Get("Msg.DialogueEventStateGroupsIntegrityFailed");
 
             foreach (var soundBank in audioProject.SoundBanks)
             {
@@ -123,13 +122,19 @@ namespace Editors.Audio.AudioEditor.Core
                                 if (!hasIntegrityError)
                                     hasIntegrityError = true;
 
-                                message += $"\n\nDialogue Event: {dialogueEvent.Name}";
+                                message += LocalizationManager.Instance.GetFormat(
+                                    "Msg.DialogueEventName",
+                                    dialogueEvent.Name);
 
                                 var audioProjectDialogueEventStateGroupsText = string.Join("-->", audioProjectDialogueEventStateGroups);
-                                message += $"\n\nOld State Groups: {audioProjectDialogueEventStateGroupsText}";
+                                message += LocalizationManager.Instance.GetFormat(
+                                    "Msg.OldStateGroups",
+                                    audioProjectDialogueEventStateGroupsText);
 
                                 var gameDialogueEventStateGroupsText = string.Join("-->", gameDialogueEventStateGroups);
-                                message += $"\n\nNew State Groups: {gameDialogueEventStateGroupsText}";
+                                message += LocalizationManager.Instance.GetFormat(
+                                    "Msg.NewStateGroups",
+                                    gameDialogueEventStateGroupsText);
                             }
                         }
                     }
@@ -159,11 +164,9 @@ namespace Editors.Audio.AudioEditor.Core
                 var sortedMissingWavFiles = missingWavFiles.OrderBy(wavFilePath => wavFilePath).ToList();
                 var missingWavFilesText = string.Join("\n - ", sortedMissingWavFiles);
 
-                var message =
-                    $"Wav files integrity check failed." +
-                    $"\n\nThe following wav files could not be found:" +
-                    $"\n - {missingWavFilesText}" +
-                    $"\n\nEnsure all wav files are in the correct location or update their usage in the Audio Project to the correct path.";
+                var message = LocalizationManager.Instance.GetFormat(
+                    "Msg.WavFilesIntegrityFailed",
+                    missingWavFilesText);
 
                 MessageBox.Show(message, LocalizationManager.Instance.Get("Msg.GeneralError"));
             }
@@ -519,22 +522,28 @@ namespace Editors.Audio.AudioEditor.Core
                 throw new InvalidOperationException("AudioFile.SoundReferences should not be empty.");
         }
 
-        public void CheckMergingSoundBanksIdIntegrity()
+        public bool CheckMergingSoundBanksIdIntegrity(
+            List<string> selectedModdedSoundBanks)
         {
             var moddedHircsByBnkByLanguage = _audioRepository.GetModdedHircsByBnkByLanguage();
+            var selectedSoundBanks = new HashSet<string>(
+                selectedModdedSoundBanks,
+                StringComparer.OrdinalIgnoreCase);
 
             var hasClashes = false;
             var messageBuilder = new StringBuilder()
-                .AppendLine("Merging SoundBanks ID Integrity Check failed.")
-                .AppendLine()
-                .AppendLine("The following Hirc Ids or SourceIds are used by multiple SoundBanks within the same language.")
-                .AppendLine("For each source SoundBank, listed Ids also exist in the listed other SoundBanks.")
+                .AppendLine(LocalizationManager.Instance.Get("Msg.MergingSoundBanksIdIntegrityFailed"))
                 .AppendLine();
 
             foreach (var languageEntry in moddedHircsByBnkByLanguage)
             {
                 var languageName = languageEntry.Key;
-                var hircsByBnkDictionary = languageEntry.Value;
+                var hircsByBnkDictionary = languageEntry.Value
+                    .Where(entry => selectedSoundBanks.Contains(entry.Key))
+                    .ToDictionary(
+                        entry => entry.Key,
+                        entry => entry.Value,
+                        StringComparer.OrdinalIgnoreCase);
 
                 var idsByBnk = new Dictionary<string, HashSet<uint>>(StringComparer.OrdinalIgnoreCase);
                 var bnksById = new Dictionary<uint, HashSet<string>>();
@@ -605,7 +614,7 @@ namespace Editors.Audio.AudioEditor.Core
                     continue;
 
                 hasClashes = true;
-                messageBuilder.AppendLine($"Language: {languageName}");
+                messageBuilder.AppendLine(LocalizationManager.Instance.GetFormat("Msg.LanguageName", languageName));
 
                 var conflictingBnks = clashingIdsById.Values
                     .SelectMany(bnkNames => bnkNames)
@@ -637,7 +646,10 @@ namespace Editors.Audio.AudioEditor.Core
                                 .Where(other => !string.Equals(other, sourceBnk, StringComparison.OrdinalIgnoreCase))
                                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
 
-                            messageBuilder.AppendLine($"Hirc Id {id} also in: {string.Join(", ", otherBnks)}");
+                            messageBuilder.AppendLine(LocalizationManager.Instance.GetFormat(
+                                "Msg.HircIdAlsoInSoundBanks",
+                                id,
+                                string.Join(", ", otherBnks)));
                         }
                     }
 
@@ -654,7 +666,10 @@ namespace Editors.Audio.AudioEditor.Core
                                 .Where(other => !string.Equals(other, sourceBnk, StringComparison.OrdinalIgnoreCase))
                                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
 
-                            messageBuilder.AppendLine($"SourceId {sourceId} also in: {string.Join(", ", otherBnks)}");
+                            messageBuilder.AppendLine(LocalizationManager.Instance.GetFormat(
+                                "Msg.SourceIdAlsoInSoundBanks",
+                                sourceId,
+                                string.Join(", ", otherBnks)));
                         }
                     }
 
@@ -667,6 +682,8 @@ namespace Editors.Audio.AudioEditor.Core
 
             if (hasClashes)
                 MessageBox.Show(messageBuilder.ToString(), LocalizationManager.Instance.Get("Msg.GeneralError"));
+
+            return !hasClashes;
         }
     }
 }

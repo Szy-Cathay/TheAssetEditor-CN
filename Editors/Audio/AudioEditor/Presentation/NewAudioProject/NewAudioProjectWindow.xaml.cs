@@ -1,5 +1,6 @@
 using CommonControls;
 ﻿using System.Windows;
+using System.ComponentModel;
 
 namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
 {
@@ -16,6 +17,20 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
         {
             if (DataContext is NewAudioProjectViewModel viewModel)
                 viewModel.SetCloseAction(this.Close);
+        }
+
+        private void OnClosing(object sender, CancelEventArgs e)
+        {
+            if (DataContext is not NewAudioProjectViewModel
+                {
+                    IsCreating: true
+                } viewModel)
+            {
+                return;
+            }
+
+            viewModel.CancelOrCloseCommand.Execute(null);
+            e.Cancel = true;
         }
     }
 }

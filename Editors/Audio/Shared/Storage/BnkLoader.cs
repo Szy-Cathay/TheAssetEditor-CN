@@ -68,7 +68,9 @@ namespace Editors.Audio.Shared.Storage
 
                 try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+
                     var packFile = bnkFile.Value;
                     var packFileContainer = _packFileService.GetPackFileContainer(packFile);
                     packFileByBnkName.TryAdd(packFile.Name, packFile);

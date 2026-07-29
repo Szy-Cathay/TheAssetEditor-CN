@@ -70,9 +70,9 @@
 
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition 
-                            Width="Auto"/>
+                            Width="*"/>
                         <ColumnDefinition 
-                            Width="Auto"/>
+                            Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <Grid.RowDefinitions>
@@ -92,7 +92,8 @@
                         x:Name ="DialogueEventTypeFilterComboBox"
                         Grid.Column="0"
                         Grid.Row="1"
-                        Width="210"
+                        MinWidth="120"
+                        HorizontalAlignment="Stretch"
                         VerticalAlignment="Center"
                         Height="{StaticResource DefaultHeight}"
                         ItemTemplate="{StaticResource EnumToStringTemplate}"
@@ -109,7 +110,8 @@
                         Grid.Column="1" 
                         Grid.Row="1"
                         Margin="5, 0, 0, 0"
-                        Width="210"
+                        MinWidth="120"
+                        HorizontalAlignment="Stretch"
                         VerticalAlignment="Center"
                         Height="{StaticResource DefaultHeight}"
                         ItemTemplate="{StaticResource EnumToStringTemplate}"
@@ -296,6 +298,7 @@
             <TreeView 
                 ItemsSource="{Binding AudioProjectTree}"
                 SelectedItemChanged="OnTreeViewSelectedItemChanged"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 Padding="0, 5, 0, 5">
 
                 <TreeView.Resources>

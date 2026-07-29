@@ -38,6 +38,8 @@
             Margin="0, 0, 0, 5">
 
             <Grid.ColumnDefinitions>
+                <ColumnDefinition
+                    Width="Auto"/>
                 <ColumnDefinition 
                     Width="Auto"/>
                 <ColumnDefinition 
@@ -46,25 +48,32 @@
 
             <Button 
                 Grid.Column="0"
-                Content="{loc:Loc AudioProjectEditor.AddRow}"
+                Content="{Binding CommitButtonLabel}"
                 ToolTipService.ShowOnDisabled="True"
                 Command="{Binding AddRowsToViewerCommand}" 
                 Margin="5, 0, 0, 0" 
-                Width="70" 
+                Width="80"
                 VerticalAlignment="Center" 
                 HorizontalAlignment="Left"
                 IsEnabled="{Binding IsAddRowButtonEnabled}">
                 
                 <Button.ToolTip>
                     <ToolTip>
-                        <TextBlock TextWrapping="Wrap" Text="{loc:Loc AudioProjectEditor.AddRow.ToolTip}"/>
+                        <TextBlock TextWrapping="Wrap" Text="{Binding CommitButtonToolTip}"/>
                     </ToolTip>
                 </Button.ToolTip>
             </Button>
 
+            <Button
+                Grid.Column="1"
+                Margin="5, 0, 0, 0"
+                Width="80"
+                Content="{loc:Loc General.Cancel}"
+                Command="{Binding CancelEditCommand}"
+                Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
             <CheckBox 
-                Grid.Column="1"
+                Grid.Column="2"
                 Content="{loc:Loc AudioProjectEditor.ShowModdedStatesOnly}"
                 ToolTip="{loc:Loc AudioProjectEditor.ShowModdedStatesOnly.ToolTip}"
                 ToolTipService.ShowOnDisabled="True"
@@ -86,6 +95,6 @@
             ItemsSource="{Binding Table.DefaultView}"
             EnableRowVirtualization="True" 
             EnableColumnVirtualization="True"
-            ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+            ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
     </Grid>
 </UserControl>

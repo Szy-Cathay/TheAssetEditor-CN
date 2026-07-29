@@ -34,44 +34,117 @@ namespace Editors.Audio.AudioProjectMerger
 
         [RelayCommand] public void MergeAudioProjects()
         {
-            var baseAudioProjectFileName = Path.GetFileNameWithoutExtension(BaseAudioProjectPath);
-            var baseAudioProjectPackFile = _packFileService.FindFile(BaseAudioProjectPath);
-            var baseAudioProject = _audioProjectFileService.DeserialiseAudioProject(baseAudioProjectPackFile);
+            try
+            {
+                if (!AudioProjectNameValidator.TryNormalize(
+                        MergedAudioProjectName,
+                        out var normalizedName))
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.Get(
+                            "NewAudioProject.InvalidName"));
+                }
 
-            var mergingAudioProjectFileName = Path.GetFileNameWithoutExtension(MergingAudioProjectPath);
-            var mergingAudioProjectPackFile = _packFileService.FindFile(MergingAudioProjectPath);
-            var mergingAudioProject = _audioProjectFileService.DeserialiseAudioProject(mergingAudioProjectPackFile);
+                if (string.Equals(
+                        BaseAudioProjectPath,
+                        MergingAudioProjectPath,
+                        System.StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.Get(
+                            "AudioProjectMerger.SameInput"));
+                }
 
-            AudioProjectFileMerger.Merge(baseAudioProject, mergingAudioProject, baseAudioProjectFileName, mergingAudioProjectFileName);
+                var baseAudioProjectFileName =
+                    Path.GetFileNameWithoutExtension(
+                        BaseAudioProjectPath);
+                var baseAudioProjectPackFile =
+                    _packFileService.FindFile(BaseAudioProjectPath) ??
+                    throw new FileNotFoundException(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.PackFileNotFound",
+                            BaseAudioProjectPath));
+                var baseAudioProject =
+                    _audioProjectFileService.DeserialiseAudioProject(
+                        baseAudioProjectPackFile);
 
-            var mergedAudioProjectFileName = $"{MergedAudioProjectName}.aproj";
-            var mergedAudioProjectFilePath = $"{OutputDirectoryPath}\\{mergedAudioProjectFileName}";
-            _audioEditorFileService.Save(baseAudioProject, mergedAudioProjectFileName, mergedAudioProjectFilePath);
+                var mergingAudioProjectFileName =
+                    Path.GetFileNameWithoutExtension(
+                        MergingAudioProjectPath);
+                var mergingAudioProjectPackFile =
+                    _packFileService.FindFile(MergingAudioProjectPath) ??
+                    throw new FileNotFoundException(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.PackFileNotFound",
+                            MergingAudioProjectPath));
+                var mergingAudioProject =
+                    _audioProjectFileService.DeserialiseAudioProject(
+                        mergingAudioProjectPackFile);
 
-            CloseWindowAction();
+                if (!string.Equals(
+                        baseAudioProject.Language,
+                        mergingAudioProject.Language,
+                        System.StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.Get(
+                            "AudioProjectMerger.LanguageMismatch"));
+                }
+
+                AudioProjectFileMerger.Merge(
+                    baseAudioProject,
+                    mergingAudioProject,
+                    baseAudioProjectFileName,
+                    mergingAudioProjectFileName);
+
+                var mergedAudioProjectFileName =
+                    $"{normalizedName}.aproj";
+                var mergedAudioProjectFilePath =
+                    $"{OutputDirectoryPath}\\{mergedAudioProjectFileName}";
+                if (_audioEditorFileService.Save(
+                        baseAudioProject,
+                        mergedAudioProjectFileName,
+                        mergedAudioProjectFilePath,
+                        true))
+                {
+                    CloseWindowAction();
+                }
+            }
+            catch (System.Exception exception)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectMerger.Failed",
+                        exception.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+            }
         }
 
         partial void OnMergedAudioProjectNameChanged(string value)
         {
-            IsMergedAudioProjectNameSet = !string.IsNullOrEmpty(value);
+            IsMergedAudioProjectNameSet =
+                AudioProjectNameValidator.TryNormalize(value, out _);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnOutputDirectoryPathChanged(string value)
         {
-            IsOutputDirectoryPathSet = !string.IsNullOrEmpty(value);
+            IsOutputDirectoryPathSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnBaseAudioProjectPathChanged(string value)
         {
-            IsBaseAudioProjectPathSet = !string.IsNullOrEmpty(value);
+            IsBaseAudioProjectPathSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnMergingAudioProjectPathChanged(string value)
         {
-            IsMergingAudioProjectPathSet = !string.IsNullOrEmpty(value);
+            IsMergingAudioProjectPathSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
@@ -80,7 +153,11 @@ namespace Editors.Audio.AudioProjectMerger
             IsOkButtonEnabled = IsMergedAudioProjectNameSet 
                 && IsOutputDirectoryPathSet 
                 && IsBaseAudioProjectPathSet 
-                && IsMergingAudioProjectPathSet;
+                && IsMergingAudioProjectPathSet
+                && !string.Equals(
+                    BaseAudioProjectPath,
+                    MergingAudioProjectPath,
+                    System.StringComparison.OrdinalIgnoreCase);
         }
 
         [RelayCommand] public void SetOutputDirectoryPath()

@@ -2,6 +2,7 @@
 using Editors.Audio.AudioEditor.Presentation.NewAudioProject;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Events;
+using System.Windows;
 
 namespace Editors.Audio.AudioEditor.Commands.Dialogs
 {
@@ -15,6 +16,7 @@ namespace Editors.Audio.AudioEditor.Commands.Dialogs
             var viewModel = _serviceProvider.GetRequiredService<NewAudioProjectViewModel>();
             viewModel.SetCloseAction(window.Close);
             window.DataContext = viewModel;
+            window.Owner = Application.Current?.MainWindow;
             window.ShowDialog();
         }
     }

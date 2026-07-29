@@ -11,12 +11,16 @@
     d:DataContext="{d:DesignInstance Type=Local:NewAudioProjectViewModel}"
     mc:Ignorable="d"
     Width="500"
-    Height="170"
+    Height="225"
+    WindowStartupLocation="CenterOwner"
+    Closing="OnClosing"
     Title="{loc:Loc NewAudioProject.Title}" Background="#FF1C1C1C">
 
     <Window.Resources>
         <ValueConverters:EnumConverter 
             x:Key="EnumConverter"/>
+        <BooleanToVisibilityConverter
+            x:Key="BoolToVisibilityConverter"/>
         <DataTemplate 
             x:Key="EnumToStringTemplate">
             <TextBlock 
@@ -30,13 +34,16 @@
                 Height="Auto"/>
             <RowDefinition 
                 Height="Auto"/>
+            <RowDefinition
+                Height="Auto"/>
             <RowDefinition 
                 Height="Auto"/>
         </Grid.RowDefinitions>
 
         <Grid 
             Grid.Row="1" 
-            Margin="10">
+            Margin="10"
+            IsEnabled="{Binding IsCreating, Converter={StaticResource InvBoolConverter}}">
             
             <Grid.RowDefinitions>
                 <RowDefinition 
@@ -56,6 +63,12 @@
                     <ColumnDefinition 
                         Width="*"/>
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                </Grid.RowDefinitions>
 
                 <Label
                     Grid.Column="0" 
@@ -67,6 +80,15 @@
                     ToolTip="{loc:Loc NewAudioProject.Name.ToolTip}"
                     VerticalContentAlignment="Center"
                     Padding="2, 0, 0, 0"/>
+
+                <TextBlock
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Margin="0,2,0,0"
+                    Foreground="#FFE57373"
+                    FontSize="11"
+                    TextWrapping="Wrap"
+                    Text="{Binding ValidationMessage}"/>
             </Grid>
 
             <Grid 
@@ -126,10 +148,29 @@
             </Grid>
         </Grid>
 
-        <StackPanel 
-            Grid.Row="2" 
-            Orientation="Horizontal" 
-            HorizontalAlignment="Right" 
+        <StackPanel
+            Grid.Row="2"
+            Margin="10,0,10,6"
+            Orientation="Horizontal"
+            Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibilityConverter}}">
+            <ProgressBar
+                Width="90"
+                Height="4"
+                Margin="0,0,8,0"
+                VerticalAlignment="Center"
+                IsIndeterminate="True"/>
+            <TextBlock
+                MaxWidth="350"
+                VerticalAlignment="Center"
+                Text="{Binding CreationStatus}"
+                TextTrimming="CharacterEllipsis"
+                ToolTip="{Binding CreationStatus}"/>
+        </StackPanel>
+
+        <StackPanel
+            Grid.Row="3"
+            Orientation="Horizontal"
+            HorizontalAlignment="Right"
             Margin="10, 0, 10, 10">
             
             <Button 
@@ -137,13 +178,14 @@
                 Width="75"
                 Margin="0, 0, 5, 0"
                 Command="{Binding CreateAudioProjectCommand}" 
+                IsDefault="True"
                 IsEnabled="{Binding IsOkButtonEnabled}"/>
             
             <Button 
                 Content="{loc:Loc General.Cancel}"
                 Width="75"
                 Margin="5, 0, 0, 0"
-                Command="{Binding CloseWindowActionCommand}"/>
+                Command="{Binding CancelOrCloseCommand}"/>
         </StackPanel>
     </Grid>
 </Window>

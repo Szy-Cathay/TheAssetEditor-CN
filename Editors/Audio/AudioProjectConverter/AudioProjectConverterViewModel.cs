@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.Audio.AudioEditor.Core;
+using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Compiler;
 using Editors.Audio.Shared.AudioProject.Models;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
@@ -29,7 +32,7 @@ namespace Editors.Audio.AudioProjectConverter
     public partial class AudioProjectConverterViewModel : ObservableObject
     {
         private readonly IStandardDialogs _standardDialogs;
-        private readonly IFileSaveService _fileSaveService;
+        private readonly IAudioPackOutputService _audioPackOutputService;
         private readonly IAudioRepository _audioRepository;
         private readonly IAudioEditorFileService _audioEditorFileService;
         private readonly ApplicationSettingsService _applicationSettingsService;
@@ -53,42 +56,231 @@ namespace Editors.Audio.AudioProjectConverter
         [ObservableProperty] private bool _isVOActorSubstringSet;
         [ObservableProperty] private bool _isSoundbanksInfoXmlSet;
         [ObservableProperty] private bool _isOkButtonEnabled;
+        [ObservableProperty] private bool _isLoading = true;
+        [ObservableProperty] private bool _isProcessing;
+        [ObservableProperty] private string _status =
+            LocalizationManager.Instance.Get(
+                "AudioProjectConverter.Loading");
+        private bool _isInitialised;
+        private bool _isRepositoryLoaded;
+        private CancellationToken _lifetimeCancellationToken;
+
+        public bool IsBusy => IsLoading || IsProcessing;
 
         public AudioProjectConverterViewModel(
             IStandardDialogs standardDialogs,
-            IFileSaveService fileSaveService,
+            IAudioPackOutputService audioPackOutputService,
             IAudioRepository audioRepository,
             IAudioEditorFileService audioEditorFileService,
             ApplicationSettingsService applicationSettingsService,
             VgStreamWrapper vgStreamWrapper)
         {
             _standardDialogs = standardDialogs;
-            _fileSaveService = fileSaveService;
+            _audioPackOutputService = audioPackOutputService;
             _audioRepository = audioRepository;
             _audioEditorFileService = audioEditorFileService;
             _applicationSettingsService = applicationSettingsService;
             _vgStreamWrapper = vgStreamWrapper;
 
-            _audioRepository.Load([Wh3LanguageInformation.GetLanguageAsString(Wh3Language.EnglishUK)]);
-
             OutputDirectoryPath = "audio\\audio_projects";
         }
 
-        [RelayCommand] public void ProcessAudioProjectConversion()
+        public async Task InitializeAsync(
+            CancellationToken cancellationToken)
         {
+            _lifetimeCancellationToken = cancellationToken;
+            if (_isInitialised)
+                return;
+
+            _isInitialised = true;
+            IsLoading = true;
+            Status = LocalizationManager.Instance.Get(
+                "AudioProjectConverter.Loading");
+            UpdateOkButtonIsEnabled();
+            try
+            {
+                await Task.Run(
+                    () => _audioRepository.Load(
+                        [
+                            Wh3LanguageInformation.GetLanguageAsString(
+                                Wh3Language.EnglishUK)
+                        ],
+                        null,
+                        cancellationToken),
+                    cancellationToken);
+                _isRepositoryLoaded = true;
+                Status = string.Empty;
+            }
+            catch (OperationCanceledException)
+            {
+                Status = LocalizationManager.Instance.Get(
+                    "AudioProjectConverter.Cancelled");
+            }
+            catch (Exception exception)
+            {
+                Status = LocalizationManager.Instance.Get(
+                    "AudioProjectConverter.LoadFailed");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectConverter.LoadFailed.Detail",
+                        exception.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+            }
+            finally
+            {
+                IsLoading = false;
+                UpdateOkButtonIsEnabled();
+            }
+        }
+
+        [RelayCommand]
+        public async Task ProcessAudioProjectConversionAsync(
+            CancellationToken cancellationToken)
+        {
+            if (!_isRepositoryLoaded || IsBusy)
+                return;
+
             var currentGame = _applicationSettingsService.CurrentSettings.CurrentGame;
             if (currentGame != GameTypeEnum.Warhammer3)
-                throw new NotImplementedException($"The Audio Editor does not support the selected game.");
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "Msg.AudioEditorUnsupportedGame"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
 
-            var fileName = $"{AudioProjectName}.aproj";
+            if (!AudioProjectNameValidator.TryNormalize(
+                    AudioProjectName,
+                    out var normalizedName))
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "NewAudioProject.InvalidName"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
+
+            var voActorSubstrings = GetVOActorSubstrings(
+                VOActorSubstring);
+            if (voActorSubstrings.Length == 0)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "AudioProjectConverter.InvalidVOActorSubstring"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
+
+            if (!Directory.Exists(WemsDirectoryPath) ||
+                !Directory.Exists(BnksDirectoryPath))
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "AudioProjectConverter.InvalidDirectories"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
+
+            if (IsUsingWwiseProject &&
+                !File.Exists(SoundbanksInfoXmlPath))
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "AudioProjectConverter.InvalidSoundbanksInfo"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
+
+            var fileName = $"{normalizedName}.aproj";
             var filePath = $"{OutputDirectoryPath}\\{fileName}";
-            var language = "english(uk)";
-            var audioProject = AudioProjectFile.CreateNew(language, AudioProjectName);
+            var soundBankPaths = Directory
+                .GetFiles(
+                    BnksDirectoryPath,
+                    "*.bnk",
+                    SearchOption.TopDirectoryOnly)
+                .ToList();
+            if (soundBankPaths.Count == 0)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "AudioProjectConverter.NoSoundBanks"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                return;
+            }
 
-            var soundBankPaths = new List<string>();
-            if (Directory.Exists(BnksDirectoryPath))
-                soundBankPaths = Directory.GetFiles(BnksDirectoryPath, "*.bnk", SearchOption.TopDirectoryOnly).ToList();
+            var workspacePath = Path.Combine(
+                DirectoryHelper.Temp,
+                "Audio",
+                $"converter-{Guid.NewGuid():N}");
+            using var linkedCancellation = CancellationTokenSource
+                .CreateLinkedTokenSource(
+                    cancellationToken,
+                    _lifetimeCancellationToken);
+            IsProcessing = true;
+            Status = LocalizationManager.Instance.Get(
+                "AudioProjectConverter.Processing");
+            try
+            {
+                DirectoryHelper.EnsureCreated(workspacePath);
+                var outputs = await Task.Run(
+                    () => CreateConversionOutputs(
+                        normalizedName,
+                        fileName,
+                        filePath,
+                        soundBankPaths,
+                        workspacePath,
+                        voActorSubstrings,
+                        linkedCancellation.Token),
+                    linkedCancellation.Token);
+                linkedCancellation.Token.ThrowIfCancellationRequested();
 
+                if (_audioPackOutputService.SaveBatch(
+                        outputs,
+                        true))
+                {
+                    Status = string.Empty;
+                    CloseWindowAction();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Status = LocalizationManager.Instance.Get(
+                    "AudioProjectConverter.Cancelled");
+            }
+            catch (Exception exception)
+            {
+                _logger.Here().Error(
+                    exception,
+                    "Audio Project conversion failed");
+                Status = LocalizationManager.Instance.Get(
+                    "AudioProjectConverter.Failed");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectConverter.Failed.Detail",
+                        exception.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+            }
+            finally
+            {
+                TryDeleteWorkspace(workspacePath);
+                IsProcessing = false;
+            }
+        }
+
+        private List<AudioPackOutput> CreateConversionOutputs(
+            string normalizedName,
+            string fileName,
+            string filePath,
+            List<string> soundBankPaths,
+            string workspacePath,
+            string[] voActorSubstrings,
+            CancellationToken cancellationToken)
+        {
+            const string language = "english(uk)";
+            var audioProject = AudioProjectFile.CreateNew(
+                language,
+                normalizedName);
             var statesLookupByStateGroupByStateId = new Dictionary<string, Dictionary<uint, string>>();
             var dialogueEventsLookupByWemId = new Dictionary<uint, List<string>>();
             var statePathsLookupByDialogueEvent = new Dictionary<string, List<StatePathInfo>>();
@@ -96,14 +288,25 @@ namespace Editors.Audio.AudioProjectConverter
             var moddedStateGroups = new Dictionary<string, List<string>>();
             var globalBaseNameUsage = new Dictionary<string, int>();
 
-            var hircItems = GetHircItems(soundBankPaths);
-            var hircLookupById = BuildHircLookupById(hircItems);
+            var hircItems = GetHircItems(
+                soundBankPaths,
+                cancellationToken);
+            var hircLookupById = BuildHircLookupById(
+                hircItems,
+                cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrEmpty(SoundbanksInfoXmlPath))
-                BuildStateGroupStateLookup(statesLookupByStateGroupByStateId);
+            {
+                BuildStateGroupStateLookup(
+                    statesLookupByStateGroupByStateId,
+                    cancellationToken);
+            }
 
             var dialogueEvents = hircItems.OfType<ICAkDialogueEvent>().ToList();
             foreach (var dialogueEvent in dialogueEvents)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 SetDialogueEventData(
                     dialogueEvent,
                     dialogueEventsLookupByWemId,
@@ -111,12 +314,18 @@ namespace Editors.Audio.AudioProjectConverter
                     statesLookupByStateGroupByStateId,
                     hircLookupById,
                     dialogueEventsToProcess,
-                    moddedStateGroups);
+                    moddedStateGroups,
+                    voActorSubstrings,
+                    cancellationToken);
+            }
 
             var usedHircIds = IdGenerator.GetUsedHircIds(_audioRepository, audioProject);
             var usedSourceIds = IdGenerator.GetUsedSourceIds(_audioRepository, audioProject);
+            var outputs = new List<AudioPackOutput>();
 
             foreach (var dialogueEvent in dialogueEventsToProcess)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 ProcessDialogueEvent(
                     audioProject,
                     dialogueEvent,
@@ -124,20 +333,45 @@ namespace Editors.Audio.AudioProjectConverter
                     statePathsLookupByDialogueEvent,
                     globalBaseNameUsage,
                     usedHircIds,
-                    usedSourceIds);
+                    usedSourceIds,
+                    outputs,
+                    workspacePath,
+                    voActorSubstrings,
+                    cancellationToken);
+            }
 
             ProcessModdedStateGroups(audioProject, moddedStateGroups);
-
-            _audioEditorFileService.Save(audioProject, fileName, filePath);
-
-            CloseWindowAction();
+            outputs.Add(_audioEditorFileService.CreateOutput(
+                audioProject,
+                fileName,
+                filePath));
+            return outputs;
         }
 
-        private static Dictionary<uint, List<HircItem>> BuildHircLookupById(List<HircItem> hircItems)
+        private void TryDeleteWorkspace(string workspacePath)
+        {
+            try
+            {
+                if (Directory.Exists(workspacePath))
+                    Directory.Delete(workspacePath, true);
+            }
+            catch (Exception exception)
+            {
+                _logger.Here().Warning(
+                    exception,
+                    "Failed to clean the converter workspace {WorkspacePath}",
+                    workspacePath);
+            }
+        }
+
+        private static Dictionary<uint, List<HircItem>> BuildHircLookupById(
+            List<HircItem> hircItems,
+            CancellationToken cancellationToken)
         {
             var hircLookupById = new Dictionary<uint, List<HircItem>>();
             foreach (var hircItem in hircItems)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!hircLookupById.TryGetValue(hircItem.Id, out var hircItemList))
                 {
                     hircItemList = [];
@@ -149,18 +383,27 @@ namespace Editors.Audio.AudioProjectConverter
             return hircLookupById;
         }
 
-        private static List<HircItem> GetHircItems(List<string> soundBankPaths)
+        private static List<HircItem> GetHircItems(
+            List<string> soundBankPaths,
+            CancellationToken cancellationToken)
         {
             var parsedSoundBanks = new List<ParsedBnkFile>();
 
             foreach (var soundBankPath in soundBankPaths)
             {
-                var soundBankDataBytes = File.ReadAllBytes(soundBankPath);
+                cancellationToken.ThrowIfCancellationRequested();
+                var soundBankDataBytes = File
+                    .ReadAllBytesAsync(
+                        soundBankPath,
+                        cancellationToken)
+                    .GetAwaiter()
+                    .GetResult();
                 var soundBankPackFile = PackFile.CreateFromBytes(soundBankPath, soundBankDataBytes);
                 var parsedSoundBank = BnkParser.Parse(soundBankPackFile, soundBankPath, false);
                 parsedSoundBanks.Add(parsedSoundBank);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             var hircItems = parsedSoundBanks
                 .SelectMany(soundBank => soundBank.HircChunk.HircItems)
                 .ToList();
@@ -168,12 +411,18 @@ namespace Editors.Audio.AudioProjectConverter
             return hircItems;
         }
 
-        private Dictionary<string, Dictionary<uint, string>> BuildStateGroupStateLookup(Dictionary<string, Dictionary<uint, string>> stateLookupByStateGroup)
+        private Dictionary<string, Dictionary<uint, string>>
+            BuildStateGroupStateLookup(
+                Dictionary<string, Dictionary<uint, string>>
+                    stateLookupByStateGroup,
+                CancellationToken cancellationToken)
         {
             var soundBanksInfo = XDocument.Load(SoundbanksInfoXmlPath);
+            cancellationToken.ThrowIfCancellationRequested();
 
             foreach (var stateGroup in soundBanksInfo.Descendants("StateGroup"))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var stateGroupName = stateGroup.Attribute("Name")?.Value;
                 if (string.IsNullOrEmpty(stateGroupName))
                     continue;
@@ -186,6 +435,7 @@ namespace Editors.Audio.AudioProjectConverter
 
                 foreach (var state in stateGroup.Element("States")?.Elements("State") ?? [])
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var stateName = state.Attribute("Name")?.Value;
                     if (!string.IsNullOrEmpty(stateName))
                     {
@@ -205,21 +455,23 @@ namespace Editors.Audio.AudioProjectConverter
             Dictionary<string, Dictionary<uint, string>> statesLookupByStateGroupByStateId,
             Dictionary<uint, List<HircItem>> hircLookupById,
             List<ICAkDialogueEvent> dialogueEventsToProcess,
-            Dictionary<string, List<string>> moddedStateGroups)
+            Dictionary<string, List<string>> moddedStateGroups,
+            string[] voActorSubstrings,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var stateGroup = "VO_Actor";
-            var statesLookupByStateId = GetStatesLookupByStateId(statesLookupByStateGroupByStateId, stateGroup);
+            var statesLookupByStateId = GetStatesLookupByStateId(
+                statesLookupByStateGroupByStateId,
+                stateGroup,
+                cancellationToken);
 
             var dialogueEventHirc = dialogueEvent as HircItem;
             var dialogueEventName = _audioRepository.GetNameFromId(dialogueEventHirc.Id);
 
             var statePathParser = new StatePathParser(_audioRepository);
             var result = statePathParser.GetStatePaths(dialogueEvent);
-
-            var voActorSubstrings = VOActorSubstring
-                .Split([','], StringSplitOptions.RemoveEmptyEntries)
-                .Select(substring => substring.Trim())
-                .ToArray();
+            cancellationToken.ThrowIfCancellationRequested();
 
             var anyStatePathsContainRequiredPattern = result.StatePaths
                 .Any(statePath => statePath.Items.Any(state =>
@@ -234,6 +486,7 @@ namespace Editors.Audio.AudioProjectConverter
 
             foreach (var statePath in result.StatePaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var statePathContainsRequiredPattern = statePath.Items.Any(state => statesLookupByStateId.TryGetValue(state.Value, out var stateName) 
                     && voActorSubstrings.Any(substring => stateName.Contains(substring, StringComparison.CurrentCultureIgnoreCase)));
 
@@ -243,15 +496,32 @@ namespace Editors.Audio.AudioProjectConverter
                 var wavFiles = new List<WavFile>();
                 var statePathNodes = new List<StatePath.Node>();
 
-                StoreStateGroupAndStateInfo(dialogueEvent, statesLookupByStateId, statesLookupByStateGroupByStateId, statePath, statePathNodes, moddedStateGroups);
+                StoreStateGroupAndStateInfo(
+                    dialogueEvent,
+                    statesLookupByStateId,
+                    statesLookupByStateGroupByStateId,
+                    statePath,
+                    statePathNodes,
+                    moddedStateGroups,
+                    cancellationToken);
 
-                StoreDialogueEventsLookupByWemId(dialogueEventsLookupByWemId, hircLookupById, wavFiles, dialogueEventName, statePath);
+                StoreDialogueEventsLookupByWemId(
+                    dialogueEventsLookupByWemId,
+                    hircLookupById,
+                    wavFiles,
+                    dialogueEventName,
+                    statePath,
+                    cancellationToken);
 
                 StoreStatePathInfo(statePathsLookupByDialogueEvent, wavFiles, dialogueEventName, statePathNodes);
             }
         }
 
-        private Dictionary<uint, string> GetStatesLookupByStateId(Dictionary<string, Dictionary<uint, string>> statesLookupByStateGroupByStateId, string stateGroupLookup)
+        private Dictionary<uint, string> GetStatesLookupByStateId(
+            Dictionary<string, Dictionary<uint, string>>
+                statesLookupByStateGroupByStateId,
+            string stateGroupLookup,
+            CancellationToken cancellationToken)
         {
             statesLookupByStateGroupByStateId.TryGetValue(stateGroupLookup, out var statesInfoFromWwiseProject);
 
@@ -260,12 +530,18 @@ namespace Editors.Audio.AudioProjectConverter
             if (statesInfoFromWwiseProject != null)
             {
                 foreach (var stateInfo in statesInfoFromWwiseProject)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     statesLookupByStateId.TryAdd(stateInfo.Key, stateInfo.Value);
+                }
             }
 
             // Not all names are States but that doesn't matter
             foreach (var stateInfo in _audioRepository.NameById)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 statesLookupByStateId.TryAdd(stateInfo.Key, stateInfo.Value);
+            }
 
             return statesLookupByStateId;
         }
@@ -276,14 +552,19 @@ namespace Editors.Audio.AudioProjectConverter
             Dictionary<string, Dictionary<uint, string>> statesLookupByStateGroupByStateId,
             StatePathParser.StatePath statePath,
             List<StatePath.Node> statePathNodes,
-            Dictionary<string, List<string>> moddedStateGroups)
+            Dictionary<string, List<string>> moddedStateGroups,
+            CancellationToken cancellationToken)
         {
             var stateGroupIndex = 0;
 
             foreach (var statePathItem in statePath.Items)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var stateGroup = _audioRepository.GetNameFromId(dialogueEvent.Arguments[stateGroupIndex].GroupId);
-                var statesLookupByStateId = GetStatesLookupByStateId(statesLookupByStateGroupByStateId, stateGroup);
+                var statesLookupByStateId = GetStatesLookupByStateId(
+                    statesLookupByStateGroupByStateId,
+                    stateGroup,
+                    cancellationToken);
                 var state = string.Empty;
 
                 if (statePathItem.Value == 0)
@@ -320,9 +601,17 @@ namespace Editors.Audio.AudioProjectConverter
             Dictionary<uint, List<HircItem>> hircLookupById,
             List<WavFile> wavFiles,
             string dialogueEventName,
-            StatePathParser.StatePath statePath)
+            StatePathParser.StatePath statePath,
+            CancellationToken cancellationToken)
         {
-            ProcessHircItem(statePath.ChildNodeId, dialogueEventsLookupByWemId, hircLookupById, wavFiles, dialogueEventName);
+            ProcessHircItem(
+                statePath.ChildNodeId,
+                dialogueEventsLookupByWemId,
+                hircLookupById,
+                wavFiles,
+                dialogueEventName,
+                [],
+                cancellationToken);
         }
 
         private static void ProcessHircItem(
@@ -330,8 +619,14 @@ namespace Editors.Audio.AudioProjectConverter
             Dictionary<uint, List<string>> dialogueEventsLookupByWemId,
             Dictionary<uint, List<HircItem>> hircLookupById,
             List<WavFile> wavFiles,
-            string dialogueEventName)
+            string dialogueEventName,
+            HashSet<uint> visitedHircIds,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!visitedHircIds.Add(childNodeId))
+                return;
+
             if (!hircLookupById.TryGetValue(childNodeId, out var hircItems) || hircItems.Count == 0)
                 return;
 
@@ -357,7 +652,16 @@ namespace Editors.Audio.AudioProjectConverter
             else if (hircItem is ICAkRanSeqCntr ranSeqCntr)
             {
                 foreach (var childId in ranSeqCntr.GetChildren())
-                    ProcessHircItem(childId, dialogueEventsLookupByWemId, hircLookupById, wavFiles, dialogueEventName);
+                {
+                    ProcessHircItem(
+                        childId,
+                        dialogueEventsLookupByWemId,
+                        hircLookupById,
+                        wavFiles,
+                        dialogueEventName,
+                        visitedHircIds,
+                        cancellationToken);
+                }
             }
         }
 
@@ -393,7 +697,11 @@ namespace Editors.Audio.AudioProjectConverter
             Dictionary<string, List<StatePathInfo>> statePathsLookupByDialogueEvent,
             Dictionary<string, int> globalBaseNameUsage,
             HashSet<uint> usedHircIds,
-            HashSet<uint> usedSourceIds)
+            HashSet<uint> usedSourceIds,
+            List<AudioPackOutput> outputs,
+            string workspacePath,
+            string[] voActorSubstrings,
+            CancellationToken cancellationToken)
         {
             var dialogueEventHirc = dialogueEvent as HircItem;
             var dialogueEventName = _audioRepository.GetNameFromId(dialogueEventHirc.Id);
@@ -408,16 +716,20 @@ namespace Editors.Audio.AudioProjectConverter
                     (soundBank, dialogueEventItem) => new { SoundBank = soundBank, DialogueEvent = dialogueEventItem })
                 .FirstOrDefault(pair => pair.DialogueEvent.Name == dialogueEventName);
 
+            if (dialogueEventAndSoundBank == null)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectConverter.UnsupportedDialogueEvent",
+                        dialogueEventName));
+            }
+
             var audioProjectDialogueEvent = dialogueEventAndSoundBank.DialogueEvent;
             var audioProjectDialogueEventSoundBank = dialogueEventAndSoundBank.SoundBank;
 
-            var voActorSubstrings = VOActorSubstring
-                .Split([','], StringSplitOptions.RemoveEmptyEntries)
-                .Select(substring => substring.Trim().ToLower())
-                .ToArray();
-
             foreach (var statePath in statePathsLookupByDialogueEvent[dialogueEventName].ToList())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 _logger.Here().Information($"Processing State Path: {statePath.JoinedStatePath}");
 
                 var audioFiles = new List<AudioFile>();
@@ -435,7 +747,18 @@ namespace Editors.Audio.AudioProjectConverter
                 if (!voActorSubstrings.Any(substring => voActor.Contains(substring, StringComparison.CurrentCultureIgnoreCase)))
                     continue;
 
-                ProcessWavFiles(audioProject, statePathWavs, audioFiles, dialogueEventsLookupByWemId, globalBaseNameUsage, dialogueEventName, voActor, usedSourceIds);
+                ProcessWavFiles(
+                    audioProject,
+                    statePathWavs,
+                    audioFiles,
+                    dialogueEventsLookupByWemId,
+                    globalBaseNameUsage,
+                    dialogueEventName,
+                    voActor,
+                    usedSourceIds,
+                    outputs,
+                    workspacePath,
+                    cancellationToken);
 
                 if (audioFiles.Count == 0)
                     continue;
@@ -504,12 +827,30 @@ namespace Editors.Audio.AudioProjectConverter
             Dictionary<string, int> globalBaseNameUsage,
             string dialogueEventName,
             string voActor,
-            HashSet<uint> usedSourceIds)
+            HashSet<uint> usedSourceIds,
+            List<AudioPackOutput> outputs,
+            string workspacePath,
+            CancellationToken cancellationToken)
         {
-            var voActorSegment = voActor.Substring(voActor.IndexOf("vo_actor_") + "vo_actor_".Length).ToLower();
+            const string voActorPrefix = "vo_actor_";
+            var prefixIndex = voActor.IndexOf(
+                voActorPrefix,
+                StringComparison.OrdinalIgnoreCase);
+            if (prefixIndex < 0)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectConverter.InvalidVOActor",
+                        voActor));
+            }
+
+            var voActorSegment = voActor
+                .Substring(prefixIndex + voActorPrefix.Length)
+                .ToLowerInvariant();
 
             foreach (var wavFile in statePathWavs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var chosenDialogueEventName = GetPreferredDialogueEventName(wavFile.WemId, dialogueEventName, dialogueEventsLookupByWemId).ToLower();
                 var baseFileName = $"{voActorSegment}_{chosenDialogueEventName}".ToLower();
 
@@ -534,16 +875,39 @@ namespace Editors.Audio.AudioProjectConverter
                 audioFiles.Add(audioFile);
 
                 var wemFilePath = $"{WemsDirectoryPath}\\{wavFile.WemId}.wem";
-                var wavTempFilePath = $"{DirectoryHelper.Temp}\\Audio\\{wavFile.FileName}";
+                if (!File.Exists(wemFilePath))
+                {
+                    throw new FileNotFoundException(
+                        LocalizationManager.Instance.GetFormat(
+                            "AudioProjectConverter.MissingWem",
+                            wemFilePath),
+                        wemFilePath);
+                }
+
+                var wavTempFilePath = Path.Combine(
+                    workspacePath,
+                    wavFile.FileName);
                 var wavPackOutputPath = $"{OutputDirectoryPath}\\vo\\{voActorSegment}\\{wavFile.FileName}";
 
-                var conversionResult = _vgStreamWrapper.ConvertFileUsingVgStream(wemFilePath, wavTempFilePath);
+                var conversionResult =
+                    _vgStreamWrapper.ConvertFileUsingVgStream(
+                        wemFilePath,
+                        wavTempFilePath,
+                        cancellationToken);
                 if (conversionResult.Failed)
                     throw new Exception($"Failed to convert {wemFilePath} to {wavTempFilePath}");
 
-                var wavFileBytes = File.ReadAllBytes(wavTempFilePath);
-                var packFile = PackFile.CreateFromBytes(AudioProjectName, wavFileBytes);
-                _fileSaveService.Save(wavPackOutputPath, packFile.DataSource.ReadData(), false);
+                cancellationToken.ThrowIfCancellationRequested();
+                var wavFileBytes = File
+                    .ReadAllBytesAsync(
+                        wavTempFilePath,
+                        cancellationToken)
+                    .GetAwaiter()
+                    .GetResult();
+                outputs.Add(new AudioPackOutput(
+                    wavFile.FileName,
+                    wavPackOutputPath,
+                    wavFileBytes));
             }
         }
 
@@ -551,10 +915,23 @@ namespace Editors.Audio.AudioProjectConverter
         {
             foreach (var moddedStateGroup in moddedStateGroups)
             {
+                var audioProjectStateGroup = audioProject.StateGroups
+                    .FirstOrDefault(
+                        stateGroup =>
+                            stateGroup.Name == moddedStateGroup.Key);
+                if (audioProjectStateGroup == null)
+                {
+                    audioProjectStateGroup =
+                        StateGroup.CreateForAudioProjectFile(
+                            moddedStateGroup.Key,
+                            []);
+                    audioProject.StateGroups.TryAdd(
+                        audioProjectStateGroup);
+                }
+
                 foreach (var moddedState in moddedStateGroup.Value)
                 {
                     var audioProjectModdedState = new State(moddedState);
-                    var audioProjectStateGroup = audioProject.StateGroups.FirstOrDefault(stateGroup => stateGroup.Name == moddedStateGroup.Key);
                     audioProjectStateGroup.States.InsertAlphabetically(audioProjectModdedState);
                 }
             }
@@ -594,54 +971,86 @@ namespace Editors.Audio.AudioProjectConverter
 
         partial void OnAudioProjectNameChanged(string value)
         {
-            IsAudioProjectNameSet = !string.IsNullOrEmpty(value);
+            IsAudioProjectNameSet =
+                AudioProjectNameValidator.TryNormalize(value, out _);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnOutputDirectoryPathChanged(string value)
         {
-            IsOutputDirectoryPathSet = !string.IsNullOrEmpty(value);
+            IsOutputDirectoryPathSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnVOActorSubstringChanged(string value)
         {
-            IsVOActorSubstringSet = !string.IsNullOrEmpty(value);
+            IsVOActorSubstringSet =
+                GetVOActorSubstrings(value).Length > 0;
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnWemsDirectoryPathChanged(string value)
         {
-            IsWemsDirectoryPathSet = !string.IsNullOrEmpty(value);
+            IsWemsDirectoryPathSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnBnksDirectoryPathChanged(string value)
         {
-            IsBnksDirectoryPathSet = !string.IsNullOrEmpty(value);
+            IsBnksDirectoryPathSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnSoundbanksInfoXmlPathChanged(string value)
         {
-            IsSoundbanksInfoXmlSet = !string.IsNullOrEmpty(value);
+            IsSoundbanksInfoXmlSet =
+                !string.IsNullOrWhiteSpace(value);
             UpdateOkButtonIsEnabled();
         }
 
         partial void OnIsUsingWwiseProjectChanged(bool value)
         {
-            IsUsingWwiseProject = value;
+            UpdateOkButtonIsEnabled();
+        }
+
+        partial void OnIsLoadingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsBusy));
+            UpdateOkButtonIsEnabled();
+        }
+
+        partial void OnIsProcessingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsBusy));
             UpdateOkButtonIsEnabled();
         }
 
         private void UpdateOkButtonIsEnabled()
         {
-            IsOkButtonEnabled = IsAudioProjectNameSet
+            IsOkButtonEnabled = _isRepositoryLoaded
+                && !IsBusy
+                && IsAudioProjectNameSet
                 && IsOutputDirectoryPathSet
                 && IsWemsDirectoryPathSet
                 && IsBnksDirectoryPathSet
                 && IsVOActorSubstringSet
                 && ((IsUsingWwiseProject && IsSoundbanksInfoXmlSet) || !IsUsingWwiseProject);
+        }
+
+        private static string[] GetVOActorSubstrings(string value)
+        {
+            return (value ?? string.Empty)
+                .Split(
+                    [','],
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+                .Where(substring =>
+                    !string.IsNullOrWhiteSpace(substring))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         [RelayCommand] public void SetOutputDirectoryPath()

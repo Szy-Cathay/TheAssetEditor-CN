@@ -15,6 +15,7 @@
         public string ToolbarName { get; set; } = "";
         public bool AddToolbarButton { get; set; } = false;
         public bool IsToolbarButtonEnabled { get; set; } = false;
+        public HashSet<Shared.Core.Settings.GameTypeEnum> SupportedGames { get; set; } = [];
         public EditorEnums EditorEnum { get; }
         public Type View { get; }
         public Type ViewModel { get; }
@@ -51,6 +52,13 @@
             // Ensure type is IFileEditor
 
             _instance.Extensions.Add(new EditorInfo.ExtentionInfo(extention.Trim().ToLower(), priority));
+            return this;
+        }
+
+        public EditorInfoBuilder ForGames(
+            params Shared.Core.Settings.GameTypeEnum[] supportedGames)
+        {
+            _instance.SupportedGames = supportedGames.ToHashSet();
             return this;
         }
 

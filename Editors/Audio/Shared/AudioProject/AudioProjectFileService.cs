@@ -1,8 +1,11 @@
 ﻿using System.IO;
+using System;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Editors.Audio.Shared.AudioProject.Models;
+using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
@@ -35,13 +38,19 @@ namespace Editors.Audio.Shared.AudioProject
             var options = new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true };
             var audioProjectJson = JsonSerializer.Serialize(cleanedAudioProject, options);
 
-            var packFile = PackFile.CreateFromASCII(fileName, audioProjectJson);
+            var packFile = PackFile.CreateFromBytes(
+                fileName,
+                Encoding.UTF8.GetBytes(audioProjectJson));
             _fileSaveService.Save(filePath, packFile.DataSource.ReadData(), false);
         }
 
         public AudioProjectFileServiceLoadResult Load(string fileName, string filePath)
         {
-            var packFile = _packFileService.FindFile(filePath);
+            var packFile = _packFileService.FindFile(filePath) ??
+                throw new FileNotFoundException(
+                    LocalizationManager.Instance.GetFormat(
+                        "Msg.PackFileNotFound",
+                        filePath));
             var audioProject = DeserialiseAudioProject(packFile);
             return new AudioProjectFileServiceLoadResult(audioProject, fileName, filePath);
         }
@@ -62,7 +71,24 @@ namespace Editors.Audio.Shared.AudioProject
         {
             var bytes = packFile.DataSource.ReadData();
             var audioProjectJson = Encoding.UTF8.GetString(bytes);
-            var audioProject = JsonSerializer.Deserialize<AudioProjectFile>(audioProjectJson);
+            var audioProject =
+                JsonSerializer.Deserialize<AudioProjectFile>(
+                    audioProjectJson);
+            if (audioProject == null ||
+                string.IsNullOrWhiteSpace(audioProject.Language) ||
+                !Wh3LanguageInformation.GetAllLanguages().Contains(
+                    audioProject.Language,
+                    StringComparer.OrdinalIgnoreCase) ||
+                audioProject.SoundBanks == null ||
+                audioProject.StateGroups == null ||
+                audioProject.AudioFiles == null)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "Msg.AudioProjectInvalidFile",
+                        packFile.Name));
+            }
+
             return audioProject;
         }
     }

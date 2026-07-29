@@ -1,5 +1,4 @@
 ﻿using System.Data;
-using System.Windows;
 using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.AudioEditor.Core.AudioProjectMutation;
 using Editors.Audio.AudioEditor.Events.AudioProjectViewer.Table;
@@ -35,7 +34,7 @@ namespace Editors.Audio.AudioEditor.Commands.AudioProjectMutation
             else
             {
                 var message = LocalizationManager.Instance.Get("Msg.StatePathIncomplete");
-                MessageBox.Show(message, LocalizationManager.Instance.Get("Msg.GeneralError"));
+                throw new System.InvalidOperationException(message);
             }
         }
     }

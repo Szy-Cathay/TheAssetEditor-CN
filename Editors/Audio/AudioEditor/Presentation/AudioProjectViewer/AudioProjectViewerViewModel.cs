@@ -20,6 +20,7 @@ using Editors.Audio.Shared.Storage;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.Services;
 using Shared.Ui.Common;
 
 namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
@@ -62,7 +63,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
             _tableServiceFactory = tableServiceFactory;
             _audioRepository = audioRepository;
 
-            ViewerLabel = $"Audio Project Viewer";
+            ViewerLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectViewer");
 
             _eventHub.Register<AudioProjectLoadedEvent>(this, OnAudioProjectInitialised);
             _eventHub.Register<AudioProjectExplorerNodeSelectedEvent>(this, OnAudioProjectExplorerNodeSelected);
@@ -78,6 +79,13 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
 
         private void OnAudioProjectInitialised(AudioProjectLoadedEvent e)
         {
+            if (!e.IsRecovery)
+            {
+                _audioEditorStateService.StoreCopiedViewerRows([]);
+                _audioEditorStateService
+                    .StoreCopiedFromAudioProjectExplorerNode(null);
+            }
+
             ResetViewerVisibility();
             ResetViewerLabel();
             ResetButtonEnablement();
@@ -95,6 +103,9 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
             ResetButtonEnablement();
             ResetContextMenuVisibility();
             ResetTable();
+
+            if (selectedAudioProjectExplorerNode == null)
+                return;
 
             if (selectedAudioProjectExplorerNode.IsActionEvent())
             {
@@ -168,7 +179,19 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
             if (!IsCopyEnabled)
                 return;
 
-            _audioEditorStateService.StoreCopiedViewerRows(_audioEditorStateService.SelectedViewerRows);
+            var copiedTable = Table.Clone();
+            var copiedRows = new List<DataRow>();
+            foreach (var selectedRow in
+                     _audioEditorStateService.SelectedViewerRows)
+            {
+                var copiedRow = copiedTable.NewRow();
+                copiedRow.ItemArray =
+                    (object[])selectedRow.ItemArray.Clone();
+                copiedTable.Rows.Add(copiedRow);
+                copiedRows.Add(copiedRow);
+            }
+
+            _audioEditorStateService.StoreCopiedViewerRows(copiedRows);
             _audioEditorStateService.StoreCopiedFromAudioProjectExplorerNode(_audioEditorStateService.SelectedAudioProjectExplorerNode);
             SetPasteEnablement();
         }
@@ -255,7 +278,8 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
 
         private List<DataRow> GetRelatedActionEventRows()
         {
-            var rowsToRemove = _audioEditorStateService.SelectedViewerRows;
+            var rowsToRemove = new List<DataRow>(
+                _audioEditorStateService.SelectedViewerRows);
             var actionEventsNamesWithoutSuffixes = rowsToRemove
                 .Select(TableHelpers.GetActionEventNameFromRow)
                 .Select(TableHelpers.RemoveActionEventPrefix)
@@ -402,9 +426,11 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectViewer
             SelectedRows = [];
         }
 
-        public void SetViewerLabel(string label) => ViewerLabel = $"Audio Project Viewer - {label}";
+        public void SetViewerLabel(string label) =>
+            ViewerLabel = $"{LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectViewer")} - {label}";
 
-        public void ResetViewerLabel() => ViewerLabel = $"Audio Project Viewer";
+        public void ResetViewerLabel() =>
+            ViewerLabel = LocalizationManager.Instance.Get("AudioEditor.Panel.AudioProjectViewer");
 
         public void SetViewerVisible() => IsViewerVisible = true;
 
