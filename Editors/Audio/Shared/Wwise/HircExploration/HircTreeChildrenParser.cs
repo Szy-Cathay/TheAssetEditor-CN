@@ -2,6 +2,7 @@
 using System.Linq;
 using Editors.Audio.AudioExplorer;
 using Editors.Audio.Shared.Storage;
+using Shared.Core.Services;
 using Shared.GameFormats.Wwise.Enums;
 using Shared.GameFormats.Wwise.Hirc;
 using Shared.GameFormats.Wwise.Hirc.V136;
@@ -34,7 +35,13 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
             var statePathParser = new StatePathParser(AudioRepository);
             var result = statePathParser.GetStatePaths(dialogueEvent);
             
-            var dialogueEventNode = new HircTreeNode() { DisplayName = $"Dialogue Event - {AudioRepository.GetNameFromId(item.Id)}", Hirc = item };
+            var dialogueEventNode = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.GetFormat(
+                    "AudioExplorer.Tree.DialogueEvent",
+                    AudioRepository.GetNameFromId(item.Id)),
+                Hirc = item
+            };
             parent.Children.Add(dialogueEventNode);
 
             var argumentPathLookup = new Dictionary<ArgumentPathLookupKey, HircTreeNode>();
@@ -50,7 +57,10 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                     {
                         existingNode = new HircTreeNode()
                         {
-                            DisplayName = $"State [{result.Header.Items[depth].DisplayName}] - {statePathItem.DisplayName}",
+                            DisplayName = LocalizationManager.Instance.GetFormat(
+                                "AudioExplorer.Tree.State",
+                                result.Header.Items[depth].DisplayName,
+                                statePathItem.DisplayName),
                             Hirc = dialogueEventNode.Hirc,
                             IsMetaNode = true
                         };
@@ -69,7 +79,13 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         private void ProcessEvent(HircItem item, HircTreeNode parent)
         {
             var actionEvent = GetAsType<ICAkEvent>(item);
-            var node = new HircTreeNode() { DisplayName = $"Action Event - {AudioRepository.GetNameFromId(item.Id)}", Hirc = item };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.GetFormat(
+                    "AudioExplorer.Tree.ActionEvent",
+                    AudioRepository.GetNameFromId(item.Id)),
+                Hirc = item
+            };
             parent.Children.Add(node);
 
             var actions = actionEvent.GetActionIds();
@@ -79,7 +95,14 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         private void ProcessAction(HircItem item, HircTreeNode parent)
         {
             var action = GetAsType<ICAkAction>(item);
-            var node = new HircTreeNode() { DisplayName = $"{action.GetActionType()} Action", Hirc = item, IsExpanded = true };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.GetFormat(
+                    "AudioExplorer.Tree.Action",
+                    action.GetActionType()),
+                Hirc = item,
+                IsExpanded = true
+            };
             parent.Children.Add(node);
             var childId = action.GetChildId();
 
@@ -91,7 +114,7 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                    .SelectMany(kvp => kvp.Value)
                    .Where(hirc => hirc.HircType == AkBkHircType.Music_Switch)
                    .DistinctBy(hirc => hirc.Id)
-                   .Cast<CAkMusicSwitchCntr_V136>()
+                   .OfType<CAkMusicSwitchCntr_V136>()
                    .ToList();
 
                 foreach (var musicSwitch in musicSwitches)
@@ -105,13 +128,13 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                    .SelectMany(kvp => kvp.Value)
                    .Where(hirc => hirc.HircType == AkBkHircType.SwitchContainer)
                    .DistinctBy(hirc => hirc.Id)
-                   .Cast<CAkSwitchCntr_V136>()
+                   .OfType<ICAkSwitchCntr>()
                    .ToList();
 
                 foreach (var normalSwitch in normalSwitches)
                 {
                     if (normalSwitch.GroupId == stateGroupId)
-                        ProcessNext(normalSwitch.Id, node);
+                        ProcessNext(((HircItem)normalSwitch).Id, node);
                 }
             }
             else 
@@ -122,9 +145,16 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         {
             var sound = GetAsType<ICAkSound>(item);
 
-            var displayName = $"Sound - {sound.GetSourceId()}.wem";
+            var displayName = LocalizationManager.Instance.GetFormat(
+                "AudioExplorer.Tree.Sound",
+                sound.GetSourceId());
             if (sound.GetStreamType() == AKBKSourceType.Data_BNK)
-                displayName = $"Sound ({sound.GetStreamType()}) - {sound.GetSourceId()}.wem";
+            {
+                displayName = LocalizationManager.Instance.GetFormat(
+                    "AudioExplorer.Tree.SoundData",
+                    sound.GetStreamType(),
+                    sound.GetSourceId());
+            }
 
             var node = new HircTreeNode() { DisplayName = displayName, Hirc = item };
             parent.Children.Add(node);
@@ -137,15 +167,29 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
 
             var defaultSwitchValue = AudioRepository.GetNameFromId(switchContainer.DefaultSwitch);
             if (defaultSwitchValue == "0")
-                defaultSwitchValue = "Any";
+                defaultSwitchValue = LocalizationManager.Instance.Get("AudioExplorer.Any");
 
-            var node = new HircTreeNode() { DisplayName = $"Switch Container (Default Value: {defaultSwitchValue})", Hirc = item };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.GetFormat(
+                    "AudioExplorer.Tree.SwitchContainer",
+                    defaultSwitchValue),
+                Hirc = item
+            };
             parent.Children.Add(node);
 
             foreach (var switchCase in switchContainer.SwitchList)
             {
                 var switchValue = AudioRepository.GetNameFromId(switchCase.SwitchId);
-                var switchValueNode = new HircTreeNode() { DisplayName = $"Switch [{switchGroup}] - {switchValue}", Hirc = item, IsMetaNode = true };
+                var switchValueNode = new HircTreeNode()
+                {
+                    DisplayName = LocalizationManager.Instance.GetFormat(
+                        "AudioExplorer.Tree.Switch",
+                        switchGroup,
+                        switchValue),
+                    Hirc = item,
+                    IsMetaNode = true
+                };
                 node.Children.Add(switchValueNode);
                 ProcessNext(switchCase.NodeIdList, switchValueNode);
             }
@@ -154,7 +198,11 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         private void ProcessBlendContainer(HircItem item, HircTreeNode parent)
         {
             var blendContainer = GetAsType<ICAkLayerCntr>(item);
-            var node = new HircTreeNode() { DisplayName = $"Blend Container", Hirc = item };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.Get("AudioExplorer.Tree.BlendContainer"),
+                Hirc = item
+            };
             parent.Children.Add(node);
 
             foreach (var layer in blendContainer.GetChildren())
@@ -164,7 +212,12 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         private void ProcessRandomSequenceContainer(HircItem item, HircTreeNode parent)
         {
             var randomSequenceContainer = GetAsType<ICAkRanSeqCntr>(item);
-            var node = new HircTreeNode() { DisplayName = $"Random / Sequence Container", Hirc = item, IsExpanded = true };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.Get("AudioExplorer.Tree.RandomSequence"),
+                Hirc = item,
+                IsExpanded = true
+            };
             parent.Children.Add(node);
             ProcessNext(randomSequenceContainer.GetChildren(), node);
         }
@@ -174,7 +227,14 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
             var musicTrack = GetAsType<ICAkMusicTrack>(item);
             foreach (var sourceItem in musicTrack.GetChildren())
             {
-                var node = new HircTreeNode() { DisplayName = $"Music Track - {sourceItem}.wem", Hirc = item };
+                var node = new HircTreeNode()
+                {
+                    DisplayName = LocalizationManager.Instance.GetFormat(
+                        "AudioExplorer.Tree.MusicTrack",
+                        sourceItem),
+                    Hirc = item,
+                    SourceId = sourceItem
+                };
                 parent.Children.Add(node);
             }
         }
@@ -182,7 +242,11 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         private void ProcessMusicSegment(HircItem item, HircTreeNode parent)
         {
             var musicSegment = GetAsType<CAkMusicSegment_V136>(item);
-            var node = new HircTreeNode() { DisplayName = $"Music Segment", Hirc = item };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.Get("AudioExplorer.Tree.MusicSegment"),
+                Hirc = item
+            };
             parent.Children.Add(node);
 
             foreach (var childId in musicSegment.MusicNodeParams.Children.ChildIds)
@@ -195,7 +259,11 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
             var statePathParser = new StatePathParser(AudioRepository);
             var result = statePathParser.GetStatePaths(musicSwitchContainer);
 
-            var musicSwitchContainerNode = new HircTreeNode() { DisplayName = $"Music Switch Container", Hirc = item };
+            var musicSwitchContainerNode = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.Get("AudioExplorer.Tree.MusicSwitchContainer"),
+                Hirc = item
+            };
             parent.Children.Add(musicSwitchContainerNode);
 
             var argumentPathLookup = new Dictionary<ArgumentPathLookupKey, HircTreeNode>();
@@ -212,7 +280,10 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
                     {
                         existingNode = new HircTreeNode()
                         {
-                            DisplayName = $"Music Switch [{result.Header.Items[depth].DisplayName}] - {statePathItem.DisplayName}",
+                            DisplayName = LocalizationManager.Instance.GetFormat(
+                                "AudioExplorer.Tree.MusicSwitch",
+                                result.Header.Items[depth].DisplayName,
+                                statePathItem.DisplayName),
                             Hirc = musicSwitchContainerNode.Hirc,
                             IsMetaNode = true
                         };
@@ -231,7 +302,12 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         private void ProcessMusicRandomSequenceContainer(HircItem item, HircTreeNode parent)
         {
             var musicRandomSequenceContainer = GetAsType<CAkMusicRanSeqCntr_V136>(item);
-            var node = new HircTreeNode() { DisplayName = $"Music Random / Sequence Container", Hirc = item, IsExpanded = true };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.Get("AudioExplorer.Tree.MusicRandomSequence"),
+                Hirc = item,
+                IsExpanded = true
+            };
             parent.Children.Add(node);
 
             if (musicRandomSequenceContainer.PlayList.Count != 0)
@@ -244,7 +320,11 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
         public void ProcessActorMixer(HircItem item, HircTreeNode parent)
         {
             var actorMixer = GetAsType<ICAkActorMixer>(item);
-            var node = new HircTreeNode() { DisplayName = $"Actor Mixer", Hirc = item };
+            var node = new HircTreeNode()
+            {
+                DisplayName = LocalizationManager.Instance.Get("AudioExplorer.Tree.ActorMixer"),
+                Hirc = item
+            };
             parent.Children.Add(node);
             ProcessNext(actorMixer.GetChildren(), node);
         }

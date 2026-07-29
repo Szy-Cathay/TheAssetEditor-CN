@@ -17,6 +17,7 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
     public interface IWaveformRendererService
     {
         Task<WaveformRenderResult> RenderAsync(string filePathKey, int targetWidth, CancellationToken cancellationToken);
+        Task<WaveformRenderResult> RenderAsync(byte[] wavData, int targetWidth, CancellationToken cancellationToken);
     }
 
     public sealed class WaveformRendererService(IPackFileService packFileService) : IWaveformRendererService
@@ -33,14 +34,28 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
 
             var packFile = _packFileService.FindFile(filePathKey);
             var data = packFile.DataSource.ReadData();
+            return await RenderAsync(data, targetWidth, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<WaveformRenderResult> RenderAsync(byte[] wavData, int targetWidth, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(wavData);
 
             var baseSettings = CreateBaseWaveformSettings(targetWidth);
             var overlaySettings = CreateOverlayWaveformSettings(targetWidth);
 
-            return await Task.Run(() => RenderWaveformFromBytes(data, packFile.Extension, baseSettings, overlaySettings), cancellationToken).ConfigureAwait(false);
+            return await Task.Run(
+                () => RenderWaveformFromBytes(
+                    wavData,
+                    baseSettings,
+                    overlaySettings),
+                cancellationToken).ConfigureAwait(false);
         }
 
-        private static WaveformRenderResult RenderWaveformFromBytes(byte[] data, string extension, WaveFormRendererSettings baseSettings, WaveFormRendererSettings overlaySettings)
+        private static WaveformRenderResult RenderWaveformFromBytes(
+            byte[] data,
+            WaveFormRendererSettings baseSettings,
+            WaveFormRendererSettings overlaySettings)
         {
             using var memoryStream = new MemoryStream(data, writable: false);
             using var waveStream = new WaveFileReader(memoryStream);

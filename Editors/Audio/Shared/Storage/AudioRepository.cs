@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles.Models;
@@ -20,8 +21,12 @@ namespace Editors.Audio.Shared.Storage
         Dictionary<string, List<string>> StateGroupsByDialogueEvent { get; }
         Dictionary<string, Dictionary<string, string>> QualifiedStateGroupByStateGroupByDialogueEvent { get; }
         Dictionary<string, List<string>> StatesByStateGroup { get; }
+        bool IsCurrentGameSupported { get; }
 
-        void Load(List<string> languages); 
+        void Load(
+            List<string> languages,
+            IProgress<AudioLoadProgress> progress = null,
+            CancellationToken cancellationToken = default);
         void Clear();
         List<T> GetHircsByType<T>() where T : class;
         List<HircItem> GetHircsByHircType(AkBkHircType type);
@@ -44,43 +49,50 @@ namespace Editors.Audio.Shared.Storage
         private readonly BnkLoader _bnkLoader = bnkLoader;
         private readonly DatLoader _datLoader = datLoader;
 
-        private readonly List<string> _loadedBnkDataLanguages = [];
+        private readonly HashSet<string> _loadedBnkDataLanguages = new(StringComparer.OrdinalIgnoreCase);
         private bool _isDatDataLoaded = false;
 
-        public Dictionary<uint, List<HircItem>> HircsById { get; set; }
-        public Dictionary<uint, List<DidxAudio>> DidxAudioListById { get; set; }
-        public Dictionary<string, PackFile> PackFileByBnkName { get; set; }
-        public Dictionary<uint, string> NameById { get; set; }
-        public Dictionary<string, List<string>> StateGroupsByDialogueEvent { get; set; }
-        public Dictionary<string, Dictionary<string, string>> QualifiedStateGroupByStateGroupByDialogueEvent { get; set; }
-        public Dictionary<string, List<string>> StatesByStateGroup { get; set; }
+        public Dictionary<uint, List<HircItem>> HircsById { get; set; } = [];
+        public Dictionary<uint, List<DidxAudio>> DidxAudioListById { get; set; } = [];
+        public Dictionary<string, PackFile> PackFileByBnkName { get; set; } = [];
+        public Dictionary<uint, string> NameById { get; set; } = [];
+        public Dictionary<string, List<string>> StateGroupsByDialogueEvent { get; set; } = [];
+        public Dictionary<string, Dictionary<string, string>> QualifiedStateGroupByStateGroupByDialogueEvent { get; set; } = [];
+        public Dictionary<string, List<string>> StatesByStateGroup { get; set; } = [];
+        public bool IsCurrentGameSupported =>
+            GameInformationDatabase.Games.TryGetValue(
+                _applicationSettingsService.CurrentSettings.CurrentGame,
+                out var gameInformation) &&
+            gameInformation.BankGeneratorVersion != GameBnkVersion.Unsupported;
 
-        public void Load(List<string> languages)
+        public void Load(
+            List<string> languages,
+            IProgress<AudioLoadProgress> progress = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var loadedData = false;
 
-            var gameInformation = GameInformationDatabase.GetGameById(_applicationSettingsService.CurrentSettings.CurrentGame);
-            var gameBankGeneratorVersion = gameInformation.BankGeneratorVersion;
+            if (!IsCurrentGameSupported)
+                return;
 
-            if (gameBankGeneratorVersion != GameBnkVersion.Unsupported)
+            var loadDatData = !_isDatDataLoaded;
+            var loadBnkData = !_loadedBnkDataLanguages.SetEquals(languages);
+
+            if (loadDatData || loadBnkData)
+                MemoryOptimiser.LogMemory("Before loading AudioRepository");
+
+            if (loadDatData)
             {
-                var loadDatData = !_isDatDataLoaded;
-                var loadBnkData = !languages.All(language => _loadedBnkDataLanguages.Contains(language, StringComparer.OrdinalIgnoreCase));
+                LoadDatData();
+                loadedData = true;
+            }
 
-                if (loadDatData || loadBnkData)
-                    MemoryOptimiser.LogMemory("Before loading AudioRepository");
-
-                if (loadDatData)
-                {
-                    LoadDatData();
-                    loadedData = true;
-                }
-
-                if (loadBnkData)
-                {
-                    LoadBnkData(languages);
-                    loadedData = true;
-                }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (loadBnkData)
+            {
+                LoadBnkData(languages, progress, cancellationToken);
+                loadedData = true;
             }
 
             if (loadedData)
@@ -101,18 +113,29 @@ namespace Editors.Audio.Shared.Storage
             _isDatDataLoaded = true;
         }
 
-        private void LoadBnkData(List<string> languages)
+        private void LoadBnkData(
+            List<string> languages,
+            IProgress<AudioLoadProgress> progress,
+            CancellationToken cancellationToken)
         {
             var allLanguages = Wh3LanguageInformation.GetAllLanguages();
+            var sharedSfxLanguage = Wh3LanguageInformation.GetLanguageAsString(
+                Wh3Language.Sfx);
             var languageToFilterOut = allLanguages
-                .Where(language => !languages.Contains(language))
+                .Where(language =>
+                    !string.Equals(
+                        language,
+                        sharedSfxLanguage,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    !languages.Contains(language))
                 .ToList();
-            var result = _bnkLoader.LoadBnkFiles(languageToFilterOut);
+            var result = _bnkLoader.LoadBnkFiles(languageToFilterOut, progress, cancellationToken);
             HircsById = result.HircsById ?? [];
             DidxAudioListById = result.DidxAudioListById ?? [];
             PackFileByBnkName = result.PackFileByBnkName ?? [];
 
-            _loadedBnkDataLanguages.AddRange(languages);
+            _loadedBnkDataLanguages.Clear();
+            _loadedBnkDataLanguages.UnionWith(languages);
         }
 
         public List<T> GetHircsByType<T>() where T : class
@@ -235,7 +258,7 @@ namespace Editors.Audio.Shared.Storage
                     list?.TrimExcess();
                 }
                 HircsById.Clear();
-                HircsById = null;
+                HircsById = [];
             }
 
             if (DidxAudioListById != null)
@@ -246,21 +269,21 @@ namespace Editors.Audio.Shared.Storage
                     list?.TrimExcess();
                 }
                 DidxAudioListById.Clear();
-                DidxAudioListById = null;
+                DidxAudioListById = [];
             }
 
             _loadedBnkDataLanguages?.Clear();
             _isDatDataLoaded = false;
             PackFileByBnkName?.Clear();
-            PackFileByBnkName = null;
+            PackFileByBnkName = [];
             NameById?.Clear();
-            NameById = null;
+            NameById = [];
             StateGroupsByDialogueEvent?.Clear();
-            StateGroupsByDialogueEvent = null;
+            StateGroupsByDialogueEvent = [];
             QualifiedStateGroupByStateGroupByDialogueEvent?.Clear();
-            QualifiedStateGroupByStateGroupByDialogueEvent = null;
+            QualifiedStateGroupByStateGroupByDialogueEvent = [];
             StatesByStateGroup?.Clear();
-            StatesByStateGroup = null;
+            StatesByStateGroup = [];
 
             MemoryOptimiser.Optimise();
             MemoryOptimiser.LogMemory("After clearing AudioRepository");

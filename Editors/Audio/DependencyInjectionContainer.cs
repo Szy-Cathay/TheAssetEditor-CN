@@ -129,12 +129,15 @@ namespace Editors.Audio
 
             // Audio Explorer
             serviceCollection.AddScoped<AudioExplorerViewModel>();
+            serviceCollection.AddScoped<
+                IAudioExportDialogService,
+                AudioExportDialogService>();
 
             // Shared audio stuff 
             serviceCollection.AddScoped<IAudioRepository, AudioRepository>();
             serviceCollection.AddSingleton<BnkLoader>();
             serviceCollection.AddSingleton<DatLoader>();
-            serviceCollection.AddScoped<SoundPlayer>();
+            serviceCollection.AddScoped<ISoundPlayer, SoundPlayer>();
             serviceCollection.AddScoped<VgStreamWrapper>();
             serviceCollection.AddScoped<WSourcesWrapper>();
 

@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 using Shared.Core.ErrorHandling;
@@ -26,7 +28,7 @@ namespace Editors.Audio.Shared.Storage
         private readonly IPackFileService _packFileService = packFileService;
         readonly ILogger _logger = Logging.Create<BnkLoader>();
 
-        public ParsedBnkFile LoadBnkFile(PackFile bnkFile, string bnkFilePath, bool isCAHircItem, bool printData = false)
+        public virtual ParsedBnkFile LoadBnkFile(PackFile bnkFile, string bnkFilePath, bool isCAHircItem, bool printData = false)
         {
             var soundDb = BnkParser.Parse(bnkFile, bnkFilePath, isCAHircItem);
             if (printData)
@@ -34,45 +36,66 @@ namespace Editors.Audio.Shared.Storage
             return soundDb;
         }
 
-        public Result LoadBnkFiles(List<string> languageToFilterOut)
+        public Result LoadBnkFiles(
+            List<string> languageToFilterOut,
+            IProgress<AudioLoadProgress> progress = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var bankFiles = PackFileServiceUtility.FindAllWithExtentionIncludePaths(_packFileService, ".bnk");
             var bankFilesAsDictionary = bankFiles.GroupBy(f => f.FileName).ToDictionary(g => g.Key, g => g.Last().Pack);
 
             var removeFilter = new List<string>() { "media", "init.bnk", "animation_blood_data.bnk" };
             removeFilter.AddRange(languageToFilterOut);
 
-            var wantedBnkFiles = PackFileUtil.FilterUnvantedFiles(bankFilesAsDictionary, removeFilter.ToArray(), out var removedFiles); ;
+            var wantedBnkFiles = PackFileUtil.FilterUnvantedFiles(bankFilesAsDictionary, removeFilter.ToArray(), out var removedFiles);
             _logger.Here().Information($"Parsing game sounds. {bankFiles.Count} bnk files found. {wantedBnkFiles.Count} after filtering");
 
-            var parsedBnks = new List<ParsedBnkFile>();
-            var bnksWithUnknownHircs = new List<string>();
-            var failedBnks = new List<(string bnkFile, string Error)>();
+            var parsedBnks = new ConcurrentBag<ParsedBnkFile>();
+            var bnksWithUnknownHircs = new ConcurrentBag<string>();
+            var failedBnks = new ConcurrentBag<(string bnkFile, string Error)>();
+            var packFileByBnkName = new ConcurrentDictionary<string, PackFile>();
             var result = new Result();
-            var counter = 1;
+            var startedCount = 0;
+            var completedCount = 0;
 
-            Parallel.ForEach(wantedBnkFiles, bnkFile =>
+            var parallelOptions = new ParallelOptions { CancellationToken = cancellationToken };
+            Parallel.ForEach(wantedBnkFiles, parallelOptions, bnkFile =>
             {
                 var filePath = bnkFile.Key;
-                _logger.Here().Information($"{counter++}/{wantedBnkFiles.Count} - {filePath}");
-
-                var packFile = bnkFile.Value;
-                var packFileContainer = _packFileService.GetPackFileContainer(packFile);
-                result.PackFileByBnkName.TryAdd(packFile.Name, packFile);
+                var started = Interlocked.Increment(ref startedCount);
+                _logger.Here().Information($"{started}/{wantedBnkFiles.Count} - {filePath}");
 
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var packFile = bnkFile.Value;
+                    var packFileContainer = _packFileService.GetPackFileContainer(packFile);
+                    packFileByBnkName.TryAdd(packFile.Name, packFile);
+
                     var parsedBnk = LoadBnkFile(packFile, filePath, packFileContainer.IsCaPackFile);
                     if (parsedBnk.HircChunk.HircItems.Any(hicItem => hicItem is UnknownHircItem == true || hicItem.HasError))
                         bnksWithUnknownHircs.Add(filePath);
 
                     parsedBnks.Add(parsedBnk);
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception e)
                 {
                     failedBnks.Add((filePath, e.Message));
                 }
+                finally
+                {
+                    var completed = Interlocked.Increment(ref completedCount);
+                    progress?.Report(new AudioLoadProgress(completed, wantedBnkFiles.Count, filePath));
+                }
             });
+
+            cancellationToken.ThrowIfCancellationRequested();
+            result.PackFileByBnkName = new Dictionary<string, PackFile>(packFileByBnkName);
 
             var allHircItems = parsedBnks.SelectMany(x => x.HircChunk.HircItems);
             PrintHircList(allHircItems, "All");
