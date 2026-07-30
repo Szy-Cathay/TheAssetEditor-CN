@@ -15,6 +15,7 @@ namespace Editors.AnimationMeta.Presentation
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly MetaDataFileParser _metaDataFileParser;
         private readonly IEventHub _eventHub;
+        private bool _hasStructuralChanges;
         public ParsedMetadataFile? ParsedFile { get; private set; }
         public ParsedMetadataAttribute? SelectedAttribute { get; private set; }
 
@@ -27,9 +28,12 @@ namespace Editors.AnimationMeta.Presentation
         {
             get
             {
+                if (_hasStructuralChanges)
+                    return true;
+
                 foreach (var tag in Tags)
                 {
-                    foreach(var variable in tag.Variables)
+                    foreach (var variable in tag.Variables)
                     {
                         if (variable.IsModified)
                             return true;
@@ -41,11 +45,16 @@ namespace Editors.AnimationMeta.Presentation
             }
             set
             {
-                foreach (var tag in Tags)
+                _hasStructuralChanges = value;
+                if (value == false)
                 {
-                    foreach (var variable in tag.Variables)
-                        variable.IsModified = false;
+                    foreach (var tag in Tags)
+                    {
+                        foreach (var variable in tag.Variables)
+                            variable.IsModified = false;
+                    }
                 }
+
                 OnPropertyChanged();
             }
 
@@ -61,8 +70,8 @@ namespace Editors.AnimationMeta.Presentation
 
         partial void OnSelectedTagChanged(MetaDataEntry? value)
         {
-            if(value == null)
-            
+            if (value == null)
+
                 SelectedAttribute = null;
             else
                 SelectedAttribute = value._input;
@@ -96,10 +105,15 @@ namespace Editors.AnimationMeta.Presentation
             }
 
             UpdateView();
+            HasUnsavedChanges = false;
         }
 
         public void UpdateView()
         {
+            var structureChanged = ParsedFile != null &&
+                Tags.Select(tag => tag._input)
+                    .SequenceEqual(ParsedFile.Attributes) == false;
+
             Tags.Clear();
             if (ParsedFile == null)
                 return;
@@ -119,6 +133,18 @@ namespace Editors.AnimationMeta.Presentation
                 else
                     throw new Exception($"{metadataEntry.GetType()} is not a known type for {nameof(MetaDataEditorViewModel)}");
             }
+
+            if (structureChanged)
+                MarkStructureChanged();
+        }
+
+        internal void MarkStructureChanged()
+        {
+            if (_hasStructuralChanges)
+                return;
+
+            _hasStructuralChanges = true;
+            OnPropertyChanged(nameof(HasUnsavedChanges));
         }
 
         [RelayCommand] void MoveUpAction() => _uiCommandFactory.Create<MoveEntryCommand>().ExecuteUp(this);

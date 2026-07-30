@@ -28,11 +28,15 @@ namespace Editors.AnimationVisualEditors.CampaignAnimationCreator.DevConfig
         {
             var debugInput = new AnimationToolInput()
             {
-                Mesh = _packFileService.FindFile(@"variantmeshes\variantmeshdefinitions\brt_damsel_campaign_01.variantmeshdefinition"),
+                Mesh = _packFileService.FindFile(@"variantmeshes\variantmeshdefinitions\brt_damsel_campaign_01.variantmeshdefinition")
+                    ?? throw new InvalidOperationException("Campaign animation test mesh was not found."),
                 Animation = _packFileService.FindFile(@"animations\battle\humanoid01b\staff_and_sword\arch_mage\locomotion\hu1b_stsw_mage_combat_walk_01.anim")
+                    ?? throw new InvalidOperationException("Campaign animation test animation was not found.")
             };
 
-            _editorCreator.Create(EditorEnums.CampaginAnimation_Editor, x => (x as EditorHost<CampaignAnimationCreatorViewModel>).Editor.SetDebugInputParameters(debugInput));
+            _editorCreator.Create(
+                EditorEnums.CampaginAnimation_Editor,
+                x => ((CampaignAnimationCreatorViewModel)x).SetDebugInputParameters(debugInput));
 
         }
 

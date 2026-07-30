@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.AnimationMeta.Presentation;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Editors.Shared.Core.Common;
@@ -33,16 +34,16 @@ namespace Editors.AnimationMeta.SuperView
         [ObservableProperty] int _selectedTabControllerIndex = 0;
         public override Type EditorViewModelType => typeof(EditorView);
         public bool HasUnsavedChanges
-        { 
-            get 
+        {
+            get
             {
                 return PersistentMetaEditor.HasUnsavedChanges || MetaEditor.HasUnsavedChanges;
             }
-            set 
+            set
             {
                 PersistentMetaEditor.HasUnsavedChanges = value;
                 MetaEditor.HasUnsavedChanges = value;
-            } 
+            }
         }
 
 
@@ -71,7 +72,11 @@ namespace Editors.AnimationMeta.SuperView
         }
 
         private void OnSelectedMetaDataAttributeChanged(SelecteMetaDataAttributeChangedEvent @event) => RecreateMetaDataInformation();
-        void OnMetaDataAttributeChanged(MetaDataAttributeChangedEvent @event) => RecreateMetaDataInformation();
+        void OnMetaDataAttributeChanged(MetaDataAttributeChangedEvent @event)
+        {
+            RecreateMetaDataInformation();
+            OnPropertyChanged(nameof(HasUnsavedChanges));
+        }
         void OnMetaDataChanged(SceneObject sceneObject) => RecreateMetaDataInformation();
 
         private void OnFileSaved(ScopedFileSavedEvent evnt)
@@ -89,8 +94,10 @@ namespace Editors.AnimationMeta.SuperView
         {
             PersistentMetaEditor = new MetaDataEditorViewModel(_uiCommandFactory, _metaDataFileParser, _eventHub);
             MetaEditor = new MetaDataEditorViewModel(_uiCommandFactory, _metaDataFileParser, _eventHub);
-            
-            var assetViewModel = _sceneObjectViewModelBuilder.CreateAsset("SuperViewRoot", true, "Root", Color.Black,null);
+            PersistentMetaEditor.PropertyChanged += OnMetaEditorPropertyChanged;
+            MetaEditor.PropertyChanged += OnMetaEditorPropertyChanged;
+
+            var assetViewModel = _sceneObjectViewModelBuilder.CreateAsset("SuperViewRoot", true, "Root", Color.Black, null);
             SceneObjects.Add(assetViewModel);
 
             assetViewModel.Data.MetaDataChanged += OnMetaDataChanged;
@@ -99,7 +106,15 @@ namespace Editors.AnimationMeta.SuperView
             OnSceneObjectUpdated(new SceneObjectUpdateEvent(_asset.Data, false, false, false, true));
         }
 
-    
+        private void OnMetaEditorPropertyChanged(
+            object? sender,
+            PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MetaDataEditorViewModel.HasUnsavedChanges))
+                OnPropertyChanged(nameof(HasUnsavedChanges));
+        }
+
+
 
         void RecreateMetaDataInformation()
         {
@@ -163,6 +178,8 @@ namespace Editors.AnimationMeta.SuperView
 
         public override void Close()
         {
+            PersistentMetaEditor.PropertyChanged -= OnMetaEditorPropertyChanged;
+            MetaEditor.PropertyChanged -= OnMetaEditorPropertyChanged;
             _eventHub?.UnRegister(this);
             base.Close();
         }

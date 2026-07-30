@@ -73,6 +73,9 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RegisterUiCommand<SaveAsCommand>();
 
             RegisterUiCommand<BrowseForReferenceCommand>();
+            RegisterUiCommand<ConstructBoxUiCommand>();
+            RegisterUiCommand<ConstructPlaneUiCommand>();
+            RegisterUiCommand<ConstructSphereUiCommand>();
 #if DEBUG
             RegisterUiCommand<ImportGeneralReferenceCommand>();
             RegisterUiCommand<ImportKarlHammerReferenceCommand>();
@@ -139,6 +142,20 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateToolBarItem<GroupItemsCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.GroupSelection"));
             builder.CreateToolBarItem<ReduceMeshCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.ReduceMesh"));
             builder.CreateToolBarItem<SortMeshesCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.SortModels"));
+            var primitiveToolbar = new ToolbarItem
+            {
+                Name = LocalizationManager.Instance.Get("Kitbash.Menu.Tools.CreatePrimitive")
+            };
+            toolsToolbar.Children.Add(primitiveToolbar);
+            builder.CreateToolBarItem<ConstructBoxUiCommand>(
+                primitiveToolbar,
+                LocalizationManager.Instance.Get("Kitbash.Menu.Tools.CreatePrimitive.Box"));
+            builder.CreateToolBarItem<ConstructPlaneUiCommand>(
+                primitiveToolbar,
+                LocalizationManager.Instance.Get("Kitbash.Menu.Tools.CreatePrimitive.Plane"));
+            builder.CreateToolBarItem<ConstructSphereUiCommand>(
+                primitiveToolbar,
+                LocalizationManager.Instance.Get("Kitbash.Menu.Tools.CreatePrimitive.Sphere"));
 
             var renderingToolbar = builder.CreateRootToolBar(LocalizationManager.Instance.Get("Kitbash.Menu.Rendering"));
             builder.CreateToolBarItem<FocusCameraCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.FocusCamera"));

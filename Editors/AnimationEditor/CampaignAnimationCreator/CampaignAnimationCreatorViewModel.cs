@@ -1,54 +1,64 @@
 ﻿using System;
 using System.Linq;
-using System.Windows;
+using AnimationEditor.CampaignAnimationCreator.Commands;
 using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
 using Editors.Shared.Core.Common.ReferenceModel;
-using Editors.Shared.Core.Services;
 using GameWorld.Core.Animation;
 using Microsoft.Xna.Framework;
-using Shared.Core.Misc;
+using Shared.Core.PackFiles;
 using Shared.Core.Services;
-using Shared.GameFormats.Animation;
 using Shared.Ui.Common;
 
 namespace AnimationEditor.CampaignAnimationCreator
 {
-    public class CampaignAnimationCreatorViewModel : NotifyPropertyChangedImpl, IHostedEditor<CampaignAnimationCreatorViewModel>
+    public class CampaignAnimationCreatorViewModel : EditorHostBase
     {
-        public Type EditorViewModelType => typeof(EditorView);
-        AnimationToolInput _debugDataToLoad;
-        SceneObject _selectedUnit;
-        AnimationClip _selectedAnimationClip;
+        public override Type EditorViewModelType => typeof(EditorView);
+        SceneObject? _selectedUnit;
+        AnimationClip? _selectedAnimationClip;
 
-        private readonly SceneObjectEditor _assetViewModelEditor;
+        private readonly IPackFileService _packFileService;
+        private readonly ConvertCampaignAnimationCommand _convertCommand;
+        private readonly SaveCampaignAnimationCommand _saveCommand;
 
-        private readonly SceneObjectViewModelBuilder _referenceModelSelectionViewModelBuilder;
-        private readonly IFileSaveService _packFileSaveService;
-
-        public FilterCollection<SkeletonBoneNode> ModelBoneList { get; set; } = new FilterCollection<SkeletonBoneNode>(null);
-        public string EditorName => LocalizationManager.Instance.Get("DisplayName.CampaignAnimationTool");
+        public FilterCollection<SkeletonBoneNode> ModelBoneList { get; set; } = new([]);
 
         public CampaignAnimationCreatorViewModel(
-            SceneObjectEditor assetViewModelEditor, 
-            SceneObjectViewModelBuilder referenceModelSelectionViewModelBuilder,
-            IFileSaveService packFileSaveService)
+            IEditorHostParameters editorHostParameters,
+            IPackFileService packFileService,
+            ConvertCampaignAnimationCommand convertCommand,
+            SaveCampaignAnimationCommand saveCommand) : base(editorHostParameters)
         {
-            _assetViewModelEditor = assetViewModelEditor;
-            _referenceModelSelectionViewModelBuilder = referenceModelSelectionViewModelBuilder;
-            _packFileSaveService = packFileSaveService;
+            DisplayName = LocalizationManager.Instance.Get("DisplayName.CampaignAnimationTool");
+            _packFileService = packFileService;
+            _convertCommand = convertCommand;
+            _saveCommand = saveCommand;
+            Initialize();
         }
 
         public void SetDebugInputParameters(AnimationToolInput debugDataToLoad)
         {
-            _debugDataToLoad = debugDataToLoad;
+            if (_selectedUnit == null)
+                return;
+
+            if (debugDataToLoad.Mesh != null)
+                SceneObjectEditor.SetMesh(_selectedUnit, debugDataToLoad.Mesh);
+
+            if (debugDataToLoad.Animation != null)
+                SceneObjectEditor.SetAnimation(_selectedUnit, _packFileService.GetFullPath(debugDataToLoad.Animation));
         }
 
-        public void Initialize(EditorHost<CampaignAnimationCreatorViewModel> owner)
+        private void Initialize()
         {
-            var item = _referenceModelSelectionViewModelBuilder.CreateAsset("model", true, "model", Color.Black, _debugDataToLoad);
+            var item = _sceneObjectViewModelBuilder.CreateAsset(
+                "model",
+                true,
+                LocalizationManager.Instance.Get("CampaignAnim.Model"),
+                Color.Black,
+                new AnimationToolInput());
             Create(item.Data);
-            owner.SceneObjects.Add(item);
+            SceneObjects.Add(item);
         }
 
         void Create(SceneObject rider)
@@ -63,44 +73,32 @@ namespace AnimationEditor.CampaignAnimationCreator
 
         public void SaveAnimation()
         {
-            var animFile = _selectedUnit.AnimationClip.ConvertToFileFormat(_selectedUnit.Skeleton);
-            var bytes = AnimationFile.ConvertToBytes(animFile);
-            _packFileSaveService.SaveAs(".anim", bytes);
+            _saveCommand.Execute(_selectedUnit?.Skeleton, _selectedUnit?.AnimationClip);
         }
 
         public void Convert()
         {
-           //if (_selectedAnimationClip == null)
-           //{
-           //    MessageBox.Show("No animation selected");
-           //    return;
-           //}
-           //
-           //if (ModelBoneList.SelectedItem == null)
-           //{
-           //    MessageBox.Show("No root bone selected");
-           //    return;
-           //}
-           //
-           //var newAnimation = _selectedAnimationClip.Clone();
-           //for (var frameIndex = 0; frameIndex < newAnimation.DynamicFrames.Count; frameIndex++)
-           //{
-           //    var frame = newAnimation.DynamicFrames[frameIndex];
-           //    frame.Position[ModelBoneList.SelectedItem.BoneIndex] = Vector3.Zero;
-           //    frame.Rotation[ModelBoneList.SelectedItem.BoneIndex] = Quaternion.Identity;
-           //}
-           //
-           //_selectedUnit.AnimationChanged -= AnimationChanged;
-           //_assetViewModelEditor.SetAnimationClip(_selectedUnit, newAnimation, new SkeletonAnimationLookUpHelper.AnimationReference("Generated animation", null));
-           //_selectedUnit.AnimationChanged += AnimationChanged;
+            if (_convertCommand.Execute(
+                    _selectedAnimationClip,
+                    ModelBoneList.SelectedItem,
+                    out var convertedAnimation) == false ||
+                _selectedUnit == null)
+            {
+                return;
+            }
+
+            SceneObjectEditor.SetAnimationClip(
+                _selectedUnit,
+                convertedAnimation,
+                _selectedUnit.AnimationName.Value);
         }
 
-        private void AnimationChanged(AnimationClip newValue)
+        private void AnimationChanged(AnimationClip? newValue)
         {
             _selectedAnimationClip = newValue;
         }
 
-        private void SkeletonChanged(GameSkeleton newValue)
+        private void SkeletonChanged(GameSkeleton? newValue)
         {
             if (newValue == null)
             {
@@ -109,8 +107,20 @@ namespace AnimationEditor.CampaignAnimationCreator
             else
             {
                 ModelBoneList.UpdatePossibleValues(SkeletonBoneNodeHelper.CreateFlatSkeletonList(newValue));
-                ModelBoneList.SelectedItem = ModelBoneList.PossibleValues.FirstOrDefault(x => x.BoneName.ToLower() == "animroot");
+                ModelBoneList.SelectedItem = ModelBoneList.PossibleValues.FirstOrDefault(
+                    x => string.Equals(x.BoneName, "animroot", StringComparison.InvariantCultureIgnoreCase));
             }
+        }
+
+        public override void Close()
+        {
+            if (_selectedUnit != null)
+            {
+                _selectedUnit.SkeletonChanged -= SkeletonChanged;
+                _selectedUnit.AnimationChanged -= AnimationChanged;
+            }
+
+            base.Close();
         }
     }
 }

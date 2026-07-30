@@ -55,9 +55,10 @@ namespace Editors.AnimationMeta.MetaEditor.Commands
             Guard.IsNotNull(controller.ParsedFile, $"{nameof(controller.ParsedFile)} - Can not paste when no file is loaded");
 
             var pastObject = _copyPasteManager.GetPasteObject<MetaDataTagCopyItem>();
-            if (pastObject != null)
-                controller.ParsedFile.Attributes.AddRange(pastObject.Items);
+            if (pastObject == null || pastObject.Items.Count == 0)
+                return;
 
+            controller.ParsedFile.Attributes.AddRange(pastObject.Items);
             controller.UpdateView();
         }
     }

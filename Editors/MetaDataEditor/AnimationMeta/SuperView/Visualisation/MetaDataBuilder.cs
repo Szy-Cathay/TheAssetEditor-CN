@@ -51,7 +51,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             _animationsContainerComponent = animationsContainerComponent;
         }
 
-        public List<IMetaDataInstance> Create(ParsedMetadataFile? persistent, 
+        public List<IMetaDataInstance> Create(ParsedMetadataFile? persistent,
             ParsedMetadataFile? metaData, ParsedMetadataAttribute? selectedMetaDataAttribute,
             SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat fragment)
         {
@@ -61,11 +61,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             // Apply persistent meta data, if no disable is given.
             if (metaData == null || metaData.GetItemsOfType<DisablePersistant_v10>().Count == 0)
             {
-                var metaDataPersistent = ApplyMetaData(persistent, selectedMetaDataAttribute,root, skeleton, rootPlayer, fragment);
+                var metaDataPersistent = ApplyMetaData(persistent, selectedMetaDataAttribute, root, skeleton, rootPlayer, fragment);
                 output.AddRange(metaDataPersistent);
             }
 
-            var metaDataInstances = ApplyMetaData(metaData, selectedMetaDataAttribute,root, skeleton, rootPlayer, fragment);
+            var metaDataInstances = ApplyMetaData(metaData, selectedMetaDataAttribute, root, skeleton, rootPlayer, fragment);
             output.AddRange(metaDataInstances);
             return output;
         }
@@ -76,7 +76,17 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             if (file == null)
                 return output;
 
-            output.AddRange(file.GetItemsOfType<IAnimatedPropMeta>().Select(x => CreateAnimatedProp(x, root, skeleton, selectedAttribute, rootPlayer)));
+            foreach (var animatedProp in file.GetItemsOfType<IAnimatedPropMeta>())
+            {
+                var instance = CreateAnimatedProp(
+                    animatedProp,
+                    root,
+                    skeleton,
+                    selectedAttribute,
+                    rootPlayer);
+                if (instance != null)
+                    output.Add(instance);
+            }
 
             output.AddRange(file.GetItemsOfType<ImpactPosition_v10>().Select(meteDataItem => CreateStaticLocator(meteDataItem, root, meteDataItem.Position, "ImpactPos", selectedAttribute)));
 
@@ -110,7 +120,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 _logger.Here().Error($"Unable to create docking, as animation is missing - select an animation");
                 return;
             }
- 
+
             var animPath = fragment.Entries.FirstOrDefault(x => x.SlotName == metaData.AnimationSlotName)?.AnimationFile ??
                            fragment.Entries.FirstOrDefault(x => x.SlotName == metaData.AnimationSlotName + "_2")?.AnimationFile;
             if (animPath == null)
@@ -135,7 +145,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             }
 
             var pf = _packFileService.FindFile(animPath);
-            if(pf == null)
+            if (pf == null)
                 throw new Exception($"Unable to find animation for docking. Searched for {animPath} and failed to find it in the pack file service. This is required to visualise the docked equipment.");
 
             var animFile = AnimationFile.Create(pf);
@@ -145,20 +155,24 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             rootPlayer.AnimationRules.Add(rule);
         }
 
-        private IMetaDataInstance CreateAnimatedProp(IAnimatedPropMeta animatedPropMeta, SceneNode root, ISkeletonProvider rootSkeleton, ParsedMetadataAttribute? selectedMetaDataAttribute, AnimationPlayer rootPlayer)
+        private IMetaDataInstance? CreateAnimatedProp(IAnimatedPropMeta animatedPropMeta, SceneNode root, ISkeletonProvider rootSkeleton, ParsedMetadataAttribute? selectedMetaDataAttribute, AnimationPlayer rootPlayer)
         {
             var propName = "Animated_prop";
             var color = selectedMetaDataAttribute == animatedPropMeta ? s_selectedColor : s_color;
 
             var meshPath = _packFileService.FindFile(animatedPropMeta.ModelName);
-            if(meshPath == null) 
-                throw new Exception($"Unable to find model for animated prop. Searched for {animatedPropMeta.ModelName} and failed to find it in the pack file service. This is required to visualise the animated prop.");
+            if (meshPath == null)
+            {
+                _logger.Here().Warning(
+                    $"Skipping animated prop preview because model '{animatedPropMeta.ModelName}' was not found.");
+                return null;
+            }
 
             var animationPath = _packFileService.FindFile(animatedPropMeta.AnimationName);
             var propPlayer = _animationsContainerComponent.RegisterAnimationPlayer(new AnimationPlayer(), propName + Guid.NewGuid());
 
             // Configure the mesh
-            var loadedNode = _complexMeshLoader.Load(meshPath, new GroupNode(propName), propPlayer, true, true); 
+            var loadedNode = _complexMeshLoader.Load(meshPath, new GroupNode(propName), propPlayer, true, true);
 
             // Configure animation
             if (animationPath != null)
@@ -196,7 +210,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             // Add the animation rules
             var animationRule = new CopyRootTransform(rootSkeleton, animatedPropMeta.BoneId, animatedPropMeta.Position, new Quaternion(animatedPropMeta.Orientation));
             propPlayer.AnimationRules.Add(animationRule);
-            if(rootPlayer.IsPlaying)
+            if (rootPlayer.IsPlaying)
                 propPlayer.Play();
             propPlayer.Refresh();
 
@@ -228,13 +242,13 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 
             var node = new SimpleDrawableNode(displayName);
             var textPos = (splashAttack.EndPosition + splashAttack.StartPosition) / 2;
-            
-            node.AddItem( new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, color));
+
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, color));
             node.AddItem(LineHelper.AddLocator(splashAttack.StartPosition, scale, color));
-            
-            node.AddItem( new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, color));
+
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, color));
             node.AddItem(LineHelper.AddLocator(splashAttack.EndPosition, scale, color));
-            
+
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, textPos, color));
             node.AddItem(LineHelper.AddLine(splashAttack.StartPosition, splashAttack.EndPosition, color));
 
@@ -275,7 +289,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 var transformationM = rotationM * Matrix.CreateScale(splashAttack.WidthForCorridor / 2) * Matrix.CreateTranslation(splashAttack.StartPosition);
                 node.AddItem(LineHelper.AddCorridorSplash(splashAttack.StartPosition, splashAttack.EndPosition, transformationM, color));
             }
-            
+
             root.AddObject(node);
 
             return new DrawableMetaInstance(splashAttack.StartTime, splashAttack.EndTime, node.Name, node);
@@ -289,7 +303,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 
             var rotationQuat = new Quaternion(effect.Orientation);
             var rotMatrix = Matrix.CreateFromQuaternion(rotationQuat);
-    
+
             var localX = Vector3.Transform(Vector3.UnitX, rotMatrix);
             var localY = Vector3.Transform(Vector3.UnitY, rotMatrix);
             var localZ = Vector3.Transform(Vector3.UnitZ, rotMatrix);

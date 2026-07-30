@@ -1,6 +1,7 @@
-using System.Windows.Input;
+﻿using System.Windows.Input;
 using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels;
+using GameWorld.Core.Components;
 using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
@@ -130,6 +131,63 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
 #else
         Assert.That(menuNames, Does.Not.Contain("调试"));
 #endif
+    }
+
+    [Test]
+    public void ReleaseMenu_ContainsPrimitiveCreationSubmenu()
+    {
+        var toolsMenu = _editor.MenuBar.MenuItems.Single(
+            item => item.NameAttribute.Value == "工具");
+        var primitiveMenu = toolsMenu.Children.Single(
+            item => item.NameAttribute.Value == "创建基础几何体");
+
+        Assert.That(
+            primitiveMenu.Children.Select(item => item.NameAttribute.Value),
+            Is.EqualTo(new[] { "立方体", "平面", "球体" }));
+    }
+
+    [Test]
+    public void CreateBoxUiCommand_CreatesSelectableUndoableMesh()
+    {
+        var commandFactory =
+            _runner.GetRequiredServiceInCurrentEditorScope<IUiCommandFactory>();
+        var commandExecutor =
+            _runner.GetRequiredServiceInCurrentEditorScope<CommandExecutor>();
+        var mainNode = _editor.SceneExplorer.SceneManager
+            .GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+        var originalMeshCount = mainNode
+            .GetLodNodes()
+            .Sum(lod => lod.GetAllModels(false).Count);
+
+        try
+        {
+            commandFactory.Create<ConstructBoxUiCommand>().Execute();
+
+            var createdMesh = mainNode
+                .GetLodNodes()
+                .SelectMany(lod => lod.GetAllModels(false))
+                .Single(mesh => mesh.Name == "primitive_box");
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    mainNode.GetLodNodes().Sum(lod => lod.GetAllModels(false).Count),
+                    Is.EqualTo(originalMeshCount + 1));
+                Assert.That(
+                    SelectionManager
+                        .GetState<ObjectSelectionState>()
+                        .GetSingleSelectedObject(),
+                    Is.SameAs(createdMesh));
+                Assert.That(commandExecutor.CanUndo(), Is.True);
+            });
+        }
+        finally
+        {
+            commandExecutor.Undo();
+        }
+
+        Assert.That(
+            mainNode.GetLodNodes().Sum(lod => lod.GetAllModels(false).Count),
+            Is.EqualTo(originalMeshCount));
     }
 
     [Test]
