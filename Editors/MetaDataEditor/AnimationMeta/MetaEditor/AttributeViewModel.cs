@@ -109,7 +109,7 @@ namespace Editors.AnimationMeta.Presentation
     {
         [ObservableProperty] Vector3ViewModel _value = new(0, 0, 0);
 
-        public OrientationAttributeViewModel(string fieldName, string description, Vector4Parser parser, Vector4 value, object target, PropertyInfo property, IEventHub eventHub) 
+        public OrientationAttributeViewModel(string fieldName, string description, Vector4Parser parser, Vector4 value, object target, PropertyInfo property, IEventHub eventHub)
             : base(fieldName, description, parser, value, target, property, eventHub)
         {
 
@@ -132,8 +132,8 @@ namespace Editors.AnimationMeta.Presentation
             value.Normalize();
 
             _property.SetValue(_target, value.ToVector4());
-            _eventHub.Publish(new MetaDataAttributeChangedEvent());
             IsModified = true;
+            _eventHub.Publish(new MetaDataAttributeChangedEvent());
         }
 
     }
@@ -142,7 +142,7 @@ namespace Editors.AnimationMeta.Presentation
     {
         [ObservableProperty] Vector3ViewModel _value;
 
-        public VectorAttributeViewModel(string fieldName, string description, Vector3Parser parser, Vector3 value, object target, PropertyInfo property, IEventHub eventHub) 
+        public VectorAttributeViewModel(string fieldName, string description, Vector3Parser parser, Vector3 value, object target, PropertyInfo property, IEventHub eventHub)
             : base(fieldName, description, parser, value, target, property, eventHub)
         {
             _value = new(0, 0, 0, OnValueChangedCallback);
@@ -157,8 +157,8 @@ namespace Editors.AnimationMeta.Presentation
         {
             var vector3 = Value.GetAsVector3();
             _property.SetValue(_target, vector3);
-            _eventHub.Publish(new MetaDataAttributeChangedEvent());
             IsModified = true;
+            _eventHub.Publish(new MetaDataAttributeChangedEvent());
         }
     }
 }

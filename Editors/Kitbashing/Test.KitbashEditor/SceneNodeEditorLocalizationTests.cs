@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using GameWorld.Core.Rendering.Materials.Shaders;
 using KitbasherEditor.ValueConverters;
 using Shared.Core.Services;
@@ -107,6 +107,32 @@ namespace Test.KitbashEditor
                     LocalizationManager.Instance.Get(
                         "Kitbash.AssignMaterial.MultipleSourcesSelected"),
                     Is.EqualTo("选择了多个网格，请只选择一个材质来源"));
+            });
+        }
+
+        [Test]
+        public void PrimitiveCreation_UsesChineseMenuTooltipsAndUndoHint()
+        {
+            var keys = new[]
+            {
+                "Kitbash.Menu.Tools.CreatePrimitive",
+                "Kitbash.Menu.Tools.CreatePrimitive.Box",
+                "Kitbash.Menu.Tools.CreatePrimitive.Plane",
+                "Kitbash.Menu.Tools.CreatePrimitive.Sphere",
+                "Kitbash.ToolTip.ConstructBoxUiCommand",
+                "Kitbash.ToolTip.ConstructPlaneUiCommand",
+                "Kitbash.ToolTip.ConstructSphereUiCommand",
+                "Kitbash.CommandHint.ConstructPrimitive"
+            };
+
+            Assert.Multiple(() =>
+            {
+                foreach (var key in keys)
+                {
+                    var localized = LocalizationManager.Instance.Get(key);
+                    Assert.That(localized, Is.Not.EqualTo(key), key);
+                    Assert.That(localized, Does.Match("[\u4e00-\u9fff]"), key);
+                }
             });
         }
     }

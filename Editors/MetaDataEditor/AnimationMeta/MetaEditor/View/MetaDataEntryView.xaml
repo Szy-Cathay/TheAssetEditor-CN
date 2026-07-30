@@ -41,6 +41,7 @@
 
         <ListView DockPanel.Dock="Bottom"
             Grid.Row="1" 
+            SelectionMode="Extended"
             DisplayMemberPath="DisplayName" 
             ItemsSource="{Binding Tags, UpdateSourceTrigger=PropertyChanged}" 
             SelectedItem="{Binding SelectedTag, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">

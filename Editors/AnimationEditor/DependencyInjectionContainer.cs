@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.CampaignAnimationCreator;
+using AnimationEditor.CampaignAnimationCreator.Commands;
 using AnimationEditor.Common.BaseControl;
 using AnimationEditor.MountAnimationCreator;
 using Editors.AnimationVisualEditors.AnimationKeyframeEditor;
@@ -14,8 +15,9 @@ namespace Editors.AnimationVisualEditors
     {
         public override void Register(IServiceCollection serviceCollection)
         {
-            serviceCollection.AddScoped<EditorHost<CampaignAnimationCreatorViewModel>>();
             serviceCollection.AddScoped<CampaignAnimationCreatorViewModel>();
+            serviceCollection.AddTransient<ConvertCampaignAnimationCommand>();
+            serviceCollection.AddTransient<SaveCampaignAnimationCommand>();
 
             serviceCollection.AddScoped<EditorHost<MountAnimationCreatorViewModel>>();
             serviceCollection.AddScoped<MountAnimationCreatorViewModel>();
@@ -32,12 +34,12 @@ namespace Editors.AnimationVisualEditors
                 .Create<EditorHost<MountAnimationCreatorViewModel>, EditorHostView>(EditorEnums.MountTool_Editor)
                 .AddToToolbar("DisplayName.MountTool", false)
                 .Build(database);
-      
+
             EditorInfoBuilder
-              .Create<EditorHost<CampaignAnimationCreatorViewModel>, EditorHostView>(EditorEnums.CampaginAnimation_Editor)
-              .AddToToolbar("DisplayName.CampaignAnimationTool", false)
+              .Create<CampaignAnimationCreatorViewModel, EditorHostView>(EditorEnums.CampaginAnimation_Editor)
+              .AddToToolbar("DisplayName.CampaignAnimationTool", true)
               .Build(database);
-        
+
             EditorInfoBuilder
               .Create<EditorHost<AnimationKeyframeEditorViewModel>, EditorHostView>(EditorEnums.AnimationKeyFrame_Editor)
               .AddToToolbar("DisplayName.KeyFrameTool", false)
