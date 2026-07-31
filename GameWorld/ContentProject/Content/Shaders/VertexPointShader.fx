@@ -14,6 +14,8 @@
 float4x4 ViewProjection;
 float4x4 World;
 float2 ViewportSize;
+float UnselectedOpacity = 1.0;
+float SelectedOpacity = 1.0;
 bool CapabilityFlag_ApplyAnimation = false;
 float4x4 Animation_Tranforms[256];
 int Animation_WeightCount = 0;
@@ -48,6 +50,8 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
     float4 Color : COLOR0;
     float Weight : TEXCOORD1;
+    float PointSize : TEXCOORD2;
+    float Opacity : TEXCOORD3;
 };
 
 VSOutput CreateVertexPointOutput(
@@ -70,6 +74,11 @@ VSOutput CreateVertexPointOutput(
     output.TexCoord = input.TexCoord;
     output.Color = float4(instanceColor, 1.0);
     output.Weight = instanceWeight;
+    output.PointSize = instanceScale;
+    output.Opacity = lerp(
+        UnselectedOpacity,
+        SelectedOpacity,
+        saturate(instanceWeight));
 
     output.Position.z = max(
         0.0f,
@@ -148,19 +157,16 @@ VSOutput AnimatedVertexPointVS(
 // Blender 3D viewport style: solid circle with AA edge, no outline ring
 float4 VertexPointPS(VSOutput input) : COLOR0
 {
-    // Distance from center (0.5, 0.5) in UV space
     float2 center = float2(0.5, 0.5);
-    float dist = length(input.TexCoord - center);
+    float distancePixels =
+        length(input.TexCoord - center) * input.PointSize;
+    float radiusPixels =
+        max(0.5, input.PointSize * 0.5 - 0.75);
+    float signedDistance = radiusPixels - distancePixels;
+    float coverage = smoothstep(-0.5, 0.5, signedDistance);
+    float alpha = coverage * input.Opacity;
 
-    // Discard pixels outside the circle
-    if (dist > 0.5)
-        discard;
-
-    // Anti-aliased outer edge using smoothstep
-    float alpha = smoothstep(0.5, 0.42, dist);
-
-    // Solid circle with AA edge (Blender 3D viewport style - no outline ring)
-    return float4(input.Color.rgb, alpha);
+    return float4(input.Color.rgb * alpha, alpha);
 }
 
 technique VertexPoint

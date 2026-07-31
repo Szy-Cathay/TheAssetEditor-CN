@@ -103,7 +103,7 @@ namespace GameWorld.Core.Components
             if (_camera.CurrentProjectionType == ProjectionType.Orthographic)
                 cameraDist = _camera.OrthoSize;
 
-            float halfSize = Math.Clamp(cameraDist * 5.0f, 25f, 8000f);
+            float halfSize = Math.Clamp(cameraDist * 12.0f, 25f, 24000f);
 
             // Snap quad center to integer grid positions (camera following)
             float cx = (float)Math.Round(_camera.Position.X);

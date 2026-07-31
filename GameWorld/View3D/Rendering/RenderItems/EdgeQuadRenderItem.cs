@@ -37,8 +37,8 @@ namespace GameWorld.Core.Rendering.RenderItems
             if (EdgeQuadRenderer.CurrentInstanceCount == 0)
                 return;
 
-            var viewportHeight = parameters.ViewportHeight > 0 ? parameters.ViewportHeight : device.Viewport.Height;
-            var viewportWidth = parameters.ViewportWidth > 0 ? parameters.ViewportWidth : device.Viewport.Width;
+            var viewportHeight = device.Viewport.Height;
+            var viewportWidth = device.Viewport.Width;
 
             EdgeQuadRenderer.Draw(parameters.View, parameters.Projection, viewportHeight, viewportWidth, device);
         }

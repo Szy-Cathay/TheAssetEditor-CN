@@ -161,6 +161,43 @@ namespace GameWorld.Core.Animation
             return positions;
         }
 
+        public BoundingBox GetConservativeAnimatedBounds()
+        {
+            var bounds = Geometry.BoundingBox;
+            if (!ApplyAnimation)
+                return bounds;
+
+            var min = bounds.Min;
+            var max = bounds.Max;
+            for (var transformIndex = 0;
+                 transformIndex < AnimationTransforms.Length;
+                 transformIndex++)
+            {
+                var transform =
+                    AnimationTransforms[transformIndex];
+                for (var corner = 0; corner < 8; corner++)
+                {
+                    var point = new Vector3(
+                        (corner & 1) == 0
+                            ? bounds.Min.X
+                            : bounds.Max.X,
+                        (corner & 2) == 0
+                            ? bounds.Min.Y
+                            : bounds.Max.Y,
+                        (corner & 4) == 0
+                            ? bounds.Min.Z
+                            : bounds.Max.Z);
+                    var transformed = Vector3.Transform(
+                        point,
+                        transform);
+                    min = Vector3.Min(min, transformed);
+                    max = Vector3.Max(max, transformed);
+                }
+            }
+
+            return new BoundingBox(min, max);
+        }
+
         public void FillWorldPositions(
             Vector3[] positions)
         {

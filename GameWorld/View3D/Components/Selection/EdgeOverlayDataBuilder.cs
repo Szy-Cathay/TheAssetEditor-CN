@@ -10,7 +10,7 @@ internal static class EdgeOverlayDataBuilder
 {
     private static readonly Vector3 WireColor = new(0.15f, 0.15f, 0.15f);
     private static readonly Vector3 SelectedColor = new(1.0f, 0.47f, 0.0f);
-    private const float SelectedEdgeHalfWidth = 1.5f;
+    private const float SelectedEdgeHalfWidth = 1.25f;
 
     public static void Fill(
         Span<EdgeData> destination,

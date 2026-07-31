@@ -57,6 +57,7 @@ namespace GameWorld.Core.Components.Rendering
 
         public SpriteBatch CommonSpriteBatch { get; private set; }
         public SpriteFont DefaultFont { get; private set; }
+        public SpriteFont ViewportOverlayFont { get; private set; }
 
         /// <summary>
         /// Viewport shading mode - controls how 3D objects are rendered
@@ -141,6 +142,8 @@ namespace GameWorld.Core.Components.Rendering
 
             CommonSpriteBatch = new SpriteBatch(device);
             DefaultFont = _wpfGame.Content.Load<SpriteFont>("Fonts//DefaultFont");
+            ViewportOverlayFont = _wpfGame.Content.Load<SpriteFont>(
+                "Fonts//ViewportOverlayFont");
         }
 
         void RebuildRasterStates(bool cullingEnabled, bool bigSceneDepthBias)
@@ -608,6 +611,11 @@ namespace GameWorld.Core.Components.Rendering
                 else
                     device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
 
+                foreach (var item in _renderItems[RenderBuckedId.Normal])
+                    item.Draw(device, commonShaderParameters, renderingTechnique);
+
+                // Draw depth-tested helpers after meshes so they cannot punch
+                // holes into the selection mask before selected geometry renders.
                 if (renderingTechnique == RenderingTechnique.Normal &&
                     _renderLines.Count != 0)
                 {
@@ -636,9 +644,6 @@ namespace GameWorld.Core.Components.Rendering
                             _renderLines.Count / 2);
                     }
                 }
-
-                foreach (var item in _renderItems[RenderBuckedId.Normal])
-                    item.Draw(device, commonShaderParameters, renderingTechnique);
 
                 device.RasterizerState =
                     _rasterStates[RasterizerStateEnum.Wireframe];

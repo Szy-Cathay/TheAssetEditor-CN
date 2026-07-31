@@ -116,6 +116,29 @@ public class MeshPoseSnapshotTests
     }
 
     [Test]
+    public void ConservativeAnimatedBounds_ContainsSkinnedPositionOutsideBindPose()
+    {
+        var mesh = CreateWeightedMesh(new Vector3(1, 0, 0));
+        var pose = MeshPoseSnapshot.Create(
+            mesh,
+            Matrix.Identity,
+            [Matrix.CreateTranslation(5, 0, 0)],
+            applyAnimation: true);
+
+        var bounds = pose.GetConservativeAnimatedBounds();
+        var skinnedPosition = pose.GetWorldPosition(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bounds.Min.X, Is.LessThanOrEqualTo(1));
+            Assert.That(bounds.Max.X, Is.GreaterThanOrEqualTo(6));
+            Assert.That(
+                bounds.Contains(skinnedPosition),
+                Is.Not.EqualTo(ContainmentType.Disjoint));
+        });
+    }
+
+    [Test]
     public void PoseReplayPlan_MapsVisibleTranslationBackToBindGeometryAndSupportsUndo()
     {
         var mesh = CreateWeightedMesh(new Vector3(1, 0, 0));

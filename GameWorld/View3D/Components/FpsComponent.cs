@@ -5,26 +5,30 @@ using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.Rendering.RenderItems;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
+using Shared.Core.Services;
 
 namespace GameWorld.Core.Components
 {
     public class FpsComponent : BaseComponent
     {
+        private const float OverlayFontScale = 0.5f;
         private int _frames;
         private int _liveFrames;
         private TimeSpan _timeElapsed;
         private readonly RenderEngineComponent _renderEngineComponent;
         private readonly SceneManager _sceneManager;
+        private readonly LocalizationManager _localizationManager;
 
         // Cached scene statistics (updated once per second)
         private int _objectCount;
         private int _vertexCount;
         private int _faceCount;
 
-        public FpsComponent(RenderEngineComponent renderEngineComponent, SceneManager sceneManager)
+        public FpsComponent(RenderEngineComponent renderEngineComponent, SceneManager sceneManager, LocalizationManager localizationManager)
         {
             _renderEngineComponent = renderEngineComponent;
             _sceneManager = sceneManager;
+            _localizationManager = localizationManager;
         }
 
         public override void Update(GameTime gameTime)
@@ -61,10 +65,22 @@ namespace GameWorld.Core.Components
         {
             _liveFrames++;
 
-            var fpsItem = new FontRenderItem(_renderEngineComponent, $"FPS: {_frames}", new Vector2(5, 5), Color.White);
+            var fpsItem = new FontRenderItem(
+                _renderEngineComponent,
+                _localizationManager.GetFormat("Viewport.Stats.FrameRate", _frames),
+                new Vector2(5, 5),
+                Color.White,
+                _renderEngineComponent.ViewportOverlayFont,
+                OverlayFontScale);
             _renderEngineComponent.AddRenderItem(RenderBuckedId.Font, fpsItem);
 
-            var statsItem = new FontRenderItem(_renderEngineComponent, $"Objects: {_objectCount}  Verts: {_vertexCount}  Faces: {_faceCount}", new Vector2(5, 25), Color.LightGray);
+            var statsItem = new FontRenderItem(
+                _renderEngineComponent,
+                _localizationManager.GetFormat("Viewport.Stats.Scene", _objectCount, _vertexCount, _faceCount),
+                new Vector2(5, 25),
+                Color.LightGray,
+                _renderEngineComponent.ViewportOverlayFont,
+                OverlayFontScale);
             _renderEngineComponent.AddRenderItem(RenderBuckedId.Font, statsItem);
         }
     }

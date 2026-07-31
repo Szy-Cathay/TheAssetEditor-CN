@@ -1,5 +1,6 @@
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Rendering;
+using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -62,8 +63,24 @@ namespace GameWorld.Core.Rendering.RenderItems
             effect.Parameters["View"].SetValue(parameters.View);
             effect.Parameters["Projection"].SetValue(
                 parameters.Projection);
+            var primitiveCount = _selectedFaces?.Count ??
+                _pose.Geometry.GetIndexCount() / 3;
+            var detailOpacity =
+                EditOverlayVisibility.CalculateDetailOpacity(
+                    _pose.GetConservativeAnimatedBounds(),
+                    _pose.WorldTransform,
+                    parameters.View,
+                    parameters.Projection,
+                    device.Viewport.Width,
+                    device.Viewport.Height,
+                    primitiveCount);
+            var alpha = _colour.W * detailOpacity;
             effect.Parameters["SelectionColour"].SetValue(
-                _colour);
+                new Vector4(
+                    _colour.X * alpha,
+                    _colour.Y * alpha,
+                    _colour.Z * alpha,
+                    alpha));
             effect.Parameters["SelectionDepthBias"].SetValue(
                 0.00001f);
             effect.Parameters["CapabilityFlag_ApplyAnimation"]
@@ -75,25 +92,35 @@ namespace GameWorld.Core.Rendering.RenderItems
                 effect.Parameters["Animation_Tranforms"]
                     .SetValue(_pose.AnimationTransforms);
             }
-            effect.CurrentTechnique.Passes[0].Apply();
-
-            var geometry = _pose.Geometry;
-            var graphicsGeometry =
-                geometry.GetGeometryContext();
-            device.Indices = graphicsGeometry.IndexBuffer;
-            device.SetVertexBuffer(
-                graphicsGeometry.VertexBuffer);
-            if (_selectedFaces == null)
+            var previousBlendState = device.BlendState;
+            device.BlendState = BlendState.AlphaBlend;
+            try
             {
-                device.DrawIndexedPrimitives(
-                    PrimitiveType.TriangleList,
-                    0,
-                    0,
-                    geometry.GetIndexCount() / 3);
-                return;
-            }
+                effect.CurrentTechnique.Passes[0].Apply();
 
-            DrawSelectedFaces(device);
+                var geometry = _pose.Geometry;
+                var graphicsGeometry =
+                    geometry.GetGeometryContext();
+                device.Indices = graphicsGeometry.IndexBuffer;
+                device.SetVertexBuffer(
+                    graphicsGeometry.VertexBuffer);
+                if (_selectedFaces == null)
+                {
+                    device.DrawIndexedPrimitives(
+                        PrimitiveType.TriangleList,
+                        0,
+                        0,
+                        geometry.GetIndexCount() / 3);
+                }
+                else
+                {
+                    DrawSelectedFaces(device);
+                }
+            }
+            finally
+            {
+                device.BlendState = previousBlendState;
+            }
         }
 
         void DrawSelectedFaces(GraphicsDevice device)

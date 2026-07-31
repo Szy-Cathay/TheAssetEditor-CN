@@ -19,6 +19,80 @@ namespace GameWorld.Core.Test.Rendering;
 public class VertexOverlayUploadTests
 {
     [Test]
+    public void Draw_AntialiasedPointUsesPremultipliedCoverage()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\VertexPointShader");
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver.SetupGet(x => x.Device).Returns(device);
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library =>
+                library.GetStaticEffect(
+                    ShaderTypes.VertexPoint))
+            .Returns(effect);
+        using var vertexRenderer = new VertexInstanceMesh(
+            deviceResolver.Object,
+            resources.Object);
+        var mesh = CreateMesh(device);
+        var node = new Rmv2MeshNode(
+            mesh,
+            Mock.Of<IRmvMaterial>(),
+            null!,
+            null!);
+        var selection = new VertexSelectionState(node, 0);
+        selection.SetSelection([0]);
+        vertexRenderer.Update([Vector3.Zero], selection);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target | ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.DepthStencilState = DepthStencilState.Default;
+            device.RasterizerState = RasterizerState.CullNone;
+            vertexRenderer.Draw(
+                Matrix.Identity,
+                Matrix.Identity,
+                device);
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[64 * 64];
+        renderTarget.GetData(pixels);
+        var antialiasedPixels = pixels
+            .Where(pixel => pixel.A > 0 && pixel.A < byte.MaxValue)
+            .ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(antialiasedPixels, Is.Not.Empty);
+            Assert.That(
+                antialiasedPixels.All(pixel =>
+                    pixel.R <= pixel.A + 2 &&
+                    pixel.G <= pixel.A + 2 &&
+                    pixel.B <= pixel.A + 2),
+                Is.True,
+                "AlphaBlend requires antialiased RGB to be premultiplied by coverage.");
+        });
+        mesh.Dispose();
+    }
+
+    [Test]
     public void Draw_UnchangedOverlay_UploadsInstancesOnlyOnce()
     {
         var game = new WpfGameMock();

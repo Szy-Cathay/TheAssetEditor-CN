@@ -69,7 +69,7 @@ public class EdgeOverlayDataBuilderTests
             Assert.That(destination[0].P1, Is.EqualTo(new Vector3(-1.0f, 0.0f, 2.0f)));
             Assert.That(destination[0].C0, Is.EqualTo(new Vector3(1.0f, 0.47f, 0.0f)));
             Assert.That(destination[0].C1, Is.EqualTo(new Vector3(1.0f, 0.47f, 0.0f)));
-            Assert.That(destination[0].Width, Is.EqualTo(1.5f));
+            Assert.That(destination[0].Width, Is.EqualTo(1.25f));
         });
     }
 
