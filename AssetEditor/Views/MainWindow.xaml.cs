@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using AssetEditor.ViewModels;
 using CommonControls;
 using Microsoft.Extensions.DependencyInjection;
@@ -66,6 +67,8 @@ namespace AssetEditor.Views
                     return;
 
                 _closeApproved = true;
+                await System.Windows.Threading.Dispatcher.Yield(
+                    DispatcherPriority.Normal);
                 Close();
             }
             finally
