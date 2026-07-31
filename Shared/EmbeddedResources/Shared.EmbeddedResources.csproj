@@ -44,7 +44,6 @@
     <None Remove="Resources\Icons\icons8-move-right-48.png" />
     <None Remove="Resources\Icons\icons8-new-copy-50.png" />
     <None Remove="Resources\Icons\icons8-orthogonal-view-50.png" />
-    <None Remove="Resources\Icons\icons8-question-mark-48.png" />
     <None Remove="Resources\Icons\icons8-sugar-cube-100.png" />
     <None Remove="Resources\Icons\icons8-sugar-cube-64.png" />
     <None Remove="Resources\Icons\icons8-trash-can-50.png" />
@@ -57,6 +56,7 @@
     <None Remove="Resources\Icons\Kitbasher\ExpandSelection.png" />
     <None Remove="Resources\Icons\Kitbasher\ExtractPolygons.png" />
     <None Remove="Resources\Icons\Kitbasher\FaceToVertex.png" />
+    <None Remove="Resources\Icons\Kitbasher\HelpModern.png" />
     <None Remove="Resources\Icons\Kitbasher\Gizmo_move.png" />
     <None Remove="Resources\Icons\Kitbasher\Gizmo_rotate.png" />
     <None Remove="Resources\Icons\Kitbasher\Gizmo_scale.png" />
@@ -71,13 +71,14 @@
     <None Remove="Resources\Icons\Kitbasher\Open.png" />
     <None Remove="Resources\Icons\Kitbasher\OpenRef.png" />
     <None Remove="Resources\Icons\Kitbasher\pin.png" />
+    <None Remove="Resources\Icons\Kitbasher\RedoModern.png" />
+    <None Remove="Resources\Icons\Kitbasher\ReRiggingModern.png" />
     <None Remove="Resources\Icons\Kitbasher\SelectionMode_face.png" />
     <None Remove="Resources\Icons\Kitbasher\SelectionMode_object.png" />
     <None Remove="Resources\Icons\Kitbasher\SelectionMode_Vertex.png" />
     <None Remove="Resources\Icons\Kitbasher\vertex_select.png" />
     <None Remove="Resources\Icons\Kitbasher\edge_select.png" />
     <None Remove="Resources\Icons\Kitbasher\face_select.png" />
-    <None Remove="Resources\Icons\Kitbasher\blender-2.png" />
     <None Remove="Resources\Icons\Kitbasher\ShowSelection.png" />
     <None Remove="Resources\Icons\Kitbasher\SnapVertex.png" />
     <None Remove="Resources\Icons\Kitbasher\tool_combine.png" />
@@ -89,9 +90,9 @@
     <None Remove="Resources\Icons\Kitbasher\tool_split.png" />
     <None Remove="Resources\Icons\Kitbasher\Undo.png" />
     <None Remove="Resources\Icons\Kitbasher\Validate.png" />
+    <None Remove="Resources\Icons\Kitbasher\VertexDebuggerModern.png" />
     <None Remove="Resources\Icons\Open.png" />
     <None Remove="Resources\Icons\Paste.png" />
-    <None Remove="Resources\Icons\Redo.png" />
     <None Remove="Resources\Icons\Save.png" />
     <None Remove="Resources\Icons\Undo.png" />
     <None Remove="Resources\Icons\WordWrap.png" />
@@ -262,9 +263,6 @@
     <EmbeddedResource Include="Resources\Icons\icons8-orthogonal-view-50.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="Resources\Icons\icons8-question-mark-48.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\icons8-sugar-cube-100.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -283,7 +281,7 @@
     <EmbeddedResource Include="Resources\Icons\Kitbasher\BlenderHelp.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="Resources\Icons\Kitbasher\blender-2.png">
+    <EmbeddedResource Include="Resources\Icons\Kitbasher\HelpModern.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Kitbasher\edge_select.png">
@@ -364,6 +362,12 @@
     <EmbeddedResource Include="Resources\Icons\Kitbasher\pin.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Icons\Kitbasher\RedoModern.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Icons\Kitbasher\ReRiggingModern.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Kitbasher\SelectionMode_face.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -406,13 +410,13 @@
     <EmbeddedResource Include="Resources\Icons\Kitbasher\Validate.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Icons\Kitbasher\VertexDebuggerModern.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Open.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Paste.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\Icons\Redo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Save.png">

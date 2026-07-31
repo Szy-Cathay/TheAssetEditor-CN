@@ -82,7 +82,7 @@ namespace Shared.EmbeddedResources
             SaveFileIcon = BitmapToImageSource(@"Kitbasher.icons8-save-all-50.png");
             OpenReferenceMeshIcon = BitmapToImageSource(@"Kitbasher.OpenRef.png");
             UndoIcon = BitmapToImageSource(@"Kitbasher.Undo.png");
-            RedoIcon = BitmapToImageSource("Redo.png");
+            RedoIcon = BitmapToImageSource(@"Kitbasher.RedoModern.png");
 
             Gizmo_CursorIcon = BitmapToImageSource(@"Kitbasher.icons8-cursor-256.png");
             Gizmo_MoveIcon = BitmapToImageSource(@"Kitbasher.Gizmo_move.png");
@@ -106,7 +106,7 @@ namespace Shared.EmbeddedResources
             CreateLodIcon = BitmapToImageSource(@"Kitbasher.CreateLod.png");
             BmiToolIcon = BitmapToImageSource(@"Kitbasher.icons8-bmi-48.png");
             SkeletonReshaperIcon = BitmapToImageSource(@"Kitbasher.icons8-body-48.png");
-            ReRiggingIcon = BitmapToImageSource(@"icons8-animated-skeleton-50.png");
+            ReRiggingIcon = BitmapToImageSource(@"Kitbasher.ReRiggingModern.png");
 
             FreezeAnimationIcon = BitmapToImageSource(@"Kitbasher.icons8-fruity-ice-pop-64.png");
             PinIcon = BitmapToImageSource(@"Kitbasher.pin.png");
@@ -116,8 +116,8 @@ namespace Shared.EmbeddedResources
             GrowSelectionIcon = BitmapToImageSource(@"Kitbasher.ExpandSelection.png");
             FaceToVertexIcon = BitmapToImageSource(@"Kitbasher.FaceToVertex.png");
             MergeVertexIcon = BitmapToImageSource(@"Kitbasher.tool_mergeVertex.png");
-            VertexDebuggerIcon = BitmapToImageSource(@"icons8-question-mark-48.png");
-            HelpIcon = BitmapToImageSource(@"Kitbasher.blender-2.png");
+            VertexDebuggerIcon = BitmapToImageSource(@"Kitbasher.VertexDebuggerModern.png");
+            HelpIcon = BitmapToImageSource(@"Kitbasher.HelpModern.png");
 
             ProportionalOffIcon = BitmapToImageSource(@"Kitbasher.proportional_off.png");
             ProportionalOnIcon = BitmapToImageSource(@"Kitbasher.proportional_on.png");
