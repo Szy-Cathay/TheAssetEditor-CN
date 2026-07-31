@@ -1,7 +1,5 @@
-// Edge quad shader for rendering wireframe edges as screen-space quads with anti-aliasing.
-// Based on Blender's overlay_edit_mesh_edge_vert.glsl approach.
-// Each edge segment = 1 instance (4-vertex quad, 2 triangles).
-// Supports gradient coloring per endpoint (GPU interpolates automatically).
+// Screen-space edit edges with analytic anti-aliasing.
+// Each edge is expanded from a line segment into an instanced quad.
 
 #if OPENGL
 #define SV_POSITION POSITION
@@ -13,110 +11,183 @@
 #endif
 
 float4x4 ViewProjection;
+float4x4 World;
 float ViewportHeight;
 float ViewportWidth;
+float OverlayOpacity = 1.0;
+float BaseOpacity = 1.0;
+float EdgeDepthBias = 0.0;
+float3 OverlayColor;
+bool CapabilityFlag_ApplyAnimation = false;
+float4x4 Animation_Tranforms[256];
+int Animation_WeightCount = 0;
 
-// Instance data: two endpoints, two colors, screen-space half-width
 struct VSInstanceInput
 {
-    float3 InstanceP0 : POSITION1;      // Edge start world position
-    float3 InstanceP1 : NORMAL1;        // Edge end world position
-    float3 InstanceC0 : NORMAL2;        // Start endpoint color
-    float3 InstanceC1 : NORMAL3;        // End endpoint color
-    float InstanceWidth : NORMAL4;      // Screen-space half-width in pixels
+    float3 InstanceP0 : POSITION1;
+    float3 InstanceP1 : NORMAL1;
+    float3 InstanceC0 : NORMAL2;
+    float3 InstanceC1 : NORMAL3;
+    float InstanceWidth : NORMAL4;
+};
+
+struct VSAnimatedInstanceInput
+{
+    float3 BindP0 : POSITION1;
+    float4 Weights0 : COLOR1;
+    float4 BoneIndices0 : BLENDINDICES1;
+    float3 BindP1 : POSITION2;
+    float4 Weights1 : COLOR2;
+    float4 BoneIndices1 : BLENDINDICES2;
 };
 
 struct VSInput
 {
-    float4 Position : POSITION0;        // Quad corner: x,y in [-0.5, +0.5], z=0, w=1
-    float2 TexCoord : TEXCOORD0;        // UV for potential future use
+    float4 Position : POSITION0;
+    float2 TexCoord : TEXCOORD0;
 };
 
 struct VSOutput
 {
     float4 Position : SV_POSITION;
     float4 Color : COLOR0;
-    float EdgeDist : TEXCOORD1;         // Distance from edge center (0=center, 1=edge)
+    float EdgeDist : TEXCOORD1;
+    float HalfWidthPixels : TEXCOORD2;
+    float ProjectedLengthPixels : TEXCOORD3;
 };
 
-// Vertex shader: expand each line segment into a screen-space quad
-VSOutput EdgeQuadVS(VSInput input, VSInstanceInput instance)
+VSOutput CreateEdgeQuadOutput(
+    VSInput input,
+    float4 clip0,
+    float4 clip1,
+    float3 color0,
+    float3 color1,
+    float halfWidth)
 {
     VSOutput output = (VSOutput)0;
-
-    // 1. Project both endpoints to clip space
-    float4 clip0 = mul(float4(instance.InstanceP0, 1.0), ViewProjection);
-    float4 clip1 = mul(float4(instance.InstanceP1, 1.0), ViewProjection);
-
-    // 2. Convert to NDC (Normalized Device Coordinates, [-1, 1] range)
-    float2 ndc0 = clip0.xy / clip0.w;
-    float2 ndc1 = clip1.xy / clip1.w;
-
-    // 3. Compute edge direction and perpendicular in NDC space
-    float2 edgeVec = ndc1 - ndc0;
-    float edgeLen = length(edgeVec);
-
-    // Handle degenerate edges (zero length)
-    if (edgeLen < 0.0001)
+    const float minClipW = 0.0001;
+    if (clip0.w < minClipW && clip1.w >= minClipW)
     {
-        output.Position = clip0;
-        output.Color = float4(instance.InstanceC0, 1.0);
-        output.EdgeDist = 0;
-        return output;
+        float clipAmount =
+            (minClipW - clip0.w) / (clip1.w - clip0.w);
+        clip0 = lerp(clip0, clip1, saturate(clipAmount));
+    }
+    else if (clip1.w < minClipW && clip0.w >= minClipW)
+    {
+        float clipAmount =
+            (minClipW - clip1.w) / (clip0.w - clip1.w);
+        clip1 = lerp(clip1, clip0, saturate(clipAmount));
     }
 
-    float2 edgeDir = edgeVec / edgeLen;
-    float2 perpDir = float2(-edgeDir.y, edgeDir.x);  // Perpendicular to edge
+    float2 ndc0 = clip0.xy / clip0.w;
+    float2 ndc1 = clip1.xy / clip1.w;
+    float2 viewportSize =
+        float2(ViewportWidth, ViewportHeight);
+    float2 edgePixels =
+        (ndc1 - ndc0) * viewportSize * 0.5;
+    float edgeLen = length(edgePixels);
 
-    // 4. Convert pixel half-width to NDC units
-    // NDC Y range [-1, 1] maps to ViewportHeight pixels
-    // So 1 pixel = 2.0 / ViewportHeight in NDC Y
-    // For consistent width, use the smaller dimension to avoid distortion
-    float ndcScale = 2.0 / ViewportHeight;
-    float halfWidthNdc = instance.InstanceWidth * ndcScale;
-
-    // 5. Select corner position based on input.Position
-    // input.Position.x: -0.5 = start endpoint, +0.5 = end endpoint
-    // input.Position.y: -0.5 = left side (perpDir negative), +0.5 = right side (perpDir positive)
-    float t = input.Position.x + 0.5;       // 0 at start, 1 at end
-    float side = input.Position.y * 2.0;    // -1 on left, +1 on right
-
-    // 6. Compute final NDC position
+    float2 edgeDir = edgePixels / max(edgeLen, 0.0001);
+    float2 perpDir = float2(-edgeDir.y, edgeDir.x);
+    float t = input.Position.x + 0.5;
+    float side = input.Position.y * 2.0;
     float2 baseNdc = lerp(ndc0, ndc1, t);
-    float2 offsetNdc = perpDir * halfWidthNdc * side;
+    float2 offsetNdc =
+        perpDir * halfWidth * side *
+        2.0 / viewportSize;
     float2 finalNdc = baseNdc + offsetNdc;
-
-    // 7. Convert back to clip space
     float w = lerp(clip0.w, clip1.w, t);
     float z = lerp(clip0.z, clip1.z, t);
+
     output.Position = float4(finalNdc * w, z, w);
-
-    // 8. Interpolate color between endpoints (GPU will also interpolate across quad)
-    float3 color = lerp(instance.InstanceC0, instance.InstanceC1, t);
-    output.Color = float4(color, 1.0);
-
-    // 9. Store edge distance for AA (normalized: 0 at center, 1 at edge)
-    // side goes from -1 to +1, but we want 0 at center
-    // The actual distance from center is |side| * halfWidthNdc
-    // Normalize by the full width so edge is at 1.0
-    output.EdgeDist = side;  // Interpolates from -1 through 0 to +1
-
+    output.Position.z = max(
+        0.0,
+        output.Position.z -
+            EdgeDepthBias * abs(output.Position.w));
+    output.Color = float4(
+        lerp(color0, color1, t),
+        1.0);
+    output.EdgeDist = side;
+    output.HalfWidthPixels = halfWidth;
+    output.ProjectedLengthPixels = edgeLen;
     return output;
 }
 
-// Pixel shader: anti-aliased edge with smoothstep (Blender style)
+VSOutput EdgeQuadVS(VSInput input, VSInstanceInput instance)
+{
+    return CreateEdgeQuadOutput(
+        input,
+        mul(float4(instance.InstanceP0, 1.0), ViewProjection),
+        mul(float4(instance.InstanceP1, 1.0), ViewProjection),
+        instance.InstanceC0,
+        instance.InstanceC1,
+        instance.InstanceWidth);
+}
+
+float4 GetAnimatedPosition(
+    float3 bindPosition,
+    float4 weights,
+    float4 boneIndices)
+{
+    if (!CapabilityFlag_ApplyAnimation)
+        return float4(bindPosition, 1.0);
+
+    float4 position = 0;
+    [unroll]
+    for (int weightIndex = 0;
+         weightIndex < Animation_WeightCount;
+         weightIndex++)
+    {
+        int boneIndex = (int)boneIndices[weightIndex];
+        position +=
+            weights[weightIndex] *
+            mul(
+                float4(bindPosition, 1.0),
+                Animation_Tranforms[boneIndex]);
+    }
+
+    return position;
+}
+
+VSOutput AnimatedEdgeQuadVS(
+    VSInput input,
+    VSAnimatedInstanceInput instance)
+{
+    float4 worldP0 = mul(
+        GetAnimatedPosition(
+            instance.BindP0,
+            instance.Weights0,
+            instance.BoneIndices0),
+        World);
+    float4 worldP1 = mul(
+        GetAnimatedPosition(
+            instance.BindP1,
+            instance.Weights1,
+            instance.BoneIndices1),
+        World);
+
+    return CreateEdgeQuadOutput(
+        input,
+        mul(worldP0, ViewProjection),
+        mul(worldP1, ViewProjection),
+        OverlayColor,
+        OverlayColor,
+        1.0);
+}
+
 float4 EdgeQuadPS(VSOutput input) : COLOR0
 {
-    // Distance from edge center (0 = center, 1 = edge)
     float dist = abs(input.EdgeDist);
-
-    // Blender-style smooth AA: smoothstep from edge to transparent
-    // LINE_SMOOTH_START ≈ 0.5 - 0.59 ≈ -0.09 (covered)
-    // LINE_SMOOTH_END ≈ 0.5 + 0.59 ≈ 1.09 (transparent)
-    // Simplified: fade from full opacity at dist=0.3 to transparent at dist=1.0
-    float alpha = smoothstep(1.0, 0.3, dist);
-
-    return float4(input.Color.rgb, alpha * input.Color.a);
+    float coverage = saturate(
+        (1.0 - dist) * input.HalfWidthPixels);
+    float lengthFade = smoothstep(
+        0.35,
+        1.5,
+        input.ProjectedLengthPixels);
+    float alpha =
+        coverage * lengthFade * OverlayOpacity *
+        BaseOpacity * input.Color.a;
+    return float4(input.Color.rgb * alpha, alpha);
 }
 
 technique EdgeQuad
@@ -125,5 +196,14 @@ technique EdgeQuad
     {
         VertexShader = compile VS_SHADERMODEL EdgeQuadVS();
         PixelShader = compile PS_SHADERMODEL EdgeQuadPS();
+    }
+}
+
+technique AnimatedEdgeQuad
+{
+    pass Pass0
+    {
+        VertexShader = compile vs_5_0 AnimatedEdgeQuadVS();
+        PixelShader = compile ps_5_0 EdgeQuadPS();
     }
 }

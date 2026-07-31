@@ -186,6 +186,17 @@ namespace GameWorld.Core.Components.Selection
                 if (outlineRequested)
                     _renderEngine.RequestSelectionOutline();
             }
+            else if (selectionState.Mode is
+                         GeometrySelectionMode.Vertex or
+                         GeometrySelectionMode.Edge or
+                         GeometrySelectionMode.Face &&
+                     selectionState.GetSingleSelectedObject() is
+                         Rmv2MeshNode editMesh)
+            {
+                editMesh.SetSelectionOutline(true);
+                _outlinedMeshes.Add(editMesh);
+                _renderEngine.RequestSelectionOutline();
+            }
 
             if (selectionState is FaceSelectionState selectionFaceState && selectionFaceState.RenderObject is Rmv2MeshNode meshNode)
             {
@@ -665,7 +676,7 @@ namespace GameWorld.Core.Components.Selection
                     new AnimatedSelectionRenderItem(
                         pose,
                         _resourceLib,
-                        new Vector4(1, 0, 0, 1),
+                        new Vector4(1.0f, 0.47f, 0.0f, 0.3f),
                         selectedFaces);
             }
             else

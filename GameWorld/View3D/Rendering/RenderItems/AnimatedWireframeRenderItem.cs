@@ -4,9 +4,57 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System.Runtime.InteropServices;
 
 namespace GameWorld.Core.Rendering.RenderItems
 {
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct AnimatedEdgeQuadInstanceData : IVertexType
+    {
+        public Vector3 BindP0;
+        public Vector4 Weights0;
+        public Vector4 BoneIndices0;
+        public Vector3 BindP1;
+        public Vector4 Weights1;
+        public Vector4 BoneIndices1;
+
+        public static readonly VertexDeclaration VertexDeclaration =
+            new(
+                new VertexElement(
+                    0,
+                    VertexElementFormat.Vector3,
+                    VertexElementUsage.Position,
+                    1),
+                new VertexElement(
+                    12,
+                    VertexElementFormat.Vector4,
+                    VertexElementUsage.Color,
+                    1),
+                new VertexElement(
+                    28,
+                    VertexElementFormat.Vector4,
+                    VertexElementUsage.BlendIndices,
+                    1),
+                new VertexElement(
+                    44,
+                    VertexElementFormat.Vector3,
+                    VertexElementUsage.Position,
+                    2),
+                new VertexElement(
+                    56,
+                    VertexElementFormat.Vector4,
+                    VertexElementUsage.Color,
+                    2),
+                new VertexElement(
+                    72,
+                    VertexElementFormat.Vector4,
+                    VertexElementUsage.BlendIndices,
+                    2));
+
+        VertexDeclaration IVertexType.VertexDeclaration =>
+            VertexDeclaration;
+    }
+
     public sealed class AnimatedWireframeRenderItem :
         IRenderItem,
         IDisposable
@@ -20,7 +68,10 @@ namespace GameWorld.Core.Rendering.RenderItems
         ushort[]? _sourceIndices;
         int _topologyVersion = -1;
         ushort[] _lineIndices = [];
-        IndexBuffer? _lineIndexBuffer;
+        VertexBuffer? _quadVertexBuffer;
+        IndexBuffer? _quadIndexBuffer;
+        VertexBuffer? _instanceBuffer;
+        VertexBufferBinding[] _bindings = [];
 
         public float DepthBias { get; set; } = 0.00002f;
         internal int IndexBufferBuildCount { get; private set; }
@@ -109,28 +160,44 @@ namespace GameWorld.Core.Rendering.RenderItems
             RenderingTechnique renderingTechnique)
         {
             if (!SupportsTechnique(renderingTechnique) ||
-                _lineIndices.Length == 0)
+                EdgePrimitiveCount == 0)
             {
                 return;
             }
 
-            EnsureIndexBuffer(device);
+            EnsureBuffers(device);
             var effect = _resourceLibrary.GetStaticEffect(
-                ShaderTypes.AnimatedSelection);
+                ShaderTypes.EdgeQuad);
             effect.CurrentTechnique =
-                effect.Techniques[
-                    _pose.ApplyAnimation
-                        ? "AnimatedSelection"
-                        : "StaticSelection"];
+                effect.Techniques["AnimatedEdgeQuad"];
+            var viewportWidth = device.Viewport.Width;
+            var viewportHeight = device.Viewport.Height;
             effect.Parameters["World"].SetValue(
                 _pose.WorldTransform);
-            effect.Parameters["View"].SetValue(parameters.View);
-            effect.Parameters["Projection"].SetValue(
-                parameters.Projection);
-            effect.Parameters["SelectionColour"].SetValue(
-                _colour);
-            effect.Parameters["SelectionDepthBias"].SetValue(
+            effect.Parameters["ViewProjection"].SetValue(
+                parameters.View * parameters.Projection);
+            effect.Parameters["ViewportWidth"].SetValue(
+                (float)viewportWidth);
+            effect.Parameters["ViewportHeight"].SetValue(
+                (float)viewportHeight);
+            effect.Parameters["OverlayColor"].SetValue(
+                new Vector3(
+                    _colour.X,
+                    _colour.Y,
+                    _colour.Z));
+            effect.Parameters["BaseOpacity"].SetValue(
+                _colour.W);
+            effect.Parameters["EdgeDepthBias"].SetValue(
                 DepthBias);
+            effect.Parameters["OverlayOpacity"].SetValue(
+                EditOverlayVisibility.CalculateDetailOpacity(
+                    _pose.GetConservativeAnimatedBounds(),
+                    _pose.WorldTransform,
+                    parameters.View,
+                    parameters.Projection,
+                    viewportWidth,
+                    viewportHeight,
+                    EdgePrimitiveCount));
             effect.Parameters["CapabilityFlag_ApplyAnimation"]
                 .SetValue(_pose.ApplyAnimation);
             effect.Parameters["Animation_WeightCount"]
@@ -141,17 +208,32 @@ namespace GameWorld.Core.Rendering.RenderItems
                     .SetValue(_pose.AnimationTransforms);
             }
 
-            effect.CurrentTechnique.Passes[0].Apply();
-            var graphicsGeometry =
-                _pose.Geometry.GetGeometryContext();
-            device.Indices = _lineIndexBuffer;
-            device.SetVertexBuffer(
-                graphicsGeometry.VertexBuffer);
-            device.DrawIndexedPrimitives(
-                PrimitiveType.LineList,
-                0,
-                0,
-                EdgePrimitiveCount);
+            var previousBlendState = device.BlendState;
+            var previousRasterizerState =
+                device.RasterizerState;
+            device.BlendState = BlendState.AlphaBlend;
+            device.RasterizerState =
+                RasterizerState.CullNone;
+            try
+            {
+                device.Indices = _quadIndexBuffer;
+                device.SetVertexBuffers(_bindings);
+                effect.CurrentTechnique.Passes[0].Apply();
+                device.DrawInstancedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    4,
+                    0,
+                    2,
+                    EdgePrimitiveCount);
+            }
+            finally
+            {
+                device.BlendState = previousBlendState;
+                device.RasterizerState =
+                    previousRasterizerState;
+            }
         }
 
         void UpdateTopology()
@@ -171,8 +253,7 @@ namespace GameWorld.Core.Rendering.RenderItems
                 EdgeIndexCacheBuilder.BuildLineIndices(
                     indices,
                     _maxEdges);
-            _lineIndexBuffer?.Dispose();
-            _lineIndexBuffer = null;
+            InvalidateInstanceBuffer();
         }
 
         void UpdateSelectedEdgeTopology()
@@ -200,28 +281,108 @@ namespace GameWorld.Core.Rendering.RenderItems
             _topologyVersion =
                 _pose.Geometry.TopologyVersion;
             _lineIndices = lineIndices.ToArray();
-            _lineIndexBuffer?.Dispose();
-            _lineIndexBuffer = null;
+            InvalidateInstanceBuffer();
         }
 
-        void EnsureIndexBuffer(GraphicsDevice device)
+        void EnsureBuffers(GraphicsDevice device)
         {
-            if (_lineIndexBuffer != null)
+            if (_quadVertexBuffer == null)
+                CreateQuadBuffers(device);
+            if (_instanceBuffer != null)
                 return;
 
-            _lineIndexBuffer = new IndexBuffer(
+            var instances = BuildInstanceData();
+            _instanceBuffer = new VertexBuffer(
+                device,
+                AnimatedEdgeQuadInstanceData.VertexDeclaration,
+                instances.Length,
+                BufferUsage.WriteOnly);
+            _instanceBuffer.SetData(instances);
+            _bindings =
+            [
+                new VertexBufferBinding(_quadVertexBuffer),
+                new VertexBufferBinding(_instanceBuffer, 0, 1)
+            ];
+            IndexBufferBuildCount++;
+        }
+
+        AnimatedEdgeQuadInstanceData[] BuildInstanceData()
+        {
+            var instances =
+                new AnimatedEdgeQuadInstanceData[
+                    EdgePrimitiveCount];
+            for (var edgeIndex = 0;
+                 edgeIndex < instances.Length;
+                 edgeIndex++)
+            {
+                var first = _pose.Geometry.VertexArray[
+                    _lineIndices[edgeIndex * 2]];
+                var second = _pose.Geometry.VertexArray[
+                    _lineIndices[edgeIndex * 2 + 1]];
+                instances[edgeIndex] =
+                    new AnimatedEdgeQuadInstanceData
+                    {
+                        BindP0 = first.Position3(),
+                        Weights0 = first.BlendWeights,
+                        BoneIndices0 = first.BlendIndices,
+                        BindP1 = second.Position3(),
+                        Weights1 = second.BlendWeights,
+                        BoneIndices1 = second.BlendIndices
+                    };
+            }
+
+            return instances;
+        }
+
+        void CreateQuadBuffers(GraphicsDevice device)
+        {
+            var vertices = new[]
+            {
+                new VertexPositionTexture(
+                    new Vector3(-0.5f, -0.5f, 0),
+                    Vector2.Zero),
+                new VertexPositionTexture(
+                    new Vector3(0.5f, -0.5f, 0),
+                    Vector2.UnitX),
+                new VertexPositionTexture(
+                    new Vector3(-0.5f, 0.5f, 0),
+                    Vector2.UnitY),
+                new VertexPositionTexture(
+                    new Vector3(0.5f, 0.5f, 0),
+                    Vector2.One)
+            };
+            _quadVertexBuffer = new VertexBuffer(
+                device,
+                VertexPositionTexture.VertexDeclaration,
+                vertices.Length,
+                BufferUsage.WriteOnly);
+            _quadVertexBuffer.SetData(vertices);
+
+            ushort[] indices = [0, 1, 2, 1, 3, 2];
+            _quadIndexBuffer = new IndexBuffer(
                 device,
                 IndexElementSize.SixteenBits,
-                _lineIndices.Length,
+                indices.Length,
                 BufferUsage.WriteOnly);
-            _lineIndexBuffer.SetData(_lineIndices);
-            IndexBufferBuildCount++;
+            _quadIndexBuffer.SetData(indices);
+        }
+
+        void InvalidateInstanceBuffer()
+        {
+            _instanceBuffer?.Dispose();
+            _instanceBuffer = null;
+            _bindings = [];
         }
 
         public void Dispose()
         {
-            _lineIndexBuffer?.Dispose();
-            _lineIndexBuffer = null;
+            _instanceBuffer?.Dispose();
+            _quadVertexBuffer?.Dispose();
+            _quadIndexBuffer?.Dispose();
+            _instanceBuffer = null;
+            _quadVertexBuffer = null;
+            _quadIndexBuffer = null;
+            _bindings = [];
         }
     }
 }

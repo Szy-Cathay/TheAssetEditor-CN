@@ -59,6 +59,9 @@ namespace GameWorld.Core.Rendering
 
         const int InitialInstanceCapacity = 50000;
         int _currentInstanceCount;
+        int _selectedInstanceCount;
+        BoundingBox _overlayBounds;
+        Matrix _overlayBoundsWorld = Matrix.Identity;
         internal int InstanceUploadCount { get; private set; }
 
         // Colors - EXACT Blender match: unselected = black (visible via z-bias), selected = orange
@@ -68,11 +71,11 @@ namespace GameWorld.Core.Rendering
 
         // Screen-space vertex size in pixels (diameter) - EXACT Blender match
         // Blender: sizes.vert = max(1.0, TH_VERTEX_SIZE * sqrt2 / 2) = ~2.12, then * 2.0 = 4.24 pixels
-        public float VertexPixelSize { get; set; } = 5.5f;
+        public float VertexPixelSize { get; set; } = 4.5f;
 
         // Additional size boost for selected vertices (pixels added to diameter)
         // Blender uses same base size, but we add slight boost for visibility
-        public float SelectedSizeBoost { get; set; } = 2.0f;
+        public float SelectedSizeBoost { get; set; } = 1.0f;
 
         // Selection threshold multiplier (selection radius = render radius * this)
         public float SelectionThresholdMultiplier { get; set; } = 2.0f;
@@ -157,12 +160,19 @@ namespace GameWorld.Core.Rendering
             VertexSelectionState selectedVertexes)
         {
             _currentInstanceCount = geo.VertexCount();
+            _selectedInstanceCount =
+                selectedVertexes.SelectedVertices.Count;
             EnsureInstanceCapacity(_currentInstanceCount);
+
+            var min = new Vector3(float.MaxValue);
+            var max = new Vector3(float.MinValue);
 
             for (var i = 0; i < _currentInstanceCount; i++)
             {
                 // World position of the vertex
                 var vertPos = Vector3.Transform(geo.GetVertexById(i), modelMatrix);
+                min = Vector3.Min(min, vertPos);
+                max = Vector3.Max(max, vertPos);
 
                 // Color based on selection weight
                 var weight = selectedVertexes.VertexWeights[i];
@@ -176,6 +186,9 @@ namespace GameWorld.Core.Rendering
                 _instanceData[i].InstanceWeight = weight;
             }
 
+            _overlayBounds = new BoundingBox(min, max);
+            _overlayBoundsWorld = Matrix.Identity;
+
             UploadInstances();
         }
 
@@ -185,11 +198,18 @@ namespace GameWorld.Core.Rendering
         {
             _currentInstanceCount =
                 worldPositions.Count;
+            _selectedInstanceCount =
+                selectedVertexes.SelectedVertices.Count;
             EnsureInstanceCapacity(_currentInstanceCount);
+
+            var min = new Vector3(float.MaxValue);
+            var max = new Vector3(float.MinValue);
 
             for (var i = 0; i < _currentInstanceCount; i++)
             {
                 var vertPos = worldPositions[i];
+                min = Vector3.Min(min, vertPos);
+                max = Vector3.Max(max, vertPos);
                 var weight = selectedVertexes.VertexWeights[i];
                 var color = Vector3.Lerp(
                     _deselectedColour,
@@ -204,6 +224,9 @@ namespace GameWorld.Core.Rendering
                 _instanceData[i].InstanceWeight = weight;
             }
 
+            _overlayBounds = new BoundingBox(min, max);
+            _overlayBoundsWorld = Matrix.Identity;
+
             UploadInstances();
         }
 
@@ -212,7 +235,10 @@ namespace GameWorld.Core.Rendering
             VertexSelectionState selectedVertexes)
         {
             _currentInstanceCount = geometry.VertexCount();
+            _selectedInstanceCount =
+                selectedVertexes.SelectedVertices.Count;
             EnsureInstanceCapacity(_currentInstanceCount);
+            _overlayBounds = geometry.BoundingBox;
 
             for (var i = 0; i < _currentInstanceCount; i++)
             {
@@ -257,6 +283,7 @@ namespace GameWorld.Core.Rendering
                 new Vector2(
                     device.Viewport.Width,
                     device.Viewport.Height));
+            ApplyVisibilityParameters(view, projection, device);
 
             // Alpha blending required for anti-aliased circle edges and outline ring transparency
             device.BlendState = BlendState.AlphaBlend;
@@ -285,6 +312,10 @@ namespace GameWorld.Core.Rendering
                 new Vector2(
                     device.Viewport.Width,
                     device.Viewport.Height));
+            _overlayBounds =
+                pose.GetConservativeAnimatedBounds();
+            _overlayBoundsWorld = pose.WorldTransform;
+            ApplyVisibilityParameters(view, projection, device);
             _effect.Parameters["CapabilityFlag_ApplyAnimation"]
                 .SetValue(pose.ApplyAnimation);
             _effect.Parameters["Animation_WeightCount"]
@@ -305,6 +336,35 @@ namespace GameWorld.Core.Rendering
             DrawInstances(device, _animatedBindings);
 
             device.BlendState = BlendState.Opaque;
+        }
+
+        void ApplyVisibilityParameters(
+            Matrix view,
+            Matrix projection,
+            GraphicsDevice device)
+        {
+            var unselectedOpacity =
+                EditOverlayVisibility.CalculateDetailOpacity(
+                    _overlayBounds,
+                    _overlayBoundsWorld,
+                    view,
+                    projection,
+                    device.Viewport.Width,
+                    device.Viewport.Height,
+                    _currentInstanceCount);
+            var selectedOpacity =
+                EditOverlayVisibility.CalculateDetailOpacity(
+                    _overlayBounds,
+                    _overlayBoundsWorld,
+                    view,
+                    projection,
+                    device.Viewport.Width,
+                    device.Viewport.Height,
+                    _selectedInstanceCount);
+            _effect.Parameters["UnselectedOpacity"]
+                .SetValue(unselectedOpacity);
+            _effect.Parameters["SelectedOpacity"]
+                .SetValue(selectedOpacity);
         }
 
         void DrawInstances(

@@ -30,6 +30,9 @@ namespace GameWorld.Core.Components.Navigation
         private const float LINE_THICKNESS = 2f;        // Axis line thickness
         private const float CIRCLE_RADIUS = 8f;         // Label circle radius
         private const float CENTER_RADIUS = 6f;         // Center indicator radius
+        private const int CIRCLE_TEXTURE_SIZE = 64;
+        private const int LINE_TEXTURE_HEIGHT = 8;
+        private const float OVERLAY_FONT_SCALE = 0.5f;
 
         // Colors (Blender style)
         private static readonly Color ColorX = new Color(220, 60, 60);    // Red
@@ -40,7 +43,8 @@ namespace GameWorld.Core.Components.Navigation
         private static readonly Color ColorCenter = new Color(80, 80, 80); // Center circle
 
         // Rendering
-        private Texture2D _whiteTexture;
+        private Texture2D _circleTexture;
+        private Texture2D _lineTexture;
 
         // State
         private NavigationAxis _hoveredAxis = NavigationAxis.None;
@@ -73,9 +77,12 @@ namespace GameWorld.Core.Components.Navigation
 
         private void Initialize()
         {
-            // Create a 1x1 white texture for drawing shapes
-            _whiteTexture = new Texture2D(_graphics, 1, 1);
-            _whiteTexture.SetData(new[] { Color.White });
+            _circleTexture = CreateCircleTexture(
+                _graphics,
+                CIRCLE_TEXTURE_SIZE);
+            _lineTexture = CreateLineTexture(
+                _graphics,
+                LINE_TEXTURE_HEIGHT);
         }
 
         /// <summary>
@@ -324,11 +331,9 @@ namespace GameWorld.Core.Components.Navigation
                     }
                 }
 
-                // Draw circle background
-                DrawFilledCircle(data.ScreenPos, CIRCLE_RADIUS, circleColor);
-
-                // Draw outline
+                // Draw outline behind the circle background.
                 DrawCircleOutline(data.ScreenPos, CIRCLE_RADIUS, ColorOutline * 0.8f, 1f);
+                DrawFilledCircle(data.ScreenPos, CIRCLE_RADIUS, circleColor);
 
                 // Draw label only for positive axes
                 if (data.IsPositive)
@@ -351,35 +356,30 @@ namespace GameWorld.Core.Components.Navigation
                 _ => ""
             };
 
-            var font = _renderEngine.DefaultFont;
-            var textSize = font.MeasureString(label);
+            var font = _renderEngine.ViewportOverlayFont;
+            var textSize = font.MeasureString(label) * OVERLAY_FONT_SCALE;
             var textPos = position - textSize / 2;
 
-            // Draw outline for better visibility
-            Color outlineColor = ColorOutline;
-            for (int ox = -1; ox <= 1; ox++)
-            {
-                for (int oy = -1; oy <= 1; oy++)
-                {
-                    if (ox != 0 || oy != 0)
-                    {
-                        _renderEngine.CommonSpriteBatch.DrawString(
-                            font,
-                            label,
-                            textPos + new Vector2(ox, oy),
-                            outlineColor
-                        );
-                    }
-                }
-            }
-
-            // Draw main text
+            _renderEngine.CommonSpriteBatch.DrawString(
+                font,
+                label,
+                textPos + Vector2.UnitY,
+                ColorOutline,
+                0,
+                Vector2.Zero,
+                OVERLAY_FONT_SCALE,
+                SpriteEffects.None,
+                0);
             _renderEngine.CommonSpriteBatch.DrawString(
                 font,
                 label,
                 textPos,
-                Color.White
-            );
+                Color.White,
+                0,
+                Vector2.Zero,
+                OVERLAY_FONT_SCALE,
+                SpriteEffects.None,
+                0);
         }
 
         /// <summary>
@@ -387,7 +387,7 @@ namespace GameWorld.Core.Components.Navigation
         /// </summary>
         private void DrawCenterIndicator()
         {
-            // Draw center circle background
+            DrawCircleOutline(_screenPosition, CENTER_RADIUS, ColorOutline * 0.7f, 1f);
             DrawFilledCircle(_screenPosition, CENTER_RADIUS, ColorCenter * 0.9f);
 
             // Draw projection mode indicator
@@ -412,8 +412,6 @@ namespace GameWorld.Core.Components.Navigation
                 DrawThickLine(p4, p1, Color.White * 0.8f, 1.5f);
             }
 
-            // Draw outline
-            DrawCircleOutline(_screenPosition, CENTER_RADIUS, ColorOutline * 0.7f, 1f);
         }
 
         private void DrawThickLine(Vector2 start, Vector2 end, Color color, float thickness)
@@ -424,16 +422,17 @@ namespace GameWorld.Core.Components.Navigation
 
             float angle = (float)Math.Atan2(delta.Y, delta.X);
 
-            var origin = new Vector2(0, 0.5f);
-            var scale = new Vector2(length, thickness);
+            var scale = new Vector2(
+                length / _lineTexture.Width,
+                thickness / _lineTexture.Height);
 
             _renderEngine.CommonSpriteBatch.Draw(
-                _whiteTexture,
+                _lineTexture,
                 start,
                 null,
                 color,
                 angle,
-                origin,
+                new Vector2(0, _lineTexture.Height * 0.5f),
                 scale,
                 SpriteEffects.None,
                 0
@@ -442,43 +441,87 @@ namespace GameWorld.Core.Components.Navigation
 
         private void DrawFilledCircle(Vector2 center, float radius, Color color)
         {
-            int r = (int)Math.Ceiling(radius);
-            for (int y = -r; y <= r; y++)
-            {
-                for (int x = -r; x <= r; x++)
-                {
-                    if (x * x + y * y <= radius * radius)
-                    {
-                        _renderEngine.CommonSpriteBatch.Draw(
-                            _whiteTexture,
-                            new Vector2((int)(center.X + x), (int)(center.Y + y)),
-                            color
-                        );
-                    }
-                }
-            }
+            var scale = radius * 2 / CIRCLE_TEXTURE_SIZE;
+            _renderEngine.CommonSpriteBatch.Draw(
+                _circleTexture,
+                center,
+                null,
+                color,
+                0,
+                new Vector2(
+                    CIRCLE_TEXTURE_SIZE * 0.5f,
+                    CIRCLE_TEXTURE_SIZE * 0.5f),
+                scale,
+                SpriteEffects.None,
+                0);
         }
 
         private void DrawCircleOutline(Vector2 center, float radius, Color color, float thickness)
         {
-            int segments = 24;
-            float angleStep = MathHelper.TwoPi / segments;
+            DrawFilledCircle(center, radius + thickness, color);
+        }
 
-            for (int i = 0; i < segments; i++)
+        private static Texture2D CreateCircleTexture(
+            GraphicsDevice graphics,
+            int size)
+        {
+            var pixels = new Color[size * size];
+            var center = size * 0.5f;
+            var radius = center - 1;
+            for (var y = 0; y < size; y++)
             {
-                float angle1 = i * angleStep;
-                float angle2 = (i + 1) * angleStep;
-
-                Vector2 p1 = center + new Vector2((float)Math.Cos(angle1), (float)Math.Sin(angle1)) * radius;
-                Vector2 p2 = center + new Vector2((float)Math.Cos(angle2), (float)Math.Sin(angle2)) * radius;
-
-                DrawThickLine(p1, p2, color, thickness);
+                for (var x = 0; x < size; x++)
+                {
+                    var dx = x + 0.5f - center;
+                    var dy = y + 0.5f - center;
+                    var distance = MathF.Sqrt(dx * dx + dy * dy);
+                    var coverage = Math.Clamp(
+                        radius + 0.5f - distance,
+                        0,
+                        1);
+                    var alpha = (byte)MathF.Round(
+                        coverage * byte.MaxValue);
+                    pixels[y * size + x] = new Color(
+                        alpha,
+                        alpha,
+                        alpha,
+                        alpha);
+                }
             }
+
+            var texture = new Texture2D(graphics, size, size);
+            texture.SetData(pixels);
+            return texture;
+        }
+
+        private static Texture2D CreateLineTexture(
+            GraphicsDevice graphics,
+            int height)
+        {
+            var pixels = new Color[height];
+            var center = height * 0.5f;
+            var radius = center - 1.25f;
+            for (var y = 0; y < height; y++)
+            {
+                var distance = MathF.Abs(y + 0.5f - center);
+                var coverage = Math.Clamp(
+                    radius + 0.5f - distance,
+                    0,
+                    1);
+                var alpha = (byte)MathF.Round(
+                    coverage * byte.MaxValue);
+                pixels[y] = new Color(alpha, alpha, alpha, alpha);
+            }
+
+            var texture = new Texture2D(graphics, 1, height);
+            texture.SetData(pixels);
+            return texture;
         }
 
         public void Dispose()
         {
-            _whiteTexture?.Dispose();
+            _circleTexture?.Dispose();
+            _lineTexture?.Dispose();
         }
     }
 }

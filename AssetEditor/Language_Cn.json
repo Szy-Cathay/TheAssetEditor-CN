@@ -1386,6 +1386,9 @@
   "AnimPack.Table.WeaponBone": "武器骨骼",
   "AnimPack.Table.Unk": "未知",
 
+  "Viewport.Stats.FrameRate": "帧率：{0}",
+  "Viewport.Stats.Scene": "物体：{0}\n顶点：{1}\n三角面：{2}",
+
   "RenderSettings.Title": "渲染设置",
   "RenderSettings.UseBackfaceCulling": "使用背面剔除",
   "RenderSettings.UseLargeSceneCulling": "使用大场景剔除",

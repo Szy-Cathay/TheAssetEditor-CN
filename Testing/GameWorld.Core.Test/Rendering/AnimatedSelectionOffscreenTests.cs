@@ -15,6 +15,92 @@ namespace GameWorld.Core.Test.Rendering;
 [NonParallelizable]
 public class AnimatedSelectionOffscreenTests
 {
+    [Test]
+    public void Draw_SelectedFaceUsesTranslucentPremultipliedOrange()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\AnimatedSelection");
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library => library.GetStaticEffect(
+                ShaderTypes.AnimatedSelection))
+            .Returns(effect);
+        var geometryContext = new GraphicsCardGeometry(device);
+        var mesh = CreateMesh(geometryContext);
+        mesh.RebuildIndexBuffer();
+        mesh.RebuildVertexBuffer();
+        var pose = MeshPoseSnapshot.Create(
+            mesh,
+            Matrix.Identity,
+            [],
+            false);
+        var renderItem = new AnimatedSelectionRenderItem(
+            pose,
+            resources.Object,
+            new Vector4(1.0f, 0.47f, 0.0f, 0.3f),
+            [0]);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target | ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.DepthStencilState = DepthStencilState.Default;
+            device.RasterizerState = RasterizerState.CullNone;
+            renderItem.Draw(
+                device,
+                new CommonShaderParameters(
+                    Matrix.Identity,
+                    Matrix.Identity,
+                    Vector3.Zero,
+                    Vector3.Forward,
+                    0,
+                    0,
+                    0,
+                    1,
+                    Vector3.One,
+                    [],
+                    64,
+                    64),
+                RenderingTechnique.Normal);
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[64 * 64];
+        renderTarget.GetData(pixels);
+        var selectedPixels = pixels
+            .Where(pixel => pixel.A > 0)
+            .ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(selectedPixels, Is.Not.Empty);
+            Assert.That(selectedPixels.Max(pixel => pixel.A), Is.LessThan(200));
+            Assert.That(
+                selectedPixels.All(pixel =>
+                    pixel.R <= pixel.A + 2 &&
+                    pixel.G <= pixel.A + 2 &&
+                    pixel.B <= pixel.A + 2),
+                Is.True);
+            Assert.That(selectedPixels.Max(pixel => pixel.G), Is.GreaterThan(20));
+        });
+        mesh.Dispose();
+    }
+
     [TestCase(true, "AnimatedSelection")]
     [TestCase(false, "StaticSelection")]
     public void Draw_SelectionMaskUsesPoseAppropriateShaderPath(

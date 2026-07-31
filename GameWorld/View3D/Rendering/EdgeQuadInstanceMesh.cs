@@ -1,4 +1,5 @@
 using GameWorld.Core.Services;
+using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -52,14 +53,14 @@ namespace GameWorld.Core.Rendering
 
         VertexBufferBinding[] _bindings;
         EdgeQuadInstanceData[] _instanceData;
+        BoundingBox _worldBounds;
 
         readonly int _maxInstanceCount = 50000;
         int _currentInstanceCount;
         internal int CurrentInstanceCount => _currentInstanceCount;
 
-        // Default edge half-width in pixels (Blender default: 0.5 + 0.5 for AA ≈ 1.0)
-        // Using 0.75 for slightly thinner edges to make vertices more visible
-        public float DefaultEdgeHalfWidth { get; set; } = 0.75f;
+        // One-pixel half-width leaves room for analytic edge coverage.
+        public float DefaultEdgeHalfWidth { get; set; } = 1.0f;
 
         public EdgeQuadInstanceMesh(IDeviceResolver deviceResolverComponent, IScopedResourceLibrary resourceLibrary)
         {
@@ -119,15 +120,22 @@ namespace GameWorld.Core.Rendering
             if (_currentInstanceCount == 0)
                 return;
 
+            var min = new Vector3(float.MaxValue);
+            var max = new Vector3(float.MinValue);
+
             for (var i = 0; i < _currentInstanceCount; i++)
             {
                 var edge = edges[i];
                 _instanceData[i].InstanceP0 = edge.P0;
                 _instanceData[i].InstanceP1 = edge.P1;
+                min = Vector3.Min(min, Vector3.Min(edge.P0, edge.P1));
+                max = Vector3.Max(max, Vector3.Max(edge.P0, edge.P1));
                 _instanceData[i].InstanceC0 = edge.C0;
                 _instanceData[i].InstanceC1 = edge.C1;
                 _instanceData[i].InstanceWidth = edge.Width > 0 ? edge.Width : DefaultEdgeHalfWidth;
             }
+
+            _worldBounds = new BoundingBox(min, max);
 
             _instanceBuffer.SetData(
                 _instanceData,
@@ -145,6 +153,17 @@ namespace GameWorld.Core.Rendering
             _effect.Parameters["ViewProjection"].SetValue(view * projection);
             _effect.Parameters["ViewportHeight"].SetValue(viewportHeight);
             _effect.Parameters["ViewportWidth"].SetValue(viewportWidth);
+            _effect.Parameters["BaseOpacity"].SetValue(1.0f);
+            _effect.Parameters["EdgeDepthBias"].SetValue(0.0f);
+            _effect.Parameters["OverlayOpacity"].SetValue(
+                EditOverlayVisibility.CalculateDetailOpacity(
+                    _worldBounds,
+                    Matrix.Identity,
+                    view,
+                    projection,
+                    (int)viewportWidth,
+                    (int)viewportHeight,
+                    _currentInstanceCount));
 
             // Alpha blending for anti-aliased edges
             device.BlendState = BlendState.AlphaBlend;

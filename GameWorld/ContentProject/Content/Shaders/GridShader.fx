@@ -62,34 +62,35 @@ float4 GridPS(VertexShaderOutput input) : COLOR0
 {
     float2 coord = input.WorldPos.xz;
 
-    // Screen-space derivatives for automatic LOD / anti-aliasing
+    // Screen-space derivatives for analytical anti-aliasing and LOD.
     float2 dv = fwidth(coord);
-    float2 dvHalf = dv * 0.5;
 
-    // --- Fine grid (every 1 unit) ---
-    float2 gridFrac = abs(frac(coord - 0.5) - 0.5);
-    float2 fineLineSmooth = smoothstep(dvHalf, dvHalf * 2.0, gridFrac);
-    float fineLine = 1.0 - min(fineLineSmooth.x, fineLineSmooth.y);
+    // Fine grid (every 1 unit). Fade it before one pixel spans an entire cell;
+    // otherwise every distant pixel is incorrectly treated as a grid line.
+    float2 fineDistance = abs(frac(coord - 0.5) - 0.5);
+    float2 fineCoverage = 1.0 - smoothstep(0.0, max(dv * 0.55, 0.00001), fineDistance);
+    float fineLod = 1.0 - smoothstep(0.35, 0.85, max(dv.x, dv.y));
+    float fineLine = max(fineCoverage.x, fineCoverage.y) * fineLod;
 
-    // --- Emphasis grid (every 5 units) ---
+    // Emphasis grid (every 5 units) remains visible after the fine grid fades.
     float2 coord5 = coord * 0.2;  // coord / 5.0
     float2 dv5 = fwidth(coord5);
-    float2 dv5Half = dv5 * 0.5;
-    float2 emphasisFrac = abs(frac(coord5 - 0.5) - 0.5);
-    float2 emphasisSmooth = smoothstep(dv5Half, dv5Half * 2.0, emphasisFrac);
-    float emphasisLine = 1.0 - min(emphasisSmooth.x, emphasisSmooth.y);
+    float2 emphasisDistance = abs(frac(coord5 - 0.5) - 0.5);
+    float2 emphasisCoverage = 1.0 - smoothstep(0.0, max(dv5 * 0.55, 0.00001), emphasisDistance);
+    float emphasisLod = 1.0 - smoothstep(0.35, 0.85, max(dv5.x, dv5.y));
+    float emphasisLine = max(emphasisCoverage.x, emphasisCoverage.y) * emphasisLod;
 
-    // --- Axis indicators ---
-    float xAxisLine = 1.0 - smoothstep(dvHalf.y, dv.y, abs(coord.y));
-    float zAxisLine = 1.0 - smoothstep(dvHalf.x, dv.x, abs(coord.x));
+    // Axis indicators use the same derivative-based coverage for smooth edges.
+    float xAxisLine = 1.0 - smoothstep(0.0, max(dv.y, 0.00001), abs(coord.y));
+    float zAxisLine = 1.0 - smoothstep(0.0, max(dv.x, 0.00001), abs(coord.x));
 
     // --- Distance fadeout (proportional to camera distance) ---
     // Wide, gradual fade for natural appearance (Blender style)
-    float fadeStart = CameraDistance * 0.3;
-    float fadeEnd = CameraDistance * 4.5;
+    float fadeStart = CameraDistance;
+    float fadeEnd = min(CameraDistance * 10.0, 20000.0);
     float dist = length(input.WorldPos.xz - CameraPosition.xz);
     float distFade = 1.0 - smoothstep(fadeStart, fadeEnd, dist);
-    distFade = pow(distFade, 0.6);  // Soften curve for more gradual falloff
+    distFade = pow(distFade, 0.75);
 
     // --- Angle fadeout (grid fades when viewed nearly edge-on) ---
     // Softer threshold: only fade when angle is < ~8 degrees from horizontal (0.02)
@@ -102,14 +103,14 @@ float4 GridPS(VertexShaderOutput input) : COLOR0
     float combinedFade = distFade * angleFade;
 
     // Fine grid: subtle
-    float fineAlpha = fineLine * 0.25 * combinedFade;
+    float fineAlpha = fineLine * 0.22 * combinedFade;
 
     // Emphasis grid: stronger, uses brighter color
-    float emphasisAlpha = emphasisLine * 0.5 * combinedFade;
+    float emphasisAlpha = emphasisLine * 0.42 * combinedFade;
 
     // Axes: most prominent with dedicated colors
-    float xAxisAlpha = xAxisLine * 0.8 * combinedFade;
-    float zAxisAlpha = zAxisLine * 0.8 * combinedFade;
+    float xAxisAlpha = xAxisLine * 0.75 * combinedFade;
+    float zAxisAlpha = zAxisLine * 0.75 * combinedFade;
 
     // Pick the dominant contribution
     float alpha = fineAlpha;
@@ -140,7 +141,9 @@ float4 GridPS(VertexShaderOutput input) : COLOR0
     if (alpha < 0.001)
         discard;
 
-    return float4(color, alpha);
+    // MonoGame AlphaBlend expects premultiplied RGB. Without this, bright grid
+    // colors stay fully bright while alpha fades, causing a hard cutoff.
+    return float4(saturate(color) * alpha, alpha);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////

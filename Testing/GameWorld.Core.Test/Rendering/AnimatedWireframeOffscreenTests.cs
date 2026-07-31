@@ -21,12 +21,12 @@ public class AnimatedWireframeOffscreenTests
         var game = new WpfGameMock();
         var device = game.GraphicsDevice;
         var effect = game.Content.Load<Effect>(
-            "Shaders\\AnimatedSelection");
+            "Shaders\\EdgeQuadShader");
         var resources = new Mock<IScopedResourceLibrary>();
         resources
             .Setup(library =>
                 library.GetStaticEffect(
-                    ShaderTypes.AnimatedSelection))
+                    ShaderTypes.EdgeQuad))
             .Returns(effect);
         var mesh = CreateMesh(device);
         var pose = MeshPoseSnapshot.Create(
@@ -122,12 +122,12 @@ public class AnimatedWireframeOffscreenTests
         var game = new WpfGameMock();
         var device = game.GraphicsDevice;
         var effect = game.Content.Load<Effect>(
-            "Shaders\\AnimatedSelection");
+            "Shaders\\EdgeQuadShader");
         var resources = new Mock<IScopedResourceLibrary>();
         resources
             .Setup(library =>
                 library.GetStaticEffect(
-                    ShaderTypes.AnimatedSelection))
+                    ShaderTypes.EdgeQuad))
             .Returns(effect);
         var mesh = CreateMesh(device);
         var pose = MeshPoseSnapshot.Create(
@@ -188,12 +188,12 @@ public class AnimatedWireframeOffscreenTests
         var game = new WpfGameMock();
         var device = game.GraphicsDevice;
         var effect = game.Content.Load<Effect>(
-            "Shaders\\AnimatedSelection");
+            "Shaders\\EdgeQuadShader");
         var resources = new Mock<IScopedResourceLibrary>();
         resources
             .Setup(library =>
                 library.GetStaticEffect(
-                    ShaderTypes.AnimatedSelection))
+                    ShaderTypes.EdgeQuad))
             .Returns(effect);
         var mesh = CreateMesh(device);
         for (var i = 0; i < mesh.VertexArray.Length; i++)
@@ -293,6 +293,114 @@ public class AnimatedWireframeOffscreenTests
                     pixel.G > 200 &&
                     pixel.B > 200),
             Is.GreaterThan(0));
+
+        mesh.Dispose();
+    }
+
+    [Test]
+    public void Draw_SlantedWireframeUsesPremultipliedPartialCoverage()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\EdgeQuadShader");
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library =>
+                library.GetStaticEffect(
+                    ShaderTypes.EdgeQuad))
+            .Returns(effect);
+        var mesh = CreateMesh(device);
+        var pose = MeshPoseSnapshot.Create(
+            mesh,
+            Matrix.Identity,
+            [],
+            false);
+        using var renderItem =
+            new AnimatedWireframeRenderItem(
+                pose,
+                resources.Object,
+                new Vector4(1, 0.47f, 0, 1));
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        using var wireframeRasterizer = new RasterizerState
+        {
+            FillMode = FillMode.WireFrame,
+            CullMode = CullMode.None
+        };
+        var parameters = new CommonShaderParameters(
+            Matrix.Identity,
+            Matrix.Identity,
+            Vector3.Zero,
+            Vector3.Forward,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            [],
+            999,
+            777);
+
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target |
+                    ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.BlendState = BlendState.Opaque;
+            device.DepthStencilState =
+                DepthStencilState.Default;
+            device.RasterizerState =
+                wireframeRasterizer;
+
+            renderItem.Draw(
+                device,
+                parameters,
+                RenderingTechnique.Normal);
+            Assert.That(
+                device.RasterizerState,
+                Is.SameAs(wireframeRasterizer));
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[64 * 64];
+        renderTarget.GetData(pixels);
+        var partialPixels = pixels.Where(
+            pixel => pixel.A is > 0 and < 255).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                partialPixels,
+                Is.Not.Empty,
+                "Slanted edit lines need analytic edge coverage instead of hardware LineList rasterization.");
+            Assert.That(
+                partialPixels.All(
+                    pixel =>
+                        pixel.R <= pixel.A + 2 &&
+                        pixel.G <= pixel.A + 2 &&
+                        pixel.B <= pixel.A + 2),
+                Is.True,
+                "Partial overlay pixels must use premultiplied alpha.");
+            Assert.That(
+                effect.Parameters["ViewportWidth"].GetValueSingle(),
+                Is.EqualTo(64));
+            Assert.That(
+                effect.Parameters["ViewportHeight"].GetValueSingle(),
+                Is.EqualTo(64));
+        });
 
         mesh.Dispose();
     }

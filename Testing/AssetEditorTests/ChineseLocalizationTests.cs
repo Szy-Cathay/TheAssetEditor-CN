@@ -28,6 +28,24 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void ChineseLanguageFile_ContainsViewportStatistics()
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "Language_Cn.json");
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+
+            Assert.AreEqual(
+                "帧率：{0}",
+                document.RootElement
+                    .GetProperty("Viewport.Stats.FrameRate")
+                    .GetString());
+            Assert.AreEqual(
+                "物体：{0}\n顶点：{1}\n三角面：{2}",
+                document.RootElement
+                    .GetProperty("Viewport.Stats.Scene")
+                    .GetString());
+        }
+
+        [TestMethod]
         [DoNotParallelize]
         public void LoadLanguage_UsesApplicationDirectoryWhenCurrentDirectoryChanges()
         {
