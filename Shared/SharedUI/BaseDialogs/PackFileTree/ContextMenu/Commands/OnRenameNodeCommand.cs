@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
@@ -20,11 +21,33 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
 
             if (_selectedNode.NodeType == NodeType.Directory)
             {
+                var currentPath = _selectedNode.GetFullPath();
                 var newFolderName = EditFileNameDialog.ShowDialog(_selectedNode.Parent, _selectedNode.Name);
                 if (newFolderName.Any())
                 {
+                    if (_selectedNode.FileOwner is FolderProjectContainer)
+                    {
+                        try
+                        {
+                            packFileService.RenameDirectory(
+                                _selectedNode.FileOwner,
+                                currentPath,
+                                newFolderName);
+                            _selectedNode.Name = newFolderName;
+                        }
+                        catch
+                        {
+                            standardDialogs.ShowDialogBox(
+                                LocalizationManager.Instance.Get(
+                                    "FolderProject.Rename.Failed"),
+                                LocalizationManager.Instance.Get(
+                                    "FolderProject.ErrorTitle"));
+                        }
+                        return;
+                    }
+
                     _selectedNode.Name = newFolderName;
-                    packFileService.RenameDirectory(_selectedNode.FileOwner, _selectedNode.GetFullPath(), newFolderName);
+                    packFileService.RenameDirectory(_selectedNode.FileOwner, currentPath, newFolderName);
                 }
 
             }

@@ -23,7 +23,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         [ObservableProperty] public partial ObservableCollection<TreeNode> Children { get; set; } = [];
         [ObservableProperty] public partial bool UnsavedChanged { get; set; }
         [ObservableProperty] public partial bool IsMainEditabelPack { get; set; }
+        [ObservableProperty] public partial bool IsIgnored { get; set; }
         [ObservableProperty] public partial bool IsVisible { get; set; } = true;
+        [ObservableProperty] public partial bool IsSelected { get; set; }
         [ObservableProperty] public partial string Name { get; set; }
         [ObservableProperty] public partial bool IsNodeExpanded { get; set; } = false;
         [ObservableProperty] public partial NodeType NodeType { get; private set; }

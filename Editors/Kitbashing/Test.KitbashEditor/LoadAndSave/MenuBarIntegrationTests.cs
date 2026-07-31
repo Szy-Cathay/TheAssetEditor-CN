@@ -147,6 +147,27 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
+    public void PhotoStudio_IsAvailableFromChineseMenuAndToolbar()
+    {
+        var renderingMenu = _editor.MenuBar.MenuItems.Single(
+            item => item.NameAttribute.Value == "渲染");
+        var photoStudioMenuItems = renderingMenu.Children.Count(
+            item => item.NameAttribute.Value.StartsWith(
+                "照片工作室",
+                StringComparison.Ordinal));
+        var photoStudioButtons = _editor.MenuBar.CustomButtons.Count(
+            button =>
+                button.Action?.ToolTipAttribute?.Value?.StartsWith(
+                    "打开照片工作室",
+                    StringComparison.Ordinal) == true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(photoStudioMenuItems, Is.EqualTo(1));
+            Assert.That(photoStudioButtons, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void CreateBoxUiCommand_CreatesSelectableUndoableMesh()
     {
         var commandFactory =

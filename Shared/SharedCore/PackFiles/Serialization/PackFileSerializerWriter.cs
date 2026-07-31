@@ -32,17 +32,49 @@ namespace Shared.Core.PackFiles.Serialization
 
     static class PackFileSerializerWriter
     {
-        internal static PackFileSerializationResult SaveToByteArray(string outputFileName, PackFileContainer container, BinaryWriter writer, GameInformation currentGameInformation, bool enableCompression = true)
+        private static readonly IReadOnlyList<(string Path, string Content)>
+            s_corruptionDetectionFiles =
+            [
+                (
+                    @"!!!packfile_corruction_detection\packfile_corruction_detection_1.txt",
+                    "This file is here to validate that the packfile has not been corrupted while saving. This is check 1"),
+                (
+                    @"packfile_corruction_detection\packfile_corruction_detection_2.txt",
+                    "This file is here to validate that the packfile has not been corrupted while saving. This is check 2"),
+                (
+                    @"zzzz_packfile_corruction_detection\packfile_corruction_detection_3.txt",
+                    "This file is here to validate that the packfile has not been corrupted while saving. This is check 3"),
+            ];
+
+        internal static PackFileSerializationResult SaveToByteArray(
+            string outputFileName,
+            PackFileContainer container,
+            BinaryWriter writer,
+            GameInformation currentGameInformation,
+            bool enableCompression = true,
+            bool enableCorruptionDetection = false)
         {
             if (container.Header.HasEncryptedData || container.Header.HasEncryptedIndex)
                 throw new InvalidOperationException("Saving encrypted packs is not supported.");
 
-            var sortedFiles = container.FileList.OrderBy(x => x.Key, StringComparer.Ordinal).ToList();
+            var sortedFiles = container.FileList
+                .Where(
+                    file =>
+                        (container is not FolderProjectContainer ||
+                         !FolderProjectPathPolicy.IsExcludedPath(
+                             file.Key)) &&
+                        (!enableCorruptionDetection ||
+                         !IsCorruptionDetectionFile(file.Key)))
+                .OrderBy(file => file.Key, StringComparer.Ordinal)
+                .ToList();
+            if (enableCorruptionDetection)
+                AddCorruptionDetectionFiles(sortedFiles);
+
             var headerSpecificBytes = ComputeFileHeaderSpecificByte(container);
             var fileNamesOffset = ComputeFileNameOffset(headerSpecificBytes, sortedFiles);
 
             // Update and write header
-            container.Header.FileCount = (uint)container.FileList.Count;
+            container.Header.FileCount = (uint)sortedFiles.Count;
             WriteHeader(container.Header, (uint)fileNamesOffset, writer);
 
             // Write the core of the file
@@ -51,7 +83,122 @@ namespace Shared.Core.PackFiles.Serialization
             var outputParent = new PackedFileSourceParent { FilePath = outputFileName };
             var pendingUpdates = new List<PendingDataSourceUpdate>(fileMetaDataTable.Count);
             SerializeFileBlob(fileMetaDataTable, container, writer, outputParent, pendingUpdates);
+            if (enableCorruptionDetection)
+            {
+                ValidateCorruptionDetectionFiles(
+                    outputFileName,
+                    writer);
+            }
             return new PackFileSerializationResult(pendingUpdates);
+        }
+
+        private static bool IsCorruptionDetectionFile(
+            string relativePath)
+        {
+            var normalizedPath = relativePath.Replace('/', '\\');
+            var fileName = Path.GetFileName(normalizedPath);
+            return s_corruptionDetectionFiles.Any(
+                detectionFile =>
+                    string.Equals(
+                        normalizedPath,
+                        detectionFile.Path,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        fileName,
+                        Path.GetFileName(detectionFile.Path),
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void AddCorruptionDetectionFiles(
+            List<KeyValuePair<string, PackFile>> files)
+        {
+            foreach (var detectionFile in s_corruptionDetectionFiles)
+            {
+                var data = Encoding.UTF8.GetBytes(
+                    detectionFile.Content);
+                files.Add(
+                    new KeyValuePair<string, PackFile>(
+                        detectionFile.Path,
+                        new PackFile(
+                            Path.GetFileName(detectionFile.Path),
+                            new MemorySource(data))));
+            }
+
+            files.Sort(
+                (left, right) =>
+                    StringComparer.Ordinal.Compare(
+                        left.Key,
+                        right.Key));
+        }
+
+        private static void ValidateCorruptionDetectionFiles(
+            string outputFileName,
+            BinaryWriter writer)
+        {
+            writer.Flush();
+            var stream = writer.BaseStream;
+            if (!stream.CanRead || !stream.CanSeek)
+            {
+                throw new InvalidOperationException(
+                    "Packfile corruption detection requires a readable, seekable output stream.");
+            }
+
+            var originalPosition = stream.Position;
+            try
+            {
+                stream.Position = 0;
+                using var reader = new BinaryReader(
+                    stream,
+                    Encoding.UTF8,
+                    true);
+                var loadedPack = PackFileSerializerLoader.Load(
+                    outputFileName,
+                    stream.Length,
+                    reader,
+                    new CaPackDuplicateFileResolver());
+
+                foreach (var detectionFile
+                         in s_corruptionDetectionFiles)
+                {
+                    if (!loadedPack.FileList.TryGetValue(
+                            detectionFile.Path.ToLowerInvariant(),
+                            out var packFile))
+                    {
+                        throw new InvalidDataException(
+                            $"Packfile corruption detection failed. Missing validation file '{detectionFile.Path}'.");
+                    }
+
+                    var data =
+                        packFile.DataSource is PackedFileSource
+                            packedFileSource
+                            ? packedFileSource.ReadData(stream)
+                            : packFile.DataSource.ReadData();
+                    var actualContent =
+                        Encoding.UTF8.GetString(data);
+                    if (!string.Equals(
+                            actualContent,
+                            detectionFile.Content,
+                            StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException(
+                            $"Packfile corruption detection failed. Validation file '{detectionFile.Path}' had unexpected content.");
+                    }
+                }
+            }
+            catch (InvalidDataException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException(
+                    "Packfile corruption detection failed while reading the generated pack.",
+                    exception);
+            }
+            finally
+            {
+                stream.Position = originalPosition;
+            }
         }
 
         public static void WriteHeader(PFHeader header, uint fileContentSize, BinaryWriter writer)

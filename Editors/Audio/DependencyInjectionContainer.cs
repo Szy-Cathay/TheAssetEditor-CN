@@ -19,6 +19,7 @@ using Editors.Audio.AudioEditor.Presentation.WaveformVisualiser;
 using Editors.Audio.AudioExplorer;
 using Editors.Audio.AudioProjectConverter;
 using Editors.Audio.AudioProjectMerger;
+using Editors.Audio.ContextMenu;
 using Editors.Audio.DialogueEventMerger;
 using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Compiler;
@@ -32,6 +33,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.DependencyInjection;
 using Shared.Core.DevConfig;
 using Shared.Core.ToolCreation;
+using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.External;
 
 namespace Editors.Audio
 {
@@ -138,11 +140,22 @@ namespace Editors.Audio
 
             // Shared audio stuff 
             serviceCollection.AddScoped<IAudioRepository, AudioRepository>();
+            serviceCollection.AddScoped<
+                IMovieAudioResolver,
+                MovieAudioResolver>();
             serviceCollection.AddSingleton<BnkLoader>();
             serviceCollection.AddSingleton<DatLoader>();
             serviceCollection.AddScoped<ISoundPlayer, SoundPlayer>();
             serviceCollection.AddScoped<VgStreamWrapper>();
             serviceCollection.AddScoped<WSourcesWrapper>();
+
+            // Pack file context menu
+            serviceCollection.AddTransient<
+                IExportCAVp8AsIvfCommand,
+                ExportCAVp8AsIvfCommand>();
+            serviceCollection.AddTransient<
+                IExportCAVp8AsWebMCommand,
+                ExportCAVp8AsWebMCommand>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
         }

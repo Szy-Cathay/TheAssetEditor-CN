@@ -1,4 +1,5 @@
-﻿using Shared.Core.PackFiles.Models;
+﻿using Shared.Core.Events.Global;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
 
 namespace Shared.Core.PackFiles
@@ -9,9 +10,18 @@ namespace Shared.Core.PackFiles
         bool EnforceGameFilesMustBeLoaded { get; set; }
 
         PackFileContainer? AddContainer(PackFileContainer container, bool setToMainPackIfFirst = false);
-        void AddFilesToPack(PackFileContainer container, List<NewPackFileEntry> newFiles);
+        PackFileContainer? AddContainer(
+            PackFileContainer container,
+            int insertionIndex,
+            bool setEditablePack,
+            PackFileContainerAddedReason reason);
+        void AddFilesToPack(
+            PackFileContainer container,
+            List<NewPackFileEntry> newFiles,
+            bool overwriteExisting = true);
         void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target);
         PackFileContainer CreateNewPackFileContainer(string name, PackFileVersion packFileVersion, PackFileCAType type, bool setEditablePack = false);
+        void CreateFolder(PackFileContainer container, string folder);
         void DeleteFile(PackFileContainer pf, PackFile file);
         void DeleteFolder(PackFileContainer pf, string folder);
         PackFile? FindFile(string path, PackFileContainer? container = null);
@@ -26,6 +36,7 @@ namespace Shared.Core.PackFiles
         void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation);
         bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation);
         void SetEditablePack(PackFileContainer? pf);
+        bool TryUnloadPackContainer(PackFileContainer pf);
         void UnloadPackContainer(PackFileContainer pf);
     }
 }

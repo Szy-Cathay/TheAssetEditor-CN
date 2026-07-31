@@ -3,6 +3,7 @@ using Shared.GameFormats.Animation;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -59,28 +60,125 @@ namespace GameWorld.Core.Animation
 
         GameSkeleton() { }
 
+        public static GameSkeleton CreateFromAnimationFile(AnimationFile animFile, AnimationPlayer animationPlayer)
+        {
+            ArgumentNullException.ThrowIfNull(animFile);
+            ArgumentNullException.ThrowIfNull(animationPlayer);
+
+            var bones = animFile.Bones
+                ?? throw new InvalidDataException("Animation does not contain a bone table.");
+            if (bones.Length > 256)
+                throw new InvalidDataException($"Animation contains {bones.Length} bones; the renderer supports at most 256.");
+
+            var skeleton = new GameSkeleton
+            {
+                SkeletonName = animFile.Header?.SkeletonName ?? "",
+                AnimationPlayer = animationPlayer,
+                Translation = new List<Vector3>(new Vector3[bones.Length]),
+                Rotation = new List<Quaternion>(new Quaternion[bones.Length]),
+                Scale = new List<float>(new float[bones.Length]),
+                _parentBoneIds = new List<int>(new int[bones.Length]),
+                BoneNames = new List<string>(new string[bones.Length]),
+            };
+
+            var part = animFile.AnimationParts.FirstOrDefault();
+            var firstFrame = part?.DynamicFrames.FirstOrDefault() ?? part?.StaticFrame;
+
+            for (var i = 0; i < bones.Length; i++)
+            {
+                var bone = bones[i]
+                    ?? throw new InvalidDataException($"Animation bone {i} is missing.");
+                skeleton._parentBoneIds[i] = bone.ParentId;
+                skeleton.BoneNames[i] = bone.Name ?? "";
+                skeleton.Translation[i] = Vector3.Zero;
+                skeleton.Rotation[i] = Quaternion.Identity;
+                skeleton.Scale[i] = 1;
+
+                if (part == null || i >= part.TranslationMappings.Count || i >= part.RotationMappings.Count)
+                    continue;
+
+                var translationMapping = part.TranslationMappings[i];
+                if (translationMapping.IsDynamic && firstFrame != null &&
+                    translationMapping.Id >= 0 && translationMapping.Id < firstFrame.Transforms.Count)
+                {
+                    skeleton.Translation[i] = ToVector3(firstFrame.Transforms[translationMapping.Id]);
+                }
+                else if (translationMapping.IsStatic && part.StaticFrame != null &&
+                    translationMapping.Id >= 0 && translationMapping.Id < part.StaticFrame.Transforms.Count)
+                {
+                    skeleton.Translation[i] = ToVector3(part.StaticFrame.Transforms[translationMapping.Id]);
+                }
+
+                var rotationMapping = part.RotationMappings[i];
+                if (rotationMapping.IsDynamic && firstFrame != null &&
+                    rotationMapping.Id >= 0 && rotationMapping.Id < firstFrame.Quaternion.Count)
+                {
+                    skeleton.Rotation[i] = ToQuaternion(firstFrame.Quaternion[rotationMapping.Id]);
+                }
+                else if (rotationMapping.IsStatic && part.StaticFrame != null &&
+                    rotationMapping.Id >= 0 && rotationMapping.Id < part.StaticFrame.Quaternion.Count)
+                {
+                    skeleton.Rotation[i] = ToQuaternion(part.StaticFrame.Quaternion[rotationMapping.Id]);
+                }
+            }
+
+            skeleton.RebuildSkeletonMatrix();
+            return skeleton;
+        }
+
+        private static Vector3 ToVector3(Shared.GameFormats.RigidModel.Transforms.RmvVector3 value) =>
+            new(value.X, value.Y, value.Z);
+
+        private static Quaternion ToQuaternion(Shared.GameFormats.RigidModel.Transforms.RmvVector4 value)
+        {
+            var quaternion = new Quaternion(value.X, value.Y, value.Z, value.W);
+            if (quaternion.LengthSquared() <= float.Epsilon)
+                return Quaternion.Identity;
+
+            quaternion.Normalize();
+            return quaternion;
+        }
+
         public void RebuildSkeletonMatrix()
         {
-            _worldTransform = new List<Matrix>(new Matrix[BoneCount]);
-            _inverseWorldTransform =
-                new List<Matrix>(new Matrix[BoneCount]);
+            var localTransforms = new Matrix[BoneCount];
             for (var i = 0; i < BoneCount; i++)
             {
                 var translationMatrix = Matrix.CreateTranslation(Translation[i]);
                 var rotationMatrix = Matrix.CreateFromQuaternion(Rotation[i]);
                 var scaleMatrix = Matrix.CreateScale(Scale[i]);
-                var transform = scaleMatrix * rotationMatrix * translationMatrix;
-                _worldTransform[i] = transform;
+                localTransforms[i] = scaleMatrix * rotationMatrix * translationMatrix;
+            }
+
+            var worldTransforms = new Matrix[BoneCount];
+            var visitStates = new byte[BoneCount];
+
+            Matrix BuildWorldTransform(int boneIndex)
+            {
+                if (visitStates[boneIndex] == 2)
+                    return worldTransforms[boneIndex];
+                if (visitStates[boneIndex] == 1)
+                    throw new InvalidDataException($"Skeleton hierarchy contains a cycle at bone {boneIndex}.");
+
+                visitStates[boneIndex] = 1;
+                var parentIndex = GetParentBoneIndex(boneIndex);
+                if (parentIndex < -1 || parentIndex >= BoneCount)
+                    throw new InvalidDataException($"Bone {boneIndex} has invalid parent index {parentIndex}.");
+                if (parentIndex == boneIndex)
+                    throw new InvalidDataException($"Bone {boneIndex} cannot be its own parent.");
+
+                worldTransforms[boneIndex] = parentIndex == -1
+                    ? localTransforms[boneIndex]
+                    : localTransforms[boneIndex] * BuildWorldTransform(parentIndex);
+                visitStates[boneIndex] = 2;
+                return worldTransforms[boneIndex];
             }
 
             for (var i = 0; i < BoneCount; i++)
-            {
-                var parentIndex = GetParentBoneIndex(i);
-                if (parentIndex == -1)
-                    continue;
-                _worldTransform[i] = _worldTransform[i] * _worldTransform[parentIndex];
-            }
+                BuildWorldTransform(i);
 
+            _worldTransform = worldTransforms.ToList();
+            _inverseWorldTransform = new List<Matrix>(new Matrix[BoneCount]);
             for (var i = 0; i < BoneCount; i++)
             {
                 _inverseWorldTransform[i] =

@@ -1,4 +1,5 @@
 ﻿using Editors.KitbasherEditor.ChildEditors.MeshFitter;
+using Editors.KitbasherEditor.ChildEditors.PhotoStudio;
 using Editors.KitbasherEditor.ChildEditors.PinTool;
 using Editors.KitbasherEditor.ChildEditors.PinTool.Commands;
 using Editors.KitbasherEditor.ChildEditors.ReRiggingTool;
@@ -72,6 +73,10 @@ namespace Editors.KitbasherEditor
             RegisterWindow<PinToolWindow>(serviceCollection);
             serviceCollection.AddTransient<PinMeshToVertexCommand>();
             serviceCollection.AddTransient<SkinWrapRiggingCommand>();
+
+            // Photo Studio
+            serviceCollection.AddScoped<PhotoStudioViewModel>();
+            RegisterWindow<PhotoStudioWindow>(serviceCollection);
 
             // Save dialog
             serviceCollection.AddTransient<SaveDialogViewModel>();

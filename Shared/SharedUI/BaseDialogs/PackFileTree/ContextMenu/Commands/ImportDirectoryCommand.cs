@@ -54,7 +54,18 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                     filesAdded.Add(new NewPackFileEntry(packDirectoryPath, file));
                 }
 
-                packFileService.AddFilesToPack(_selectedNode.FileOwner, filesAdded);
+                if (!FolderProjectImportSafety.TryApproveOverwrite(
+                        _selectedNode.FileOwner,
+                        filesAdded,
+                        out var overwriteExisting))
+                {
+                    return;
+                }
+
+                packFileService.AddFilesToPack(
+                    _selectedNode.FileOwner,
+                    filesAdded,
+                    overwriteExisting);
             }
         }
     }

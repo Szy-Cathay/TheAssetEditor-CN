@@ -23,6 +23,8 @@ namespace AssetEditor.Services
         private readonly IPackFileService _packFileService;
         private readonly IEditorDatabase _editorDatabase;
         private readonly Func<string, string, MessageBoxButton, MessageBoxResult> _showMessage;
+        private readonly Dictionary<IEditorInterface, PackFileContainer>
+            _editorOwners = new(ReferenceEqualityComparer.Instance);
 
         public ObservableCollection<IEditorInterface> CurrentEditorsList { get; set; } = [];
         [ObservableProperty] private int _selectedEditorIndex = -1;
@@ -65,6 +67,7 @@ namespace AssetEditor.Services
             }
 
             var fullFileName = _packFileService.GetFullPath(file);
+            var owner = _packFileService.GetPackFileContainer(file);
             var editorViewModel = _editorDatabase.Create(fullFileName, preferedEditor);
             if (editorViewModel == null)
             {
@@ -85,6 +88,8 @@ namespace AssetEditor.Services
                         if (existingFileEditor.CurrentFile == file)
                         {
                             _logger.Here().Information($"Attempting to open file '{file.Name}', but is is already open");
+                            if (owner != null)
+                                _editorOwners[existingEditor] = owner;
                             SelectedEditorIndex = i;
                             return CurrentEditorsList[i];
                         }
@@ -97,6 +102,8 @@ namespace AssetEditor.Services
             }
 
             InsertEditorIntoTab(editorViewModel);
+            if (owner != null)
+                _editorOwners[editorViewModel] = owner;
             return editorViewModel;
         }
 
@@ -140,29 +147,67 @@ namespace AssetEditor.Services
 
         private void OnBeforeRemoved(BeforePackFileContainerRemovedEvent e)
         {
-            var container = e.Removed;
-            var openFiles = new List<IEditorInterface>();
-            for (var i = 0; i < CurrentEditorsList.Count; i++)
-            {
-                if (CurrentEditorsList[i] is not IFileEditor fileEditor)
-                    continue;
+            if (!e.AllowClose)
+                return;
 
-                var containterForPack = _packFileService.GetPackFileContainer(fileEditor.CurrentFile);
-                if (containterForPack == container)
-                    openFiles.Add(CurrentEditorsList[i]);
+            e.SetApprovedCloseAction(
+                () => TryCloseEditorsForContainer(e.Removed));
+        }
+
+        public bool TryCloseEditorsForContainer(
+            PackFileContainer container)
+        {
+            ArgumentNullException.ThrowIfNull(container);
+            var openEditors = CurrentEditorsList
+                .Where(editor => IsOwnedBy(editor, container))
+                .ToList();
+            if (openEditors.Count == 0)
+                return true;
+
+            var hasUnsavedChanges = openEditors
+                .OfType<ISaveableEditor>()
+                .Any(editor => editor.HasUnsavedChanges);
+            if (hasUnsavedChanges)
+            {
+                var result = _showMessage(
+                    LocalizationManager.Instance.Get(
+                        "Msg.UnsavedChangesOnClose"),
+                    LocalizationManager.Instance.Get("Msg.CloseTitle"),
+                    MessageBoxButton.OKCancel);
+                if (result != MessageBoxResult.OK)
+                    return false;
+            }
+            else
+            {
+                var result = _showMessage(
+                    LocalizationManager.Instance.GetFormat(
+                        "Msg.ClosePackWithOpenFiles",
+                        container.Name,
+                        openEditors[0].DisplayName),
+                    LocalizationManager.Instance.Get("Msg.AreYouSure"),
+                    MessageBoxButton.YesNo);
+                if (result != MessageBoxResult.Yes)
+                    return false;
             }
 
-            if (openFiles.Any())
-            {
-                if (_showMessage(LocalizationManager.Instance.GetFormat("Msg.ClosePackWithOpenFiles", container.Name, openFiles.First().DisplayName), LocalizationManager.Instance.Get("Msg.AreYouSure"), MessageBoxButton.YesNo) == MessageBoxResult.No)
-                {
-                    e.AllowClose = false;
-                    return;
-                }
-            }
-
-            foreach (var editor in openFiles)
+            foreach (var editor in openEditors)
                 DestroyEditor(editor);
+            return true;
+        }
+
+        private bool IsOwnedBy(
+            IEditorInterface editor,
+            PackFileContainer container)
+        {
+            if (_editorOwners.TryGetValue(editor, out var owner))
+                return ReferenceEquals(owner, container);
+            if (editor is not IFileEditor fileEditor)
+                return false;
+
+            return ReferenceEquals(
+                _packFileService.GetPackFileContainer(
+                    fileEditor.CurrentFile),
+                container);
         }
 
         private void OnForceShutdownEditor(ForceShutdownEvent e)
@@ -202,6 +247,7 @@ namespace AssetEditor.Services
             if (!CurrentEditorsList.Remove(editor))
                 return;
 
+            _editorOwners.Remove(editor);
             _editorDatabase.DestroyEditor(editor);
             editor.Close();
         }

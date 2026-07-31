@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using AssetEditor.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -19,6 +20,8 @@ namespace AssetEditor.ViewModels
     public partial class MainViewModel : ObservableObject, IDropTarget<IEditorInterface, bool>
     {
         private readonly IUiCommandFactory _uiCommandFactory;
+        private readonly IPackFileService _packFileService;
+        private readonly IFolderProjectCloseGuard _folderProjectCloseGuard;
 
         public PackFileBrowserViewModel FileTree { get; private set; }
         public MenuBarViewModel MenuBar { get; set; }
@@ -43,12 +46,15 @@ namespace AssetEditor.ViewModels
                 IEditorDatabase toolFactory, 
                 IUiCommandFactory uiCommandFactory, 
                 IEventHub eventHub,
-                ApplicationSettingsService applicationSettingsService)
+                ApplicationSettingsService applicationSettingsService,
+                IFolderProjectCloseGuard folderProjectCloseGuard)
         {
             MenuBar = menuViewModel;
 
             EditorManager = editorManager;
             _uiCommandFactory = uiCommandFactory;
+            _packFileService = packfileService;
+            _folderProjectCloseGuard = folderProjectCloseGuard;
 
             eventHub.Register<PackFileContainerSetAsMainEditableEvent>(this, SetStatusBarEditablePackFile);
 
@@ -63,19 +69,43 @@ namespace AssetEditor.ViewModels
 
         void OpenFile(PackFile file) => _uiCommandFactory.Create<OpenEditorCommand>().Execute(file);
 
-        [RelayCommand] private void Closing(IEditorInterface editor) 
+        [RelayCommand]
+        internal async Task Closing(IEditorInterface? editor)
         {
-            var hasUnsavedPackFiles = FileTree.Files.Any(node => node.UnsavedChanged);
-            if (EditorManager.ShouldBlockCloseCommand(editor, hasUnsavedPackFiles))
+            IsClosingWithoutPrompt = false;
+            var hasUnsavedPackFiles = FileTree.Files.Any(
+                node =>
+                    node.UnsavedChanged &&
+                    node.FileOwner is not FolderProjectContainer);
+            if (!EditorManager.ShouldBlockCloseCommand(
+                    editor!,
+                    hasUnsavedPackFiles) &&
+                MessageBox.Show(
+                    LocalizationManager.Instance.Get(
+                        "Msg.UnsavedChangesOnQuit"),
+                    LocalizationManager.Instance.Get(
+                        "Msg.UnsavedChangesOnQuitTitle"),
+                    MessageBoxButton.YesNo) != MessageBoxResult.Yes)
             {
-                IsClosingWithoutPrompt = true;
                 return;
             }
 
-            IsClosingWithoutPrompt = MessageBox.Show(
-                LocalizationManager.Instance.Get("Msg.UnsavedChangesOnQuit"),
-                LocalizationManager.Instance.Get("Msg.UnsavedChangesOnQuitTitle"),
-                MessageBoxButton.YesNo) == MessageBoxResult.Yes;
+            IsLoadingPacks = true;
+            LoadingStatusText = LocalizationManager.Instance.Get(
+                "FolderProject.Close.CheckingStatus");
+            try
+            {
+                var project =
+                    _packFileService.GetEditablePack() as
+                        FolderProjectContainer;
+                IsClosingWithoutPrompt =
+                    await _folderProjectCloseGuard.CanCloseAsync(project);
+            }
+            finally
+            {
+                LoadingStatusText = "";
+                IsLoadingPacks = false;
+            }
         }
 
         [RelayCommand] void CloseTool(IEditorInterface tool) => EditorManager.CloseTool(tool);

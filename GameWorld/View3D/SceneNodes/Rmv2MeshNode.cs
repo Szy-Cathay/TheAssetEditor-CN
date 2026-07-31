@@ -59,6 +59,7 @@ namespace GameWorld.Core.SceneNodes
 
         public AnimationPlayer? AnimationPlayer { get; set; }                               // This is a hack - remove at some point
         public SkeletonBoneAnimationResolver? AttachmentBoneResolver { get; set; } = null;  // This is a hack - remove at some point
+        public Matrix AttachmentOuterWorld { get; set; } = Matrix.Identity;
 
     
         // Pooled buffers to avoid per-frame allocations
@@ -84,6 +85,9 @@ namespace GameWorld.Core.SceneNodes
        
         public void Render(RenderEngineComponent renderEngine, Matrix parentWorld)
         {
+            var frame = AnimationPlayer?.GetCurrentAnimationFrame();
+            var followsBoneRigidly = AttachmentBoneResolver != null && AnimationMatrixOverride >= 0;
+            var boneMatrix = AttachmentBoneResolver?.GetWorldTransformIfAnimating() ?? Matrix.Identity;
             var animationCapability = Material.TryGetCapability<AnimationCapability>();
             if (animationCapability != null)
             {
@@ -91,25 +95,24 @@ namespace GameWorld.Core.SceneNodes
                 for (var i = 0; i < 256; i++)
                     _animationBuffer[i] = Matrix.Identity;
 
-                if (AnimationPlayer != null)
+                if (frame != null)
                 {
-                    var frame = AnimationPlayer.GetCurrentAnimationFrame();
-                    if (frame != null)
-                    {
-                        for (var i = 0; i < frame.BoneTransforms.Count(); i++)
-                            _animationBuffer[i] = frame.BoneTransforms[i].WorldTransform;
-                    }
+                    var transformCount = Math.Min(frame.BoneTransforms.Count, _animationBuffer.Length);
+                    for (var i = 0; i < transformCount; i++)
+                        _animationBuffer[i] = frame.BoneTransforms[i].WorldTransform;
                 }
 
                 animationCapability.AnimationTransforms = _animationBuffer;
                 animationCapability.AnimationWeightCount = Geometry.WeightCount;
-                animationCapability.ApplyAnimation = AnimationPlayer != null && AnimationPlayer.IsEnabled && Geometry.VertexFormat != UiVertexFormat.Static;
+                animationCapability.ApplyAnimation = AnimationPlayer != null && AnimationPlayer.IsEnabled &&
+                    Geometry.VertexFormat != UiVertexFormat.Static && !followsBoneRigidly;
             }
 
-            if (AttachmentBoneResolver != null)
-                parentWorld = parentWorld * AttachmentBoneResolver.GetWorldTransformIfAnimating();
-
-            var modelWithOffset = ModelMatrix * Matrix.CreateTranslation(PivotPoint);
+            var modelWithOffset =
+                Matrix.CreateTranslation(PivotPoint) *
+                ModelMatrix *
+                boneMatrix *
+                AttachmentOuterWorld;
             RenderMatrix = modelWithOffset;
 
             // Reuse pooled render item instead of allocating new each frame
@@ -141,16 +144,13 @@ namespace GameWorld.Core.SceneNodes
             var parentWorld =
                 GetAncestorWorldMatrix(Parent);
 
-            if (AttachmentBoneResolver != null)
-            {
-                parentWorld *=
-                    AttachmentBoneResolver
-                        .GetWorldTransformIfAnimating();
-            }
+            var boneMatrix = AttachmentBoneResolver?.GetWorldTransformIfAnimating() ?? Matrix.Identity;
 
             return
-                ModelMatrix *
                 Matrix.CreateTranslation(PivotPoint) *
+                ModelMatrix *
+                boneMatrix *
+                AttachmentOuterWorld *
                 parentWorld;
         }
 
@@ -197,6 +197,8 @@ namespace GameWorld.Core.SceneNodes
             typedTarget.Scale = Scale;
             typedTarget.ReduceMeshOnLodGeneration = ReduceMeshOnLodGeneration;
             typedTarget.AnimationPlayer = AnimationPlayer;
+            typedTarget.AttachmentBoneResolver = AttachmentBoneResolver;
+            typedTarget.AttachmentOuterWorld = AttachmentOuterWorld;
             typedTarget.ScaleMult = ScaleMult;
             typedTarget.PivotPoint = PivotPoint;
 

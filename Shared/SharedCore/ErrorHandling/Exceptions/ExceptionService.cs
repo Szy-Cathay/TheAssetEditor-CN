@@ -3,6 +3,7 @@
     public interface IExceptionService
     {
         ExceptionInformation Create(Exception e);
+        ExceptionInformation Create(Exception e, string userMessage);
     }
 
     class ExceptionService : IExceptionService
@@ -16,12 +17,16 @@
 
         }
 
-        public ExceptionInformation Create(Exception e)
+        public ExceptionInformation Create(Exception e) =>
+            Create(e, string.Empty);
+
+        public ExceptionInformation Create(Exception e, string userMessage)
         {
             var exceptionList = UnrollException(e);
             var extendedException = new ExceptionInformation
             {
                 ExceptionInfo = exceptionList.ToArray(),
+                UserMessage = userMessage,
             };
 
             foreach (var provider in _informationProviders)

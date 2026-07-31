@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using CommunityToolkit.Diagnostics;
 using GameWorld.Core.Components.Selection;
@@ -6,7 +7,9 @@ using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.Misc;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using GameWorld.Core.Components;
@@ -15,6 +18,8 @@ namespace GameWorld.Core.Components.Rendering
 {
     public class RenderEngineComponent : BaseComponent, IDisposable
     {
+        private readonly Serilog.ILogger _logger =
+            Logging.Create<RenderEngineComponent>();
         Color _backgroundColour;
 
         private readonly Dictionary<RasterizerStateEnum, RasterizerState> _rasterStates = [];
@@ -34,8 +39,11 @@ namespace GameWorld.Core.Components.Rendering
         bool _cullingEnabled = false;
         bool _bigSceneDepthBiasMode = false;
         bool _drawGlow = true;
+        private readonly PendingRenderCapture _pendingCapture =
+            new();
 
         private BloomFilter _bloomFilter;
+        private BloomFilter _captureBloomFilter;
         private OutlineFilter _outlineFilter;
         private QuadRenderer _quadRenderer;
         Texture2D _whiteTexture;
@@ -43,6 +51,7 @@ namespace GameWorld.Core.Components.Rendering
         RenderTarget2D _defaultRenderTarget;
         RenderTarget2D _glowRenderTarget;
         RenderTarget2D _selectionMaskTarget;
+        RenderTarget2D _transparentCaptureTarget;
         RenderTargetBinding[] _mainRenderTargets;
         bool _selectionOutlineRequested;
 
@@ -53,6 +62,9 @@ namespace GameWorld.Core.Components.Rendering
         /// Viewport shading mode - controls how 3D objects are rendered
         /// </summary>
         public ViewportShadingMode ShadingMode { get; set; } = ViewportShadingMode.Textured;
+        public bool SquareViewport { get; set; }
+        public RenderTarget2D? LastFrame =>
+            SquareViewport ? _transparentCaptureTarget : null;
 
         public RenderEngineComponent(IWpfGame wpfGame, ResourceLibrary resourceLibrary, ArcBallCamera camera, IDeviceResolver deviceResolverComponent, ApplicationSettingsService applicationSettingsService, SceneRenderParametersStore sceneLightParametersStore, IEventHub eventHub, GridComponent gridComponent)
         {
@@ -81,6 +93,15 @@ namespace GameWorld.Core.Components.Rendering
             _eventHub.Register<SelectionChangedEvent>(this, OnSelectionChanged);
         }
 
+        public void SaveNextFrame(
+            SaveRenderImageSettings settings)
+        {
+            _pendingCapture.Request(settings);
+            _logger.Here().Information(
+                "Photo Studio capture requested: {Name}",
+                settings.Name);
+        }
+
         void OnSelectionChanged(SelectionChangedEvent changedEvent)
         {
             if (changedEvent.NewState.Mode == GeometrySelectionMode.Object)
@@ -100,6 +121,17 @@ namespace GameWorld.Core.Components.Rendering
             _bloomFilter = new BloomFilter();
             _bloomFilter.Load(device, _resourceLibrary, device.Viewport.Width, device.Viewport.Height);
             _bloomFilter.BloomPreset = BloomFilter.BloomPresets.SuperWide;
+
+            _captureBloomFilter = new BloomFilter();
+            _captureBloomFilter.Load(
+                device,
+                _resourceLibrary,
+                device.Viewport.Width,
+                device.Viewport.Height,
+                quadRenderer: _quadRenderer,
+                cloneEffect: true);
+            _captureBloomFilter.BloomPreset =
+                BloomFilter.BloomPresets.SuperWide;
 
             _outlineFilter = new OutlineFilter();
             _outlineFilter.Load(device, _resourceLibrary, _quadRenderer);
@@ -193,6 +225,8 @@ namespace GameWorld.Core.Components.Rendering
             else
             {
                 device.SetRenderTarget(_defaultRenderTarget);
+                if (SquareViewport)
+                    device.Clear(Color.Transparent);
             }
 
             // 2D drawing
@@ -212,12 +246,24 @@ namespace GameWorld.Core.Components.Rendering
             Render3DObjects(commonShaderParameters, RenderingTechnique.Normal);
 
             // 3D drawing - Emissive (only if scene contains emissive-capable objects)
-            bool hasEmissiveItems = _renderItems[RenderBuckedId.Normal].Any(item => item.SupportsTechnique(RenderingTechnique.Emissive));
+            var hasEmissiveItems = _renderItems[RenderBuckedId.Normal]
+                .Any(item => item.SupportsTechnique(
+                    RenderingTechnique.Emissive));
+            Texture2D? bloomRenderTarget = null;
 
             if (hasEmissiveItems)
             {
                 device.SetRenderTarget(_glowRenderTarget);
+                device.Clear(Color.Transparent);
                 Render3DObjects(commonShaderParameters, RenderingTechnique.Emissive);
+
+                if (_drawGlow)
+                {
+                    bloomRenderTarget = _bloomFilter.Draw(
+                        _glowRenderTarget,
+                        screenWidth,
+                        screenHeight);
+                }
             }
 
             // Screen-space selection outline
@@ -227,7 +273,13 @@ namespace GameWorld.Core.Components.Rendering
 
                 // Composite scene
                 device.SetRenderTarget(backBufferRenderTarget);
-                spriteBatch.Begin();
+                spriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.AlphaBlend);
+                DrawViewportBackground(
+                    spriteBatch,
+                    screenWidth,
+                    screenHeight);
                 spriteBatch.Draw(_defaultRenderTarget, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
                 spriteBatch.End();
 
@@ -244,24 +296,267 @@ namespace GameWorld.Core.Components.Rendering
             {
                 // No outline - just composite scene
                 device.SetRenderTarget(backBufferRenderTarget);
-                spriteBatch.Begin();
+                spriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.AlphaBlend);
+                DrawViewportBackground(
+                    spriteBatch,
+                    screenWidth,
+                    screenHeight);
                 spriteBatch.Draw(_defaultRenderTarget, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
                 spriteBatch.End();
             }
 
-            if (_drawGlow && hasEmissiveItems)
+            if (bloomRenderTarget != null)
             {
-                // While re-sizing or changing view, there is a small chance that the
-                // bloomRenderTarget could be null
-                var bloomRenderTarget = _bloomFilter.Draw(_glowRenderTarget, screenWidth, screenHeight);
-                if (bloomRenderTarget != null)
+                device.SetRenderTarget(backBufferRenderTarget);
+                spriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.Additive);
+                spriteBatch.Draw(
+                    bloomRenderTarget,
+                    new Rectangle(0, 0, screenWidth, screenHeight),
+                    Color.White);
+                spriteBatch.End();
+            }
+
+            if (SquareViewport)
+            {
+                CaptureTransparentFrame(
+                    device,
+                    spriteBatch,
+                    bloomRenderTarget,
+                    screenWidth,
+                    screenHeight);
+            }
+
+            HandlePendingCapture(screenWidth, screenHeight);
+        }
+
+        private void DrawViewportBackground(
+            SpriteBatch spriteBatch,
+            int width,
+            int height)
+        {
+            if (SquareViewport)
+            {
+                spriteBatch.Draw(
+                    _whiteTexture,
+                    new Rectangle(0, 0, width, height),
+                    _backgroundColour);
+            }
+        }
+
+        private void HandlePendingCapture(
+            int screenWidth,
+            int screenHeight)
+        {
+            var settings = _pendingCapture.Consume();
+            if (settings == null)
+                return;
+
+            if (!RenderCaptureMath.TryGetCaptureSize(
+                    screenWidth,
+                    screenHeight,
+                    settings.ImageUpScaleFactor,
+                    out var width,
+                    out var height))
+            {
+                _logger.Here().Error(
+                    "Rejected Photo Studio capture size {Width}x{Height} at {Scale}x",
+                    screenWidth,
+                    screenHeight,
+                    settings.ImageUpScaleFactor);
+                ReportCaptureFailure(
+                    settings,
+                    new InvalidOperationException(
+                        $"Unsupported Photo Studio capture size: " +
+                        $"{screenWidth}x{screenHeight} at " +
+                        $"{settings.ImageUpScaleFactor}x."));
+                return;
+            }
+
+            var device = _deviceResolverComponent.Device;
+            var state = GraphicsDeviceStateSnapshot.Capture(device);
+            RenderTarget2D outputTarget = null;
+            Exception? renderFailure = null;
+            try
+            {
+                using var normalTarget =
+                    PhotoCaptureSurface.Render(
+                        device,
+                        width,
+                        height,
+                        captureDevice =>
+                            DrawPhotoCaptureScene(
+                                captureDevice,
+                                width,
+                                height,
+                                RenderingTechnique.Normal));
+
+                var hasEmissiveItems =
+                    _renderItems[RenderBuckedId.Normal]
+                        .Any(item =>
+                            item.IncludeInPhotoCapture &&
+                            item.SupportsTechnique(
+                                RenderingTechnique.Emissive));
+                using var glowTarget = hasEmissiveItems
+                    ? PhotoCaptureSurface.Render(
+                        device,
+                        width,
+                        height,
+                        captureDevice =>
+                            DrawPhotoCaptureScene(
+                                captureDevice,
+                                width,
+                                height,
+                                RenderingTechnique.Emissive))
+                    : null;
+
+                outputTarget = new RenderTarget2D(
+                    device,
+                    width,
+                    height,
+                    false,
+                    SurfaceFormat.Color,
+                    DepthFormat.None,
+                    0,
+                    RenderTargetUsage.PreserveContents);
+                device.SetRenderTarget(outputTarget);
+                device.Clear(Color.Transparent);
+                CommonSpriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.Opaque);
+                CommonSpriteBatch.Draw(
+                    normalTarget,
+                    new Rectangle(0, 0, width, height),
+                    Color.White);
+                CommonSpriteBatch.End();
+
+                if (glowTarget != null)
                 {
-                    device.SetRenderTarget(backBufferRenderTarget);
-                    spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive);
-                    spriteBatch.Draw(bloomRenderTarget, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
-                    spriteBatch.End();
+                    var bloomTarget = _captureBloomFilter.Draw(
+                        glowTarget,
+                        width,
+                        height);
+                    if (bloomTarget != null)
+                    {
+                        device.SetRenderTarget(outputTarget);
+                        CommonSpriteBatch.Begin(
+                            SpriteSortMode.Deferred,
+                            BlendState.Additive);
+                        CommonSpriteBatch.Draw(
+                            bloomTarget,
+                            new Rectangle(0, 0, width, height),
+                            Color.White);
+                        CommonSpriteBatch.End();
+                    }
                 }
             }
+            catch (Exception exception)
+            {
+                outputTarget?.Dispose();
+                outputTarget = null;
+                _logger.Here().Error(
+                    exception,
+                    "Photo Studio capture rendering failed");
+                renderFailure = exception;
+            }
+            finally
+            {
+                state.Restore(device);
+                _ = _camera.ProjectionMatrix;
+            }
+
+            if (renderFailure != null)
+            {
+                ReportCaptureFailure(settings, renderFailure);
+                return;
+            }
+
+            if (outputTarget == null)
+                return;
+
+            Exception? saveFailure = null;
+            try
+            {
+                SavePhotoCapture(outputTarget, settings);
+            }
+            catch (Exception exception)
+            {
+                _logger.Here().Error(
+                    exception,
+                    "Photo Studio capture saving failed");
+                saveFailure = exception;
+            }
+            finally
+            {
+                outputTarget.Dispose();
+            }
+
+            if (saveFailure != null)
+                ReportCaptureFailure(settings, saveFailure);
+        }
+
+        private void ReportCaptureFailure(
+            SaveRenderImageSettings settings,
+            Exception exception)
+        {
+            try
+            {
+                settings.FailureHandler?.Invoke(exception);
+            }
+            catch (Exception callbackException)
+            {
+                _logger.Here().Error(
+                    callbackException,
+                    "Photo Studio capture failure handler failed");
+            }
+        }
+
+        private void DrawPhotoCaptureScene(
+            GraphicsDevice device,
+            int width,
+            int height,
+            RenderingTechnique technique)
+        {
+            device.DepthStencilState = DepthStencilState.Default;
+            device.BlendState = BlendState.Opaque;
+            var parameters = CommonShaderParameterBuilder.Build(
+                _camera,
+                _sceneLightParameters,
+                height,
+                width);
+            PhotoCaptureSceneRenderer.Draw(
+                device,
+                parameters,
+                _renderItems[RenderBuckedId.Normal],
+                technique,
+                _rasterStates[RasterizerStateEnum.Normal]);
+        }
+
+        private static void SavePhotoCapture(
+            RenderTarget2D target,
+            SaveRenderImageSettings settings)
+        {
+            DirectoryHelper.EnsureCreated(settings.OutputFolder);
+            var name = Path.GetFileName(settings.Name);
+            if (string.IsNullOrWhiteSpace(name))
+                name = "Screenshot";
+
+            var outputPath = Path.Combine(
+                settings.OutputFolder,
+                $"{name}_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png");
+            using (var stream = File.Create(outputPath))
+            {
+                target.SaveAsPng(
+                    stream,
+                    target.Width,
+                    target.Height);
+            }
+
+            if (settings.OpenFolder)
+                DirectoryHelper.OpenFolderAndSelectFile(outputPath);
         }
 
         private void Render2DObjects(GraphicsDevice device, CommonShaderParameters commonShaderParameters)
@@ -269,8 +564,17 @@ namespace GameWorld.Core.Components.Rendering
             var spriteBatch = CommonSpriteBatch;
             spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
 
-            // Clear the screen
-            spriteBatch.Draw(_whiteTexture, new Rectangle(0, 0, device.Viewport.Width, device.Viewport.Height), _backgroundColour);
+            if (!SquareViewport)
+            {
+                spriteBatch.Draw(
+                    _whiteTexture,
+                    new Rectangle(
+                        0,
+                        0,
+                        device.Viewport.Width,
+                        device.Viewport.Height),
+                    _backgroundColour);
+            }
 
             foreach (var item in _renderItems[RenderBuckedId.Font])
                 item.Draw(device, commonShaderParameters, RenderingTechnique.Normal);
@@ -280,60 +584,152 @@ namespace GameWorld.Core.Components.Rendering
         void Render3DObjects(CommonShaderParameters commonShaderParameters, RenderingTechnique renderingTechnique)
         {
             var device = _deviceResolverComponent.Device;
+            var previousViewport = device.Viewport;
 
-            // Apply shading mode to the normal render bucket
-            if (ShadingMode == ViewportShadingMode.Wireframe)
-                device.RasterizerState = _rasterStates[RasterizerStateEnum.Wireframe];
-            else
-                device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
-
-            if (renderingTechnique == RenderingTechnique.Normal && _renderLines.Count != 0)
+            try
             {
-                var shader = _resourceLibrary.GetStaticEffect(ShaderTypes.Line);
-                shader.Parameters["View"].SetValue(commonShaderParameters.View);
-                shader.Parameters["Projection"].SetValue(commonShaderParameters.Projection);
-                shader.Parameters["World"].SetValue(Matrix.Identity);
-
-                foreach (var pass in shader.CurrentTechnique.Passes)
+                if (SquareViewport)
                 {
-                    pass.Apply();
-                    // Reuse cached array instead of allocating via ToArray() each frame
-                    if (_renderLinesArray == null || _renderLinesArray.Length < _renderLines.Count)
-                        _renderLinesArray = new VertexPositionColor[_renderLines.Count];
-                    _renderLines.CopyTo(_renderLinesArray, 0);
-                    device.DrawUserPrimitives(PrimitiveType.LineList, _renderLinesArray, 0, _renderLines.Count / 2);
+                    var size = Math.Min(
+                        previousViewport.Width,
+                        previousViewport.Height);
+                    device.Viewport = new Viewport(
+                        previousViewport.X +
+                            (previousViewport.Width - size) / 2,
+                        previousViewport.Y +
+                            (previousViewport.Height - size) / 2,
+                        size,
+                        size);
+                }
+
+                // Apply shading mode to the normal render bucket
+                if (ShadingMode == ViewportShadingMode.Wireframe)
+                    device.RasterizerState = _rasterStates[RasterizerStateEnum.Wireframe];
+                else
+                    device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
+
+                if (renderingTechnique == RenderingTechnique.Normal &&
+                    _renderLines.Count != 0)
+                {
+                    var shader =
+                        _resourceLibrary.GetStaticEffect(ShaderTypes.Line);
+                    shader.Parameters["View"].SetValue(
+                        commonShaderParameters.View);
+                    shader.Parameters["Projection"].SetValue(
+                        commonShaderParameters.Projection);
+                    shader.Parameters["World"].SetValue(Matrix.Identity);
+
+                    foreach (var pass in shader.CurrentTechnique.Passes)
+                    {
+                        pass.Apply();
+                        if (_renderLinesArray == null ||
+                            _renderLinesArray.Length < _renderLines.Count)
+                        {
+                            _renderLinesArray =
+                                new VertexPositionColor[_renderLines.Count];
+                        }
+                        _renderLines.CopyTo(_renderLinesArray, 0);
+                        device.DrawUserPrimitives(
+                            PrimitiveType.LineList,
+                            _renderLinesArray,
+                            0,
+                            _renderLines.Count / 2);
+                    }
+                }
+
+                foreach (var item in _renderItems[RenderBuckedId.Normal])
+                    item.Draw(device, commonShaderParameters, renderingTechnique);
+
+                device.RasterizerState =
+                    _rasterStates[RasterizerStateEnum.Wireframe];
+                foreach (var item in _renderItems[RenderBuckedId.Wireframe])
+                    item.Draw(device, commonShaderParameters, renderingTechnique);
+
+                if (renderingTechnique == RenderingTechnique.Normal &&
+                    _overlayLines.Count != 0)
+                {
+                    var shader =
+                        _resourceLibrary.GetStaticEffect(ShaderTypes.Line);
+                    shader.Parameters["View"].SetValue(
+                        commonShaderParameters.View);
+                    shader.Parameters["Projection"].SetValue(
+                        commonShaderParameters.Projection);
+                    shader.Parameters["World"].SetValue(Matrix.Identity);
+
+                    device.RasterizerState =
+                        _rasterStates[RasterizerStateEnum.Normal];
+                    foreach (var pass in shader.CurrentTechnique.Passes)
+                    {
+                        pass.Apply();
+                        if (_overlayLinesArray == null ||
+                            _overlayLinesArray.Length < _overlayLines.Count)
+                        {
+                            _overlayLinesArray =
+                                new VertexPositionColor[_overlayLines.Count];
+                        }
+                        _overlayLines.CopyTo(_overlayLinesArray, 0);
+                        device.DrawUserPrimitives(
+                            PrimitiveType.LineList,
+                            _overlayLinesArray,
+                            0,
+                            _overlayLines.Count / 2);
+                    }
+                }
+
+                device.RasterizerState =
+                    _rasterStates[RasterizerStateEnum.SelectedFaces];
+                foreach (var item in _renderItems[RenderBuckedId.Selection])
+                    item.Draw(device, commonShaderParameters, renderingTechnique);
+            }
+            finally
+            {
+                device.Viewport = previousViewport;
+            }
+        }
+
+        private void CaptureTransparentFrame(
+            GraphicsDevice device,
+            SpriteBatch spriteBatch,
+            Texture2D? bloomRenderTarget,
+            int width,
+            int height)
+        {
+            var state = GraphicsDeviceStateSnapshot.Capture(device);
+            try
+            {
+                _transparentCaptureTarget =
+                    RenderTargetHelper.GetRenderTarget(
+                        device,
+                        _transparentCaptureTarget,
+                        enableMsaa: false);
+                device.SetRenderTarget(_transparentCaptureTarget);
+                device.Clear(Color.Transparent);
+
+                spriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    BlendState.AlphaBlend);
+                spriteBatch.Draw(
+                    _defaultRenderTarget,
+                    new Rectangle(0, 0, width, height),
+                    Color.White);
+                spriteBatch.End();
+
+                if (bloomRenderTarget != null)
+                {
+                    spriteBatch.Begin(
+                        SpriteSortMode.Deferred,
+                        BlendState.Additive);
+                    spriteBatch.Draw(
+                        bloomRenderTarget,
+                        new Rectangle(0, 0, width, height),
+                        Color.White);
+                    spriteBatch.End();
                 }
             }
-
-            foreach (var item in _renderItems[RenderBuckedId.Normal])
-                item.Draw(device, commonShaderParameters, renderingTechnique);
-
-            device.RasterizerState = _rasterStates[RasterizerStateEnum.Wireframe];
-            foreach (var item in _renderItems[RenderBuckedId.Wireframe])
-                item.Draw(device, commonShaderParameters, renderingTechnique);
-
-            // Overlay lines rendered AFTER wireframe bucket (e.g. gradient edges for vertex selection)
-            if (renderingTechnique == RenderingTechnique.Normal && _overlayLines.Count != 0)
+            finally
             {
-                var shader = _resourceLibrary.GetStaticEffect(ShaderTypes.Line);
-                shader.Parameters["View"].SetValue(commonShaderParameters.View);
-                shader.Parameters["Projection"].SetValue(commonShaderParameters.Projection);
-                shader.Parameters["World"].SetValue(Matrix.Identity);
-
-                device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
-                foreach (var pass in shader.CurrentTechnique.Passes)
-                {
-                    pass.Apply();
-                    if (_overlayLinesArray == null || _overlayLinesArray.Length < _overlayLines.Count)
-                        _overlayLinesArray = new VertexPositionColor[_overlayLines.Count];
-                    _overlayLines.CopyTo(_overlayLinesArray, 0);
-                    device.DrawUserPrimitives(PrimitiveType.LineList, _overlayLinesArray, 0, _overlayLines.Count / 2);
-                }
+                state.Restore(device);
             }
-
-            device.RasterizerState = _rasterStates[RasterizerStateEnum.SelectedFaces];
-            foreach (var item in _renderItems[RenderBuckedId.Selection])
-                item.Draw(device, commonShaderParameters, renderingTechnique);
         }
 
         void EnsureSelectionMaskTarget(
@@ -377,11 +773,14 @@ namespace GameWorld.Core.Components.Rendering
             CommonSpriteBatch = null;
 
             _bloomFilter.Dispose();
+            _captureBloomFilter.Dispose();
             _outlineFilter.Dispose();
             _defaultRenderTarget.Dispose();
             _glowRenderTarget.Dispose();
             _selectionMaskTarget?.Dispose();
             _selectionMaskTarget = null;
+            _transparentCaptureTarget?.Dispose();
+            _transparentCaptureTarget = null;
             _whiteTexture.Dispose();
 
             _renderLines.Clear();

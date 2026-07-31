@@ -5,6 +5,7 @@ using Shared.Core.Events.Global;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Serialization;
+using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 
@@ -36,10 +37,25 @@ namespace Shared.Core.PackFiles
 
         public PackFileContainer? AddContainer(PackFileContainer container, bool setToMainPackIfFirst = false)
         {
+            return AddContainer(
+                container,
+                _packFileContainers.Count,
+                setToMainPackIfFirst,
+                PackFileContainerAddedReason.UserOpen);
+        }
+
+        public PackFileContainer? AddContainer(
+            PackFileContainer container,
+            int insertionIndex,
+            bool setEditablePack,
+            PackFileContainerAddedReason reason)
+        {
             if (EnforceGameFilesMustBeLoaded)
             {
                 var caPacksLoaded = _packFileContainers.Count(x => x.IsCaPackFile);
-                if (caPacksLoaded == 0 && container.IsCaPackFile == false)
+                if (caPacksLoaded == 0 &&
+                    container.IsCaPackFile == false &&
+                    container is not FolderProjectContainer)
                 {
                     MessageBoxProvider.ShowDialogBox(LocalizationManager.Instance.Get("Msg.LoadBeforeCaPackfile"), LocalizationManager.Instance.Get("Msg.GeneralError"));
                     return null;
@@ -49,24 +65,110 @@ namespace Shared.Core.PackFiles
             // Check if already added!
             foreach (var packFile in _packFileContainers)
             {
-                if (packFile.SystemFilePath == container.SystemFilePath)
+                if (string.Equals(
+                        packFile.SystemFilePath,
+                        container.SystemFilePath,
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     MessageBoxProvider.ShowDialogBox(LocalizationManager.Instance.GetFormat("Msg.PackFileAlreadyLoaded", packFile.SystemFilePath), LocalizationManager.Instance.Get("Msg.GeneralError"));
                     return null;
                 }
             }
 
-            AddContainerInternal(container, setToMainPackIfFirst);
-            return container;
+            var previousEditable = GetEditablePack();
+            try
+            {
+                AddContainerInternal(
+                    container,
+                    insertionIndex,
+                    setEditablePack,
+                    reason);
+                if (container is FolderProjectContainer folderProject)
+                {
+                    folderProject.FilesReconciled += OnFolderProjectReconciled;
+                    folderProject.StartWatching();
+                }
+                return container;
+            }
+            catch
+            {
+                RollbackFailedAdd(container, previousEditable);
+                throw;
+            }
         }
 
-        void AddContainerInternal(PackFileContainer container, bool setToMainPackIfFirst = false)
+        private void RollbackFailedAdd(
+            PackFileContainer container,
+            PackFileContainer? previousEditable)
         {
-            _packFileContainers.Add(container);
-            _globalEventHub?.PublishGlobalEvent(new PackFileContainerAddedEvent(container));
+            var removed = _packFileContainers.Remove(container);
+            bool editableChanged;
+            lock (s_saveGate)
+            {
+                editableChanged = !ReferenceEquals(
+                    _packFileContainerSelectedForEdit,
+                    previousEditable);
+                _packFileContainerSelectedForEdit = previousEditable;
+            }
+
+            if (editableChanged)
+            {
+                try
+                {
+                    _globalEventHub?.PublishGlobalEvent(
+                        new PackFileContainerSetAsMainEditableEvent(
+                            previousEditable));
+                }
+                catch
+                {
+                    // Preserve the original add failure.
+                }
+            }
+
+            if (removed)
+            {
+                try
+                {
+                    _globalEventHub?.PublishGlobalEvent(
+                        new PackFileContainerRemovedEvent(container));
+                }
+                catch
+                {
+                    // Preserve the original add failure.
+                }
+            }
+
+            if (container is FolderProjectContainer folderProject)
+            {
+                folderProject.FilesReconciled -=
+                    OnFolderProjectReconciled;
+                try
+                {
+                    folderProject.Dispose();
+                }
+                catch
+                {
+                    // Preserve the original add failure.
+                }
+            }
+        }
+
+        void AddContainerInternal(
+            PackFileContainer container,
+            int insertionIndex,
+            bool setEditablePack,
+            PackFileContainerAddedReason reason)
+        {
+            var index = Math.Clamp(
+                insertionIndex,
+                0,
+                _packFileContainers.Count);
+            _packFileContainers.Insert(index, container);
+            _globalEventHub?.PublishGlobalEvent(
+                new PackFileContainerAddedEvent(container, reason));
 
             var notCaPacksLoaded = _packFileContainers.Count(x => !x.IsCaPackFile);
-            if (container.IsCaPackFile == false && setToMainPackIfFirst)
+            if (container.IsCaPackFile == false && setEditablePack)
                 SetEditablePack(container);
         }
 
@@ -81,15 +183,34 @@ namespace Shared.Core.PackFiles
                 Header = new PFHeader(versionString, type),
             };
 
-            AddContainerInternal(newPackFile, setEditablePack);
+            AddContainerInternal(
+                newPackFile,
+                _packFileContainers.Count,
+                setEditablePack,
+                PackFileContainerAddedReason.UserOpen);
 
             return newPackFile;
         }
 
-        public void AddFilesToPack(PackFileContainer container, List<NewPackFileEntry> newFiles)
+        public void AddFilesToPack(
+            PackFileContainer container,
+            List<NewPackFileEntry> newFiles,
+            bool overwriteExisting = true)
         {
             if (container.IsCaPackFile)
                 throw new Exception("Can not add files to ca pack file");
+
+            if (container is FolderProjectContainer folderProject)
+            {
+                var addedFiles = folderProject.AddFiles(
+                    newFiles,
+                    overwriteExisting);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesAddedEvent(
+                        container,
+                        addedFiles));
+                return;
+            }
 
             foreach (var file in newFiles)
             {
@@ -115,15 +236,54 @@ namespace Shared.Core.PackFiles
         public void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target)
         {
             var lowerPath = path.Replace('/', '\\').ToLower().Trim();
-            if (source.FileList.ContainsKey(lowerPath))
+            var newFile = source is FolderProjectContainer sourceProject
+                ? sourceProject.ExecuteSynchronized(
+                    () => CloneFile(source, lowerPath))
+                : CloneFile(source, lowerPath);
+            if (newFile != null)
             {
-                var file = source.FileList[lowerPath];
-                var data = file.DataSource.ReadData();
-                var newFile = new PackFile(file.Name, new MemorySource(data));
+                if (target is FolderProjectContainer folderProject)
+                {
+                    var added = folderProject.AddFiles(
+                    [
+                        new NewPackFileEntry(
+                            Path.GetDirectoryName(lowerPath) ?? "",
+                            newFile),
+                    ]);
+                    _globalEventHub?.PublishGlobalEvent(
+                        new PackFileContainerFilesAddedEvent(
+                            target,
+                            added));
+                    return;
+                }
+
                 target.FileList[lowerPath] = newFile;
 
                 _globalEventHub?.PublishGlobalEvent(new PackFileContainerFilesAddedEvent(target, [newFile]));
             }
+        }
+
+        private static PackFile? CloneFile(
+            PackFileContainer source,
+            string path)
+        {
+            if (!source.FileList.TryGetValue(path, out var file))
+                return null;
+
+            return new PackFile(
+                file.Name,
+                new MemorySource(file.DataSource.ReadData()));
+        }
+
+        public void CreateFolder(
+            PackFileContainer container,
+            string folder)
+        {
+            if (container.IsCaPackFile)
+                throw new Exception("Can not create folders inside CA pack file");
+
+            if (container is FolderProjectContainer folderProject)
+                folderProject.CreateDirectoryOnDisk(folder);
         }
 
         public void SetEditablePack(PackFileContainer? pf)
@@ -141,23 +301,75 @@ namespace Shared.Core.PackFiles
 
         public void UnloadPackContainer(PackFileContainer pf)
         {
+            TryUnloadPackContainer(pf);
+        }
+
+        public bool TryUnloadPackContainer(PackFileContainer pf)
+        {
+            if (!_packFileContainers.Contains(pf))
+                return false;
+
             var e = new BeforePackFileContainerRemovedEvent(pf);
             _globalEventHub?.PublishGlobalEvent(e);
 
-            if (e.AllowClose == false)
-                return;
+            if (!e.AllowClose ||
+                !e.ExecuteApprovedCloseAction())
+            {
+                return false;
+            }
 
-            _packFileContainers.Remove(pf);
-            if (_packFileContainerSelectedForEdit == pf)
-                SetEditablePack(null);
+            if (!_packFileContainers.Remove(pf))
+                return false;
+            bool wasEditable;
+            lock (s_saveGate)
+            {
+                wasEditable = ReferenceEquals(
+                    _packFileContainerSelectedForEdit,
+                    pf);
+                if (wasEditable)
+                    _packFileContainerSelectedForEdit = null;
+            }
 
-            _globalEventHub?.PublishGlobalEvent(new PackFileContainerRemovedEvent(pf));
+            try
+            {
+                if (wasEditable)
+                {
+                    _globalEventHub?.PublishGlobalEvent(
+                        new PackFileContainerSetAsMainEditableEvent(null));
+                }
+            }
+            finally
+            {
+                try
+                {
+                    _globalEventHub?.PublishGlobalEvent(
+                        new PackFileContainerRemovedEvent(pf));
+                }
+                finally
+                {
+                    if (pf is FolderProjectContainer folderProject)
+                    {
+                        folderProject.FilesReconciled -=
+                            OnFolderProjectReconciled;
+                        folderProject.Dispose();
+                    }
+                }
+            }
+            return true;
         }
 
         public void DeleteFolder(PackFileContainer pf, string folder)
         {
             if (pf.IsCaPackFile)
                 throw new Exception("Can not delete folder inside CA pack file");
+
+            if (pf is FolderProjectContainer folderProject)
+            {
+                folderProject.DeleteFolderFromDisk(folder);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFolderRemovedEvent(pf, folder));
+                return;
+            }
 
             var filesToDelete = new List<string>();
             foreach (var file in pf.FileList)
@@ -184,6 +396,14 @@ namespace Shared.Core.PackFiles
             if (pf.IsCaPackFile)
                 throw new Exception("Can not delete files inside CA pack file");
 
+            if (pf is FolderProjectContainer folderProject)
+            {
+                folderProject.DeleteFileFromDisk(file);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesRemovedEvent(pf, [file]));
+                return;
+            }
+
             var key = pf.FileList.FirstOrDefault(x => x.Value == file).Key;
             _logger.Here().Information($"Deleting file {key}");
 
@@ -195,6 +415,16 @@ namespace Shared.Core.PackFiles
         {
             if (pf.IsCaPackFile)
                 throw new Exception("Can not move files inside CA pack file");
+
+            if (pf is FolderProjectContainer folderProject)
+            {
+                folderProject.MoveFileOnDisk(file, newFolderPath);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesRemovedEvent(pf, [file]));
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesAddedEvent(pf, [file]));
+                return;
+            }
 
             var newFullPath = newFolderPath + "\\" + file.Name;
 
@@ -216,6 +446,19 @@ namespace Shared.Core.PackFiles
 
             if (string.IsNullOrWhiteSpace(newName))
                 throw new Exception("Name can not be empty");
+
+            if (pf is FolderProjectContainer folderProject)
+            {
+                var projectNewNodePath =
+                    folderProject.RenameDirectoryOnDisk(
+                        currentNodeName,
+                        newName);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFolderRenamedEvent(
+                        pf,
+                        projectNewNodePath));
+                return;
+            }
 
             var oldNodePath = currentNodeName;
             var newNodePath = currentNodeName;
@@ -242,6 +485,14 @@ namespace Shared.Core.PackFiles
             if (string.IsNullOrWhiteSpace(newName))
                 throw new Exception("Name can not be empty");
 
+            if (pf is FolderProjectContainer folderProject)
+            {
+                folderProject.RenameFileOnDisk(file, newName);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesUpdatedEvent(pf, [file]));
+                return;
+            }
+
             var key = pf.FileList.FirstOrDefault(x => x.Value == file).Key;
             pf.FileList.Remove(key);
 
@@ -255,9 +506,15 @@ namespace Shared.Core.PackFiles
         public void SaveFile(PackFile file, byte[] data)
         {
             var pf = GetEditablePack();
+            if (pf == null)
+                throw new InvalidOperationException("No editable pack is selected.");
             if (pf.IsCaPackFile)
                 throw new Exception("Can not save ca pack file");
-            file.DataSource = new MemorySource(data);
+
+            if (pf is FolderProjectContainer folderProject)
+                folderProject.SaveFileData(file, data);
+            else
+                file.DataSource = new MemorySource(data);
 
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerFilesUpdatedEvent(pf, [file]));
             _globalEventHub?.PublishGlobalEvent(new PackFileSavedEvent(file));
@@ -266,7 +523,18 @@ namespace Shared.Core.PackFiles
         public void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation)
         {
             lock (s_saveGate)
-                SavePackContainerCore(pf, path, createBackup, gameInformation);
+            {
+                if (pf is FolderProjectContainer folderProject)
+                {
+                    SaveFolderProjectContainerCore(
+                        folderProject,
+                        path,
+                        createBackup,
+                        gameInformation);
+                }
+                else
+                    SavePackContainerCore(pf, path, createBackup, gameInformation);
+            }
 
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
         }
@@ -275,20 +543,128 @@ namespace Shared.Core.PackFiles
         {
             lock (s_saveGate)
             {
+                var currentPath =
+                    pf is FolderProjectContainer folderProject
+                        ? folderProject.ExecuteSynchronized(
+                            () => folderProject.ProjectSettings
+                                .OutputPackPath)
+                        : pf.SystemFilePath;
                 if (!ReferenceEquals(_packFileContainerSelectedForEdit, pf) ||
-                    !string.Equals(pf.SystemFilePath, expectedPath, StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(
+                        currentPath,
+                        expectedPath,
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     return false;
                 }
 
-                SavePackContainerCore(pf, expectedPath, false, gameInformation);
+                if (pf is FolderProjectContainer project)
+                {
+                    SaveFolderProjectContainerCore(
+                        project,
+                        expectedPath,
+                        false,
+                        gameInformation);
+                }
+                else
+                    SavePackContainerCore(pf, expectedPath, false, gameInformation);
             }
 
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
             return true;
         }
 
-        private void SavePackContainerCore(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation)
+        private void SaveFolderProjectContainerCore(
+            FolderProjectContainer project,
+            string path,
+            bool createBackup,
+            GameInformation gameInformation)
+        {
+            var outputPath = Path.GetFullPath(path);
+            var loadedOutput = _packFileContainers.FirstOrDefault(
+                container =>
+                    !ReferenceEquals(container, project) &&
+                    !string.IsNullOrWhiteSpace(
+                        container.SystemFilePath) &&
+                    string.Equals(
+                        Path.GetFullPath(container.SystemFilePath),
+                        outputPath,
+                        StringComparison.OrdinalIgnoreCase));
+            if (loadedOutput != null)
+            {
+                throw new InvalidOperationException(
+                    LocalizationManager.Instance.GetFormat(
+                        "Msg.PackFileAlreadyLoaded",
+                        outputPath));
+            }
+
+            project.ExecuteSynchronized(
+                () =>
+                {
+                    FolderProjectPathPolicy.EnsureOutputOutsideProject(
+                        project.ProjectRoot,
+                        path);
+
+                    var transient =
+                        new PackFileContainer(project.Name)
+                        {
+                            Header = new PFHeader(
+                                PackFileVersionConverter.ToString(
+                                    project.ProjectSettings
+                                        .PackFileVersion),
+                                project.ProjectSettings.PackFileType)
+                            {
+                                DependantFiles =
+                                    project.Header.DependantFiles
+                                        .ToList(),
+                            },
+                            SystemFilePath = path,
+                        };
+
+                    foreach (var (relativePath, file)
+                             in project.FileList)
+                    {
+                        if (FolderProjectPathPolicy.IsExcludedPath(
+                                relativePath) ||
+                            project.IsIgnored(relativePath))
+                        {
+                            continue;
+                        }
+
+                        transient.FileList[relativePath] =
+                            new PackFile(
+                                file.Name,
+                                file.DataSource);
+                    }
+
+                    if (project.ProjectSettings.GameVersion
+                        is { } gameVersion)
+                    {
+                        gameInformation =
+                            GameInformationDatabase.GetGameById(
+                                gameVersion);
+                    }
+
+                    SavePackContainerCore(
+                        transient,
+                        path,
+                        createBackup,
+                        gameInformation,
+                        project.ProjectSettings
+                            .EnablePackFileCorruptionDetection);
+
+                    project.ProjectSettings.OutputPackPath =
+                        Path.GetFullPath(path);
+                    project.SaveSettings();
+                });
+        }
+
+        private void SavePackContainerCore(
+            PackFileContainer pf,
+            string path,
+            bool createBackup,
+            GameInformation gameInformation,
+            bool enableCorruptionDetection = false)
         {
             var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
             try
@@ -327,7 +703,12 @@ namespace Shared.Core.PackFiles
                     var useCompression = SettingsService?.CurrentSettings.UseZstdCompression ?? true;
                     _logger.Here().Information($"Saving pack with compression={useCompression}");
                     serializationResult = PackFileSerializerWriter.SaveToByteArray(
-                        path, pf, writer, gameInformation, useCompression);
+                        path,
+                        pf,
+                        writer,
+                        gameInformation,
+                        useCompression,
+                        enableCorruptionDetection);
                 }
 
                 foreach (var parent in oldParents)
@@ -372,8 +753,14 @@ namespace Shared.Core.PackFiles
         {
             foreach (var pf in _packFileContainers)
             {
-                var res = pf.FileList.FirstOrDefault(x => x.Value == file).Value;
-                if (res != null)
+                var containsFile =
+                    pf is FolderProjectContainer folderProject
+                        ? folderProject.ExecuteSynchronized(
+                            () => pf.FileList.Values.Any(
+                                value => ReferenceEquals(value, file)))
+                        : pf.FileList.Values.Any(
+                            value => ReferenceEquals(value, file));
+                if (containsFile)
                     return pf;
             }
             _logger.Here().Information($"Unknown packfile container for {file.Name}");
@@ -388,17 +775,32 @@ namespace Shared.Core.PackFiles
             {
                 for (var i = _packFileContainers.Count - 1; i >= 0; i--)
                 {
-                    if (_packFileContainers[i].FileList.TryGetValue(lowerPath, out var value))
+                    var currentContainer = _packFileContainers[i];
+                    var value =
+                        currentContainer
+                            is FolderProjectContainer folderProject
+                            ? folderProject.ExecuteSynchronized(
+                                () => currentContainer.FileList
+                                    .GetValueOrDefault(lowerPath))
+                            : currentContainer.FileList
+                                .GetValueOrDefault(lowerPath);
+                    if (value != null)
                     {
                         if (EnableFileLookUpEvents)
-                            _globalEventHub?.PublishGlobalEvent(new PackFileLookUpEvent(path, _packFileContainers[i], true));
+                            _globalEventHub?.PublishGlobalEvent(new PackFileLookUpEvent(path, currentContainer, true));
                         return value;
                     }
                 }
             }
             else
             {
-                if (container.FileList.TryGetValue(lowerPath, out var value))
+                var value =
+                    container is FolderProjectContainer folderProject
+                        ? folderProject.ExecuteSynchronized(
+                            () => container.FileList
+                                .GetValueOrDefault(lowerPath))
+                        : container.FileList.GetValueOrDefault(lowerPath);
+                if (value != null)
                 {
                     if (EnableFileLookUpEvents)
                         _globalEventHub?.PublishGlobalEvent(new PackFileLookUpEvent(path, container, true));
@@ -417,19 +819,37 @@ namespace Shared.Core.PackFiles
             {
                 foreach (var pf in _packFileContainers)
                 {
-                    var res = pf.FileList.FirstOrDefault(x => ReferenceEquals(x.Value, file)).Key;
+                    var res =
+                        pf is FolderProjectContainer folderProject
+                            ? folderProject.ExecuteSynchronized(
+                                () => FindPath(pf, file))
+                            : FindPath(pf, file);
                     if (string.IsNullOrWhiteSpace(res) == false)
                         return res;
                 }
             }
             else
             {
-                var res = container.FileList.FirstOrDefault(x => ReferenceEquals(x.Value, file)).Key;
+                var res =
+                    container is FolderProjectContainer folderProject
+                        ? folderProject.ExecuteSynchronized(
+                            () => FindPath(container, file))
+                        : FindPath(container, file);
                 if (string.IsNullOrWhiteSpace(res) == false)
                     return res;
             }
 
             throw new Exception("Unknown path for " + file.Name);
+        }
+
+        private static string? FindPath(
+            PackFileContainer container,
+            PackFile file)
+        {
+            return container.FileList
+                .FirstOrDefault(
+                    pair => ReferenceEquals(pair.Value, file))
+                .Key;
         }
 
         /// <summary>
@@ -438,10 +858,56 @@ namespace Shared.Core.PackFiles
         /// </summary>
         private static void ClosePackedFileStreams(PackFileContainer container)
         {
-            foreach (var kvp in container.FileList)
+            if (container is FolderProjectContainer folderProject)
             {
-                if (kvp.Value.DataSource is PackedFileSource packedSource)
+                folderProject.ExecuteSynchronized(
+                    () => ClosePackedFileStreamsCore(container));
+                return;
+            }
+
+            ClosePackedFileStreamsCore(container);
+        }
+
+        private static void ClosePackedFileStreamsCore(
+            PackFileContainer container)
+        {
+            foreach (var file in container.FileList.Values)
+            {
+                if (file.DataSource is PackedFileSource packedSource)
                     packedSource.Parent.CloseStream();
+            }
+        }
+
+        private void OnFolderProjectReconciled(
+            object? sender,
+            FolderProjectReconciledEventArgs e)
+        {
+            if (sender is not FolderProjectContainer folderProject)
+                return;
+
+            if (e.RemovedFiles.Count != 0)
+            {
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesRemovedEvent(
+                        folderProject,
+                        e.RemovedFiles.ToList()));
+            }
+
+            if (e.AddedFiles.Count != 0)
+            {
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesAddedEvent(
+                        folderProject,
+                        e.AddedFiles.ToList()));
+            }
+
+            if (e.UpdatedFiles.Count != 0 ||
+                e.DirectoriesChanged)
+            {
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesUpdatedEvent(
+                        folderProject,
+                        e.UpdatedFiles.ToList()));
             }
         }
     }

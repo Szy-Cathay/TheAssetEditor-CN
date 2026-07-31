@@ -120,6 +120,45 @@ namespace Test.Shared.Core.PackFiles
         }
 
         [Test]
+        public void AddContainer_InternalReattach_RestoresIndexAndLookupOrder()
+        {
+            var eventHub = new Mock<IGlobalEventHub>();
+            var service = new PackFileService(eventHub.Object)
+            {
+                EnforceGameFilesMustBeLoaded = false,
+            };
+            var first = CreateContainer("first.pack", 1);
+            var reattached = CreateContainer("project", 2);
+            var last = CreateContainer("last.pack", 3);
+            service.AddContainer(first);
+            service.AddContainer(last);
+            eventHub.Invocations.Clear();
+
+            var result = service.AddContainer(
+                reattached,
+                1,
+                false,
+                PackFileContainerAddedReason.InternalReattach);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result, Is.SameAs(reattached));
+                Assert.That(
+                    service.GetAllPackfileContainers(),
+                    Is.EqualTo(new[] { first, reattached, last }));
+                Assert.That(
+                    service.FindFile("shared.bin"),
+                    Is.SameAs(last.FileList["shared.bin"]));
+            });
+            eventHub.Verify(
+                hub => hub.PublishGlobalEvent(
+                    new PackFileContainerAddedEvent(
+                        reattached,
+                        PackFileContainerAddedReason.InternalReattach)),
+                Times.Once);
+        }
+
+        [Test]
         public void CreateNewPackFileContainer()
         {
             // Arrenge
@@ -168,5 +207,18 @@ namespace Test.Shared.Core.PackFiles
         // UnloadPackContainer
         // SaveFile
         // SavePackContainer
+
+        private static PackFileContainer CreateContainer(
+            string path,
+            byte value)
+        {
+            var container = new PackFileContainer(path)
+            {
+                SystemFilePath = path,
+            };
+            container.FileList["shared.bin"] =
+                PackFile.CreateFromBytes("shared.bin", [value]);
+            return container;
+        }
     }
 }

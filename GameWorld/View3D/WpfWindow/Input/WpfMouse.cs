@@ -117,8 +117,7 @@ namespace GameWorld.Core.WpfWindow.Input
                     var res = LogicalTreeHelperEx.FindParent<Grid>(_focusElement);
                     if (res != null)
                     {
-                        var result = VisualTreeHelper.HitTest(res, pos);
-                        if (result?.VisualHit == _focusElement)
+                        if (HitTestFocusElement(res, pos, _focusElement))
                         {
                             _focusElement.Focus();
                         }
@@ -134,8 +133,7 @@ namespace GameWorld.Core.WpfWindow.Input
                 //if (res == null) return; <-- please see: https://github.com/donkeyProgramming/TheAssetEditor/pull/90#:~:text=Monogame.WpfInterop/Input/WpfMouse.cs
                 if (res != null)
                 {
-                    var result = VisualTreeHelper.HitTest(res, pos);
-                    if (result?.VisualHit == _focusElement)
+                    if (HitTestFocusElement(res, pos, _focusElement))
                         hit = true;
                 }
 
@@ -192,6 +190,16 @@ namespace GameWorld.Core.WpfWindow.Input
             return isMouseCaptured &&
                    leftButton == MouseButtonState.Released &&
                    middleButton == MouseButtonState.Released;
+        }
+
+        internal static bool HitTestFocusElement(
+            Grid parent,
+            Point position,
+            FrameworkElement focusElement)
+        {
+            return ReferenceEquals(
+                parent.InputHitTest(position),
+                focusElement);
         }
 
         private static double Clamp(double v, int min, double max)

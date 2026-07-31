@@ -22,20 +22,34 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 fileName = item.Name.Substring(0, index);
                 extension = item.Name.Substring(index);
             }
-            var newName = fileName + "_copy" + extension;
-            ReadAndSave(newName, item);
+            ReadAndSave(fileName, extension, item);
         }
 
-        private void ReadAndSave(string newName, PackFile item)
+        private void ReadAndSave(
+            string fileName,
+            string extension,
+            PackFile item)
         {
             var bytes = item.DataSource.ReadData();
-            var packFile = new PackFile(newName, new MemorySource(bytes));
             var parentPath = packFileService.GetFullPath(item);
             var path = Path.GetDirectoryName(parentPath);
             var editablePack = packFileService.GetEditablePack();
+            var newName = fileName + "_copy" + extension;
+            var suffix = 2;
+            while (packFileService.FindFile(
+                       Path.Combine(path ?? string.Empty, newName),
+                       editablePack) != null)
+            {
+                newName = $"{fileName}_copy_{suffix}{extension}";
+                suffix++;
+            }
 
+            var packFile = new PackFile(newName, new MemorySource(bytes));
             var fileEntry = new NewPackFileEntry(path, packFile);
-            packFileService.AddFilesToPack(editablePack, [fileEntry]);
+            packFileService.AddFilesToPack(
+                editablePack,
+                [fileEntry],
+                overwriteExisting: false);
         }
     }
 

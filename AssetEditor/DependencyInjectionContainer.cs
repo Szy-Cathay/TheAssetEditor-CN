@@ -2,6 +2,7 @@
 using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
 using AssetEditor.Views;
+using AssetEditor.Views.FolderProjectVersionControl;
 using AssetEditor.Views.Settings;
 using AssetEditor.Views.Updater;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,11 @@ namespace AssetEditor
 
             serviceCollection.AddTransient<OpenGamePackCommand>();
             serviceCollection.AddTransient<OpenPackFileCommand>();
+            serviceCollection.AddTransient<CreateFolderProjectCommand>();
+            serviceCollection.AddTransient<OpenFolderProjectCommand>();
+            serviceCollection.AddTransient<
+                OpenFolderProjectVersionControlCommand>();
+            serviceCollection.AddTransient<ImportPackAsFolderProjectCommand>();
             serviceCollection.AddTransient<OpenSettingsDialogCommand>();
             serviceCollection.AddTransient<OpenUpdaterWindowCommand>();
             serviceCollection.AddTransient<OpenWebpageCommand>();
@@ -35,11 +41,27 @@ namespace AssetEditor
             serviceCollection.AddTransient<SettingsViewModel>();
             serviceCollection.AddTransient<UpdaterWindow>();
             serviceCollection.AddTransient<UpdaterViewModel>();
+            serviceCollection.AddTransient<
+                FolderProjectVersionControlWindow>();
+            serviceCollection.AddTransient<
+                FolderProjectVersionControlViewModel>();
             serviceCollection.AddScoped<MenuBarViewModel>();
 
             serviceCollection.AddScoped<MainWindow>();
 
             serviceCollection.AddSingleton<RecentFilesTracker>();
+            serviceCollection.AddSingleton<
+                IFolderProjectGitOperationCoordinator,
+                FolderProjectGitOperationCoordinator>();
+            serviceCollection.AddScoped<
+                IFolderProjectOpenService,
+                FolderProjectOpenService>();
+            serviceCollection.AddScoped<
+                IFolderProjectVersionControlWindowService,
+                FolderProjectVersionControlWindowService>();
+            serviceCollection.AddScoped<
+                IFolderProjectCloseGuard,
+                FolderProjectCloseGuard>();
 
             serviceCollection.AddScoped<IExceptionInformationProvider, CurrentEditorExceptionInfoProvider>();
 

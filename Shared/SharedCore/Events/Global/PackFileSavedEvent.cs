@@ -7,7 +7,17 @@ namespace Shared.Core.Events.Global
     public record PackFileLookUpEvent(string FileName, PackFileContainer? Container, bool Found);
 
     public abstract record PackFileContainerManipulationEvent();
-    public record PackFileContainerAddedEvent(PackFileContainer Container) : PackFileContainerManipulationEvent;
+    public enum PackFileContainerAddedReason
+    {
+        UserOpen,
+        InternalReattach,
+    }
+
+    public record PackFileContainerAddedEvent(
+        PackFileContainer Container,
+        PackFileContainerAddedReason Reason =
+            PackFileContainerAddedReason.UserOpen)
+        : PackFileContainerManipulationEvent;
     public record PackFileContainerRemovedEvent(PackFileContainer Container) : PackFileContainerManipulationEvent;
     public record PackFileContainerSetAsMainEditableEvent(PackFileContainer? Container);
     public record PackFileContainerFilesUpdatedEvent(PackFileContainer Container, List<PackFile> ChangedFiles) : PackFileContainerManipulationEvent;
@@ -18,7 +28,37 @@ namespace Shared.Core.Events.Global
 
     public class BeforePackFileContainerRemovedEvent(PackFileContainer removed)
     {
+        private bool _allowClose = true;
+        private Func<bool>? _approvedCloseAction;
+
         public PackFileContainer Removed { get; internal set; } = removed;
-        public bool AllowClose { get; set; } = true;
+        public bool AllowClose
+        {
+            get => _allowClose;
+            set
+            {
+                if (!value)
+                    _allowClose = false;
+            }
+        }
+        public bool HasApprovedCloseAction =>
+            _approvedCloseAction != null;
+
+        public void SetApprovedCloseAction(Func<bool> action)
+        {
+            ArgumentNullException.ThrowIfNull(action);
+            if (_approvedCloseAction != null)
+            {
+                throw new InvalidOperationException(
+                    "A close action has already been registered.");
+            }
+
+            _approvedCloseAction = action;
+        }
+
+        internal bool ExecuteApprovedCloseAction()
+        {
+            return _approvedCloseAction?.Invoke() ?? true;
+        }
     }
 }

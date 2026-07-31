@@ -111,6 +111,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             Filter(FilterText);
         }
 
+        public void Refresh() => Filter(FilterText);
+
         private bool HasChildWithFilterMatch(TreeNode file, Regex expression)
         {
             if (file.NodeType == NodeType.Root && file.Children.Count == 0)

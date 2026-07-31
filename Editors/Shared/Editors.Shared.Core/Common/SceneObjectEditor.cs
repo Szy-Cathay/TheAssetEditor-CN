@@ -101,17 +101,7 @@ namespace Editors.Shared.Core.Common
             sceneObject.ShowMesh.Value = sceneObject.ShowMesh.Value;
             sceneObject.ShowSkeleton.Value = sceneObject.ShowSkeleton.Value;
 
-            loadedNode.ForeachNodeRecursive((node) =>
-            {
-                if (node is Rmv2MeshNode mesh && string.IsNullOrWhiteSpace(mesh.AttachmentPointName) == false)
-                {
-                    if (sceneObject.Skeleton != null)
-                    {
-                        var boneIndex = sceneObject.Skeleton.GetBoneIndexByName(mesh.AttachmentPointName);
-                        mesh.AttachmentBoneResolver = new SkeletonBoneAnimationResolver(sceneObject, boneIndex);
-                    }
-                }
-            });
+            WireAttachmentResolvers(sceneObject);
 
             _eventHub.Publish(new SceneObjectUpdateEvent(sceneObject, true, skeletonChanged, skeletonChanged, metaDataChanged));
             sceneObject.TriggerMeshChanged();
@@ -207,8 +197,48 @@ namespace Editors.Shared.Core.Common
             
             var file = _packFileService.FindFile(animationFileName);
             var animation = AnimationFile.Create(file);
+
+            if (assetViewModel.Skeleton == null)
+            {
+                assetViewModel.Skeleton = GameSkeleton.CreateFromAnimationFile(animation, assetViewModel.Player);
+                assetViewModel.SkeletonSceneNode.Skeleton = assetViewModel.Skeleton;
+            }
+
+            WireAttachmentResolvers(assetViewModel);
+
             var animationClip = new AnimationClip(animation, assetViewModel.Skeleton);
             SetAnimationClip(assetViewModel, animationClip, animationFileName);
+        }
+
+        internal static void WireAttachmentResolvers(SceneObject sceneObject)
+        {
+            if (sceneObject.ModelNode == null)
+                return;
+
+            sceneObject.ModelNode.ForeachNodeRecursive(node =>
+            {
+                if (node is not Rmv2MeshNode mesh)
+                    return;
+
+                if (!string.IsNullOrWhiteSpace(mesh.AttachmentPointName))
+                {
+                    var boneIndex = sceneObject.Skeleton?.GetBoneIndexByName(mesh.AttachmentPointName) ?? -1;
+                    mesh.AttachmentBoneResolver = boneIndex >= 0
+                        ? new SkeletonBoneAnimationResolver(sceneObject, boneIndex, useBindPoseWhenDisabled: true)
+                        : null;
+                }
+                else if (mesh.AnimationMatrixOverride >= 0)
+                {
+                    mesh.AttachmentBoneResolver =
+                        sceneObject.Skeleton != null &&
+                        mesh.AnimationMatrixOverride < sceneObject.Skeleton.BoneCount
+                            ? new SkeletonBoneAnimationResolver(
+                                sceneObject,
+                                mesh.AnimationMatrixOverride,
+                                useBindPoseWhenDisabled: true)
+                            : null;
+                }
+            });
         }
 
         public void SetAnimationClip(SceneObject assetViewModel, AnimationClip? clip, string animationName)

@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -28,13 +29,26 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
             {
                 var parentPath = _selectedNode.GetFullPath();
                 var files = dialog.FileNames;
+                var items = new List<NewPackFileEntry>();
                 foreach (var file in files)
                 {
                     var fileName = Path.GetFileName(file);
                     var packFile = new PackFile(fileName, new MemorySource(File.ReadAllBytes(file)));
-                    var item = new NewPackFileEntry(parentPath, packFile);
-                    packFileService.AddFilesToPack(_selectedNode.FileOwner, [item]);
+                    items.Add(new NewPackFileEntry(parentPath, packFile));
                 }
+
+                if (!FolderProjectImportSafety.TryApproveOverwrite(
+                        _selectedNode.FileOwner,
+                        items,
+                        out var overwriteExisting))
+                {
+                    return;
+                }
+
+                packFileService.AddFilesToPack(
+                    _selectedNode.FileOwner,
+                    items,
+                    overwriteExisting);
             }
         }
     }

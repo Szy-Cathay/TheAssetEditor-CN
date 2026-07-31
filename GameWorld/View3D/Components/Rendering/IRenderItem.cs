@@ -30,5 +30,6 @@ namespace GameWorld.Core.Components.Rendering
     {
         void Draw(GraphicsDevice device, CommonShaderParameters parameters, RenderingTechnique renderingTechnique);
         bool SupportsTechnique(RenderingTechnique technique) => false;
+        bool IncludeInPhotoCapture => true;
     }
 }

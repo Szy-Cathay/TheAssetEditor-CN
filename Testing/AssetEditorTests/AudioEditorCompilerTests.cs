@@ -65,13 +65,14 @@ namespace AssetEditorTests
                 Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
             var wrapper = new WSourcesWrapper(settings);
             using var cancellationTokenSource =
-                new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+                new CancellationTokenSource();
 
             var commandTask = wrapper.RunExternalCommandAsync(
                     "/d /c ping 127.0.0.1 -n 10 > nul",
                     cancellationTokenSource.Token);
 
             Assert.IsFalse(commandTask.IsCompleted);
+            cancellationTokenSource.Cancel();
             await Assert.ThrowsExceptionAsync<TaskCanceledException>(
                 () => commandTask);
         }

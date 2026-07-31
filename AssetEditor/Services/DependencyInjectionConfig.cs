@@ -35,6 +35,7 @@ namespace AssetEditor.Services
                 new Editors.AnimatioReTarget.DependencyInjectionContainer(),
                 new Editors.Twui.DependencyInjectionContainer(),
                 new Editors.Ipc.DependencyInjectionContainer(),
+                new Editors.CscEditor.DependencyInjectionContainer(),
 
                 // Host application
                 new DependencyInjectionContainer(),

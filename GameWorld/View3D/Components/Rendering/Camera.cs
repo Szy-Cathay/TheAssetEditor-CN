@@ -206,10 +206,16 @@ namespace GameWorld.Core.Components.Rendering
         private Matrix viewMatrix;
         private readonly IDeviceResolver _deviceResolverComponent;
 
+        public Matrix? ViewMatrixOverride { get; set; }
+        public Matrix? ProjectionMatrixOverride { get; set; }
+
         public Matrix ViewMatrix
         {
             get
             {
+                if (ViewMatrixOverride.HasValue)
+                    return ViewMatrixOverride.Value;
+
                 if (viewMatrixDirty)
                 {
                     ReCreateViewMatrix();
@@ -224,6 +230,9 @@ namespace GameWorld.Core.Components.Rendering
         {
             get
             {
+                if (ProjectionMatrixOverride.HasValue)
+                    return ProjectionMatrixOverride.Value;
+
                 // Check if viewport size changed (happens when window/viewport is resized)
                 if (_graphicsDevice != null)
                 {

@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using AssetEditor.Services;
 using AssetEditor.UiCommands;
 using CommonControls.BaseDialogs;
 using CommunityToolkit.Mvvm.Input;
@@ -14,6 +15,7 @@ using Editors.Reports.Files;
 using Editors.Reports.Geometry;
 using Editors.Shared.Core.Services;
 using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -34,9 +36,11 @@ namespace AssetEditor.ViewModels
         private readonly TouchedFilesRecorder _touchedFilesRecorder;
         private readonly IFileSaveService _packFileSaveService;
         private readonly IPackFileContainerLoader _packFileContainerLoader;
+        private readonly IFolderProjectOpenService _folderProjectOpenService;
         private readonly IStandardDialogs _standardDialogs;
 
         public ObservableCollection<RecentPackFileItem> RecentPackFiles { get; set; } = [];
+        public ObservableCollection<RecentPackFileItem> RecentFolderProjects { get; set; } = [];
         public ObservableCollection<EditorShortcutViewModel> Editors { get; set; } = [];
 
         public MenuBarViewModel(IPackFileService packfileService, 
@@ -46,7 +50,9 @@ namespace AssetEditor.ViewModels
             TouchedFilesRecorder touchedFilesRecorder, 
             IFileSaveService packFileSaveService,
             IPackFileContainerLoader packFileContainerLoader,
-            IStandardDialogs standardDialogs)
+            IFolderProjectOpenService folderProjectOpenService,
+            IStandardDialogs standardDialogs,
+            IEventHub eventHub)
         {
             _packfileService = packfileService;
             _settingsService = settingsService;
@@ -55,15 +61,36 @@ namespace AssetEditor.ViewModels
             _touchedFilesRecorder = touchedFilesRecorder;
             _packFileSaveService = packFileSaveService;
             _packFileContainerLoader = packFileContainerLoader;
+            _folderProjectOpenService = folderProjectOpenService;
             _standardDialogs = standardDialogs;
             var settings = settingsService.CurrentSettings;
             settings.RecentPackFilePaths.CollectionChanged += (sender, args) => CreateRecentPackFilesItems();
+            settings.RecentFolderProjectPaths.CollectionChanged +=
+                (sender, args) => CreateRecentFolderProjectItems();
             CreateRecentPackFilesItems();
+            CreateRecentFolderProjectItems();
             CreateTools();
+            eventHub.Register<PackFileContainerSetAsMainEditableEvent>(
+                this,
+                _ => OpenFolderProjectVersionControlCommand
+                    .NotifyCanExecuteChanged());
         }
 
         [RelayCommand] private void OpenSettingsWindow() => _uiCommandFactory.Create<OpenSettingsDialogCommand>().Execute();
         [RelayCommand] private void OpenPackFile() => _uiCommandFactory.Create<OpenPackFileCommand>().Execute();
+        [RelayCommand] private void CreateFolderProject() => _uiCommandFactory.Create<CreateFolderProjectCommand>().Execute();
+        [RelayCommand] private void OpenFolderProject() => _uiCommandFactory.Create<OpenFolderProjectCommand>().Execute();
+        [RelayCommand] private void ImportPackAsFolderProject() => _uiCommandFactory.Create<ImportPackAsFolderProjectCommand>().Execute();
+        [RelayCommand(CanExecute =
+            nameof(CanOpenFolderProjectVersionControl))]
+        private void OpenFolderProjectVersionControl() =>
+            _uiCommandFactory
+                .Create<OpenFolderProjectVersionControlCommand>()
+                .Execute();
+
+        private bool CanOpenFolderProjectVersionControl() =>
+            _packfileService.GetEditablePack() is
+                FolderProjectContainer;
         [RelayCommand] private void CreateNewPackFile()
         {
             var window = new TextInputWindow("New Pack Name", "");
@@ -159,6 +186,20 @@ namespace AssetEditor.ViewModels
             {
                 RecentPackFiles.Add(menuItem);
             }
+        }
+
+        void CreateRecentFolderProjectItems()
+        {
+            var settings = _settingsService.CurrentSettings;
+
+            RecentFolderProjects.Clear();
+            var items = settings.RecentFolderProjectPaths.Select(
+                path => new RecentPackFileItem(
+                    path,
+                    () => _folderProjectOpenService.Open(path)));
+
+            foreach (var item in items.Reverse())
+                RecentFolderProjects.Add(item);
         }
 
         void CreateTools()

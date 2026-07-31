@@ -51,6 +51,10 @@ namespace Shared.Ui
             services.AddScoped<SaveAsPackFileContainerCommand>();
             services.AddScoped<SavePackFileContainerCommand>();
             services.AddScoped<SetAsEditablePackCommand>();
+            services.AddScoped<ToggleFolderProjectIgnoreCommand>();
+            services.AddScoped<
+                ToggleFolderProjectCorruptionDetectionCommand>();
+            services.AddScoped<ChangeFolderProjectOutputCommand>();
         }
 
         public override void RegisterTools(IEditorDatabase factory)

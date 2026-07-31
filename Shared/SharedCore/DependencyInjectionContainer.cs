@@ -43,6 +43,10 @@ namespace Shared.Core
 
             services.AddSingleton<LocalizationManager>();
             services.AddSingleton<IPackFileContainerLoader, PackFileContainerLoader>();
+            services.AddSingleton<IFolderProjectFactory, FolderProjectFactory>();
+            services.AddSingleton<
+                IFolderProjectVersionControlService,
+                FolderProjectVersionControlService>();
             services.AddSingleton<PackAutoSaveService>();
         }
     }
