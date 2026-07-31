@@ -21,6 +21,37 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         string message);
 
+    void StageChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths);
+
+    void UnstageChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths);
+
+    void DiscardChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths);
+
+    FolderProjectCommitSummary CommitStaged(
+        string projectRoot,
+        string message);
+
+    void UndoLatestCommit(
+        string projectRoot,
+        string commitId,
+        FolderProjectCommitUndoMode mode);
+
+    FolderProjectCommitEditSession EditLatestCommitChanges(
+        string projectRoot,
+        string commitId,
+        IReadOnlyList<string> relativePaths,
+        FolderProjectCommitChangeEditMode mode);
+
+    FolderProjectCommitSummary CompleteLatestCommitEdit(
+        string projectRoot,
+        FolderProjectCommitEditSession editSession);
+
     IReadOnlyList<FolderProjectCommitSummary> GetHistory(
         string projectRoot,
         int maxCount = 100);
@@ -585,6 +616,16 @@ public sealed partial class FolderProjectVersionControlService :
         Commit tip,
         int maxCount)
     {
+        var masterCommitIds = repository.Branches["master"]?.Tip == null
+            ? null
+            : repository.Commits.QueryBy(
+                    new CommitFilter
+                    {
+                        IncludeReachableFrom =
+                            repository.Branches["master"].Tip,
+                    })
+                .Select(commit => commit.Sha)
+                .ToHashSet(StringComparer.Ordinal);
         return repository.Commits.QueryBy(
                 new CommitFilter
                 {
@@ -594,7 +635,14 @@ public sealed partial class FolderProjectVersionControlService :
                         CommitSortStrategies.Time,
                 })
             .Take(maxCount)
-            .Select(ToSummary)
+            .Select(
+                commit => ToSummary(
+                    commit,
+                    masterCommitIds == null
+                        ? FolderProjectCommitMergeStatus.Unknown
+                        : masterCommitIds.Contains(commit.Sha)
+                            ? FolderProjectCommitMergeStatus.Merged
+                            : FolderProjectCommitMergeStatus.NotMerged))
             .ToList();
     }
 
@@ -959,15 +1007,27 @@ public sealed partial class FolderProjectVersionControlService :
         return entry?.Target is Blob blob && blob.IsBinary;
     }
 
-    private static FolderProjectCommitSummary ToSummary(Commit commit)
+    private static FolderProjectCommitSummary ToSummary(
+        Commit commit,
+        FolderProjectCommitMergeStatus mergeStatus =
+            FolderProjectCommitMergeStatus.Unknown)
     {
+        var title = commit.MessageShort.Trim();
+        var fullMessage = commit.Message.TrimEnd();
+        var description = fullMessage.Length > title.Length
+            ? fullMessage[title.Length..].TrimStart('\r', '\n')
+            : "";
         return new FolderProjectCommitSummary(
             commit.Sha,
-            commit.MessageShort,
+            title,
             commit.Author.Name,
             commit.Author.Email,
             commit.Author.When,
-            commit.Parents.Select(parent => parent.Sha).ToList());
+            commit.Parents.Select(parent => parent.Sha).ToList())
+        {
+            Description = description,
+            MergeStatus = mergeStatus,
+        };
     }
 
     private static FolderProjectRepositoryOperationState GetOperationState(

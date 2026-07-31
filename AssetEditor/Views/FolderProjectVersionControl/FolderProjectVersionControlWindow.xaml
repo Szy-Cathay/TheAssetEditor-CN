@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:models="clr-namespace:Shared.Core.PackFiles.Models;assembly=Shared.Core"
     xmlns:windowhandling="clr-namespace:WindowHandling;assembly=Shared.Ui"
     mc:Ignorable="d"
     Title="{loc:Loc FolderProject.VersionControl.Title}"
@@ -15,6 +16,27 @@
     ResizeMode="CanResize"
     WindowStartupLocation="CenterOwner"
     Style="{StaticResource CustomWindowStyle}">
+    <windowhandling:AssetEditorWindow.Resources>
+        <Style
+            x:Key="SelectRowOnRightClickStyle"
+            TargetType="DataGridRow"
+            BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <EventSetter
+                Event="PreviewMouseRightButtonDown"
+                Handler="DataGridRow_PreviewMouseRightButtonDown" />
+        </Style>
+        <Style
+            x:Key="BranchRowStyle"
+            TargetType="DataGridRow"
+            BasedOn="{StaticResource SelectRowOnRightClickStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </windowhandling:AssetEditorWindow.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -58,60 +80,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock
-                            Margin="0,0,8,5"
-                            FontWeight="SemiBold"
-                            Text="{loc:Loc FolderProject.VersionControl.Repository}" />
-                        <TextBlock
-                            Grid.Column="1"
-                            Margin="0,0,18,5"
-                            Text="{loc:Loc FolderProject.VersionControl.Initialized}"
-                            Visibility="{Binding IsInitialized, Converter={StaticResource BoolToCollapsedConverter}}" />
-                        <TextBlock
-                            Grid.Column="1"
-                            Margin="0,0,18,5"
-                            Text="{loc:Loc FolderProject.VersionControl.Uninitialized}"
-                            Visibility="{Binding IsInitialized, Converter={StaticResource InvBoolToHiddenConverter}}" />
-                        <TextBlock
-                            Grid.Column="2"
-                            Margin="0,0,8,5"
-                            FontWeight="SemiBold"
-                            Text="{loc:Loc FolderProject.VersionControl.CurrentBranch}" />
-                        <TextBlock
-                            Grid.Column="3"
-                            Margin="0,0,0,5"
-                            Text="{Binding CurrentBranch}" />
-                        <TextBlock
-                            Grid.Row="1"
-                            Margin="0,0,8,0"
-                            FontWeight="SemiBold"
-                            Text="{loc:Loc FolderProject.VersionControl.Head}" />
-                        <TextBlock
-                            Grid.Row="1"
-                            Grid.Column="1"
-                            Margin="0,0,18,0"
-                            Text="{Binding HeadCommitId}"
-                            TextTrimming="CharacterEllipsis" />
-                        <TextBlock
-                            Grid.Row="1"
-                            Grid.Column="2"
-                            Grid.ColumnSpan="2"
-                            Text="{loc:Loc FolderProject.VersionControl.Detached}"
-                            Visibility="{Binding IsDetached, Converter={StaticResource BoolToCollapsedConverter}}" />
-                    </Grid>
-
-                    <Grid Grid.Row="1" Margin="0,12,0,10">
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="180" />
@@ -156,48 +125,248 @@
                             Content="{loc:Loc FolderProject.VersionControl.Initialize}" />
                     </Grid>
 
-                    <DataGrid
-                        Grid.Row="2"
-                        AutoGenerateColumns="False"
-                        CanUserAddRows="False"
-                        IsReadOnly="True"
-                        ItemsSource="{Binding WorkingChanges}"
-                        SelectionMode="Single">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn
-                                Width="*"
-                                MinWidth="400"
-                                Header="{loc:Loc FolderProject.VersionControl.Path}"
-                                Binding="{Binding RepositoryPath}" />
-                            <DataGridTextColumn
-                                Width="220"
-                                Header="{loc:Loc FolderProject.VersionControl.Kind}"
-                                Binding="{Binding KindText}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <Grid Grid.Row="3" Margin="0,10,0,0">
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock
                             Margin="0,0,8,0"
                             VerticalAlignment="Center"
-                            Text="{loc:Loc FolderProject.VersionControl.CommitMessage}" />
-                        <TextBox
+                            Text="{loc:Loc FolderProject.VersionControl.CurrentBranch}" />
+                        <ComboBox
                             Grid.Column="1"
-                            Height="30"
-                            Margin="0,0,10,0"
-                            VerticalContentAlignment="Center"
-                            Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}" />
+                            Height="28"
+                            Margin="0,0,8,0"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{Binding Branches}"
+                            SelectedItem="{Binding SelectedBranch}" />
                         <Button
                             Grid.Column="2"
                             MinWidth="120"
-                            Height="30"
-                            Command="{Binding CommitCommand}"
-                            Content="{loc:Loc FolderProject.VersionControl.Commit}" />
+                            Height="28"
+                            Margin="0,0,8,0"
+                            Command="{Binding SwitchBranchCommand}"
+                            Content="{loc:Loc FolderProject.VersionControl.SwitchBranch}" />
+                        <Button
+                            Grid.Column="3"
+                            MinWidth="130"
+                            Height="28"
+                            Command="{Binding CreateAndSwitchBranchCommand}"
+                            Content="{loc:Loc FolderProject.VersionControl.CreateAndSwitchBranch}" />
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                Margin="0,0,0,6"
+                                FontWeight="SemiBold"
+                                Text="{loc:Loc FolderProject.VersionControl.UnstagedChanges}" />
+                            <DataGrid
+                                Grid.Row="1"
+                                AutoGenerateColumns="False"
+                                CanUserAddRows="False"
+                                IsReadOnly="True"
+                                ItemsSource="{Binding UnstagedChanges}"
+                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
+                                SelectedItem="{Binding SelectedUnstagedChange}"
+                                SelectionChanged="UnstagedChanges_SelectionChanged"
+                                SelectionMode="Extended"
+                                SelectionUnit="FullRow">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.StageSelected}"
+                                            Command="{Binding StageSelectedCommand}" />
+                                        <Separator />
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}"
+                                            Command="{Binding DiscardUnstagedCommand}" />
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn
+                                        Width="*"
+                                        MinWidth="220"
+                                        Header="{loc:Loc FolderProject.VersionControl.Path}"
+                                        Binding="{Binding RepositoryPath}" />
+                                    <DataGridTextColumn
+                                        Width="130"
+                                        Header="{loc:Loc FolderProject.VersionControl.Kind}"
+                                        Binding="{Binding KindText}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel
+                                Grid.Row="2"
+                                Margin="0,7,0,0"
+                                HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                                <Button
+                                    MinWidth="100"
+                                    Height="28"
+                                    Margin="0,0,7,0"
+                                    Command="{Binding StageSelectedCommand}"
+                                    Content="{loc:Loc FolderProject.VersionControl.StageSelected}" />
+                                <Button
+                                    MinWidth="90"
+                                    Height="28"
+                                    Margin="0,0,7,0"
+                                    Command="{Binding StageAllCommand}"
+                                    Content="{loc:Loc FolderProject.VersionControl.StageAll}" />
+                                <Button
+                                    MinWidth="110"
+                                    Height="28"
+                                    Command="{Binding DiscardUnstagedCommand}"
+                                    Content="{loc:Loc FolderProject.VersionControl.DiscardSelected}" />
+                            </StackPanel>
+                        </Grid>
+                        <GridSplitter
+                            Grid.Column="1"
+                            Width="6"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch" />
+                        <Grid Grid.Column="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                Margin="0,0,0,6"
+                                FontWeight="SemiBold"
+                                Text="{loc:Loc FolderProject.VersionControl.StagedChanges}" />
+                            <DataGrid
+                                Grid.Row="1"
+                                AutoGenerateColumns="False"
+                                CanUserAddRows="False"
+                                IsReadOnly="True"
+                                ItemsSource="{Binding StagedChanges}"
+                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
+                                SelectedItem="{Binding SelectedStagedChange}"
+                                SelectionChanged="StagedChanges_SelectionChanged"
+                                SelectionMode="Extended"
+                                SelectionUnit="FullRow">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.UnstageSelected}"
+                                            Command="{Binding UnstageSelectedCommand}" />
+                                        <Separator />
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}"
+                                            Command="{Binding DiscardStagedCommand}" />
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn
+                                        Width="*"
+                                        MinWidth="220"
+                                        Header="{loc:Loc FolderProject.VersionControl.Path}"
+                                        Binding="{Binding RepositoryPath}" />
+                                    <DataGridTextColumn
+                                        Width="130"
+                                        Header="{loc:Loc FolderProject.VersionControl.Kind}"
+                                        Binding="{Binding KindText}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel
+                                Grid.Row="2"
+                                Margin="0,7,0,0"
+                                HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                                <Button
+                                    MinWidth="110"
+                                    Height="28"
+                                    Margin="0,0,7,0"
+                                    Command="{Binding UnstageSelectedCommand}"
+                                    Content="{loc:Loc FolderProject.VersionControl.UnstageSelected}" />
+                                <Button
+                                    MinWidth="100"
+                                    Height="28"
+                                    Margin="0,0,7,0"
+                                    Command="{Binding UnstageAllCommand}"
+                                    Content="{loc:Loc FolderProject.VersionControl.UnstageAll}" />
+                                <Button
+                                    MinWidth="110"
+                                    Height="28"
+                                    Command="{Binding DiscardStagedCommand}"
+                                    Content="{loc:Loc FolderProject.VersionControl.DiscardSelected}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+                    <Grid Grid.Row="3" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <Button
+                                MinWidth="120"
+                                Height="28"
+                                HorizontalAlignment="Left"
+                                Command="{Binding DiscardAllCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.DiscardAll}" />
+                            <StackPanel
+                                Margin="0,8,0,0"
+                                Orientation="Horizontal">
+                                <TextBlock
+                                    Margin="0,0,8,0"
+                                    FontWeight="SemiBold"
+                                    Text="{loc:Loc FolderProject.VersionControl.Repository}" />
+                                <TextBlock
+                                    Text="{loc:Loc FolderProject.VersionControl.Initialized}"
+                                    Visibility="{Binding IsInitialized, Converter={StaticResource BoolToCollapsedConverter}}" />
+                                <TextBlock
+                                    Text="{loc:Loc FolderProject.VersionControl.Uninitialized}"
+                                    Visibility="{Binding IsInitialized, Converter={StaticResource InvBoolToHiddenConverter}}" />
+                            </StackPanel>
+                            <StackPanel
+                                Margin="0,3,0,0"
+                                Orientation="Horizontal">
+                                <TextBlock
+                                    Margin="0,0,8,0"
+                                    FontWeight="SemiBold"
+                                    Text="{loc:Loc FolderProject.VersionControl.Head}" />
+                                <TextBlock
+                                    MaxWidth="430"
+                                    Text="{Binding HeadCommitId}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    Margin="10,0,0,0"
+                                    Text="{loc:Loc FolderProject.VersionControl.Detached}"
+                                    Visibility="{Binding IsDetached, Converter={StaticResource BoolToCollapsedConverter}}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Bottom"
+                            Orientation="Horizontal">
+                            <Button
+                                MinWidth="120"
+                                Height="30"
+                                Margin="0,0,8,0"
+                                Command="{Binding ReturnChangesToOriginalCommitCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.ReturnChangesToOriginalCommit}" />
+                            <Button
+                                MinWidth="120"
+                                Height="30"
+                                Command="{Binding CommitCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.Commit}" />
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </TabItem>
@@ -235,35 +404,73 @@
                     </Grid>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="0.48*" />
+                            <ColumnDefinition Width="0.55*" />
                             <ColumnDefinition Width="5" />
-                            <ColumnDefinition Width="0.52*" />
+                            <ColumnDefinition Width="0.45*" />
                         </Grid.ColumnDefinitions>
                         <DataGrid
                             AutoGenerateColumns="False"
                             CanUserAddRows="False"
                             IsReadOnly="True"
                             ItemsSource="{Binding History}"
+                            RowStyle="{StaticResource SelectRowOnRightClickStyle}"
                             SelectedItem="{Binding SelectedCommit}"
                             SelectionMode="Single">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem
+                                        Header="{loc:Loc FolderProject.VersionControl.UndoLatestCommitKeepChanges}"
+                                        Command="{Binding UndoLatestCommitKeepChangesCommand}" />
+                                    <MenuItem
+                                        Header="{loc:Loc FolderProject.VersionControl.UndoLatestCommitAndDiscardChanges}"
+                                        Command="{Binding UndoLatestCommitAndDiscardChangesCommand}" />
+                                    <Separator />
+                                    <MenuItem
+                                        Header="{loc:Loc FolderProject.VersionControl.CreateRecoveryBranch}"
+                                        Command="{Binding CreateRecoveryBranchCommand}" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTextColumn
-                                    Width="80"
-                                    Header="{loc:Loc FolderProject.VersionControl.CommitId}"
-                                    Binding="{Binding ShortId}" />
-                                <DataGridTextColumn
                                     Width="*"
-                                    MinWidth="160"
-                                    Header="{loc:Loc FolderProject.VersionControl.Message}"
-                                    Binding="{Binding Message}" />
+                                    MinWidth="140"
+                                    Header="{loc:Loc FolderProject.VersionControl.CommitTitleColumn}"
+                                    Binding="{Binding Title}" />
                                 <DataGridTextColumn
-                                    Width="120"
+                                    Width="95"
                                     Header="{loc:Loc FolderProject.VersionControl.Author}"
                                     Binding="{Binding AuthorName}" />
                                 <DataGridTextColumn
                                     Width="130"
                                     Header="{loc:Loc FolderProject.VersionControl.Time}"
                                     Binding="{Binding CommittedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
+                                <DataGridTemplateColumn
+                                    Width="86"
+                                    Header="{loc:Loc FolderProject.VersionControl.CommitMergeStatus}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="{loc:Loc FolderProject.VersionControl.CommitMergeStatus.Unknown}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding MergeStatus}" Value="{x:Static models:FolderProjectCommitMergeStatus.Merged}">
+                                                                <Setter Property="Text" Value="{loc:Loc FolderProject.VersionControl.CommitMergeStatus.Merged}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding MergeStatus}" Value="{x:Static models:FolderProjectCommitMergeStatus.NotMerged}">
+                                                                <Setter Property="Text" Value="{loc:Loc FolderProject.VersionControl.CommitMergeStatus.NotMerged}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn
+                                    Width="74"
+                                    Header="{loc:Loc FolderProject.VersionControl.CommitId}"
+                                    Binding="{Binding ShortId}" />
                             </DataGrid.Columns>
                         </DataGrid>
                         <GridSplitter
@@ -271,14 +478,48 @@
                             Width="5"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch" />
-                        <DataGrid
-                            Grid.Column="2"
+                        <Grid Grid.Column="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontWeight="SemiBold"
+                                Text="{loc:Loc FolderProject.VersionControl.CommitDescriptionLabel}" />
+                            <TextBox
+                                Grid.Row="1"
+                                MinHeight="68"
+                                MaxHeight="110"
+                                Margin="0,0,0,8"
+                                AcceptsReturn="True"
+                                HorizontalScrollBarVisibility="Disabled"
+                                IsReadOnly="True"
+                                Text="{Binding SelectedCommit.Description}"
+                                TextWrapping="Wrap"
+                                VerticalScrollBarVisibility="Auto" />
+                            <DataGrid
+                            Grid.Row="2"
                             AutoGenerateColumns="False"
                             CanUserAddRows="False"
                             IsReadOnly="True"
                             ItemsSource="{Binding CommitChanges}"
+                            RowStyle="{StaticResource SelectRowOnRightClickStyle}"
                             SelectedItem="{Binding SelectedCommitChange}"
-                            SelectionMode="Single">
+                            SelectionChanged="CommitChanges_SelectionChanged"
+                            SelectionMode="Extended"
+                            SelectionUnit="FullRow">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem
+                                        Header="{loc:Loc FolderProject.VersionControl.RestoreCommitChangesToStage}"
+                                        Command="{Binding RestoreCommitChangesToStageCommand}" />
+                                    <MenuItem
+                                        Header="{loc:Loc FolderProject.VersionControl.DiscardCommitChanges}"
+                                        Command="{Binding DiscardCommitChangesCommand}" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTextColumn
                                     Width="*"
@@ -298,44 +539,69 @@
                                     Header="{loc:Loc FolderProject.VersionControl.Binary}"
                                     Binding="{Binding BinaryText}" />
                             </DataGrid.Columns>
-                        </DataGrid>
+                            </DataGrid>
+                        </Grid>
                     </Grid>
                     <Grid Grid.Row="2" Margin="0,10,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="180" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock
-                            Margin="0,0,8,0"
-                            VerticalAlignment="Center"
-                            Text="{loc:Loc FolderProject.VersionControl.RecoveryBranchName}" />
-                        <TextBox
-                            Grid.Column="1"
-                            Height="30"
-                            Margin="0,0,8,0"
-                            VerticalContentAlignment="Center"
-                            Text="{Binding RecoveryBranchName, UpdateSourceTrigger=PropertyChanged}" />
                         <Button
-                            Grid.Column="2"
                             MinWidth="170"
                             Height="30"
                             Command="{Binding CreateRecoveryBranchCommand}"
                             Content="{loc:Loc FolderProject.VersionControl.CreateRecoveryBranch}" />
-                        <Button
-                            Grid.Column="4"
-                            MinWidth="130"
-                            Height="30"
-                            Command="{Binding RestoreFileCommand}"
-                            Content="{loc:Loc FolderProject.VersionControl.Restore}" />
+                        <StackPanel
+                            Grid.Column="2"
+                            Orientation="Horizontal">
+                            <Button
+                                MinWidth="120"
+                                Height="30"
+                                Margin="0,0,8,0"
+                                Command="{Binding RestoreCommitChangesToStageCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.RestoreCommitChangesToStage}" />
+                            <Button
+                                MinWidth="100"
+                                Height="30"
+                                Command="{Binding DiscardCommitChangesCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.DiscardCommitChanges}" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Row="1"
+                            Grid.ColumnSpan="3"
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Right"
+                            Orientation="Horizontal">
+                            <Button
+                                MinWidth="180"
+                                Height="30"
+                                Margin="0,0,8,0"
+                                Command="{Binding UndoLatestCommitKeepChangesCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.UndoLatestCommitKeepChanges}" />
+                            <Button
+                                MinWidth="210"
+                                Height="30"
+                                Command="{Binding UndoLatestCommitAndDiscardChangesCommand}"
+                                Content="{loc:Loc FolderProject.VersionControl.UndoLatestCommitAndDiscardChanges}" />
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </TabItem>
 
             <TabItem Header="{loc:Loc FolderProject.VersionControl.Tab.Branches}">
                 <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="0.38*" MinHeight="180" />
+                        <RowDefinition Height="6" />
+                        <RowDefinition Height="0.62*" MinHeight="230" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
@@ -346,8 +612,18 @@
                         CanUserAddRows="False"
                         IsReadOnly="True"
                         ItemsSource="{Binding Branches}"
+                        RowStyle="{StaticResource BranchRowStyle}"
                         SelectedItem="{Binding SelectedBranch}"
                         SelectionMode="Single">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="{loc:Loc FolderProject.VersionControl.SwitchBranch}" Command="{Binding SwitchBranchCommand}" />
+                                <MenuItem Header="{loc:Loc FolderProject.VersionControl.PrepareMerge}" Command="{Binding PrepareMergeCommand}" />
+                                <Separator />
+                                <MenuItem Header="{loc:Loc FolderProject.VersionControl.RenameBranch}" Command="{Binding RenameBranchCommand}" />
+                                <MenuItem Header="{loc:Loc FolderProject.VersionControl.DeleteBranch}" Command="{Binding DeleteBranchCommand}" />
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn
                                 Width="*"
@@ -359,10 +635,6 @@
                                 MinWidth="360"
                                 Header="{loc:Loc FolderProject.VersionControl.BranchTip}"
                                 Binding="{Binding TipCommitId}" />
-                            <DataGridCheckBoxColumn
-                                Width="80"
-                                Header="{loc:Loc FolderProject.VersionControl.BranchCurrent}"
-                                Binding="{Binding IsCurrent}" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock
@@ -378,37 +650,24 @@
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="190" />
-                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock
-                            Margin="0,0,8,0"
-                            VerticalAlignment="Center"
-                            Text="{loc:Loc FolderProject.VersionControl.BranchName}" />
-                        <TextBox
-                            Grid.Column="1"
-                            Height="30"
-                            Margin="0,0,8,0"
-                            VerticalContentAlignment="Center"
-                            Text="{Binding BranchName, UpdateSourceTrigger=PropertyChanged}" />
                         <Button
-                            Grid.Column="2"
                             MinWidth="100"
                             Height="30"
                             Margin="0,0,8,0"
                             Command="{Binding CreateBranchCommand}"
                             Content="{loc:Loc FolderProject.VersionControl.CreateBranch}" />
                         <Button
-                            Grid.Column="3"
+                            Grid.Column="1"
                             MinWidth="130"
                             Height="30"
                             Command="{Binding RenameBranchCommand}"
                             Content="{loc:Loc FolderProject.VersionControl.RenameBranch}" />
                         <StackPanel
                             Grid.Row="1"
-                            Grid.ColumnSpan="5"
+                            Grid.ColumnSpan="3"
                             Margin="0,8,0,0"
                             HorizontalAlignment="Right"
                             Orientation="Horizontal">
@@ -431,11 +690,13 @@
                                 Content="{loc:Loc FolderProject.VersionControl.DeleteBranch}" />
                         </StackPanel>
                     </Grid>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="{loc:Loc FolderProject.VersionControl.Tab.Merge}">
-                <Grid Margin="10">
+                    </Grid>
+                    <GridSplitter
+                        Grid.Row="1"
+                        Height="6"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch" />
+                    <Grid Grid.Row="2">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -504,8 +765,17 @@
                         CanUserAddRows="False"
                         IsReadOnly="True"
                         ItemsSource="{Binding MergeConflicts}"
+                        RowStyle="{StaticResource SelectRowOnRightClickStyle}"
                         SelectedItem="{Binding SelectedMergeConflict}"
-                        SelectionMode="Single">
+                        SelectionChanged="MergeConflicts_SelectionChanged"
+                        SelectionMode="Extended"
+                        SelectionUnit="FullRow">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="{loc:Loc FolderProject.VersionControl.UseCurrent}" Command="{Binding UseCurrentCommand}" />
+                                <MenuItem Header="{loc:Loc FolderProject.VersionControl.UseIncoming}" Command="{Binding UseIncomingCommand}" />
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn
                                 Width="1.1*"
@@ -548,38 +818,25 @@
                                 Command="{Binding UseIncomingCommand}"
                                 Content="{loc:Loc FolderProject.VersionControl.UseIncoming}" />
                         </StackPanel>
-                        <Grid Grid.Row="1" Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                Margin="0,0,8,0"
-                                VerticalAlignment="Center"
-                                Text="{loc:Loc FolderProject.VersionControl.CommitMessage}" />
-                            <TextBox
-                                Grid.Column="1"
-                                Height="30"
-                                Margin="0,0,8,0"
-                                VerticalContentAlignment="Center"
-                                Text="{Binding MergeMessage, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel
+                            Grid.Row="1"
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Right"
+                            Orientation="Horizontal">
                             <Button
-                                Grid.Column="2"
                                 MinWidth="110"
                                 Height="30"
                                 Margin="0,0,8,0"
                                 Command="{Binding CompleteMergeCommand}"
                                 Content="{loc:Loc FolderProject.VersionControl.CompleteMerge}" />
                             <Button
-                                Grid.Column="3"
                                 MinWidth="100"
                                 Height="30"
                                 Command="{Binding AbortMergeCommand}"
                                 Content="{loc:Loc FolderProject.VersionControl.AbortMerge}" />
-                        </Grid>
+                        </StackPanel>
                     </Grid>
+                </Grid>
                 </Grid>
             </TabItem>
         </TabControl>

@@ -1,0 +1,64 @@
+<Window
+    x:Class="CommonControls.BaseDialogs.TitleDescriptionInputWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:Shared.Ui.Common"
+    Title=""
+    Width="520"
+    Height="360"
+    ResizeMode="NoResize"
+    WindowStartupLocation="CenterOwner"
+    Background="#FF1C1C1C">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            x:Name="TitleLabel"
+            Margin="0,0,0,6" />
+        <TextBox
+            x:Name="TitleTextBox"
+            Grid.Row="1"
+            Height="30"
+            VerticalContentAlignment="Center"
+            HorizontalScrollBarVisibility="Auto"
+            TextChanged="TitleTextBox_TextChanged"
+            TextWrapping="NoWrap" />
+
+        <TextBlock
+            x:Name="DescriptionLabel"
+            Grid.Row="2"
+            Margin="0,12,0,6" />
+        <TextBox
+            x:Name="DescriptionTextBox"
+            Grid.Row="3"
+            AcceptsReturn="True"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            TextWrapping="Wrap" />
+
+        <StackPanel
+            Grid.Row="4"
+            Margin="0,12,0,0"
+            HorizontalAlignment="Right"
+            Orientation="Horizontal">
+            <Button
+                x:Name="OkButton"
+                Width="90"
+                Margin="0,0,8,0"
+                Click="Ok_Click"
+                Content="{loc:Loc General.Ok}"
+                IsDefault="True" />
+            <Button
+                Width="90"
+                Click="Cancel_Click"
+                Content="{loc:Loc General.Cancel}"
+                IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>

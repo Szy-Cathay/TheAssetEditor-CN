@@ -295,6 +295,48 @@ public class FolderProjectContextMenuTests
         }
     }
 
+    [NUnit.Framework.Test]
+    public void PackTreeContextMenus_ContainNoEnglishSectionNames()
+    {
+        var serviceProvider = new DependencyInjectionConfig(false).Build(true);
+        using var scope = serviceProvider.CreateScope();
+        var services = scope.ServiceProvider;
+        services.GetRequiredService<LocalizationManager>().LoadLanguage();
+        var pack = new PackFileContainer("测试 Pack")
+        {
+            Header = new PFHeader(
+                PackFileVersionConverter.ToString(PackFileVersion.PFH5),
+                PackFileCAType.MOD),
+        };
+        var root = new TreeNode(
+            pack.Name,
+            NodeType.Root,
+            pack,
+            null);
+        var file = new TreeNode(
+            "file.bin",
+            NodeType.File,
+            pack,
+            root,
+            PackFile.CreateFromBytes("file.bin", [1]));
+        root.Children.Add(file);
+        var menuBuilder = services
+            .GetServices<IContextMenuBuilder>()
+            .Single(
+                builder =>
+                    builder.Type == ContextMenuType.MainApplication);
+
+        var names = FlattenMenuNames(menuBuilder.Build(root))
+            .Concat(FlattenMenuNames(menuBuilder.Build(file)))
+            .ToList();
+
+        NUnitAssert.That(
+            names,
+            NUnit.Framework.Does.Not.Contain("Open")
+                .And.Not.Contain("Import")
+                .And.Not.Contain("Create"));
+    }
+
     private static bool ContainsMenuItem(
         IEnumerable<ContextMenuItem2?> items,
         string displayName)
@@ -306,5 +348,19 @@ public class FolderProjectContextMenuTests
                  ContainsMenuItem(
                      item.ContextMenu,
                      displayName)));
+    }
+
+    private static IEnumerable<string> FlattenMenuNames(
+        IEnumerable<ContextMenuItem2?> items)
+    {
+        foreach (var item in items)
+        {
+            if (item == null)
+                continue;
+
+            yield return item.Name;
+            foreach (var name in FlattenMenuNames(item.ContextMenu))
+                yield return name;
+        }
     }
 }

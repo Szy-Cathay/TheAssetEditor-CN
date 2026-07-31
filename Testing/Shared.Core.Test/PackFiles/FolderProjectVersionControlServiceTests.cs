@@ -513,6 +513,588 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void StageAndUnstageChanges_OnlyUpdatesSelectedFiles()
+    {
+        using var project = new TemporaryDirectory("stage-selection");
+        var service = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "first.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "second.txt"), "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "first.txt"), "two");
+        File.WriteAllText(Path.Combine(project.Path, "second.txt"), "two");
+
+        service.StageChanges(project.Path, ["first.txt"]);
+
+        var staged = service.GetStatus(project.Path).Changes;
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                staged.Single(change => change.RepositoryPath == "first.txt")
+                    .Kind.HasFlag(FolderProjectWorkingChangeKind.Staged),
+                Is.True);
+            Assert.That(
+                staged.Single(change => change.RepositoryPath == "second.txt")
+                    .Kind.HasFlag(FolderProjectWorkingChangeKind.Staged),
+                Is.False);
+        });
+
+        service.UnstageChanges(project.Path, ["first.txt"]);
+
+        var unstaged = service.GetStatus(project.Path).Changes;
+        Assert.That(
+            unstaged.All(
+                change =>
+                    change.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Unstaged) &&
+                    !change.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Staged)),
+            Is.True);
+    }
+
+    [Test]
+    public void StageAndDiscardChanges_AllowsTrackedProjectControlFile()
+    {
+        using var project = new TemporaryDirectory("stage-project-control");
+        var service = new FolderProjectVersionControlService();
+        var settingsPath = Path.Combine(
+            project.Path,
+            FolderProjectSettings.CnFileName);
+        File.WriteAllText(settingsPath, "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(settingsPath, "two");
+
+        service.StageChanges(
+            project.Path,
+            [FolderProjectSettings.CnFileName]);
+
+        var staged = service.GetStatus(project.Path).Changes.Single();
+        Assert.That(
+            staged.Kind.HasFlag(FolderProjectWorkingChangeKind.Staged),
+            Is.True);
+
+        service.DiscardChanges(
+            project.Path,
+            [FolderProjectSettings.CnFileName]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(settingsPath), Is.EqualTo("one"));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void CommitStaged_LeavesUnstagedFilesOutOfCommit()
+    {
+        using var project = new TemporaryDirectory("commit-staged");
+        var service = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "staged.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "working.txt"), "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "staged.txt"), "two");
+        File.WriteAllText(Path.Combine(project.Path, "working.txt"), "two");
+        service.StageChanges(project.Path, ["staged.txt"]);
+
+        var commit = service.CommitStaged(project.Path, "只提交暂存内容");
+
+        using var repository = new Repository(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(repository.Head.Tip!.Sha, Is.EqualTo(commit.Id));
+            Assert.That(
+                ((Blob)repository.Head.Tip.Tree["staged.txt"].Target)
+                    .GetContentText(),
+                Is.EqualTo("two"));
+            Assert.That(
+                ((Blob)repository.Head.Tip.Tree["working.txt"].Target)
+                    .GetContentText(),
+                Is.EqualTo("one"));
+            Assert.That(File.ReadAllText(
+                Path.Combine(project.Path, "working.txt")),
+                Is.EqualTo("two"));
+            Assert.That(
+                service.GetStatus(project.Path).Changes.Single()
+                    .RepositoryPath,
+                Is.EqualTo("working.txt"));
+        });
+    }
+
+    [Test]
+    public void DiscardChanges_RestoresTrackedFilesAndRemovesAddedFile()
+    {
+        using var project = new TemporaryDirectory("discard-changes");
+        var service = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "modified.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "deleted.txt"), "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "modified.txt"), "two");
+        File.Delete(Path.Combine(project.Path, "deleted.txt"));
+        File.WriteAllText(Path.Combine(project.Path, "added.txt"), "new");
+        service.StageChanges(
+            project.Path,
+            ["modified.txt", "deleted.txt", "added.txt"]);
+
+        service.DiscardChanges(
+            project.Path,
+            ["modified.txt", "deleted.txt", "added.txt"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(
+                Path.Combine(project.Path, "modified.txt")),
+                Is.EqualTo("one"));
+            Assert.That(File.ReadAllText(
+                Path.Combine(project.Path, "deleted.txt")),
+                Is.EqualTo("one"));
+            Assert.That(
+                File.Exists(Path.Combine(project.Path, "added.txt")),
+                Is.False);
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void DiscardChanges_RestoresBothSidesOfRename()
+    {
+        using var project = new TemporaryDirectory("discard-rename");
+        var service = new FolderProjectVersionControlService();
+        var originalPath = Path.Combine(project.Path, "original.txt");
+        var renamedPath = Path.Combine(project.Path, "renamed.txt");
+        File.WriteAllText(originalPath, "content");
+        service.Initialize(project.Path, s_identity);
+        File.Move(originalPath, renamedPath);
+        var rename = service.GetStatus(project.Path).Changes.Single();
+
+        service.DiscardChanges(project.Path, [rename.RepositoryPath]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(originalPath), Is.EqualTo("content"));
+            Assert.That(File.Exists(renamedPath), Is.False);
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void UndoLatestCommit_RemovesHistoryAndKeepsChangesUnstaged()
+    {
+        using var project = new TemporaryDirectory("revert-to-working");
+        var service = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "modified.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "deleted.txt"), "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "modified.txt"), "two");
+        File.Delete(Path.Combine(project.Path, "deleted.txt"));
+        File.WriteAllText(Path.Combine(project.Path, "added.txt"), "new");
+        var committed = service.CommitAll(project.Path, "待重新修改");
+
+        service.UndoLatestCommit(
+            project.Path,
+            committed.Id,
+            FolderProjectCommitUndoMode.KeepChanges);
+
+        var status = service.GetStatus(project.Path);
+        var history = new FolderProjectVersionControlService()
+            .GetHistory(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(status.HeadCommitId, Is.EqualTo(history[0].Id));
+            Assert.That(history, Has.Count.EqualTo(1));
+            Assert.That(history[0].Id, Is.EqualTo(committed.ParentIds[0]));
+            Assert.That(
+                status.OperationState,
+                Is.EqualTo(FolderProjectRepositoryOperationState.None));
+            Assert.That(
+                service.GetMergeState(project.Path).Phase,
+                Is.EqualTo(FolderProjectMergePhase.None));
+            Assert.That(File.ReadAllText(
+                Path.Combine(project.Path, "modified.txt")),
+                Is.EqualTo("two"));
+            Assert.That(
+                File.Exists(Path.Combine(project.Path, "deleted.txt")),
+                Is.False);
+            Assert.That(
+                File.Exists(Path.Combine(project.Path, "added.txt")),
+                Is.True);
+            Assert.That(status.Changes, Has.Count.EqualTo(3));
+            Assert.That(
+                status.Changes.All(
+                    change =>
+                        change.Kind.HasFlag(
+                            FolderProjectWorkingChangeKind.Unstaged) &&
+                        !change.Kind.HasFlag(
+                            FolderProjectWorkingChangeKind.Staged)),
+                Is.True);
+        });
+
+        var changedPaths = status.Changes
+            .Select(change => change.RepositoryPath)
+            .ToList();
+        service.StageChanges(project.Path, changedPaths);
+        Assert.That(
+            service.GetStatus(project.Path).Changes.All(
+                change => change.Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged)),
+            Is.True);
+
+        service.UnstageChanges(project.Path, changedPaths);
+        service.DiscardChanges(project.Path, changedPaths);
+        Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+    }
+
+    [Test]
+    public void EditLatestCommitChanges_DiscardRemovesOnlySelectedChange()
+    {
+        using var project = new TemporaryDirectory("discard-commit-file");
+        var service = new FolderProjectVersionControlService();
+        var firstPath = Path.Combine(project.Path, "first.txt");
+        var secondPath = Path.Combine(project.Path, "second.txt");
+        File.WriteAllText(firstPath, "first before");
+        File.WriteAllText(secondPath, "second before");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(firstPath, "first in A");
+        File.WriteAllText(secondPath, "second in A");
+        var original = service.CommitAll(project.Path, "提交 A");
+
+        service.EditLatestCommitChanges(
+            project.Path,
+            original.Id,
+            ["first.txt"],
+            FolderProjectCommitChangeEditMode.Discard);
+
+        var history = service.GetHistory(project.Path);
+        var changes = service.GetCommitChanges(project.Path, history[0].Id);
+        Assert.Multiple(() =>
+        {
+            Assert.That(history[0].Message, Is.EqualTo("提交 A"));
+            Assert.That(history[0].Id, Is.Not.EqualTo(original.Id));
+            Assert.That(
+                changes.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+            Assert.That(File.ReadAllText(firstPath), Is.EqualTo("first before"));
+            Assert.That(File.ReadAllText(secondPath), Is.EqualTo("second in A"));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void EditLatestCommitChanges_StageAndCompleteRewritesSameCommit()
+    {
+        using var project = new TemporaryDirectory("edit-commit-file");
+        var service = new FolderProjectVersionControlService();
+        var firstPath = Path.Combine(project.Path, "first.txt");
+        var secondPath = Path.Combine(project.Path, "second.txt");
+        File.WriteAllText(firstPath, "first before");
+        File.WriteAllText(secondPath, "second before");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(firstPath, "first in A");
+        File.WriteAllText(secondPath, "second in A");
+        var original = service.CommitAll(project.Path, "提交 A");
+
+        var editSession = service.EditLatestCommitChanges(
+            project.Path,
+            original.Id,
+            ["first.txt"],
+            FolderProjectCommitChangeEditMode.StageForEdit);
+
+        var stagedStatus = service.GetStatus(project.Path);
+        var rewrittenChanges = service.GetCommitChanges(
+            project.Path,
+            editSession.ExpectedHeadCommitId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(editSession.CanReturnToOriginalCommit, Is.True);
+            Assert.That(
+                rewrittenChanges.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+            Assert.That(stagedStatus.Changes, Has.Count.EqualTo(1));
+            Assert.That(
+                stagedStatus.Changes[0].RepositoryPath,
+                Is.EqualTo("first.txt"));
+            Assert.That(
+                stagedStatus.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged),
+                Is.True);
+        });
+
+        File.WriteAllText(firstPath, "first edited");
+        service.StageChanges(project.Path, ["first.txt"]);
+        var completed = service.CompleteLatestCommitEdit(
+            project.Path,
+            editSession);
+
+        var completedChanges = service.GetCommitChanges(
+            project.Path,
+            completed.Id);
+        Assert.Multiple(() =>
+        {
+            Assert.That(completed.Message, Is.EqualTo("提交 A"));
+            Assert.That(
+                completedChanges.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[] { "first.txt", "second.txt" }));
+            Assert.That(File.ReadAllText(firstPath), Is.EqualTo("first edited"));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void EditLatestCommitChanges_AllChangesRemovedCanOnlyCreateNewCommit()
+    {
+        using var project = new TemporaryDirectory("edit-entire-commit");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "only.txt");
+        File.WriteAllText(filePath, "before");
+        var parent = service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "in A");
+        var original = service.CommitAll(project.Path, "提交 A");
+
+        var editSession = service.EditLatestCommitChanges(
+            project.Path,
+            original.Id,
+            ["only.txt"],
+            FolderProjectCommitChangeEditMode.StageForEdit);
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.CompleteLatestCommitEdit(
+                project.Path,
+                editSession));
+        Assert.Multiple(() =>
+        {
+            Assert.That(editSession.CanReturnToOriginalCommit, Is.False);
+            Assert.That(editSession.ExpectedHeadCommitId, Is.EqualTo(parent.Id));
+            Assert.That(
+                exception!.Code,
+                Is.EqualTo(FolderProjectVersionControlError.CommitNotFound));
+            Assert.That(service.GetHistory(project.Path), Has.Count.EqualTo(1));
+            Assert.That(
+                service.GetStatus(project.Path).Changes.Single().Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged),
+                Is.True);
+        });
+
+        var newCommit = service.CommitStaged(project.Path, "新提交");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(newCommit.Message, Is.EqualTo("新提交"));
+            Assert.That(service.GetHistory(project.Path), Has.Count.EqualTo(2));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void EditLatestCommitChanges_DiscardHandlesAddDeleteAndRename()
+    {
+        using var project = new TemporaryDirectory("discard-file-kinds");
+        var service = new FolderProjectVersionControlService();
+        var deletedPath = Path.Combine(project.Path, "deleted.txt");
+        var oldPath = Path.Combine(project.Path, "old-name.txt");
+        var newPath = Path.Combine(project.Path, "new-name.txt");
+        var addedPath = Path.Combine(project.Path, "added.txt");
+        File.WriteAllText(deletedPath, "delete me");
+        File.WriteAllText(oldPath, "rename me");
+        var parent = service.Initialize(project.Path, s_identity);
+        File.Delete(deletedPath);
+        File.Move(oldPath, newPath);
+        File.WriteAllText(addedPath, "add me");
+        var original = service.CommitAll(project.Path, "提交 A");
+        var changedPaths = service.GetCommitChanges(project.Path, original.Id)
+            .Select(change => change.RepositoryPath)
+            .ToList();
+
+        var result = service.EditLatestCommitChanges(
+            project.Path,
+            original.Id,
+            changedPaths,
+            FolderProjectCommitChangeEditMode.Discard);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ExpectedHeadCommitId, Is.EqualTo(parent.Id));
+            Assert.That(result.CanReturnToOriginalCommit, Is.False);
+            Assert.That(File.Exists(addedPath), Is.False);
+            Assert.That(File.ReadAllText(deletedPath), Is.EqualTo("delete me"));
+            Assert.That(File.ReadAllText(oldPath), Is.EqualTo("rename me"));
+            Assert.That(File.Exists(newPath), Is.False);
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void GetMergeState_StaleRevertPreservesInverseAndReturnsToIdle()
+    {
+        using var project = new TemporaryDirectory("stale-revert");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "modified.txt");
+        File.WriteAllText(filePath, "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        var original = service.CommitAll(project.Path, "待重新修改");
+        using (var repository = new Repository(project.Path))
+        {
+            repository.Revert(
+                repository.Head.Tip!,
+                new Signature(
+                    s_identity.Name,
+                    s_identity.Email,
+                    DateTimeOffset.Now),
+                new RevertOptions { CommitOnSuccess = false });
+            Assert.That(
+                repository.Info.CurrentOperation,
+                Is.EqualTo(CurrentOperation.Revert));
+        }
+
+        var mergeState = service.GetMergeState(project.Path);
+        var status = service.GetStatus(project.Path);
+        var history = service.GetHistory(project.Path);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                mergeState.Phase,
+                Is.EqualTo(FolderProjectMergePhase.None));
+            Assert.That(
+                status.OperationState,
+                Is.EqualTo(FolderProjectRepositoryOperationState.None));
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("one"));
+            Assert.That(history[0].Id, Is.EqualTo(original.Id));
+            Assert.That(status.Changes, Has.Count.EqualTo(1));
+            Assert.That(
+                status.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Unstaged),
+                Is.True);
+            Assert.That(
+                status.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged),
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void UndoLatestCommit_DiscardChangesRemovesCommitAndChanges()
+    {
+        using var project = new TemporaryDirectory("undo-and-discard");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "modified.txt");
+        var addedPath = Path.Combine(project.Path, "added.txt");
+        File.WriteAllText(filePath, "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        File.WriteAllText(addedPath, "new");
+        var original = service.CommitAll(project.Path, "原提交");
+
+        service.UndoLatestCommit(
+            project.Path,
+            original.Id,
+            FolderProjectCommitUndoMode.DiscardChanges);
+
+        var history = service.GetHistory(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(history, Has.Count.EqualTo(1));
+            Assert.That(history[0].Id, Is.EqualTo(original.ParentIds[0]));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("one"));
+            Assert.That(File.Exists(addedPath), Is.False);
+        });
+    }
+
+    [Test]
+    public void UndoLatestCommit_DirtyRepositoryIsUnchanged()
+    {
+        using var project = new TemporaryDirectory("revert-dirty");
+        var service = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "committed.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "working.txt"), "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "committed.txt"), "two");
+        var committed = service.CommitAll(project.Path, "待撤销");
+        File.WriteAllText(Path.Combine(project.Path, "working.txt"), "dirty");
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.UndoLatestCommit(
+                project.Path,
+                committed.Id,
+                FolderProjectCommitUndoMode.KeepChanges));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Code,
+                Is.EqualTo(FolderProjectVersionControlError.WorkingTreeNotClean));
+            Assert.That(
+                service.GetStatus(project.Path).HeadCommitId,
+                Is.EqualTo(committed.Id));
+            Assert.That(File.ReadAllText(
+                Path.Combine(project.Path, "committed.txt")),
+                Is.EqualTo("two"));
+            Assert.That(File.ReadAllText(
+                Path.Combine(project.Path, "working.txt")),
+                Is.EqualTo("dirty"));
+        });
+    }
+
+    [Test]
+    public void UndoLatestCommit_NonLatestCommitIsUnchanged()
+    {
+        using var project = new TemporaryDirectory("revert-conflict");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "conflict.txt");
+        File.WriteAllText(filePath, "base");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "target");
+        var target = service.CommitAll(project.Path, "目标提交");
+        File.WriteAllText(filePath, "later");
+        var head = service.CommitAll(project.Path, "后续提交");
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.UndoLatestCommit(
+                project.Path,
+                target.Id,
+                FolderProjectCommitUndoMode.KeepChanges));
+
+        var status = service.GetStatus(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Code,
+                Is.EqualTo(FolderProjectVersionControlError.CommitIsNotLatest));
+            Assert.That(status.HeadCommitId, Is.EqualTo(head.Id));
+            Assert.That(status.IsClean, Is.True);
+            Assert.That(
+                status.OperationState,
+                Is.EqualTo(FolderProjectRepositoryOperationState.None));
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("later"));
+        });
+    }
+
+    [Test]
+    public void UndoLatestCommit_InvalidModeIsUnchanged()
+    {
+        using var project = new TemporaryDirectory("undo-invalid-mode");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "file.txt");
+        File.WriteAllText(filePath, "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        var committed = service.CommitAll(project.Path, "最新提交");
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => service.UndoLatestCommit(
+                project.Path,
+                committed.Id,
+                (FolderProjectCommitUndoMode)int.MaxValue));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                service.GetStatus(project.Path).HeadCommitId,
+                Is.EqualTo(committed.Id));
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("two"));
+        });
+    }
+
+    [Test]
     public void GetStatus_UnreadableModifiedFile_MergesStatusFlags()
     {
         using var project = new TemporaryDirectory("unreadable-modified");
@@ -1122,6 +1704,42 @@ public class FolderProjectVersionControlServiceTests
             Assert.That(history[0].ParentIds, Is.EqualTo(new[] { second.Id }));
             Assert.That(history, Has.None.Matches<FolderProjectCommitSummary>(
                 commit => commit.Id == initial.Id));
+        });
+    }
+
+    [Test]
+    public void GetHistory_SplitsTitleAndDescriptionAndReportsMasterMergeStatus()
+    {
+        using var project = new TemporaryDirectory("history-details");
+        var service = new FolderProjectVersionControlService();
+        var initial = service.Initialize(project.Path, s_identity);
+        using (var repository = new Repository(project.Path))
+            repository.CreateBranch("feature");
+        File.WriteAllText(Path.Combine(project.Path, "main.txt"), "main");
+        service.CommitAll(project.Path, "主线标题\n\n主线说明");
+        using (var repository = new Repository(project.Path))
+            Commands.Checkout(repository, "feature");
+        File.WriteAllText(Path.Combine(project.Path, "feature.txt"), "feature");
+        var feature = service.CommitAll(
+            project.Path,
+            "功能标题\n\n第一行说明\n第二行说明");
+
+        var history = service.GetHistory(project.Path, "feature", 100);
+        var featureSummary = history.Single(commit => commit.Id == feature.Id);
+        var initialSummary = history.Single(commit => commit.Id == initial.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(featureSummary.Title, Is.EqualTo("功能标题"));
+            Assert.That(
+                featureSummary.Description,
+                Is.EqualTo("第一行说明\n第二行说明"));
+            Assert.That(
+                featureSummary.MergeStatus,
+                Is.EqualTo(FolderProjectCommitMergeStatus.NotMerged));
+            Assert.That(
+                initialSummary.MergeStatus,
+                Is.EqualTo(FolderProjectCommitMergeStatus.Merged));
         });
     }
 

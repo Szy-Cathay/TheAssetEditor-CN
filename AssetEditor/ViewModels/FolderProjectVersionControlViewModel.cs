@@ -125,6 +125,7 @@ public partial class FolderProjectVersionControlViewModel :
     private bool _mergeStateKnown;
     private int _commitChangesRequestId;
     private int _historyRequestId;
+    private FolderProjectCommitEditSession? _commitEditSession;
 
     [ObservableProperty] private string _projectRoot = "";
     [ObservableProperty] private string _projectName = "";
@@ -156,6 +157,19 @@ public partial class FolderProjectVersionControlViewModel :
     [ObservableProperty]
     private FolderProjectCommitChangeRow? _selectedCommitChange;
     [ObservableProperty]
+    private IReadOnlyList<FolderProjectCommitChangeRow>
+        _selectedCommitChanges = [];
+    [ObservableProperty]
+    private FolderProjectWorkingChangeRow? _selectedUnstagedChange;
+    [ObservableProperty]
+    private FolderProjectWorkingChangeRow? _selectedStagedChange;
+    [ObservableProperty]
+    private IReadOnlyList<FolderProjectWorkingChangeRow>
+        _selectedUnstagedChanges = [];
+    [ObservableProperty]
+    private IReadOnlyList<FolderProjectWorkingChangeRow>
+        _selectedStagedChanges = [];
+    [ObservableProperty]
     private FolderProjectBranchInfo? _selectedHistoryBranch;
     [ObservableProperty]
     private FolderProjectBranchInfo? _selectedBranch;
@@ -165,9 +179,18 @@ public partial class FolderProjectVersionControlViewModel :
     private FolderProjectBranchInfo? _selectedMergeTarget;
     [ObservableProperty]
     private FolderProjectMergeConflictRow? _selectedMergeConflict;
+    [ObservableProperty]
+    private IReadOnlyList<FolderProjectMergeConflictRow>
+        _selectedMergeConflicts = [];
 
     public ObservableCollection<FolderProjectWorkingChangeRow>
         WorkingChanges
+    { get; } = [];
+    public ObservableCollection<FolderProjectWorkingChangeRow>
+        UnstagedChanges
+    { get; } = [];
+    public ObservableCollection<FolderProjectWorkingChangeRow>
+        StagedChanges
     { get; } = [];
     public ObservableCollection<FolderProjectCommitSummary> History { get; } =
         [];
@@ -337,19 +360,138 @@ public partial class FolderProjectVersionControlViewModel :
     [RelayCommand(CanExecute = nameof(CanCommit))]
     private async Task Commit()
     {
-        var message = CommitMessage;
+        var message = PromptForCommitMessage(CommitMessage);
+        if (message == null)
+            return;
+
         await RunOperationAsync(
             async () =>
             {
                 await Task.Run(
-                    () => _versionControlService.CommitAll(
+                    () => _versionControlService.CommitStaged(
                         ProjectRoot,
                         message));
+                _commitEditSession = null;
                 CommitMessage = "";
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Committed");
             },
             "FolderProject.VersionControl.Busy.Committing");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStageSelected))]
+    private Task StageSelected()
+    {
+        return Stage(
+            GetSelectedUnstagedChanges()
+                .Where(IsUsableWorkingChange)
+                .Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStageAll))]
+    private Task StageAll()
+    {
+        return Stage(UnstagedChanges.Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUnstageSelected))]
+    private Task UnstageSelected()
+    {
+        return Unstage(
+            GetSelectedStagedChanges()
+                .Where(IsUsableWorkingChange)
+                .Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUnstageAll))]
+    private Task UnstageAll()
+    {
+        return Unstage(StagedChanges.Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardUnstaged))]
+    private Task DiscardUnstaged()
+    {
+        return Discard(
+            GetSelectedUnstagedChanges()
+                .Where(IsUsableWorkingChange)
+                .Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardStaged))]
+    private Task DiscardStaged()
+    {
+        return Discard(
+            GetSelectedStagedChanges()
+                .Where(IsUsableWorkingChange)
+                .Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardAll))]
+    private Task DiscardAll()
+    {
+        return Discard(
+            WorkingChanges
+                .Where(IsUsableWorkingChange)
+                .Select(change => change.RepositoryPath),
+            "DiscardAllChanges");
+    }
+
+    private async Task Stage(IEnumerable<string> paths)
+    {
+        var selectedPaths = paths.Distinct().ToList();
+        await RunOperationAsync(
+            async () =>
+            {
+                await Task.Run(
+                    () => _versionControlService.StageChanges(
+                        ProjectRoot,
+                        selectedPaths));
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.Staged");
+            },
+            "FolderProject.VersionControl.Busy.UpdatingStage");
+    }
+
+    private async Task Unstage(IEnumerable<string> paths)
+    {
+        var selectedPaths = paths.Distinct().ToList();
+        await RunOperationAsync(
+            async () =>
+            {
+                await Task.Run(
+                    () => _versionControlService.UnstageChanges(
+                        ProjectRoot,
+                        selectedPaths));
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.Unstaged");
+            },
+            "FolderProject.VersionControl.Busy.UpdatingStage");
+    }
+
+    private async Task Discard(
+        IEnumerable<string> paths,
+        string confirmationKey = "DiscardChanges")
+    {
+        if (!Confirm(confirmationKey))
+            return;
+
+        var selectedPaths = paths.Distinct().ToList();
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () =>
+                    {
+                        _versionControlService.DiscardChanges(
+                            ProjectRoot,
+                            selectedPaths);
+                        return true;
+                    });
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.Discarded");
+            },
+            "FolderProject.VersionControl.Busy.Discarding");
     }
 
     [RelayCommand(CanExecute = nameof(CanRestoreFile))]
@@ -359,23 +501,40 @@ public partial class FolderProjectVersionControlViewModel :
             return;
 
         var commit = SelectedCommit!;
-        var change = SelectedCommitChange!.Source;
+        var requests = GetSelectedCommitChanges()
+            .Where(IsRestorableCommitChange)
+            .Select(
+                row =>
+                {
+                    var change = row.Source;
+                    return (
+                        CommitId: change.Kind ==
+                            FolderProjectCommitChangeKind.Deleted
+                                ? commit.ParentIds[0]
+                                : commit.Id,
+                        change.RepositoryPath);
+                })
+            .ToList();
+        var overwrite = requests.Any(
+            request => WorkingChanges.Any(
+                change => change.RepositoryPath.Equals(
+                    request.RepositoryPath,
+                    StringComparison.OrdinalIgnoreCase)));
+        if (overwrite && !Confirm("RestoreOverwrite"))
+            return;
+
         await RunOperationAsync(
             async () =>
             {
                 try
                 {
-                    await ExecuteCoordinatedAsync(
-                        () => _versionControlService.RestoreFile(
-                            ProjectRoot,
-                            commit.Id,
-                            change.RepositoryPath,
-                            false));
+                    await RestoreSelectedFilesAsync(overwrite);
                 }
                 catch (FolderProjectVersionControlException exception)
-                    when (exception.Code ==
-                          FolderProjectVersionControlError
-                              .WorkingTreeNotClean)
+                    when (!overwrite &&
+                          exception.Code ==
+                              FolderProjectVersionControlError
+                                  .WorkingTreeNotClean)
                 {
                     if (!Confirm("RestoreOverwrite"))
                     {
@@ -383,24 +542,161 @@ public partial class FolderProjectVersionControlViewModel :
                             "FolderProject.VersionControl.Status.Cancelled");
                     }
 
-                    await ExecuteCoordinatedAsync(
-                        () => _versionControlService.RestoreFile(
-                            ProjectRoot,
-                            commit.Id,
-                            change.RepositoryPath,
-                            true));
+                    await RestoreSelectedFilesAsync(true);
                 }
 
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Restored");
+
+                Task<bool> RestoreSelectedFilesAsync(bool overwriteFiles)
+                {
+                    return ExecuteCoordinatedAsync(
+                        () =>
+                        {
+                            foreach (var request in requests)
+                            {
+                                _versionControlService.RestoreFile(
+                                    ProjectRoot,
+                                    request.CommitId,
+                                    request.RepositoryPath,
+                                    overwriteFiles);
+                            }
+                            return true;
+                        });
+                }
             },
             "FolderProject.VersionControl.Busy.Restoring");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditSelectedCommitChanges))]
+    private Task DiscardCommitChanges()
+    {
+        return EditLatestCommitChanges(
+            FolderProjectCommitChangeEditMode.Discard,
+            "DiscardCommitChanges",
+            "FolderProject.VersionControl.Status.CommitChangesDiscarded");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditSelectedCommitChanges))]
+    private Task RestoreCommitChangesToStage()
+    {
+        return EditLatestCommitChanges(
+            FolderProjectCommitChangeEditMode.StageForEdit,
+            "RestoreCommitChangesToStage",
+            "FolderProject.VersionControl.Status.CommitChangesStaged");
+    }
+
+    private async Task EditLatestCommitChanges(
+        FolderProjectCommitChangeEditMode mode,
+        string confirmationKey,
+        string statusKey)
+    {
+        var commit = SelectedCommit!;
+        if (!Confirm(confirmationKey, commit.Message))
+            return;
+
+        var paths = GetSelectedCommitChanges()
+            .Where(IsRestorableCommitChange)
+            .Select(change => change.RepositoryPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        await RunOperationAsync(
+            async () =>
+            {
+                var session = await ExecuteCoordinatedAsync(
+                    () => _versionControlService.EditLatestCommitChanges(
+                        ProjectRoot,
+                        commit.Id,
+                        paths,
+                        mode));
+                _commitEditSession = mode ==
+                    FolderProjectCommitChangeEditMode.StageForEdit
+                        ? session
+                        : null;
+                return _localization.Get(statusKey);
+            },
+            "FolderProject.VersionControl.Busy.EditingCommit");
+        if (mode == FolderProjectCommitChangeEditMode.StageForEdit &&
+            _commitEditSession != null)
+        {
+            SelectedTabIndex = 0;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanReturnChangesToOriginalCommit))]
+    private async Task ReturnChangesToOriginalCommit()
+    {
+        if (!Confirm("ReturnChangesToOriginalCommit"))
+            return;
+
+        var session = _commitEditSession!;
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () => _versionControlService.CompleteLatestCommitEdit(
+                        ProjectRoot,
+                        session));
+                _commitEditSession = null;
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.CommitChangesReturned");
+            },
+            "FolderProject.VersionControl.Busy.EditingCommit");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndoLatestCommit))]
+    private Task UndoLatestCommitKeepChanges()
+    {
+        return UndoLatestCommit(
+            FolderProjectCommitUndoMode.KeepChanges,
+            "UndoLatestCommitKeepChanges",
+            "FolderProject.VersionControl.Status.CommitUndoneKeepChanges");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndoLatestCommit))]
+    private Task UndoLatestCommitAndDiscardChanges()
+    {
+        return UndoLatestCommit(
+            FolderProjectCommitUndoMode.DiscardChanges,
+            "UndoLatestCommitAndDiscardChanges",
+            "FolderProject.VersionControl.Status.CommitUndoneAndDiscarded");
+    }
+
+    private async Task UndoLatestCommit(
+        FolderProjectCommitUndoMode mode,
+        string confirmationKey,
+        string statusKey)
+    {
+        if (!Confirm(confirmationKey, SelectedCommit!.Message))
+            return;
+
+        var commitId = SelectedCommit.Id;
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () =>
+                    {
+                        _versionControlService.UndoLatestCommit(
+                            ProjectRoot,
+                            commitId,
+                            mode);
+                        return true;
+                    });
+                return _localization.Get(statusKey);
+            },
+            "FolderProject.VersionControl.Busy.UndoingCommit");
     }
 
     [RelayCommand(CanExecute = nameof(CanCreateRecoveryBranch))]
     private async Task CreateRecoveryBranch()
     {
-        var branchName = RecoveryBranchName;
+        var branchName = PromptForText(
+            "FolderProject.VersionControl.RecoveryBranchName",
+            RecoveryBranchName);
+        if (branchName == null)
+            return;
+
         var commitId = SelectedCommit!.Id;
         await RunOperationAsync(
             async () =>
@@ -421,7 +717,12 @@ public partial class FolderProjectVersionControlViewModel :
     [RelayCommand(CanExecute = nameof(CanCreateBranch))]
     private async Task CreateBranch()
     {
-        var branchName = BranchName;
+        var branchName = PromptForText(
+            "FolderProject.VersionControl.CreateBranch",
+            BranchName);
+        if (branchName == null)
+            return;
+
         await RunOperationAsync(
             async () =>
             {
@@ -441,7 +742,14 @@ public partial class FolderProjectVersionControlViewModel :
     private async Task RenameBranch()
     {
         var oldName = SelectedBranch!.Name;
-        var newName = BranchName;
+        var newName = PromptForText(
+            "FolderProject.VersionControl.RenameBranch",
+            string.IsNullOrWhiteSpace(BranchName)
+                ? oldName
+                : BranchName);
+        if (newName == null)
+            return;
+
         await RunOperationAsync(
             async () =>
             {
@@ -456,6 +764,53 @@ public partial class FolderProjectVersionControlViewModel :
             },
             "FolderProject.VersionControl.Busy.UpdatingBranches",
             RefreshMode.Branches);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCreateAndSwitchBranch))]
+    private async Task CreateAndSwitchBranch()
+    {
+        var branchName = PromptForText(
+            "FolderProject.VersionControl.CreateAndSwitchBranch");
+        if (branchName == null)
+            return;
+        if (!IsClean &&
+            _dialogs.ShowYesNoBox(
+                _localization.Get(
+                    "FolderProject.VersionControl.Confirm.CarryChangesToNewBranch"),
+                _localization.Get(
+                    "FolderProject.VersionControl.CreateAndSwitchBranch")) !=
+            ShowMessageBoxResult.OK)
+        {
+            return;
+        }
+
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () => CreateAndSwitchBranchCore(branchName));
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.BranchCreatedAndSwitched");
+            },
+            "FolderProject.VersionControl.Busy.SwitchingBranch");
+        SelectCurrentBranch();
+    }
+
+    private FolderProjectBranchInfo CreateAndSwitchBranchCore(
+        string branchName)
+    {
+        _versionControlService.CreateBranch(ProjectRoot, branchName);
+        try
+        {
+            return _versionControlService.SwitchBranch(
+                ProjectRoot,
+                branchName);
+        }
+        catch
+        {
+            _versionControlService.DeleteBranch(ProjectRoot, branchName);
+            throw;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanDeleteBranch))]
@@ -497,6 +852,7 @@ public partial class FolderProjectVersionControlViewModel :
                     "FolderProject.VersionControl.Status.BranchSwitched");
             },
             "FolderProject.VersionControl.Busy.SwitchingBranch");
+        SelectCurrentBranch();
     }
 
     [RelayCommand(CanExecute = nameof(CanPrepareMerge))]
@@ -506,7 +862,7 @@ public partial class FolderProjectVersionControlViewModel :
             branch => branch.Name == SelectedBranch!.Name);
         SelectedMergeTarget = GetDefaultMergeTarget(
             SelectedMergeSource);
-        SelectedTabIndex = 3;
+        SelectedTabIndex = 2;
     }
 
     [RelayCommand(CanExecute = nameof(CanBeginMerge))]
@@ -627,7 +983,10 @@ public partial class FolderProjectVersionControlViewModel :
     [RelayCommand(CanExecute = nameof(CanCompleteMerge))]
     private async Task CompleteMerge()
     {
-        var message = MergeMessage;
+        var message = PromptForCommitMessage(MergeMessage);
+        if (message == null)
+            return;
+
         await RunOperationAsync(
             async () =>
             {
@@ -781,15 +1140,27 @@ public partial class FolderProjectVersionControlViewModel :
 
     private async Task ResolveConflict(FolderProjectMergeChoice choice)
     {
-        var conflictId = SelectedMergeConflict!.Id;
+        var conflictIds = GetSelectedMergeConflicts()
+            .Select(conflict => conflict.Id)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         await RunOperationAsync(
             async () =>
             {
                 await ExecuteCoordinatedAsync(
-                    () => _versionControlService.ResolveMergeConflict(
-                        ProjectRoot,
-                        conflictId,
-                        choice));
+                    () =>
+                    {
+                        FolderProjectMergeState? state = null;
+                        foreach (var conflictId in conflictIds)
+                        {
+                            state = _versionControlService
+                                .ResolveMergeConflict(
+                                    ProjectRoot,
+                                    conflictId,
+                                    choice);
+                        }
+                        return state!;
+                    });
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.ConflictResolved");
             },
@@ -996,12 +1367,35 @@ public partial class FolderProjectVersionControlViewModel :
             IsDetached = status.IsDetached;
             OperationState = status.OperationState;
             IsClean = status.IsClean;
-            Replace(
-                WorkingChanges,
-                status.Changes.Select(
+            var workingRows = status.Changes
+                .Select(
                     change => new FolderProjectWorkingChangeRow(
                         change,
-                        _localization)));
+                        _localization))
+                .ToList();
+            Replace(WorkingChanges, workingRows);
+            Replace(
+                UnstagedChanges,
+                workingRows.Where(
+                    change => change.Source.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Unstaged)));
+            Replace(
+                StagedChanges,
+                workingRows.Where(
+                    change => change.Source.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Staged)));
+            SelectedUnstagedChanges = [];
+            SelectedStagedChanges = [];
+            SelectedUnstagedChange = UnstagedChanges.FirstOrDefault(
+                change =>
+                    change.RepositoryPath ==
+                    selection.SelectedUnstagedChangePath) ??
+                UnstagedChanges.FirstOrDefault();
+            SelectedStagedChange = StagedChanges.FirstOrDefault(
+                change =>
+                    change.RepositoryPath ==
+                    selection.SelectedStagedChangePath) ??
+                StagedChanges.FirstOrDefault();
 
             if (!status.IsInitialized)
             {
@@ -1086,7 +1480,10 @@ public partial class FolderProjectVersionControlViewModel :
         Replace(MergeSources, Branches);
         Replace(MergeTargets, Branches);
         SelectedBranch = Branches.FirstOrDefault(
-            branch => branch.Name == selectedBranchName);
+                             branch =>
+                                 branch.Name == selectedBranchName) ??
+                         Branches.FirstOrDefault(
+                             branch => branch.IsCurrent);
         SelectedHistoryBranch =
             Branches.FirstOrDefault(
                 branch => branch.Name == selectedHistoryBranchName) ??
@@ -1149,6 +1546,7 @@ public partial class FolderProjectVersionControlViewModel :
                 conflict => new FolderProjectMergeConflictRow(
                     conflict,
                     _localization)));
+        SelectedMergeConflicts = [];
         SelectedMergeConflict =
             MergeConflicts.FirstOrDefault(
                 conflict => conflict.Id == selectedConflictId) ??
@@ -1170,6 +1568,9 @@ public partial class FolderProjectVersionControlViewModel :
         OperationState = FolderProjectRepositoryOperationState.None;
         IsClean = true;
         HasIdentity = false;
+        WorkingChanges.Clear();
+        UnstagedChanges.Clear();
+        StagedChanges.Clear();
         History.Clear();
         CommitChanges.Clear();
         Branches.Clear();
@@ -1178,11 +1579,18 @@ public partial class FolderProjectVersionControlViewModel :
         MergeConflicts.Clear();
         SelectedCommit = null;
         SelectedCommitChange = null;
+        SelectedCommitChanges = [];
+        SelectedUnstagedChange = null;
+        SelectedStagedChange = null;
+        SelectedUnstagedChanges = [];
+        SelectedStagedChanges = [];
         SelectedHistoryBranch = null;
         SelectedBranch = null;
         SelectedMergeSource = null;
         SelectedMergeTarget = null;
         SelectedMergeConflict = null;
+        SelectedMergeConflicts = [];
+        _commitEditSession = null;
         MergePhase = FolderProjectMergePhase.None;
         MergeSummary = _localization.Get(
             "FolderProject.VersionControl.Merge.Phase.None");
@@ -1198,6 +1606,7 @@ public partial class FolderProjectVersionControlViewModel :
                 change => new FolderProjectCommitChangeRow(
                     change,
                     _localization)));
+        SelectedCommitChanges = [];
         SelectedCommitChange = CommitChanges.FirstOrDefault(
             change => change.RepositoryPath == selectedPath);
     }
@@ -1374,6 +1783,8 @@ public partial class FolderProjectVersionControlViewModel :
     private FolderProjectSelection CurrentSelection()
     {
         return new FolderProjectSelection(
+            SelectedUnstagedChange?.RepositoryPath,
+            SelectedStagedChange?.RepositoryPath,
             SelectedCommit?.Id,
             SelectedCommitChange?.RepositoryPath,
             SelectedHistoryBranch?.Name,
@@ -1395,6 +1806,49 @@ public partial class FolderProjectVersionControlViewModel :
                    _localization.Get(
                        "FolderProject.VersionControl.ConfirmTitle")) ==
                ShowMessageBoxResult.OK;
+    }
+
+    private string? PromptForText(
+        string titleKey,
+        string initialText = "")
+    {
+        var result = _dialogs.ShowTextInputDialog(
+            _localization.Get(titleKey),
+            initialText);
+        if (!result.Result)
+            return null;
+
+        var text = result.Text.Trim();
+        return text.Length == 0 ? null : text;
+    }
+
+    private string? PromptForCommitMessage(string initialTitle)
+    {
+        var result = _dialogs.ShowTitleDescriptionInputDialog(
+            _localization.Get(
+                "FolderProject.VersionControl.CommitDialogTitle"),
+            _localization.Get(
+                "FolderProject.VersionControl.CommitTitle"),
+            _localization.Get(
+                "FolderProject.VersionControl.CommitDescription"),
+            initialTitle,
+            "");
+        if (!result.Result)
+            return null;
+
+        var title = result.Title.Trim();
+        if (title.Length == 0)
+            return null;
+
+        var description = result.Description.Trim();
+        return description.Length == 0
+            ? title
+            : $"{title}\n\n{description}";
+    }
+
+    private void SelectCurrentBranch()
+    {
+        SelectedBranch = Branches.FirstOrDefault(branch => branch.IsCurrent);
     }
 
     private static void Replace<T>(
@@ -1419,32 +1873,143 @@ public partial class FolderProjectVersionControlViewModel :
     private bool CanCommit() =>
         CanUseRepository() &&
         HasIdentity &&
-        !IsClean &&
-        !string.IsNullOrWhiteSpace(CommitMessage);
+        StagedChanges.Count != 0;
+
+    private bool CanStageSelected() =>
+        CanUseRepository() &&
+        GetSelectedUnstagedChanges().Any(IsUsableWorkingChange);
+
+    private bool CanStageAll() =>
+        CanUseRepository() &&
+        UnstagedChanges.Any(IsUsableWorkingChange);
+
+    private bool CanUnstageSelected() =>
+        CanUseRepository() &&
+        GetSelectedStagedChanges().Any(IsUsableWorkingChange);
+
+    private bool CanUnstageAll() =>
+        CanUseRepository() &&
+        StagedChanges.Any(IsUsableWorkingChange);
+
+    private bool CanDiscardUnstaged() =>
+        CanUseRepository() &&
+        GetSelectedUnstagedChanges().Any(IsUsableWorkingChange);
+
+    private bool CanDiscardStaged() =>
+        CanUseRepository() &&
+        GetSelectedStagedChanges().Any(IsUsableWorkingChange);
+
+    private bool CanDiscardAll() =>
+        CanUseRepository() &&
+        WorkingChanges.Count != 0 &&
+        WorkingChanges.All(IsUsableWorkingChange);
+
+    private IReadOnlyList<FolderProjectWorkingChangeRow>
+        GetSelectedUnstagedChanges()
+    {
+        return SelectedUnstagedChanges.Count != 0
+            ? SelectedUnstagedChanges
+            : SelectedUnstagedChange == null
+                ? []
+                : [SelectedUnstagedChange];
+    }
+
+    private IReadOnlyList<FolderProjectWorkingChangeRow>
+        GetSelectedStagedChanges()
+    {
+        return SelectedStagedChanges.Count != 0
+            ? SelectedStagedChanges
+            : SelectedStagedChange == null
+                ? []
+                : [SelectedStagedChange];
+    }
+
+    private static bool IsUsableWorkingChange(
+        FolderProjectWorkingChangeRow? change)
+    {
+        return change != null &&
+               !change.Source.Kind.HasFlag(
+                   FolderProjectWorkingChangeKind.Conflicted) &&
+               !change.Source.Kind.HasFlag(
+                   FolderProjectWorkingChangeKind.Unreadable);
+    }
 
     private bool CanRestoreFile()
     {
         return CanUseRepository() &&
                SelectedHistoryBranch is { IsCurrent: true } &&
                SelectedCommit != null &&
-               SelectedCommitChange?.Source.Kind is
-                   FolderProjectCommitChangeKind.Added or
-                   FolderProjectCommitChangeKind.Modified or
-                   FolderProjectCommitChangeKind.Renamed;
+               GetSelectedCommitChanges().Any(IsRestorableCommitChange);
     }
+
+    private bool CanEditSelectedCommitChanges()
+    {
+        return CanUseRepository() &&
+               IsClean &&
+               SelectedHistoryBranch is { IsCurrent: true } &&
+               SelectedCommit?.Id == HeadCommitId &&
+               GetSelectedCommitChanges().Any(IsRestorableCommitChange);
+    }
+
+    private bool CanReturnChangesToOriginalCommit()
+    {
+        return CanUseRepository() &&
+               _commitEditSession is
+               {
+                   CanReturnToOriginalCommit: true,
+               } session &&
+               session.ExpectedHeadCommitId == HeadCommitId &&
+               StagedChanges.Any(
+                   change => session.RepositoryPaths.Contains(
+                       change.RepositoryPath,
+                       StringComparer.OrdinalIgnoreCase));
+    }
+
+    private IReadOnlyList<FolderProjectCommitChangeRow>
+        GetSelectedCommitChanges()
+    {
+        return SelectedCommitChanges.Count != 0
+            ? SelectedCommitChanges
+            : SelectedCommitChange == null
+                ? []
+                : [SelectedCommitChange];
+    }
+
+    private static bool IsRestorableCommitChange(
+        FolderProjectCommitChangeRow change)
+    {
+        return change.Source.Kind is
+            FolderProjectCommitChangeKind.Added or
+            FolderProjectCommitChangeKind.Modified or
+            FolderProjectCommitChangeKind.Deleted or
+            FolderProjectCommitChangeKind.Renamed;
+    }
+
+    private bool CanUndoLatestCommit() =>
+        CanUseRepository() &&
+        IsClean &&
+        !IsDetached &&
+        SelectedHistoryBranch is { IsCurrent: true } &&
+        SelectedCommit?.ParentIds.Count == 1 &&
+        string.Equals(
+            SelectedCommit.Id,
+            HeadCommitId,
+            StringComparison.Ordinal);
 
     private bool CanCreateRecoveryBranch() =>
         IsInitialized &&
         !IsBusy &&
-        SelectedCommit != null &&
-        !string.IsNullOrWhiteSpace(RecoveryBranchName);
+        SelectedCommit != null;
 
     private bool CanCreateBranch() =>
-        CanUseRepository() &&
-        !string.IsNullOrWhiteSpace(BranchName);
+        CanUseRepository();
 
     private bool CanRenameBranch() =>
-        CanCreateBranch() && SelectedBranch != null;
+        CanUseRepository() && SelectedBranch != null;
+
+    private bool CanCreateAndSwitchBranch() =>
+        CanUseRepository() &&
+        !IsDetached;
 
     private bool CanDeleteBranch() =>
         CanUseRepository() &&
@@ -1452,7 +2017,6 @@ public partial class FolderProjectVersionControlViewModel :
 
     private bool CanSwitchBranch() =>
         CanUseRepository() &&
-        IsClean &&
         !IsDetached &&
         SelectedBranch is { IsCurrent: false };
 
@@ -1476,14 +2040,23 @@ public partial class FolderProjectVersionControlViewModel :
         IsInitialized &&
         !IsBusy &&
         MergePhase == FolderProjectMergePhase.Conflicts &&
-        SelectedMergeConflict != null;
+        GetSelectedMergeConflicts().Count != 0;
+
+    private IReadOnlyList<FolderProjectMergeConflictRow>
+        GetSelectedMergeConflicts()
+    {
+        return SelectedMergeConflicts.Count != 0
+            ? SelectedMergeConflicts
+            : SelectedMergeConflict == null
+                ? []
+                : [SelectedMergeConflict];
+    }
 
     private bool CanCompleteMerge() =>
         IsInitialized &&
         !IsBusy &&
         HasIdentity &&
-        MergePhase == FolderProjectMergePhase.ReadyToCommit &&
-        !string.IsNullOrWhiteSpace(MergeMessage);
+        MergePhase == FolderProjectMergePhase.ReadyToCommit;
 
     private bool CanAbortMerge() =>
         IsInitialized &&
@@ -1550,6 +2123,21 @@ public partial class FolderProjectVersionControlViewModel :
     partial void OnSelectedCommitChangeChanged(
         FolderProjectCommitChangeRow? value) =>
         NotifyCommands();
+    partial void OnSelectedCommitChangesChanged(
+        IReadOnlyList<FolderProjectCommitChangeRow> value) =>
+        NotifyCommands();
+    partial void OnSelectedUnstagedChangeChanged(
+        FolderProjectWorkingChangeRow? value) =>
+        NotifyCommands();
+    partial void OnSelectedStagedChangeChanged(
+        FolderProjectWorkingChangeRow? value) =>
+        NotifyCommands();
+    partial void OnSelectedUnstagedChangesChanged(
+        IReadOnlyList<FolderProjectWorkingChangeRow> value) =>
+        NotifyCommands();
+    partial void OnSelectedStagedChangesChanged(
+        IReadOnlyList<FolderProjectWorkingChangeRow> value) =>
+        NotifyCommands();
     partial void OnSelectedHistoryBranchChanged(
         FolderProjectBranchInfo? value)
     {
@@ -1583,6 +2171,9 @@ public partial class FolderProjectVersionControlViewModel :
     partial void OnSelectedMergeConflictChanged(
         FolderProjectMergeConflictRow? value) =>
         NotifyCommands();
+    partial void OnSelectedMergeConflictsChanged(
+        IReadOnlyList<FolderProjectMergeConflictRow> value) =>
+        NotifyCommands();
 
     private void NotifyCommands()
     {
@@ -1590,9 +2181,22 @@ public partial class FolderProjectVersionControlViewModel :
         InitializeCommand.NotifyCanExecuteChanged();
         SaveIdentityCommand.NotifyCanExecuteChanged();
         CommitCommand.NotifyCanExecuteChanged();
+        StageSelectedCommand.NotifyCanExecuteChanged();
+        StageAllCommand.NotifyCanExecuteChanged();
+        UnstageSelectedCommand.NotifyCanExecuteChanged();
+        UnstageAllCommand.NotifyCanExecuteChanged();
+        DiscardUnstagedCommand.NotifyCanExecuteChanged();
+        DiscardStagedCommand.NotifyCanExecuteChanged();
+        DiscardAllCommand.NotifyCanExecuteChanged();
         RestoreFileCommand.NotifyCanExecuteChanged();
+        DiscardCommitChangesCommand.NotifyCanExecuteChanged();
+        RestoreCommitChangesToStageCommand.NotifyCanExecuteChanged();
+        ReturnChangesToOriginalCommitCommand.NotifyCanExecuteChanged();
+        UndoLatestCommitKeepChangesCommand.NotifyCanExecuteChanged();
+        UndoLatestCommitAndDiscardChangesCommand.NotifyCanExecuteChanged();
         CreateRecoveryBranchCommand.NotifyCanExecuteChanged();
         CreateBranchCommand.NotifyCanExecuteChanged();
+        CreateAndSwitchBranchCommand.NotifyCanExecuteChanged();
         RenameBranchCommand.NotifyCanExecuteChanged();
         DeleteBranchCommand.NotifyCanExecuteChanged();
         SwitchBranchCommand.NotifyCanExecuteChanged();
@@ -1612,6 +2216,8 @@ public partial class FolderProjectVersionControlViewModel :
     }
 
     private sealed record FolderProjectSelection(
+        string? SelectedUnstagedChangePath,
+        string? SelectedStagedChangePath,
         string? SelectedCommitId,
         string? SelectedCommitChangePath,
         string? SelectedHistoryBranchName,

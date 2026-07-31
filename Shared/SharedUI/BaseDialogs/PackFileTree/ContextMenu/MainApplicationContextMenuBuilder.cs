@@ -61,7 +61,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             Add<IExportCAVp8AsWebMCommand>(selectedNode, exportFolder);
             Add<AdvancedExportCommand>(selectedNode, exportFolder);
 
-            var openFolder = AddChildMenu("Open", rootNode);
+            var openFolder = AddChildMenu(
+                LocalizationManager.Instance.Get("ContextMenu.Open"),
+                rootNode);
             Add<OpenNodeInHxDCommand>(selectedNode, openFolder);
             Add<OpenNodeInNotepadCommand>(selectedNode, openFolder);
 
@@ -112,14 +114,18 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
 
             if (!isCaPack)
             {
-                var importFolder = AddChildMenu("Import", rootNode);
+                var importFolder = AddChildMenu(
+                    LocalizationManager.Instance.Get("ContextMenu.Import"),
+                    rootNode);
                 Add<ImportFileCommand>(selectedNode, importFolder);
                 Add<ImportDirectoryCommand>(selectedNode, importFolder);
 
                 if (selectedNode.NodeType != NodeType.Root)
                     Add<AdvancedImportCommand>(selectedNode, importFolder);
 
-                var createMenu = AddChildMenu("Create", rootNode);
+                var createMenu = AddChildMenu(
+                    LocalizationManager.Instance.Get("ContextMenu.Create"),
+                    rootNode);
                 Add<CreateFolderCommand>(selectedNode, createMenu);
 
                 AddSeperator(rootNode);

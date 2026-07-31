@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Windows.Forms;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -15,20 +14,21 @@ public sealed class CreateFolderProjectCommand(
     IFolderProjectFactory folderProjectFactory,
     ApplicationSettingsService settingsService,
     IStandardDialogs dialogs,
-    LocalizationManager localizationManager) : IUiCommand
+    LocalizationManager localizationManager,
+    IFolderProjectSetupDialogs? setupDialogs = null) : IUiCommand
 {
+    private readonly IFolderProjectSetupDialogs _setupDialogs =
+        setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
+
     public void Execute()
     {
-        using var folderDialog = new FolderBrowserDialog
-        {
-            Description = localizationManager.Get(
-                "FolderProject.Create.SelectFolder"),
-            UseDescriptionForTitle = true,
-        };
-        if (folderDialog.ShowDialog() != DialogResult.OK)
+        var setup = _setupDialogs.ShowSetup(
+            localizationManager.Get("FolderProject.Create.SetupTitle"),
+            localizationManager.Get("FolderProject.Create.SetupDescription"));
+        if (setup == null)
             return;
 
-        var root = folderDialog.SelectedPath;
+        var root = setup.ProjectFolder;
         if (HasProjectSettings(root))
         {
             dialogs.ShowDialogBox(
@@ -38,9 +38,11 @@ public sealed class CreateFolderProjectCommand(
             return;
         }
 
-        var outputPath = SelectOutputPath(root);
-        if (outputPath == null)
-            return;
+        var name = Path.GetFileName(
+            Path.TrimEndingDirectorySeparator(root));
+        var outputPath = Path.Combine(
+            setup.OutputFolder,
+            name + ".pack");
 
         FolderProjectContainer? project = null;
         try
@@ -51,13 +53,13 @@ public sealed class CreateFolderProjectCommand(
                 root,
                 new FolderProjectSettings
                 {
-                    Name = Path.GetFileName(
-                        Path.TrimEndingDirectorySeparator(root)),
+                    Name = name,
                     OutputPackPath = outputPath,
                     GameVersion = game.Type,
                     PackFileVersion = game.PackFileVersion,
                     PackFileType = PackFileCAType.MOD,
-                    EnablePackFileCorruptionDetection = false,
+                    EnablePackFileCorruptionDetection =
+                        setup.EnablePackFileCorruptionDetection,
                 });
 
             if (packFileService.AddContainer(project, true) == null)
@@ -71,27 +73,6 @@ public sealed class CreateFolderProjectCommand(
                 localizationManager.Get(
                     "FolderProject.Create.Failed"));
         }
-    }
-
-    private string? SelectOutputPath(string root)
-    {
-        using var dialog = new SaveFileDialog
-        {
-            Title = localizationManager.Get(
-                "FolderProject.SelectOutputPack"),
-            Filter = localizationManager.Get("FolderProject.PackFilter"),
-            DefaultExt = "pack",
-            AddExtension = true,
-            InitialDirectory = Path.GetDirectoryName(
-                Path.TrimEndingDirectorySeparator(root)),
-            FileName =
-                Path.GetFileName(
-                    Path.TrimEndingDirectorySeparator(root)) +
-                ".pack",
-        };
-        return dialog.ShowDialog() == DialogResult.OK
-            ? dialog.FileName
-            : null;
     }
 
     private static bool HasProjectSettings(string root)

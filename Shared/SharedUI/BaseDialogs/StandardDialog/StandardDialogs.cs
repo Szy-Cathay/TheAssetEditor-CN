@@ -91,6 +91,26 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
             return new TextInputDialogResult(result!.Value, window.TextValue);
         }
 
+        public TitleDescriptionInputDialogResult ShowTitleDescriptionInputDialog(
+            string title,
+            string titleLabel,
+            string descriptionLabel,
+            string initialTitle = "",
+            string initialDescription = "")
+        {
+            var window = new TitleDescriptionInputWindow(
+                title,
+                titleLabel,
+                descriptionLabel,
+                initialTitle,
+                initialDescription);
+            var result = window.ShowDialog() == true;
+            return new TitleDescriptionInputDialogResult(
+                result,
+                window.TitleValue,
+                window.DescriptionValue);
+        }
+
         public void ShowDialogBox(string message, string title)
         {
             MessageBox.Show(message, title);

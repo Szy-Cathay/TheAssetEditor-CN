@@ -1,17 +1,26 @@
-using System.IO;
 using System.Windows.Forms;
+
+using AssetEditor.Views.FolderProject;
+
+using Shared.Core.Services;
 
 namespace AssetEditor.UiCommands;
 
 public interface IFolderProjectImportDialogs
 {
     string? SelectSourcePack(string title, string filter);
-    string? SelectTargetFolder(string description);
-    string? SelectOutputPack(
-        string root,
-        string defaultName,
+}
+
+public sealed record FolderProjectSetupDialogResult(
+    string ProjectFolder,
+    string OutputFolder,
+    bool EnablePackFileCorruptionDetection);
+
+public interface IFolderProjectSetupDialogs
+{
+    FolderProjectSetupDialogResult? ShowSetup(
         string title,
-        string filter);
+        string description);
 }
 
 public sealed class FolderProjectImportDialogs :
@@ -29,36 +38,24 @@ public sealed class FolderProjectImportDialogs :
             : null;
     }
 
-    public string? SelectTargetFolder(string description)
-    {
-        using var dialog = new FolderBrowserDialog
-        {
-            Description = description,
-            UseDescriptionForTitle = true,
-        };
-        return dialog.ShowDialog() == DialogResult.OK
-            ? dialog.SelectedPath
-            : null;
-    }
+}
 
-    public string? SelectOutputPack(
-        string root,
-        string defaultName,
+public sealed class FolderProjectSetupDialogs(
+    LocalizationManager localizationManager) : IFolderProjectSetupDialogs
+{
+    public FolderProjectSetupDialogResult? ShowSetup(
         string title,
-        string filter)
+        string description)
     {
-        using var dialog = new SaveFileDialog
-        {
-            Title = title,
-            Filter = filter,
-            DefaultExt = "pack",
-            AddExtension = true,
-            InitialDirectory = Path.GetDirectoryName(
-                Path.TrimEndingDirectorySeparator(root)),
-            FileName = defaultName + ".pack",
-        };
-        return dialog.ShowDialog() == DialogResult.OK
-            ? dialog.FileName
+        var window = new FolderProjectSetupWindow(
+            localizationManager,
+            title,
+            description);
+        return window.ShowDialog() == true
+            ? new FolderProjectSetupDialogResult(
+                window.ProjectFolder,
+                window.OutputFolder,
+                window.EnablePackFileCorruptionDetection)
             : null;
     }
 }
