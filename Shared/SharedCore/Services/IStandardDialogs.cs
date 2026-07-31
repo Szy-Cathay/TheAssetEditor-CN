@@ -14,6 +14,12 @@ namespace Shared.Core.Services
         void ShowErrorViewDialog(string title, ErrorList errorItems, bool modal = true);
 
         TextInputDialogResult ShowTextInputDialog(string title, string initialText = "");
+        TitleDescriptionInputDialogResult ShowTitleDescriptionInputDialog(
+            string title,
+            string titleLabel,
+            string descriptionLabel,
+            string initialTitle = "",
+            string initialDescription = "");
         void ShowDialogBox(string message, string title = "Error");
         ShowMessageBoxResult ShowYesNoBox(string message, string title);
     }
@@ -22,6 +28,10 @@ namespace Shared.Core.Services
     public record BrowseDialogResultFile(bool Result, PackFile File);
     public record BrowseDialogResultFolder(bool Result, string Folder);
     public record TextInputDialogResult(bool Result, string Text);
+    public record TitleDescriptionInputDialogResult(
+        bool Result,
+        string Title,
+        string Description);
 
     public enum ShowMessageBoxResult
     {

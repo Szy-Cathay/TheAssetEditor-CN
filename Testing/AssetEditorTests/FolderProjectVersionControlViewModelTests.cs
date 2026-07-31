@@ -18,6 +18,7 @@ public class FolderProjectVersionControlViewModelTests
     private const string ProjectRoot = @"C:\projects\test";
     private const string MainCommit = "1111111111111111111111111111111111111111";
     private const string FeatureCommit = "2222222222222222222222222222222222222222";
+    private const string RewrittenCommit = "3333333333333333333333333333333333333333";
 
     [NUnit.Framework.SetUp]
     public void SetUp()
@@ -73,6 +74,614 @@ public class FolderProjectVersionControlViewModelTests
                 viewModel.MergeConflicts[0].CurrentText,
                 Is.Not.Null.And.Not.Empty);
         });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task OpenProject_SplitsStagedAndUnstagedChanges()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "working.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "index.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                        new FolderProjectWorkingChange(
+                            "both.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(service);
+
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.UnstagedChanges.Select(item => item.RepositoryPath),
+                Is.EquivalentTo(new[] { "working.txt", "both.txt" }));
+            NUnit.Framework.Assert.That(
+                viewModel.StagedChanges.Select(item => item.RepositoryPath),
+                Is.EquivalentTo(new[] { "index.txt", "both.txt" }));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StatusCommands_OperateOnSelectedAndAllVisiblePaths()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "second.txt",
+                            FolderProjectWorkingChangeKind.Added |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "staged.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                    ]));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges[0];
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+        await ExecuteAsync(viewModel.StageAllCommand);
+        viewModel.SelectedStagedChange = viewModel.StagedChanges.Single();
+        await ExecuteAsync(viewModel.UnstageSelectedCommand);
+        await ExecuteAsync(viewModel.UnstageAllCommand);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges[1];
+        await ExecuteAsync(viewModel.DiscardUnstagedCommand);
+
+        service.Verify(
+            item => item.StageChanges(ProjectRoot, new[] { "first.txt" }),
+            Times.Once);
+        service.Verify(
+            item => item.StageChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths =>
+                        paths.Count == 2 &&
+                        paths.Contains("first.txt") &&
+                        paths.Contains("second.txt"))),
+            Times.Once);
+        service.Verify(
+            item => item.UnstageChanges(ProjectRoot, new[] { "staged.txt" }),
+            Times.Exactly(2));
+        service.Verify(
+            item => item.DiscardChanges(ProjectRoot, new[] { "second.txt" }),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StageSelected_OperatesOnEverySelectedChange()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "second.txt",
+                            FolderProjectWorkingChangeKind.Added |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChanges =
+            viewModel.UnstagedChanges.ToList();
+
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+
+        service.Verify(
+            item => item.StageChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths =>
+                        paths.Count == 2 &&
+                        paths.Contains("first.txt") &&
+                        paths.Contains("second.txt"))),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task DiscardAll_DiscardsEveryWorkingChange()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "working.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "index.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                        new FolderProjectWorkingChange(
+                            "both.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        var command = viewModel.GetType()
+            .GetProperty("DiscardAllCommand")?
+            .GetValue(viewModel) as IAsyncRelayCommand;
+
+        NUnit.Framework.Assert.That(command, Is.Not.Null);
+        await command!.ExecuteAsync(null);
+
+        service.Verify(
+            item => item.DiscardChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths =>
+                        paths.Count == 3 &&
+                        paths.Contains("working.txt") &&
+                        paths.Contains("index.txt") &&
+                        paths.Contains("both.txt"))),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task Commit_UsesOnlyStagedChanges()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "staged.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                    ]));
+        service.Setup(item => item.CommitStaged(
+                ProjectRoot,
+                "保存修改\n\n详细说明"))
+            .Returns(Commit());
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowTitleDescriptionInputDialog(
+                "提交文件",
+                "提交标题",
+                "提交说明",
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(
+                new TitleDescriptionInputDialogResult(
+                    true,
+                    "保存修改",
+                    "详细说明"));
+        var viewModel = CreateViewModel(service, dialogs: dialogs.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        NUnit.Framework.Assert.That(
+            viewModel.CommitCommand.CanExecute(null),
+            Is.True);
+
+        await ExecuteAsync(viewModel.CommitCommand);
+
+        service.Verify(
+            item => item.CommitStaged(
+                ProjectRoot,
+                "保存修改\n\n详细说明"),
+            Times.Once);
+        service.Verify(
+            item => item.CommitAll(
+                It.IsAny<string>(),
+                It.IsAny<string>()),
+            Times.Never);
+        dialogs.Verify(item => item.ShowTitleDescriptionInputDialog(
+            "提交文件",
+            "提交标题",
+            "提交说明",
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task RestoreDeletedFile_UsesCommitParentVersion()
+    {
+        var deletedCommit = new FolderProjectCommitSummary(
+            MainCommit,
+            "删除文件",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
+            [FeatureCommit]);
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetHistory(
+                ProjectRoot,
+                It.IsAny<string>(),
+                100))
+            .Returns([deletedCommit]);
+        service.Setup(item => item.GetCommitChanges(ProjectRoot, MainCommit))
+            .Returns(
+                [
+                    new FolderProjectCommitChange(
+                        "deleted.bin",
+                        null,
+                        FolderProjectCommitChangeKind.Deleted,
+                        true),
+                ]);
+        service.Setup(item => item.RestoreFile(
+                ProjectRoot,
+                FeatureCommit,
+                "deleted.bin",
+                false))
+            .Returns(
+                new FolderProjectFileRestoreResult(
+                    FeatureCommit,
+                    "deleted.bin",
+                    10));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+        viewModel.SelectedCommitChange = viewModel.CommitChanges.Single();
+
+        await ExecuteAsync(viewModel.RestoreFileCommand);
+
+        service.Verify(item => item.RestoreFile(
+            ProjectRoot,
+            FeatureCommit,
+            "deleted.bin",
+            false), Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task RestoreFile_RestoresEverySelectedCommitChange()
+    {
+        var commit = new FolderProjectCommitSummary(
+            MainCommit,
+            "修改文件",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
+            [FeatureCommit]);
+        var changes = new[]
+        {
+            new FolderProjectCommitChange(
+                "first.bin",
+                null,
+                FolderProjectCommitChangeKind.Modified,
+                true),
+            new FolderProjectCommitChange(
+                "second.bin",
+                null,
+                FolderProjectCommitChangeKind.Modified,
+                true),
+        };
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetHistory(
+                ProjectRoot,
+                It.IsAny<string>(),
+                100))
+            .Returns([commit]);
+        service.Setup(item => item.GetCommitChanges(ProjectRoot, MainCommit))
+            .Returns(changes);
+        service.Setup(item => item.RestoreFile(
+                ProjectRoot,
+                MainCommit,
+                It.IsAny<string>(),
+                false))
+            .Returns(
+                (string _, string commitId, string path, bool _) =>
+                    new FolderProjectFileRestoreResult(
+                        commitId,
+                        path,
+                        10));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+        viewModel.SelectedCommitChanges = viewModel.CommitChanges.ToList();
+        viewModel.SelectedCommitChange = viewModel.CommitChanges[0];
+
+        await ExecuteAsync(viewModel.RestoreFileCommand);
+
+        service.Verify(item => item.RestoreFile(
+            ProjectRoot,
+            MainCommit,
+            "first.bin",
+            false), Times.Once);
+        service.Verify(item => item.RestoreFile(
+            ProjectRoot,
+            MainCommit,
+            "second.bin",
+            false), Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task DiscardCommitChanges_RemovesSelectedPathFromLatestCommit()
+    {
+        var original = new FolderProjectCommitSummary(
+            MainCommit,
+            "提交 A",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
+            [FeatureCommit]);
+        var rewritten = original with { Id = RewrittenCommit };
+        var first = new FolderProjectCommitChange(
+            "first.txt",
+            null,
+            FolderProjectCommitChangeKind.Modified,
+            false);
+        var second = new FolderProjectCommitChange(
+            "second.txt",
+            null,
+            FolderProjectCommitChangeKind.Modified,
+            false);
+        var edited = false;
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                () => new FolderProjectRepositoryStatus(
+                    true,
+                    "main",
+                    edited ? RewrittenCommit : MainCommit,
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    []));
+        service.Setup(item => item.GetHistory(ProjectRoot, "main", 100))
+            .Returns(() => edited ? [rewritten] : [original]);
+        service.Setup(item => item.GetCommitChanges(
+                ProjectRoot,
+                It.IsAny<string>()))
+            .Returns(
+                (string _, string commitId) =>
+                    commitId == MainCommit ? [first, second] : [second]);
+        service.Setup(item => item.EditLatestCommitChanges(
+                ProjectRoot,
+                MainCommit,
+                It.IsAny<IReadOnlyList<string>>(),
+                FolderProjectCommitChangeEditMode.Discard))
+            .Callback(() => edited = true)
+            .Returns(
+                new FolderProjectCommitEditSession(
+                    MainCommit,
+                    RewrittenCommit,
+                    ["first.txt"],
+                    true));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+        viewModel.SelectedCommitChange = viewModel.CommitChanges[0];
+
+        await ExecuteAsync(viewModel.DiscardCommitChangesCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.CommitChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+            NUnit.Framework.Assert.That(
+                viewModel.SelectedCommit?.Id,
+                Is.EqualTo(RewrittenCommit));
+        });
+        service.Verify(item => item.EditLatestCommitChanges(
+            ProjectRoot,
+            MainCommit,
+            It.Is<IReadOnlyList<string>>(
+                paths => paths.SequenceEqual(new[] { "first.txt" })),
+            FolderProjectCommitChangeEditMode.Discard), Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task RestoreCommitChangesToStage_AllowsExplicitReturnToOriginalCommit()
+    {
+        var original = new FolderProjectCommitSummary(
+            MainCommit,
+            "提交 A",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
+            [FeatureCommit]);
+        var rewritten = original with { Id = RewrittenCommit };
+        var first = new FolderProjectCommitChange(
+            "first.txt",
+            null,
+            FolderProjectCommitChangeKind.Modified,
+            false);
+        var second = new FolderProjectCommitChange(
+            "second.txt",
+            null,
+            FolderProjectCommitChangeKind.Modified,
+            false);
+        var staged = false;
+        var completed = false;
+        var session = new FolderProjectCommitEditSession(
+            MainCommit,
+            RewrittenCommit,
+            ["first.txt"],
+            true);
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                () => new FolderProjectRepositoryStatus(
+                    true,
+                    "main",
+                    completed ? MainCommit : staged ? RewrittenCommit : MainCommit,
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    staged && !completed
+                        ?
+                        [
+                            new FolderProjectWorkingChange(
+                                "first.txt",
+                                FolderProjectWorkingChangeKind.Modified |
+                                FolderProjectWorkingChangeKind.Staged),
+                        ]
+                        : []));
+        service.Setup(item => item.GetHistory(ProjectRoot, "main", 100))
+            .Returns(
+                () => completed || !staged
+                    ? [original]
+                    : [rewritten]);
+        service.Setup(item => item.GetCommitChanges(
+                ProjectRoot,
+                It.IsAny<string>()))
+            .Returns(
+                (string _, string commitId) =>
+                    commitId == RewrittenCommit ? [second] : [first, second]);
+        service.Setup(item => item.EditLatestCommitChanges(
+                ProjectRoot,
+                MainCommit,
+                It.IsAny<IReadOnlyList<string>>(),
+                FolderProjectCommitChangeEditMode.StageForEdit))
+            .Callback(() => staged = true)
+            .Returns(session);
+        service.Setup(item => item.CompleteLatestCommitEdit(
+                ProjectRoot,
+                session))
+            .Callback(() => completed = true)
+            .Returns(original);
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+        viewModel.SelectedCommitChange = viewModel.CommitChanges[0];
+
+        await ExecuteAsync(viewModel.RestoreCommitChangesToStageCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.CommitChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+            NUnit.Framework.Assert.That(
+                viewModel.StagedChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "first.txt" }));
+            NUnit.Framework.Assert.That(viewModel.SelectedTabIndex, Is.Zero);
+            NUnit.Framework.Assert.That(
+                viewModel.ReturnChangesToOriginalCommitCommand.CanExecute(null),
+                Is.True);
+        });
+
+        await ExecuteAsync(viewModel.ReturnChangesToOriginalCommitCommand);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(viewModel.CommitChanges, Has.Count.EqualTo(2));
+            NUnit.Framework.Assert.That(viewModel.StagedChanges, Is.Empty);
+            NUnit.Framework.Assert.That(
+                viewModel.ReturnChangesToOriginalCommitCommand.CanExecute(null),
+                Is.False);
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public void CommitFileEditingCommands_HaveClearChineseLabels()
+    {
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                LocalizationManager.Instance.Get(
+                    "FolderProject.VersionControl.DiscardCommitChanges"),
+                Is.EqualTo("撤销修改"));
+            NUnit.Framework.Assert.That(
+                LocalizationManager.Instance.Get(
+                    "FolderProject.VersionControl.RestoreCommitChangesToStage"),
+                Is.EqualTo("恢复到暂存"));
+            NUnit.Framework.Assert.That(
+                LocalizationManager.Instance.Get(
+                    "FolderProject.VersionControl.ReturnChangesToOriginalCommit"),
+                Is.EqualTo("重新提交"));
+            NUnit.Framework.Assert.That(
+                LocalizationManager.Instance.Get(
+                    "FolderProject.VersionControl.Commit"),
+                Is.EqualTo("提交已暂存文件"));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task UndoLatestCommit_RequiresCleanCurrentBranchAndLatestHead()
+    {
+        var commit = new FolderProjectCommitSummary(
+            MainCommit,
+            "待重新修改",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
+            [FeatureCommit]);
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetHistory(
+                ProjectRoot,
+                It.IsAny<string>(),
+                100))
+            .Returns([commit]);
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        NUnit.Framework.Assert.That(
+            viewModel.UndoLatestCommitKeepChangesCommand.CanExecute(null),
+            Is.True);
+        NUnit.Framework.Assert.That(
+            viewModel.UndoLatestCommitAndDiscardChangesCommand.CanExecute(null),
+            Is.True);
+        await ExecuteAsync(viewModel.UndoLatestCommitKeepChangesCommand);
+        await ExecuteAsync(
+            viewModel.UndoLatestCommitAndDiscardChangesCommand);
+
+        service.Verify(
+            item => item.UndoLatestCommit(
+                ProjectRoot,
+                MainCommit,
+                FolderProjectCommitUndoMode.KeepChanges),
+            Times.Once);
+        service.Verify(
+            item => item.UndoLatestCommit(
+                ProjectRoot,
+                MainCommit,
+                FolderProjectCommitUndoMode.DiscardChanges),
+            Times.Once);
     }
 
     [NUnit.Framework.Test]
@@ -275,7 +884,12 @@ public class FolderProjectVersionControlViewModelTests
                     "new-branch",
                     MainCommit,
                     false));
-        var viewModel = CreateViewModel(service);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowTextInputDialog(
+                "新建分支",
+                It.IsAny<string>()))
+            .Returns(new TextInputDialogResult(true, "new-branch"));
+        var viewModel = CreateViewModel(service, dialogs: dialogs.Object);
         await OpenProjectAsync(
             viewModel,
             ProjectRoot,
@@ -283,10 +897,144 @@ public class FolderProjectVersionControlViewModelTests
             false);
 
         await ExecuteAsync(viewModel.SaveIdentityCommand);
-        viewModel.BranchName = "new-branch";
         await ExecuteAsync(viewModel.CreateBranchCommand);
 
         NUnit.Framework.Assert.That(statusReads, Is.EqualTo(1));
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CreateAndSwitchBranch_CarriesDirtyChangesFromStatusPage()
+    {
+        var currentBranch = "main";
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                () => new FolderProjectRepositoryStatus(
+                    true,
+                    currentBranch,
+                    MainCommit,
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    [
+                        new FolderProjectWorkingChange(
+                            "file.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        service.Setup(item => item.GetBranches(ProjectRoot))
+            .Returns(
+                () =>
+                [
+                    new FolderProjectBranchInfo(
+                        "main",
+                        MainCommit,
+                        currentBranch == "main"),
+                    .. currentBranch == "topic"
+                        ? new[]
+                        {
+                            new FolderProjectBranchInfo(
+                                "topic",
+                                MainCommit,
+                                true),
+                        }
+                        : [],
+                    new FolderProjectBranchInfo(
+                        "feature",
+                        FeatureCommit,
+                        false),
+                ]);
+        service.Setup(item => item.CreateBranch(
+                ProjectRoot,
+                "topic",
+                null))
+            .Returns(new FolderProjectBranchInfo("topic", MainCommit, false));
+        service.Setup(item => item.SwitchBranch(ProjectRoot, "topic"))
+            .Returns(
+                () =>
+                {
+                    currentBranch = "topic";
+                    return new FolderProjectBranchInfo(
+                        "topic",
+                        MainCommit,
+                        true);
+                });
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowTextInputDialog(
+                "新建分支",
+                It.IsAny<string>()))
+            .Returns(new TextInputDialogResult(true, "topic"));
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.Is<string>(message => message.Contains("带入")),
+                "新建分支"))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new RecordingCoordinator();
+        var viewModel = CreateViewModel(
+            service,
+            coordinator,
+            dialogs.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        await ExecuteAsync(viewModel.CreateAndSwitchBranchCommand);
+
+        service.Verify(item => item.CreateBranch(
+            ProjectRoot,
+            "topic",
+            null), Times.Once);
+        service.Verify(item => item.SwitchBranch(
+            ProjectRoot,
+            "topic"), Times.Once);
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.CurrentBranch,
+                Is.EqualTo("topic"));
+            NUnit.Framework.Assert.That(
+                viewModel.SelectedBranch?.Name,
+                Is.EqualTo("topic"));
+            NUnit.Framework.Assert.That(
+                viewModel.SelectedBranch?.IsCurrent,
+                Is.True);
+            NUnit.Framework.Assert.That(
+                coordinator.Calls,
+                Has.Count.EqualTo(1));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CreateAndSwitchBranch_DirtyCancellationDoesNotCreateBranch()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "file.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowTextInputDialog(
+                "新建分支",
+                It.IsAny<string>()))
+            .Returns(new TextInputDialogResult(true, "topic"));
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.Is<string>(message => message.Contains("带入")),
+                "新建分支"))
+            .Returns(ShowMessageBoxResult.Cancel);
+        var viewModel = CreateViewModel(service, dialogs: dialogs.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        await ExecuteAsync(viewModel.CreateAndSwitchBranchCommand);
+
+        service.Verify(item => item.CreateBranch(
+            ProjectRoot,
+            "topic",
+            null), Times.Never);
+        service.Verify(item => item.SwitchBranch(
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Never);
     }
 
     [NUnit.Framework.Test]
@@ -316,7 +1064,7 @@ public class FolderProjectVersionControlViewModelTests
                 Is.EqualTo("main"));
             NUnit.Framework.Assert.That(
                 viewModel.SelectedTabIndex,
-                Is.EqualTo(3));
+                Is.EqualTo(2));
         });
     }
 
@@ -369,7 +1117,7 @@ public class FolderProjectVersionControlViewModelTests
                 Is.EqualTo("master"));
             NUnit.Framework.Assert.That(
                 viewModel.SelectedTabIndex,
-                Is.EqualTo(3));
+                Is.EqualTo(2));
         });
     }
 
@@ -904,6 +1652,49 @@ public class FolderProjectVersionControlViewModelTests
     }
 
     [NUnit.Framework.Test]
+    public async Task ResolveConflict_ResolvesEverySelectedConflict()
+    {
+        var conflicts = new[]
+        {
+            MergeConflict("first-conflict", "first.txt"),
+            MergeConflict("second-conflict", "second.txt"),
+        };
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status(FolderProjectRepositoryOperationState.Merge));
+        service.Setup(item => item.GetMergeState(ProjectRoot))
+            .Returns(
+                MergeState(
+                    FolderProjectMergePhase.Conflicts,
+                    conflicts));
+        service.Setup(item => item.ResolveMergeConflict(
+                ProjectRoot,
+                It.IsAny<string>(),
+                FolderProjectMergeChoice.Current))
+            .Returns(
+                MergeState(
+                    FolderProjectMergePhase.Conflicts,
+                    conflicts));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedMergeConflicts = viewModel.MergeConflicts.ToList();
+        viewModel.SelectedMergeConflict = viewModel.MergeConflicts[0];
+
+        await ExecuteAsync(viewModel.UseCurrentCommand);
+
+        service.Verify(item => item.ResolveMergeConflict(
+            ProjectRoot,
+            "first-conflict",
+            FolderProjectMergeChoice.Current), Times.Once);
+        service.Verify(item => item.ResolveMergeConflict(
+            ProjectRoot,
+            "second-conflict",
+            FolderProjectMergeChoice.Current), Times.Once);
+    }
+
+    [NUnit.Framework.Test]
     public async Task ResolveCompleteAndAbort_UseOpaqueIdAndCoordinator()
     {
         var phase = FolderProjectMergePhase.Conflicts;
@@ -944,7 +1735,9 @@ public class FolderProjectVersionControlViewModelTests
                     phase = FolderProjectMergePhase.ReadyToCommit;
                     return MergeState(phase);
                 });
-        service.Setup(item => item.CompleteMerge(ProjectRoot, "完成合并"))
+        service.Setup(item => item.CompleteMerge(
+                ProjectRoot,
+                "完成合并\n\n合并后的说明"))
             .Returns(
                 () =>
                 {
@@ -954,10 +1747,11 @@ public class FolderProjectVersionControlViewModelTests
         service.Setup(item => item.AbortMerge(ProjectRoot))
             .Callback(() => phase = FolderProjectMergePhase.None);
         var coordinator = new RecordingCoordinator();
+        var dialogs = ConfirmingDialogs();
         var viewModel = CreateViewModel(
             service,
             coordinator,
-            ConfirmingDialogs().Object);
+            dialogs.Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", true);
         viewModel.SelectedMergeConflict =
             viewModel.MergeConflicts.Single();
@@ -976,11 +1770,19 @@ public class FolderProjectVersionControlViewModelTests
                 FolderProjectMergeChoice.Incoming),
             Times.Once);
         service.Verify(
-            item => item.CompleteMerge(ProjectRoot, "完成合并"),
+            item => item.CompleteMerge(
+                ProjectRoot,
+                "完成合并\n\n合并后的说明"),
             Times.Once);
         service.Verify(
             item => item.AbortMerge(ProjectRoot),
             Times.Once);
+        dialogs.Verify(item => item.ShowTitleDescriptionInputDialog(
+            "提交文件",
+            "提交标题",
+            "提交说明",
+            "完成合并",
+            ""), Times.Once);
         NUnit.Framework.Assert.That(coordinator.Calls, Has.Count.EqualTo(3));
         NUnit.Framework.Assert.That(
             coordinator.Calls.All(item => item.OpenWhenComplete),
@@ -1002,15 +1804,18 @@ public class FolderProjectVersionControlViewModelTests
                         [
                             new FolderProjectWorkingChange(
                                 "file.txt",
-                                FolderProjectWorkingChangeKind.Modified),
+                                FolderProjectWorkingChangeKind.Modified |
+                                FolderProjectWorkingChangeKind.Staged),
                         ]);
                 });
-        service.Setup(item => item.CommitAll(ProjectRoot, "保存修改"))
+        service.Setup(item => item.CommitStaged(ProjectRoot, "保存修改"))
             .Throws(
                 new FolderProjectVersionControlException(
                     FolderProjectVersionControlError.NothingToCommit,
                     "SECRET RAW ERROR"));
-        var viewModel = CreateViewModel(service);
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
         viewModel.CommitMessage = "保存修改";
 
@@ -1186,7 +1991,8 @@ public class FolderProjectVersionControlViewModelTests
                         [
                             new FolderProjectWorkingChange(
                                 "file.txt",
-                                FolderProjectWorkingChangeKind.Modified),
+                                FolderProjectWorkingChangeKind.Modified |
+                                FolderProjectWorkingChangeKind.Staged),
                         ])
                     : new FolderProjectRepositoryStatus(
                         false,
@@ -1211,7 +2017,7 @@ public class FolderProjectVersionControlViewModelTests
             item => item.SetIdentity(
                 ProjectRoot,
                 It.IsAny<FolderProjectGitIdentity>()));
-        service.Setup(item => item.CommitAll(ProjectRoot, "保存修改"))
+        service.Setup(item => item.CommitStaged(ProjectRoot, "保存修改"))
             .Returns(Commit());
         service.Setup(
                 item => item.CreateRecoveryBranch(
@@ -1245,10 +2051,11 @@ public class FolderProjectVersionControlViewModelTests
                     false));
         service.Setup(item => item.DeleteBranch(ProjectRoot, "feature"));
         var coordinator = new RecordingCoordinator();
+        var dialogs = ConfirmingDialogs();
         var viewModel = CreateViewModel(
             service,
             coordinator,
-            ConfirmingDialogs().Object);
+            dialogs.Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
         viewModel.IdentityName = "测试者";
         viewModel.IdentityEmail = "test@example.com";
@@ -1284,7 +2091,7 @@ public class FolderProjectVersionControlViewModelTests
                 It.IsAny<FolderProjectGitIdentity>()),
             Times.Once);
         service.Verify(
-            item => item.CommitAll(ProjectRoot, "保存修改"),
+            item => item.CommitStaged(ProjectRoot, "保存修改"),
             Times.Once);
         service.Verify(
             item => item.CreateRecoveryBranch(
@@ -1307,11 +2114,26 @@ public class FolderProjectVersionControlViewModelTests
         service.Verify(
             item => item.DeleteBranch(ProjectRoot, "feature"),
             Times.Once);
+        dialogs.Verify(item => item.ShowTitleDescriptionInputDialog(
+            "提交文件",
+            "提交标题",
+            "提交说明",
+            "保存修改",
+            ""), Times.Once);
+        dialogs.Verify(item => item.ShowTextInputDialog(
+            "保护分支名称",
+            "recovery/test"), Times.Once);
+        dialogs.Verify(item => item.ShowTextInputDialog(
+            "新建分支",
+            "new-branch"), Times.Once);
+        dialogs.Verify(item => item.ShowTextInputDialog(
+            "重命名所选分支",
+            "renamed"), Times.Once);
         NUnit.Framework.Assert.That(coordinator.Calls, Is.Empty);
     }
 
     [NUnit.Framework.Test]
-    public async Task UnsafeRepositoryState_DisablesBranchActionsWithReason()
+    public async Task DirtyRepository_AllowsSafeBranchSwitchButNotMerge()
     {
         var service = CreateService();
         service.Setup(item => item.GetStatus(ProjectRoot))
@@ -1326,7 +2148,7 @@ public class FolderProjectVersionControlViewModelTests
         var viewModel = CreateViewModel(service);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
         viewModel.SelectedBranch =
-            viewModel.Branches.Single(item => item.IsCurrent);
+            viewModel.Branches.Single(item => item.Name == "feature");
         viewModel.SelectedMergeSource =
             viewModel.MergeSources.Single(item => item.Name == "feature");
 
@@ -1334,7 +2156,7 @@ public class FolderProjectVersionControlViewModelTests
         {
             NUnit.Framework.Assert.That(
                 viewModel.SwitchBranchCommand.CanExecute(null),
-                Is.False);
+                Is.True);
             NUnit.Framework.Assert.That(
                 viewModel.PrepareMergeCommand.CanExecute(null),
                 Is.False);
@@ -1343,7 +2165,7 @@ public class FolderProjectVersionControlViewModelTests
                 Is.False);
             NUnit.Framework.Assert.That(
                 viewModel.BranchActionHint,
-                Does.Contain("状态与提交"));
+                Does.Contain("安全保留"));
         });
     }
 
@@ -1372,6 +2194,7 @@ public class FolderProjectVersionControlViewModelTests
         await ExecuteAsync(viewModel.InitializeCommand);
         File.WriteAllText(resourcePath, "second");
         await ExecuteAsync(viewModel.RefreshCommand);
+        await ExecuteAsync(viewModel.StageAllCommand);
         viewModel.CommitMessage = "保存真实修改";
         await ExecuteAsync(viewModel.CommitCommand);
         viewModel.BranchName = "feature";
@@ -1391,6 +2214,56 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(
                 coordinator.Calls,
                 Has.Count.EqualTo(1));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task RealRepository_RestoreCommitFileEnablesRecommit()
+    {
+        using var directory = new TemporaryDirectory();
+        new FolderProjectSettings { Name = "真实重新提交测试" }
+            .Save(directory.Path);
+        var resourcePath = Path.Combine(directory.Path, "file.txt");
+        var otherPath = Path.Combine(directory.Path, "other.txt");
+        File.WriteAllText(resourcePath, "first");
+        File.WriteAllText(otherPath, "first");
+        var viewModel = new FolderProjectVersionControlViewModel(
+            new FolderProjectVersionControlService(),
+            new RecordingCoordinator(),
+            ConfirmingDialogs().Object,
+            LocalizationManager.Instance);
+        await OpenProjectAsync(
+            viewModel,
+            directory.Path,
+            "真实重新提交测试",
+            false);
+        viewModel.IdentityName = "测试者";
+        viewModel.IdentityEmail = "test@example.com";
+
+        await ExecuteAsync(viewModel.InitializeCommand);
+        File.WriteAllText(resourcePath, "second");
+        File.WriteAllText(otherPath, "second");
+        await ExecuteAsync(viewModel.RefreshCommand);
+        await ExecuteAsync(viewModel.StageAllCommand);
+        viewModel.CommitMessage = "提交 A";
+        await ExecuteAsync(viewModel.CommitCommand);
+        viewModel.SelectedCommit = viewModel.History.First();
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+        viewModel.SelectedCommitChange = viewModel.CommitChanges.Single(
+            change => change.RepositoryPath == "file.txt");
+
+        await ExecuteAsync(viewModel.RestoreCommitChangesToStageCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(viewModel.SelectedTabIndex, Is.Zero);
+            NUnit.Framework.Assert.That(
+                viewModel.StagedChanges.Select(change => change.RepositoryPath),
+                Does.Contain("file.txt"));
+            NUnit.Framework.Assert.That(
+                viewModel.ReturnChangesToOriginalCommitCommand.CanExecute(null),
+                Is.True);
         });
     }
 
@@ -1424,6 +2297,7 @@ public class FolderProjectVersionControlViewModelTests
         await ExecuteAsync(viewModel.SwitchBranchCommand);
         File.WriteAllText(resourcePath, "feature");
         await ExecuteAsync(viewModel.RefreshCommand);
+        await ExecuteAsync(viewModel.StageAllCommand);
         viewModel.CommitMessage = "功能分支修改";
         await ExecuteAsync(viewModel.CommitCommand);
         viewModel.SelectedBranch =
@@ -1593,6 +2467,33 @@ public class FolderProjectVersionControlViewModelTests
                     It.IsAny<string>(),
                     It.IsAny<string>()))
             .Returns(ShowMessageBoxResult.OK);
+        dialogs.Setup(
+                item => item.ShowTextInputDialog(
+                    It.IsAny<string>(),
+                    It.IsAny<string>()))
+            .Returns(
+                (string _, string initialText) =>
+                    new TextInputDialogResult(true, initialText));
+        dialogs.Setup(
+                item => item.ShowTitleDescriptionInputDialog(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>()))
+            .Returns(
+                (
+                    string _,
+                    string _,
+                    string _,
+                    string initialTitle,
+                    string initialDescription) =>
+                    new TitleDescriptionInputDialogResult(
+                        true,
+                        initialTitle,
+                        initialTitle == "完成合并"
+                            ? "合并后的说明"
+                            : initialDescription));
         return dialogs;
     }
 
@@ -1619,6 +2520,22 @@ public class FolderProjectVersionControlViewModelTests
             "test@example.com",
             DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
             []);
+    }
+
+    private static FolderProjectMergeConflict MergeConflict(
+        string id,
+        string path)
+    {
+        return new FolderProjectMergeConflict(
+            id,
+            null,
+            new FolderProjectMergeSide(
+                path,
+                MainCommit,
+                FolderProjectGitFileMode.NonExecutable,
+                4,
+                false),
+            null);
     }
 
     private static FolderProjectMergeState MergeState(

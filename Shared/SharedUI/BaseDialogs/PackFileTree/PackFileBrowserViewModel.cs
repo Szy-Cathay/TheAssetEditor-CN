@@ -10,6 +10,7 @@ using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.PackFiles.Utility;
 using Shared.Core.Settings;
 using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu;
 using Shared.Ui.Common;
@@ -25,6 +26,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private readonly IEventHub? _eventHub;
         private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly IContextMenuBuilder _contextMenuBuilder;
+        private readonly IFolderProjectVersionControlService?
+            _versionControlService;
         private readonly Dictionary<string, FolderProjectTreeState>
             _detachedFolderProjectStates =
                 new(StringComparer.OrdinalIgnoreCase);
@@ -40,12 +43,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         public bool ShowFoldersOnly { get; }
 
-        public PackFileBrowserViewModel(ApplicationSettingsService applicationSettingsService, IContextMenuBuilder contextMenuBuilder, IPackFileService packFileService, IEventHub? eventHub, bool showCaFiles, bool showFoldersOnly)
+        public PackFileBrowserViewModel(ApplicationSettingsService applicationSettingsService, IContextMenuBuilder contextMenuBuilder, IPackFileService packFileService, IEventHub? eventHub, bool showCaFiles, bool showFoldersOnly, IFolderProjectVersionControlService? versionControlService = null)
         {
             _packFileService = packFileService;
             _eventHub = eventHub;
             _applicationSettingsService = applicationSettingsService;
             _contextMenuBuilder = contextMenuBuilder;
+            _versionControlService = versionControlService;
 
             ShowFoldersOnly = showFoldersOnly;
 
@@ -145,7 +149,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         {
             if (e.Container is FolderProjectContainer)
             {
-                ReloadFolderProjectTreeAndMarkChanged(e.Container);
+                ReloadTree(e.Container);
+                MarkFolderProjectFilesChanged(
+                    e.Container,
+                    e.ChangedFiles);
                 return;
             }
 
@@ -173,7 +180,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         {
             if (e.Container is FolderProjectContainer)
             {
-                ReloadFolderProjectTreeAndMarkChanged(e.Container);
+                ReloadTree(e.Container);
+                MarkFolderProjectFilesChanged(
+                    e.Container,
+                    e.AddedFiles);
                 return;
             }
 
@@ -187,6 +197,36 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             var root = GetPackFileCollectionRootNode(container);
             if (root != null)
                 root.UnsavedChanged = true;
+        }
+
+        private void MarkFolderProjectFilesChanged(
+            PackFileContainer container,
+            IEnumerable<PackFile> files)
+        {
+            var root = GetPackFileCollectionRootNode(container);
+            if (root == null)
+                return;
+
+            foreach (var file in files)
+            {
+                var relativePath = container.FileList
+                    .FirstOrDefault(
+                        pair => ReferenceEquals(pair.Value, file))
+                    .Key;
+                var node = string.IsNullOrWhiteSpace(relativePath)
+                    ? null
+                    : FindNodeByPath(
+                        root,
+                        relativePath.Replace(
+                            Path.AltDirectorySeparatorChar,
+                            Path.DirectorySeparatorChar));
+                node ??= root;
+                while (node != null)
+                {
+                    node.UnsavedChanged = true;
+                    node = node.Parent;
+                }
+            }
         }
 
         [RelayCommand]
@@ -469,6 +509,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                             node.NodeType != NodeType.Root &&
                             folderProject.IsIgnored(
                                 node.GetFullPath()));
+                MarkFolderProjectGitChanges(folderProject, root);
             }
 
             if (existingIndex == -1)
@@ -478,6 +519,45 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
             Filter.Refresh();
             RestoreTreeState(container, root, state);
+        }
+
+        private void MarkFolderProjectGitChanges(
+            FolderProjectContainer project,
+            TreeNode root)
+        {
+            if (_versionControlService == null)
+                return;
+
+            FolderProjectRepositoryStatus status;
+            try
+            {
+                status = _versionControlService.GetStatus(
+                    project.ProjectRoot);
+            }
+            catch (FolderProjectVersionControlException)
+            {
+                return;
+            }
+
+            foreach (var change in status.Changes)
+            {
+                var path = change.RepositoryPath.Replace(
+                    Path.AltDirectorySeparatorChar,
+                    Path.DirectorySeparatorChar);
+                TreeNode? node = null;
+                while (node == null && path.Length != 0)
+                {
+                    node = FindNodeByPath(root, path);
+                    path = GetParentPath(path) ?? "";
+                }
+
+                node ??= root;
+                while (node != null)
+                {
+                    node.UnsavedChanged = true;
+                    node = node.Parent;
+                }
+            }
         }
 
         private int GetContainerInsertionIndex(PackFileContainer container)

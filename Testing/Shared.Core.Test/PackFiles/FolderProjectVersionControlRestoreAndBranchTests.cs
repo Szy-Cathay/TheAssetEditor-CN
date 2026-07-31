@@ -519,12 +519,13 @@ public class FolderProjectVersionControlRestoreAndBranchTests
     }
 
     [Test]
-    public void GetBranches_ReturnsOnlyLocalWithCurrentFirstAndStableSort()
+    public void GetBranches_ReturnsOnlyLocalInCreationOrderAcrossSwitches()
     {
         using var project = new TemporaryDirectory("branch-list");
         var service = new FolderProjectVersionControlService();
         var initial = service.Initialize(project.Path, s_identity);
         service.CreateBranch(project.Path, "zeta");
+        Thread.Sleep(20);
         service.CreateBranch(project.Path, "Alpha");
         using (var repository = new Repository(project.Path))
         {
@@ -533,13 +534,22 @@ public class FolderProjectVersionControlRestoreAndBranchTests
                 initial.Id);
         }
 
-        var branches = service.GetBranches(project.Path);
+        var beforeSwitch = service.GetBranches(project.Path);
+        service.SwitchBranch(project.Path, "Alpha");
+        var afterSwitch = service.GetBranches(project.Path);
 
-        Assert.That(
-            branches.Select(branch => branch.Name),
-            Is.EqualTo(new[] { "master", "Alpha", "zeta" }));
-        Assert.That(branches[0].IsCurrent, Is.True);
-        Assert.That(branches.Skip(1).All(branch => !branch.IsCurrent), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                beforeSwitch.Select(branch => branch.Name),
+                Is.EqualTo(new[] { "master", "zeta", "Alpha" }));
+            Assert.That(
+                afterSwitch.Select(branch => branch.Name),
+                Is.EqualTo(beforeSwitch.Select(branch => branch.Name)));
+            Assert.That(
+                afterSwitch.Single(branch => branch.Name == "Alpha").IsCurrent,
+                Is.True);
+        });
     }
 
     [TestCase("")]
@@ -631,6 +641,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var service = new FolderProjectVersionControlService();
         var initial = service.Initialize(project.Path, s_identity);
         service.CreateBranch(project.Path, "other");
+        Thread.Sleep(20);
+        service.CreateBranch(project.Path, "later");
 
         var other = service.RenameBranch(project.Path, "other", "renamed-other");
         var current = service.RenameBranch(project.Path, "master", "renamed-main");
@@ -647,6 +659,14 @@ public class FolderProjectVersionControlRestoreAndBranchTests
             Assert.That(repository.Head.FriendlyName, Is.EqualTo("renamed-main"));
             Assert.That(repository.Branches["other"], Is.Null);
             Assert.That(repository.Branches["master"], Is.Null);
+            Assert.That(
+                service.GetBranches(project.Path).Select(branch => branch.Name),
+                Is.EqualTo(new[]
+                {
+                    "renamed-main",
+                    "renamed-other",
+                    "later",
+                }));
         });
     }
 
@@ -817,11 +837,42 @@ public class FolderProjectVersionControlRestoreAndBranchTests
     [TestCase("unstaged")]
     [TestCase("untracked")]
     [TestCase("deleted")]
-    public void SwitchBranch_DirtyStatus_RejectsWithoutChangingRepository(
+    public void SwitchBranch_NonConflictingDirtyStatus_PreservesChanges(
         string dirtyState)
     {
         using var project = CreateSwitchProject();
         ConfigureSwitchDirtyState(project.Path, dirtyState);
+        var service = new FolderProjectVersionControlService();
+
+        var branch = service.SwitchBranch(project.Path, "other");
+        var status = service.GetStatus(project.Path);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(branch.Name, Is.EqualTo("other"));
+            Assert.That(branch.IsCurrent, Is.True);
+            Assert.That(status.IsClean, Is.False);
+            Assert.That(
+                status.Changes.Select(change => change.RepositoryPath),
+                Does.Contain(
+                    dirtyState == "untracked"
+                        ? "untracked.bin"
+                        : "tracked.bin"));
+        });
+    }
+
+    [Test]
+    public void SwitchBranch_ConflictingDirtyStatus_RejectsWithoutChanges()
+    {
+        using var project = CreateSwitchProject();
+        AdvanceBranchWithEntry(
+            project.Path,
+            "other",
+            "tracked.bin",
+            [4, 5, 6]);
+        File.WriteAllBytes(
+            Path.Combine(project.Path, "tracked.bin"),
+            [9, 9, 9]);
         var service = new FolderProjectVersionControlService();
         var before = CaptureRepository(project.Path);
 

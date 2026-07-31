@@ -1121,6 +1121,26 @@ public sealed partial class FolderProjectVersionControlService
 
         if (session == null)
         {
+            if (repository.Info.CurrentOperation == CurrentOperation.Revert &&
+                !repository.Index.Conflicts.Any() &&
+                repository.Head.Tip is { } revertHead)
+            {
+                try
+                {
+                    repository.Reset(ResetMode.Mixed, revertHead);
+                }
+                catch (Exception exception)
+                    when (exception is LibGit2SharpException or
+                          IOException or
+                          UnauthorizedAccessException)
+                {
+                    return CreateRecoveryMergeState(
+                        repository,
+                        "The pending revert could not be finalized safely.");
+                }
+
+            }
+
             if (repository.Info.CurrentOperation == CurrentOperation.None &&
                 !repository.Index.Conflicts.Any())
             {

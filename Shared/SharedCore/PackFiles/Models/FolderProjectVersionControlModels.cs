@@ -11,6 +11,8 @@ public enum FolderProjectVersionControlError
     EmptyCommitMessage,
     NothingToCommit,
     CommitNotFound,
+    CommitCannotBeUndone,
+    CommitIsNotLatest,
     InvalidCommitId,
     InvalidResourcePath,
     CommitPathNotFound,
@@ -77,6 +79,18 @@ public sealed record FolderProjectWorkingChange(
     string RepositoryPath,
     FolderProjectWorkingChangeKind Kind);
 
+public enum FolderProjectCommitUndoMode
+{
+    KeepChanges,
+    DiscardChanges,
+}
+
+public enum FolderProjectCommitChangeEditMode
+{
+    Discard,
+    StageForEdit,
+}
+
 public sealed record FolderProjectCommitSummary(
     string Id,
     string Message,
@@ -86,6 +100,16 @@ public sealed record FolderProjectCommitSummary(
     IReadOnlyList<string> ParentIds)
 {
     public string ShortId => Id[..Math.Min(7, Id.Length)];
+    public string Title => Message;
+    public string Description { get; init; } = "";
+    public FolderProjectCommitMergeStatus MergeStatus { get; init; }
+}
+
+public enum FolderProjectCommitMergeStatus
+{
+    Unknown,
+    NotMerged,
+    Merged,
 }
 
 public enum FolderProjectCommitChangeKind
@@ -107,6 +131,12 @@ public sealed record FolderProjectFileRestoreResult(
     string CommitId,
     string RepositoryPath,
     long Size);
+
+public sealed record FolderProjectCommitEditSession(
+    string OriginalCommitId,
+    string ExpectedHeadCommitId,
+    IReadOnlyList<string> RepositoryPaths,
+    bool CanReturnToOriginalCommit);
 
 public sealed record FolderProjectBranchInfo(
     string Name,

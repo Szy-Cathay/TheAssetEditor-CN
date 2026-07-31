@@ -70,16 +70,21 @@ public sealed partial class FolderProjectVersionControlService
                 return repository.Branches
                     .Where(branch => !branch.IsRemote)
                     .Select(
-                        branch => ToBranchInfo(
-                            repository,
-                            branch))
-                    .OrderByDescending(branch => branch.IsCurrent)
+                        branch => new
+                        {
+                            Info = ToBranchInfo(repository, branch),
+                            CreatedAt = GetBranchCreationTime(
+                                repository,
+                                branch),
+                        })
+                    .OrderBy(branch => branch.CreatedAt)
                     .ThenBy(
-                        branch => branch.Name,
+                        branch => branch.Info.Name,
                         StringComparer.OrdinalIgnoreCase)
                     .ThenBy(
-                        branch => branch.Name,
+                        branch => branch.Info.Name,
                         StringComparer.Ordinal)
+                    .Select(branch => branch.Info)
                     .ToList();
             });
     }
@@ -116,7 +121,11 @@ public sealed partial class FolderProjectVersionControlService
                         "The repository has no commit for the branch.");
                 }
 
-                var branch = repository.Branches.Add(name, commit);
+                repository.Refs.Add(
+                    $"refs/heads/{name}",
+                    commit.Id,
+                    $"branch: Created from {commit.Sha}");
+                var branch = repository.Branches[name]!;
                 return ToBranchInfo(repository, branch);
             });
     }
@@ -521,8 +530,7 @@ public sealed partial class FolderProjectVersionControlService
                 FolderProjectVersionControlError.RepositoryBusy,
                 "The folder-project repository is busy.");
         }
-        if (RetrieveWorkingStatus(repository).IsDirty ||
-            GetWorkingChanges(repository, projectRoot).Any(
+        if (GetWorkingChanges(repository, projectRoot).Any(
                 change => HasAny(
                     change.Kind,
                     FolderProjectWorkingChangeKind.Unreadable)))
@@ -537,6 +545,24 @@ public sealed partial class FolderProjectVersionControlService
             repository,
             projectRoot,
             targetBranch);
+    }
+
+    private static DateTimeOffset GetBranchCreationTime(
+        Repository repository,
+        Branch branch)
+    {
+        var reflogPath = Path.Combine(
+            repository.Info.Path,
+            "logs",
+            branch.CanonicalName.Replace(
+                '/',
+                Path.DirectorySeparatorChar));
+        if (File.Exists(reflogPath))
+            return new DateTimeOffset(File.GetCreationTimeUtc(reflogPath));
+
+        return repository.Refs.Log(branch.Reference)
+                   .LastOrDefault()?.Committer.When ??
+               branch.Tip.Committer.When;
     }
 
     private static void EnsureTargetTreeSupported(Tree tree)

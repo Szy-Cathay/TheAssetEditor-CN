@@ -8,6 +8,7 @@ using NUnitAssert = NUnit.Framework.Assert;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.PackFiles.Utility;
 using Shared.Core.Settings;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu;
@@ -16,6 +17,133 @@ namespace AssetEditorTests;
 
 public class FolderProjectTreeStateTests
 {
+    [Test]
+    public void LoadedFolderProject_MarksGitChangesAndAncestorsChanged()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\child\changed.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(service => service.GetStatus(projectRoot.Path))
+            .Returns(
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "main",
+                    new string('1', 40),
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    [
+                        new FolderProjectWorkingChange(
+                            "folder/child/changed.bin",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+
+        using var harness = CreateViewModelWithVersionControl(
+            versionControl.Object,
+            project);
+
+        var root = harness.ViewModel.Files.Single();
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.UnsavedChanged, Is.True);
+            NUnitAssert.That(
+                FindNode(root, "folder").UnsavedChanged,
+                Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"folder\child").UnsavedChanged,
+                Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"folder\child\changed.bin").UnsavedChanged,
+                Is.True);
+        });
+    }
+
+    [Test]
+    public void CleanInternalReattach_ClearsFolderProjectChangeMarkers()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\changed.bin", [1]);
+        using var original = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var status = new FolderProjectRepositoryStatus(
+            true,
+            "main",
+            new string('1', 40),
+            false,
+            FolderProjectRepositoryOperationState.None,
+            [
+                new FolderProjectWorkingChange(
+                    "folder/changed.bin",
+                    FolderProjectWorkingChangeKind.Modified |
+                    FolderProjectWorkingChangeKind.Unstaged),
+            ]);
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(service => service.GetStatus(projectRoot.Path))
+            .Returns(() => status);
+        using var harness = CreateViewModelWithVersionControl(
+            versionControl.Object,
+            original);
+        NUnitAssert.That(
+            FindNode(
+                harness.ViewModel.Files.Single(),
+                @"folder\changed.bin").UnsavedChanged,
+            Is.True);
+
+        harness.EventHub.Publish(new PackFileContainerRemovedEvent(original));
+        status = status with { Changes = [] };
+        using var reattached = FolderProjectContainer.Open(projectRoot.Path);
+        harness.EventHub.Publish(new PackFileContainerAddedEvent(
+            reattached,
+            PackFileContainerAddedReason.InternalReattach));
+
+        var root = harness.ViewModel.Files.Single();
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.UnsavedChanged, Is.False);
+            NUnitAssert.That(
+                FindNode(root, "folder").UnsavedChanged,
+                Is.False);
+            NUnitAssert.That(
+                FindNode(root, @"folder\changed.bin").UnsavedChanged,
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void UpdatedFolderProjectFile_MarksFileAndAncestorsChanged()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\child\changed.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var changedFile = project.FileList.Values.Single();
+
+        harness.EventHub.Publish(new PackFileContainerFilesUpdatedEvent(
+            project,
+            [changedFile]));
+
+        var root = harness.ViewModel.Files.Single();
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.UnsavedChanged, Is.True);
+            NUnitAssert.That(
+                FindNode(root, "folder").UnsavedChanged,
+                Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"folder\child").UnsavedChanged,
+                Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"folder\child\changed.bin").UnsavedChanged,
+                Is.True);
+        });
+    }
+
     [Test]
     public void AddedAndUpdatedEvents_RestoreExpansionSelectionAndFilter()
     {
@@ -432,16 +560,35 @@ public class FolderProjectTreeStateTests
     private static TreeHarness CreateViewModel(
         params PackFileContainer[] containers)
     {
-        return CreateViewModelWithContainerList(containers.ToList());
+        return CreateViewModelWithContainerList(
+            containers.ToList(),
+            null);
+    }
+
+    private static TreeHarness CreateViewModelWithVersionControl(
+        IFolderProjectVersionControlService versionControl,
+        params PackFileContainer[] containers)
+    {
+        return CreateViewModelWithContainerList(
+            containers.ToList(),
+            versionControl);
     }
 
     private static TreeHarness CreateViewModelWithContainerList(
-        List<PackFileContainer> containers)
+        List<PackFileContainer> containers,
+        IFolderProjectVersionControlService? versionControl = null)
     {
         var service = new Mock<IPackFileService>();
         service.Setup(x => x.GetAllPackfileContainers())
             .Returns(containers);
         service.Setup(x => x.GetEditablePack()).Returns(containers[0]);
+        service.Setup(x => x.GetFullPath(
+                It.IsAny<PackFile>(),
+                It.IsAny<PackFileContainer>()))
+            .Returns(
+                (PackFile file, PackFileContainer container) =>
+                    container.FileList.Single(
+                        pair => ReferenceEquals(pair.Value, file)).Key);
         var contextMenu = new Mock<IContextMenuBuilder>();
         contextMenu.Setup(x => x.Build(It.IsAny<TreeNode?>()))
             .Returns(new ObservableCollection<ContextMenuItem2>());
@@ -454,7 +601,8 @@ public class FolderProjectTreeStateTests
                 service.Object,
                 eventHub,
                 true,
-                false));
+                false,
+                versionControl));
     }
 
     private sealed record TreeHarness(

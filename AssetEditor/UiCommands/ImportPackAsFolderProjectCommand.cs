@@ -18,10 +18,13 @@ public sealed class ImportPackAsFolderProjectCommand(
     IStandardDialogs dialogs,
     LocalizationManager localizationManager,
     IFolderProjectImportDialogs? importDialogs = null,
+    IFolderProjectSetupDialogs? setupDialogs = null,
     Func<string, bool>? isEmptyTarget = null) : IUiCommand
 {
     private readonly IFolderProjectImportDialogs _importDialogs =
         importDialogs ?? new FolderProjectImportDialogs();
+    private readonly IFolderProjectSetupDialogs _setupDialogs =
+        setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
     private readonly Func<string, bool> _isEmptyTarget =
         isEmptyTarget ?? FolderProjectImportTargetValidator.IsEmptyTarget;
 
@@ -34,11 +37,13 @@ public sealed class ImportPackAsFolderProjectCommand(
         if (sourcePath == null)
             return;
 
-        var projectRoot = _importDialogs.SelectTargetFolder(
-            localizationManager.Get("FolderProject.Import.SelectFolder"));
-        if (projectRoot == null)
+        var setup = _setupDialogs.ShowSetup(
+            localizationManager.Get("FolderProject.Import.SetupTitle"),
+            localizationManager.Get("FolderProject.Import.SetupDescription"));
+        if (setup == null)
             return;
 
+        var projectRoot = setup.ProjectFolder;
         var isEmptyTarget = false;
         try
         {
@@ -58,13 +63,11 @@ public sealed class ImportPackAsFolderProjectCommand(
             return;
         }
 
-        var outputPath = _importDialogs.SelectOutputPack(
-            projectRoot,
-            Path.GetFileNameWithoutExtension(sourcePath),
-            localizationManager.Get("FolderProject.SelectOutputPack"),
-            localizationManager.Get("FolderProject.PackFilter"));
-        if (outputPath == null)
-            return;
+        var projectName = Path.GetFileName(
+            Path.TrimEndingDirectorySeparator(projectRoot));
+        var outputPath = Path.Combine(
+            setup.OutputFolder,
+            projectName + ".pack");
 
         FolderProjectContainer? project = null;
         using (new WaitCursor())
@@ -83,14 +86,13 @@ public sealed class ImportPackAsFolderProjectCommand(
                     projectRoot,
                     new FolderProjectSettings
                     {
-                        Name = Path.GetFileName(
-                            Path.TrimEndingDirectorySeparator(
-                                projectRoot)),
+                        Name = projectName,
                         OutputPackPath = outputPath,
                         GameVersion = game.Type,
                         PackFileVersion = source.Header.Version,
                         PackFileType = source.Header.PackFileType,
-                        EnablePackFileCorruptionDetection = false,
+                        EnablePackFileCorruptionDetection =
+                            setup.EnablePackFileCorruptionDetection,
                     });
 
                 if (packFileService.AddContainer(project, true) == null)
