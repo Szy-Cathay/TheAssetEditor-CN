@@ -21,6 +21,7 @@
         AudioExplorer_Editor,
         Audio_Editor,
         Twui_Editor,
+        Csc_Editor,
         None,
     }
 }

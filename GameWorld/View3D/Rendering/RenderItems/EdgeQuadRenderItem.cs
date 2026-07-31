@@ -7,6 +7,8 @@ namespace GameWorld.Core.Rendering.RenderItems
 {
     public class EdgeQuadRenderItem : IRenderItem
     {
+        public bool IncludeInPhotoCapture => false;
+
         public EdgeQuadInstanceMesh EdgeQuadRenderer { get; set; }
         public EdgeData[] Edges { get; set; }
         private EdgeData[] _lastUploadedEdges;

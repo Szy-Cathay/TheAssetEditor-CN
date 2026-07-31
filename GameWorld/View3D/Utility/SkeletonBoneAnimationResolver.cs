@@ -7,11 +7,16 @@ namespace GameWorld.Core.Utility
     {
         private readonly ISkeletonProvider _animationProvider;
         private readonly int _boneIndex;
+        private readonly bool _useBindPoseWhenDisabled;
 
-        public SkeletonBoneAnimationResolver(ISkeletonProvider gameSkeleton, int boneIndex)
+        public SkeletonBoneAnimationResolver(
+            ISkeletonProvider gameSkeleton,
+            int boneIndex,
+            bool useBindPoseWhenDisabled = true)
         {
             _animationProvider = gameSkeleton;
             _boneIndex = boneIndex;
+            _useBindPoseWhenDisabled = useBindPoseWhenDisabled;
         }
 
         public Matrix GetWorldTransform()
@@ -21,16 +26,22 @@ namespace GameWorld.Core.Utility
 
         public Matrix GetWorldTransformIfAnimating()
         {
-            if (_animationProvider.Skeleton != null && _animationProvider.Skeleton.AnimationPlayer.IsEnabled && _boneIndex != -1)
-                return _animationProvider.Skeleton.GetAnimatedWorldTranform(_boneIndex);
-            return Matrix.Identity;
+            var skeleton = _animationProvider.Skeleton;
+            if (skeleton == null || _boneIndex < 0 || _boneIndex >= skeleton.BoneCount)
+                return Matrix.Identity;
+            if (!_useBindPoseWhenDisabled && !skeleton.AnimationPlayer.IsEnabled)
+                return Matrix.Identity;
+            return skeleton.GetAnimatedWorldTranform(_boneIndex);
         }
 
         public Matrix GetTransformIfAnimating()
         {
-            if (_animationProvider.Skeleton != null && _animationProvider.Skeleton.AnimationPlayer.IsEnabled && _boneIndex != -1)
-                return _animationProvider.Skeleton.GetAnimatedTranform(_boneIndex);
-            return Matrix.Identity;
+            var skeleton = _animationProvider.Skeleton;
+            if (skeleton == null || _boneIndex < 0 || _boneIndex >= skeleton.BoneCount)
+                return Matrix.Identity;
+            if (!_useBindPoseWhenDisabled && !skeleton.AnimationPlayer.IsEnabled)
+                return Matrix.Identity;
+            return skeleton.GetAnimatedTranform(_boneIndex);
         }
     }
 }

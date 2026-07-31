@@ -1,6 +1,9 @@
 ﻿using Shared.Core.Events;
 using Shared.Core.PackFiles;
+using Shared.Core.Services;
+using Shared.Core.PackFiles.Models;
 using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands;
+using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.External;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
 {
@@ -45,14 +48,29 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             }
 
             Add<CopyNodePathCommand>(selectedNode, rootNode);
+            if (selectedNode.FileOwner is FolderProjectContainer)
+                Add<ToggleFolderProjectIgnoreCommand>(
+                    selectedNode,
+                    rootNode);
 
-            var exportFolder = AddChildMenu("Export", rootNode);
+            var exportFolder = AddChildMenu(
+                LocalizationManager.Instance.Get("General.Export"),
+                rootNode);
             Add<ExportToDirectoryCommand>(selectedNode, exportFolder);
+            Add<IExportCAVp8AsIvfCommand>(selectedNode, exportFolder);
+            Add<IExportCAVp8AsWebMCommand>(selectedNode, exportFolder);
             Add<AdvancedExportCommand>(selectedNode, exportFolder);
 
             var openFolder = AddChildMenu("Open", rootNode);
             Add<OpenNodeInHxDCommand>(selectedNode, openFolder);
             Add<OpenNodeInNotepadCommand>(selectedNode, openFolder);
+
+            var reportsFolder = AddChildMenu(
+                LocalizationManager.Instance.Get("ContextMenu.Reports"),
+                rootNode);
+            Add<IRmvToTextCommand>(selectedNode, reportsFolder);
+            if (reportsFolder.ContextMenu.Count == 0)
+                rootNode.ContextMenu.Remove(reportsFolder);
         }
 
         void CreateForDirectory(ContextMenuItem2 rootNode, TreeNode selectedNode)
@@ -75,6 +93,16 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
                     AddSeperator(rootNode);
                     Add<SavePackFileContainerCommand>(selectedNode, rootNode);
                     Add<SaveAsPackFileContainerCommand>(selectedNode, rootNode);
+                    if (selectedNode.FileOwner is FolderProjectContainer)
+                    {
+                        Add<ChangeFolderProjectOutputCommand>(
+                            selectedNode,
+                            rootNode);
+                        Add<
+                            ToggleFolderProjectCorruptionDetectionCommand>(
+                            selectedNode,
+                            rootNode);
+                    }
                     AddSeperator(rootNode);
                 }
             }
@@ -97,6 +125,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
                 AddSeperator(rootNode);
                 Add<OnRenameNodeCommand>(selectedNode, rootNode);
                 Add<DeleteNodeCommand>(selectedNode, rootNode);
+                if (selectedNode.FileOwner is FolderProjectContainer &&
+                    selectedNode.NodeType != NodeType.Root)
+                {
+                    Add<ToggleFolderProjectIgnoreCommand>(
+                        selectedNode,
+                        rootNode);
+                }
                 AddSeperator(rootNode);
             }
 

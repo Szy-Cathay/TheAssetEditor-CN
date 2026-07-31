@@ -65,7 +65,8 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
 
         public void ShowExceptionWindow(Exception e, string userInfo = "")
         {
-            var extendedException = _exceptionService.Create(e);
+            var extendedException =
+                _exceptionService.Create(e, userInfo);
             var errorWindow = new CustomExceptionWindow(extendedException, this, _eventHub, _scopeToken, _scopeRepository);
             if (Application.Current.MainWindow != null)
             {

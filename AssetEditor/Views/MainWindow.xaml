@@ -14,8 +14,6 @@
         xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
         mc:Ignorable="d"
-        behaviors:WindowCancellableClosingBehavior.Closing="{Binding ClosingCommand}"
-        behaviors:WindowCancellableClosingBehavior.IsClosingWithoutPrompt="{Binding IsClosingWithoutPrompt}"
         x:Name="window"
         Width="1920"
         Height="1080"
@@ -180,7 +178,7 @@
 
             <StatusBarItem Grid.Column="3" Visibility="{Binding IsLoadingPacks, Converter={StaticResource BoolToVisibilityConverter}}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{loc:Loc MainWindow.StatusBar.LoadingGamePacks}" Margin="5, 0, 5, 5" Foreground="#FFAAAAAA"/>
+                    <TextBlock Text="{Binding LoadingStatusText}" Margin="5, 0, 5, 5" Foreground="#FFAAAAAA"/>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>

@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using System.Windows;
+using System.IO;
 using Shared.Core.PackFiles;
 using Shared.Core.Services;
 
@@ -21,7 +22,16 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
             var folderName = EditFileNameDialog.ShowDialog(_selectedNode, "");
 
             if (folderName.Any())
+            {
+                var parentPath = _selectedNode.GetFullPath();
+                var folderPath = string.IsNullOrEmpty(parentPath)
+                    ? folderName
+                    : Path.Combine(parentPath, folderName);
+                packFileService.CreateFolder(
+                    _selectedNode.FileOwner,
+                    folderPath);
                 _selectedNode.Children.Add(new TreeNode(folderName, NodeType.Directory, _selectedNode.FileOwner, _selectedNode));
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ namespace Shared.Core.Settings
         }
 
         public ObservableCollection<string> RecentPackFilePaths { get; set; } = [];
+        public ObservableCollection<string> RecentFolderProjectPaths { get; set; } = [];
         public ThemeType Theme { get; set; } = ThemeType.DarkTheme;
         public BackgroundColour RenderEngineBackgroundColour { get; set; } = BackgroundColour.DarkGrey;
         public bool StartMaximised { get; set; } = false;
@@ -101,6 +102,40 @@ namespace Shared.Core.Settings
                 recentPackFilePaths.RemoveAt(0);
         }
 
+        public void AddRecentlyOpenedFolderProject(string path)
+        {
+            var recentPaths =
+                CurrentSettings.RecentFolderProjectPaths;
+
+            var existing = recentPaths.FirstOrDefault(
+                item => string.Equals(
+                    item,
+                    path,
+                    StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+                recentPaths.Remove(existing);
+
+            recentPaths.Add(path);
+            if (recentPaths.Count > 15)
+                recentPaths.RemoveAt(0);
+        }
+
+        public bool RemoveRecentlyOpenedFolderProject(string path)
+        {
+            var recentPaths =
+                CurrentSettings.RecentFolderProjectPaths;
+            var existing = recentPaths.FirstOrDefault(
+                item => string.Equals(
+                    item,
+                    path,
+                    StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+                return false;
+
+            recentPaths.Remove(existing);
+            return true;
+        }
+
         public string? GetGamePathForGame(GameTypeEnum game)
         {
             var gameDirInfo = CurrentSettings.GameDirectories.FirstOrDefault(x => x.Game == game);
@@ -132,6 +167,7 @@ namespace Shared.Core.Settings
 
                     _logger.Here().Information($"Settings loaded.");
                     ValidateRecentPackFilePaths();
+                    ValidateRecentFolderProjectPaths();
                     ValidateSettings();
                 }
                 catch (Exception ex)
@@ -156,6 +192,26 @@ namespace Shared.Core.Settings
 
             foreach (var invalidPath in invalidPacks)
                 recentPackfilePaths.Remove(invalidPath);
+        }
+
+        void ValidateRecentFolderProjectPaths()
+        {
+            var recentPaths =
+                CurrentSettings.RecentFolderProjectPaths;
+            var invalidPaths = recentPaths
+                .Where(
+                    path =>
+                        !Directory.Exists(path) ||
+                        (!File.Exists(
+                             Path.Combine(path, "aeproject.cn.json")) &&
+                         !File.Exists(
+                             Path.Combine(path, "aeproject.json")) &&
+                         !File.Exists(
+                             Path.Combine(path, "project_ignore.json"))))
+                .ToList();
+
+            foreach (var invalidPath in invalidPaths)
+                recentPaths.Remove(invalidPath);
         }
 
 

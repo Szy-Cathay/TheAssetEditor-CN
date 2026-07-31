@@ -115,6 +115,7 @@
                     <Setter Property="behaviors:MouseDoubleClick.Command" Value="{Binding DataContext.DoubleClickCommand,  RelativeSource={RelativeSource FindAncestor, AncestorType=TreeView}, Mode=OneTime}"/>
                     <Setter Property="ContextMenu" Value="{StaticResource NodeContextMenu}"/>
                     <Setter Property="IsExpanded" Value="{Binding IsNodeExpanded, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     <Setter Property="Visibility" Value="Visible" />
                     <Setter Property="Foreground" Value="Red"/>
                     <Style.Triggers>
@@ -159,6 +160,10 @@
                             <TextBlock.Style>
                                 <Style TargetType="{x:Type TextBlock}">
                                     <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsIgnored, UpdateSourceTrigger=PropertyChanged}" Value="True">
+                                            <Setter Property="FontStyle" Value="Italic"/>
+                                            <Setter Property="Opacity" Value="0.55"/>
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding UnsavedChanged, UpdateSourceTrigger=PropertyChanged}" Value="True">
                                             <Setter Property="Foreground" Value="Red"/>
                                         </DataTrigger>

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
 
 namespace Shared.Core.Services
@@ -76,9 +77,17 @@ namespace Shared.Core.Services
                 if (editablePack == null || editablePack.IsCaPackFile)
                     return false;
 
-                var systemPath = editablePack.SystemFilePath;
-                if (string.IsNullOrWhiteSpace(systemPath) || !File.Exists(systemPath))
+                var systemPath =
+                    editablePack is FolderProjectContainer folderProject
+                        ? folderProject.ProjectSettings.OutputPackPath
+                        : editablePack.SystemFilePath;
+                if (string.IsNullOrWhiteSpace(systemPath))
                     return false;
+                if (editablePack is not FolderProjectContainer &&
+                    !File.Exists(systemPath))
+                {
+                    return false;
+                }
 
                 var gameInfo = GameInformationDatabase.GetGameById(_settingsService.CurrentSettings.CurrentGame);
                 if (!_packFileService.TryAutoSavePackContainer(editablePack, systemPath, gameInfo))

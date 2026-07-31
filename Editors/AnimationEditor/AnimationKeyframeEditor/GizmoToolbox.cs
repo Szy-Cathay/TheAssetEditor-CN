@@ -26,6 +26,9 @@ namespace AnimationEditor.AnimationKeyframeEditor
         private GizmoMode _lastGizmoTool = GizmoMode.Translate;
 
         private int _lastFrame = 0;
+        private ISelectionState? _subscribedSelectionState;
+        private BoneSelectionState? _subscribedBoneSelectionState;
+        private bool _isSelectionManagerSubscribed;
 
 
         public GizmoToolbox(AnimationKeyframeEditorViewModel parent)
@@ -152,11 +155,38 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 selection.SelectedBones.Clear();
             }
 
-            _parent.SelectionManager.GetState().SelectionChanged += OnSelectionChanged;
+            StartSelectionSubscriptions();
+        }
 
-            if (_parent.SelectionManager.GetState() is BoneSelectionState state)
+        private void StartSelectionSubscriptions()
+        {
+            if (!_isSelectionManagerSubscribed)
             {
-                state.BoneModifiedEvent += OnModifiedBonesEvent;
+                _parent.SelectionManager.StateChanged += UpdateSelectionSubscriptions;
+                _isSelectionManagerSubscribed = true;
+            }
+
+            UpdateSelectionSubscriptions(_parent.SelectionManager.GetState());
+        }
+
+        private void UpdateSelectionSubscriptions(ISelectionState selectionState)
+        {
+            if (ReferenceEquals(_subscribedSelectionState, selectionState))
+                return;
+
+            if (_subscribedSelectionState != null)
+                _subscribedSelectionState.SelectionChanged -= OnSelectionChanged;
+            if (_subscribedBoneSelectionState != null)
+                _subscribedBoneSelectionState.BoneModifiedEvent -= OnModifiedBonesEvent;
+
+            _subscribedSelectionState = selectionState;
+            _subscribedBoneSelectionState = selectionState as BoneSelectionState;
+            _subscribedSelectionState.SelectionChanged -= OnSelectionChanged;
+            _subscribedSelectionState.SelectionChanged += OnSelectionChanged;
+            if (_subscribedBoneSelectionState != null)
+            {
+                _subscribedBoneSelectionState.BoneModifiedEvent -= OnModifiedBonesEvent;
+                _subscribedBoneSelectionState.BoneModifiedEvent += OnModifiedBonesEvent;
             }
         }
 

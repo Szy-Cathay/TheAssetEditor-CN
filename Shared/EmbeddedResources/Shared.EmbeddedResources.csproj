@@ -15,6 +15,7 @@
     <None Remove="Resources\AnimationSlots\Warhammer3AnimationSlots_dlc23.txt" />
     <None Remove="Resources\AnimationSlots\Warhammer3AnimationSlots_dlc24.txt" />
     <None Remove="Resources\AudioConversion\Wh3WavToWemWwiseProject\Wh3WavToWemWwiseProject.zip" />
+    <None Remove="Resources\Wwise\packed_codebooks_aoTuV_603.bin" />
     <None Remove="Resources\Icons\audio_file.png" />
     <None Remove="Resources\Icons\Copy.png" />
     <None Remove="Resources\Icons\Cut.png" />
@@ -50,6 +51,7 @@
     <None Remove="Resources\Icons\icons8-txt-48.png" />
     <None Remove="Resources\Icons\icons8-xml-file-48.png" />
     <None Remove="Resources\Icons\Kitbasher\Camera_Focus.png" />
+    <None Remove="Resources\Icons\Kitbasher\CameraTool.png" />
     <None Remove="Resources\Icons\Kitbasher\CreateLod.png" />
     <None Remove="Resources\Icons\Kitbasher\DeleteHistory.png" />
     <None Remove="Resources\Icons\Kitbasher\ExpandSelection.png" />
@@ -156,6 +158,7 @@
     <EmbeddedResource Include="Resources\AudioConversion\vgstream\vgstream.exe" />
     <EmbeddedResource Include="Resources\AudioConversion\vgstream\xmp-vgmstream.dll" />
     <EmbeddedResource Include="Resources\AudioConversion\Wh3WavToWemWwiseProject\Wh3WavToWemWwiseProject.zip" />
+    <EmbeddedResource Include="Resources\Wwise\packed_codebooks_aoTuV_603.bin" />
     <EmbeddedResource Include="Resources\Icons\audio_file.png" />
     <EmbeddedResource Include="Resources\Icons\Kitbasher\AssignTextureFromOther.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -299,6 +302,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Kitbasher\Camera_Focus.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Icons\Kitbasher\CameraTool.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Resources\Icons\Kitbasher\CreateLod.png">

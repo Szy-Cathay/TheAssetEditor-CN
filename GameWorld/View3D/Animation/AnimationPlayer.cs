@@ -202,6 +202,11 @@ namespace GameWorld.Core.Animation
             return (int)fps;
         }
 
+        /// <summary>
+        /// Overrides the sampled frame until the next refresh.
+        /// </summary>
+        public void SetManualFrame(AnimationFrame frame) => _currentAnimFrame = frame;
+
         public AnimationFrame GetCurrentAnimationFrame() => _currentAnimFrame;
         public int FrameCount() => _animationClip != null ? _animationClip.DynamicFrames.Count() : 0;
         public long GetAnimationLengthUs() => _animationClip?.PlayTimeUs ?? 0;

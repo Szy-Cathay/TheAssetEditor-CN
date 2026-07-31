@@ -10,6 +10,7 @@ namespace AssetEditor.ViewModels
         {
             Command = new RelayCommand(execute);
             Header = System.IO.Path.GetFileName(path);
+            Path = path;
         }
 
         public string Header { get; set; }

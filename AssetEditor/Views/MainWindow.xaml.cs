@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -22,6 +23,8 @@ namespace AssetEditor.Views
         private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly IServiceProvider _serviceProvider;
         private readonly PackAutoSaveService _autoSaveService;
+        private bool _closeCheckRunning;
+        private bool _closeApproved;
 
         public MainWindow(ApplicationSettingsService applicationSettingsService, IServiceProvider serviceProvider)
         {
@@ -37,7 +40,38 @@ namespace AssetEditor.Views
             _autoSaveService = serviceProvider.GetRequiredService<PackAutoSaveService>();
             _autoSaveService.Start();
 
+            Closing += OnWindowClosing;
             Closed += OnWindowClosed;
+        }
+
+        private async void OnWindowClosing(
+            object? sender,
+            CancelEventArgs e)
+        {
+            if (_closeApproved)
+                return;
+
+            if (DataContext is not MainViewModel viewModel)
+                return;
+
+            e.Cancel = true;
+            if (_closeCheckRunning)
+                return;
+
+            _closeCheckRunning = true;
+            try
+            {
+                await viewModel.Closing(null);
+                if (!viewModel.IsClosingWithoutPrompt)
+                    return;
+
+                _closeApproved = true;
+                Close();
+            }
+            finally
+            {
+                _closeCheckRunning = false;
+            }
         }
 
         private void OnWindowClosed(object sender, EventArgs e)

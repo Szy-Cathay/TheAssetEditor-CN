@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Windows.Input;
 using Editors.KitbasherEditor.ChildEditors.MeshFitter;
+using Editors.KitbasherEditor.ChildEditors.PhotoStudio;
 using Editors.KitbasherEditor.ChildEditors.PinTool.UiCommands;
 using Editors.KitbasherEditor.ChildEditors.ReRiggingTool;
 using Editors.KitbasherEditor.ChildEditors.VertexDebugger;
@@ -119,6 +120,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RegisterUiCommand<ExpandFaceSelectionCommand>();
             RegisterUiCommand<ConvertFaceToVertexCommand>();
             RegisterUiCommand<OpenVertexDebuggerCommand>();
+            RegisterUiCommand<OpenPhotoStudioCommand>();
         }
 
         ObservableCollection<ToolbarItem> CreateToolbarMenu()
@@ -161,6 +163,10 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateToolBarItem<FocusCameraCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.FocusCamera"));
             builder.CreateToolBarItem<ResetCameraCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.ResetCamera"));
             builder.CreateToolBarItem<OpenRenderSettingsWindowCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.OpenRenderSettings"));
+            builder.CreateToolBarItem<OpenPhotoStudioCommand>(
+                renderingToolbar,
+                LocalizationManager.Instance.Get(
+                    "Kitbash.Menu.Rendering.PhotoStudio"));
 
 
             return builder.Build();
@@ -191,6 +197,9 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateButton<OpenReriggingToolCommand>(IconLibrary.ReRiggingIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<OpenPinToolCommand>(IconLibrary.PinIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<AssignMaterialFromOtherMeshUiCommand>(IconLibrary.AssignTextureFromOtherIcon, ButtonVisibilityRule.ObjectMode);
+            builder.CreateButton<OpenPhotoStudioCommand>(
+                IconLibrary.CameraTool,
+                ButtonVisibilityRule.Always);
 
             // Face buttons
             builder.CreateButton<ConvertFaceToVertexCommand>(IconLibrary.FaceToVertexIcon, ButtonVisibilityRule.FaceMode);

@@ -1,0 +1,612 @@
+<UserControl x:Class="Editors.CscEditor.Views.CscEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="clr-namespace:Editors.CscEditor.ViewModels"
+             xmlns:views="clr-namespace:Editors.CscEditor.Views"
+             xmlns:resources="clr-namespace:Shared.EmbeddedResources;assembly=Shared.EmbeddedResources"
+              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+              mc:Ignorable="d"
+              PreviewKeyDown="Editor_PreviewKeyDown"
+              d:DesignHeight="800" d:DesignWidth="1200">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisRoot"/>
+        <views:CscFloatConverter x:Key="CscFloat"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <ToolBar Grid.Row="0">
+            <Button x:Name="SaveButton" Content="{loc:Loc General.Save}" Click="Save_Click" Padding="8,3"/>
+            <Button x:Name="UndoButton" Click="Undo_Click" IsEnabled="{Binding CanUndo}" Padding="6,3"
+                    ToolTip="{loc:Loc Csc.ToolTip.Undo}">
+                <Image Width="20" Height="20"
+                       Source="{Binding Source={x:Static resources:IconLibrary.UndoIcon}, UpdateSourceTrigger=PropertyChanged}"/>
+            </Button>
+            <Button x:Name="RedoButton" Click="Redo_Click" IsEnabled="{Binding CanRedo}" Padding="6,3"
+                    ToolTip="{loc:Loc Csc.ToolTip.Redo}">
+                <Image Width="20" Height="20"
+                       Source="{Binding Source={x:Static resources:IconLibrary.RedoIcon}, UpdateSourceTrigger=PropertyChanged}"/>
+            </Button>
+            <Separator/>
+            <Menu Background="Transparent" VerticalAlignment="Center">
+                <MenuItem Header="{loc:Loc Csc.Add}" Padding="8,3"
+                          IsEnabled="{Binding ManifestEditable}"
+                          Background="{DynamicResource Popup.Static.Background}"
+                          Foreground="{DynamicResource Popup.Static.Foreground}">
+                    <MenuItem.Resources>
+                        <!-- Forces dark-theme contrast on the dropdown items regardless of ambient
+                             styling - this is the only Menu (as opposed to Button+ContextMenu) in
+                             the CSC editor, and its submenu popup was rendering with the OS default
+                             light chrome instead of the app's dark theme. -->
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Background" Value="{DynamicResource Popup.Static.Background}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource Popup.Static.Foreground}"/>
+                        </Style>
+                    </MenuItem.Resources>
+                    <MenuItem Header="{loc:Loc Csc.Add.Model}" Command="{Binding AddModelCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.VariantModel}" Command="{Binding AddVariantModelCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.Vfx}" Command="{Binding AddVfxCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.Sfx}" Command="{Binding AddSfxCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.Animation}" Command="{Binding AddAnimationCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.PointLight}" Command="{Binding AddPointLightCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.SpotLight}" Command="{Binding AddSpotLightCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.Camera}" Command="{Binding AddCameraCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.CompositeScene}" Command="{Binding AddCompositeSceneCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.Prefab}" Command="{Binding AddPrefabCommand}"/>
+                    <MenuItem Header="{loc:Loc Csc.Add.Group}" Command="{Binding AddLocatorCommand}"/>
+                </MenuItem>
+            </Menu>
+            <Button Content="{loc:Loc General.Delete}" Command="{Binding DeleteSelectedCommand}" IsEnabled="{Binding HasSelection}" Padding="8,3"/>
+            <Separator/>
+            <Button Command="{Binding GizmoTranslateCommand}" IsEnabled="{Binding HasSelection}" Padding="6,3" ToolTip="{loc:Loc Csc.ToolTip.Move}">
+                <Image Width="20" Height="20" Source="{Binding Source={x:Static resources:IconLibrary.Gizmo_MoveIcon}, UpdateSourceTrigger=PropertyChanged}"/>
+            </Button>
+            <Button Command="{Binding GizmoRotateCommand}" IsEnabled="{Binding HasSelection}" Padding="6,3" ToolTip="{loc:Loc Csc.ToolTip.Rotate}">
+                <Image Width="20" Height="20" Source="{Binding Source={x:Static resources:IconLibrary.Gizmo_RotateIcon}, UpdateSourceTrigger=PropertyChanged}"/>
+            </Button>
+            <Button Command="{Binding GizmoScaleCommand}" IsEnabled="{Binding HasSelection}" Padding="6,3" ToolTip="{loc:Loc Csc.ToolTip.Scale}">
+                <Image Width="20" Height="20" Source="{Binding Source={x:Static resources:IconLibrary.Gizmo_ScaleIcon}, UpdateSourceTrigger=PropertyChanged}"/>
+            </Button>
+            <Button Command="{Binding GizmoOffCommand}" Padding="6,3" ToolTip="{loc:Loc Csc.ToolTip.GizmoOff}">
+                <Image Width="20" Height="20" Source="{Binding Source={x:Static resources:IconLibrary.Gizmo_CursorIcon}, UpdateSourceTrigger=PropertyChanged}"/>
+            </Button>
+            <Separator/>
+            <Button Content="{loc:Loc Csc.Focus}" Command="{Binding FocusSelectedCommand}" IsEnabled="{Binding HasSelection}" Padding="8,3"/>
+            <Button Content="{loc:Loc Csc.LookThroughCamera}" Command="{Binding LookThroughCameraCommand}"
+                    IsEnabled="{Binding SelectedElement.IsCamera, FallbackValue=False}" Padding="8,3"/>
+            <Button Content="{loc:Loc Csc.ResetView}" Command="{Binding ResetViewCommand}"
+                    IsEnabled="{Binding IsLookingThroughCamera}" Padding="8,3"/>
+        </ToolBar>
+
+        <!-- Main area: 3D view | tree + details -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- MinWidth keeps the 3D view from being squeezed smaller than the porthole
+                     overlay's own fixed 242px footprint (see below) - avoids it overflowing/clipping
+                     against the tree+details panel while looking through a camera. -->
+                <ColumnDefinition Width="*" MinWidth="242"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="340"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <ContentControl Content="{Binding Scene, Mode=OneTime}"/>
+
+                <!-- Porthole overlay: emulates the in-game 2D framing while looking through a
+                     camera. Fixed pixel size (porthole.png's own 242x258 footprint, circular cutout
+                     180x180 centred at 115,120 -> offset 25,30) - intentionally does NOT scale with
+                     the panel, since it's a fixed-size UI widget in-game, not viewport-relative. -->
+                <Grid Visibility="{Binding IsLookingThroughCamera, Converter={StaticResource BoolToVisRoot}}"
+                      IsHitTestVisible="False">
+                    <!-- Nothing but the porthole itself is visible in-game, so hide the raw render
+                         entirely (its own grid/background are also suppressed at the source while
+                         looking through a camera - see CscAnimationComponent.ApplyLookThroughCamera). -->
+                    <Rectangle Fill="Black"/>
+
+                    <Canvas Width="242" Height="258" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- Back art: shows through wherever the circle clip below is transparent. -->
+                        <Image Source="{Binding PortholeBackImage}" Canvas.Left="25" Canvas.Top="30"
+                               Width="180" Height="180" Stretch="Fill"/>
+
+                        <!-- Live, alpha-preserving snapshot of the 3D render (CscAnimationComponent.
+                             PortholeLiveFrame - a throttled CPU readback of RenderEngineComponent's
+                             pre-composite render target, not a mirror of the opaque viewport surface -
+                             see its CapturePortholeFrame for why), clipped to a circle. -->
+                        <Image Source="{Binding PortholeLiveFrame}" Canvas.Left="25" Canvas.Top="30"
+                               Width="180" Height="180" Stretch="Fill">
+                            <Image.Clip>
+                                <EllipseGeometry Center="90,90" RadiusX="90" RadiusY="90"/>
+                            </Image.Clip>
+                        </Image>
+
+                        <!-- Frame art on top, at its native footprint. -->
+                        <Image Source="{Binding PortholeFrameImage}" Width="242" Height="258"/>
+                    </Canvas>
+                </Grid>
+            </Grid>
+
+            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="#FF606060"/>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="5"/>
+                    <RowDefinition Height="Auto" MinHeight="200"/>
+                </Grid.RowDefinitions>
+
+                <!-- Component tree -->
+                <GroupBox Grid.Row="0" Header="{loc:Loc Csc.Components.Header}">
+                    <TreeView x:Name="ComponentTree"
+                              ItemsSource="{Binding SceneRootItems}"
+                              SelectedItemChanged="ComponentTree_SelectedItemChanged"
+                              AllowDrop="True"
+                              PreviewMouseLeftButtonDown="ComponentTree_PreviewMouseLeftButtonDown"
+                              PreviewMouseMove="ComponentTree_PreviewMouseMove"
+                              Drop="ComponentTree_Drop">
+                        <TreeView.Resources>
+                            <HierarchicalDataTemplate DataType="{x:Type vm:CscSceneRootViewModel}" ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Foreground="#FFCCCCCC"/>
+                                    <TextBlock Text="{Binding Subtitle, StringFormat=' ({0})'}" Foreground="#FF888888" Margin="4,0,0,0"/>
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
+                            <HierarchicalDataTemplate DataType="{x:Type vm:CscElementViewModel}" ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal" ToolTip="{Binding ReadOnlyReason}">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsEditable}" Value="False">
+                                                    <Setter Property="Opacity" Value="0.45"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="{Binding KindName}" FontWeight="Bold" Margin="0,0,6,0" Foreground="#FF88AACC"/>
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
+                        </TreeView.Resources>
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="{x:Type TreeViewItem}">
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{loc:Loc Csc.Detach}" Command="{Binding DetachSelectedCommand}"/>
+                                <MenuItem Header="{loc:Loc General.Delete}" Command="{Binding DeleteSelectedCommand}"/>
+                                <MenuItem Header="{loc:Loc Csc.FocusInView}" Command="{Binding FocusSelectedCommand}"/>
+                            </ContextMenu>
+                        </TreeView.ContextMenu>
+                    </TreeView>
+                </GroupBox>
+
+                <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" Background="#FF606060"/>
+
+                <!-- Details -->
+                <GroupBox Grid.Row="2" Header="{loc:Loc Csc.Details}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="420">
+                        <ScrollViewer.Resources>
+                            <BooleanToVisibilityConverter x:Key="PanelBoolToVis"/>
+                        </ScrollViewer.Resources>
+                        <Grid>
+                        <StackPanel DataContext="{Binding SelectedElement}" Margin="4" IsEnabled="{Binding IsEditable, FallbackValue=False}"
+                                    Visibility="{Binding DataContext.IsElementSelected, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource PanelBoolToVis}, FallbackValue=Collapsed}">
+                            <StackPanel.Resources>
+                                <Style TargetType="TextBox">
+                                    <Setter Property="Margin" Value="2"/>
+                                    <Setter Property="MinWidth" Value="60"/>
+                                </Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Margin" Value="2"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                                <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+                            </StackPanel.Resources>
+
+                            <TextBlock FontWeight="Bold" Text="{Binding DisplayName}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{loc:Loc Csc.Type}"/>
+                                <TextBlock Text="{Binding KindName}"/>
+                            </StackPanel>
+
+                            <Grid Visibility="{Binding ShowAssetPath, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding AssetPathLabel}"/>
+                                <TextBox Grid.Column="1" Text="{Binding AssetPath}"/>
+                            </Grid>
+
+                            <Grid Visibility="{Binding IsSfx, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc Csc.Field.Event1Stop}"/>
+                                <TextBox Grid.Column="1" Text="{Binding SfxStopEvent}"/>
+                            </Grid>
+
+                            <StackPanel Visibility="{Binding SfxHasSecondEventPair, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.Field.Event2Start}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SfxEvent2Start}"/>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.Field.Event2Stop}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SfxEvent2Stop}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Timing -->
+                            <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.Timing}" Margin="2,8,2,0"/>
+                            <UniformGrid Columns="4">
+                                <TextBlock Text="{loc:Loc Csc.Begin}"/><TextBox Text="{Binding Begin, Converter={StaticResource CscFloat}}"/>
+                                <TextBlock Text="{loc:Loc Csc.End}"/><TextBox Text="{Binding End, Converter={StaticResource CscFloat}}"/>
+                            </UniformGrid>
+                            <UniformGrid Columns="2">
+                                <ComboBox Margin="2" SelectedValue="{Binding TimingMode}" SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="{loc:Loc Csc.Timing.Duration}" Tag="duration"/>
+                                    <ComboBoxItem Content="{loc:Loc Csc.Timing.Infinite}" Tag="infinite"/>
+                                    <ComboBoxItem Content="{loc:Loc Csc.Timing.Pulse}" Tag="pulse"/>
+                                </ComboBox>
+                                <ComboBox Margin="2" SelectedValue="{Binding AnchorMode}" SelectedValuePath="Tag">
+                                    <ComboBoxItem Content="{loc:Loc Csc.Anchor.Free}" Tag="free"/>
+                                    <ComboBoxItem Content="{loc:Loc Csc.Anchor.MapToTerrain}" Tag="map_zero_y_to_terrain"/>
+                                    <ComboBoxItem Content="{loc:Loc Csc.Anchor.MapAndAlign}" Tag="map_zero_y_to_terrain_and_align"/>
+                                    <ComboBoxItem Content="{loc:Loc Csc.Anchor.AlignToTerrain}" Tag="align_to_terrain"/>
+                                </ComboBox>
+                            </UniformGrid>
+
+                            <!-- ELEMENT_PERIOD: (flag, speed multiplier, time offset) - in-game confirmed -->
+                            <StackPanel Visibility="{Binding HasPeriod, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.Period}" Margin="2,8,2,0"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox VerticalAlignment="Center" IsChecked="{Binding PeriodFlag}"/>
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Csc.Flag}" VerticalAlignment="Center" Margin="2,0,8,0"/>
+                                    <TextBlock Grid.Column="2" Text="{loc:Loc Csc.SpeedMultiplier}"/>
+                                    <TextBox Grid.Column="3" Text="{Binding PeriodSpeedMultiplier, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                    <TextBlock Grid.Column="4" Text="{loc:Loc Csc.TimeOffset}" Margin="8,0,2,0"/>
+                                    <TextBox Grid.Column="5" Text="{Binding PeriodTimeOffset, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Transform -->
+                            <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.TransformChannels}" Margin="2,8,2,0"/>
+                            <UniformGrid Columns="6">
+                                <TextBlock Text="{loc:Loc Csc.PositionX}"/><TextBox Text="{Binding PositionX, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="Y"/><TextBox Text="{Binding PositionY, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="Z"/><TextBox Text="{Binding PositionZ, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="{loc:Loc Csc.RotationX}"/><TextBox Text="{Binding RotationXDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                <TextBlock Text="Y°"/><TextBox Text="{Binding RotationYDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                <TextBlock Text="Z°"/><TextBox Text="{Binding RotationZDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                <TextBlock Text="{loc:Loc Csc.Scale}"/><TextBox Text="{Binding ScaleValue, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="{loc:Loc Csc.Weight}"/><TextBox Text="{Binding WeightValue, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                            </UniformGrid>
+
+                            <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.BasePlacement}" Margin="2,8,2,0"/>
+                            <UniformGrid Columns="6">
+                                <TextBlock Text="{loc:Loc Csc.PositionX}"/><TextBox Text="{Binding BasePositionX, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="Y"/><TextBox Text="{Binding BasePositionY, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="Z"/><TextBox Text="{Binding BasePositionZ, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="{loc:Loc Csc.RotationX}"/><TextBox Text="{Binding BaseRotationXDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                <TextBlock Text="Y°"/><TextBox Text="{Binding BaseRotationYDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                <TextBlock Text="Z°"/><TextBox Text="{Binding BaseRotationZDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                            </UniformGrid>
+
+                            <!-- ELEMENT's trailing Bool (v7/v100 only) - meaning unconfirmed, but
+                                 real files show it varying, so it's exposed rather than only
+                                 preserved verbatim. Shown for every element kind since it's part of
+                                 the base ELEMENT record, not a type-specific field. -->
+                            <Grid Visibility="{Binding HasElementTrailingBool, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" Margin="2,4,2,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox VerticalAlignment="Center" IsChecked="{Binding ElementTrailingBool}"/>
+                                <TextBlock Grid.Column="1" Text="{loc:Loc Csc.TrailingFlag}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            </Grid>
+
+                            <!-- Attachment -->
+                            <Grid Visibility="{Binding HasAttachParent, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc Csc.AttachBoneIndex}"/>
+                                <TextBox Grid.Column="1" Text="{Binding AttachBoneIndex}"/>
+                            </Grid>
+
+                            <!-- Composite Scene (RootRef): the referenced .csc's own ROOT header
+                                 info, shown read-only - IsEnabled is hardcoded False (not tied to
+                                 IsEditable) so it stays non-interactive even when this RootRef
+                                 element's own fields above are editable. Edit the referenced file
+                                 directly instead. -->
+                            <StackPanel Visibility="{Binding HasSubScene, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" IsEnabled="False">
+                                <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.ReferencedSceneReadOnly}" Margin="2,8,2,0"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.DurationSeconds}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SubSceneDuration, StringFormat=0.###, Mode=OneWay}"/>
+                                </Grid>
+                                <TextBlock Text="{loc:Loc Csc.FocusPoint}" Margin="2,4,2,0"/>
+                                <UniformGrid Columns="6">
+                                    <TextBlock Text="X"/><TextBox Text="{Binding SubSceneFocusPointX, StringFormat=0.###, Mode=OneWay}"/>
+                                    <TextBlock Text="Y"/><TextBox Text="{Binding SubSceneFocusPointY, StringFormat=0.###, Mode=OneWay}"/>
+                                    <TextBlock Text="Z"/><TextBox Text="{Binding SubSceneFocusPointZ, StringFormat=0.###, Mode=OneWay}"/>
+                                </UniformGrid>
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.RadiusDistance}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SubSceneRadius, StringFormat=0.###, Mode=OneWay}"/>
+                                </Grid>
+                                <Grid Visibility="{Binding SubSceneHasWeatherPath, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.WeatherEnvironment}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SubSceneWeatherPath, Mode=OneWay}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Lights -->
+                            <StackPanel Visibility="{Binding IsLight, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.Light}" Margin="2,8,2,0"/>
+                                <UniformGrid Columns="6">
+                                    <TextBlock Text="R"/><TextBox Text="{Binding LightColourR, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                    <TextBlock Text="G"/><TextBox Text="{Binding LightColourG, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                    <TextBlock Text="B"/><TextBox Text="{Binding LightColourB, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                    <TextBlock Text="{loc:Loc Csc.Intensity}"/><TextBox Text="{Binding LightIntensity, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                    <TextBlock Text="{loc:Loc Csc.RangeLength}"/><TextBox Text="{Binding LightRange, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                </UniformGrid>
+                                <UniformGrid Columns="4" Visibility="{Binding IsSpotLight, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                    <TextBlock Text="{loc:Loc Csc.InnerAngle}"/><TextBox Text="{Binding SpotInnerAngleDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                    <TextBlock Text="{loc:Loc Csc.OuterAngle}"/><TextBox Text="{Binding SpotOuterAngleDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                </UniformGrid>
+                            </StackPanel>
+
+                            <!-- Camera -->
+                            <StackPanel Visibility="{Binding IsCamera, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.Camera}" Margin="2,8,2,0"/>
+                                <UniformGrid Columns="6">
+                                    <TextBlock Text="FOV°"/><TextBox Text="{Binding CameraFov, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                    <TextBlock Text="{loc:Loc Csc.CameraRoll}"/><TextBox Text="{Binding CameraRollDegrees, Converter={StaticResource CscFloat}, StringFormat=0.##}"/>
+                                    <TextBlock Text="{loc:Loc Csc.CameraNear}"/><TextBox Text="{Binding CameraNear, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                    <TextBlock Text="{loc:Loc Csc.CameraFar}"/><TextBox Text="{Binding CameraFar, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                </UniformGrid>
+
+                                <!-- CAMERA_ELEMENT carries an extra Bool between the roll and near
+                                     fields (any version) - meaning unconfirmed, exposed for inspection/editing. -->
+                                <Grid Visibility="{Binding HasCameraUnknownFlag, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" Margin="2,4,2,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox VerticalAlignment="Center" IsChecked="{Binding CameraUnknownFlag}"/>
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Csc.UnknownFlag}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- ANIMATION_SPLICE_ELEMENT: sibling record alongside ANIMATION_ELEMENT -->
+                            <StackPanel Visibility="{Binding HasSplice, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.Splice}" Margin="2,8,2,0"/>
+                                <TextBlock Text="{loc:Loc Csc.Splice.Description}"
+                                           TextWrapping="Wrap" Foreground="#FF999999" FontStyle="Italic" Margin="2,0,2,4"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.BoneId}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SpliceBoneId}" LostFocus="AuxField_LostFocus"/>
+                                    <TextBlock Grid.Column="2" Text="{loc:Loc Csc.DepthA}" Margin="8,2,2,2"/>
+                                    <TextBox Grid.Column="3" Text="{Binding SpliceDepthA}" LostFocus="AuxField_LostFocus"/>
+                                    <TextBlock Grid.Column="4" Text="{loc:Loc Csc.DepthB}" Margin="8,2,2,2"/>
+                                    <TextBox Grid.Column="5" Text="{Binding SpliceDepthB}" LostFocus="AuxField_LostFocus"/>
+                                </Grid>
+                                <TextBlock Text="{Binding SpliceRemainingFieldsDisplay}" TextWrapping="Wrap" Foreground="#FF888888" FontSize="10" Margin="2,2,2,0"/>
+                            </StackPanel>
+
+                            <!-- ANIMATION_NODE_TRANSFORM_ELEMENT: this element's own kind - its Transform
+                                 (channels) section above drives the bone named here. -->
+                            <StackPanel Visibility="{Binding IsAnimationNodeTransform, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.NodeTransform}" Margin="2,8,2,0"/>
+                                <TextBlock Text="{loc:Loc Csc.NodeTransform.Description}"
+                                           TextWrapping="Wrap" Foreground="#FF999999" FontStyle="Italic" Margin="2,0,2,4"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:Loc Csc.BoneId}"/>
+                                    <TextBox Grid.Column="1" Text="{Binding NodeTransformBoneId}" LostFocus="AuxField_LostFocus"/>
+                                    <TextBlock Grid.Column="2" Text="{loc:Loc Csc.SecondSigned}" Margin="8,2,2,2"/>
+                                    <TextBox Grid.Column="3" Text="{Binding NodeTransformSecondValue}" LostFocus="AuxField_LostFocus"/>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Scene root (Composite Scene) details: the .csc's own ROOT header fields -->
+                        <StackPanel DataContext="{Binding SelectedSceneRoot}" Margin="4"
+                                    Visibility="{Binding DataContext.IsSceneRootSelected, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource PanelBoolToVis}, FallbackValue=Collapsed}">
+                            <StackPanel.Resources>
+                                <Style TargetType="TextBox">
+                                    <Setter Property="Margin" Value="2"/>
+                                    <Setter Property="MinWidth" Value="60"/>
+                                </Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Margin" Value="2"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </StackPanel.Resources>
+
+                            <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.CompositeScene}"/>
+                            <TextBlock Text="{loc:Loc Csc.RootHeader.Description}"
+                                       TextWrapping="Wrap" Foreground="#FF999999" FontStyle="Italic" Margin="2,2,2,4"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc Csc.DurationSeconds}"/>
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding SceneDuration, Converter={StaticResource CscFloat}, ConverterParameter=NonNegative, StringFormat=0.###, UpdateSourceTrigger=LostFocus}"/>
+                            </Grid>
+
+                            <TextBlock FontWeight="Bold" Text="{loc:Loc Csc.FocusPoint}" Margin="2,8,2,0"/>
+                            <UniformGrid Columns="6">
+                                <TextBlock Text="X"/><TextBox Text="{Binding FocusPointX, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="Y"/><TextBox Text="{Binding FocusPointY, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                                <TextBlock Text="Z"/><TextBox Text="{Binding FocusPointZ, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                            </UniformGrid>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc Csc.RadiusDistance}"/>
+                                <TextBox Grid.Column="1" Text="{Binding Radius, Converter={StaticResource CscFloat}, StringFormat=0.###}"/>
+                            </Grid>
+
+                            <Grid Visibility="{Binding HasWeatherPath, Converter={StaticResource PanelBoolToVis}, FallbackValue=Collapsed}" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc Csc.WeatherEnvironment}"/>
+                                <TextBox Grid.Column="1" Text="{Binding WeatherPath}"/>
+                            </Grid>
+                        </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </GroupBox>
+            </Grid>
+        </Grid>
+
+        <!-- Timeline + curve editor -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="170"/>
+            </Grid.RowDefinitions>
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="4,2">
+                <Button Command="{Binding PlayPauseCommand}" Width="60" Margin="0,0,4,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="Content" Value="{loc:Loc Csc.Play}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                    <Setter Property="Content" Value="{loc:Loc Csc.Pause}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Content="{loc:Loc Csc.Stop}" Command="{Binding StopCommand}" Width="50"/>
+            </StackPanel>
+
+            <!-- Time readout only - scrubbing happens on the curve editor's own ruler below, so
+                 the two never fall out of alignment. -->
+            <TextBlock Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="4,2,18,2">
+                <Run Text="{Binding CurrentTime, StringFormat=0.00, Mode=OneWay}"/><Run Text=" / "/><Run Text="{Binding Duration, StringFormat=0.00, Mode=OneWay}"/><Run Text="{loc:Loc Csc.SecondsSuffix}"/>
+            </TextBlock>
+
+            <ListBox Grid.Row="1" Grid.Column="0" ItemsSource="{Binding CurveSeriesList}"
+                     SelectedItem="{Binding SelectedCurveSeries, Mode=TwoWay}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox IsChecked="{Binding IsVisible, Mode=TwoWay}" Click="CurveVisibility_Click" VerticalAlignment="Center"/>
+                            <Rectangle Width="10" Height="10" Fill="{Binding Brush}" Margin="4,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <views:CurveEditorControl Grid.Row="1" Grid.Column="1" x:Name="CurveEditor" Margin="0,0,12,0"
+                                      SeriesSource="{Binding CurveSeriesList}"
+                                      SelectedSeries="{Binding SelectedCurveSeries, Mode=TwoWay}"
+                                      CurrentTime="{Binding CurrentTime, Mode=TwoWay}"
+                                      Duration="{Binding Duration, Mode=OneWay}"
+                                      IsReadOnlyStructure="{Binding CurveStructureLocked, Mode=OneWay}"
+                                      IsLooping="{Binding Playback.Loop, Mode=OneWay}"
+                                      ElementBegin="{Binding SelectedElement.Begin, Mode=OneWay, FallbackValue=0}"
+                                      ElementEnd="{Binding SelectedElement.End, Mode=OneWay, FallbackValue=0}"
+                                      ElementTimingMode="{Binding SelectedElement.TimingMode, Mode=OneWay, FallbackValue=''}"/>
+        </Grid>
+
+        <!-- Status bar -->
+        <StatusBar Grid.Row="3">
+            <StatusBarItem>
+                <TextBlock Text="{Binding DisplayName}"/>
+            </StatusBarItem>
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusText}"/>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{loc:Loc Csc.UnsavedChanges}" Foreground="Orange">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</UserControl>

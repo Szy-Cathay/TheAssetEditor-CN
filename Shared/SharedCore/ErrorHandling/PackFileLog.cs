@@ -22,12 +22,19 @@ namespace Shared.Core.ErrorHandling
 
         public static Dictionary<CompressionFormat, CompressionInformation> GetCompressionInformation(PackFileContainer container)
         {
-            var compressionInformation = new Dictionary<CompressionFormat, CompressionInformation>();
             if(IsLoggingEnabled == false)
-                return compressionInformation;
+                return [];
 
+            return GetCompressionInformation(
+                GetFilesSnapshot(container));
+        }
 
-            foreach (var packFile in container.FileList.Values)
+        private static Dictionary<CompressionFormat, CompressionInformation>
+            GetCompressionInformation(IReadOnlyList<PackFile> files)
+        {
+            var compressionInformation =
+                new Dictionary<CompressionFormat, CompressionInformation>();
+            foreach (var packFile in files)
             {
                 if (packFile.DataSource is PackedFileSource source)
                 {
@@ -51,8 +58,10 @@ namespace Shared.Core.ErrorHandling
             if (IsLoggingEnabled == false)
                 return;
 
-            var compressionInformation = GetCompressionInformation(container);
-            var totalFiles = container.FileList.Count;
+            var files = GetFilesSnapshot(container);
+            var compressionInformation =
+                GetCompressionInformation(files);
+            var totalFiles = files.Count;
             var packSize = FormatSize(container.OriginalLoadByteSize);
 
             var loadingPart = $"Loading {container.Name}.pack ({totalFiles} files, {packSize})";
@@ -60,7 +69,7 @@ namespace Shared.Core.ErrorHandling
             var fileCountsByCompressionFormat = new Dictionary<CompressionFormat, int>();
             var fileTypeCountsByCompressionFormat = new Dictionary<CompressionFormat, Dictionary<string, int>>();
 
-            foreach (var packFile in container.FileList.Values)
+            foreach (var packFile in files)
             {
                 if (packFile.DataSource is not PackedFileSource packedFileSource)
                     continue;
@@ -157,6 +166,15 @@ namespace Shared.Core.ErrorHandling
             if (bytes >= mb)
                 return $"{bytes / mb:F2} MB";
             return $"{bytes / kb:F2} KB";
+        }
+
+        private static List<PackFile> GetFilesSnapshot(
+            PackFileContainer container)
+        {
+            return container is FolderProjectContainer folderProject
+                ? folderProject.ExecuteSynchronized(
+                    () => container.FileList.Values.ToList())
+                : container.FileList.Values.ToList();
         }
     }
 }

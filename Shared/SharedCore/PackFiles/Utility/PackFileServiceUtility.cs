@@ -11,7 +11,7 @@ namespace Shared.Core.PackFiles.Utility
 
             foreach (var pf in pfs.GetAllPackfileContainers())
             {
-                foreach (var file in pf.FileList)
+                foreach (var file in GetFilesSnapshot(pf))
                 {
                     var includeFile = false;
                     if (includeSubFolders)
@@ -40,7 +40,7 @@ namespace Shared.Core.PackFiles.Utility
             var output = new List<string>();
             foreach (var pf in pfs.GetAllPackfileContainers())
             {
-                foreach (var file in pf.FileList)
+                foreach (var file in GetFilesSnapshot(pf))
                 {
                     if (file.Key.Contains(partOfFileName, StringComparison.InvariantCultureIgnoreCase))
                         output.Add(file.Key);
@@ -75,7 +75,7 @@ namespace Shared.Core.PackFiles.Utility
             {
                 foreach (var pf in pfs.GetAllPackfileContainers())
                 {
-                    foreach (var file in pf.FileList)
+                    foreach (var file in GetFilesSnapshot(pf))
                     {
                         var fileExtention = Path.GetExtension(file.Key);
                         if (fileExtention == extention)
@@ -85,7 +85,7 @@ namespace Shared.Core.PackFiles.Utility
             }
             else
             {
-                foreach (var file in packFileContainer.FileList)
+                foreach (var file in GetFilesSnapshot(packFileContainer))
                 {
                     var fileExtention = Path.GetExtension(file.Key);
                     if (fileExtention == extention)
@@ -96,6 +96,13 @@ namespace Shared.Core.PackFiles.Utility
             return output;
         }
 
-
+        private static List<KeyValuePair<string, PackFile>>
+            GetFilesSnapshot(PackFileContainer container)
+        {
+            return container is FolderProjectContainer folderProject
+                ? folderProject.ExecuteSynchronized(
+                    () => container.FileList.ToList())
+                : container.FileList.ToList();
+        }
     }
 }

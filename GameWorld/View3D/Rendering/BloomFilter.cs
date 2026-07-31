@@ -67,6 +67,7 @@ namespace GameWorld.Core.Rendering
 
         //Shader + variables
         private Effect _bloomEffect;
+        private bool _ownsBloomEffect;
 
         private EffectPass _bloomPassExtract;
         private EffectPass _bloomPassExtractLuminance;
@@ -226,7 +227,7 @@ namespace GameWorld.Core.Rendering
         /// <param name="height">initial value for creating the rendertargets</param>
         /// <param name="renderTargetFormat">The intended format for the rendertargets. For normal, non-hdr, applications color or rgba1010102 are fine NOTE: For OpenGL, SurfaceFormat.Color is recommended for non-HDR applications.</param>
         /// <param name="quadRenderer">if you already have quadRenderer you may reuse it here</param>
-        public void Load(GraphicsDevice graphicsDevice, ResourceLibrary content, int width, int height, SurfaceFormat renderTargetFormat = SurfaceFormat.Color, QuadRenderer quadRenderer = null)
+        public void Load(GraphicsDevice graphicsDevice, ResourceLibrary content, int width, int height, SurfaceFormat renderTargetFormat = SurfaceFormat.Color, QuadRenderer quadRenderer = null, bool cloneEffect = false)
         {
             _graphicsDevice = graphicsDevice;
             UpdateResolution(width, height);
@@ -237,7 +238,13 @@ namespace GameWorld.Core.Rendering
             _renderTargetFormat = renderTargetFormat;
 
             //Load the shader parameters and passes for cheap and easy access
-            _bloomEffect = content.LoadEffect(@"Shaders/Bloom", ShaderTypes.BloomFilter);
+            var sharedEffect = content.LoadEffect(
+                @"Shaders/Bloom",
+                ShaderTypes.BloomFilter);
+            _bloomEffect = cloneEffect
+                ? sharedEffect.Clone()
+                : sharedEffect;
+            _ownsBloomEffect = cloneEffect;
             _bloomInverseResolutionParameter = _bloomEffect.Parameters["InverseResolution"];
             _bloomRadiusParameter = _bloomEffect.Parameters["Radius"];
             _bloomStrengthParameter = _bloomEffect.Parameters["Strength"];
@@ -580,7 +587,7 @@ namespace GameWorld.Core.Rendering
 
             if (_bloomRenderTarget2DMip0 != null)
             {
-                Dispose();
+                DisposeRenderTargets();
             }
 
             _bloomRenderTarget2DMip0 = new RenderTarget2D(_graphicsDevice,
@@ -608,12 +615,29 @@ namespace GameWorld.Core.Rendering
         /// </summary>
         public void Dispose()
         {
-            _bloomRenderTarget2DMip0.Dispose();
-            _bloomRenderTarget2DMip1.Dispose();
-            _bloomRenderTarget2DMip2.Dispose();
-            _bloomRenderTarget2DMip3.Dispose();
-            _bloomRenderTarget2DMip4.Dispose();
-            _bloomRenderTarget2DMip5.Dispose();
+            DisposeRenderTargets();
+            if (_ownsBloomEffect)
+            {
+                _bloomEffect?.Dispose();
+                _bloomEffect = null;
+                _ownsBloomEffect = false;
+            }
+        }
+
+        private void DisposeRenderTargets()
+        {
+            _bloomRenderTarget2DMip0?.Dispose();
+            _bloomRenderTarget2DMip1?.Dispose();
+            _bloomRenderTarget2DMip2?.Dispose();
+            _bloomRenderTarget2DMip3?.Dispose();
+            _bloomRenderTarget2DMip4?.Dispose();
+            _bloomRenderTarget2DMip5?.Dispose();
+            _bloomRenderTarget2DMip0 = null;
+            _bloomRenderTarget2DMip1 = null;
+            _bloomRenderTarget2DMip2 = null;
+            _bloomRenderTarget2DMip3 = null;
+            _bloomRenderTarget2DMip4 = null;
+            _bloomRenderTarget2DMip5 = null;
         }
     }
 }

@@ -20,6 +20,8 @@
             <MenuItem Header="{loc:Loc MenuBar.File}" BorderThickness="1.5">
 
                 <MenuItem Header="{loc:Loc MenuBar.File.NewPack}" Command="{Binding MenuBar.CreateNewPackFileCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.NewFolderProject}" Command="{Binding MenuBar.CreateFolderProjectCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.ImportPackAsFolderProject}" Command="{Binding MenuBar.ImportPackAsFolderProjectCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.NewAnimPackWh3}" Command="{Binding MenuBar.CreateAnimPackWarhammer3Command}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.NewAnimPack3K}" Command="{Binding MenuBar.CreateAnimPack3kCommand}"/>
 
@@ -28,8 +30,32 @@
                 <Separator/>
 
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenPack}" Command="{Binding MenuBar.OpenPackFileCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.OpenFolderProject}" Command="{Binding MenuBar.OpenFolderProjectCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.FolderProjectVersionControl}" Command="{Binding MenuBar.OpenFolderProjectVersionControlCommand}"/>
 
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenRecentPacks}" ItemsSource="{Binding MenuBar.RecentPackFiles}">
+                    <MenuItem.Style>
+                        <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
+                            <Style.Triggers>
+                                <Trigger Property="HasItems" Value="False">
+                                    <Setter Property="IsEnabled" Value="False" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </MenuItem.Style>
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
+                            <Setter Property="Command" Value="{Binding Command}" />
+                        </Style>
+                    </MenuItem.ItemContainerStyle>
+                    <MenuItem.ItemTemplate>
+                        <HierarchicalDataTemplate DataType="{x:Type viewModels:RecentPackFileItem}">
+                            <TextBlock Text="{Binding Header}"/>
+                        </HierarchicalDataTemplate>
+                    </MenuItem.ItemTemplate>
+                </MenuItem>
+
+                <MenuItem Header="{loc:Loc MenuBar.File.OpenRecentFolderProjects}" ItemsSource="{Binding MenuBar.RecentFolderProjects}">
                     <MenuItem.Style>
                         <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
                             <Style.Triggers>

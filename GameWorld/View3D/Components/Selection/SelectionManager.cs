@@ -21,6 +21,7 @@ namespace GameWorld.Core.Components.Selection
     public class SelectionManager : BaseComponent, IDisposable
     {
         ISelectionState _currentState;
+        public event Action<ISelectionState>? StateChanged;
         private readonly IEventHub _eventHub;
         private readonly RenderEngineComponent _renderEngine;
         VertexInstanceMesh _vertexRenderer;
@@ -131,6 +132,7 @@ namespace GameWorld.Core.Components.Selection
 
             _currentState.SelectionChanged += SelectionManager_SelectionChanged;
             SelectionManager_SelectionChanged(_currentState, sendEvent);
+            StateChanged?.Invoke(_currentState);
             return _currentState;
         }
 
@@ -148,8 +150,10 @@ namespace GameWorld.Core.Components.Selection
                 _currentState.SelectionChanged -= SelectionManager_SelectionChanged;
 
             _currentState = state;
+            _currentState.SelectionChanged -= SelectionManager_SelectionChanged;
             _currentState.SelectionChanged += SelectionManager_SelectionChanged;
             SelectionManager_SelectionChanged(_currentState, true);
+            StateChanged?.Invoke(_currentState);
         }
 
         private void SelectionManager_SelectionChanged(ISelectionState state, bool sendEvent)

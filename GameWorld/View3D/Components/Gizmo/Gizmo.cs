@@ -290,7 +290,7 @@ namespace GameWorld.Core.Components.Gizmo
             StopEvent?.Invoke();
         }
 
-        internal void AbortTransformInteraction()
+        public void AbortTransformInteraction()
         {
             var wasModalTransform = IsInModalTransform;
 

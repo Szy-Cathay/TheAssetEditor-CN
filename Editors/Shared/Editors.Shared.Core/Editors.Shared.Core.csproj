@@ -15,4 +15,8 @@
     <ProjectReference Include="..\..\..\Shared\SharedUI\Shared.Ui.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Test.Editors.Shared.Core" />
+  </ItemGroup>
+
 </Project>

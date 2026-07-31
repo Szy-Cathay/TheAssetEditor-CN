@@ -8,6 +8,13 @@ namespace Test.Shared.Core.PackFiles.Serialization
     [TestFixture]
     internal class PackFileSerializerWriterTests
     {
+        private static readonly string[] s_corruptionDetectionContents =
+        [
+            "This file is here to validate that the packfile has not been corrupted while saving. This is check 1",
+            "This file is here to validate that the packfile has not been corrupted while saving. This is check 2",
+            "This file is here to validate that the packfile has not been corrupted while saving. This is check 3",
+        ];
+
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH4, "folder//filex.txt", CompressionFormat.Zstd, CompressionFormat.None, true)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH5, "folder//filex.txt", CompressionFormat.Zstd, CompressionFormat.Zstd, false)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH5, "folder//filex.txt", CompressionFormat.Lzma1, CompressionFormat.Zstd, true)]
@@ -65,6 +72,95 @@ namespace Test.Shared.Core.PackFiles.Serialization
                     outputPath, container, writer, gameInfo, false));
             Assert.That(first.DataSource, Is.SameAs(firstSource));
             Assert.That(second.DataSource, Is.SameAs(missingSource));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void SaveToByteArray_CorruptionDetectionEnabled_DetectsCorruptedOutput(
+            int validationFileIndex)
+        {
+            var gameInfo = GameInformationDatabase.GetGameById(
+                GameTypeEnum.Rome2);
+            var container = new PackFileContainer("test")
+            {
+                Header = new PFHeader(
+                    PackFileVersionConverter.ToString(
+                        PackFileVersion.PFH4),
+                    PackFileCAType.MOD),
+            };
+            container.FileList["keep.bin"] =
+                PackFile.CreateFromBytes("keep.bin", [1, 2, 3]);
+
+            using var stream = new CorruptOnRewindStream(
+                s_corruptionDetectionContents[validationFileIndex]);
+            using var writer = new BinaryWriter(stream);
+
+            Assert.That(
+                () => PackFileSerializerWriter.SaveToByteArray(
+                    "corrupted-output.pack",
+                    container,
+                    writer,
+                    gameInfo,
+                    enableCompression: false,
+                    enableCorruptionDetection: true),
+                Throws.TypeOf<InvalidDataException>()
+                    .With.Message.Contains("unexpected content"));
+        }
+
+        [Test]
+        public void SaveToByteArray_DefaultOptions_PreserveMarkerNamedUserFile()
+        {
+            const string markerPath =
+                @"packfile_corruction_detection\packfile_corruction_detection_2.txt";
+            var gameInfo = GameInformationDatabase.GetGameById(
+                GameTypeEnum.Rome2);
+            var container = new PackFileContainer("test")
+            {
+                Header = new PFHeader(
+                    PackFileVersionConverter.ToString(
+                        PackFileVersion.PFH4),
+                    PackFileCAType.MOD),
+            };
+            container.FileList["keep.bin"] =
+                PackFile.CreateFromBytes("keep.bin", [1]);
+            container.FileList[markerPath] =
+                PackFile.CreateFromASCII(
+                    Path.GetFileName(markerPath),
+                    "user data");
+
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            PackFileSerializerWriter.SaveToByteArray(
+                "ordinary.pack",
+                container,
+                writer,
+                gameInfo,
+                enableCompression: false);
+
+            using var readStream = new MemoryStream(stream.ToArray());
+            using var reader = new BinaryReader(readStream);
+            var loaded = PackFileSerializerLoader.Load(
+                "ordinary.pack",
+                readStream.Length,
+                reader,
+                new CaPackDuplicateFileResolver());
+            var marker =
+                (PackedFileSource)loaded.FileList[markerPath]
+                    .DataSource;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    loaded.FileList.Keys,
+                    Is.EquivalentTo(
+                        new[] { "keep.bin", markerPath }));
+                Assert.That(
+                    marker.ReadData(readStream),
+                    Is.EqualTo(
+                        System.Text.Encoding.ASCII.GetBytes(
+                            "user data")));
+            });
         }
 
         [Test]
@@ -153,6 +249,41 @@ namespace Test.Shared.Core.PackFiles.Serialization
                 }
             }
 
+        }
+
+        private sealed class CorruptOnRewindStream(
+            string contentToCorrupt) : MemoryStream
+        {
+            private bool _corruptOnRewind = true;
+
+            public override long Position
+            {
+                get => base.Position;
+                set
+                {
+                    if (_corruptOnRewind &&
+                        value == 0 &&
+                        Length != 0)
+                    {
+                        var content = System.Text.Encoding.UTF8.GetBytes(
+                            contentToCorrupt);
+                        var data = GetBuffer().AsSpan(
+                            0,
+                            checked((int)Length));
+                        var contentIndex = data.IndexOf(content);
+                        if (contentIndex < 0)
+                        {
+                            throw new InvalidOperationException(
+                                "The validation content was not serialized.");
+                        }
+
+                        data[contentIndex] ^= 0xFF;
+                        _corruptOnRewind = false;
+                    }
+
+                    base.Position = value;
+                }
+            }
         }
     }
 }

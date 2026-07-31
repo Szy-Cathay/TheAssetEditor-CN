@@ -10,6 +10,8 @@ namespace GameWorld.Core.Rendering.RenderItems
 {
     public class VertexRenderItem : IRenderItem
     {
+        public bool IncludeInPhotoCapture => false;
+
         public VertexInstanceMesh VertexRenderer { get; set; }
 
         public Rmv2MeshNode Node { get; set; }

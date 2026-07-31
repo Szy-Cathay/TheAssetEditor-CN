@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using System;
+using System.IO;
 using System.Linq;
 using static Editors.Audio.Shared.GameInformation.Warhammer3.Wh3ActionEventType;
 using static Editors.Audio.Shared.GameInformation.Warhammer3.Wh3SoundBank;
@@ -75,6 +77,36 @@ namespace Editors.Audio.Shared.GameInformation.Warhammer3
         public static uint GetActorMixerId(Wh3ActionEventType actionEventType) => Information.First(definition => definition.ActionEventType == actionEventType).ActorMixerId;
         
         public static uint GetOverrideBusId(Wh3ActionEventType actionEventType) => Information.First(definition => definition.ActionEventType == actionEventType).OverrideBusId;
+
+        public static string GetMovieActionEventName(string filePath)
+        {
+            var normalizedPath = filePath
+                .Replace('/', '\\')
+                .TrimStart('\\');
+            const string moviesPrefix = "movies\\";
+            if (!normalizedPath.StartsWith(
+                    moviesPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Movie files must be located under the movies folder.",
+                    nameof(filePath));
+            }
+
+            var relativePath = normalizedPath[moviesPrefix.Length..];
+            if (relativePath
+                .Split('\\', StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment == ".."))
+            {
+                throw new ArgumentException(
+                    "Movie paths cannot contain parent-directory segments.",
+                    nameof(filePath));
+            }
+
+            var withoutExtension =
+                Path.ChangeExtension(relativePath, null);
+            return $"Play_Movie_{withoutExtension.Replace('\\', '_')}";
+        }
 
         public static List<Wh3ActionEventType> GetSoundBankActionEventTypes(Wh3SoundBank soundBank)
         {

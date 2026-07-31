@@ -36,6 +36,8 @@ namespace Shared.Core.ToolCreation
         void SetEditorAsCurrent(IEditorInterface editor);
 
         public void CloseTool(IEditorInterface tool);
+        public bool TryCloseEditorsForContainer(
+            PackFileContainer container);
         public bool ShouldBlockCloseCommand(IEditorInterface editor, bool hasUnsavedFiles);
 
         public void CloseOtherTools(IEditorInterface tool);

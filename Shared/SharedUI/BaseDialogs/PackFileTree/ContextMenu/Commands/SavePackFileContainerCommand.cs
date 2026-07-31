@@ -3,6 +3,7 @@ using System.Windows.Forms;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Ui.Common;
@@ -20,12 +21,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
 
         public void Execute(TreeNode _selectedNode)
         {
-            var systemPath = _selectedNode.FileOwner.SystemFilePath;
+            var systemPath = GetSavePath(_selectedNode.FileOwner);
             if (string.IsNullOrWhiteSpace(systemPath))
             {
                 var saveFileDialog = new SaveFileDialog();
                 saveFileDialog.FileName = _selectedNode.FileOwner.Name;
-                saveFileDialog.Filter = "PackFile | *.pack";
+                saveFileDialog.Filter = LocalizationManager.Instance.Get(
+                    "FolderProject.PackFilter");
                 saveFileDialog.DefaultExt = "pack";
                 if (saveFileDialog.ShowDialog() != DialogResult.OK)
                     return;
@@ -56,12 +58,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 return;
             }
 
-            var systemPath = pack.SystemFilePath;
+            var systemPath = GetSavePath(pack);
             if (string.IsNullOrWhiteSpace(systemPath))
             {
                 var saveFileDialog = new SaveFileDialog();
                 saveFileDialog.FileName = pack.Name;
-                saveFileDialog.Filter = "PackFile | *.pack";
+                saveFileDialog.Filter = LocalizationManager.Instance.Get(
+                    "FolderProject.PackFilter");
                 saveFileDialog.DefaultExt = "pack";
                 if (saveFileDialog.ShowDialog() != DialogResult.OK)
                     return;
@@ -81,6 +84,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                     System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ErrorSavingPack", e.Message), LocalizationManager.Instance.Get("Msg.GeneralError"));
                 }
             }
+        }
+
+        private static string? GetSavePath(PackFileContainer container)
+        {
+            return container is FolderProjectContainer folderProject
+                ? folderProject.ProjectSettings.OutputPackPath
+                : container.SystemFilePath;
         }
     }
 }
