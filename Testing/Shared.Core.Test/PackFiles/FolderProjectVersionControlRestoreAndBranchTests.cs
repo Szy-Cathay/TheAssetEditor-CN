@@ -23,7 +23,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         File.WriteAllBytes(targetPath, originalBytes);
         File.WriteAllBytes(otherPath, [9, 8, 7]);
         var service = new FolderProjectVersionControlService();
-        var original = service.Initialize(project.Path, s_identity);
+        service.Initialize(project.Path, s_identity);
+        var original = CreateRestorableCommit(service, project.Path);
         File.WriteAllBytes(targetPath, [1, 2, 3]);
         service.CommitAll(project.Path, "new target");
         var before = CaptureRepository(project.Path);
@@ -86,7 +87,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var targetPath = Path.Combine(project.Path, "target.bin");
         File.WriteAllBytes(targetPath, [1, 2, 3]);
         var service = new FolderProjectVersionControlService();
-        var initial = service.Initialize(project.Path, s_identity);
+        service.Initialize(project.Path, s_identity);
+        var historical = CreateRestorableCommit(service, project.Path);
         File.Move(
             targetPath,
             Path.Combine(project.Path, "renamed.bin"));
@@ -97,7 +99,7 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var exception = Assert.Throws<FolderProjectVersionControlException>(
             () => service.RestoreFile(
                 project.Path,
-                initial.Id,
+                historical.Id,
                 "target.bin",
                 overwrite));
 
@@ -122,7 +124,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var targetPath = Path.Combine(project.Path, "target");
         File.WriteAllBytes(targetPath, [1, 2, 3]);
         var service = new FolderProjectVersionControlService();
-        var initial = service.Initialize(project.Path, s_identity);
+        service.Initialize(project.Path, s_identity);
+        var historical = CreateRestorableCommit(service, project.Path);
         File.Delete(targetPath);
         service.CommitAll(project.Path, "delete target");
         Directory.CreateDirectory(targetPath);
@@ -134,7 +137,7 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var exception = Assert.Throws<FolderProjectVersionControlException>(
             () => service.RestoreFile(
                 project.Path,
-                initial.Id,
+                historical.Id,
                 "target",
                 overwrite));
 
@@ -203,18 +206,19 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var targetPath = Path.Combine(project.Path, "target.bin");
         File.WriteAllBytes(targetPath, [1, 2, 3]);
         var service = new FolderProjectVersionControlService();
-        var initial = service.Initialize(project.Path, s_identity);
+        service.Initialize(project.Path, s_identity);
+        var historical = CreateRestorableCommit(service, project.Path);
         File.WriteAllBytes(targetPath, [4, 5, 6]);
         service.CommitAll(project.Path, "later");
 
         var restored = service.RestoreFile(
             project.Path,
-            initial.Id.ToUpperInvariant(),
+            historical.Id.ToUpperInvariant(),
             "target.bin");
 
         Assert.Multiple(() =>
         {
-            Assert.That(restored.CommitId, Is.EqualTo(initial.Id));
+            Assert.That(restored.CommitId, Is.EqualTo(historical.Id));
             Assert.That(File.ReadAllBytes(targetPath), Is.EqualTo(new byte[] { 1, 2, 3 }));
         });
     }
@@ -275,12 +279,13 @@ public class FolderProjectVersionControlRestoreAndBranchTests
     {
         using var project = new TemporaryDirectory("restore-missing-path");
         var service = new FolderProjectVersionControlService();
-        var initial = service.Initialize(project.Path, s_identity);
+        service.Initialize(project.Path, s_identity);
+        var historical = CreateRestorableCommit(service, project.Path);
 
         var exception = Assert.Throws<FolderProjectVersionControlException>(
             () => service.RestoreFile(
                 project.Path,
-                initial.Id,
+                historical.Id,
                 "missing.bin"));
 
         Assert.That(
@@ -395,14 +400,14 @@ public class FolderProjectVersionControlRestoreAndBranchTests
     {
         using var project = CreateSwitchProject();
         var service = new FolderProjectVersionControlService();
-        var initial = service.GetHistory(project.Path).Single();
+        var historical = CreateRestorableCommit(service, project.Path);
         ConfigureSwitchUnsafeState(project.Path, unsafeState);
         var before = CaptureRepository(project.Path);
 
         var exception = Assert.Throws<FolderProjectVersionControlException>(
             () => service.RestoreFile(
                 project.Path,
-                initial.Id,
+                historical.Id,
                 "tracked.bin",
                 overwriteWorkingChange: true));
 
@@ -463,7 +468,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var targetPath = Path.Combine(project.Path, "target.bin");
         File.WriteAllBytes(targetPath, [1, 2, 3]);
         var setup = new FolderProjectVersionControlService();
-        var initial = setup.Initialize(project.Path, s_identity);
+        setup.Initialize(project.Path, s_identity);
+        var historical = CreateRestorableCommit(setup, project.Path);
         File.WriteAllBytes(targetPath, [9, 9, 9]);
         setup.CommitAll(project.Path, "later");
         var platform = new RestoreMoveFailurePlatform();
@@ -472,7 +478,7 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var exception = Assert.Throws<FolderProjectVersionControlException>(
             () => service.RestoreFile(
                 project.Path,
-                initial.Id,
+                historical.Id,
                 "target.bin"));
 
         Assert.Multiple(() =>
@@ -754,11 +760,13 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var service = new FolderProjectVersionControlService();
         service.Initialize(project.Path, s_identity);
         service.CreateBranch(project.Path, "other");
+        service.CreateBranch(project.Path, "delete-me");
 
-        service.DeleteBranch(project.Path, "other");
+        service.DeleteBranch(project.Path, "delete-me");
+        service.SwitchBranch(project.Path, "other");
         var currentException =
             Assert.Throws<FolderProjectVersionControlException>(
-                () => service.DeleteBranch(project.Path, "master"));
+                () => service.DeleteBranch(project.Path, "other"));
         var missingException =
             Assert.Throws<FolderProjectVersionControlException>(
                 () => service.DeleteBranch(project.Path, "missing"));
@@ -774,7 +782,7 @@ public class FolderProjectVersionControlRestoreAndBranchTests
                 Is.EqualTo(FolderProjectVersionControlError.BranchNotFound));
             Assert.That(
                 service.GetBranches(project.Path).Select(branch => branch.Name),
-                Is.EqualTo(new[] { "master" }));
+                Is.EqualTo(new[] { "master", "other" }));
         });
     }
 
@@ -987,7 +995,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var targetPath = Path.Combine(project.Path, "target");
         File.WriteAllBytes(targetPath, [1, 2, 3]);
         var service = new FolderProjectVersionControlService();
-        var initial = service.Initialize(project.Path, s_identity);
+        service.Initialize(project.Path, s_identity);
+        var historical = CreateRestorableCommit(service, project.Path);
         File.Delete(targetPath);
         service.CommitAll(project.Path, "delete target");
         Directory.CreateDirectory(targetPath);
@@ -996,7 +1005,7 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var exception = Assert.Throws<FolderProjectVersionControlException>(
             () => service.RestoreFile(
                 project.Path,
-                initial.Id,
+                historical.Id,
                 "target",
                 overwrite));
 
@@ -1310,7 +1319,8 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         var targetPath = Path.Combine(project.Path, "target.bin");
         File.WriteAllBytes(targetPath, [0, 255, 13, 10]);
         var service = new FolderProjectVersionControlService();
-        historicalCommitId = service.Initialize(project.Path, s_identity).Id;
+        service.Initialize(project.Path, s_identity);
+        historicalCommitId = CreateRestorableCommit(service, project.Path).Id;
         switch (dirtyState)
         {
             case "staged":
@@ -1353,6 +1363,16 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         service.Initialize(project.Path, s_identity);
         service.CreateBranch(project.Path, "other");
         return project;
+    }
+
+    private static FolderProjectCommitSummary CreateRestorableCommit(
+        FolderProjectVersionControlService service,
+        string projectPath)
+    {
+        File.WriteAllText(
+            Path.Combine(projectPath, "restore-baseline.marker"),
+            "baseline");
+        return service.CommitAll(projectPath, "restore baseline");
     }
 
     private static void ConfigureSwitchDirtyState(

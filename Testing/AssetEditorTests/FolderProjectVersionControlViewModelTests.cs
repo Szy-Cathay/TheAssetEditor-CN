@@ -833,16 +833,20 @@ public class FolderProjectVersionControlViewModelTests
                         FolderProjectRepositoryOperationState.None,
                         []));
         FolderProjectGitIdentity? capturedIdentity = null;
+        string? capturedPrimaryBranchName = null;
         service.Setup(
                 item => item.Initialize(
                     ProjectRoot,
-                    It.IsAny<FolderProjectGitIdentity>()))
+                    It.IsAny<FolderProjectGitIdentity>(),
+                    It.IsAny<string>()))
             .Returns(
                 (
                     string _,
-                    FolderProjectGitIdentity identity) =>
+                    FolderProjectGitIdentity identity,
+                    string primaryBranchName) =>
                 {
                     capturedIdentity = identity;
+                    capturedPrimaryBranchName = primaryBranchName;
                     entered.Set();
                     release.Wait(TimeSpan.FromSeconds(5));
                     initialized = true;
@@ -884,6 +888,9 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(
                 capturedIdentity?.Email,
                 Is.EqualTo("local@asseteditor.cn"));
+            NUnit.Framework.Assert.That(
+                capturedPrimaryBranchName,
+                Is.EqualTo("master"));
             NUnit.Framework.Assert.That(viewModel.IsBusy, Is.False);
             NUnit.Framework.Assert.That(viewModel.IsInitialized, Is.True);
         });
@@ -2355,7 +2362,7 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(
                 viewModel.CurrentBranch,
                 Is.EqualTo("feature"));
-            NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(2));
+            NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(1));
             NUnit.Framework.Assert.That(
                 coordinator.Calls,
                 Has.Count.EqualTo(1));

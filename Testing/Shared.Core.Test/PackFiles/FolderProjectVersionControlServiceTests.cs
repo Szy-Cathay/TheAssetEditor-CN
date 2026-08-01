@@ -718,9 +718,10 @@ public class FolderProjectVersionControlServiceTests
             .GetHistory(project.Path);
         Assert.Multiple(() =>
         {
-            Assert.That(status.HeadCommitId, Is.EqualTo(history[0].Id));
-            Assert.That(history, Has.Count.EqualTo(1));
-            Assert.That(history[0].Id, Is.EqualTo(committed.ParentIds[0]));
+            Assert.That(
+                status.HeadCommitId,
+                Is.EqualTo(committed.ParentIds[0]));
+            Assert.That(history, Is.Empty);
             Assert.That(
                 status.OperationState,
                 Is.EqualTo(FolderProjectRepositoryOperationState.None));
@@ -1011,8 +1012,7 @@ public class FolderProjectVersionControlServiceTests
         var history = service.GetHistory(project.Path);
         Assert.Multiple(() =>
         {
-            Assert.That(history, Has.Count.EqualTo(1));
-            Assert.That(history[0].Id, Is.EqualTo(original.ParentIds[0]));
+            Assert.That(history, Is.Empty);
             Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
             Assert.That(File.ReadAllText(filePath), Is.EqualTo("one"));
             Assert.That(File.Exists(addedPath), Is.False);
