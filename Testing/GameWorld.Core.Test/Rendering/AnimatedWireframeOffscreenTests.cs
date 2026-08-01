@@ -117,6 +117,127 @@ public class AnimatedWireframeOffscreenTests
     }
 
     [Test]
+    public void Draw_VertexMutationMovesWireframeWithoutRecreatingInstanceBuffer()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\EdgeQuadShader");
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library =>
+                library.GetStaticEffect(
+                    ShaderTypes.EdgeQuad))
+            .Returns(effect);
+        var mesh = CreateMesh(device);
+        var pose = MeshPoseSnapshot.Create(
+            mesh,
+            Matrix.Identity,
+            [],
+            false);
+        using var renderItem =
+            new AnimatedWireframeRenderItem(
+                pose,
+                resources.Object,
+                Vector4.One,
+                50_000);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        var parameters = new CommonShaderParameters(
+            Matrix.Identity,
+            Matrix.Identity,
+            Vector3.Zero,
+            Vector3.Forward,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            []);
+
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target |
+                    ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.BlendState = BlendState.Opaque;
+            device.DepthStencilState =
+                DepthStencilState.Default;
+            device.RasterizerState =
+                RasterizerState.CullNone;
+            renderItem.Draw(
+                device,
+                parameters,
+                RenderingTechnique.Normal);
+
+            for (var i = 0;
+                i < mesh.VertexArray.Length;
+                i++)
+            {
+                mesh.VertexArray[i].Position.X += 1.25f;
+            }
+
+            mesh.RebuildVertexBufferPartial(
+                0,
+                mesh.VertexArray.Length - 1);
+            renderItem.UpdatePose(
+                MeshPoseSnapshot.Create(
+                    mesh,
+                    Matrix.Identity,
+                    [],
+                    false));
+
+            device.Clear(
+                ClearOptions.Target |
+                    ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            renderItem.Draw(
+                device,
+                parameters,
+                RenderingTechnique.Normal);
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[64 * 64];
+        renderTarget.GetData(pixels);
+        var leftPixels = CountVisiblePixels(
+            pixels,
+            64,
+            0,
+            32);
+        var rightPixels = CountVisiblePixels(
+            pixels,
+            64,
+            32,
+            64);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(leftPixels, Is.EqualTo(0));
+            Assert.That(rightPixels, Is.GreaterThan(0));
+            Assert.That(
+                renderItem.IndexBufferBuildCount,
+                Is.EqualTo(1));
+        });
+
+        mesh.Dispose();
+    }
+
+    [Test]
     public void DefaultOverlay_KeepsAllUniqueEdgesAndSupportsSelectedSubset()
     {
         var game = new WpfGameMock();

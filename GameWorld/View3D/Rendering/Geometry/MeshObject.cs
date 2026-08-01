@@ -28,6 +28,7 @@ namespace GameWorld.Core.Rendering.Geometry
         public UiVertexFormat VertexFormat { get; private set; } = UiVertexFormat.Unknown;
         public string SkeletonName { get; private set; }  // SkeletonName
         public int TopologyVersion { get; private set; }
+        public int VertexDataVersion { get; private set; }
 
 
         public IGraphicsCardGeometry GetGeometryContext() => Context;
@@ -491,6 +492,7 @@ namespace GameWorld.Core.Rendering.Geometry
         public void RebuildVertexBuffer()
         {
             Context.RebuildVertexBuffer(VertexArray, VertexPositionNormalTextureCustom.VertexDeclaration);
+            VertexDataVersion++;
             if (!DeferBoundingBoxRebuild)
                 BuildBoundingBox();
         }
@@ -502,6 +504,7 @@ namespace GameWorld.Core.Rendering.Geometry
             Context.RebuildVertexBufferPartial(VertexArray, startIndex, count,
                 VertexPositionNormalTextureCustom.VertexDeclaration,
                 VertexPositionNormalTextureCustom.VertexDeclaration.VertexStride);
+            VertexDataVersion++;
         }
 
         public void RebuildIndexBuffer()

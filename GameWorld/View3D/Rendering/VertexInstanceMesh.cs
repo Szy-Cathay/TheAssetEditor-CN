@@ -77,6 +77,9 @@ namespace GameWorld.Core.Rendering
         // Blender uses same base size, but we add slight boost for visibility
         public float SelectedSizeBoost { get; set; } = 1.0f;
 
+        // Animated edit mode also shows a dense skinned wireframe, so its points need more separation.
+        const float AnimatedVertexSizeBoost = 1.5f;
+
         // Selection threshold multiplier (selection radius = render radius * this)
         public float SelectionThresholdMultiplier { get; set; } = 2.0f;
 
@@ -246,6 +249,7 @@ namespace GameWorld.Core.Rendering
                     selectedVertexes.VertexWeights[i];
                 _instanceData[i].InstanceScale =
                     VertexPixelSize +
+                    AnimatedVertexSizeBoost +
                     weight * SelectedSizeBoost;
                 _instanceData[i].InstanceColor =
                     Vector3.Lerp(

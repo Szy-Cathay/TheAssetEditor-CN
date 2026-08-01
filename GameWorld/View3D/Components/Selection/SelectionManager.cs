@@ -64,17 +64,9 @@ namespace GameWorld.Core.Components.Selection
         private int _sampleIdx1 = 1;
 
         const int MaxRenderEdges = 50000;
+        const float SelectedEdgeHalfWidth = 2.0f;
         private EdgeData[] _edgeDataCache = Array.Empty<EdgeData>();
-        private (int v0, int v1)[] _selectedEdgeIndicesCache = Array.Empty<(int, int)>();
-        private EdgeData[] _selectedEdgeDataCache = Array.Empty<EdgeData>();
-        private Matrix _cachedSelectedEdgeRenderMatrix;
-        private Vector3 _selectedEdgeSamplePos0;
-        private Vector3 _selectedEdgeSamplePos1;
         private bool _selectedEdgeDataDirty = true;
-        private AnimationPlayer?
-            _cachedSelectedEdgeAnimationPlayer;
-        private long _cachedSelectedEdgeAnimationTimeUs =
-            long.MinValue;
 
         public SelectionManager(IEventHub eventHub, RenderEngineComponent renderEngine, IScopedResourceLibrary resourceLib, IDeviceResolver deviceResolverComponent)
         {
@@ -448,83 +440,16 @@ namespace GameWorld.Core.Components.Selection
                     RenderBuckedId.Wireframe,
                     GetWireframeRenderItem(edgeNode, pose));
 
-                if (!ShouldRenderDenseEditOverlay(
-                        edgeNode,
-                        pose))
+                if (selectionEdgeState
+                        .SelectedEdges.Count > 0)
                 {
-                    if (selectionEdgeState
-                            .SelectedEdges.Count > 0)
-                    {
-                        _renderEngine.AddRenderItem(
-                            RenderBuckedId.Selection,
-                            GetSelectedEdgeWireframeRenderItem(
-                                edgeNode,
-                                pose,
-                                selectionEdgeState
-                                    .SelectedEdges));
-                    }
-                }
-                else
-                {
-                    if (!_selectedEdgeDataDirty &&
-                        _selectedEdgeIndicesCache.Length >
-                            0)
-                    {
-                        var sampleEdge =
-                            _selectedEdgeIndicesCache[0];
-                        if (_cachedSelectedEdgeRenderMatrix !=
-                                pose.WorldTransform ||
-                            _selectedEdgeSamplePos0 !=
-                                edgeNode.Geometry
-                                    .GetVertexById(
-                                        sampleEdge.v0) ||
-                            _selectedEdgeSamplePos1 !=
-                                edgeNode.Geometry
-                                    .GetVertexById(
-                                        sampleEdge.v1))
-                        {
-                            _selectedEdgeDataDirty = true;
-                        }
-                    }
-
-                    var animationTimeUs =
-                        GetAnimationTimeUs(
+                    _renderEngine.AddRenderItem(
+                        RenderBuckedId.Selection,
+                        GetSelectedEdgeWireframeRenderItem(
                             edgeNode,
-                            pose);
-                    if (!_selectedEdgeDataDirty &&
-                        (!ReferenceEquals(
-                             _cachedSelectedEdgeAnimationPlayer,
-                             edgeNode.AnimationPlayer) ||
-                         _cachedSelectedEdgeAnimationTimeUs !=
-                             animationTimeUs))
-                    {
-                        _selectedEdgeDataDirty = true;
-                    }
-
-                    if (_selectedEdgeDataDirty)
-                    {
-                        var worldPositions =
-                            selectionEdgeState
-                                .SelectedEdges.Count == 0
-                                ? Array.Empty<Vector3>()
-                                : pose.GetWorldPositions();
-                        UpdateSelectedEdgeQuadData(
                             pose,
-                            worldPositions,
-                            selectionEdgeState);
-                        _cachedSelectedEdgeAnimationPlayer =
-                            edgeNode.AnimationPlayer;
-                        _cachedSelectedEdgeAnimationTimeUs =
-                            animationTimeUs;
-                    }
-
-                    if (_selectedEdgeDataCache.Length >
-                        0)
-                    {
-                        _renderEngine.AddRenderItem(
-                            RenderBuckedId.Selection,
-                            _edgeQuadRenderItem);
-                    }
+                            selectionEdgeState
+                                .SelectedEdges));
                 }
             }
 
@@ -645,7 +570,8 @@ namespace GameWorld.Core.Components.Selection
                         new Vector4(1, 0.47f, 0, 1),
                         0)
                     {
-                        DepthBias = 0.00004f
+                        DepthBias = 0.00004f,
+                        EdgeHalfWidth = SelectedEdgeHalfWidth
                     };
                 _selectedEdgeDataDirty = true;
             }
@@ -732,40 +658,6 @@ namespace GameWorld.Core.Components.Selection
 
             _edgeQuadRenderItem.Edges = _edgeDataCache;
             _edgeQuadRenderItem.MarkDirty();
-        }
-
-        private void UpdateSelectedEdgeQuadData(
-            MeshPoseSnapshot pose,
-            IReadOnlyList<Vector3> worldPositions,
-            EdgeSelectionState selectionState)
-        {
-            var selectedEdgeCount = selectionState.SelectedEdges.Count;
-            if (_selectedEdgeIndicesCache.Length != selectedEdgeCount)
-            {
-                _selectedEdgeIndicesCache = new (int, int)[selectedEdgeCount];
-                _selectedEdgeDataCache = new EdgeData[selectedEdgeCount];
-            }
-
-            selectionState.SelectedEdges.CopyTo(_selectedEdgeIndicesCache);
-            EdgeOverlayDataBuilder.FillSelected(
-                _selectedEdgeDataCache,
-                worldPositions,
-                _selectedEdgeIndicesCache);
-
-            _cachedSelectedEdgeRenderMatrix =
-                pose.WorldTransform;
-            if (selectedEdgeCount > 0)
-            {
-                var sampleEdge = _selectedEdgeIndicesCache[0];
-                _selectedEdgeSamplePos0 =
-                    pose.Geometry.GetVertexById(sampleEdge.v0);
-                _selectedEdgeSamplePos1 =
-                    pose.Geometry.GetVertexById(sampleEdge.v1);
-            }
-
-            _edgeQuadRenderItem.Edges = _selectedEdgeDataCache;
-            _edgeQuadRenderItem.MarkDirty();
-            _selectedEdgeDataDirty = false;
         }
 
         private void ResetEdgeCache()
