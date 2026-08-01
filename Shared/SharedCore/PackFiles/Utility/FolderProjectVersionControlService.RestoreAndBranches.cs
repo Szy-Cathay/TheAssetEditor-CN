@@ -30,6 +30,12 @@ public sealed partial class FolderProjectVersionControlService
                 using var repository = OpenRepository(root);
                 EnsureRestoreStateSupported(repository);
                 var commit = LookupCommit(repository, objectId);
+                if (!commit.Parents.Any())
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "The initial folder project commit is immutable.");
+                }
                 var entry = commit.Tree[repositoryPath];
                 if (entry == null)
                 {
@@ -150,6 +156,12 @@ public sealed partial class FolderProjectVersionControlService
             {
                 using var repository = OpenRepository(projectRoot);
                 var branch = FindLocalBranch(repository, oldName);
+                if (IsPrimaryBranch(repository, branch))
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.PrimaryBranchProtected,
+                        "The primary branch cannot be renamed.");
+                }
                 EnsureBranchNameAvailable(
                     repository,
                     newName,
@@ -172,6 +184,12 @@ public sealed partial class FolderProjectVersionControlService
             {
                 using var repository = OpenRepository(projectRoot);
                 var branch = FindLocalBranch(repository, name);
+                if (IsPrimaryBranch(repository, branch))
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.PrimaryBranchProtected,
+                        "The primary branch cannot be deleted.");
+                }
                 if (branch.IsCurrentRepositoryHead)
                 {
                     throw new FolderProjectVersionControlException(
@@ -194,6 +212,25 @@ public sealed partial class FolderProjectVersionControlService
         string projectRoot,
         string name)
     {
+        return SwitchBranch(
+            projectRoot,
+            name,
+            FolderProjectBranchSwitchMode.CarryChanges);
+    }
+
+    public FolderProjectBranchInfo SwitchBranch(
+        string projectRoot,
+        string name,
+        FolderProjectBranchSwitchMode mode,
+        string? stashMessage = null)
+    {
+        if (mode is not FolderProjectBranchSwitchMode.CarryChanges and
+            not FolderProjectBranchSwitchMode.StashChanges and
+            not FolderProjectBranchSwitchMode.DiscardChanges)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+        }
+
         ValidateBranchName(name);
         return Execute(
             () =>
@@ -204,6 +241,15 @@ public sealed partial class FolderProjectVersionControlService
                     repository,
                     Path.GetFullPath(projectRoot),
                     branch);
+                var hasChanges = RetrieveWorkingStatus(repository).IsDirty;
+                var createdStash = false;
+                if (hasChanges &&
+                    mode != FolderProjectBranchSwitchMode.CarryChanges)
+                {
+                    CreateStashCore(repository, stashMessage);
+                    createdStash = true;
+                }
+
                 try
                 {
                     var checkedOut = _platform.CheckoutBranch(
@@ -213,16 +259,54 @@ public sealed partial class FolderProjectVersionControlService
                         {
                             CheckoutModifiers = CheckoutModifiers.None,
                         });
+                    if (createdStash &&
+                        mode == FolderProjectBranchSwitchMode.DiscardChanges)
+                    {
+                        repository.Stashes.Remove(0);
+                    }
                     return ToBranchInfo(repository, checkedOut);
                 }
                 catch (CheckoutConflictException exception)
                 {
+                    RestoreSwitchStashAfterFailure(
+                        repository,
+                        createdStash,
+                        exception);
                     throw new FolderProjectVersionControlException(
                         FolderProjectVersionControlError.WorkingTreeNotClean,
                         "The branch cannot be switched because the working tree changed.",
                         exception);
                 }
+                catch (Exception exception)
+                {
+                    RestoreSwitchStashAfterFailure(
+                        repository,
+                        createdStash,
+                        exception);
+                    throw;
+                }
             });
+    }
+
+    private static void RestoreSwitchStashAfterFailure(
+        Repository repository,
+        bool createdStash,
+        Exception failure)
+    {
+        if (!createdStash)
+            return;
+
+        try
+        {
+            RestoreStashCore(repository, 0, pop: true);
+        }
+        catch (Exception rollbackFailure)
+        {
+            throw new AggregateException(
+                "Branch switching failed and the saved changes could not be restored.",
+                failure,
+                rollbackFailure);
+        }
     }
 
     private static bool IsBranchTipRetained(
@@ -425,23 +509,7 @@ public sealed partial class FolderProjectVersionControlService
 
     private static void ValidateBranchName(string name)
     {
-        var isValidWindowsPath = false;
-        if (!string.IsNullOrWhiteSpace(name))
-        {
-            try
-            {
-                FolderProjectPathPolicy.NormalizeRelativePath(name);
-                isValidWindowsPath = true;
-            }
-            catch (Exception exception)
-                when (exception is ArgumentException or
-                      InvalidDataException or
-                      NotSupportedException)
-            {
-            }
-        }
-        if (!isValidWindowsPath ||
-            !Reference.IsValidName($"refs/heads/{name}"))
+        if (!FolderProjectGitRepository.IsValidBranchName(name))
         {
             throw new FolderProjectVersionControlException(
                 FolderProjectVersionControlError.InvalidBranchName,
@@ -671,7 +739,17 @@ public sealed partial class FolderProjectVersionControlService
             !repository.Info.IsHeadDetached &&
             branch.CanonicalName.Equals(
                 repository.Head.CanonicalName,
-                StringComparison.Ordinal));
+                StringComparison.Ordinal),
+            IsPrimaryBranch(repository, branch));
+    }
+
+    private static bool IsPrimaryBranch(
+        Repository repository,
+        Branch branch)
+    {
+        return GetPrimaryBranch(repository)?.CanonicalName.Equals(
+            branch.CanonicalName,
+            StringComparison.Ordinal) == true;
     }
 
     private static bool HasAny(

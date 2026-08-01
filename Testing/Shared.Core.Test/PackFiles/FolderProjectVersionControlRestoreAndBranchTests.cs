@@ -645,28 +645,59 @@ public class FolderProjectVersionControlRestoreAndBranchTests
         service.CreateBranch(project.Path, "later");
 
         var other = service.RenameBranch(project.Path, "other", "renamed-other");
-        var current = service.RenameBranch(project.Path, "master", "renamed-main");
+        var primaryException =
+            Assert.Throws<FolderProjectVersionControlException>(
+                () => service.RenameBranch(
+                    project.Path,
+                    "master",
+                    "renamed-main"));
 
         Assert.Multiple(() =>
         {
             Assert.That(other.Name, Is.EqualTo("renamed-other"));
             Assert.That(other.TipCommitId, Is.EqualTo(initial.Id));
             Assert.That(other.IsCurrent, Is.False);
-            Assert.That(current.Name, Is.EqualTo("renamed-main"));
-            Assert.That(current.TipCommitId, Is.EqualTo(initial.Id));
-            Assert.That(current.IsCurrent, Is.True);
+            Assert.That(
+                primaryException!.Code,
+                Is.EqualTo(
+                    FolderProjectVersionControlError.PrimaryBranchProtected));
             using var repository = new Repository(project.Path);
-            Assert.That(repository.Head.FriendlyName, Is.EqualTo("renamed-main"));
+            Assert.That(repository.Head.FriendlyName, Is.EqualTo("master"));
             Assert.That(repository.Branches["other"], Is.Null);
-            Assert.That(repository.Branches["master"], Is.Null);
+            Assert.That(repository.Branches["master"], Is.Not.Null);
             Assert.That(
                 service.GetBranches(project.Path).Select(branch => branch.Name),
                 Is.EqualTo(new[]
                 {
-                    "renamed-main",
+                    "master",
                     "renamed-other",
                     "later",
                 }));
+        });
+    }
+
+    [Test]
+    public void DeleteBranch_PrimaryBranchRejectsAfterSwitchingAway()
+    {
+        using var project = new TemporaryDirectory("primary-delete");
+        var service = new FolderProjectVersionControlService();
+        service.Initialize(project.Path, s_identity, "main");
+        service.CreateBranch(project.Path, "work");
+        service.SwitchBranch(project.Path, "work");
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.DeleteBranch(project.Path, "main"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Code,
+                Is.EqualTo(
+                    FolderProjectVersionControlError.PrimaryBranchProtected));
+            Assert.That(
+                service.GetBranches(project.Path).Single(x => x.Name == "main")
+                    .IsPrimary,
+                Is.True);
         });
     }
 

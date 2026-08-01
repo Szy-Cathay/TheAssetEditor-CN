@@ -15,10 +15,14 @@ public sealed class CreateFolderProjectCommand(
     ApplicationSettingsService settingsService,
     IStandardDialogs dialogs,
     LocalizationManager localizationManager,
-    IFolderProjectSetupDialogs? setupDialogs = null) : IUiCommand
+    IFolderProjectSetupDialogs? setupDialogs = null,
+    IFolderProjectVersionControlService? versionControlService = null) : IUiCommand
 {
     private readonly IFolderProjectSetupDialogs _setupDialogs =
         setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
+    private readonly IFolderProjectVersionControlService
+        _versionControlService =
+            versionControlService ?? new FolderProjectVersionControlService();
 
     public void Execute()
     {
@@ -61,6 +65,15 @@ public sealed class CreateFolderProjectCommand(
                     EnablePackFileCorruptionDetection =
                         setup.EnablePackFileCorruptionDetection,
                 });
+
+            _versionControlService.Initialize(
+                root,
+                new FolderProjectGitIdentity(
+                    localizationManager.Get(
+                        "FolderProject.VersionControl.DefaultIdentityName"),
+                    localizationManager.Get(
+                        "FolderProject.VersionControl.DefaultIdentityEmail")),
+                setup.PrimaryBranchName);
 
             if (packFileService.AddContainer(project, true) == null)
                 project.Dispose();

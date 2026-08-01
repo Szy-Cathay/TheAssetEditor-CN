@@ -63,14 +63,18 @@ public class CreateFolderProjectCommandTests
                 new FolderProjectSetupDialogResult(
                     project.Path,
                     output.Path,
-                    true));
+                    true,
+                    "main"));
+        var versionControl =
+            new Mock<IFolderProjectVersionControlService>();
         var command = new CreateFolderProjectCommand(
             Mock.Of<IPackFileService>(),
             new FolderProjectFactory(),
             new ApplicationSettingsService(GameTypeEnum.Warhammer3),
             Mock.Of<IStandardDialogs>(),
             LoadLocalization(),
-            setupDialogs.Object);
+            setupDialogs.Object,
+            versionControl.Object);
 
         command.Execute();
 
@@ -87,6 +91,10 @@ public class CreateFolderProjectCommandTests
                 settings.EnablePackFileCorruptionDetection,
                 Is.True);
         });
+        versionControl.Verify(item => item.Initialize(
+            project.Path,
+            It.IsAny<FolderProjectGitIdentity>(),
+            "main"), Times.Once);
     }
 
     [Test]

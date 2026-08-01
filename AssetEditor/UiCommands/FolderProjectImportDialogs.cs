@@ -14,7 +14,8 @@ public interface IFolderProjectImportDialogs
 public sealed record FolderProjectSetupDialogResult(
     string ProjectFolder,
     string OutputFolder,
-    bool EnablePackFileCorruptionDetection);
+    bool EnablePackFileCorruptionDetection,
+    string PrimaryBranchName = "master");
 
 public interface IFolderProjectSetupDialogs
 {
@@ -55,7 +56,8 @@ public sealed class FolderProjectSetupDialogs(
             ? new FolderProjectSetupDialogResult(
                 window.ProjectFolder,
                 window.OutputFolder,
-                window.EnablePackFileCorruptionDetection)
+                window.EnablePackFileCorruptionDetection,
+                window.PrimaryBranchName)
             : null;
     }
 }

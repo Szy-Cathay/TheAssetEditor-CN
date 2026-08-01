@@ -19,7 +19,8 @@ public sealed class ImportPackAsFolderProjectCommand(
     LocalizationManager localizationManager,
     IFolderProjectImportDialogs? importDialogs = null,
     IFolderProjectSetupDialogs? setupDialogs = null,
-    Func<string, bool>? isEmptyTarget = null) : IUiCommand
+    Func<string, bool>? isEmptyTarget = null,
+    IFolderProjectVersionControlService? versionControlService = null) : IUiCommand
 {
     private readonly IFolderProjectImportDialogs _importDialogs =
         importDialogs ?? new FolderProjectImportDialogs();
@@ -27,6 +28,9 @@ public sealed class ImportPackAsFolderProjectCommand(
         setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
     private readonly Func<string, bool> _isEmptyTarget =
         isEmptyTarget ?? FolderProjectImportTargetValidator.IsEmptyTarget;
+    private readonly IFolderProjectVersionControlService
+        _versionControlService =
+            versionControlService ?? new FolderProjectVersionControlService();
 
     public void Execute()
     {
@@ -94,6 +98,15 @@ public sealed class ImportPackAsFolderProjectCommand(
                         EnablePackFileCorruptionDetection =
                             setup.EnablePackFileCorruptionDetection,
                     });
+
+                _versionControlService.Initialize(
+                    projectRoot,
+                    new FolderProjectGitIdentity(
+                        localizationManager.Get(
+                            "FolderProject.VersionControl.DefaultIdentityName"),
+                        localizationManager.Get(
+                            "FolderProject.VersionControl.DefaultIdentityEmail")),
+                    setup.PrimaryBranchName);
 
                 if (packFileService.AddContainer(project, true) == null)
                     project.Dispose();

@@ -49,6 +49,8 @@ public class ImportPackAsFolderProjectCommandTests
             .Callback<PackFileContainer, bool>((container, _) =>
                 importedProject = (FolderProjectContainer)container)
             .Returns<PackFileContainer, bool>((container, _) => container);
+        var versionControl =
+            new Mock<IFolderProjectVersionControlService>();
         var command = new ImportPackAsFolderProjectCommand(
             packFileService.Object,
             loader.Object,
@@ -57,7 +59,9 @@ public class ImportPackAsFolderProjectCommandTests
             Mock.Of<IStandardDialogs>(),
             LoadLocalization(),
             importDialogs.Object,
-            setupDialogs.Object);
+            setupDialogs.Object,
+            null,
+            versionControl.Object);
 
         try
         {
@@ -76,6 +80,10 @@ public class ImportPackAsFolderProjectCommandTests
                     settings.EnablePackFileCorruptionDetection,
                     Is.True);
             });
+            versionControl.Verify(item => item.Initialize(
+                project.Path,
+                It.IsAny<FolderProjectGitIdentity>(),
+                "master"), Times.Once);
         }
         finally
         {

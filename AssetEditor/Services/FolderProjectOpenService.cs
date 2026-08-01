@@ -54,7 +54,26 @@ public sealed class FolderProjectOpenService(
                 return;
             }
 
-            var mergeState = GetMergeState(root);
+            FolderProjectMergeState mergeState;
+            try
+            {
+                mergeState = versionControlService.GetMergeState(root);
+            }
+            catch (FolderProjectVersionControlException exception)
+                when (exception.Code ==
+                      FolderProjectVersionControlError
+                          .RepositoryNotInitialized)
+            {
+                dialogs.ShowDialogBox(
+                    localizationManager.Get(
+                        "FolderProject.Open.VersionControlRequired"),
+                    localizationManager.Get("FolderProject.ErrorTitle"));
+                versionControlWindowService.ShowDialog(
+                    root,
+                    GetProjectName(root),
+                    true);
+                return;
+            }
             if (mergeState != null &&
                 mergeState.Phase != FolderProjectMergePhase.None)
             {
@@ -94,21 +113,6 @@ public sealed class FolderProjectOpenService(
             dialogs.ShowDialogBox(
                 localizationManager.Get("FolderProject.Open.Failed"),
                 localizationManager.Get("FolderProject.ErrorTitle"));
-        }
-    }
-
-    private FolderProjectMergeState? GetMergeState(string projectRoot)
-    {
-        try
-        {
-            return versionControlService.GetMergeState(projectRoot);
-        }
-        catch (FolderProjectVersionControlException exception)
-            when (exception.Code ==
-                  FolderProjectVersionControlError
-                      .RepositoryNotInitialized)
-        {
-            return null;
         }
     }
 

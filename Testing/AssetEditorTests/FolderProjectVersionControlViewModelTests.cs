@@ -270,24 +270,19 @@ public class FolderProjectVersionControlViewModelTests
                 ProjectRoot,
                 "保存修改\n\n详细说明"))
             .Returns(Commit());
-        var dialogs = new Mock<IStandardDialogs>();
-        dialogs.Setup(item => item.ShowTitleDescriptionInputDialog(
-                "提交文件",
-                "提交标题",
-                "提交说明",
-                It.IsAny<string>(),
-                It.IsAny<string>()))
-            .Returns(
-                new TitleDescriptionInputDialogResult(
-                    true,
-                    "保存修改",
-                    "详细说明"));
-        var viewModel = CreateViewModel(service, dialogs: dialogs.Object);
+        var viewModel = CreateViewModel(service);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存修改\n\n详细说明";
 
-        NUnit.Framework.Assert.That(
-            viewModel.CommitCommand.CanExecute(null),
-            Is.True);
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.CommitCommand.CanExecute(null),
+                Is.True);
+            NUnit.Framework.Assert.That(
+                viewModel.CommitActionText,
+                Is.EqualTo("提交暂存的更改"));
+        });
 
         await ExecuteAsync(viewModel.CommitCommand);
 
@@ -301,12 +296,48 @@ public class FolderProjectVersionControlViewModelTests
                 It.IsAny<string>(),
                 It.IsAny<string>()),
             Times.Never);
-        dialogs.Verify(item => item.ShowTitleDescriptionInputDialog(
-            "提交文件",
-            "提交标题",
-            "提交说明",
-            It.IsAny<string>(),
-            It.IsAny<string>()), Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task Commit_WithoutStagedChanges_CommitsAllChanges()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "working.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        service.Setup(item => item.CommitAll(ProjectRoot, "保存全部修改"))
+            .Returns(Commit());
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存全部修改";
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.CommitCommand.CanExecute(null),
+                Is.True);
+            NUnit.Framework.Assert.That(
+                viewModel.CommitActionText,
+                Is.EqualTo("全部提交"));
+        });
+
+        await ExecuteAsync(viewModel.CommitCommand);
+
+        service.Verify(
+            item => item.CommitAll(ProjectRoot, "保存全部修改"),
+            Times.Once);
+        service.Verify(
+            item => item.CommitStaged(
+                It.IsAny<string>(),
+                It.IsAny<string>()),
+            Times.Never);
     }
 
     [NUnit.Framework.Test]
@@ -634,7 +665,7 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(
                 LocalizationManager.Instance.Get(
                     "FolderProject.VersionControl.Commit"),
-                Is.EqualTo("提交已暂存文件"));
+                Is.EqualTo("提交"));
         });
     }
 
@@ -943,6 +974,7 @@ public class FolderProjectVersionControlViewModelTests
                         FeatureCommit,
                         false),
                 ]);
+        service.Setup(item => item.GetStashes(ProjectRoot)).Returns([]);
         service.Setup(item => item.CreateBranch(
                 ProjectRoot,
                 "topic",
@@ -1064,7 +1096,7 @@ public class FolderProjectVersionControlViewModelTests
                 Is.EqualTo("main"));
             NUnit.Framework.Assert.That(
                 viewModel.SelectedTabIndex,
-                Is.EqualTo(2));
+                Is.EqualTo(1));
         });
     }
 
@@ -1117,7 +1149,7 @@ public class FolderProjectVersionControlViewModelTests
                 Is.EqualTo("master"));
             NUnit.Framework.Assert.That(
                 viewModel.SelectedTabIndex,
-                Is.EqualTo(2));
+                Is.EqualTo(1));
         });
     }
 
@@ -1396,6 +1428,119 @@ public class FolderProjectVersionControlViewModelTests
             item => item.BeginMerge(ProjectRoot, "feature"),
             Times.Once);
         NUnit.Framework.Assert.That(coordinator.Calls, Has.Count.EqualTo(2));
+    }
+
+    [NUnit.Framework.Test]
+    public async Task SwitchBranch_DirtyRepository_OpensVsChoiceWithoutSwitching()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "file.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedBranch =
+            viewModel.Branches.Single(item => item.Name == "feature");
+
+        await ExecuteAsync(viewModel.SwitchBranchCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.IsBranchSwitchChoiceOpen,
+                Is.True);
+            NUnit.Framework.Assert.That(
+                viewModel.PendingBranchName,
+                Is.EqualTo("feature"));
+        });
+        service.Verify(
+            item => item.SwitchBranch(
+                It.IsAny<string>(),
+                It.IsAny<string>()),
+            Times.Never);
+        service.Verify(
+            item => item.SwitchBranch(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<FolderProjectBranchSwitchMode>(),
+                It.IsAny<string?>()),
+            Times.Never);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StashChangesAndSwitch_UsesStashModeThroughCoordinator()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "file.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        service.Setup(item => item.SwitchBranch(
+                ProjectRoot,
+                "feature",
+                FolderProjectBranchSwitchMode.StashChanges,
+                "WIP on main"))
+            .Returns(
+                new FolderProjectBranchInfo(
+                    "feature",
+                    FeatureCommit,
+                    true));
+        var coordinator = new RecordingCoordinator();
+        var viewModel = CreateViewModel(service, coordinator);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedBranch =
+            viewModel.Branches.Single(item => item.Name == "feature");
+        await ExecuteAsync(viewModel.SwitchBranchCommand);
+
+        await ExecuteAsync(viewModel.StashChangesAndSwitchCommand);
+
+        service.Verify(item => item.SwitchBranch(
+            ProjectRoot,
+            "feature",
+            FolderProjectBranchSwitchMode.StashChanges,
+            "WIP on main"), Times.Once);
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(coordinator.Calls, Has.Count.EqualTo(1));
+            NUnit.Framework.Assert.That(
+                viewModel.IsBranchSwitchChoiceOpen,
+                Is.False);
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task OpenProject_LoadsStashesAndApplyUsesCoordinator()
+    {
+        var stash = new FolderProjectStashInfo(
+            0,
+            "WIP on main",
+            DateTimeOffset.Parse("2026-08-01T10:00:00+08:00"),
+            ["file.txt"]);
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetStashes(ProjectRoot)).Returns([stash]);
+        var coordinator = new RecordingCoordinator();
+        var viewModel = CreateViewModel(service, coordinator);
+
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedStash = viewModel.Stashes.Single();
+        await ExecuteAsync(viewModel.ApplyStashCommand);
+
+        service.Verify(item => item.ApplyStash(ProjectRoot, 0), Times.Once);
+        NUnit.Framework.Assert.That(coordinator.Calls, Has.Count.EqualTo(1));
     }
 
     [NUnit.Framework.Test]
@@ -2115,11 +2260,11 @@ public class FolderProjectVersionControlViewModelTests
             item => item.DeleteBranch(ProjectRoot, "feature"),
             Times.Once);
         dialogs.Verify(item => item.ShowTitleDescriptionInputDialog(
-            "提交文件",
-            "提交标题",
-            "提交说明",
-            "保存修改",
-            ""), Times.Once);
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Never);
         dialogs.Verify(item => item.ShowTextInputDialog(
             "保护分支名称",
             "recovery/test"), Times.Once);
@@ -2442,6 +2587,7 @@ public class FolderProjectVersionControlViewModelTests
                         FeatureCommit,
                         false),
                 ]);
+        service.Setup(item => item.GetStashes(ProjectRoot)).Returns([]);
         service.Setup(item => item.GetMergeState(ProjectRoot))
             .Returns(MergeState(FolderProjectMergePhase.None));
         return service;

@@ -5,6 +5,7 @@ using System.Windows;
 using CommonControls;
 
 using Shared.Core.PackFiles.Models;
+using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 
 namespace AssetEditor.Views.FolderProject;
@@ -17,6 +18,8 @@ public partial class FolderProjectSetupWindow : Window
     public string OutputFolder { get; private set; } = "";
     public bool EnablePackFileCorruptionDetection =>
         EnablePackFileCorruptionDetectionCheckBox.IsChecked == true;
+    public string PrimaryBranchName =>
+        PrimaryBranchNameTextBox.Text.Trim();
 
     public FolderProjectSetupWindow(
         LocalizationManager localizationManager,
@@ -28,6 +31,7 @@ public partial class FolderProjectSetupWindow : Window
         DarkTitleBarHelper.Enable(this);
         Title = title;
         DescriptionTextBlock.Text = description;
+        PrimaryBranchNameTextBox.Text = "master";
         if (Application.Current?.MainWindow is { } owner &&
             !ReferenceEquals(owner, this))
         {
@@ -106,6 +110,15 @@ public partial class FolderProjectSetupWindow : Window
         {
             MessageBox.Show(
                 GetText("FolderProject.Setup.NoOutputFolder"),
+                GetText("FolderProject.ErrorTitle"));
+            return;
+        }
+
+        if (!FolderProjectGitRepository.IsValidBranchName(
+                PrimaryBranchName))
+        {
+            MessageBox.Show(
+                GetText("FolderProject.Setup.InvalidPrimaryBranch"),
                 GetText("FolderProject.ErrorTitle"));
             return;
         }

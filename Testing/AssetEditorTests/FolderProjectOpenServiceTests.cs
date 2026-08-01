@@ -66,43 +66,27 @@ public class FolderProjectOpenServiceTests
             Times.Never);
     }
 
-    [TestCase(true)]
-    [TestCase(false)]
-    public void Open_NoPendingMerge_OpensAndAddsProject(
-        bool repositoryNotInitialized)
+    [Test]
+    public void Open_NoPendingMerge_OpensAndAddsProject()
     {
         using var project = new TemporaryFolderProject();
         var calls = new List<string>();
         var versionControl =
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
-        if (repositoryNotInitialized)
-        {
-            versionControl.Setup(
-                    item => item.GetMergeState(project.Path))
-                .Callback(() => calls.Add("merge-state"))
-                .Throws(
-                    new FolderProjectVersionControlException(
-                        FolderProjectVersionControlError
-                            .RepositoryNotInitialized,
-                        "raw not initialized"));
-        }
-        else
-        {
-            versionControl.Setup(
-                    item => item.GetMergeState(project.Path))
-                .Callback(() => calls.Add("merge-state"))
-                .Returns(
-                    new FolderProjectMergeState(
-                        FolderProjectMergePhase.None,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        [],
-                        null));
-        }
+        versionControl.Setup(
+                item => item.GetMergeState(project.Path))
+            .Callback(() => calls.Add("merge-state"))
+            .Returns(
+                new FolderProjectMergeState(
+                    FolderProjectMergePhase.None,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    [],
+                    null));
         using var container =
             FolderProjectContainer.Open(project.Path);
         var factory = new Mock<IFolderProjectFactory>(
@@ -131,6 +115,39 @@ public class FolderProjectOpenServiceTests
             calls,
             Is.EqualTo(
                 new[] { "merge-state", "factory-open", "add" }));
+    }
+
+    [Test]
+    public void Open_UninitializedProject_RequiresInitializationBeforeOpening()
+    {
+        using var project = new TemporaryFolderProject();
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(item => item.GetMergeState(project.Path))
+            .Throws(new FolderProjectVersionControlException(
+                FolderProjectVersionControlError.RepositoryNotInitialized,
+                "not initialized"));
+        var factory = new Mock<IFolderProjectFactory>();
+        var window = new Mock<IFolderProjectVersionControlWindowService>();
+        var dialogs = new Mock<IStandardDialogs>();
+        var service = new FolderProjectOpenService(
+            Mock.Of<IPackFileService>(),
+            factory.Object,
+            versionControl.Object,
+            window.Object,
+            new ApplicationSettingsService(),
+            dialogs.Object,
+            LoadLocalization());
+
+        service.Open(project.Path);
+
+        factory.Verify(item => item.Open(It.IsAny<string>()), Times.Never);
+        dialogs.Verify(item => item.ShowDialogBox(
+            "必须先初始化本地版本管理，才能打开并修改这个文件夹工程。",
+            "文件夹工程错误"), Times.Once);
+        window.Verify(item => item.ShowDialog(
+            project.Path,
+            project.Name,
+            true), Times.Once);
     }
 
     [Test]
@@ -206,5 +223,12 @@ public class FolderProjectOpenServiceTests
         {
             Directory.Delete(Path, true);
         }
+    }
+
+    private static LocalizationManager LoadLocalization()
+    {
+        var localization = new LocalizationManager();
+        localization.LoadLanguage();
+        return localization;
     }
 }

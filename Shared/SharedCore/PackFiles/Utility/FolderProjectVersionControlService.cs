@@ -9,7 +9,8 @@ public interface IFolderProjectVersionControlService
 
     FolderProjectCommitSummary Initialize(
         string projectRoot,
-        FolderProjectGitIdentity identity);
+        FolderProjectGitIdentity identity,
+        string primaryBranchName = "master");
 
     FolderProjectGitIdentity GetIdentity(string projectRoot);
 
@@ -36,6 +37,27 @@ public interface IFolderProjectVersionControlService
     FolderProjectCommitSummary CommitStaged(
         string projectRoot,
         string message);
+
+    IReadOnlyList<FolderProjectStashInfo> GetStashes(
+        string projectRoot);
+
+    FolderProjectStashInfo StashChanges(
+        string projectRoot,
+        string message);
+
+    void ApplyStash(
+        string projectRoot,
+        int index);
+
+    void PopStash(
+        string projectRoot,
+        int index);
+
+    void DeleteStash(
+        string projectRoot,
+        int index);
+
+    void ClearStashes(string projectRoot);
 
     void UndoLatestCommit(
         string projectRoot,
@@ -96,6 +118,12 @@ public interface IFolderProjectVersionControlService
     FolderProjectBranchInfo SwitchBranch(
         string projectRoot,
         string name);
+
+    FolderProjectBranchInfo SwitchBranch(
+        string projectRoot,
+        string name,
+        FolderProjectBranchSwitchMode mode,
+        string? stashMessage = null);
 
     FolderProjectMergeState GetMergeState(string projectRoot);
 
@@ -206,6 +234,10 @@ internal class FolderProjectVersionControlPlatform
 public sealed partial class FolderProjectVersionControlService :
     IFolderProjectVersionControlService
 {
+    private const string PrimaryBranchConfigKey =
+        "asseteditor.primaryBranch";
+    private const string InitialCommitConfigKey =
+        "asseteditor.initialCommit";
     private readonly FolderProjectVersionControlPlatform _platform;
 
     public FolderProjectVersionControlService()
@@ -454,9 +486,12 @@ public sealed partial class FolderProjectVersionControlService :
 
     public FolderProjectCommitSummary Initialize(
         string projectRoot,
-        FolderProjectGitIdentity identity)
+        FolderProjectGitIdentity identity,
+        string primaryBranchName = "master")
     {
         ValidateIdentity(identity);
+        primaryBranchName = primaryBranchName.Trim();
+        ValidateBranchName(primaryBranchName);
         var repositoryState = GetRepositoryState(projectRoot);
         if (repositoryState == RepositoryState.Unsupported)
         {
@@ -502,13 +537,28 @@ public sealed partial class FolderProjectVersionControlService :
                     SetLocalIdentity(repository, identity);
                     if (repository.Head.Tip == null)
                     {
+                        if (!repository.Head.FriendlyName.Equals(
+                                primaryBranchName,
+                                StringComparison.Ordinal))
+                        {
+                            repository.Refs.UpdateTarget(
+                                "HEAD",
+                                $"refs/heads/{primaryBranchName}",
+                                "asseteditor: Set primary branch");
+                        }
                         Commands.Stage(repository, "*");
                         var signature = CreateSignature(identity);
-                        repository.Commit(
+                        var initialCommit = repository.Commit(
                             "初始化文件夹工程",
                             signature,
                             signature);
+                        SetRepositoryMetadata(
+                            repository,
+                            primaryBranchName,
+                            initialCommit.Sha);
                     }
+                    else
+                        EnsureRepositoryMetadata(repository);
 
                     return ToSummary(repository.Head.Tip!);
                 });
@@ -616,17 +666,18 @@ public sealed partial class FolderProjectVersionControlService :
         Commit tip,
         int maxCount)
     {
-        var masterCommitIds = repository.Branches["master"]?.Tip == null
+        var primaryBranch = GetPrimaryBranch(repository);
+        var primaryCommitIds = primaryBranch?.Tip == null
             ? null
             : repository.Commits.QueryBy(
                     new CommitFilter
                     {
                         IncludeReachableFrom =
-                            repository.Branches["master"].Tip,
+                            primaryBranch.Tip,
                     })
                 .Select(commit => commit.Sha)
                 .ToHashSet(StringComparer.Ordinal);
-        return repository.Commits.QueryBy(
+        var reachableCommits = repository.Commits.QueryBy(
                 new CommitFilter
                 {
                     IncludeReachableFrom = tip,
@@ -634,16 +685,89 @@ public sealed partial class FolderProjectVersionControlService :
                         CommitSortStrategies.Topological |
                         CommitSortStrategies.Time,
                 })
+            .ToList();
+        var visibleCommits = reachableCommits
+            .Where(commit => commit.Parents.Any())
             .Take(maxCount)
+            .ToList();
+
+        return visibleCommits
             .Select(
                 commit => ToSummary(
                     commit,
-                    masterCommitIds == null
+                    primaryCommitIds == null
                         ? FolderProjectCommitMergeStatus.Unknown
-                        : masterCommitIds.Contains(commit.Sha)
+                        : primaryCommitIds.Contains(commit.Sha)
                             ? FolderProjectCommitMergeStatus.Merged
                             : FolderProjectCommitMergeStatus.NotMerged))
             .ToList();
+    }
+
+    private static void SetRepositoryMetadata(
+        Repository repository,
+        string primaryBranchName,
+        string initialCommitId)
+    {
+        repository.Config.Set(
+            PrimaryBranchConfigKey,
+            primaryBranchName,
+            ConfigurationLevel.Local);
+        repository.Config.Set(
+            InitialCommitConfigKey,
+            initialCommitId,
+            ConfigurationLevel.Local);
+    }
+
+    private static void EnsureRepositoryMetadata(Repository repository)
+    {
+        var primaryBranch = GetPrimaryBranch(repository);
+        var initialCommit = GetInitialCommit(
+            repository,
+            repository.Commits.ToList());
+        if (primaryBranch != null && initialCommit != null)
+        {
+            SetRepositoryMetadata(
+                repository,
+                primaryBranch.FriendlyName,
+                initialCommit.Sha);
+        }
+    }
+
+    private static Branch? GetPrimaryBranch(Repository repository)
+    {
+        var configuredName = repository.Config.Get<string>(
+            PrimaryBranchConfigKey,
+            ConfigurationLevel.Local)?.Value;
+        if (!string.IsNullOrWhiteSpace(configuredName))
+        {
+            var configuredBranch = repository.Branches[configuredName];
+            if (configuredBranch != null && !configuredBranch.IsRemote)
+                return configuredBranch;
+        }
+
+        return repository.Branches["master"] ??
+               repository.Branches.FirstOrDefault(
+                   branch => branch.IsCurrentRepositoryHead) ??
+               repository.Branches.FirstOrDefault(
+                   branch => !branch.IsRemote);
+    }
+
+    private static Commit? GetInitialCommit(
+        Repository repository,
+        IReadOnlyList<Commit> reachableCommits)
+    {
+        var configuredId = repository.Config.Get<string>(
+            InitialCommitConfigKey,
+            ConfigurationLevel.Local)?.Value;
+        if (!string.IsNullOrWhiteSpace(configuredId))
+        {
+            var configuredCommit = repository.Lookup<Commit>(configuredId);
+            if (configuredCommit != null)
+                return configuredCommit;
+        }
+
+        return reachableCommits.LastOrDefault(
+            commit => !commit.Parents.Any());
     }
 
     public FolderProjectCommitSummary CommitAll(

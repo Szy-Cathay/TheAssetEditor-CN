@@ -22,6 +22,7 @@ public enum FolderProjectVersionControlError
     BranchNotFound,
     BranchAlreadyExists,
     CurrentBranchProtected,
+    PrimaryBranchProtected,
     BranchNotMerged,
     MergeAlreadyActive,
     MergeNotActive,
@@ -141,7 +142,21 @@ public sealed record FolderProjectCommitEditSession(
 public sealed record FolderProjectBranchInfo(
     string Name,
     string TipCommitId,
-    bool IsCurrent);
+    bool IsCurrent,
+    bool IsPrimary = false);
+
+public sealed record FolderProjectStashInfo(
+    int Index,
+    string Message,
+    DateTimeOffset StashedAt,
+    IReadOnlyList<string> Paths);
+
+public enum FolderProjectBranchSwitchMode
+{
+    CarryChanges,
+    StashChanges,
+    DiscardChanges,
+}
 
 public enum FolderProjectMergePhase
 {

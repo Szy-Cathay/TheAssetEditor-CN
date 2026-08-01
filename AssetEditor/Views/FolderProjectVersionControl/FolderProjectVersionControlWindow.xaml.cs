@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Input;
 using AssetEditor.ViewModels;
+using Shared.Core.PackFiles.Models;
 using WindowHandling;
 
 namespace AssetEditor.Views.FolderProjectVersionControl;
@@ -77,6 +78,22 @@ public partial class FolderProjectVersionControlWindow : AssetEditorWindow
                 .Cast<FolderProjectMergeConflictRow>()
                 .ToList();
         }
+    }
+
+    private void HeaderBranchComboBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox { SelectedItem: FolderProjectBranchInfo branch } ||
+            branch.IsCurrent ||
+            DataContext is not FolderProjectVersionControlViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.SelectedBranch = branch;
+        if (viewModel.SwitchBranchCommand.CanExecute(null))
+            viewModel.SwitchBranchCommand.Execute(null);
     }
 
     protected override void OnClosing(CancelEventArgs e)

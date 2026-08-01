@@ -21,6 +21,25 @@ public static class FolderProjectGitRepository
         return IsRepositoryRoot(Path.GetFullPath(projectRoot));
     }
 
+    public static bool IsValidBranchName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        try
+        {
+            FolderProjectPathPolicy.NormalizeRelativePath(name);
+            return Reference.IsValidName($"refs/heads/{name}");
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or
+                  InvalidDataException or
+                  NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     public static void Initialize(string projectRoot)
     {
         ValidateProjectRoot(projectRoot);
