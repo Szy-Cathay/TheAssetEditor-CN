@@ -7,7 +7,7 @@ Asset Editor 国区版是面向中国大陆用户维护的 Total War 资产编�
 - 程序：`AssetEditor.CN.exe`
 - 用户数据：`%USERPROFILE%\AssetEditor.CN`
 - 更新仓库：`Szy-Cathay/TheAssetEditor-CN`
-- 当前版本：`1.1.1`
+- 当前版本：`2.0.0`
 
 国区版可以与原版 Asset Editor 并存，两者不共用配置、日志、缓存、更新目录或 IPC 接口。
 
