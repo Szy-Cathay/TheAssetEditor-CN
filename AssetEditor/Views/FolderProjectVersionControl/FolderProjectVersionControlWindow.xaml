@@ -161,31 +161,6 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                        <Border
-                            Margin="0,0,0,8"
-                            Padding="8,6"
-                            BorderBrush="{DynamicResource GroupBox.Static.Border}"
-                            BorderThickness="1"
-                            Visibility="{Binding IsInitialized, Converter={StaticResource InvBoolToHiddenConverter}}">
-                            <DockPanel LastChildFill="True">
-                                <Button
-                                    DockPanel.Dock="Right"
-                                    Height="28"
-                                    Command="{Binding InitializeCommand}"
-                                    Content="{loc:Loc FolderProject.VersionControl.Initialize}" />
-                                <TextBox
-                                    Width="140"
-                                    Height="28"
-                                    Margin="0,0,8,0"
-                                    VerticalContentAlignment="Center"
-                                    Text="{Binding PrimaryBranchName, UpdateSourceTrigger=PropertyChanged}"
-                                    ToolTip="{loc:Loc FolderProject.VersionControl.PrimaryBranchName}" />
-                                <TextBlock
-                                    VerticalAlignment="Center"
-                                    FontWeight="SemiBold"
-                                    Text="{loc:Loc FolderProject.VersionControl.Uninitialized}" />
-                            </DockPanel>
-                        </Border>
                         <TextBox
                             MinHeight="62"
                             Padding="8"
@@ -193,13 +168,34 @@
                             Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}"
                             TextWrapping="Wrap"
                             ToolTip="{loc:Loc FolderProject.VersionControl.CommitMessage}" />
-                        <Button
-                            MinWidth="170"
-                            Height="30"
+                        <StackPanel
                             Margin="0,7,0,0"
                             HorizontalAlignment="Left"
-                            Command="{Binding CommitCommand}"
-                            Content="{Binding CommitActionText}" />
+                            Orientation="Horizontal">
+                            <Button
+                                MinWidth="170"
+                                Height="30"
+                                Command="{Binding CommitCommand}"
+                                Content="{Binding CommitActionText}" />
+                            <Button
+                                x:Name="CommitMenuButton"
+                                Width="30"
+                                Height="30"
+                                Margin="-1,0,0,0"
+                                Click="CommitMenuButton_Click"
+                                Content="▼">
+                                <Button.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.CommitStaged}"
+                                            Command="{Binding CommitStagedCommand}" />
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.CommitAll}"
+                                            Command="{Binding CommitAllCommand}" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
 
                     <Border
@@ -333,7 +329,6 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBox
                                 Height="28"
@@ -356,12 +351,6 @@
                                 Content="{loc:Loc FolderProject.VersionControl.SaveIdentity}" />
                             <Button
                                 Grid.Column="3"
-                                Height="28"
-                                Margin="0,0,7,0"
-                                Command="{Binding InitializeCommand}"
-                                Content="{loc:Loc FolderProject.VersionControl.Initialize}" />
-                            <Button
-                                Grid.Column="4"
                                 Height="28"
                                 Command="{Binding DiscardAllCommand}"
                                 Content="{loc:Loc FolderProject.VersionControl.DiscardAll}" />
@@ -509,9 +498,25 @@
                                 CanUserAddRows="False"
                                 IsReadOnly="True"
                                 ItemsSource="{Binding History}"
+                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
                                 SelectedItem="{Binding SelectedCommit}"
                                 SelectionMode="Single"
                                 SelectionUnit="FullRow">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem
+                                            Header="{loc:Loc FolderProject.VersionControl.RevertCommit}"
+                                            Command="{Binding RevertCommitCommand}" />
+                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.ResetCommit}">
+                                            <MenuItem
+                                                Header="{loc:Loc FolderProject.VersionControl.ResetCommitKeepChanges}"
+                                                Command="{Binding ResetCommitKeepChangesCommand}" />
+                                            <MenuItem
+                                                Header="{loc:Loc FolderProject.VersionControl.ResetCommitAndDiscardChanges}"
+                                                Command="{Binding ResetCommitAndDiscardChangesCommand}" />
+                                        </MenuItem>
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Width="*" Header="{loc:Loc FolderProject.VersionControl.CommitTitleColumn}" Binding="{Binding Title}" />
                                     <DataGridTextColumn Width="120" Header="{loc:Loc FolderProject.VersionControl.Author}" Binding="{Binding AuthorName}" />

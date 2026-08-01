@@ -22,6 +22,12 @@ namespace AssetEditor
             serviceCollection.AddScoped<MainViewModel>();
             serviceCollection.AddSingleton<IEditorCreator>( x=> x.GetRequiredService<IEditorManager>());
             serviceCollection.AddSingleton<IEditorManager, EditorManager>();
+            serviceCollection.AddSingleton<
+                IFolderProjectUnsavedChangesService,
+                FolderProjectUnsavedChangesService>();
+            serviceCollection.AddSingleton<
+                IFolderProjectUnsavedChangesPrompt,
+                FolderProjectUnsavedChangesPrompt>();
 
             serviceCollection.AddTransient<OpenGamePackCommand>();
             serviceCollection.AddTransient<OpenPackFileCommand>();
@@ -45,6 +51,10 @@ namespace AssetEditor
                 FolderProjectVersionControlWindow>();
             serviceCollection.AddTransient<
                 FolderProjectVersionControlViewModel>();
+            serviceCollection.AddScoped<
+                FolderProjectGitWorkspaceViewModel>();
+            serviceCollection.AddTransient<
+                FolderProjectGitRepositoryViewModel>();
             serviceCollection.AddScoped<MenuBarViewModel>();
 
             serviceCollection.AddScoped<MainWindow>();
@@ -66,6 +76,16 @@ namespace AssetEditor
             serviceCollection.AddScoped<IExceptionInformationProvider, CurrentEditorExceptionInfoProvider>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
+        }
+
+        public override void RegisterTools(IEditorDatabase factory)
+        {
+            EditorInfoBuilder
+                .Create<
+                    FolderProjectGitRepositoryViewModel,
+                    FolderProjectGitRepositoryView>(
+                    EditorEnums.FolderProjectGitRepository)
+                .Build(factory);
         }
     }
 }

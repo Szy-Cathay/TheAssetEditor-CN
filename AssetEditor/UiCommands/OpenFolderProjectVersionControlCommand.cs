@@ -1,4 +1,4 @@
-﻿using AssetEditor.Services;
+using AssetEditor.Events;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -7,19 +7,13 @@ namespace AssetEditor.UiCommands;
 
 public sealed class OpenFolderProjectVersionControlCommand(
     IPackFileService packFileService,
-    IFolderProjectVersionControlWindowService windowService) : IUiCommand
+    IEventHub eventHub) : IUiCommand
 {
     public void Execute()
     {
-        if (packFileService.GetEditablePack() is not
-            FolderProjectContainer project)
-        {
+        if (packFileService.GetEditablePack() is not FolderProjectContainer)
             return;
-        }
 
-        windowService.ShowDialog(
-            project.ProjectRoot,
-            project.ProjectSettings.Name,
-            false);
+        eventHub.Publish(new OpenFolderProjectGitPanelEvent());
     }
 }

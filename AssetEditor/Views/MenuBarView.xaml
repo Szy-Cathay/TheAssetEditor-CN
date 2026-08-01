@@ -21,7 +21,7 @@
                 <MenuItem Header="{loc:Loc MenuBar.File.NewPack}" Command="{Binding MenuBar.CreateNewPackFileCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.NewAnimPackWh3}" Command="{Binding MenuBar.CreateAnimPackWarhammer3Command}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.NewAnimPack3K}" Command="{Binding MenuBar.CreateAnimPack3kCommand}"/>
-                <MenuItem Header="{loc:Loc MenuBar.File.SaveActivePack}" Command="{Binding MenuBar.SaveActivePackCommand}"/>
+                <MenuItem Header="{Binding MenuBar.SaveActiveContainerText}" Command="{Binding MenuBar.SaveActivePackCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenPack}" Command="{Binding MenuBar.OpenPackFileCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenRecentPacks}" ItemsSource="{Binding MenuBar.RecentPackFiles}">
                     <MenuItem.Style>
@@ -58,6 +58,7 @@
                 <MenuItem Header="{loc:Loc MenuBar.File.ImportPackAsFolderProject}" Command="{Binding MenuBar.ImportPackAsFolderProjectCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenFolderProject}" Command="{Binding MenuBar.OpenFolderProjectCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.FolderProjectVersionControl}" Command="{Binding MenuBar.OpenFolderProjectVersionControlCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.GeneratePack}" Command="{Binding MenuBar.GeneratePackCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenRecentFolderProjects}" ItemsSource="{Binding MenuBar.RecentFolderProjects}">
                     <MenuItem.Style>
                         <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">

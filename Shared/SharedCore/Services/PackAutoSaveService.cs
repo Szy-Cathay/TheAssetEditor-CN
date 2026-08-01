@@ -74,17 +74,15 @@ namespace Shared.Core.Services
             try
             {
                 var editablePack = _packFileService.GetEditablePack();
-                if (editablePack == null || editablePack.IsCaPackFile)
+                if (editablePack == null ||
+                    editablePack.IsCaPackFile ||
+                    editablePack is FolderProjectContainer)
                     return false;
 
-                var systemPath =
-                    editablePack is FolderProjectContainer folderProject
-                        ? folderProject.ProjectSettings.OutputPackPath
-                        : editablePack.SystemFilePath;
+                var systemPath = editablePack.SystemFilePath;
                 if (string.IsNullOrWhiteSpace(systemPath))
                     return false;
-                if (editablePack is not FolderProjectContainer &&
-                    !File.Exists(systemPath))
+                if (!File.Exists(systemPath))
                 {
                     return false;
                 }

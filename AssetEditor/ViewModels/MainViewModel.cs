@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.Windows;
 using AssetEditor.Services;
+using AssetEditor.Events;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Shared.Core.Events;
@@ -26,6 +27,7 @@ namespace AssetEditor.ViewModels
         public PackFileBrowserViewModel FileTree { get; private set; }
         public MenuBarViewModel MenuBar { get; set; }
         public IEditorDatabase ToolsFactory { get; set; }
+        public FolderProjectGitWorkspaceViewModel? GitWorkspace { get; }
 
         [ObservableProperty] public partial IEditorManager EditorManager { get; set; }
         [ObservableProperty] public partial bool IsClosingWithoutPrompt { get; set; }
@@ -47,7 +49,8 @@ namespace AssetEditor.ViewModels
                 IUiCommandFactory uiCommandFactory, 
                 IEventHub eventHub,
                 ApplicationSettingsService applicationSettingsService,
-                IFolderProjectCloseGuard folderProjectCloseGuard)
+                IFolderProjectCloseGuard folderProjectCloseGuard,
+                FolderProjectGitWorkspaceViewModel? gitWorkspace = null)
         {
             MenuBar = menuViewModel;
 
@@ -55,8 +58,12 @@ namespace AssetEditor.ViewModels
             _uiCommandFactory = uiCommandFactory;
             _packFileService = packfileService;
             _folderProjectCloseGuard = folderProjectCloseGuard;
+            GitWorkspace = gitWorkspace;
 
             eventHub.Register<PackFileContainerSetAsMainEditableEvent>(this, SetStatusBarEditablePackFile);
+            eventHub.Register<OpenFolderProjectGitPanelEvent>(
+                this,
+                _ => GitWorkspace?.ShowGitManagement());
 
             FileTree = packFileBrowserBuilder.Create(ContextMenuType.MainApplication, showCaFiles: true, showFoldersOnly: false);
             FileTree.FileOpen += OpenFile;
@@ -121,6 +128,7 @@ namespace AssetEditor.ViewModels
         private void SetStatusBarEditablePackFile(PackFileContainerSetAsMainEditableEvent e)
         {
             EditablePackFile = e.Container != null ? LocalizationManager.Instance.GetFormat("Title.EditablePack", e.Container.Name) : LocalizationManager.Instance.Get("Title.EditablePackNone");
+            GitWorkspace?.SetEditableContainer(e.Container);
         }
     }
 }

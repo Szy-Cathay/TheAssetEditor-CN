@@ -116,6 +116,9 @@ public partial class FolderProjectVersionControlViewModel :
         _versionControlService;
     private readonly IFolderProjectGitOperationCoordinator _coordinator;
     private readonly IStandardDialogs _dialogs;
+    private readonly IFolderProjectUnsavedChangesService _unsavedChanges;
+    private readonly IFolderProjectUnsavedChangesPrompt
+        _unsavedChangesPrompt;
     private readonly LocalizationManager _localization;
     private readonly string _defaultIdentityName;
     private readonly string _defaultIdentityEmail;
@@ -289,11 +292,15 @@ public partial class FolderProjectVersionControlViewModel :
         IFolderProjectVersionControlService versionControlService,
         IFolderProjectGitOperationCoordinator coordinator,
         IStandardDialogs dialogs,
+        IFolderProjectUnsavedChangesService unsavedChanges,
+        IFolderProjectUnsavedChangesPrompt unsavedChangesPrompt,
         LocalizationManager localization)
     {
         _versionControlService = versionControlService;
         _coordinator = coordinator;
         _dialogs = dialogs;
+        _unsavedChanges = unsavedChanges;
+        _unsavedChangesPrompt = unsavedChangesPrompt;
         _localization = localization;
         _defaultIdentityName = _localization.Get(
             "FolderProject.VersionControl.DefaultIdentityName");
@@ -377,8 +384,40 @@ public partial class FolderProjectVersionControlViewModel :
     [RelayCommand(CanExecute = nameof(CanCommit))]
     private async Task Commit()
     {
+        if (HasStagedChanges)
+            await CommitCore(true);
+        else
+            await CommitAll();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCommitStaged))]
+    private Task CommitStaged()
+    {
+        return CommitCore(true);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCommitAll))]
+    private async Task CommitAll()
+    {
+        if (_unsavedChanges.HasUnsavedChanges(ProjectRoot, null))
+        {
+            var choice = _unsavedChangesPrompt.Show(
+                FolderProjectUnsavedChangesOperation.CommitAll);
+            if (choice == FolderProjectUnsavedChangesChoice.Cancel)
+                return;
+            if (choice == FolderProjectUnsavedChangesChoice.Save &&
+                !_unsavedChanges.SaveUnsavedChanges(ProjectRoot, null))
+            {
+                return;
+            }
+        }
+
+        await CommitCore(false);
+    }
+
+    private async Task CommitCore(bool commitStaged)
+    {
         var message = CommitMessage.Trim();
-        var commitStaged = HasStagedChanges;
 
         await RunOperationAsync(
             async () =>
@@ -468,6 +507,21 @@ public partial class FolderProjectVersionControlViewModel :
     private async Task Stage(IEnumerable<string> paths)
     {
         var selectedPaths = paths.Distinct().ToList();
+        if (_unsavedChanges.HasUnsavedChanges(ProjectRoot, selectedPaths))
+        {
+            var choice = _unsavedChangesPrompt.Show(
+                FolderProjectUnsavedChangesOperation.Stage);
+            if (choice == FolderProjectUnsavedChangesChoice.Cancel)
+                return;
+            if (choice == FolderProjectUnsavedChangesChoice.Save &&
+                !_unsavedChanges.SaveUnsavedChanges(
+                    ProjectRoot,
+                    selectedPaths))
+            {
+                return;
+            }
+        }
+
         await RunOperationAsync(
             async () =>
             {
@@ -746,25 +800,45 @@ public partial class FolderProjectVersionControlViewModel :
             "FolderProject.VersionControl.Busy.EditingCommit");
     }
 
-    [RelayCommand(CanExecute = nameof(CanUndoLatestCommit))]
-    private Task UndoLatestCommitKeepChanges()
+    [RelayCommand(CanExecute = nameof(CanRevertCommit))]
+    private async Task RevertCommit()
     {
-        return UndoLatestCommit(
+        if (!Confirm("RevertCommit", SelectedCommit!.Message))
+            return;
+
+        var commitId = SelectedCommit.Id;
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () => _versionControlService.RevertCommit(
+                        ProjectRoot,
+                        commitId));
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.CommitReverted");
+            },
+            "FolderProject.VersionControl.Busy.RevertingCommit");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetCommit))]
+    private Task ResetCommitKeepChanges()
+    {
+        return ResetCommit(
             FolderProjectCommitUndoMode.KeepChanges,
-            "UndoLatestCommitKeepChanges",
-            "FolderProject.VersionControl.Status.CommitUndoneKeepChanges");
+            "ResetCommitKeepChanges",
+            "FolderProject.VersionControl.Status.CommitResetKeepChanges");
     }
 
-    [RelayCommand(CanExecute = nameof(CanUndoLatestCommit))]
-    private Task UndoLatestCommitAndDiscardChanges()
+    [RelayCommand(CanExecute = nameof(CanResetCommit))]
+    private Task ResetCommitAndDiscardChanges()
     {
-        return UndoLatestCommit(
+        return ResetCommit(
             FolderProjectCommitUndoMode.DiscardChanges,
-            "UndoLatestCommitAndDiscardChanges",
-            "FolderProject.VersionControl.Status.CommitUndoneAndDiscarded");
+            "ResetCommitAndDiscardChanges",
+            "FolderProject.VersionControl.Status.CommitResetAndDiscarded");
     }
 
-    private async Task UndoLatestCommit(
+    private async Task ResetCommit(
         FolderProjectCommitUndoMode mode,
         string confirmationKey,
         string statusKey)
@@ -779,7 +853,7 @@ public partial class FolderProjectVersionControlViewModel :
                 await ExecuteCoordinatedAsync(
                     () =>
                     {
-                        _versionControlService.UndoLatestCommit(
+                        _versionControlService.ResetToCommit(
                             ProjectRoot,
                             commitId,
                             mode);
@@ -787,7 +861,7 @@ public partial class FolderProjectVersionControlViewModel :
                     });
                 return _localization.Get(statusKey);
             },
-            "FolderProject.VersionControl.Busy.UndoingCommit");
+            "FolderProject.VersionControl.Busy.ResettingCommit");
     }
 
     [RelayCommand(CanExecute = nameof(CanCreateRecoveryBranch))]
@@ -2055,9 +2129,19 @@ public partial class FolderProjectVersionControlViewModel :
         CanUseRepository();
 
     private bool CanCommit() =>
+        HasStagedChanges ? CanCommitStaged() : CanCommitAll();
+
+    private bool CanCommitStaged() =>
         CanUseRepository() &&
         HasIdentity &&
-        WorkingChanges.Count != 0 &&
+        HasStagedChanges &&
+        !string.IsNullOrWhiteSpace(CommitMessage);
+
+    private bool CanCommitAll() =>
+        CanUseRepository() &&
+        HasIdentity &&
+        (WorkingChanges.Count != 0 ||
+         _unsavedChanges.HasUnsavedChanges(ProjectRoot, null)) &&
         !string.IsNullOrWhiteSpace(CommitMessage);
 
     private bool CanStageSelected() =>
@@ -2182,13 +2266,20 @@ public partial class FolderProjectVersionControlViewModel :
             FolderProjectCommitChangeKind.Renamed;
     }
 
-    private bool CanUndoLatestCommit() =>
+    private bool CanRevertCommit() =>
         CanUseRepository() &&
         IsClean &&
         !IsDetached &&
         SelectedHistoryBranch is { IsCurrent: true } &&
-        SelectedCommit?.ParentIds.Count == 1 &&
-        string.Equals(
+        SelectedCommit?.ParentIds.Count == 1;
+
+    private bool CanResetCommit() =>
+        CanUseRepository() &&
+        IsClean &&
+        !IsDetached &&
+        SelectedHistoryBranch is { IsCurrent: true } &&
+        SelectedCommit != null &&
+        !string.Equals(
             SelectedCommit.Id,
             HeadCommitId,
             StringComparison.Ordinal);
@@ -2414,6 +2505,8 @@ public partial class FolderProjectVersionControlViewModel :
         InitializeCommand.NotifyCanExecuteChanged();
         SaveIdentityCommand.NotifyCanExecuteChanged();
         CommitCommand.NotifyCanExecuteChanged();
+        CommitStagedCommand.NotifyCanExecuteChanged();
+        CommitAllCommand.NotifyCanExecuteChanged();
         StageSelectedCommand.NotifyCanExecuteChanged();
         StageAllCommand.NotifyCanExecuteChanged();
         UnstageSelectedCommand.NotifyCanExecuteChanged();
@@ -2429,8 +2522,9 @@ public partial class FolderProjectVersionControlViewModel :
         DiscardCommitChangesCommand.NotifyCanExecuteChanged();
         RestoreCommitChangesToStageCommand.NotifyCanExecuteChanged();
         ReturnChangesToOriginalCommitCommand.NotifyCanExecuteChanged();
-        UndoLatestCommitKeepChangesCommand.NotifyCanExecuteChanged();
-        UndoLatestCommitAndDiscardChangesCommand.NotifyCanExecuteChanged();
+        RevertCommitCommand.NotifyCanExecuteChanged();
+        ResetCommitKeepChangesCommand.NotifyCanExecuteChanged();
+        ResetCommitAndDiscardChangesCommand.NotifyCanExecuteChanged();
         CreateRecoveryBranchCommand.NotifyCanExecuteChanged();
         CreateBranchCommand.NotifyCanExecuteChanged();
         CreateAndSwitchBranchCommand.NotifyCanExecuteChanged();

@@ -207,6 +207,133 @@ public class FolderProjectVersionControlViewModelTests
     }
 
     [NUnit.Framework.Test]
+    public async Task StageSelected_WithUnsavedEditor_SavesBeforeStaging()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyCollection<string>>(
+                    paths => paths.SequenceEqual(new[] { "first.txt" }))))
+            .Returns(true);
+        unsavedChanges.Setup(item => item.SaveUnsavedChanges(
+                ProjectRoot,
+                It.IsAny<IReadOnlyCollection<string>>()))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        prompt.Setup(item => item.Show(
+                FolderProjectUnsavedChangesOperation.Stage))
+            .Returns(FolderProjectUnsavedChangesChoice.Save);
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges.Single();
+
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+
+        unsavedChanges.Verify(item => item.SaveUnsavedChanges(
+            ProjectRoot,
+            It.Is<IReadOnlyCollection<string>>(
+                paths => paths.SequenceEqual(new[] { "first.txt" }))),
+            Times.Once);
+        service.Verify(
+            item => item.StageChanges(ProjectRoot, new[] { "first.txt" }),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StageSelected_WithUnsavedEditor_DontSaveStagesDiskVersion()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                It.IsAny<IReadOnlyCollection<string>>()))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        prompt.Setup(item => item.Show(
+                FolderProjectUnsavedChangesOperation.Stage))
+            .Returns(FolderProjectUnsavedChangesChoice.DontSave);
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges.Single();
+
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+
+        unsavedChanges.Verify(item => item.SaveUnsavedChanges(
+            It.IsAny<string>(),
+            It.IsAny<IReadOnlyCollection<string>>()), Times.Never);
+        service.Verify(
+            item => item.StageChanges(ProjectRoot, new[] { "first.txt" }),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StageSelected_WithUnsavedEditor_CancelDoesNothing()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                It.IsAny<IReadOnlyCollection<string>>()))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        prompt.Setup(item => item.Show(
+                FolderProjectUnsavedChangesOperation.Stage))
+            .Returns(FolderProjectUnsavedChangesChoice.Cancel);
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges.Single();
+
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+
+        service.Verify(item => item.StageChanges(
+            It.IsAny<string>(),
+            It.IsAny<IReadOnlyList<string>>()), Times.Never);
+    }
+
+    [NUnit.Framework.Test]
     public async Task DiscardAll_DiscardsEveryWorkingChange()
     {
         var service = CreateService();
@@ -338,6 +465,158 @@ public class FolderProjectVersionControlViewModelTests
                 It.IsAny<string>(),
                 It.IsAny<string>()),
             Times.Never);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CommitStaged_WithUnsavedEditor_DoesNotPromptOrSave()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "both.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        service.Setup(item => item.CommitStaged(ProjectRoot, "保存修改"))
+            .Returns(Commit());
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                It.IsAny<IReadOnlyCollection<string>>()))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存修改";
+
+        await ExecuteAsync(viewModel.CommitStagedCommand);
+
+        service.Verify(
+            item => item.CommitStaged(ProjectRoot, "保存修改"),
+            Times.Once);
+        prompt.Verify(
+            item => item.Show(It.IsAny<FolderProjectUnsavedChangesOperation>()),
+            Times.Never);
+        unsavedChanges.Verify(item => item.SaveUnsavedChanges(
+            It.IsAny<string>(),
+            It.IsAny<IReadOnlyCollection<string>>()), Times.Never);
+    }
+
+    [NUnit.Framework.TestCase(
+        FolderProjectUnsavedChangesChoice.Save,
+        true)]
+    [NUnit.Framework.TestCase(
+        FolderProjectUnsavedChangesChoice.DontSave,
+        false)]
+    public async Task CommitAll_WithUnsavedEditor_UsesChosenDiskVersion(
+        FolderProjectUnsavedChangesChoice choice,
+        bool shouldSave)
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status());
+        service.Setup(item => item.CommitAll(ProjectRoot, "保存全部修改"))
+            .Returns(Commit());
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                null))
+            .Returns(true);
+        unsavedChanges.Setup(item => item.SaveUnsavedChanges(
+                ProjectRoot,
+                null))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        prompt.Setup(item => item.Show(
+                FolderProjectUnsavedChangesOperation.CommitAll))
+            .Returns(choice);
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存全部修改";
+
+        await ExecuteAsync(viewModel.CommitAllCommand);
+
+        unsavedChanges.Verify(item => item.SaveUnsavedChanges(
+            ProjectRoot,
+            null), shouldSave ? Times.Once() : Times.Never());
+        service.Verify(
+            item => item.CommitAll(ProjectRoot, "保存全部修改"),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CommitAll_WithUnsavedEditor_CancelDoesNothing()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                null))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        prompt.Setup(item => item.Show(
+                FolderProjectUnsavedChangesOperation.CommitAll))
+            .Returns(FolderProjectUnsavedChangesChoice.Cancel);
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存全部修改";
+
+        await ExecuteAsync(viewModel.CommitAllCommand);
+
+        service.Verify(item => item.CommitAll(
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Never);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task Commit_DefaultAllActionPromptsForUnsavedEditor()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.CommitAll(ProjectRoot, "保存全部修改"))
+            .Returns(Commit());
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(item => item.HasUnsavedChanges(
+                ProjectRoot,
+                null))
+            .Returns(true);
+        var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
+        prompt.Setup(item => item.Show(
+                FolderProjectUnsavedChangesOperation.CommitAll))
+            .Returns(FolderProjectUnsavedChangesChoice.DontSave);
+        var viewModel = CreateViewModel(
+            service,
+            unsavedChanges: unsavedChanges.Object,
+            unsavedChangesPrompt: prompt.Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存全部修改";
+
+        await ExecuteAsync(viewModel.CommitCommand);
+
+        prompt.Verify(item => item.Show(
+            FolderProjectUnsavedChangesOperation.CommitAll), Times.Once);
+        service.Verify(
+            item => item.CommitAll(ProjectRoot, "保存全部修改"),
+            Times.Once);
     }
 
     [NUnit.Framework.Test]
@@ -670,49 +949,89 @@ public class FolderProjectVersionControlViewModelTests
     }
 
     [NUnit.Framework.Test]
-    public async Task UndoLatestCommit_RequiresCleanCurrentBranchAndLatestHead()
+    public async Task HistoryActions_ResetHistoricalCommitAndProtectInitialRevert()
     {
-        var commit = new FolderProjectCommitSummary(
+        var head = new FolderProjectCommitSummary(
             MainCommit,
-            "待重新修改",
+            "最新提交",
             "测试者",
             "test@example.com",
             DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
             [FeatureCommit]);
+        var historical = new FolderProjectCommitSummary(
+            FeatureCommit,
+            "历史提交",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T09:00:00+08:00"),
+            [RewrittenCommit]);
+        var initial = new FolderProjectCommitSummary(
+            RewrittenCommit,
+            "初始化文件夹工程",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T08:00:00+08:00"),
+            []);
         var service = CreateService();
         service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
         service.Setup(item => item.GetHistory(
                 ProjectRoot,
                 It.IsAny<string>(),
                 100))
-            .Returns([commit]);
+            .Returns([head, historical, initial]);
         var viewModel = CreateViewModel(
             service,
             dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedCommit = historical;
+        await viewModel.CommitChangesLoadTask;
 
         NUnit.Framework.Assert.That(
-            viewModel.UndoLatestCommitKeepChangesCommand.CanExecute(null),
-            Is.True);
+            viewModel.RevertCommitCommand.CanExecute(null),
+            Is.True,
+            "ordinary commits can be reverted");
         NUnit.Framework.Assert.That(
-            viewModel.UndoLatestCommitAndDiscardChangesCommand.CanExecute(null),
-            Is.True);
-        await ExecuteAsync(viewModel.UndoLatestCommitKeepChangesCommand);
-        await ExecuteAsync(
-            viewModel.UndoLatestCommitAndDiscardChangesCommand);
+            viewModel.ResetCommitKeepChangesCommand.CanExecute(null),
+            Is.True,
+            "historical commits can be mixed-reset targets");
+        NUnit.Framework.Assert.That(
+            viewModel.ResetCommitAndDiscardChangesCommand.CanExecute(null),
+            Is.True,
+            "historical commits can be hard-reset targets");
+        await ExecuteAsync(viewModel.RevertCommitCommand);
+        await ExecuteAsync(viewModel.ResetCommitKeepChangesCommand);
+        await ExecuteAsync(viewModel.ResetCommitAndDiscardChangesCommand);
 
         service.Verify(
-            item => item.UndoLatestCommit(
+            item => item.RevertCommit(ProjectRoot, FeatureCommit),
+            Times.Once);
+        service.Verify(
+            item => item.ResetToCommit(
                 ProjectRoot,
-                MainCommit,
+                FeatureCommit,
                 FolderProjectCommitUndoMode.KeepChanges),
             Times.Once);
         service.Verify(
-            item => item.UndoLatestCommit(
+            item => item.ResetToCommit(
                 ProjectRoot,
-                MainCommit,
+                FeatureCommit,
                 FolderProjectCommitUndoMode.DiscardChanges),
             Times.Once);
+
+        viewModel.SelectedCommit = initial;
+        await viewModel.CommitChangesLoadTask;
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.RevertCommitCommand.CanExecute(null),
+                Is.False);
+            NUnit.Framework.Assert.That(
+                viewModel.ResetCommitKeepChangesCommand.CanExecute(null),
+                Is.True);
+            NUnit.Framework.Assert.That(
+                viewModel.ResetCommitAndDiscardChangesCommand.CanExecute(null),
+                Is.True);
+        });
     }
 
     [NUnit.Framework.Test]
@@ -2334,6 +2653,8 @@ public class FolderProjectVersionControlViewModelTests
             new FolderProjectVersionControlService(),
             coordinator,
             ConfirmingDialogs().Object,
+            Mock.Of<IFolderProjectUnsavedChangesService>(),
+            Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
             LocalizationManager.Instance);
         await OpenProjectAsync(
             viewModel,
@@ -2362,7 +2683,7 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(
                 viewModel.CurrentBranch,
                 Is.EqualTo("feature"));
-            NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(1));
+            NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(2));
             NUnit.Framework.Assert.That(
                 coordinator.Calls,
                 Has.Count.EqualTo(1));
@@ -2383,6 +2704,8 @@ public class FolderProjectVersionControlViewModelTests
             new FolderProjectVersionControlService(),
             new RecordingCoordinator(),
             ConfirmingDialogs().Object,
+            Mock.Of<IFolderProjectUnsavedChangesService>(),
+            Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
             LocalizationManager.Instance);
         await OpenProjectAsync(
             viewModel,
@@ -2432,6 +2755,8 @@ public class FolderProjectVersionControlViewModelTests
             new FolderProjectVersionControlService(),
             coordinator,
             ConfirmingDialogs().Object,
+            Mock.Of<IFolderProjectUnsavedChangesService>(),
+            Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
             LocalizationManager.Instance);
         await OpenProjectAsync(
             viewModel,
@@ -2603,12 +2928,18 @@ public class FolderProjectVersionControlViewModelTests
     private static FolderProjectVersionControlViewModel CreateViewModel(
         Mock<IFolderProjectVersionControlService> service,
         IFolderProjectGitOperationCoordinator? coordinator = null,
-        IStandardDialogs? dialogs = null)
+        IStandardDialogs? dialogs = null,
+        IFolderProjectUnsavedChangesService? unsavedChanges = null,
+        IFolderProjectUnsavedChangesPrompt? unsavedChangesPrompt = null)
     {
         return new FolderProjectVersionControlViewModel(
             service.Object,
             coordinator ?? new RecordingCoordinator(),
             dialogs ?? Mock.Of<IStandardDialogs>(),
+            unsavedChanges ??
+                Mock.Of<IFolderProjectUnsavedChangesService>(),
+            unsavedChangesPrompt ??
+                Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
             LocalizationManager.Instance);
     }
 

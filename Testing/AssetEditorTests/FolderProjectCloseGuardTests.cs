@@ -1,4 +1,5 @@
 using System.Windows;
+using AssetEditor.Events;
 using AssetEditor.Services;
 using Moq;
 using Shared.Core.PackFiles.Models;
@@ -16,7 +17,7 @@ public class FolderProjectCloseGuardTests
     }
 
     [NUnit.Framework.Test]
-    public async Task CanCloseAsync_DirtyProjectReview_OpensVersionControl()
+    public async Task CanCloseAsync_DirtyProjectReview_OpensGitPanel()
     {
         using var project = CreateInitializedProject();
         var service = new Mock<IFolderProjectVersionControlService>();
@@ -33,22 +34,20 @@ public class FolderProjectCloseGuardTests
                             "db/test.tsv",
                             FolderProjectWorkingChangeKind.Modified),
                     ]));
-        var windowService =
-            new Mock<IFolderProjectVersionControlWindowService>();
+        var eventHub = new TestEventHub();
+        OpenFolderProjectGitPanelEvent? published = null;
+        eventHub.Register<OpenFolderProjectGitPanelEvent>(
+            this,
+            item => published = item);
         var guard = new FolderProjectCloseGuard(
             service.Object,
-            windowService.Object,
+            eventHub,
             (_, _, _) => MessageBoxResult.No);
 
         var canClose = await guard.CanCloseAsync(project);
 
         NUnit.Framework.Assert.That(canClose, NUnit.Framework.Is.False);
-        windowService.Verify(
-            item => item.ShowDialog(
-                project.ProjectRoot,
-                project.ProjectSettings.Name,
-                false),
-            Times.Once);
+        NUnit.Framework.Assert.That(published, NUnit.Framework.Is.Not.Null);
     }
 
     [NUnit.Framework.Test]
@@ -68,7 +67,7 @@ public class FolderProjectCloseGuardTests
         var promptCalls = 0;
         var guard = new FolderProjectCloseGuard(
             service.Object,
-            Mock.Of<IFolderProjectVersionControlWindowService>(),
+            new TestEventHub(),
             (_, _, _) =>
             {
                 promptCalls++;
