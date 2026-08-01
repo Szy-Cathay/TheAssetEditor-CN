@@ -17,6 +17,7 @@ float ViewportWidth;
 float OverlayOpacity = 1.0;
 float BaseOpacity = 1.0;
 float EdgeDepthBias = 0.0;
+float EdgeHalfWidth = 1.0;
 float3 OverlayColor;
 bool CapabilityFlag_ApplyAnimation = false;
 float4x4 Animation_Tranforms[256];
@@ -172,7 +173,7 @@ VSOutput AnimatedEdgeQuadVS(
         mul(worldP1, ViewProjection),
         OverlayColor,
         OverlayColor,
-        1.0);
+        EdgeHalfWidth);
 }
 
 float4 EdgeQuadPS(VSOutput input) : COLOR0

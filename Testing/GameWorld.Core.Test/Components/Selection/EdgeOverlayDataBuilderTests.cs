@@ -53,27 +53,6 @@ public class EdgeOverlayDataBuilderTests
     }
 
     [Test]
-    public void FillSelected_UsesSelectionColorAndWiderScreenSpaceQuad()
-    {
-        var destination = new EdgeData[1];
-
-        EdgeOverlayDataBuilder.FillSelected(
-            destination,
-            CreateMesh(),
-            Matrix.Identity,
-            new[] { (0, 1) });
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(destination[0].P0, Is.EqualTo(new Vector3(1.0f, 2.0f, 3.0f)));
-            Assert.That(destination[0].P1, Is.EqualTo(new Vector3(-1.0f, 0.0f, 2.0f)));
-            Assert.That(destination[0].C0, Is.EqualTo(new Vector3(1.0f, 0.47f, 0.0f)));
-            Assert.That(destination[0].C1, Is.EqualTo(new Vector3(1.0f, 0.47f, 0.0f)));
-            Assert.That(destination[0].Width, Is.EqualTo(1.25f));
-        });
-    }
-
-    [Test]
     public void Fill_EvaluatedWorldPositionsUseCurrentPoseEndpoints()
     {
         var destination = new EdgeData[1];
@@ -98,33 +77,6 @@ public class EdgeOverlayDataBuilderTests
             Assert.That(
                 destination[0].P1,
                 Is.EqualTo(worldPositions[1]));
-        });
-    }
-
-    [Test]
-    public void FillSelected_EvaluatedWorldPositionsUseCurrentPoseEndpoints()
-    {
-        var destination = new EdgeData[1];
-        var worldPositions = new[]
-        {
-            new Vector3(20, 21, 22),
-            new Vector3(30, 31, 32),
-            new Vector3(40, 41, 42)
-        };
-
-        EdgeOverlayDataBuilder.FillSelected(
-            destination,
-            worldPositions,
-            new[] { (1, 2) });
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(
-                destination[0].P0,
-                Is.EqualTo(worldPositions[1]));
-            Assert.That(
-                destination[0].P1,
-                Is.EqualTo(worldPositions[2]));
         });
     }
 

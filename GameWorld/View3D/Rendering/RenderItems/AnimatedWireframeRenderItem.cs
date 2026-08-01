@@ -70,10 +70,14 @@ namespace GameWorld.Core.Rendering.RenderItems
         ushort[] _lineIndices = [];
         VertexBuffer? _quadVertexBuffer;
         IndexBuffer? _quadIndexBuffer;
-        VertexBuffer? _instanceBuffer;
+        DynamicVertexBuffer? _instanceBuffer;
+        AnimatedEdgeQuadInstanceData[] _instanceData = [];
         VertexBufferBinding[] _bindings = [];
+        int _vertexDataVersion = -1;
+        bool _instanceDataDirty = true;
 
         public float DepthBias { get; set; } = 0.00002f;
+        public float EdgeHalfWidth { get; set; } = 1.0f;
         internal int IndexBufferBuildCount { get; private set; }
         internal int EdgePrimitiveCount =>
             _lineIndices.Length / 2;
@@ -109,6 +113,10 @@ namespace GameWorld.Core.Rendering.RenderItems
                 !ReferenceEquals(
                     _pose.Geometry,
                     pose.Geometry);
+            var vertexDataChanged =
+                geometryChanged ||
+                _vertexDataVersion !=
+                    pose.Geometry.VertexDataVersion;
             _pose = pose;
             if (_renderFullTopology)
             {
@@ -123,6 +131,9 @@ namespace GameWorld.Core.Rendering.RenderItems
             {
                 UpdateSelectedEdgeTopology();
             }
+
+            if (vertexDataChanged)
+                _instanceDataDirty = true;
         }
 
         public void UpdateEdges(
@@ -189,6 +200,8 @@ namespace GameWorld.Core.Rendering.RenderItems
                 _colour.W);
             effect.Parameters["EdgeDepthBias"].SetValue(
                 DepthBias);
+            effect.Parameters["EdgeHalfWidth"].SetValue(
+                EdgeHalfWidth);
             effect.Parameters["OverlayOpacity"].SetValue(
                 EditOverlayVisibility.CalculateDetailOpacity(
                     _pose.GetConservativeAnimatedBounds(),
@@ -253,7 +266,7 @@ namespace GameWorld.Core.Rendering.RenderItems
                 EdgeIndexCacheBuilder.BuildLineIndices(
                     indices,
                     _maxEdges);
-            InvalidateInstanceBuffer();
+            _instanceDataDirty = true;
         }
 
         void UpdateSelectedEdgeTopology()
@@ -281,45 +294,64 @@ namespace GameWorld.Core.Rendering.RenderItems
             _topologyVersion =
                 _pose.Geometry.TopologyVersion;
             _lineIndices = lineIndices.ToArray();
-            InvalidateInstanceBuffer();
+            _instanceDataDirty = true;
         }
 
         void EnsureBuffers(GraphicsDevice device)
         {
             if (_quadVertexBuffer == null)
                 CreateQuadBuffers(device);
-            if (_instanceBuffer != null)
+            if (_instanceBuffer == null ||
+                _instanceBuffer.VertexCount !=
+                    EdgePrimitiveCount)
+            {
+                _instanceBuffer?.Dispose();
+                _instanceBuffer = new DynamicVertexBuffer(
+                    device,
+                    AnimatedEdgeQuadInstanceData.VertexDeclaration,
+                    EdgePrimitiveCount,
+                    BufferUsage.WriteOnly);
+                _bindings =
+                [
+                    new VertexBufferBinding(_quadVertexBuffer),
+                    new VertexBufferBinding(_instanceBuffer, 0, 1)
+                ];
+                _instanceDataDirty = true;
+                IndexBufferBuildCount++;
+            }
+
+            if (!_instanceDataDirty)
                 return;
 
             var instances = BuildInstanceData();
-            _instanceBuffer = new VertexBuffer(
-                device,
-                AnimatedEdgeQuadInstanceData.VertexDeclaration,
+            _instanceBuffer.SetData(
+                instances,
+                0,
                 instances.Length,
-                BufferUsage.WriteOnly);
-            _instanceBuffer.SetData(instances);
-            _bindings =
-            [
-                new VertexBufferBinding(_quadVertexBuffer),
-                new VertexBufferBinding(_instanceBuffer, 0, 1)
-            ];
-            IndexBufferBuildCount++;
+                SetDataOptions.Discard);
+            _vertexDataVersion =
+                _pose.Geometry.VertexDataVersion;
+            _instanceDataDirty = false;
         }
 
         AnimatedEdgeQuadInstanceData[] BuildInstanceData()
         {
-            var instances =
-                new AnimatedEdgeQuadInstanceData[
-                    EdgePrimitiveCount];
+            if (_instanceData.Length != EdgePrimitiveCount)
+            {
+                _instanceData =
+                    new AnimatedEdgeQuadInstanceData[
+                        EdgePrimitiveCount];
+            }
+
             for (var edgeIndex = 0;
-                 edgeIndex < instances.Length;
+                 edgeIndex < _instanceData.Length;
                  edgeIndex++)
             {
                 var first = _pose.Geometry.VertexArray[
                     _lineIndices[edgeIndex * 2]];
                 var second = _pose.Geometry.VertexArray[
                     _lineIndices[edgeIndex * 2 + 1]];
-                instances[edgeIndex] =
+                _instanceData[edgeIndex] =
                     new AnimatedEdgeQuadInstanceData
                     {
                         BindP0 = first.Position3(),
@@ -331,7 +363,7 @@ namespace GameWorld.Core.Rendering.RenderItems
                     };
             }
 
-            return instances;
+            return _instanceData;
         }
 
         void CreateQuadBuffers(GraphicsDevice device)
@@ -367,13 +399,6 @@ namespace GameWorld.Core.Rendering.RenderItems
             _quadIndexBuffer.SetData(indices);
         }
 
-        void InvalidateInstanceBuffer()
-        {
-            _instanceBuffer?.Dispose();
-            _instanceBuffer = null;
-            _bindings = [];
-        }
-
         public void Dispose()
         {
             _instanceBuffer?.Dispose();
@@ -382,6 +407,7 @@ namespace GameWorld.Core.Rendering.RenderItems
             _instanceBuffer = null;
             _quadVertexBuffer = null;
             _quadIndexBuffer = null;
+            _instanceData = [];
             _bindings = [];
         }
     }

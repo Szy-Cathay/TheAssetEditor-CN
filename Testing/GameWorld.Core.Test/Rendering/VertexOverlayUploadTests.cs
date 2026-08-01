@@ -93,6 +93,75 @@ public class VertexOverlayUploadTests
     }
 
     [Test]
+    public void Draw_AnimatedUnselectedVertexHasLargerVisibleFootprint()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\VertexPointShader");
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver.SetupGet(x => x.Device).Returns(device);
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library =>
+                library.GetStaticEffect(
+                    ShaderTypes.VertexPoint))
+            .Returns(effect);
+        using var vertexRenderer = new VertexInstanceMesh(
+            deviceResolver.Object,
+            resources.Object);
+        var mesh = CreateCenteredAnimatedMesh(device);
+        var node = new Rmv2MeshNode(
+            mesh,
+            Mock.Of<IRmvMaterial>(),
+            null!,
+            null!);
+        var selection = new VertexSelectionState(node, 0);
+        var pose = GameWorld.Core.Animation.MeshPoseSnapshot.Create(
+            mesh,
+            Matrix.Identity,
+            [Matrix.Identity],
+            true);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+
+        vertexRenderer.Update([Vector3.Zero], selection);
+        var staticPixels = DrawAndCountVisiblePixels(
+            device,
+            renderTarget,
+            () => vertexRenderer.Draw(
+                Matrix.Identity,
+                Matrix.Identity,
+                device));
+
+        vertexRenderer.UpdateAnimated(mesh, selection);
+        var animatedPixels = DrawAndCountVisiblePixels(
+            device,
+            renderTarget,
+            () => vertexRenderer.DrawAnimated(
+                pose,
+                Matrix.Identity,
+                Matrix.Identity,
+                device));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(staticPixels, Is.GreaterThan(0));
+            Assert.That(
+                animatedPixels,
+                Is.GreaterThan(staticPixels),
+                "Animated edit mode needs a larger unselected vertex footprint to remain visible over its dense wireframe.");
+        });
+
+        mesh.Dispose();
+    }
+
+    [Test]
     public void Draw_UnchangedOverlay_UploadsInstancesOnlyOnce()
     {
         var game = new WpfGameMock();
@@ -398,6 +467,24 @@ public class VertexOverlayUploadTests
         return mesh;
     }
 
+    private static MeshObject CreateCenteredAnimatedMesh(
+        GraphicsDevice device)
+    {
+        var mesh = new MeshObject(
+            new GraphicsCardGeometry(device),
+            "test")
+        {
+            VertexArray = [CreateAnimatedVertex(0)],
+            IndexArray = []
+        };
+        mesh.ChangeVertexType(
+            UiVertexFormat.Weighted,
+            updateMesh: false);
+        mesh.BuildBoundingBox();
+        mesh.RebuildVertexBuffer();
+        return mesh;
+    }
+
     private static VertexPositionNormalTextureCustom
         CreateAnimatedVertex(float x)
     {
@@ -429,5 +516,36 @@ public class VertexOverlayUploadTests
         }
 
         return count;
+    }
+
+    private static int DrawAndCountVisiblePixels(
+        GraphicsDevice device,
+        RenderTarget2D renderTarget,
+        Action draw)
+    {
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target |
+                    ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.DepthStencilState =
+                DepthStencilState.Default;
+            device.RasterizerState =
+                RasterizerState.CullNone;
+            draw();
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[
+            renderTarget.Width * renderTarget.Height];
+        renderTarget.GetData(pixels);
+        return pixels.Count(pixel => pixel.A != 0);
     }
 }
