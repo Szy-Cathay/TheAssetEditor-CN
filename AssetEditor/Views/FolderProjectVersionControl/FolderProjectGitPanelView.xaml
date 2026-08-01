@@ -2,6 +2,7 @@
     x:Class="AssetEditor.Views.FolderProjectVersionControl.FolderProjectGitPanelView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:common="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -11,15 +12,30 @@
     mc:Ignorable="d">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <common:BindingProxy x:Key="WorkspaceProxy" Data="{Binding}" />
     </UserControl.Resources>
     <Grid Background="{DynamicResource WindowBackground}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock
+            x:Name="SidebarTitle"
+            Height="30"
+            Margin="8,0"
+            VerticalAlignment="Center"
+            FontSize="12"
+            Text="{loc:Loc FolderProject.Git.Management}" />
+        <ScrollViewer
+            Grid.Row="1"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="8,0,8,8">
                 <ToggleButton
                     x:Name="BranchButton"
                     Height="34"
                     Padding="10,0"
-                    HorizontalContentAlignment="Stretch">
+                    HorizontalContentAlignment="Stretch"
+                    IsChecked="{Binding IsBranchPickerOpen, Mode=TwoWay}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -40,7 +56,7 @@
                 <Popup
                     AllowsTransparency="True"
                     DataContext="{Binding DataContext, ElementName=Root}"
-                    IsOpen="{Binding IsChecked, ElementName=BranchButton, Mode=TwoWay}"
+                    IsOpen="{Binding IsBranchPickerOpen, Mode=TwoWay}"
                     Placement="Bottom"
                     PlacementTarget="{Binding ElementName=BranchButton}"
                     StaysOpen="False">
@@ -81,6 +97,11 @@
                                 BorderThickness="0"
                                 ItemsSource="{Binding FilteredBranches}"
                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Button
@@ -88,7 +109,7 @@
                                             HorizontalContentAlignment="Stretch"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            Command="{Binding DataContext.SwitchBranchCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            Command="{Binding Data.SwitchBranchCommand, Source={StaticResource WorkspaceProxy}}"
                                             CommandParameter="{Binding}">
                                             <DockPanel>
                                                 <TextBlock
@@ -186,28 +207,33 @@
                     </StackPanel>
                 </Expander>
 
-                <Expander IsExpanded="True">
+                <Expander
+                    HorizontalContentAlignment="Stretch"
+                    IsExpanded="True">
                     <Expander.Header>
-                        <TextBlock>
-                            <Run Text="{loc:Loc FolderProject.VersionControl.UnstagedChanges}" />
-                            <Run Text=" (" /><Run Text="{Binding VersionControl.UnstagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
-                        </TextBlock>
-                    </Expander.Header>
-                    <Grid Margin="0,6,0,8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <DockPanel Margin="0,0,0,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center">
+                                <Run Text="{loc:Loc FolderProject.VersionControl.UnstagedChanges}" />
+                                <Run Text=" (" /><Run Text="{Binding VersionControl.UnstagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
+                            </TextBlock>
                             <Button
-                                DockPanel.Dock="Right"
+                                x:Name="StageAllButton"
+                                Grid.Column="1"
                                 Width="28"
-                                Command="{Binding VersionControl.StageAllCommand}"
+                                Height="28"
+                                Background="{DynamicResource Button.Static.Background}"
+                                Command="{Binding Data.VersionControl.StageAllCommand, Source={StaticResource WorkspaceProxy}}"
                                 Content="+"
+                                Opacity="1"
                                 ToolTip="{loc:Loc FolderProject.VersionControl.StageAll}" />
-                        </DockPanel>
-                        <ListBox
-                            Grid.Row="1"
+                        </Grid>
+                    </Expander.Header>
+                    <ListBox
+                            Margin="0,6,0,8"
                             MaxHeight="220"
                             ItemsSource="{Binding VersionControl.UnstagedChanges}"
                             SelectedItem="{Binding VersionControl.SelectedUnstagedChange}">
@@ -231,31 +257,33 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                    </Grid>
                 </Expander>
 
-                <Expander>
+                <Expander HorizontalContentAlignment="Stretch">
                     <Expander.Header>
-                        <TextBlock>
-                            <Run Text="{loc:Loc FolderProject.VersionControl.StagedChanges}" />
-                            <Run Text=" (" /><Run Text="{Binding VersionControl.StagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
-                        </TextBlock>
-                    </Expander.Header>
-                    <Grid Margin="0,6,0,8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <DockPanel Margin="0,0,0,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center">
+                                <Run Text="{loc:Loc FolderProject.VersionControl.StagedChanges}" />
+                                <Run Text=" (" /><Run Text="{Binding VersionControl.StagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
+                            </TextBlock>
                             <Button
-                                DockPanel.Dock="Right"
+                                x:Name="UnstageAllButton"
+                                Grid.Column="1"
                                 Width="28"
-                                Command="{Binding VersionControl.UnstageAllCommand}"
+                                Height="28"
+                                Background="{DynamicResource Button.Static.Background}"
+                                Command="{Binding Data.VersionControl.UnstageAllCommand, Source={StaticResource WorkspaceProxy}}"
                                 Content="−"
+                                Opacity="1"
                                 ToolTip="{loc:Loc FolderProject.VersionControl.UnstageAll}" />
-                        </DockPanel>
-                        <ListBox
-                            Grid.Row="1"
+                        </Grid>
+                    </Expander.Header>
+                    <ListBox
+                            Margin="0,6,0,8"
                             MaxHeight="220"
                             ItemsSource="{Binding VersionControl.StagedChanges}"
                             SelectedItem="{Binding VersionControl.SelectedStagedChange}">
@@ -279,7 +307,6 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                    </Grid>
                 </Expander>
 
                 <Expander>
@@ -311,7 +338,55 @@
             </StackPanel>
         </ScrollViewer>
 
+        <Grid
+            Grid.RowSpan="2"
+            Panel.ZIndex="100"
+            Background="#88000000"
+            Visibility="{Binding VersionControl.IsBranchSwitchChoiceOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border
+                MaxWidth="430"
+                Margin="18"
+                Padding="18"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ABrush.Foreground.Deeper}"
+                BorderBrush="{DynamicResource GroupBox.Static.Border}"
+                BorderThickness="1">
+                <StackPanel>
+                    <TextBlock
+                        FontSize="16"
+                        FontWeight="SemiBold"
+                        TextWrapping="Wrap">
+                        <Run Text="切换到 " /><Run Text="{Binding VersionControl.PendingBranchName}" />
+                    </TextBlock>
+                    <Button
+                        Height="34"
+                        Margin="0,14,0,7"
+                        HorizontalContentAlignment="Left"
+                        Command="{Binding VersionControl.CarryChangesAndSwitchCommand}"
+                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Carry}" />
+                    <Button
+                        Height="34"
+                        Margin="0,0,0,7"
+                        HorizontalContentAlignment="Left"
+                        Command="{Binding VersionControl.StashChangesAndSwitchCommand}"
+                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Stash}" />
+                    <Button
+                        Height="34"
+                        Margin="0,0,0,12"
+                        HorizontalContentAlignment="Left"
+                        Command="{Binding VersionControl.DiscardChangesAndSwitchCommand}"
+                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Discard}" />
+                    <Button
+                        HorizontalAlignment="Right"
+                        Command="{Binding VersionControl.CancelBranchSwitchCommand}"
+                        Content="取消" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
         <Border
+            Grid.RowSpan="2"
             Padding="18"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"

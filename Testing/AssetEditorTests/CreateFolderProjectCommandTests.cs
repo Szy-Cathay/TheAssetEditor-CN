@@ -51,6 +51,39 @@ public class CreateFolderProjectCommandTests
     }
 
     [Test]
+    public void FolderProjectCreation_ShowsIndeterminateProgressBar()
+    {
+        var viewDirectory = Path.Combine(
+            FindSolutionRoot(),
+            "AssetEditor",
+            "Views",
+            "FolderProject");
+        XNamespace presentation =
+            "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace xaml =
+            "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var progressBars = Directory
+            .EnumerateFiles(viewDirectory, "*.xaml")
+            .Select(XDocument.Load)
+            .SelectMany(document =>
+                document.Descendants(presentation + "ProgressBar"))
+            .Where(element =>
+                element.Attribute(xaml + "Name")?.Value ==
+                "FolderProjectCreationProgressBar")
+            .ToArray();
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(progressBars, Has.Length.EqualTo(1));
+            NUnitAssert.That(
+                progressBars.SingleOrDefault()?
+                    .Attribute("IsIndeterminate")?.Value,
+                Is.EqualTo("True"));
+        });
+    }
+
+    [Test]
     public void Execute_UsesSetupDialogValues()
     {
         using var project = new TemporaryDirectory();
@@ -67,6 +100,32 @@ public class CreateFolderProjectCommandTests
                     "main"));
         var versionControl =
             new Mock<IFolderProjectVersionControlService>();
+        var progressRunner = new Mock<IFolderProjectProgressRunner>();
+        var progressVisible = false;
+        var initializedWhileProgressVisible = false;
+        progressRunner.Setup(item => item.Run(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Func<FolderProjectContainer?>>()))
+            .Returns(
+                (string _, string _, Func<FolderProjectContainer?> operation) =>
+                {
+                    progressVisible = true;
+                    try
+                    {
+                        return operation();
+                    }
+                    finally
+                    {
+                        progressVisible = false;
+                    }
+                });
+        versionControl.Setup(item => item.Initialize(
+                project.Path,
+                It.IsAny<FolderProjectGitIdentity>(),
+                "main"))
+            .Callback(() =>
+                initializedWhileProgressVisible = progressVisible);
         var command = new CreateFolderProjectCommand(
             Mock.Of<IPackFileService>(),
             new FolderProjectFactory(),
@@ -74,7 +133,8 @@ public class CreateFolderProjectCommandTests
             Mock.Of<IStandardDialogs>(),
             LoadLocalization(),
             setupDialogs.Object,
-            versionControl.Object);
+            versionControl.Object,
+            progressRunner.Object);
 
         command.Execute();
 
@@ -90,7 +150,13 @@ public class CreateFolderProjectCommandTests
             NUnitAssert.That(
                 settings.EnablePackFileCorruptionDetection,
                 Is.True);
+            NUnitAssert.That(initializedWhileProgressVisible, Is.True);
         });
+        progressRunner.Verify(item => item.Run(
+            It.IsAny<string>(),
+            It.Is<string>(message =>
+                message.Contains("首次", StringComparison.Ordinal)),
+            It.IsAny<Func<FolderProjectContainer?>>()), Times.Once);
         versionControl.Verify(item => item.Initialize(
             project.Path,
             It.IsAny<FolderProjectGitIdentity>(),

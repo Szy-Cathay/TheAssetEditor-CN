@@ -16,6 +16,7 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 
     [ObservableProperty] private bool _isEnabled;
     [ObservableProperty] private int _selectedSidebarTabIndex;
+    [ObservableProperty] private bool _isBranchPickerOpen;
     [ObservableProperty] private string _branchFilter = "";
 
     public FolderProjectVersionControlViewModel VersionControl { get; }
@@ -40,6 +41,13 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 
     public void SetEditableContainer(PackFileContainer? container)
     {
+        if (container == null &&
+            VersionControl.IsBusy &&
+            _currentProjectRoot != null)
+        {
+            return;
+        }
+
         if (container is not FolderProjectContainer project)
         {
             CloseRepositoryEditor();
@@ -95,6 +103,7 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task SwitchBranch(FolderProjectBranchInfo? branch)
     {
+        IsBranchPickerOpen = false;
         if (branch == null || branch.IsCurrent)
             return;
 
@@ -105,6 +114,16 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 
     partial void OnBranchFilterChanged(string value) =>
         OnPropertyChanged(nameof(FilteredBranches));
+
+    partial void OnSelectedSidebarTabIndexChanged(int value)
+    {
+        if (value == 1 &&
+            IsEnabled &&
+            VersionControl.RefreshCommand.CanExecute(null))
+        {
+            VersionControl.RefreshCommand.Execute(null);
+        }
+    }
 
     private void CloseRepositoryEditor()
     {

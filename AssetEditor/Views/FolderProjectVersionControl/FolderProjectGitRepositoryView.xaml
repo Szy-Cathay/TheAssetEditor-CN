@@ -94,7 +94,7 @@
                                         VerticalAlignment="Center"
                                         Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
                                         Text="●"
-                                        Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        Visibility="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Converter={StaticResource BoolToVisibilityConverter}}" />
                                     <TextBlock
                                         Grid.Column="1"
                                         VerticalAlignment="Center"

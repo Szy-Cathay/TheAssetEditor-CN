@@ -16,18 +16,23 @@ public sealed class CreateFolderProjectCommand(
     IStandardDialogs dialogs,
     LocalizationManager localizationManager,
     IFolderProjectSetupDialogs? setupDialogs = null,
-    IFolderProjectVersionControlService? versionControlService = null) : IUiCommand
+    IFolderProjectVersionControlService? versionControlService = null,
+    IFolderProjectProgressRunner? progressRunner = null) : IUiCommand
 {
     private readonly IFolderProjectSetupDialogs _setupDialogs =
         setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
     private readonly IFolderProjectVersionControlService
         _versionControlService =
             versionControlService ?? new FolderProjectVersionControlService();
+    private readonly IFolderProjectProgressRunner _progressRunner =
+        progressRunner ?? new FolderProjectProgressRunner();
 
     public void Execute()
     {
+        var setupTitle =
+            localizationManager.Get("FolderProject.Create.SetupTitle");
         var setup = _setupDialogs.ShowSetup(
-            localizationManager.Get("FolderProject.Create.SetupTitle"),
+            setupTitle,
             localizationManager.Get("FolderProject.Create.SetupDescription"));
         if (setup == null)
             return;
@@ -51,29 +56,49 @@ public sealed class CreateFolderProjectCommand(
         FolderProjectContainer? project = null;
         try
         {
-            var game = GameInformationDatabase.GetGameById(
-                settingsService.CurrentSettings.CurrentGame);
-            project = folderProjectFactory.Create(
-                root,
-                new FolderProjectSettings
+            project = _progressRunner.Run(
+                setupTitle,
+                localizationManager.Get(
+                    "FolderProject.Create.Progress"),
+                () =>
                 {
-                    Name = name,
-                    OutputPackPath = outputPath,
-                    GameVersion = game.Type,
-                    PackFileVersion = game.PackFileVersion,
-                    PackFileType = PackFileCAType.MOD,
-                    EnablePackFileCorruptionDetection =
-                        setup.EnablePackFileCorruptionDetection,
+                    FolderProjectContainer? createdProject = null;
+                    try
+                    {
+                        var game = GameInformationDatabase.GetGameById(
+                            settingsService.CurrentSettings.CurrentGame);
+                        createdProject = folderProjectFactory.Create(
+                            root,
+                            new FolderProjectSettings
+                            {
+                                Name = name,
+                                OutputPackPath = outputPath,
+                                GameVersion = game.Type,
+                                PackFileVersion = game.PackFileVersion,
+                                PackFileType = PackFileCAType.MOD,
+                                EnablePackFileCorruptionDetection =
+                                    setup.EnablePackFileCorruptionDetection,
+                            });
+
+                        _versionControlService.Initialize(
+                            root,
+                            new FolderProjectGitIdentity(
+                                localizationManager.Get(
+                                    "FolderProject.VersionControl.DefaultIdentityName"),
+                                localizationManager.Get(
+                                    "FolderProject.VersionControl.DefaultIdentityEmail")),
+                            setup.PrimaryBranchName);
+                        return createdProject;
+                    }
+                    catch
+                    {
+                        createdProject?.Dispose();
+                        throw;
+                    }
                 });
 
-            _versionControlService.Initialize(
-                root,
-                new FolderProjectGitIdentity(
-                    localizationManager.Get(
-                        "FolderProject.VersionControl.DefaultIdentityName"),
-                    localizationManager.Get(
-                        "FolderProject.VersionControl.DefaultIdentityEmail")),
-                setup.PrimaryBranchName);
+            if (project == null)
+                return;
 
             if (packFileService.AddContainer(project, true) == null)
                 project.Dispose();
