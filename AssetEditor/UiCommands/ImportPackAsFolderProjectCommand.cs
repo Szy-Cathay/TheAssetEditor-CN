@@ -6,7 +6,6 @@ using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
-using Shared.Ui.Common;
 
 namespace AssetEditor.UiCommands;
 
@@ -20,7 +19,8 @@ public sealed class ImportPackAsFolderProjectCommand(
     IFolderProjectImportDialogs? importDialogs = null,
     IFolderProjectSetupDialogs? setupDialogs = null,
     Func<string, bool>? isEmptyTarget = null,
-    IFolderProjectVersionControlService? versionControlService = null) : IUiCommand
+    IFolderProjectVersionControlService? versionControlService = null,
+    IFolderProjectProgressRunner? progressRunner = null) : IUiCommand
 {
     private readonly IFolderProjectImportDialogs _importDialogs =
         importDialogs ?? new FolderProjectImportDialogs();
@@ -31,6 +31,8 @@ public sealed class ImportPackAsFolderProjectCommand(
     private readonly IFolderProjectVersionControlService
         _versionControlService =
             versionControlService ?? new FolderProjectVersionControlService();
+    private readonly IFolderProjectProgressRunner _progressRunner =
+        progressRunner ?? new FolderProjectProgressRunner();
 
     public void Execute()
     {
@@ -41,8 +43,10 @@ public sealed class ImportPackAsFolderProjectCommand(
         if (sourcePath == null)
             return;
 
+        var setupTitle =
+            localizationManager.Get("FolderProject.Import.SetupTitle");
         var setup = _setupDialogs.ShowSetup(
-            localizationManager.Get("FolderProject.Import.SetupTitle"),
+            setupTitle,
             localizationManager.Get("FolderProject.Import.SetupDescription"));
         if (setup == null)
             return;
@@ -74,51 +78,68 @@ public sealed class ImportPackAsFolderProjectCommand(
             projectName + ".pack");
 
         FolderProjectContainer? project = null;
-        using (new WaitCursor())
+        try
         {
-            try
-            {
-                var source = packFileContainerLoader.Load(
-                    sourcePath);
-                if (source == null)
-                    return;
-
-                var game = GameInformationDatabase.GetGameById(
-                    settingsService.CurrentSettings.CurrentGame);
-                project = folderProjectFactory.ImportPack(
-                    source,
-                    projectRoot,
-                    new FolderProjectSettings
+            project = _progressRunner.Run(
+                setupTitle,
+                localizationManager.Get(
+                    "FolderProject.Import.Progress"),
+                () =>
+                {
+                    FolderProjectContainer? importedProject = null;
+                    try
                     {
-                        Name = projectName,
-                        OutputPackPath = outputPath,
-                        GameVersion = game.Type,
-                        PackFileVersion = source.Header.Version,
-                        PackFileType = source.Header.PackFileType,
-                        EnablePackFileCorruptionDetection =
-                            setup.EnablePackFileCorruptionDetection,
-                    });
+                        var source = packFileContainerLoader.Load(
+                            sourcePath);
+                        if (source == null)
+                            return null;
 
-                _versionControlService.Initialize(
-                    projectRoot,
-                    new FolderProjectGitIdentity(
-                        localizationManager.Get(
-                            "FolderProject.VersionControl.DefaultIdentityName"),
-                        localizationManager.Get(
-                            "FolderProject.VersionControl.DefaultIdentityEmail")),
-                    setup.PrimaryBranchName);
+                        var game = GameInformationDatabase.GetGameById(
+                            settingsService.CurrentSettings.CurrentGame);
+                        importedProject = folderProjectFactory.ImportPack(
+                            source,
+                            projectRoot,
+                            new FolderProjectSettings
+                            {
+                                Name = projectName,
+                                OutputPackPath = outputPath,
+                                GameVersion = game.Type,
+                                PackFileVersion = source.Header.Version,
+                                PackFileType = source.Header.PackFileType,
+                                EnablePackFileCorruptionDetection =
+                                    setup.EnablePackFileCorruptionDetection,
+                            });
 
-                if (packFileService.AddContainer(project, true) == null)
-                    project.Dispose();
-            }
-            catch (Exception exception)
-            {
-                project?.Dispose();
-                dialogs.ShowExceptionWindow(
-                    exception,
-                    localizationManager.Get(
-                        "FolderProject.Import.Failed"));
-            }
+                        _versionControlService.Initialize(
+                            projectRoot,
+                            new FolderProjectGitIdentity(
+                                localizationManager.Get(
+                                    "FolderProject.VersionControl.DefaultIdentityName"),
+                                localizationManager.Get(
+                                    "FolderProject.VersionControl.DefaultIdentityEmail")),
+                            setup.PrimaryBranchName);
+                        return importedProject;
+                    }
+                    catch
+                    {
+                        importedProject?.Dispose();
+                        throw;
+                    }
+                });
+
+            if (project == null)
+                return;
+
+            if (packFileService.AddContainer(project, true) == null)
+                project.Dispose();
+        }
+        catch (Exception exception)
+        {
+            project?.Dispose();
+            dialogs.ShowExceptionWindow(
+                exception,
+                localizationManager.Get(
+                    "FolderProject.Import.Failed"));
         }
     }
 

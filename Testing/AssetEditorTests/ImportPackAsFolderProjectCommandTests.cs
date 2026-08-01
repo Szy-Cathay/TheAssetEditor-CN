@@ -51,6 +51,32 @@ public class ImportPackAsFolderProjectCommandTests
             .Returns<PackFileContainer, bool>((container, _) => container);
         var versionControl =
             new Mock<IFolderProjectVersionControlService>();
+        var progressRunner = new Mock<IFolderProjectProgressRunner>();
+        var progressVisible = false;
+        var initializedWhileProgressVisible = false;
+        progressRunner.Setup(item => item.Run(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Func<FolderProjectContainer?>>()))
+            .Returns(
+                (string _, string _, Func<FolderProjectContainer?> operation) =>
+                {
+                    progressVisible = true;
+                    try
+                    {
+                        return operation();
+                    }
+                    finally
+                    {
+                        progressVisible = false;
+                    }
+                });
+        versionControl.Setup(item => item.Initialize(
+                project.Path,
+                It.IsAny<FolderProjectGitIdentity>(),
+                "master"))
+            .Callback(() =>
+                initializedWhileProgressVisible = progressVisible);
         var command = new ImportPackAsFolderProjectCommand(
             packFileService.Object,
             loader.Object,
@@ -61,7 +87,8 @@ public class ImportPackAsFolderProjectCommandTests
             importDialogs.Object,
             setupDialogs.Object,
             null,
-            versionControl.Object);
+            versionControl.Object,
+            progressRunner.Object);
 
         try
         {
@@ -79,7 +106,13 @@ public class ImportPackAsFolderProjectCommandTests
                 NUnitAssert.That(
                     settings.EnablePackFileCorruptionDetection,
                     Is.True);
+                NUnitAssert.That(initializedWhileProgressVisible, Is.True);
             });
+            progressRunner.Verify(item => item.Run(
+                It.IsAny<string>(),
+                It.Is<string>(message =>
+                    message.Contains("大型 Pack", StringComparison.Ordinal)),
+                It.IsAny<Func<FolderProjectContainer?>>()), Times.Once);
             versionControl.Verify(item => item.Initialize(
                 project.Path,
                 It.IsAny<FolderProjectGitIdentity>(),
