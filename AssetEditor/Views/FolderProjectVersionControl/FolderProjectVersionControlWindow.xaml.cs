@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using AssetEditor.ViewModels;
 using Shared.Core.PackFiles.Models;
@@ -94,6 +95,18 @@ public partial class FolderProjectVersionControlWindow : AssetEditorWindow
         viewModel.SelectedBranch = branch;
         if (viewModel.SwitchBranchCommand.CanExecute(null))
             viewModel.SwitchBranchCommand.Execute(null);
+    }
+
+    private void CommitMenuButton_Click(
+        object sender,
+        System.Windows.RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button)
+            return;
+
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
     }
 
     protected override void OnClosing(CancelEventArgs e)

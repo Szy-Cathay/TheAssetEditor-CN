@@ -15,7 +15,7 @@ namespace Shared.Ui.Editors.TextEditor
         void SetEditor(ITextEditor theEditor);
     }
 
-    public class TextEditorViewModel<TextConverter> : NotifyPropertyChangedImpl, ITextEditorViewModel, IEditorInterface, IFileEditor
+    public class TextEditorViewModel<TextConverter> : NotifyPropertyChangedImpl, ITextEditorViewModel, IEditorInterface, IFileEditor, ISaveableEditor
         where TextConverter : ITextConverter
     {
         public ICommand SaveCommand { get; set; }
@@ -23,7 +23,23 @@ namespace Shared.Ui.Editors.TextEditor
         public string DisplayName { get; set; } = "Not set";
 
         string _text;
-        public string Text { get => _text; set => SetAndNotify(ref _text, value); }
+        public string Text
+        {
+            get => _text;
+            set => SetAndNotifyWhenChanged(
+                ref _text,
+                value,
+                _ => HasUnsavedChanges = true);
+        }
+
+        bool _hasUnsavedChanges;
+        public bool HasUnsavedChanges
+        {
+            get => _hasUnsavedChanges;
+            set => SetAndNotifyWhenChanged(
+                ref _hasUnsavedChanges,
+                value);
+        }
 
         PackFile _packFile;
         private readonly IFileSaveService _packFileSaveService;
@@ -73,7 +89,9 @@ namespace Shared.Ui.Editors.TextEditor
             DisplayName = file.Name;
 
             var data = file.DataSource.ReadData();
-            Text = _converter.GetText(data);
+            _text = _converter.GetText(data);
+            NotifyPropertyChanged(nameof(Text));
+            HasUnsavedChanges = false;
         }
 
         public bool Save()
@@ -98,9 +116,11 @@ namespace Shared.Ui.Editors.TextEditor
             }
 
             var res = _packFileSaveService.Save(path, bytes, false);
-            if (res != null)
-                MainFile = res;
-            return false;
+            if (res == null)
+                return false;
+
+            MainFile = res;
+            return true;
         }
 
         public void Close()

@@ -64,6 +64,15 @@ public interface IFolderProjectVersionControlService
         string commitId,
         FolderProjectCommitUndoMode mode);
 
+    void ResetToCommit(
+        string projectRoot,
+        string commitId,
+        FolderProjectCommitUndoMode mode);
+
+    FolderProjectCommitSummary RevertCommit(
+        string projectRoot,
+        string commitId);
+
     FolderProjectCommitEditSession EditLatestCommitChanges(
         string projectRoot,
         string commitId,
@@ -687,7 +696,6 @@ public sealed partial class FolderProjectVersionControlService :
                 })
             .ToList();
         var visibleCommits = reachableCommits
-            .Where(commit => commit.Parents.Any())
             .Take(maxCount)
             .ToList();
 

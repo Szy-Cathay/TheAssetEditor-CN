@@ -1,5 +1,6 @@
 ﻿using AssetEditor.Services;
 using AssetEditor.UiCommands;
+using AssetEditor.Events;
 using AssetEditor.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -13,6 +14,7 @@ using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
+using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands;
 
 namespace AssetEditorTests;
 
@@ -98,7 +100,7 @@ public class MenuBarFolderProjectRecentTests
     }
 
     [Test]
-    public void VersionControlMenuCommand_OpensWindowOnce()
+    public void VersionControlMenuCommand_OpensEmbeddedGitPanel()
     {
         using var directory = new TemporaryDirectory();
         using var project = FolderProjectContainer.Create(
@@ -108,11 +110,14 @@ public class MenuBarFolderProjectRecentTests
         packFileService
             .Setup(service => service.GetEditablePack())
             .Returns(project);
-        var windowService =
-            new Mock<IFolderProjectVersionControlWindowService>();
+        var eventHub = new TestEventHub();
+        OpenFolderProjectGitPanelEvent? published = null;
+        eventHub.Register<OpenFolderProjectGitPanelEvent>(
+            this,
+            item => published = item);
         var services = new ServiceCollection();
         services.AddSingleton(packFileService.Object);
-        services.AddSingleton(windowService.Object);
+        services.AddSingleton<IEventHub>(eventHub);
         services.AddTransient<OpenFolderProjectVersionControlCommand>();
         using var provider = services.BuildServiceProvider();
         var viewModel = CreateViewModel(
@@ -120,16 +125,103 @@ public class MenuBarFolderProjectRecentTests
             new ApplicationSettingsService(GameTypeEnum.Warhammer3),
             new UiCommandFactory(provider),
             Mock.Of<IFolderProjectOpenService>(),
-            new TestEventHub());
+            eventHub);
 
         viewModel.OpenFolderProjectVersionControlCommand.Execute(null);
 
-        windowService.Verify(
-            service => service.ShowDialog(
+        NUnitAssert.That(published, Is.Not.Null);
+    }
+
+    [Test]
+    public void SaveFolderProject_SavesEditorsWithoutGeneratingPack()
+    {
+        new LocalizationManager().LoadLanguage();
+        using var directory = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetEditablePack())
+            .Returns(project);
+        var unsavedChanges =
+            new Mock<IFolderProjectUnsavedChangesService>();
+        unsavedChanges.Setup(service => service.SaveUnsavedChanges(
                 project.ProjectRoot,
-                "测试工程",
-                false),
-            Times.Once);
+                null))
+            .Returns(true);
+        var commandFactory = new Mock<IUiCommandFactory>();
+        var viewModel = CreateViewModel(
+            packFileService.Object,
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            commandFactory.Object,
+            Mock.Of<IFolderProjectOpenService>(),
+            new TestEventHub(),
+            unsavedChanges.Object);
+
+        viewModel.SaveActivePackCommand.Execute(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                viewModel.SaveActiveContainerText,
+                Is.EqualTo("保存文件夹工程"));
+            NUnitAssert.That(
+                viewModel.GeneratePackCommand.CanExecute(null),
+                Is.True);
+        });
+        unsavedChanges.Verify(service => service.SaveUnsavedChanges(
+            project.ProjectRoot,
+            null), Times.Once);
+        commandFactory.Verify(factory => factory.Create<
+            SavePackFileContainerCommand>(
+                It.IsAny<Action<SavePackFileContainerCommand>?>()),
+            Times.Never);
+    }
+
+    [Test]
+    [Apartment(ApartmentState.STA)]
+    public void GeneratePack_IsSeparateFolderProjectAction()
+    {
+        new LocalizationManager().LoadLanguage();
+        using var directory = new TemporaryDirectory();
+        var outputPath = Path.Combine(
+            Path.GetTempPath(),
+            $"ae-generated-{Guid.NewGuid():N}.pack");
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings
+            {
+                Name = "测试工程",
+                OutputPackPath = outputPath,
+            });
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetEditablePack())
+            .Returns(project);
+        var settings =
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+        var saveCommand = new SavePackFileContainerCommand(
+            packFileService.Object,
+            Mock.Of<IStandardDialogs>(),
+            settings);
+        var commandFactory = new Mock<IUiCommandFactory>();
+        commandFactory.Setup(factory => factory.Create<
+                SavePackFileContainerCommand>(
+                It.IsAny<Action<SavePackFileContainerCommand>?>()))
+            .Returns(saveCommand);
+        var viewModel = CreateViewModel(
+            packFileService.Object,
+            settings,
+            commandFactory.Object,
+            Mock.Of<IFolderProjectOpenService>(),
+            new TestEventHub());
+
+        viewModel.GeneratePackCommand.Execute(null);
+
+        packFileService.Verify(service => service.SavePackContainer(
+            project,
+            outputPath,
+            false,
+            It.IsAny<GameInformation>()), Times.Once);
     }
 
     private static MenuBarViewModel CreateViewModel(
@@ -137,7 +229,8 @@ public class MenuBarFolderProjectRecentTests
         ApplicationSettingsService settingsService,
         IUiCommandFactory uiCommandFactory,
         IFolderProjectOpenService openService,
-        IEventHub eventHub)
+        IEventHub eventHub,
+        IFolderProjectUnsavedChangesService? unsavedChanges = null)
     {
         var editorDatabase = new Mock<IEditorDatabase>();
         editorDatabase
@@ -156,6 +249,8 @@ public class MenuBarFolderProjectRecentTests
             Mock.Of<IPackFileContainerLoader>(),
             openService,
             Mock.Of<IStandardDialogs>(),
+            unsavedChanges ??
+                Mock.Of<IFolderProjectUnsavedChangesService>(),
             eventHub);
     }
 

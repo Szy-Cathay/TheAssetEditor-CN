@@ -83,7 +83,7 @@ public class FolderProjectVersionControlServiceTests
         using var project = new TemporaryDirectory("custom-primary");
         var service = new FolderProjectVersionControlService();
 
-        service.Initialize(project.Path, s_identity, "main");
+        var initial = service.Initialize(project.Path, s_identity, "main");
 
         using var repository = new Repository(project.Path);
         Assert.Multiple(() =>
@@ -93,7 +93,10 @@ public class FolderProjectVersionControlServiceTests
             Assert.That(
                 service.GetBranches(project.Path).Single().IsPrimary,
                 Is.True);
-            Assert.That(service.GetHistory(project.Path, "main"), Is.Empty);
+            Assert.That(
+                service.GetHistory(project.Path, "main")
+                    .Select(commit => commit.Id),
+                Is.EqualTo(new[] { initial.Id }));
         });
     }
 
@@ -181,7 +184,9 @@ public class FolderProjectVersionControlServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(second.Id, Is.EqualTo(first.Id));
-            Assert.That(service.GetHistory(project.Path), Is.Empty);
+            Assert.That(
+                service.GetHistory(project.Path).Select(commit => commit.Id),
+                Is.EqualTo(new[] { first.Id }));
             Assert.That(
                 service.GetStatus(project.Path).HeadCommitId,
                 Is.EqualTo(first.Id));
@@ -721,7 +726,7 @@ public class FolderProjectVersionControlServiceTests
             Assert.That(
                 status.HeadCommitId,
                 Is.EqualTo(committed.ParentIds[0]));
-            Assert.That(history, Is.Empty);
+            Assert.That(history, Has.Count.EqualTo(1));
             Assert.That(
                 status.OperationState,
                 Is.EqualTo(FolderProjectRepositoryOperationState.None));
@@ -886,7 +891,9 @@ public class FolderProjectVersionControlServiceTests
             Assert.That(
                 exception!.Code,
                 Is.EqualTo(FolderProjectVersionControlError.CommitNotFound));
-            Assert.That(service.GetHistory(project.Path), Is.Empty);
+            Assert.That(
+                service.GetHistory(project.Path).Select(commit => commit.Id),
+                Is.EqualTo(new[] { parent.Id }));
             Assert.That(
                 service.GetStatus(project.Path).Changes.Single().Kind.HasFlag(
                     FolderProjectWorkingChangeKind.Staged),
@@ -898,7 +905,7 @@ public class FolderProjectVersionControlServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(newCommit.Message, Is.EqualTo("新提交"));
-            Assert.That(service.GetHistory(project.Path), Has.Count.EqualTo(1));
+            Assert.That(service.GetHistory(project.Path), Has.Count.EqualTo(2));
             Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
         });
     }
@@ -1012,7 +1019,7 @@ public class FolderProjectVersionControlServiceTests
         var history = service.GetHistory(project.Path);
         Assert.Multiple(() =>
         {
-            Assert.That(history, Is.Empty);
+            Assert.That(history, Has.Count.EqualTo(1));
             Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
             Assert.That(File.ReadAllText(filePath), Is.EqualTo("one"));
             Assert.That(File.Exists(addedPath), Is.False);
@@ -1726,7 +1733,7 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
-    public void GetHistory_HidesInitialCommitFromEveryBranch()
+    public void GetHistory_IncludesInitialCommitOnEveryBranch()
     {
         using var project = new TemporaryDirectory("history-hide-initial");
         var service = new FolderProjectVersionControlService();
@@ -1745,14 +1752,136 @@ public class FolderProjectVersionControlServiceTests
         {
             Assert.That(
                 mainHistory.Select(commit => commit.Id),
-                Is.EqualTo(new[] { main.Id }));
+                Is.EqualTo(new[] { main.Id, initial.Id }));
             Assert.That(
                 featureHistory.Select(commit => commit.Id),
-                Is.EqualTo(new[] { feature.Id }));
+                Is.EqualTo(new[] { feature.Id, initial.Id }));
             Assert.That(
                 mainHistory.Concat(featureHistory),
-                Has.None.Matches<FolderProjectCommitSummary>(
+                Has.Some.Matches<FolderProjectCommitSummary>(
                     commit => commit.Id == initial.Id));
+        });
+    }
+
+    [Test]
+    public void ResetToCommit_KeepChanges_AllowsInitialCommitTarget()
+    {
+        using var project = new TemporaryDirectory("reset-keep-initial");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "file.txt");
+        File.WriteAllText(filePath, "one");
+        var initial = service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        service.CommitAll(project.Path, "second");
+        File.WriteAllText(filePath, "three");
+        service.CommitAll(project.Path, "third");
+
+        service.ResetToCommit(
+            project.Path,
+            initial.Id,
+            FolderProjectCommitUndoMode.KeepChanges);
+
+        var status = service.GetStatus(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(status.HeadCommitId, Is.EqualTo(initial.Id));
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("three"));
+            Assert.That(status.Changes, Has.Count.EqualTo(1));
+            Assert.That(
+                status.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Unstaged),
+                Is.True);
+            Assert.That(
+                status.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged),
+                Is.False);
+            Assert.That(
+                service.GetHistory(project.Path).Select(commit => commit.Id),
+                Is.EqualTo(new[] { initial.Id }));
+        });
+    }
+
+    [Test]
+    public void ResetToCommit_DiscardChanges_TargetsArbitraryCommit()
+    {
+        using var project = new TemporaryDirectory("reset-discard-target");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "file.txt");
+        File.WriteAllText(filePath, "one");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        var second = service.CommitAll(project.Path, "second");
+        File.WriteAllText(filePath, "three");
+        service.CommitAll(project.Path, "third");
+
+        service.ResetToCommit(
+            project.Path,
+            second.Id,
+            FolderProjectCommitUndoMode.DiscardChanges);
+
+        var status = service.GetStatus(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(status.HeadCommitId, Is.EqualTo(second.Id));
+            Assert.That(status.IsClean, Is.True);
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("two"));
+        });
+    }
+
+    [Test]
+    public void RevertCommit_CreatesInverseCommitAndKeepsOriginalHistory()
+    {
+        using var project = new TemporaryDirectory("revert-commit");
+        var service = new FolderProjectVersionControlService();
+        var filePath = Path.Combine(project.Path, "file.txt");
+        var addedPath = Path.Combine(project.Path, "added.txt");
+        File.WriteAllText(filePath, "one");
+        var initial = service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        File.WriteAllText(addedPath, "added");
+        var original = service.CommitAll(project.Path, "测试提交");
+
+        var reverted = service.RevertCommit(project.Path, original.Id);
+
+        var history = service.GetHistory(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reverted.Id, Is.Not.EqualTo(original.Id));
+            Assert.That(reverted.Message, Does.StartWith("Revert"));
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("one"));
+            Assert.That(File.Exists(addedPath), Is.False);
+            Assert.That(
+                history.Select(commit => commit.Id),
+                Is.EqualTo(new[]
+                {
+                    reverted.Id,
+                    original.Id,
+                    initial.Id,
+                }));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void RevertCommit_InitialCommitIsProtected()
+    {
+        using var project = new TemporaryDirectory("revert-initial");
+        var service = new FolderProjectVersionControlService();
+        var initial = service.Initialize(project.Path, s_identity);
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.RevertCommit(project.Path, initial.Id));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Code,
+                Is.EqualTo(
+                    FolderProjectVersionControlError.CommitCannotBeUndone));
+            Assert.That(
+                service.GetStatus(project.Path).HeadCommitId,
+                Is.EqualTo(initial.Id));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
         });
     }
 
@@ -1839,13 +1968,13 @@ public class FolderProjectVersionControlServiceTests
         {
             Assert.That(
                 branchHistory.Select(commit => commit.Id),
-                Is.EqualTo(new[] { otherCommit.Id }));
+                Is.EqualTo(new[] { otherCommit.Id, initial.Id }));
             Assert.That(
                 branchHistory.Select(commit => commit.Id),
                 Does.Not.Contain(mainCommit.Id));
             Assert.That(
                 detachedHistory.Select(commit => commit.Id),
-                Is.Empty);
+                Is.EqualTo(new[] { initial.Id }));
         });
     }
 
@@ -1854,7 +1983,7 @@ public class FolderProjectVersionControlServiceTests
     {
         using var project = new TemporaryDirectory("history-branch");
         var service = new FolderProjectVersionControlService();
-        service.Initialize(project.Path, s_identity);
+        var initial = service.Initialize(project.Path, s_identity);
         using (var repository = new Repository(project.Path))
             repository.CreateBranch("feature");
         File.WriteAllText(Path.Combine(project.Path, "main.txt"), "main");
@@ -1873,7 +2002,7 @@ public class FolderProjectVersionControlServiceTests
         {
             Assert.That(
                 history.Select(commit => commit.Id),
-                Is.EqualTo(new[] { featureCommit.Id }));
+                Is.EqualTo(new[] { featureCommit.Id, initial.Id }));
             Assert.That(
                 history.Select(commit => commit.Id),
                 Does.Not.Contain(mainCommit.Id));

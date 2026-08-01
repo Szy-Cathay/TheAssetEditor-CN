@@ -16,7 +16,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
         ApplicationSettingsService applicationSettingsService) : IContextMenuCommand
     {
         private readonly ILogger _logger = Logging.Create<SavePackFileContainerCommand>();
-        public string GetDisplayName(TreeNode node) => LocalizationManager.Instance.Get("ContextMenu.Save");
+        public string GetDisplayName(TreeNode node) =>
+            LocalizationManager.Instance.Get(
+                node.FileOwner is FolderProjectContainer
+                    ? "MenuBar.File.GeneratePack"
+                    : "ContextMenu.Save");
         public bool IsEnabled(TreeNode node) => true;
 
         public void Execute(TreeNode _selectedNode)

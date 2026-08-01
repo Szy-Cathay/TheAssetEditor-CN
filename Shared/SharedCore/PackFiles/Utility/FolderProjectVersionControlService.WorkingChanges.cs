@@ -263,6 +263,173 @@ public sealed partial class FolderProjectVersionControlService
             });
     }
 
+    public void ResetToCommit(
+        string projectRoot,
+        string commitId,
+        FolderProjectCommitUndoMode mode)
+    {
+        if (mode is not FolderProjectCommitUndoMode.KeepChanges and
+            not FolderProjectCommitUndoMode.DiscardChanges)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(mode),
+                mode,
+                "The commit reset mode is not supported.");
+        }
+
+        var objectId = ParseFullCommitId(commitId);
+        Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureCommitStateSupported(repository);
+                if (RetrieveWorkingStatus(repository).IsDirty)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.WorkingTreeNotClean,
+                        "A clean working tree is required before resetting a commit.");
+                }
+
+                var target = LookupCommit(repository, objectId);
+                var originalHead = repository.Head.Tip!;
+                if (!IsAncestor(repository, target, originalHead))
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "The reset target is not in the current branch history.");
+                }
+                if (target.Id == originalHead.Id)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "The selected commit is already the current commit.");
+                }
+
+                try
+                {
+                    if (mode == FolderProjectCommitUndoMode.KeepChanges)
+                    {
+                        repository.Reset(ResetMode.Mixed, target);
+                    }
+                    else
+                    {
+                        _platform.Reset(
+                            repository,
+                            target,
+                            new CheckoutOptions
+                            {
+                                CheckoutModifiers = CheckoutModifiers.Force,
+                            });
+                    }
+                }
+                catch (Exception failure)
+                {
+                    RestoreHeadAfterFailedHistoryOperation(
+                        repository,
+                        originalHead,
+                        failure,
+                        "Reset failed and rollback was incomplete.");
+                }
+
+                return true;
+            });
+    }
+
+    public FolderProjectCommitSummary RevertCommit(
+        string projectRoot,
+        string commitId)
+    {
+        var objectId = ParseFullCommitId(commitId);
+        return Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureCommitStateSupported(repository);
+                if (RetrieveWorkingStatus(repository).IsDirty)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.WorkingTreeNotClean,
+                        "A clean working tree is required before reverting a commit.");
+                }
+
+                var commit = LookupCommit(repository, objectId);
+                var originalHead = repository.Head.Tip!;
+                if (!IsAncestor(repository, commit, originalHead) ||
+                    commit.Parents.Count() != 1)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "Only an ordinary commit in the current branch can be reverted.");
+                }
+
+                var identity = ReadLocalIdentity(repository);
+                ValidateIdentity(identity);
+                try
+                {
+                    var result = repository.Revert(
+                        commit,
+                        CreateSignature(identity),
+                        new RevertOptions { CommitOnSuccess = true });
+                    if (result.Status != RevertStatus.Reverted ||
+                        result.Commit == null)
+                    {
+                        RestoreHeadAfterFailedHistoryOperation(
+                            repository,
+                            originalHead,
+                            new FolderProjectVersionControlException(
+                                FolderProjectVersionControlError
+                                    .CommitCannotBeUndone,
+                                "The selected commit could not be reverted cleanly."),
+                            "Revert failed and rollback was incomplete.");
+                    }
+
+                    return ToSummary(result.Commit!);
+                }
+                catch (Exception failure)
+                {
+                    if (repository.Head.Tip?.Id != originalHead.Id ||
+                        RetrieveWorkingStatus(repository).IsDirty ||
+                        repository.Info.CurrentOperation !=
+                        CurrentOperation.None)
+                    {
+                        RestoreHeadAfterFailedHistoryOperation(
+                            repository,
+                            originalHead,
+                            failure,
+                            "Revert failed and rollback was incomplete.");
+                    }
+                    throw;
+                }
+            });
+    }
+
+    private void RestoreHeadAfterFailedHistoryOperation(
+        Repository repository,
+        Commit originalHead,
+        Exception failure,
+        string aggregateMessage)
+    {
+        try
+        {
+            _platform.Reset(
+                repository,
+                originalHead,
+                new CheckoutOptions
+                {
+                    CheckoutModifiers = CheckoutModifiers.Force,
+                });
+        }
+        catch (Exception rollbackFailure)
+        {
+            throw new AggregateException(
+                aggregateMessage,
+                failure,
+                rollbackFailure);
+        }
+
+        throw failure;
+    }
+
     private void UpdateStagingArea(
         string projectRoot,
         IReadOnlyList<string> relativePaths,

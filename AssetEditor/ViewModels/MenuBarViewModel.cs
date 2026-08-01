@@ -6,6 +6,7 @@ using System.Linq;
 using AssetEditor.Services;
 using AssetEditor.UiCommands;
 using CommonControls.BaseDialogs;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationFragmentEditor.AnimationPack.Commands;
 using Editors.Reports.Animation;
@@ -27,7 +28,7 @@ using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands;
 
 namespace AssetEditor.ViewModels
 {
-    public partial class MenuBarViewModel
+    public partial class MenuBarViewModel : ObservableObject
     {
         private readonly IPackFileService _packfileService;
         private readonly ApplicationSettingsService _settingsService;
@@ -38,10 +39,17 @@ namespace AssetEditor.ViewModels
         private readonly IPackFileContainerLoader _packFileContainerLoader;
         private readonly IFolderProjectOpenService _folderProjectOpenService;
         private readonly IStandardDialogs _standardDialogs;
+        private readonly IFolderProjectUnsavedChangesService _unsavedChanges;
 
         public ObservableCollection<RecentPackFileItem> RecentPackFiles { get; set; } = [];
         public ObservableCollection<RecentPackFileItem> RecentFolderProjects { get; set; } = [];
         public ObservableCollection<EditorShortcutViewModel> Editors { get; set; } = [];
+        public string SaveActiveContainerText =>
+            _packfileService.GetEditablePack() is FolderProjectContainer
+                ? LocalizationManager.Instance.Get(
+                    "MenuBar.File.SaveFolderProject")
+                : LocalizationManager.Instance.Get(
+                    "MenuBar.File.SaveActivePack");
 
         public MenuBarViewModel(IPackFileService packfileService, 
             ApplicationSettingsService settingsService, 
@@ -52,6 +60,7 @@ namespace AssetEditor.ViewModels
             IPackFileContainerLoader packFileContainerLoader,
             IFolderProjectOpenService folderProjectOpenService,
             IStandardDialogs standardDialogs,
+            IFolderProjectUnsavedChangesService unsavedChanges,
             IEventHub eventHub)
         {
             _packfileService = packfileService;
@@ -63,6 +72,7 @@ namespace AssetEditor.ViewModels
             _packFileContainerLoader = packFileContainerLoader;
             _folderProjectOpenService = folderProjectOpenService;
             _standardDialogs = standardDialogs;
+            _unsavedChanges = unsavedChanges;
             var settings = settingsService.CurrentSettings;
             settings.RecentPackFilePaths.CollectionChanged += (sender, args) => CreateRecentPackFilesItems();
             settings.RecentFolderProjectPaths.CollectionChanged +=
@@ -72,8 +82,13 @@ namespace AssetEditor.ViewModels
             CreateTools();
             eventHub.Register<PackFileContainerSetAsMainEditableEvent>(
                 this,
-                _ => OpenFolderProjectVersionControlCommand
-                    .NotifyCanExecuteChanged());
+                _ =>
+                {
+                    OpenFolderProjectVersionControlCommand
+                        .NotifyCanExecuteChanged();
+                    GeneratePackCommand.NotifyCanExecuteChanged();
+                    OnPropertyChanged(nameof(SaveActiveContainerText));
+                });
         }
 
         [RelayCommand] private void OpenSettingsWindow() => _uiCommandFactory.Create<OpenSettingsDialogCommand>().Execute();
@@ -112,7 +127,30 @@ namespace AssetEditor.ViewModels
         
         [RelayCommand] private void CreateAnimPackWarhammer3() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDbWarhammer3();
         [RelayCommand] private void CreateAnimPack3k() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDb3k();
-        [RelayCommand] private void SaveActivePack() => _uiCommandFactory.Create<SavePackFileContainerCommand>().Execute();
+        [RelayCommand]
+        private void SaveActivePack()
+        {
+            if (_packfileService.GetEditablePack() is
+                FolderProjectContainer folderProject)
+            {
+                _unsavedChanges.SaveUnsavedChanges(
+                    folderProject.ProjectRoot,
+                    null);
+                return;
+            }
+
+            _uiCommandFactory
+                .Create<SavePackFileContainerCommand>()
+                .Execute();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanGeneratePack))]
+        private void GeneratePack() => _uiCommandFactory
+            .Create<SavePackFileContainerCommand>()
+            .Execute();
+
+        private bool CanGeneratePack() =>
+            _packfileService.GetEditablePack() is FolderProjectContainer;
         [RelayCommand] private void OpenWh2AnimpackUpdater() => new AnimPackUpdaterService(_packfileService).Process();
         [RelayCommand] private void GenerateRmv2Report() => _uiCommandFactory.Create<Rmv2ReportCommand>().Execute();
         [RelayCommand] private void GenerateMetaDataReport() => _uiCommandFactory.Create<GenerateMetaDataReportCommand>().Execute();

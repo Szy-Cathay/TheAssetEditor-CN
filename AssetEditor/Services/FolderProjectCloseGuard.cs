@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using AssetEditor.Events;
+using Shared.Core.Events;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
@@ -18,8 +20,7 @@ public sealed class FolderProjectCloseGuard :
 {
     private readonly IFolderProjectVersionControlService
         _versionControlService;
-    private readonly IFolderProjectVersionControlWindowService
-        _windowService;
+    private readonly IEventHub _eventHub;
     private readonly Func<
         string,
         string,
@@ -28,17 +29,17 @@ public sealed class FolderProjectCloseGuard :
 
     public FolderProjectCloseGuard(
         IFolderProjectVersionControlService versionControlService,
-        IFolderProjectVersionControlWindowService windowService)
+        IEventHub eventHub)
         : this(
             versionControlService,
-            windowService,
+            eventHub,
             MessageBox.Show)
     {
     }
 
     internal FolderProjectCloseGuard(
         IFolderProjectVersionControlService versionControlService,
-        IFolderProjectVersionControlWindowService windowService,
+        IEventHub eventHub,
         Func<
             string,
             string,
@@ -46,7 +47,7 @@ public sealed class FolderProjectCloseGuard :
             MessageBoxResult> showMessage)
     {
         _versionControlService = versionControlService;
-        _windowService = windowService;
+        _eventHub = eventHub;
         _showMessage = showMessage;
     }
 
@@ -93,10 +94,7 @@ public sealed class FolderProjectCloseGuard :
         if (result != MessageBoxResult.No)
             return false;
 
-        _windowService.ShowDialog(
-            project.ProjectRoot,
-            project.ProjectSettings.Name,
-            false);
+        _eventHub.Publish(new OpenFolderProjectGitPanelEvent());
         return false;
     }
 }

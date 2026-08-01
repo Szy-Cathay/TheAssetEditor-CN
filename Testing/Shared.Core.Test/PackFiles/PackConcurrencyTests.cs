@@ -279,6 +279,41 @@ namespace Test.Shared.Core.PackFiles
                 It.IsAny<GameInformation>()), Times.Once);
         }
 
+        [Test]
+        public void TryAutoSave_FolderProjectDoesNotGeneratePack()
+        {
+            var projectPath = Path.Combine(
+                _tempDirectory,
+                "folder-project");
+            Directory.CreateDirectory(projectPath);
+            var outputPath = Path.Combine(
+                _tempDirectory,
+                "generated.pack");
+            using var project = FolderProjectContainer.Create(
+                projectPath,
+                new FolderProjectSettings
+                {
+                    Name = "folder project",
+                    OutputPackPath = outputPath,
+                });
+            var packFileService = new Mock<IPackFileService>();
+            packFileService.Setup(service => service.GetEditablePack())
+                .Returns(project);
+            var autoSaveService = new PackAutoSaveService(
+                packFileService.Object,
+                new ApplicationSettingsService(GameTypeEnum.Rome2));
+
+            var saved = autoSaveService.TryAutoSave();
+
+            Assert.That(saved, Is.False);
+            packFileService.Verify(
+                service => service.TryAutoSavePackContainer(
+                    It.IsAny<PackFileContainer>(),
+                    It.IsAny<string>(),
+                    It.IsAny<GameInformation>()),
+                Times.Never);
+        }
+
         private PackFileService CreatePackFileService(IGlobalEventHub? eventHub = null)
         {
             var settings = new ApplicationSettingsService(GameTypeEnum.Rome2);

@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:AssetEditor.Views"
+        xmlns:gitViews="clr-namespace:AssetEditor.Views.FolderProjectVersionControl"
         xmlns:viewFactory="clr-namespace:Shared.Ui.Common.DataTemplates;assembly=Shared.Ui"
         xmlns:datatemplates="clr-namespace:Shared.Ui.Common.DataTemplates;assembly=Shared.Ui"
         xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
@@ -47,14 +48,26 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <views:FileTreeView
+                <TabControl
                     Grid.Row="1"
                     Grid.Column="0"
-                    DataContext="{Binding FileTree}"
-                    Padding="10, 0, 10, 5"
+                    TabStripPlacement="Bottom"
+                    SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}"
                     BorderBrush="{DynamicResource App.Border}"
                     BorderThickness="0, 1, 1, 0"
-                    Visibility="{Binding DataContext.IsPackFileExplorerVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    Visibility="{Binding DataContext.IsPackFileExplorerVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TabItem Header="{loc:Loc FolderProject.Git.WorkTree}">
+                        <views:FileTreeView
+                            DataContext="{Binding DataContext.FileTree, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Padding="10,0,10,5" />
+                    </TabItem>
+                    <TabItem
+                        Header="{loc:Loc FolderProject.Git.Management}"
+                        IsEnabled="{Binding DataContext.GitWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <gitViews:FolderProjectGitPanelView
+                            DataContext="{Binding DataContext.GitWorkspace, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    </TabItem>
+                </TabControl>
 
                 <GridSplitter Grid.Row="1" Grid.RowSpan="1" Grid.Column="1" Width="2.9" HorizontalAlignment="Stretch" Background="{DynamicResource App.Border}" 
                               Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>

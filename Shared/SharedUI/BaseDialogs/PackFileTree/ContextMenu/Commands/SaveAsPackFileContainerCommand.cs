@@ -1,5 +1,6 @@
 ﻿using System.Windows.Forms;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using System;
 using Shared.Core.Services;
 using Shared.Core.Settings;
@@ -9,7 +10,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
 {
     public class SaveAsPackFileContainerCommand(IPackFileService packFileService, ApplicationSettingsService applicationSettingsService) : IContextMenuCommand
     {
-        public string GetDisplayName(TreeNode node) => LocalizationManager.Instance.Get("ContextMenu.SaveAs");
+        public string GetDisplayName(TreeNode node) =>
+            LocalizationManager.Instance.Get(
+                node.FileOwner is FolderProjectContainer
+                    ? "MenuBar.File.GeneratePackAs"
+                    : "ContextMenu.SaveAs");
         public bool IsEnabled(TreeNode node) => true;
 
         public void Execute(TreeNode _selectedNode)

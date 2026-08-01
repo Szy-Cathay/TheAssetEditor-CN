@@ -142,7 +142,7 @@ public class FolderProjectOpenServiceTests
 
         factory.Verify(item => item.Open(It.IsAny<string>()), Times.Never);
         dialogs.Verify(item => item.ShowDialogBox(
-            "必须先初始化本地版本管理，才能打开并修改这个文件夹工程。",
+            "必须先初始化本地 Git 管理，才能打开并修改这个文件夹工程。",
             "文件夹工程错误"), Times.Once);
         window.Verify(item => item.ShowDialog(
             project.Path,
