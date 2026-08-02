@@ -68,10 +68,6 @@ public sealed class FolderProjectOpenService(
                     localizationManager.Get(
                         "FolderProject.Open.VersionControlRequired"),
                     localizationManager.Get("FolderProject.ErrorTitle"));
-                versionControlWindowService.ShowDialog(
-                    root,
-                    GetProjectName(root),
-                    true);
                 return;
             }
             if (mergeState != null &&

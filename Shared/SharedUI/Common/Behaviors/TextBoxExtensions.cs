@@ -81,7 +81,9 @@ namespace Shared.Ui.Common.Behaviors
                 FontSize = tb.FontSize,
                 FontFamily = tb.FontFamily,
                 Foreground = Brushes.LightGray,
-                Content = text
+                Content = text,
+                VerticalAlignment = tb.VerticalContentAlignment,
+                VerticalContentAlignment = tb.VerticalContentAlignment
             });
 
             var vb = new VisualBrush

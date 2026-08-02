@@ -12,6 +12,11 @@ public interface IFolderProjectVersionControlWindowService
         string projectRoot,
         string projectName,
         bool openWhenComplete);
+
+    void ShowMergeDialog(
+        string projectRoot,
+        string projectName,
+        string sourceBranch);
 }
 
 public sealed class FolderProjectVersionControlWindowService(
@@ -23,15 +28,50 @@ public sealed class FolderProjectVersionControlWindowService(
         string projectName,
         bool openWhenComplete)
     {
+        ShowDialogCore(
+            projectRoot,
+            projectName,
+            openWhenComplete,
+            null);
+    }
+
+    public void ShowMergeDialog(
+        string projectRoot,
+        string projectName,
+        string sourceBranch)
+    {
+        ShowDialogCore(
+            projectRoot,
+            projectName,
+            false,
+            sourceBranch);
+    }
+
+    private void ShowDialogCore(
+        string projectRoot,
+        string projectName,
+        bool openWhenComplete,
+        string? sourceBranch)
+    {
         using var scope = scopeFactory.CreateScope();
         var window = scope.ServiceProvider.GetRequiredService<
             FolderProjectVersionControlWindow>();
         var viewModel = scope.ServiceProvider.GetRequiredService<
             FolderProjectVersionControlViewModel>();
-        viewModel.OpenProject(
-            projectRoot,
-            projectName,
-            openWhenComplete);
+        if (sourceBranch == null)
+        {
+            viewModel.OpenProject(
+                projectRoot,
+                projectName,
+                openWhenComplete);
+        }
+        else
+        {
+            viewModel.OpenMergeProject(
+                projectRoot,
+                projectName,
+                sourceBranch);
+        }
         window.DataContext = viewModel;
         SetOwner(window, Application.Current?.MainWindow);
         window.ShowDialog();

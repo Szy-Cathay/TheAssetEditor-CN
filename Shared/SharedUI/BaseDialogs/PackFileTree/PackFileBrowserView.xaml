@@ -33,7 +33,21 @@
             HorizontalAlignment="Left"
             VerticalAlignment="Center"
             FontSize="12"
-            Text="{loc:Loc Shared.PackFileBrowser.Title}" />
+            Text="{loc:Loc Shared.PackFileBrowser.Title}">
+            <TextBlock.Style>
+                <Style
+                    TargetType="TextBlock"
+                    BasedOn="{StaticResource {x:Type TextBlock}}">
+                    <Style.Triggers>
+                        <DataTrigger
+                            Binding="{Binding ShowTitle, ElementName=mystuff}"
+                            Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
 
         <!-- Search and Clear Button -->
         <Grid Grid.Row="1">

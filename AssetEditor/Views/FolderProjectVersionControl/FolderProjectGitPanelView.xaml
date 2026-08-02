@@ -2,38 +2,183 @@
     x:Class="AssetEditor.Views.FolderProjectVersionControl.FolderProjectGitPanelView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
     xmlns:common="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
     x:Name="Root"
     d:DataContext="{d:DesignInstance Type=viewmodels:FolderProjectGitWorkspaceViewModel}"
     mc:Ignorable="d">
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-        <common:BindingProxy x:Key="WorkspaceProxy" Data="{Binding}" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="FolderProjectGitStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <common:BindingProxy x:Key="WorkspaceProxy" Data="{Binding}" />
+            <HierarchicalDataTemplate
+                x:Key="GitChangeTreeNodeTemplate"
+                ItemContainerStyle="{StaticResource GitChangeTreeItemStyle}"
+                ItemsSource="{Binding Children}">
+                <Border
+                    x:Name="NodeRow"
+                    MinHeight="28"
+                    Margin="2,1"
+                    Padding="3,1"
+                    Background="Transparent"
+                    CornerRadius="3">
+                    <Border.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem
+                                Command="{Binding Data.VersionControl.StageTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Header="{loc:Loc FolderProject.VersionControl.StageSelected}">
+                                <MenuItem.Style>
+                                    <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsStagedTree}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </MenuItem.Style>
+                            </MenuItem>
+                            <MenuItem
+                                Command="{Binding Data.VersionControl.UnstageTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Header="{loc:Loc FolderProject.VersionControl.UnstageSelected}">
+                                <MenuItem.Style>
+                                    <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsStagedTree}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </MenuItem.Style>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem
+                                Command="{Binding Data.VersionControl.DiscardTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}" />
+                        </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="22" />
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon
+                            x:Name="NodeIcon"
+                            Width="16"
+                            Height="16"
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Kind="FileDocumentOutline" />
+                        <TextBlock
+                            x:Name="NodeName"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Text="{Binding Name}"
+                            TextTrimming="CharacterEllipsis"
+                            ToolTip="{Binding RepositoryPath}" />
+                        <StackPanel
+                            x:Name="NodeActions"
+                            Grid.Column="2"
+                            Margin="4,0,2,0"
+                            Orientation="Horizontal"
+                            Opacity="0"
+                            IsHitTestVisible="False">
+                            <Button
+                                Command="{Binding Data.VersionControl.DiscardTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource GitTreeActionButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.DiscardSelected}"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.DiscardSelected}">
+                                <materialIcons:MaterialIcon Width="15" Height="15" Kind="Undo" />
+                            </Button>
+                            <Button
+                                x:Name="StageChangeButton"
+                                Command="{Binding Data.VersionControl.StageTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource GitTreeActionButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.StageSelected}"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.StageSelected}">
+                                <materialIcons:MaterialIcon Width="15" Height="15" Kind="Plus" />
+                            </Button>
+                            <Button
+                                x:Name="UnstageChangeButton"
+                                Command="{Binding Data.VersionControl.UnstageTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource GitTreeActionButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.UnstageSelected}"
+                                Visibility="Collapsed"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.UnstageSelected}">
+                                <materialIcons:MaterialIcon Width="15" Height="15" Kind="Minus" />
+                            </Button>
+                        </StackPanel>
+                        <TextBlock
+                            x:Name="NodeStatus"
+                            Grid.Column="3"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontWeight="SemiBold"
+                            Text="{Binding StatusGlyph}"
+                            ToolTip="{Binding KindText}"
+                            AutomationProperties.Name="{Binding KindText}" />
+                    </Grid>
+                </Border>
+                <HierarchicalDataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                        <Setter TargetName="NodeIcon" Property="Kind" Value="FolderOutline" />
+                        <Setter TargetName="NodeStatus" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsRoot}" Value="True">
+                        <Setter TargetName="NodeIcon" Property="Kind" Value="SourceRepository" />
+                        <Setter TargetName="NodeIcon" Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
+                        <Setter TargetName="NodeName" Property="FontWeight" Value="SemiBold" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsStagedTree}" Value="True">
+                        <Setter TargetName="StageChangeButton" Property="Visibility" Value="Collapsed" />
+                        <Setter TargetName="UnstageChangeButton" Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsDeleted}" Value="True">
+                        <Setter TargetName="NodeName" Property="TextDecorations" Value="Strikethrough" />
+                        <Setter TargetName="NodeName" Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=NodeRow}" Value="True">
+                        <Setter TargetName="NodeRow" Property="Background" Value="{DynamicResource ABrush.Tone4.Background.Static}" />
+                        <Setter TargetName="NodeActions" Property="Opacity" Value="1" />
+                        <Setter TargetName="NodeActions" Property="IsHitTestVisible" Value="True" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                        <Setter TargetName="NodeRow" Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
+                    </DataTrigger>
+                </HierarchicalDataTemplate.Triggers>
+            </HierarchicalDataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
     <Grid Background="{DynamicResource WindowBackground}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <TextBlock
-            x:Name="SidebarTitle"
-            Height="30"
-            Margin="8,0"
-            VerticalAlignment="Center"
-            FontSize="12"
-            Text="{loc:Loc FolderProject.Git.Management}" />
         <ScrollViewer
-            Grid.Row="1"
             VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="8,0,8,8">
+            <StackPanel Margin="8,5,8,8">
+                <TextBlock
+                    Margin="2,0,0,3"
+                    FontSize="11"
+                    Style="{StaticResource GitCaptionStyle}"
+                    Text="{loc:Loc FolderProject.Git.CurrentBranch}" />
                 <ToggleButton
                     x:Name="BranchButton"
-                    Height="34"
-                    Padding="10,0"
+                    Height="30"
+                    Padding="8,0"
                     HorizontalContentAlignment="Stretch"
                     IsChecked="{Binding IsBranchPickerOpen, Mode=TwoWay}">
                     <Grid>
@@ -43,13 +188,16 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock
                             VerticalAlignment="Center"
+                            FontWeight="SemiBold"
                             Text="{Binding VersionControl.CurrentBranch}"
                             TextTrimming="CharacterEllipsis" />
-                        <TextBlock
+                        <materialIcons:MaterialIcon
                             Grid.Column="1"
+                            Width="15"
+                            Height="15"
                             Margin="8,0,0,0"
                             VerticalAlignment="Center"
-                            Text="⌄" />
+                            Kind="ChevronDown" />
                     </Grid>
                 </ToggleButton>
 
@@ -63,10 +211,7 @@
                     <Border
                         Width="340"
                         MaxHeight="500"
-                        Padding="9"
-                        Background="{DynamicResource WindowBackground}"
-                        BorderBrush="{DynamicResource App.Border}"
-                        BorderThickness="1">
+                        Style="{StaticResource GitSurfaceBorderStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -77,18 +222,31 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox
-                                    Height="30"
-                                    Padding="7,0"
-                                    VerticalContentAlignment="Center"
-                                    Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged}"
-                                    ToolTip="{loc:Loc FolderProject.Git.SearchBranches}" />
+                                <Grid>
+                                    <TextBox
+                                        Height="30"
+                                        Padding="8,0,28,0"
+                                        behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.SearchBranches}"
+                                        VerticalContentAlignment="Center"
+                                        Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged}"
+                                        ToolTip="{loc:Loc FolderProject.Git.SearchBranches}"
+                                        AutomationProperties.Name="{loc:Loc FolderProject.Git.SearchBranches}" />
+                                    <materialIcons:MaterialIcon
+                                        Width="15"
+                                        Height="15"
+                                        Margin="0,0,9,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                                        IsHitTestVisible="False"
+                                        Kind="Magnify" />
+                                </Grid>
                                 <Button
                                     Grid.Column="1"
-                                    Height="30"
                                     Margin="7,0,0,0"
                                     Command="{Binding VersionControl.CreateAndSwitchBranchCommand}"
-                                    Content="{loc:Loc FolderProject.Git.NewBranch}" />
+                                    Content="{loc:Loc FolderProject.Git.NewBranch}"
+                                    Style="{StaticResource GitTextLinkButtonStyle}" />
                             </Grid>
                             <ListBox
                                 Grid.Row="1"
@@ -98,26 +256,38 @@
                                 ItemsSource="{Binding FilteredBranches}"
                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
+                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource GitBranchPickerListItemStyle}">
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                     </Style>
                                 </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Button
-                                            Padding="7,5"
-                                            HorizontalContentAlignment="Stretch"
-                                            Background="Transparent"
-                                            BorderThickness="0"
                                             Command="{Binding Data.SwitchBranchCommand, Source={StaticResource WorkspaceProxy}}"
-                                            CommandParameter="{Binding}">
+                                            CommandParameter="{Binding}"
+                                            Style="{StaticResource GitBranchPickerButtonStyle}">
+                                            <Button.ContextMenu>
+                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                    <MenuItem
+                                                        Command="{Binding Data.DeleteBranchCommand, Source={StaticResource WorkspaceProxy}}"
+                                                        CommandParameter="{Binding}"
+                                                        Header="{loc:Loc FolderProject.Git.DeleteBranch}" />
+                                                    <MenuItem
+                                                        Command="{Binding Data.MergeBranchCommand, Source={StaticResource WorkspaceProxy}}"
+                                                        CommandParameter="{Binding}"
+                                                        Header="{loc:Loc FolderProject.Git.MergeBranch}" />
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
                                             <DockPanel>
-                                                <TextBlock
+                                                <materialIcons:MaterialIcon
                                                     DockPanel.Dock="Right"
+                                                    Width="15"
+                                                    Height="15"
                                                     Margin="8,0,0,0"
-                                                    Text="●">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
+                                                    Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                                                    Kind="Check">
+                                                    <materialIcons:MaterialIcon.Style>
+                                                        <Style TargetType="materialIcons:MaterialIcon">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
@@ -125,8 +295,8 @@
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
+                                                    </materialIcons:MaterialIcon.Style>
+                                                </materialIcons:MaterialIcon>
                                                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
@@ -149,45 +319,223 @@
                 </Popup>
 
                 <Button
-                    Height="30"
-                    Margin="0,7,0,10"
-                    HorizontalContentAlignment="Left"
-                    Background="Transparent"
-                    BorderThickness="0"
+                    Margin="0,4,0,7"
                     Command="{Binding OpenRepositoryCommand}"
-                    Content="{loc:Loc FolderProject.Git.ViewAllCommits}"
-                    Foreground="{DynamicResource Markdown.Hyperlink.Foreground}" />
+                    Style="{StaticResource GitQuietButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon
+                            Width="16"
+                            Height="16"
+                            Margin="0,0,7,0"
+                            VerticalAlignment="Center"
+                            Kind="History" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Text="{loc:Loc FolderProject.Git.ViewAllCommits}" />
+                    </StackPanel>
+                </Button>
 
+                <TextBlock
+                    Margin="0,0,0,6"
+                    Style="{StaticResource GitSectionTitleStyle}"
+                    Text="{loc:Loc FolderProject.Git.CommitChanges}" />
                 <TextBox
-                    MinHeight="68"
+                    MinHeight="64"
                     Padding="8"
                     AcceptsReturn="True"
+                    behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.CommitMessageHint}"
                     Text="{Binding VersionControl.CommitMessage, UpdateSourceTrigger=PropertyChanged}"
                     TextWrapping="Wrap"
                     ToolTip="{loc:Loc FolderProject.VersionControl.CommitMessage}" />
-                <Grid Margin="0,7,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        Height="31"
-                        Command="{Binding VersionControl.CommitCommand}"
-                        Content="{Binding VersionControl.CommitActionText}" />
-                    <Menu Grid.Column="1" Margin="-1,0,0,0">
-                        <MenuItem Header="▼">
-                            <MenuItem
-                                Command="{Binding VersionControl.CommitStagedCommand}"
-                                Header="{loc:Loc FolderProject.VersionControl.CommitStaged}" />
-                            <MenuItem
-                                Command="{Binding VersionControl.CommitAllCommand}"
-                                Header="{loc:Loc FolderProject.VersionControl.CommitAll}" />
-                        </MenuItem>
-                    </Menu>
-                </Grid>
+                <Border
+                    x:Name="CommitSplitButton"
+                    Margin="0,7,0,10"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource GitCommitSplitButtonStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            x:Name="CommitButton"
+                            Command="{Binding VersionControl.CommitCommand}"
+                            Content="{Binding VersionControl.CommitActionText}"
+                            Style="{StaticResource GitCommitSplitMainButtonStyle}" />
+                        <Border
+                            Grid.Column="1"
+                            Margin="0,5"
+                            Background="{DynamicResource Button.Static.Border}"
+                            IsHitTestVisible="False" />
+                        <Button
+                            x:Name="CommitOptionsButton"
+                            Grid.Column="2"
+                            Click="CommitOptionsButton_Click"
+                            Style="{StaticResource GitCommitSplitMenuButtonStyle}"
+                            ToolTip="{loc:Loc FolderProject.Git.CommitOptions}"
+                            AutomationProperties.Name="{loc:Loc FolderProject.Git.CommitOptions}">
+                            <materialIcons:MaterialIcon
+                                Width="12"
+                                Height="12"
+                                Kind="ChevronDown" />
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem
+                                        Command="{Binding VersionControl.CommitStagedCommand}"
+                                        Header="{loc:Loc FolderProject.VersionControl.CommitStaged}" />
+                                    <MenuItem
+                                        Command="{Binding VersionControl.CommitAllCommand}"
+                                        Header="{loc:Loc FolderProject.VersionControl.CommitAll}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </Grid>
+                </Border>
 
-                <Expander Header="{loc:Loc FolderProject.Git.RelatedItems}">
-                    <StackPanel Margin="0,6,0,8">
+                <Expander
+                    HorizontalContentAlignment="Stretch"
+                    IsExpanded="True"
+                    Style="{StaticResource GitSectionExpanderStyle}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource GitSectionTitleStyle}">
+                                <Run Text="{loc:Loc FolderProject.VersionControl.UnstagedChanges}" />
+                                <Run Text=" (" /><Run Text="{Binding VersionControl.UnstagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
+                            </TextBlock>
+                            <Button
+                                x:Name="StageAllButton"
+                                Grid.Column="1"
+                                Command="{Binding Data.VersionControl.StageAllCommand, Source={StaticResource WorkspaceProxy}}"
+                                Style="{StaticResource GitIconButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.StageAll}"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.StageAll}">
+                                <materialIcons:MaterialIcon Width="16" Height="16" Kind="Plus" />
+                            </Button>
+                        </Grid>
+                    </Expander.Header>
+                    <Grid Margin="0,3,0,5">
+                        <TreeView
+                            x:Name="UnstagedChangesTree"
+                            ItemContainerStyle="{StaticResource GitChangeTreeItemStyle}"
+                            ItemTemplate="{StaticResource GitChangeTreeNodeTemplate}"
+                            ItemsSource="{Binding VersionControl.UnstagedChangeTree}"
+                            Style="{StaticResource GitChangeTreeStyle}" />
+                        <TextBlock
+                            Text="{loc:Loc FolderProject.Git.NoUnstagedChanges}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource GitEmptyStateTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Items.Count, ElementName=UnstagedChangesTree}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Expander>
+
+                <Expander
+                    HorizontalContentAlignment="Stretch"
+                    Style="{StaticResource GitSectionExpanderStyle}">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource GitSectionTitleStyle}">
+                                <Run Text="{loc:Loc FolderProject.VersionControl.StagedChanges}" />
+                                <Run Text=" (" /><Run Text="{Binding VersionControl.StagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
+                            </TextBlock>
+                            <Button
+                                x:Name="UnstageAllButton"
+                                Grid.Column="1"
+                                Command="{Binding Data.VersionControl.UnstageAllCommand, Source={StaticResource WorkspaceProxy}}"
+                                Style="{StaticResource GitIconButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.UnstageAll}"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.UnstageAll}">
+                                <materialIcons:MaterialIcon Width="16" Height="16" Kind="Minus" />
+                            </Button>
+                        </Grid>
+                    </Expander.Header>
+                    <Grid Margin="0,3,0,5">
+                        <TreeView
+                            x:Name="StagedChangesTree"
+                            ItemContainerStyle="{StaticResource GitChangeTreeItemStyle}"
+                            ItemTemplate="{StaticResource GitChangeTreeNodeTemplate}"
+                            ItemsSource="{Binding VersionControl.StagedChangeTree}"
+                            Style="{StaticResource GitChangeTreeStyle}" />
+                        <TextBlock
+                            Text="{loc:Loc FolderProject.Git.NoStagedChanges}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource GitEmptyStateTextStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Items.Count, ElementName=StagedChangesTree}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Expander>
+
+                <Expander
+                    Style="{StaticResource GitSectionExpanderStyle}">
+                    <Expander.Header>
+                        <TextBlock Style="{StaticResource GitSectionTitleStyle}">
+                            <Run Text="{loc:Loc FolderProject.VersionControl.Stashes}" />
+                            <Run Text=" (" /><Run Text="{Binding VersionControl.Stashes.Count, Mode=OneWay}" /><Run Text=")" />
+                        </TextBlock>
+                    </Expander.Header>
+                    <StackPanel Margin="0,3,0,5">
+                        <Grid>
+                            <ListBox
+                                x:Name="StashesList"
+                                MaxHeight="160"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                DisplayMemberPath="Message"
+                                ItemsSource="{Binding VersionControl.Stashes}"
+                                SelectedItem="{Binding VersionControl.SelectedStash}" />
+                            <TextBlock Text="{loc:Loc FolderProject.Git.NoStashes}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GitEmptyStateTextStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Items.Count, ElementName=StashesList}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <WrapPanel Margin="0,6,0,0">
+                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.ApplyStashCommand}" Content="{loc:Loc FolderProject.VersionControl.ApplyStash}" />
+                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.PopStashCommand}" Content="{loc:Loc FolderProject.VersionControl.PopStash}" />
+                            <Button Command="{Binding VersionControl.DeleteStashCommand}" Content="{loc:Loc FolderProject.VersionControl.DeleteStash}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Expander>
+
+                <Expander
+                    Style="{StaticResource GitSectionExpanderStyle}">
+                    <Expander.Header>
+                        <TextBlock
+                            Style="{StaticResource GitSectionTitleStyle}"
+                            Text="{loc:Loc FolderProject.Git.RelatedItems}" />
+                    </Expander.Header>
+                    <StackPanel Margin="0,3,0,5">
                         <TextBox
                             Height="28"
                             Margin="0,0,0,5"
@@ -207,134 +555,38 @@
                     </StackPanel>
                 </Expander>
 
-                <Expander
-                    HorizontalContentAlignment="Stretch"
-                    IsExpanded="True">
-                    <Expander.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center">
-                                <Run Text="{loc:Loc FolderProject.VersionControl.UnstagedChanges}" />
-                                <Run Text=" (" /><Run Text="{Binding VersionControl.UnstagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
-                            </TextBlock>
-                            <Button
-                                x:Name="StageAllButton"
-                                Grid.Column="1"
-                                Width="28"
-                                Height="28"
-                                Background="{DynamicResource Button.Static.Background}"
-                                Command="{Binding Data.VersionControl.StageAllCommand, Source={StaticResource WorkspaceProxy}}"
-                                Content="+"
-                                Opacity="1"
-                                ToolTip="{loc:Loc FolderProject.VersionControl.StageAll}" />
-                        </Grid>
-                    </Expander.Header>
-                    <ListBox
-                            Margin="0,6,0,8"
-                            MaxHeight="220"
-                            ItemsSource="{Binding VersionControl.UnstagedChanges}"
-                            SelectedItem="{Binding VersionControl.SelectedUnstagedChange}">
-                            <ListBox.ContextMenu>
-                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem Command="{Binding VersionControl.StageSelectedCommand}" Header="{loc:Loc FolderProject.VersionControl.StageSelected}" />
-                                    <Separator />
-                                    <MenuItem Command="{Binding VersionControl.DiscardUnstagedCommand}" Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}" />
-                                </ContextMenu>
-                            </ListBox.ContextMenu>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel>
-                                        <Button
-                                            DockPanel.Dock="Right"
-                                            Width="25"
-                                            Command="{Binding DataContext.VersionControl.StageSelectedCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                            Content="+" />
-                                        <TextBlock Text="{Binding RepositoryPath}" TextTrimming="CharacterEllipsis" />
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                </Expander>
-
-                <Expander HorizontalContentAlignment="Stretch">
-                    <Expander.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center">
-                                <Run Text="{loc:Loc FolderProject.VersionControl.StagedChanges}" />
-                                <Run Text=" (" /><Run Text="{Binding VersionControl.StagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
-                            </TextBlock>
-                            <Button
-                                x:Name="UnstageAllButton"
-                                Grid.Column="1"
-                                Width="28"
-                                Height="28"
-                                Background="{DynamicResource Button.Static.Background}"
-                                Command="{Binding Data.VersionControl.UnstageAllCommand, Source={StaticResource WorkspaceProxy}}"
-                                Content="−"
-                                Opacity="1"
-                                ToolTip="{loc:Loc FolderProject.VersionControl.UnstageAll}" />
-                        </Grid>
-                    </Expander.Header>
-                    <ListBox
-                            Margin="0,6,0,8"
-                            MaxHeight="220"
-                            ItemsSource="{Binding VersionControl.StagedChanges}"
-                            SelectedItem="{Binding VersionControl.SelectedStagedChange}">
-                            <ListBox.ContextMenu>
-                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                    <MenuItem Command="{Binding VersionControl.UnstageSelectedCommand}" Header="{loc:Loc FolderProject.VersionControl.UnstageSelected}" />
-                                    <Separator />
-                                    <MenuItem Command="{Binding VersionControl.DiscardStagedCommand}" Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}" />
-                                </ContextMenu>
-                            </ListBox.ContextMenu>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel>
-                                        <Button
-                                            DockPanel.Dock="Right"
-                                            Width="25"
-                                            Command="{Binding DataContext.VersionControl.UnstageSelectedCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                            Content="−" />
-                                        <TextBlock Text="{Binding RepositoryPath}" TextTrimming="CharacterEllipsis" />
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                </Expander>
-
-                <Expander>
-                    <Expander.Header>
-                        <TextBlock>
-                            <Run Text="{loc:Loc FolderProject.VersionControl.Stashes}" />
-                            <Run Text=" (" /><Run Text="{Binding VersionControl.Stashes.Count, Mode=OneWay}" /><Run Text=")" />
-                        </TextBlock>
-                    </Expander.Header>
-                    <StackPanel Margin="0,6,0,8">
-                        <ListBox
-                            MaxHeight="160"
-                            DisplayMemberPath="Message"
-                            ItemsSource="{Binding VersionControl.Stashes}"
-                            SelectedItem="{Binding VersionControl.SelectedStash}" />
-                        <WrapPanel Margin="0,6,0,0">
-                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.ApplyStashCommand}" Content="{loc:Loc FolderProject.VersionControl.ApplyStash}" />
-                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.PopStashCommand}" Content="{loc:Loc FolderProject.VersionControl.PopStash}" />
-                            <Button Command="{Binding VersionControl.DeleteStashCommand}" Content="{loc:Loc FolderProject.VersionControl.DeleteStash}" />
-                        </WrapPanel>
-                    </StackPanel>
-                </Expander>
-
-                <TextBlock
+                <Border
                     Margin="0,8,0,0"
-                    Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
-                    Text="{Binding VersionControl.StatusMessage}"
-                    TextWrapping="Wrap" />
+                    Padding="8,6"
+                    Background="{DynamicResource ABrush.Tone3.Background.Static}"
+                    CornerRadius="4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding VersionControl.StatusMessage}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding VersionControl.StatusMessage}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <DockPanel>
+                        <materialIcons:MaterialIcon
+                            Width="15"
+                            Height="15"
+                            Margin="0,0,7,0"
+                            VerticalAlignment="Top"
+                            Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                            Kind="InformationOutline" />
+                        <TextBlock
+                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Text="{Binding VersionControl.StatusMessage}"
+                            TextWrapping="Wrap" />
+                    </DockPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
@@ -349,9 +601,7 @@
                 Padding="18"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Center"
-                Background="{DynamicResource ABrush.Foreground.Deeper}"
-                BorderBrush="{DynamicResource GroupBox.Static.Border}"
-                BorderThickness="1">
+                Style="{StaticResource GitSurfaceBorderStyle}">
                 <StackPanel>
                     <TextBlock
                         FontSize="16"
@@ -385,17 +635,30 @@
             </Border>
         </Grid>
 
-        <Border
+        <Grid
+            x:Name="GitPanelBusyOverlay"
             Grid.RowSpan="2"
-            Padding="18"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Background="{DynamicResource WindowBackground}"
+            Panel.ZIndex="110"
+            Background="#66000000"
+            IsHitTestVisible="{Binding VersionControl.IsBusy}"
             Visibility="{Binding VersionControl.IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
-            <StackPanel>
-                <ProgressBar Width="210" Height="8" IsIndeterminate="True" />
-                <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="{Binding VersionControl.BusyMessage}" />
-            </StackPanel>
-        </Border>
+            <Border
+                MaxWidth="300"
+                Margin="18"
+                Padding="18"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                Style="{StaticResource GitSurfaceBorderStyle}">
+                <StackPanel>
+                    <ProgressBar Width="210" Height="8" IsIndeterminate="True" />
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Center"
+                        Text="{Binding VersionControl.BusyMessage}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using AssetEditor.Services;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.ToolCreation;
 
@@ -12,6 +13,8 @@ namespace AssetEditor.ViewModels;
 public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 {
     private readonly IEditorManager _editorManager;
+    private readonly IFolderProjectVersionControlWindowService
+        _versionControlWindowService;
     private string? _currentProjectRoot;
 
     [ObservableProperty] private bool _isEnabled;
@@ -31,10 +34,13 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 
     public FolderProjectGitWorkspaceViewModel(
         FolderProjectVersionControlViewModel versionControl,
-        IEditorManager editorManager)
+        IEditorManager editorManager,
+        IFolderProjectVersionControlWindowService
+            versionControlWindowService)
     {
         VersionControl = versionControl;
         _editorManager = editorManager;
+        _versionControlWindowService = versionControlWindowService;
         VersionControl.Branches.CollectionChanged +=
             (_, _) => OnPropertyChanged(nameof(FilteredBranches));
     }
@@ -111,6 +117,47 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         if (VersionControl.SwitchBranchCommand.CanExecute(null))
             await VersionControl.SwitchBranchCommand.ExecuteAsync(null);
     }
+
+    [RelayCommand(CanExecute = nameof(CanDeleteBranch))]
+    private async Task DeleteBranch(FolderProjectBranchInfo? branch)
+    {
+        if (branch == null)
+            return;
+
+        VersionControl.SelectedBranch = branch;
+        if (VersionControl.DeleteBranchCommand.CanExecute(null))
+            await VersionControl.DeleteBranchCommand.ExecuteAsync(null);
+    }
+
+    private bool CanDeleteBranch(FolderProjectBranchInfo? branch) =>
+        CanUseBranchAction(branch) &&
+        branch is { IsPrimary: false };
+
+    [RelayCommand(CanExecute = nameof(CanMergeBranch))]
+    private void MergeBranch(FolderProjectBranchInfo? branch)
+    {
+        if (branch == null)
+            return;
+
+        _versionControlWindowService.ShowMergeDialog(
+            VersionControl.ProjectRoot,
+            VersionControl.ProjectName,
+            branch.Name);
+    }
+
+    private bool CanMergeBranch(FolderProjectBranchInfo? branch) =>
+        CanUseBranchAction(branch) &&
+        VersionControl.IsClean &&
+        !VersionControl.IsDetached &&
+        branch is { IsPrimary: false };
+
+    private bool CanUseBranchAction(FolderProjectBranchInfo? branch) =>
+        branch != null &&
+        VersionControl.IsInitialized &&
+        !VersionControl.IsBusy &&
+        VersionControl.MergePhase == FolderProjectMergePhase.None &&
+        VersionControl.OperationState ==
+            FolderProjectRepositoryOperationState.None;
 
     partial void OnBranchFilterChanged(string value) =>
         OnPropertyChanged(nameof(FilteredBranches));

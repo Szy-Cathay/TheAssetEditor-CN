@@ -21,6 +21,19 @@ public sealed class FolderProjectWorkingChangeRow
     public FolderProjectWorkingChange Source { get; }
     public string RepositoryPath => Source.RepositoryPath;
     public string KindText { get; }
+    public string KindSummaryText { get; }
+    public bool IsDeleted => Source.Kind.HasFlag(
+        FolderProjectWorkingChangeKind.Deleted);
+    public string StatusGlyph => IsDeleted
+        ? ""
+        : Source.Kind.HasFlag(FolderProjectWorkingChangeKind.Added) ||
+          Source.Kind.HasFlag(FolderProjectWorkingChangeKind.Untracked)
+            ? "A"
+            : Source.Kind.HasFlag(FolderProjectWorkingChangeKind.Modified) ||
+              Source.Kind.HasFlag(FolderProjectWorkingChangeKind.Renamed) ||
+              Source.Kind.HasFlag(FolderProjectWorkingChangeKind.TypeChanged)
+                ? "M"
+                : "";
 
     public FolderProjectWorkingChangeRow(
         FolderProjectWorkingChange source,
@@ -37,6 +50,133 @@ public sealed class FolderProjectWorkingChangeRow
                 .Select(
                     kind => localization.Get(
                         $"FolderProject.VersionControl.Change.{kind}")));
+        var summaryKind = new[]
+        {
+            FolderProjectWorkingChangeKind.Conflicted,
+            FolderProjectWorkingChangeKind.Unreadable,
+            FolderProjectWorkingChangeKind.Renamed,
+            FolderProjectWorkingChangeKind.Deleted,
+            FolderProjectWorkingChangeKind.Added,
+            FolderProjectWorkingChangeKind.TypeChanged,
+            FolderProjectWorkingChangeKind.Modified,
+            FolderProjectWorkingChangeKind.Untracked,
+        }.First(kind => source.Kind.HasFlag(kind));
+        KindSummaryText = localization.Get(
+            $"FolderProject.VersionControl.Change.{summaryKind}");
+    }
+}
+
+public sealed class FolderProjectWorkingChangeTreeNode
+{
+    private readonly List<FolderProjectWorkingChangeTreeNode> _children = [];
+
+    public string Name { get; }
+    public string RepositoryPath { get; }
+    public bool IsRoot { get; }
+    public bool IsStagedTree { get; }
+    public bool IsFolder => Change == null;
+    public bool IsExpanded { get; set; } = true;
+    public FolderProjectWorkingChangeRow? Change { get; }
+    public IReadOnlyList<FolderProjectWorkingChangeTreeNode> Children =>
+        _children;
+    public IReadOnlyList<FolderProjectWorkingChangeRow> Changes =>
+        Change == null
+            ? _children.SelectMany(child => child.Changes).ToList()
+            : [Change];
+    public string KindText => Change?.KindText ?? "";
+    public string KindSummaryText => Change?.KindSummaryText ?? "";
+    public bool IsDeleted => Change?.IsDeleted == true;
+    public string StatusGlyph => Change?.StatusGlyph ?? "";
+
+    private FolderProjectWorkingChangeTreeNode(
+        string name,
+        string repositoryPath,
+        bool isRoot,
+        bool isStagedTree,
+        FolderProjectWorkingChangeRow? change = null)
+    {
+        Name = name;
+        RepositoryPath = repositoryPath;
+        IsRoot = isRoot;
+        IsStagedTree = isStagedTree;
+        Change = change;
+    }
+
+    public static IReadOnlyList<FolderProjectWorkingChangeTreeNode> Build(
+        string projectRoot,
+        IEnumerable<FolderProjectWorkingChangeRow> changes,
+        bool isStagedTree = false)
+    {
+        var root = new FolderProjectWorkingChangeTreeNode(
+            projectRoot,
+            projectRoot,
+            isRoot: true,
+            isStagedTree: isStagedTree);
+        foreach (var change in changes.OrderBy(
+                     item => item.RepositoryPath,
+                     StringComparer.OrdinalIgnoreCase))
+        {
+            var segments = change.RepositoryPath
+                .Replace('\\', '/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+                continue;
+
+            var parent = root;
+            var folderPath = "";
+            foreach (var segment in segments[..^1])
+            {
+                folderPath = string.IsNullOrEmpty(folderPath)
+                    ? segment
+                    : $"{folderPath}/{segment}";
+                var folder = parent._children.FirstOrDefault(
+                    item =>
+                        item.IsFolder &&
+                        item.Name.Equals(
+                            segment,
+                            StringComparison.OrdinalIgnoreCase));
+                if (folder == null)
+                {
+                    folder = new FolderProjectWorkingChangeTreeNode(
+                        segment,
+                        folderPath,
+                        isRoot: false,
+                        isStagedTree: isStagedTree);
+                    parent._children.Add(folder);
+                }
+                parent = folder;
+            }
+
+            parent._children.Add(
+                new FolderProjectWorkingChangeTreeNode(
+                    segments[^1],
+                    change.RepositoryPath,
+                    isRoot: false,
+                    isStagedTree: isStagedTree,
+                    change: change));
+        }
+
+        if (root._children.Count == 0)
+            return [];
+
+        root.SortChildren();
+        return [root];
+    }
+
+    private void SortChildren()
+    {
+        _children.Sort(
+            (left, right) =>
+            {
+                var folderOrder = right.IsFolder.CompareTo(left.IsFolder);
+                return folderOrder != 0
+                    ? folderOrder
+                    : StringComparer.OrdinalIgnoreCase.Compare(
+                        left.Name,
+                        right.Name);
+            });
+        foreach (var child in _children)
+            child.SortChildren();
     }
 }
 
@@ -48,6 +188,14 @@ public sealed class FolderProjectCommitChangeRow
         Source.PreviousRepositoryPath ?? "";
     public string KindText { get; }
     public string BinaryText { get; }
+    public bool IsDeleted => Source.Kind ==
+        FolderProjectCommitChangeKind.Deleted;
+    public string StatusGlyph => Source.Kind switch
+    {
+        FolderProjectCommitChangeKind.Added => "A",
+        FolderProjectCommitChangeKind.Deleted => "",
+        _ => "M",
+    };
 
     public FolderProjectCommitChangeRow(
         FolderProjectCommitChange source,
@@ -60,6 +208,112 @@ public sealed class FolderProjectCommitChangeRow
             source.IsBinary
                 ? "FolderProject.VersionControl.Binary.Yes"
                 : "FolderProject.VersionControl.Binary.No");
+    }
+}
+
+public sealed class FolderProjectCommitChangeTreeNode
+{
+    private readonly List<FolderProjectCommitChangeTreeNode> _children = [];
+
+    public string Name { get; }
+    public string RepositoryPath { get; }
+    public bool IsRoot { get; }
+    public bool IsFolder => Change == null;
+    public bool IsExpanded { get; set; } = true;
+    public FolderProjectCommitChangeRow? Change { get; }
+    public IReadOnlyList<FolderProjectCommitChangeTreeNode> Children =>
+        _children;
+    public IReadOnlyList<FolderProjectCommitChangeRow> Changes =>
+        Change == null
+            ? _children.SelectMany(child => child.Changes).ToList()
+            : [Change];
+    public string KindText => Change?.KindText ?? "";
+    public bool IsDeleted => Change?.IsDeleted == true;
+    public string StatusGlyph => Change?.StatusGlyph ?? "";
+
+    private FolderProjectCommitChangeTreeNode(
+        string name,
+        string repositoryPath,
+        bool isRoot,
+        FolderProjectCommitChangeRow? change = null)
+    {
+        Name = name;
+        RepositoryPath = repositoryPath;
+        IsRoot = isRoot;
+        Change = change;
+    }
+
+    public static IReadOnlyList<FolderProjectCommitChangeTreeNode> Build(
+        string projectRoot,
+        IEnumerable<FolderProjectCommitChangeRow> changes)
+    {
+        var root = new FolderProjectCommitChangeTreeNode(
+            projectRoot,
+            projectRoot,
+            isRoot: true);
+        foreach (var change in changes.OrderBy(
+                     item => item.RepositoryPath,
+                     StringComparer.OrdinalIgnoreCase))
+        {
+            var segments = change.RepositoryPath
+                .Replace('\\', '/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+                continue;
+
+            var parent = root;
+            var folderPath = "";
+            foreach (var segment in segments[..^1])
+            {
+                folderPath = string.IsNullOrEmpty(folderPath)
+                    ? segment
+                    : $"{folderPath}/{segment}";
+                var folder = parent._children.FirstOrDefault(
+                    item =>
+                        item.IsFolder &&
+                        item.Name.Equals(
+                            segment,
+                            StringComparison.OrdinalIgnoreCase));
+                if (folder == null)
+                {
+                    folder = new FolderProjectCommitChangeTreeNode(
+                        segment,
+                        folderPath,
+                        isRoot: false);
+                    parent._children.Add(folder);
+                }
+                parent = folder;
+            }
+
+            parent._children.Add(
+                new FolderProjectCommitChangeTreeNode(
+                    segments[^1],
+                    change.RepositoryPath,
+                    isRoot: false,
+                    change));
+        }
+
+        if (root._children.Count == 0)
+            return [];
+
+        root.SortChildren();
+        return [root];
+    }
+
+    private void SortChildren()
+    {
+        _children.Sort(
+            (left, right) =>
+            {
+                var folderOrder = right.IsFolder.CompareTo(left.IsFolder);
+                return folderOrder != 0
+                    ? folderOrder
+                    : StringComparer.OrdinalIgnoreCase.Compare(
+                        left.Name,
+                        right.Name);
+            });
+        foreach (var child in _children)
+            child.SortChildren();
     }
 }
 
@@ -126,6 +380,7 @@ public partial class FolderProjectVersionControlViewModel :
         Logging.Create<FolderProjectVersionControlViewModel>();
     private bool _refreshing;
     private bool _suppressRepositoryTabHistoryLoad;
+    private string? _requestedMergeSourceBranchName;
     private bool _mergeStateKnown;
     private int _commitChangesRequestId;
     private int _historyRequestId;
@@ -155,6 +410,7 @@ public partial class FolderProjectVersionControlViewModel :
     [ObservableProperty] private bool _isBranchSwitchChoiceOpen;
     [ObservableProperty] private string _pendingBranchName = "";
     [ObservableProperty] private string _mergeMessage = "";
+    [ObservableProperty] private bool _isMergeSectionExpanded;
     [ObservableProperty]
     private FolderProjectMergePhase _mergePhase =
         FolderProjectMergePhase.None;
@@ -163,6 +419,9 @@ public partial class FolderProjectVersionControlViewModel :
     private FolderProjectCommitSummary? _selectedCommit;
     [ObservableProperty]
     private FolderProjectCommitChangeRow? _selectedCommitChange;
+    [ObservableProperty]
+    private FolderProjectCommitChangeTreeNode?
+        _selectedCommitChangeTreeNode;
     [ObservableProperty]
     private IReadOnlyList<FolderProjectCommitChangeRow>
         _selectedCommitChanges = [];
@@ -201,12 +460,21 @@ public partial class FolderProjectVersionControlViewModel :
     public ObservableCollection<FolderProjectWorkingChangeRow>
         StagedChanges
     { get; } = [];
+    public ObservableCollection<FolderProjectWorkingChangeTreeNode>
+        UnstagedChangeTree
+    { get; } = [];
+    public ObservableCollection<FolderProjectWorkingChangeTreeNode>
+        StagedChangeTree
+    { get; } = [];
     public ObservableCollection<FolderProjectCommitSummary> History { get; } =
         [];
     public ObservableCollection<FolderProjectCommitChangeRow> CommitChanges
     {
         get;
     } = [];
+    public ObservableCollection<FolderProjectCommitChangeTreeNode>
+        CommitChangeTree
+    { get; } = [];
     public ObservableCollection<FolderProjectBranchInfo> Branches { get; } =
         [];
     public ObservableCollection<FolderProjectStashInfo> Stashes { get; } = [];
@@ -321,6 +589,41 @@ public partial class FolderProjectVersionControlViewModel :
         OpenWhenComplete = openWhenComplete;
         _mergeStateKnown = false;
         RefreshCommand.Execute(null);
+    }
+
+    public void OpenRepositoryHistory()
+    {
+        _suppressRepositoryTabHistoryLoad = true;
+        try
+        {
+            SelectedTabIndex = 1;
+        }
+        finally
+        {
+            _suppressRepositoryTabHistoryLoad = false;
+        }
+
+        RefreshCommand.Execute(null);
+    }
+
+    public void OpenMergeProject(
+        string projectRoot,
+        string projectName,
+        string sourceBranch)
+    {
+        _requestedMergeSourceBranchName = sourceBranch;
+        IsMergeSectionExpanded = true;
+        _suppressRepositoryTabHistoryLoad = true;
+        try
+        {
+            SelectedTabIndex = 1;
+        }
+        finally
+        {
+            _suppressRepositoryTabHistoryLoad = false;
+        }
+
+        OpenProject(projectRoot, projectName, false);
     }
 
     [RelayCommand(CanExecute = nameof(CanRefresh))]
@@ -461,6 +764,23 @@ public partial class FolderProjectVersionControlViewModel :
         return Stage(UnstagedChanges.Select(change => change.RepositoryPath));
     }
 
+    [RelayCommand(CanExecute = nameof(CanStageChange))]
+    private Task StageChange(FolderProjectWorkingChangeRow? change)
+    {
+        return Stage(change == null ? [] : [change.RepositoryPath]);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStageTreeNode))]
+    private Task StageTreeNode(FolderProjectWorkingChangeTreeNode? node)
+    {
+        return Stage(
+            node?.Changes
+                .OrderBy(
+                    change => change.RepositoryPath,
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(change => change.RepositoryPath) ?? []);
+    }
+
     [RelayCommand(CanExecute = nameof(CanUnstageSelected))]
     private Task UnstageSelected()
     {
@@ -474,6 +794,23 @@ public partial class FolderProjectVersionControlViewModel :
     private Task UnstageAll()
     {
         return Unstage(StagedChanges.Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUnstageChange))]
+    private Task UnstageChange(FolderProjectWorkingChangeRow? change)
+    {
+        return Unstage(change == null ? [] : [change.RepositoryPath]);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUnstageTreeNode))]
+    private Task UnstageTreeNode(FolderProjectWorkingChangeTreeNode? node)
+    {
+        return Unstage(
+            node?.Changes
+                .OrderBy(
+                    change => change.RepositoryPath,
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(change => change.RepositoryPath) ?? []);
     }
 
     [RelayCommand(CanExecute = nameof(CanDiscardUnstaged))]
@@ -492,6 +829,23 @@ public partial class FolderProjectVersionControlViewModel :
             GetSelectedStagedChanges()
                 .Where(IsUsableWorkingChange)
                 .Select(change => change.RepositoryPath));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardChange))]
+    private Task DiscardChange(FolderProjectWorkingChangeRow? change)
+    {
+        return Discard(change == null ? [] : [change.RepositoryPath]);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardTreeNode))]
+    private Task DiscardTreeNode(FolderProjectWorkingChangeTreeNode? node)
+    {
+        return Discard(
+            node?.Changes
+                .OrderBy(
+                    change => change.RepositoryPath,
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(change => change.RepositoryPath) ?? []);
     }
 
     [RelayCommand(CanExecute = nameof(CanDiscardAll))]
@@ -777,6 +1131,87 @@ public partial class FolderProjectVersionControlViewModel :
         {
             SelectedTabIndex = 0;
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetCommitChanges))]
+    private Task ResetCommitChangesKeep(
+        FolderProjectCommitChangeTreeNode? node)
+    {
+        return ResetCommitChanges(
+            node,
+            FolderProjectCommitChangeEditMode.KeepChanges,
+            "ResetCommitChangesKeep",
+            "FolderProject.VersionControl.Status.CommitChangesResetKeep");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetCommitChanges))]
+    private Task ResetCommitChangesAndDiscard(
+        FolderProjectCommitChangeTreeNode? node)
+    {
+        return ResetCommitChanges(
+            node,
+            FolderProjectCommitChangeEditMode.Discard,
+            "ResetCommitChangesAndDiscard",
+            "FolderProject.VersionControl.Status.CommitChangesResetDiscard");
+    }
+
+    private async Task ResetCommitChanges(
+        FolderProjectCommitChangeTreeNode? node,
+        FolderProjectCommitChangeEditMode mode,
+        string confirmationKey,
+        string statusKey)
+    {
+        var commit = SelectedCommit!;
+        if (!Confirm(confirmationKey, commit.Message))
+            return;
+
+        var paths = node!.Changes
+            .Where(IsRestorableCommitChange)
+            .Select(change => change.RepositoryPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () => _versionControlService.EditLatestCommitChanges(
+                        ProjectRoot,
+                        commit.Id,
+                        paths,
+                        mode));
+                _commitEditSession = null;
+                return _localization.Get(statusKey);
+            },
+            "FolderProject.VersionControl.Busy.ResettingCommitChanges");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRevertCommitChanges))]
+    private async Task RevertCommitChanges(
+        FolderProjectCommitChangeTreeNode? node)
+    {
+        var commit = SelectedCommit!;
+        if (!Confirm("RevertCommitChanges", commit.Message))
+            return;
+
+        var paths = node!.Changes
+            .Where(IsRestorableCommitChange)
+            .Select(change => change.RepositoryPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        await RunOperationAsync(
+            async () =>
+            {
+                await ExecuteCoordinatedAsync(
+                    () => _versionControlService.RevertCommitChanges(
+                        ProjectRoot,
+                        commit.Id,
+                        paths));
+                return _localization.Get(
+                    "FolderProject.VersionControl.Status.CommitChangesReverted");
+            },
+            "FolderProject.VersionControl.Busy.RevertingCommitChanges");
     }
 
     [RelayCommand(CanExecute = nameof(CanReturnChangesToOriginalCommit))]
@@ -1098,6 +1533,7 @@ public partial class FolderProjectVersionControlViewModel :
             branch => branch.Name == SelectedBranch!.Name);
         SelectedMergeTarget = GetDefaultMergeTarget(
             SelectedMergeSource);
+        IsMergeSectionExpanded = true;
         _suppressRepositoryTabHistoryLoad = true;
         try
         {
@@ -1621,16 +2057,27 @@ public partial class FolderProjectVersionControlViewModel :
                         _localization))
                 .ToList();
             Replace(WorkingChanges, workingRows);
-            Replace(
-                UnstagedChanges,
-                workingRows.Where(
+            var unstagedRows = workingRows.Where(
                     change => change.Source.Kind.HasFlag(
-                        FolderProjectWorkingChangeKind.Unstaged)));
-            Replace(
-                StagedChanges,
-                workingRows.Where(
+                        FolderProjectWorkingChangeKind.Unstaged))
+                .ToList();
+            var stagedRows = workingRows.Where(
                     change => change.Source.Kind.HasFlag(
-                        FolderProjectWorkingChangeKind.Staged)));
+                        FolderProjectWorkingChangeKind.Staged))
+                .ToList();
+            Replace(UnstagedChanges, unstagedRows);
+            Replace(StagedChanges, stagedRows);
+            Replace(
+                UnstagedChangeTree,
+                FolderProjectWorkingChangeTreeNode.Build(
+                    ProjectRoot,
+                    unstagedRows));
+            Replace(
+                StagedChangeTree,
+                FolderProjectWorkingChangeTreeNode.Build(
+                    ProjectRoot,
+                    stagedRows,
+                    isStagedTree: true));
             OnPropertyChanged(nameof(HasStagedChanges));
             OnPropertyChanged(nameof(CommitActionText));
             SelectedUnstagedChanges = [];
@@ -1690,6 +2137,7 @@ public partial class FolderProjectVersionControlViewModel :
                 selection.SelectedConflictId,
                 selection.SelectedMergeSourceName,
                 selection.SelectedMergeTargetName);
+            _requestedMergeSourceBranchName = null;
         }
         finally
         {
@@ -1825,15 +2273,19 @@ public partial class FolderProjectVersionControlViewModel :
         WorkingChanges.Clear();
         UnstagedChanges.Clear();
         StagedChanges.Clear();
+        UnstagedChangeTree.Clear();
+        StagedChangeTree.Clear();
         Stashes.Clear();
         History.Clear();
         CommitChanges.Clear();
+        CommitChangeTree.Clear();
         Branches.Clear();
         MergeSources.Clear();
         MergeTargets.Clear();
         MergeConflicts.Clear();
         SelectedCommit = null;
         SelectedCommitChange = null;
+        SelectedCommitChangeTreeNode = null;
         SelectedCommitChanges = [];
         SelectedUnstagedChange = null;
         SelectedStagedChange = null;
@@ -1862,9 +2314,15 @@ public partial class FolderProjectVersionControlViewModel :
                 change => new FolderProjectCommitChangeRow(
                     change,
                     _localization)));
+        Replace(
+            CommitChangeTree,
+            FolderProjectCommitChangeTreeNode.Build(
+                ProjectRoot,
+                CommitChanges));
         SelectedCommitChanges = [];
         SelectedCommitChange = CommitChanges.FirstOrDefault(
             change => change.RepositoryPath == selectedPath);
+        SelectedCommitChangeTreeNode = null;
     }
 
     private async Task LoadSelectedCommitChangesAsync(
@@ -2045,7 +2503,8 @@ public partial class FolderProjectVersionControlViewModel :
             SelectedCommitChange?.RepositoryPath,
             SelectedHistoryBranch?.Name,
             SelectedBranch?.Name,
-            SelectedMergeSource?.Name,
+            _requestedMergeSourceBranchName ??
+                SelectedMergeSource?.Name,
             SelectedMergeTarget?.Name,
             SelectedMergeConflict?.Id,
             SelectedStash?.Index);
@@ -2152,6 +2611,18 @@ public partial class FolderProjectVersionControlViewModel :
         CanUseRepository() &&
         UnstagedChanges.Any(IsUsableWorkingChange);
 
+    private bool CanStageChange(FolderProjectWorkingChangeRow? change) =>
+        CanUseRepository() &&
+        change != null &&
+        UnstagedChanges.Contains(change) &&
+        IsUsableWorkingChange(change);
+
+    private bool CanStageTreeNode(
+        FolderProjectWorkingChangeTreeNode? node) =>
+        CanUseRepository() &&
+        node is { IsStagedTree: false } &&
+        node.Changes.Any(IsUsableWorkingChange);
+
     private bool CanUnstageSelected() =>
         CanUseRepository() &&
         GetSelectedStagedChanges().Any(IsUsableWorkingChange);
@@ -2160,6 +2631,18 @@ public partial class FolderProjectVersionControlViewModel :
         CanUseRepository() &&
         StagedChanges.Any(IsUsableWorkingChange);
 
+    private bool CanUnstageChange(FolderProjectWorkingChangeRow? change) =>
+        CanUseRepository() &&
+        change != null &&
+        StagedChanges.Contains(change) &&
+        IsUsableWorkingChange(change);
+
+    private bool CanUnstageTreeNode(
+        FolderProjectWorkingChangeTreeNode? node) =>
+        CanUseRepository() &&
+        node is { IsStagedTree: true } &&
+        node.Changes.Any(IsUsableWorkingChange);
+
     private bool CanDiscardUnstaged() =>
         CanUseRepository() &&
         GetSelectedUnstagedChanges().Any(IsUsableWorkingChange);
@@ -2167,6 +2650,18 @@ public partial class FolderProjectVersionControlViewModel :
     private bool CanDiscardStaged() =>
         CanUseRepository() &&
         GetSelectedStagedChanges().Any(IsUsableWorkingChange);
+
+    private bool CanDiscardChange(FolderProjectWorkingChangeRow? change) =>
+        CanUseRepository() &&
+        change != null &&
+        WorkingChanges.Contains(change) &&
+        IsUsableWorkingChange(change);
+
+    private bool CanDiscardTreeNode(
+        FolderProjectWorkingChangeTreeNode? node) =>
+        CanUseRepository() &&
+        node != null &&
+        node.Changes.Any(IsUsableWorkingChange);
 
     private bool CanDiscardAll() =>
         CanUseRepository() &&
@@ -2230,6 +2725,31 @@ public partial class FolderProjectVersionControlViewModel :
                SelectedCommit is { ParentIds.Count: 1 } &&
                SelectedCommit.Id == HeadCommitId &&
                GetSelectedCommitChanges().Any(IsRestorableCommitChange);
+    }
+
+    private bool CanResetCommitChanges(
+        FolderProjectCommitChangeTreeNode? node)
+    {
+        return CanUseRepository() &&
+               IsClean &&
+               !IsDetached &&
+               SelectedHistoryBranch is { IsCurrent: true } &&
+               SelectedCommit is { ParentIds.Count: 1 } &&
+               SelectedCommit.Id == HeadCommitId &&
+               node != null &&
+               node.Changes.Any(IsRestorableCommitChange);
+    }
+
+    private bool CanRevertCommitChanges(
+        FolderProjectCommitChangeTreeNode? node)
+    {
+        return CanUseRepository() &&
+               IsClean &&
+               !IsDetached &&
+               SelectedHistoryBranch is { IsCurrent: true } &&
+               SelectedCommit is { ParentIds.Count: 1 } &&
+               node != null &&
+               node.Changes.Any(IsRestorableCommitChange);
     }
 
     private bool CanReturnChangesToOriginalCommit()
@@ -2301,7 +2821,7 @@ public partial class FolderProjectVersionControlViewModel :
 
     private bool CanDeleteBranch() =>
         CanUseRepository() &&
-        SelectedBranch is { IsCurrent: false, IsPrimary: false };
+        SelectedBranch is { IsPrimary: false };
 
     private bool CanSwitchBranch() =>
         CanUseRepository() &&
@@ -2392,15 +2912,6 @@ public partial class FolderProjectVersionControlViewModel :
             return;
         }
 
-        if (SelectedStash == null &&
-            SelectedBranch != null &&
-            SelectedHistoryBranch?.Name != SelectedBranch.Name)
-        {
-            SelectedHistoryBranch = Branches.FirstOrDefault(
-                branch => branch.Name == SelectedBranch.Name);
-            return;
-        }
-
         if (SelectedCommit != null)
         {
             CommitChangesLoadTask =
@@ -2434,6 +2945,12 @@ public partial class FolderProjectVersionControlViewModel :
     partial void OnSelectedCommitChangeChanged(
         FolderProjectCommitChangeRow? value) =>
         NotifyCommands();
+    partial void OnSelectedCommitChangeTreeNodeChanged(
+        FolderProjectCommitChangeTreeNode? value)
+    {
+        SelectedCommitChange = value?.Change;
+        NotifyCommands();
+    }
     partial void OnSelectedCommitChangesChanged(
         IReadOnlyList<FolderProjectCommitChangeRow> value) =>
         NotifyCommands();
@@ -2468,11 +2985,6 @@ public partial class FolderProjectVersionControlViewModel :
             return;
 
         SelectedStash = null;
-        if (SelectedTabIndex == 1)
-        {
-            SelectedHistoryBranch = Branches.FirstOrDefault(
-                branch => branch.Name == value.Name);
-        }
     }
     partial void OnSelectedStashChanged(FolderProjectStashInfo? value)
     {
@@ -2509,10 +3021,16 @@ public partial class FolderProjectVersionControlViewModel :
         CommitAllCommand.NotifyCanExecuteChanged();
         StageSelectedCommand.NotifyCanExecuteChanged();
         StageAllCommand.NotifyCanExecuteChanged();
+        StageChangeCommand.NotifyCanExecuteChanged();
+        StageTreeNodeCommand.NotifyCanExecuteChanged();
         UnstageSelectedCommand.NotifyCanExecuteChanged();
         UnstageAllCommand.NotifyCanExecuteChanged();
+        UnstageChangeCommand.NotifyCanExecuteChanged();
+        UnstageTreeNodeCommand.NotifyCanExecuteChanged();
         DiscardUnstagedCommand.NotifyCanExecuteChanged();
         DiscardStagedCommand.NotifyCanExecuteChanged();
+        DiscardChangeCommand.NotifyCanExecuteChanged();
+        DiscardTreeNodeCommand.NotifyCanExecuteChanged();
         DiscardAllCommand.NotifyCanExecuteChanged();
         ApplyStashCommand.NotifyCanExecuteChanged();
         PopStashCommand.NotifyCanExecuteChanged();
@@ -2521,6 +3039,9 @@ public partial class FolderProjectVersionControlViewModel :
         RestoreFileCommand.NotifyCanExecuteChanged();
         DiscardCommitChangesCommand.NotifyCanExecuteChanged();
         RestoreCommitChangesToStageCommand.NotifyCanExecuteChanged();
+        ResetCommitChangesKeepCommand.NotifyCanExecuteChanged();
+        ResetCommitChangesAndDiscardCommand.NotifyCanExecuteChanged();
+        RevertCommitChangesCommand.NotifyCanExecuteChanged();
         ReturnChangesToOriginalCommitCommand.NotifyCanExecuteChanged();
         RevertCommitCommand.NotifyCanExecuteChanged();
         ResetCommitKeepChangesCommand.NotifyCanExecuteChanged();

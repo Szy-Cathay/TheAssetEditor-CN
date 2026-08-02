@@ -3,647 +3,159 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
     xmlns:windowhandling="clr-namespace:WindowHandling;assembly=Shared.Ui"
+    d:DataContext="{d:DesignInstance Type=viewmodels:FolderProjectVersionControlViewModel}"
     mc:Ignorable="d"
-    Title="{loc:Loc FolderProject.VersionControl.Title}"
-    Width="960"
-    Height="700"
-    MinWidth="780"
-    MinHeight="580"
+    Title="{loc:Loc FolderProject.VersionControl.Tab.Merge}"
+    Width="680"
+    Height="460"
+    MinWidth="560"
+    MinHeight="380"
     ResizeMode="CanResize"
     WindowStartupLocation="CenterOwner"
     Style="{StaticResource CustomWindowStyle}">
-    <windowhandling:AssetEditorWindow.Resources>
-        <Style
-            x:Key="SelectRowOnRightClickStyle"
-            TargetType="DataGridRow"
-            BasedOn="{StaticResource {x:Type DataGridRow}}">
-            <EventSetter
-                Event="PreviewMouseRightButtonDown"
-                Handler="DataGridRow_PreviewMouseRightButtonDown" />
-        </Style>
-        <Style
-            x:Key="BranchRowStyle"
-            TargetType="ListBoxItem"
-            BasedOn="{StaticResource {x:Type ListBoxItem}}">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background}" />
-                    <Setter Property="FontWeight" Value="SemiBold" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="SectionHeaderStyle" TargetType="Border">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="BorderBrush" Value="{DynamicResource GroupBox.Static.Border}" />
-            <Setter Property="BorderThickness" Value="0,0,0,1" />
-        </Style>
-        <Style x:Key="IconButtonStyle" TargetType="Button">
-            <Setter Property="MinWidth" Value="22" />
-            <Setter Property="Height" Value="22" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border
-                            x:Name="IconButtonBorder"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="2">
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                FontSize="{TemplateBinding FontSize}"
-                                FontWeight="{TemplateBinding FontWeight}"
-                                Foreground="{TemplateBinding Foreground}"
-                                Text="{TemplateBinding Content}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsEnabled" Value="True" />
-                                    <Condition Property="IsMouseOver" Value="True" />
-                                </MultiTrigger.Conditions>
-                                <Setter TargetName="IconButtonBorder" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background}" />
-                                <Setter TargetName="IconButtonBorder" Property="BorderBrush" Value="{DynamicResource ABrush.Glyph.MouseOver}" />
-                                <Setter Property="Foreground" Value="{DynamicResource ABrush.Glyph.MouseOver}" />
-                            </MultiTrigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="IconButtonBorder" Property="Background" Value="{DynamicResource Button.Pressed.Background}" />
-                                <Setter TargetName="IconButtonBorder" Property="BorderBrush" Value="{DynamicResource ABrush.Glyph.MouseDown}" />
-                                <Setter Property="Foreground" Value="{DynamicResource ABrush.Glyph.MouseDown}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="IconButtonBorder" Property="Background" Value="Transparent" />
-                                <Setter TargetName="IconButtonBorder" Property="BorderBrush" Value="Transparent" />
-                                <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </windowhandling:AssetEditorWindow.Resources>
-
-    <Grid>
+    <Grid Margin="14">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border
-            Grid.Row="0"
-            Padding="12,9"
-            BorderBrush="{DynamicResource GroupBox.Static.Border}"
-            BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock
-                        FontSize="16"
-                        FontWeight="SemiBold"
-                        Text="{Binding ProjectName}" />
-                    <TextBlock
-                        Margin="0,2,0,0"
-                        Opacity="0.65"
-                        Text="{Binding ProjectRoot}"
-                        TextTrimming="CharacterEllipsis" />
-                </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="32" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock
+                    Margin="0,0,0,5"
+                    Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                    Text="{loc:Loc FolderProject.VersionControl.MergeSource}" />
                 <ComboBox
-                    x:Name="HeaderBranchComboBox"
-                    Grid.Column="1"
-                    Margin="10,0"
-                    MinWidth="120"
-                    Height="28"
-                    VerticalAlignment="Center"
+                    Height="30"
+                    VerticalContentAlignment="Center"
+                    AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.MergeSource}"
                     DisplayMemberPath="Name"
-                    ItemsSource="{Binding Branches}"
-                    SelectedItem="{Binding SelectedBranch, Mode=TwoWay}"
-                    SelectionChanged="HeaderBranchComboBox_SelectionChanged" />
-                <Button
-                    Grid.Column="2"
-                    MinWidth="72"
-                    Height="28"
-                    VerticalAlignment="Center"
-                    Command="{Binding RefreshCommand}"
-                    Content="{loc:Loc FolderProject.VersionControl.Refresh}" />
-            </Grid>
-        </Border>
-
-        <TabControl
-            Grid.Row="1"
-            Padding="0"
-            SelectedIndex="{Binding SelectedTabIndex}">
-            <TabItem Header="{loc:Loc FolderProject.VersionControl.Tab.Status}">
-                <Grid Margin="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                        <TextBox
-                            MinHeight="62"
-                            Padding="8"
-                            AcceptsReturn="True"
-                            Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}"
-                            TextWrapping="Wrap"
-                            ToolTip="{loc:Loc FolderProject.VersionControl.CommitMessage}" />
-                        <StackPanel
-                            Margin="0,7,0,0"
-                            HorizontalAlignment="Left"
-                            Orientation="Horizontal">
-                            <Button
-                                MinWidth="170"
-                                Height="30"
-                                Command="{Binding CommitCommand}"
-                                Content="{Binding CommitActionText}" />
-                            <Button
-                                x:Name="CommitMenuButton"
-                                Width="30"
-                                Height="30"
-                                Margin="-1,0,0,0"
-                                Click="CommitMenuButton_Click"
-                                Content="▼">
-                                <Button.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem
-                                            Header="{loc:Loc FolderProject.VersionControl.CommitStaged}"
-                                            Command="{Binding CommitStagedCommand}" />
-                                        <MenuItem
-                                            Header="{loc:Loc FolderProject.VersionControl.CommitAll}"
-                                            Command="{Binding CommitAllCommand}" />
-                                    </ContextMenu>
-                                </Button.ContextMenu>
-                            </Button>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <Border
-                        Grid.Row="1"
-                        Margin="0,0,0,8"
-                        BorderBrush="{DynamicResource GroupBox.Static.Border}"
-                        BorderThickness="1">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Border Style="{StaticResource SectionHeaderStyle}">
-                                <DockPanel LastChildFill="True">
-                                    <Button
-                                        DockPanel.Dock="Right"
-                                        Style="{StaticResource IconButtonStyle}"
-                                        Command="{Binding StageAllCommand}"
-                                        Content="+"
-                                        ToolTip="{loc:Loc FolderProject.VersionControl.StageAll}" />
-                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
-                                        <Run Text="{loc:Loc FolderProject.VersionControl.UnstagedChanges}" />
-                                        <Run Text=" (" /><Run Text="{Binding UnstagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
-                                    </TextBlock>
-                                </DockPanel>
-                            </Border>
-                            <DataGrid
-                                Grid.Row="1"
-                                AutoGenerateColumns="False"
-                                CanUserAddRows="False"
-                                HeadersVisibility="None"
-                                IsReadOnly="True"
-                                ItemsSource="{Binding UnstagedChanges}"
-                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
-                                SelectedItem="{Binding SelectedUnstagedChange}"
-                                SelectionChanged="UnstagedChanges_SelectionChanged"
-                                SelectionMode="Extended"
-                                SelectionUnit="FullRow">
-                                <DataGrid.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.StageSelected}" Command="{Binding StageSelectedCommand}" />
-                                        <Separator />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}" Command="{Binding DiscardUnstagedCommand}" />
-                                    </ContextMenu>
-                                </DataGrid.ContextMenu>
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Width="*" Binding="{Binding RepositoryPath}" />
-                                    <DataGridTemplateColumn Width="38">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <Button
-                                                    Style="{StaticResource IconButtonStyle}"
-                                                    Command="{Binding DataContext.StageSelectedCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    Content="+"
-                                                    ToolTip="{loc:Loc FolderProject.VersionControl.StageSelected}" />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Grid>
-                    </Border>
-
-                    <Border
-                        Grid.Row="2"
-                        BorderBrush="{DynamicResource GroupBox.Static.Border}"
-                        BorderThickness="1">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Border Style="{StaticResource SectionHeaderStyle}">
-                                <DockPanel LastChildFill="True">
-                                    <Button
-                                        DockPanel.Dock="Right"
-                                        Style="{StaticResource IconButtonStyle}"
-                                        Command="{Binding UnstageAllCommand}"
-                                        Content="−"
-                                        ToolTip="{loc:Loc FolderProject.VersionControl.UnstageAll}" />
-                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
-                                        <Run Text="{loc:Loc FolderProject.VersionControl.StagedChanges}" />
-                                        <Run Text=" (" /><Run Text="{Binding StagedChanges.Count, Mode=OneWay}" /><Run Text=")" />
-                                    </TextBlock>
-                                </DockPanel>
-                            </Border>
-                            <DataGrid
-                                Grid.Row="1"
-                                AutoGenerateColumns="False"
-                                CanUserAddRows="False"
-                                HeadersVisibility="None"
-                                IsReadOnly="True"
-                                ItemsSource="{Binding StagedChanges}"
-                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
-                                SelectedItem="{Binding SelectedStagedChange}"
-                                SelectionChanged="StagedChanges_SelectionChanged"
-                                SelectionMode="Extended"
-                                SelectionUnit="FullRow">
-                                <DataGrid.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.UnstageSelected}" Command="{Binding UnstageSelectedCommand}" />
-                                        <Separator />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.DiscardSelected}" Command="{Binding DiscardStagedCommand}" />
-                                    </ContextMenu>
-                                </DataGrid.ContextMenu>
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Width="*" Binding="{Binding RepositoryPath}" />
-                                    <DataGridTemplateColumn Width="38">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <Button
-                                                    Style="{StaticResource IconButtonStyle}"
-                                                    Command="{Binding DataContext.UnstageSelectedCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    Content="−"
-                                                    ToolTip="{loc:Loc FolderProject.VersionControl.UnstageSelected}" />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Grid>
-                    </Border>
-
-                    <Expander
-                        Grid.Row="3"
-                        Margin="0,8,0,0"
-                        Header="{loc:Loc FolderProject.VersionControl.Identity}">
-                        <Grid Margin="0,7,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox
-                                Height="28"
-                                Margin="0,0,7,0"
-                                VerticalContentAlignment="Center"
-                                Text="{Binding IdentityName, UpdateSourceTrigger=PropertyChanged}"
-                                ToolTip="{loc:Loc FolderProject.VersionControl.IdentityName}" />
-                            <TextBox
-                                Grid.Column="1"
-                                Height="28"
-                                Margin="0,0,7,0"
-                                VerticalContentAlignment="Center"
-                                Text="{Binding IdentityEmail, UpdateSourceTrigger=PropertyChanged}"
-                                ToolTip="{loc:Loc FolderProject.VersionControl.IdentityEmail}" />
-                            <Button
-                                Grid.Column="2"
-                                Height="28"
-                                Margin="0,0,7,0"
-                                Command="{Binding SaveIdentityCommand}"
-                                Content="{loc:Loc FolderProject.VersionControl.SaveIdentity}" />
-                            <Button
-                                Grid.Column="3"
-                                Height="28"
-                                Command="{Binding DiscardAllCommand}"
-                                Content="{loc:Loc FolderProject.VersionControl.DiscardAll}" />
-                        </Grid>
-                    </Expander>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="{loc:Loc FolderProject.VersionControl.Tab.History}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="240" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Border
-                        Padding="8"
-                        BorderBrush="{DynamicResource GroupBox.Static.Border}"
-                        BorderThickness="0,0,1,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="180" />
-                            </Grid.RowDefinitions>
-                            <DockPanel Margin="2,0,2,5">
-                                <Button
-                                    DockPanel.Dock="Right"
-                                    Style="{StaticResource IconButtonStyle}"
-                                    Command="{Binding CreateBranchCommand}"
-                                    Content="+"
-                                    ToolTip="{loc:Loc FolderProject.VersionControl.CreateBranch}" />
-                                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="本地" />
-                            </DockPanel>
-                            <ListBox
-                                Grid.Row="1"
-                                ItemsSource="{Binding Branches}"
-                                ItemContainerStyle="{StaticResource BranchRowStyle}"
-                                SelectedItem="{Binding SelectedBranch}">
-                                <ListBox.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.SwitchBranch}" Command="{Binding SwitchBranchCommand}" />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.PrepareMerge}" Command="{Binding PrepareMergeCommand}" />
-                                        <Separator />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.RenameBranch}" Command="{Binding RenameBranchCommand}" />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.DeleteBranch}" Command="{Binding DeleteBranchCommand}" />
-                                    </ContextMenu>
-                                </ListBox.ContextMenu>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <DockPanel Margin="2,4">
-                                            <TextBlock DockPanel.Dock="Left" Margin="0,0,7,0" Text="⑂" />
-                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock
-                                                Margin="7,0,0,0"
-                                                HorizontalAlignment="Right"
-                                                Opacity="0.65"
-                                                Text="{loc:Loc FolderProject.VersionControl.BranchCurrent}"
-                                                Visibility="{Binding IsCurrent, Converter={StaticResource BoolToCollapsedConverter}}" />
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <DockPanel Grid.Row="2" Margin="2,9,2,5">
-                                <Button
-                                    DockPanel.Dock="Right"
-                                    Style="{StaticResource IconButtonStyle}"
-                                    Command="{Binding ClearStashesCommand}"
-                                    Content="×"
-                                    ToolTip="{loc:Loc FolderProject.VersionControl.ClearStashes}" />
-                                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
-                                    <Run Text="{loc:Loc FolderProject.VersionControl.Stashes}" />
-                                    <Run Text=" (" /><Run Text="{Binding Stashes.Count, Mode=OneWay}" /><Run Text=")" />
-                                </TextBlock>
-                            </DockPanel>
-                            <ListBox
-                                Grid.Row="3"
-                                ItemsSource="{Binding Stashes}"
-                                SelectedItem="{Binding SelectedStash}">
-                                <ListBox.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.ApplyStash}" Command="{Binding ApplyStashCommand}" />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.PopStash}" Command="{Binding PopStashCommand}" />
-                                        <Separator />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.DeleteStash}" Command="{Binding DeleteStashCommand}" />
-                                    </ContextMenu>
-                                </ListBox.ContextMenu>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Margin="2,4">
-                                            <TextBlock Text="{Binding Message}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Opacity="0.6" Text="{Binding StashedAt, StringFormat={}{0:g}}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Grid>
-                    </Border>
-
-                    <Grid Grid.Column="1" Margin="12">
-                        <Grid>
-                            <Grid.Style>
-                                <Style TargetType="Grid">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedStash}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Grid.Style>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="2*" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <DockPanel Margin="0,0,0,8">
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button
-                                        MinWidth="72"
-                                        Height="28"
-                                        Margin="0,0,7,0"
-                                        Command="{Binding SwitchBranchCommand}"
-                                        Content="切换" />
-                                    <Button
-                                        MinWidth="110"
-                                        Height="28"
-                                        Command="{Binding PrepareMergeCommand}"
-                                        Content="{loc:Loc FolderProject.VersionControl.PrepareMerge}" />
-                                </StackPanel>
-                                <TextBlock
-                                    VerticalAlignment="Center"
-                                    FontSize="15"
-                                    FontWeight="SemiBold"
-                                    Text="{Binding SelectedBranch.Name}" />
-                            </DockPanel>
-
-                            <DataGrid
-                                Grid.Row="1"
-                                AutoGenerateColumns="False"
-                                CanUserAddRows="False"
-                                IsReadOnly="True"
-                                ItemsSource="{Binding History}"
-                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
-                                SelectedItem="{Binding SelectedCommit}"
-                                SelectionMode="Single"
-                                SelectionUnit="FullRow">
-                                <DataGrid.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem
-                                            Header="{loc:Loc FolderProject.VersionControl.RevertCommit}"
-                                            Command="{Binding RevertCommitCommand}" />
-                                        <MenuItem Header="{loc:Loc FolderProject.VersionControl.ResetCommit}">
-                                            <MenuItem
-                                                Header="{loc:Loc FolderProject.VersionControl.ResetCommitKeepChanges}"
-                                                Command="{Binding ResetCommitKeepChangesCommand}" />
-                                            <MenuItem
-                                                Header="{loc:Loc FolderProject.VersionControl.ResetCommitAndDiscardChanges}"
-                                                Command="{Binding ResetCommitAndDiscardChangesCommand}" />
-                                        </MenuItem>
-                                    </ContextMenu>
-                                </DataGrid.ContextMenu>
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Width="*" Header="{loc:Loc FolderProject.VersionControl.CommitTitleColumn}" Binding="{Binding Title}" />
-                                    <DataGridTextColumn Width="120" Header="{loc:Loc FolderProject.VersionControl.Author}" Binding="{Binding AuthorName}" />
-                                    <DataGridTextColumn Width="145" Header="{loc:Loc FolderProject.VersionControl.Time}" Binding="{Binding CommittedAt, StringFormat={}{0:g}}" />
-                                    <DataGridTextColumn Width="78" Header="{loc:Loc FolderProject.VersionControl.CommitId}" Binding="{Binding ShortId}" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-
-                            <DockPanel Grid.Row="2" Margin="0,8,0,5">
-                                <WrapPanel DockPanel.Dock="Right">
-                                    <Button Margin="0,0,6,0" Command="{Binding RestoreFileCommand}" Content="{loc:Loc FolderProject.VersionControl.Restore}" />
-                                    <Button Margin="0,0,6,0" Command="{Binding DiscardCommitChangesCommand}" Content="{loc:Loc FolderProject.VersionControl.DiscardCommitChanges}" />
-                                    <Button Margin="0,0,6,0" Command="{Binding RestoreCommitChangesToStageCommand}" Content="{loc:Loc FolderProject.VersionControl.RestoreCommitChangesToStage}" />
-                                    <Button Command="{Binding ReturnChangesToOriginalCommitCommand}" Content="{loc:Loc FolderProject.VersionControl.ReturnChangesToOriginalCommit}" />
-                                </WrapPanel>
-                                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{loc:Loc FolderProject.VersionControl.CommitChanges}" />
-                            </DockPanel>
-
-                            <DataGrid
-                                Grid.Row="3"
-                                AutoGenerateColumns="False"
-                                CanUserAddRows="False"
-                                IsReadOnly="True"
-                                ItemsSource="{Binding CommitChanges}"
-                                RowStyle="{StaticResource SelectRowOnRightClickStyle}"
-                                SelectedItem="{Binding SelectedCommitChange}"
-                                SelectionChanged="CommitChanges_SelectionChanged"
-                                SelectionMode="Extended"
-                                SelectionUnit="FullRow">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Width="*" Header="{loc:Loc FolderProject.VersionControl.Path}" Binding="{Binding RepositoryPath}" />
-                                    <DataGridTextColumn Width="120" Header="{loc:Loc FolderProject.VersionControl.Kind}" Binding="{Binding KindText}" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-
-                            <Expander Grid.Row="4" Margin="0,8,0,0" Header="{loc:Loc FolderProject.VersionControl.Tab.Merge}">
-                                <StackPanel Margin="0,7,0,0">
-                                    <WrapPanel>
-                                        <ComboBox Width="170" Margin="0,0,7,0" DisplayMemberPath="Name" ItemsSource="{Binding MergeSources}" SelectedItem="{Binding SelectedMergeSource}" />
-                                        <TextBlock Margin="0,0,7,0" VerticalAlignment="Center" Text="→" />
-                                        <ComboBox Width="170" Margin="0,0,7,0" DisplayMemberPath="Name" ItemsSource="{Binding MergeTargets}" SelectedItem="{Binding SelectedMergeTarget}" />
-                                        <Button Margin="0,0,7,0" Command="{Binding BeginMergeCommand}" Content="{loc:Loc FolderProject.VersionControl.BeginMerge}" />
-                                        <Button Command="{Binding AbortMergeCommand}" Content="{loc:Loc FolderProject.VersionControl.AbortMerge}" />
-                                    </WrapPanel>
-                                    <TextBlock Margin="0,6,0,0" Text="{Binding MergeSummary}" />
-                                    <DataGrid
-                                        MaxHeight="150"
-                                        AutoGenerateColumns="False"
-                                        CanUserAddRows="False"
-                                        IsReadOnly="True"
-                                        ItemsSource="{Binding MergeConflicts}"
-                                        SelectedItem="{Binding SelectedMergeConflict}"
-                                        SelectionChanged="MergeConflicts_SelectionChanged"
-                                        SelectionMode="Extended"
-                                        SelectionUnit="FullRow">
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Width="*" Header="{loc:Loc FolderProject.VersionControl.Path}" Binding="{Binding DisplayPath}" />
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                    <WrapPanel Margin="0,6,0,0">
-                                        <Button Margin="0,0,7,0" Command="{Binding UseCurrentCommand}" Content="{loc:Loc FolderProject.VersionControl.UseCurrent}" />
-                                        <Button Margin="0,0,7,0" Command="{Binding UseIncomingCommand}" Content="{loc:Loc FolderProject.VersionControl.UseIncoming}" />
-                                        <Button Command="{Binding CompleteMergeCommand}" Content="{loc:Loc FolderProject.VersionControl.CompleteMerge}" />
-                                    </WrapPanel>
-                                </StackPanel>
-                            </Expander>
-                        </Grid>
-
-                        <Grid Visibility="{Binding SelectedStash, Converter={StaticResource NullToVisibilityConverter}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <DockPanel Margin="0,0,0,8">
-                                <WrapPanel DockPanel.Dock="Right">
-                                    <Button Margin="0,0,6,0" Command="{Binding ApplyStashCommand}" Content="{loc:Loc FolderProject.VersionControl.ApplyStash}" />
-                                    <Button Margin="0,0,6,0" Command="{Binding PopStashCommand}" Content="{loc:Loc FolderProject.VersionControl.PopStash}" />
-                                    <Button Margin="0,0,6,0" Command="{Binding DeleteStashCommand}" Content="{loc:Loc FolderProject.VersionControl.DeleteStash}" />
-                                    <Button Command="{Binding ClearStashesCommand}" Content="{loc:Loc FolderProject.VersionControl.ClearStashes}" />
-                                </WrapPanel>
-                                <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{Binding SelectedStash.Message}" />
-                            </DockPanel>
-                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedStash.Paths}" />
-                        </Grid>
-                    </Grid>
-                </Grid>
-            </TabItem>
-        </TabControl>
-
-        <Border
-            Grid.Row="2"
-            MinHeight="28"
-            Padding="9,4"
-            Background="{DynamicResource ABrush.AccentTone1.Background}">
-            <DockPanel>
-                <TextBlock DockPanel.Dock="Right" Margin="12,0,0,0" Text="{Binding CurrentBranch, StringFormat=⑂ {0}}" />
-                <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" />
-            </DockPanel>
-        </Border>
-
-        <Grid
-            Grid.RowSpan="3"
-            Panel.ZIndex="100"
-            Background="#88000000"
-            Visibility="{Binding IsBranchSwitchChoiceOpen, Converter={StaticResource BoolToCollapsedConverter}}">
-            <Border
-                Width="430"
-                Padding="18"
+                    ItemsSource="{Binding MergeSources}"
+                    SelectedItem="{Binding SelectedMergeSource}" />
+            </StackPanel>
+            <TextBlock
+                Grid.Column="1"
+                Margin="0,23,0,0"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="{DynamicResource ABrush.Foreground.Deeper}"
-                BorderBrush="{DynamicResource GroupBox.Static.Border}"
-                BorderThickness="1">
-                <StackPanel>
-                    <TextBlock FontSize="16" FontWeight="SemiBold">
-                        <Run Text="切换到 " /><Run Text="{Binding PendingBranchName}" />
-                    </TextBlock>
-                    <Button Margin="0,14,0,7" Height="34" HorizontalContentAlignment="Left" Command="{Binding CarryChangesAndSwitchCommand}" Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Carry}" />
-                    <Button Margin="0,0,0,7" Height="34" HorizontalContentAlignment="Left" Command="{Binding StashChangesAndSwitchCommand}" Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Stash}" />
-                    <Button Margin="0,0,0,12" Height="34" HorizontalContentAlignment="Left" Command="{Binding DiscardChangesAndSwitchCommand}" Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Discard}" />
-                    <Button HorizontalAlignment="Right" Command="{Binding CancelBranchSwitchCommand}" Content="取消" />
-                </StackPanel>
-            </Border>
+                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Text="→" />
+            <StackPanel Grid.Column="2">
+                <TextBlock
+                    Margin="0,0,0,5"
+                    Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                    Text="{loc:Loc FolderProject.VersionControl.MergeTarget}" />
+                <ComboBox
+                    Height="30"
+                    VerticalContentAlignment="Center"
+                    AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.MergeTarget}"
+                    DisplayMemberPath="Name"
+                    ItemsSource="{Binding MergeTargets}"
+                    SelectedItem="{Binding SelectedMergeTarget}" />
+            </StackPanel>
         </Grid>
 
+        <DockPanel Grid.Row="1" Margin="0,12,0,0" LastChildFill="True">
+            <StackPanel DockPanel.Dock="Right" Margin="12,0,0,0" Orientation="Horizontal">
+                <Button
+                    MinWidth="86"
+                    Height="28"
+                    Margin="0,0,6,0"
+                    Command="{Binding BeginMergeCommand}"
+                    Content="{loc:Loc FolderProject.VersionControl.BeginMerge}" />
+                <Button
+                    MinWidth="86"
+                    Height="28"
+                    Command="{Binding AbortMergeCommand}"
+                    Content="{loc:Loc FolderProject.VersionControl.AbortMerge}" />
+            </StackPanel>
+            <TextBlock
+                VerticalAlignment="Center"
+                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Text="{Binding MergeSummary}"
+                TextTrimming="CharacterEllipsis"
+                ToolTip="{Binding MergeSummary}" />
+        </DockPanel>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock
+                Margin="0,0,0,5"
+                FontWeight="SemiBold"
+                Text="{loc:Loc FolderProject.VersionControl.MergeConflicts}" />
+            <DataGrid
+                Grid.Row="1"
+                AutoGenerateColumns="False"
+                CanUserAddRows="False"
+                IsReadOnly="True"
+                ItemsSource="{Binding MergeConflicts}"
+                SelectedItem="{Binding SelectedMergeConflict}"
+                SelectionChanged="MergeConflicts_SelectionChanged"
+                SelectionMode="Extended"
+                SelectionUnit="FullRow">
+                <DataGrid.Columns>
+                    <DataGridTextColumn
+                        Width="*"
+                        Header="{loc:Loc FolderProject.VersionControl.Path}"
+                        Binding="{Binding DisplayPath}" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <DockPanel Grid.Row="3" Margin="0,10,0,0">
+            <Button
+                MinWidth="86"
+                Height="28"
+                DockPanel.Dock="Right"
+                Command="{Binding CompleteMergeCommand}"
+                Content="{loc:Loc FolderProject.VersionControl.CompleteMerge}" />
+            <StackPanel Orientation="Horizontal">
+                <Button
+                    MinWidth="110"
+                    Height="28"
+                    Margin="0,0,6,0"
+                    Command="{Binding UseCurrentCommand}"
+                    Content="{loc:Loc FolderProject.VersionControl.UseCurrent}" />
+                <Button
+                    MinWidth="110"
+                    Height="28"
+                    Command="{Binding UseIncomingCommand}"
+                    Content="{loc:Loc FolderProject.VersionControl.UseIncoming}" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border
+            Grid.Row="4"
+            MinHeight="28"
+            Margin="0,10,0,0"
+            Padding="0,7,0,0"
+            BorderBrush="{DynamicResource App.Border}"
+            BorderThickness="0,1,0,0">
+            <TextBlock
+                VerticalAlignment="Center"
+                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Text="{Binding StatusMessage}"
+                TextTrimming="CharacterEllipsis"
+                ToolTip="{Binding StatusMessage}" />
+        </Border>
+
         <Grid
-            Grid.RowSpan="3"
+            Grid.RowSpan="5"
             Panel.ZIndex="110"
             Background="#66000000"
             IsHitTestVisible="{Binding IsBusy}"
@@ -655,7 +167,12 @@
                 Background="{DynamicResource ABrush.Foreground.Deeper}">
                 <StackPanel>
                     <ProgressBar Width="260" Height="8" IsIndeterminate="True" />
-                    <TextBlock Margin="0,10,0,0" HorizontalAlignment="Center" Text="{Binding BusyMessage}" />
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        HorizontalAlignment="Center"
+                        Text="{Binding BusyMessage}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
         </Grid>

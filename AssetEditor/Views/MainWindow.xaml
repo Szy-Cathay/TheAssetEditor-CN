@@ -26,6 +26,170 @@
     <Window.Resources>
         <datatemplates:EditorTemplateSelector x:Key="EditorSelector" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+        <Style
+            x:Key="SidebarWorkspaceTabItemStyle"
+            TargetType="{x:Type TabItem}">
+            <Setter Property="Height" Value="22" />
+            <Setter Property="MinWidth" Value="72" />
+            <Setter Property="Margin" Value="0,1,2,1" />
+            <Setter Property="Padding" Value="12,0,10,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
+            <Setter Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabItem}">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border
+                                x:Name="SegmentSurface"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3" />
+                            <Border
+                                x:Name="SelectionIndicator"
+                                Width="2"
+                                Height="12"
+                                Margin="4,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource ABrush.AccentTone2.Background.Static}"
+                                CornerRadius="1"
+                                Visibility="Collapsed" />
+                            <ContentPresenter
+                                x:Name="HeaderContent"
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                ContentSource="Header"
+                                Focusable="False"
+                                RecognizesAccessKey="True"
+                                SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource ABrush.Tone3.Background.MouseOver}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource ABrush.Tone4.Background.Static}" />
+                                <Setter
+                                    TargetName="SelectionIndicator"
+                                    Property="Visibility"
+                                    Value="Visible" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsKeyboardFocusWithin" Value="True" />
+                                    <Condition Property="IsSelected" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource ABrush.Tone3.Background.MouseOver}" />
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsKeyboardFocusWithin" Value="True" />
+                                    <Condition Property="IsSelected" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource ABrush.Tone4.Background.MouseOver}" />
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsSelected" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource ABrush.Tone4.Background.MouseOver}" />
+                            </MultiTrigger>
+                            <Trigger Property="IsMouseCaptured" Value="True">
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource ABrush.Tone4.Background.MouseDown}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter
+                                    TargetName="HeaderContent"
+                                    Property="Opacity"
+                                    Value="0.56" />
+                                <Setter
+                                    TargetName="SegmentSurface"
+                                    Property="Background"
+                                    Value="{DynamicResource TabItem.Disabled.Background}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style
+            x:Key="SidebarWorkspaceTabControlStyle"
+            TargetType="{x:Type TabControl}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="{DynamicResource TabItem.Static.Background}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource App.Border}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource SidebarWorkspaceTabItemStyle}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabControl}">
+                        <Grid
+                            Background="{TemplateBinding Background}"
+                            ClipToBounds="True"
+                            KeyboardNavigation.TabNavigation="Local"
+                            SnapsToDevicePixels="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="24" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TabPanel
+                                x:Name="SidebarHeaderPanel"
+                                Height="24"
+                                Background="{DynamicResource ABrush.Tone2.Background.Static}"
+                                IsItemsHost="True"
+                                KeyboardNavigation.TabIndex="1"
+                                Panel.ZIndex="1" />
+                            <Border
+                                x:Name="SidebarContentBorder"
+                                Grid.Row="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                KeyboardNavigation.DirectionalNavigation="Contained"
+                                KeyboardNavigation.TabIndex="2"
+                                KeyboardNavigation.TabNavigation="Local">
+                                <ContentPresenter
+                                    x:Name="PART_SelectedContentHost"
+                                    Margin="{TemplateBinding Padding}"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"
+                                    ContentSource="SelectedContent"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="rootGrid">
@@ -51,10 +215,9 @@
                 <TabControl
                     Grid.Row="1"
                     Grid.Column="0"
-                    TabStripPlacement="Bottom"
+                    Style="{StaticResource SidebarWorkspaceTabControlStyle}"
+                    TabStripPlacement="Top"
                     SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}"
-                    BorderBrush="{DynamicResource App.Border}"
-                    BorderThickness="0, 1, 1, 0"
                     Visibility="{Binding DataContext.IsPackFileExplorerVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TabItem Header="{loc:Loc FolderProject.Git.WorkTree}">
                         <views:FileTreeView
@@ -69,13 +232,13 @@
                     </TabItem>
                 </TabControl>
 
-                <GridSplitter Grid.Row="1" Grid.RowSpan="1" Grid.Column="1" Width="2.9" HorizontalAlignment="Stretch" Background="{DynamicResource App.Border}" 
+                <GridSplitter Grid.Row="1" Grid.RowSpan="1" Grid.Column="1" Width="3" HorizontalAlignment="Stretch" Background="Transparent" SnapsToDevicePixels="True"
                               Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                 <views:CachedTabControl Grid.Row="1" Grid.Column="2" ItemsSource="{Binding EditorManager.CurrentEditorsList, UpdateSourceTrigger=PropertyChanged}" 
                         SelectedIndex="{Binding EditorManager.SelectedEditorIndex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                         ContentTemplateSelector="{StaticResource EditorSelector}" viewFactory:ToolFactoryParameter.ViewFactory="{Binding ToolsFactory}"
-                        x:Name="EditorsTabControl" BorderThickness="1, 1, 0, 0" >
+                        x:Name="EditorsTabControl" Margin="0" BorderThickness="0,1,0,0" >
 
                     <views:CachedTabControl.Template>
                         <!-- [Crucial Fix]: TargetType must be strictly set to views:CachedTabControl to prevent rendering crashes or white screens -->
@@ -87,7 +250,7 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- This line controls the display of the tab headers -->
-                                <TabPanel x:Name="HeaderPanel" Panel.ZIndex="1" Margin="0,2,2,0" IsItemsHost="True" KeyboardNavigation.TabIndex="1" Background="Transparent" />
+                                <TabPanel x:Name="HeaderPanel" Panel.ZIndex="1" Height="24" Margin="0" IsItemsHost="True" KeyboardNavigation.TabIndex="1" Background="{DynamicResource ABrush.Tone2.Background.Static}" />
 
                                 <!-- [Crucial Fix]: This binds to the AssetEditor exclusive dark theme color TabItem.Static.Background -->
                                 <Border x:Name="Border" Grid.Row="1" 
@@ -107,8 +270,8 @@
                     </views:CachedTabControl.Resources>
 
                     <views:CachedTabControl.ItemContainerStyle>
-                        <!-- Ensure each child tab item inherits the native theme and events -->
-                        <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                        <!-- Ensure each child tab item inherits the workspace tab theme and events -->
+                        <Style TargetType="TabItem" BasedOn="{StaticResource SidebarWorkspaceTabItemStyle}">
                             <EventSetter Event="Drop" Handler="TabItem_Drop"/>
                             <EventSetter Event="PreviewMouseMove" Handler="TabItem_MouseMove"/>
                             <EventSetter Event="PreviewMouseDown" Handler="TabItem_MouseDown"/>

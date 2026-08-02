@@ -73,6 +73,11 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         string commitId);
 
+    FolderProjectCommitSummary RevertCommitChanges(
+        string projectRoot,
+        string commitId,
+        IReadOnlyList<string> relativePaths);
+
     FolderProjectCommitEditSession EditLatestCommitChanges(
         string projectRoot,
         string commitId,

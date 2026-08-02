@@ -2,19 +2,140 @@
     x:Class="AssetEditor.Views.FolderProjectVersionControl.FolderProjectGitRepositoryView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
+    xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:common="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
+    x:Name="Root"
     d:DataContext="{d:DesignInstance Type=viewmodels:FolderProjectGitRepositoryViewModel}"
     mc:Ignorable="d">
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="FolderProjectGitStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <common:BindingProxy x:Key="WorkspaceProxy" Data="{Binding}" />
+            <HierarchicalDataTemplate
+                x:Key="GitCommitChangeTreeNodeTemplate"
+                ItemContainerStyle="{StaticResource GitChangeTreeItemStyle}"
+                ItemsSource="{Binding Children}">
+                <Border
+                    x:Name="CommitNodeRow"
+                    MinHeight="24"
+                    Margin="1,0"
+                    Padding="3,0"
+                    Background="Transparent"
+                    CornerRadius="3">
+                    <Border.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="{loc:Loc FolderProject.VersionControl.ResetCommitChanges}">
+                                <MenuItem
+                                    Command="{Binding Data.VersionControl.ResetCommitChangesKeepCommand, Source={StaticResource WorkspaceProxy}}"
+                                    CommandParameter="{Binding}"
+                                    Header="{loc:Loc FolderProject.VersionControl.ResetCommitChangesKeep}" />
+                                <MenuItem
+                                    Command="{Binding Data.VersionControl.ResetCommitChangesAndDiscardCommand, Source={StaticResource WorkspaceProxy}}"
+                                    CommandParameter="{Binding}"
+                                    Header="{loc:Loc FolderProject.VersionControl.ResetCommitChangesAndDiscard}" />
+                            </MenuItem>
+                            <MenuItem
+                                Command="{Binding Data.VersionControl.RevertCommitChangesCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Header="{loc:Loc FolderProject.VersionControl.RevertCommitChanges}" />
+                        </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="22" />
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon
+                            x:Name="CommitNodeIcon"
+                            Width="16"
+                            Height="16"
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Kind="FileDocumentOutline" />
+                        <TextBlock
+                            x:Name="CommitNodeName"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Text="{Binding Name}"
+                            TextTrimming="CharacterEllipsis"
+                            ToolTip="{Binding RepositoryPath}" />
+                        <StackPanel
+                            x:Name="CommitNodeActions"
+                            Grid.Column="2"
+                            Margin="4,0,2,0"
+                            Orientation="Horizontal"
+                            Opacity="0"
+                            IsHitTestVisible="False">
+                            <Button
+                                Command="{Binding Data.VersionControl.ResetCommitChangesKeepCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource GitTreeActionButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.ResetCommitChangesKeepTooltip}"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.ResetCommitChangesKeepTooltip}">
+                                <materialIcons:MaterialIcon Width="15" Height="15" Kind="Restore" />
+                            </Button>
+                            <Button
+                                Command="{Binding Data.VersionControl.RevertCommitChangesCommand, Source={StaticResource WorkspaceProxy}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource GitTreeActionButtonStyle}"
+                                ToolTip="{loc:Loc FolderProject.VersionControl.RevertCommitChangesTooltip}"
+                                AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.RevertCommitChangesTooltip}">
+                                <materialIcons:MaterialIcon Width="15" Height="15" Kind="Undo" />
+                            </Button>
+                        </StackPanel>
+                        <TextBlock
+                            x:Name="CommitNodeStatus"
+                            Grid.Column="3"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontWeight="SemiBold"
+                            Text="{Binding StatusGlyph}"
+                            ToolTip="{Binding KindText}"
+                            AutomationProperties.Name="{Binding KindText}" />
+                    </Grid>
+                </Border>
+                <HierarchicalDataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                        <Setter TargetName="CommitNodeIcon" Property="Kind" Value="FolderOutline" />
+                        <Setter TargetName="CommitNodeStatus" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsRoot}" Value="True">
+                        <Setter TargetName="CommitNodeIcon" Property="Kind" Value="SourceRepository" />
+                        <Setter TargetName="CommitNodeIcon" Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
+                        <Setter TargetName="CommitNodeName" Property="FontWeight" Value="SemiBold" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsDeleted}" Value="True">
+                        <Setter TargetName="CommitNodeName" Property="TextDecorations" Value="Strikethrough" />
+                        <Setter TargetName="CommitNodeName" Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                        <Setter TargetName="CommitNodeRow" Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=CommitNodeRow}" Value="True">
+                        <Setter TargetName="CommitNodeRow" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
+                        <Setter TargetName="CommitNodeActions" Property="Opacity" Value="1" />
+                        <Setter TargetName="CommitNodeActions" Property="IsHitTestVisible" Value="True" />
+                    </DataTrigger>
+                </HierarchicalDataTemplate.Triggers>
+            </HierarchicalDataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250" MinWidth="190" MaxWidth="380" />
+            <ColumnDefinition Width="230" MinWidth="190" MaxWidth="320" />
             <ColumnDefinition Width="5" />
             <ColumnDefinition Width="*" MinWidth="420" />
         </Grid.ColumnDefinitions>
@@ -34,66 +155,111 @@
                 </Grid.RowDefinitions>
 
                 <Border
-                    Padding="12,11"
+                    Height="46"
+                    Padding="9,5"
                     BorderBrush="{DynamicResource App.Border}"
                     BorderThickness="0,0,0,1">
-                    <StackPanel>
-                        <TextBlock
-                            FontSize="15"
-                            FontWeight="SemiBold"
-                            Text="{Binding VersionControl.ProjectName}"
-                            TextTrimming="CharacterEllipsis"
-                            ToolTip="{Binding VersionControl.ProjectName}" />
-                        <TextBlock
-                            Margin="0,4,0,0"
-                            Opacity="0.7"
-                            Text="{Binding VersionControl.ProjectRoot}"
-                            TextTrimming="CharacterEllipsis"
-                            ToolTip="{Binding VersionControl.ProjectRoot}" />
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon
+                            Width="16"
+                            Height="16"
+                            Margin="0,0,7,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                            Kind="SourceBranch" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                Style="{StaticResource GitSectionTitleStyle}"
+                                Text="{Binding VersionControl.ProjectName}"
+                                TextTrimming="CharacterEllipsis"
+                                ToolTip="{Binding VersionControl.ProjectName}" />
+                            <TextBlock
+                                Margin="0,1,0,0"
+                                FontSize="11"
+                                Style="{StaticResource GitCaptionStyle}"
+                                Text="{Binding VersionControl.ProjectRoot}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap"
+                                ToolTip="{Binding VersionControl.ProjectRoot}" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <TextBox
+                <Grid
                     Grid.Row="1"
-                    Height="30"
-                    Margin="10"
-                    Padding="8,0"
-                    VerticalContentAlignment="Center"
-                    Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged}"
-                    ToolTip="{loc:Loc FolderProject.Git.SearchBranches}" />
+                    Margin="8,6">
+                    <TextBox
+                        Height="28"
+                        Padding="8,0,28,0"
+                        behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.SearchBranches}"
+                        VerticalContentAlignment="Center"
+                        Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged}"
+                        ToolTip="{loc:Loc FolderProject.Git.SearchBranches}"
+                        AutomationProperties.Name="{loc:Loc FolderProject.Git.SearchBranches}" />
+                    <materialIcons:MaterialIcon
+                        Width="15"
+                        Height="15"
+                        Margin="0,0,9,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                        IsHitTestVisible="False"
+                        Kind="Magnify" />
+                </Grid>
 
                 <Border
                     Grid.Row="2"
-                    Padding="11,7"
-                    Background="{DynamicResource WindowBackground}"
+                    Padding="9,4"
+                    Background="Transparent"
                     BorderBrush="{DynamicResource App.Border}"
-                    BorderThickness="0,1,0,1">
+                    BorderThickness="0,0,0,1">
                     <TextBlock
-                        FontWeight="SemiBold"
+                        Style="{StaticResource GitSectionTitleStyle}"
                         Text="{loc:Loc FolderProject.Git.LocalBranches}" />
                 </Border>
 
                 <Grid Grid.Row="3">
                     <ListBox
                         x:Name="BranchList"
-                        Padding="4"
+                        Padding="0,2"
                         BorderThickness="0"
                         ItemsSource="{Binding FilteredBranches}"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                         SelectedItem="{Binding VersionControl.SelectedHistoryBranch, Mode=TwoWay}"
                         SelectionMode="Single">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource GitBranchListItemStyle}" />
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="5,3">
+                                <Grid MinHeight="24" Margin="4,0">
+                                    <Grid.ContextMenu>
+                                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                            <MenuItem
+                                                Command="{Binding Data.Workspace.DeleteBranchCommand, Source={StaticResource WorkspaceProxy}}"
+                                                CommandParameter="{Binding}"
+                                                Header="{loc:Loc FolderProject.Git.DeleteBranch}" />
+                                            <MenuItem
+                                                Command="{Binding Data.Workspace.MergeBranchCommand, Source={StaticResource WorkspaceProxy}}"
+                                                CommandParameter="{Binding}"
+                                                Header="{loc:Loc FolderProject.Git.MergeBranch}" />
+                                        </ContextMenu>
+                                    </Grid.ContextMenu>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="18" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock
+                                    <materialIcons:MaterialIcon
+                                        Width="15"
+                                        Height="15"
                                         VerticalAlignment="Center"
                                         Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
-                                        Text="●"
+                                        Kind="Check"
                                         Visibility="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Converter={StaticResource BoolToVisibilityConverter}}" />
                                     <TextBlock
                                         Grid.Column="1"
@@ -128,12 +294,9 @@
                             </Style>
                         </Border.Style>
                         <TextBlock
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Opacity="0.7"
+                            Style="{StaticResource GitEmptyStateTextStyle}"
                             Text="{Binding BranchEmptyMessage}"
-                            TextAlignment="Center"
-                            TextWrapping="Wrap" />
+                            />
                     </Border>
                 </Grid>
             </Grid>
@@ -147,48 +310,70 @@
             ResizeDirection="Columns"
             ShowsPreview="True" />
 
-        <Grid Grid.Column="2" Margin="10">
+        <Grid Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="3*" MinHeight="150" />
+                <RowDefinition x:Name="HistoryRow" Height="*" MinHeight="120" />
                 <RowDefinition Height="5" />
-                <RowDefinition Height="2*" MinHeight="145" />
+                <RowDefinition x:Name="DetailsRow" Height="*" MinHeight="120" />
             </Grid.RowDefinitions>
 
-            <Grid Margin="0,0,0,5">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="260" />
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold">
-                    <Run Text="{loc:Loc FolderProject.VersionControl.HistoryBranch}" /><Run Text=": " /><Run Text="{Binding VersionControl.SelectedHistoryBranch.Name}" />
-                </TextBlock>
-                <TextBox
-                    Grid.Column="1"
-                    Height="30"
-                    Padding="8,0"
-                    VerticalContentAlignment="Center"
-                    Text="{Binding HistoryFilter, UpdateSourceTrigger=PropertyChanged}"
-                    ToolTip="{loc:Loc FolderProject.Git.SearchHistory}" />
-            </Grid>
+            <Border
+                Height="46"
+                Padding="10,6"
+                BorderBrush="{DynamicResource App.Border}"
+                BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="240" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource GitPageTitleStyle}">
+                        <Run Text="{loc:Loc FolderProject.VersionControl.HistoryBranch}" /><Run Text=": " /><Run Text="{Binding VersionControl.SelectedHistoryBranch.Name}" />
+                    </TextBlock>
+                    <Grid Grid.Column="1">
+                        <TextBox
+                            Height="28"
+                            Padding="8,0,28,0"
+                            behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.SearchHistory}"
+                            VerticalContentAlignment="Center"
+                            Text="{Binding HistoryFilter, UpdateSourceTrigger=PropertyChanged}"
+                            ToolTip="{loc:Loc FolderProject.Git.SearchHistory}"
+                            AutomationProperties.Name="{loc:Loc FolderProject.Git.SearchHistory}" />
+                        <materialIcons:MaterialIcon
+                            Width="15"
+                            Height="15"
+                            Margin="0,0,9,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            IsHitTestVisible="False"
+                            Kind="Magnify" />
+                    </Grid>
+                </Grid>
+            </Border>
 
             <TextBlock
                 Grid.Row="1"
-                Margin="0,0,0,7"
-                Opacity="0.72"
+                Margin="10,5,10,6"
+                Style="{StaticResource GitCaptionStyle}"
                 Text="{Binding VersionControl.HistoryBranchHint}"
                 TextTrimming="CharacterEllipsis"
                 ToolTip="{Binding VersionControl.HistoryBranchHint}" />
 
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="2" Margin="10,0">
                 <DataGrid
                     x:Name="HistoryGrid"
                     AutoGenerateColumns="False"
                     CanUserAddRows="False"
+                    GridLinesVisibility="Horizontal"
                     IsReadOnly="True"
                     ItemsSource="{Binding FilteredHistory}"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                     SelectedItem="{Binding VersionControl.SelectedCommit, Mode=TwoWay}"
+                    RowHeight="26"
+                    RowStyle="{StaticResource GitHistoryDataGridRowStyle}"
                     SelectionMode="Single"
                     SelectionUnit="FullRow">
                     <DataGrid.ContextMenu>
@@ -203,7 +388,7 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Width="*" Binding="{Binding Title}" Header="{loc:Loc FolderProject.VersionControl.CommitTitleColumn}" />
                         <DataGridTextColumn Width="150" Binding="{Binding AuthorName}" Header="{loc:Loc FolderProject.VersionControl.Author}" />
-                        <DataGridTextColumn Width="145" Binding="{Binding CommittedAt, StringFormat={}{0:g}}" Header="{loc:Loc FolderProject.VersionControl.Time}" />
+                        <DataGridTextColumn Width="145" Binding="{Binding CommittedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="{loc:Loc FolderProject.VersionControl.Time}" />
                         <DataGridTextColumn Width="82" Binding="{Binding ShortId}" Header="{loc:Loc FolderProject.VersionControl.CommitId}" />
                     </DataGrid.Columns>
                 </DataGrid>
@@ -222,19 +407,21 @@
                         </Style>
                     </Border.Style>
                     <TextBlock
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Opacity="0.7"
+                        Style="{StaticResource GitEmptyStateTextStyle}"
                         Text="{Binding HistoryEmptyMessage}"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
+                        />
                 </Border>
             </Grid>
 
             <GridSplitter
                 x:Name="DetailsSplitter"
                 Grid.Row="3"
+                Height="5"
+                Margin="10,0"
+                HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
+                Background="{DynamicResource App.Border}"
+                Cursor="SizeNS"
                 ResizeBehavior="PreviousAndNext"
                 ResizeDirection="Rows"
                 ShowsPreview="True" />
@@ -244,47 +431,44 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <DockPanel Margin="0,7,0,6">
+                <Grid Margin="10,5,10,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock
-                        DockPanel.Dock="Right"
-                        Margin="10,0,0,0"
-                        Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
-                        Text="{Binding VersionControl.StatusMessage}"
-                        TextTrimming="CharacterEllipsis" />
-                    <TextBlock
-                        FontWeight="SemiBold"
+                        Style="{StaticResource GitSectionTitleStyle}"
                         Text="{loc:Loc FolderProject.Git.CommitDetails}" />
-                </DockPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock
+                            MaxWidth="180"
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                            Text="{Binding VersionControl.StatusMessage}"
+                            TextTrimming="CharacterEllipsis"
+                            ToolTip="{Binding VersionControl.StatusMessage}" />
+                    </StackPanel>
+                </Grid>
 
-                <Grid Grid.Row="1">
+                <Grid Grid.Row="1" Margin="10,0,10,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*" MinWidth="230" />
                         <ColumnDefinition Width="5" />
                         <ColumnDefinition Width="2*" MinWidth="210" />
                     </Grid.ColumnDefinitions>
 
-                    <DataGrid
-                        AutoGenerateColumns="False"
-                        CanUserAddRows="False"
-                        IsReadOnly="True"
-                        ItemsSource="{Binding VersionControl.CommitChanges}"
-                        SelectedItem="{Binding VersionControl.SelectedCommitChange}"
-                        SelectionMode="Single"
-                        SelectionUnit="FullRow">
-                        <DataGrid.ContextMenu>
-                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                <MenuItem Command="{Binding VersionControl.RestoreFileCommand}" Header="{loc:Loc FolderProject.VersionControl.Restore}" />
-                                <MenuItem Command="{Binding VersionControl.DiscardCommitChangesCommand}" Header="{loc:Loc FolderProject.VersionControl.DiscardCommitChanges}" />
-                                <Separator />
-                                <MenuItem Command="{Binding VersionControl.RestoreCommitChangesToStageCommand}" Header="{loc:Loc FolderProject.VersionControl.RestoreCommitChangesToStage}" />
-                                <MenuItem Command="{Binding VersionControl.ReturnChangesToOriginalCommitCommand}" Header="{loc:Loc FolderProject.VersionControl.ReturnChangesToOriginalCommit}" />
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Width="*" Binding="{Binding RepositoryPath}" Header="{loc:Loc FolderProject.VersionControl.Path}" />
-                            <DataGridTextColumn Width="110" Binding="{Binding KindText}" Header="{loc:Loc FolderProject.VersionControl.Kind}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <TreeView
+                        MaxHeight="10000"
+                        ItemContainerStyle="{StaticResource GitChangeTreeItemStyle}"
+                        ItemTemplate="{StaticResource GitCommitChangeTreeNodeTemplate}"
+                        ItemsSource="{Binding VersionControl.CommitChangeTree}"
+                        Style="{StaticResource GitChangeTreeStyle}">
+                        <b:Interaction.Behaviors>
+                            <behaviors:BindableSelectedItemBehavior
+                                SelectedItem="{Binding VersionControl.SelectedCommitChangeTreeNode, Mode=TwoWay}" />
+                        </b:Interaction.Behaviors>
+                    </TreeView>
 
                     <GridSplitter
                         Grid.Column="1"
@@ -295,10 +479,8 @@
 
                     <Border
                         Grid.Column="2"
-                        Padding="12"
-                        Background="{DynamicResource WindowBackground}"
-                        BorderBrush="{DynamicResource App.Border}"
-                        BorderThickness="1">
+                        Padding="10,4,0,4"
+                        Style="{StaticResource GitFlatPaneStyle}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock
@@ -311,7 +493,7 @@
                                     FontWeight="SemiBold"
                                     Text="{loc:Loc FolderProject.VersionControl.Author}" />
                                 <TextBlock Margin="0,2,0,0" Text="{Binding VersionControl.SelectedCommit.AuthorName}" />
-                                <TextBlock Margin="0,2,0,0" Opacity="0.7" Text="{Binding VersionControl.SelectedCommit.CommittedAt, StringFormat={}{0:g}}" />
+                                <TextBlock Margin="0,2,0,0" Opacity="0.7" Text="{Binding VersionControl.SelectedCommit.CommittedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
                                 <TextBlock
                                     Margin="0,9,0,0"
                                     FontWeight="SemiBold"
@@ -351,30 +533,37 @@
                             </Style>
                         </Border.Style>
                         <TextBlock
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Opacity="0.7"
+                            Style="{StaticResource GitEmptyStateTextStyle}"
                             Text="{loc:Loc FolderProject.Git.SelectCommit}"
-                            TextAlignment="Center"
-                            TextWrapping="Wrap" />
+                            />
                     </Border>
                 </Grid>
             </Grid>
         </Grid>
 
-        <Border
+        <Grid
+            x:Name="RepositoryBusyOverlay"
             Grid.ColumnSpan="3"
-            Padding="18"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Background="{DynamicResource WindowBackground}"
-            BorderBrush="{DynamicResource App.Border}"
-            BorderThickness="1"
+            Panel.ZIndex="100"
+            Background="#66000000"
+            IsHitTestVisible="{Binding VersionControl.IsBusy}"
             Visibility="{Binding VersionControl.IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
-            <StackPanel>
-                <ProgressBar Width="260" Height="8" IsIndeterminate="True" />
-                <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="{Binding VersionControl.BusyMessage}" />
-            </StackPanel>
-        </Border>
+            <Border
+                Width="330"
+                Padding="18"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Style="{StaticResource GitSurfaceBorderStyle}">
+                <StackPanel>
+                    <ProgressBar Width="260" Height="8" IsIndeterminate="True" />
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Center"
+                        Text="{Binding VersionControl.BusyMessage}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
