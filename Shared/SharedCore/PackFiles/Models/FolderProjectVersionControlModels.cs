@@ -90,6 +90,7 @@ public enum FolderProjectCommitChangeEditMode
 {
     Discard,
     StageForEdit,
+    KeepChanges,
 }
 
 public sealed record FolderProjectCommitSummary(

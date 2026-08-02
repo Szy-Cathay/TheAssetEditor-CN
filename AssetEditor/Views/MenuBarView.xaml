@@ -21,7 +21,9 @@
                 <MenuItem Header="{loc:Loc MenuBar.File.NewPack}" Command="{Binding MenuBar.CreateNewPackFileCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.NewAnimPackWh3}" Command="{Binding MenuBar.CreateAnimPackWarhammer3Command}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.NewAnimPack3K}" Command="{Binding MenuBar.CreateAnimPack3kCommand}"/>
-                <MenuItem Header="{Binding MenuBar.SaveActiveContainerText}" Command="{Binding MenuBar.SaveActivePackCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.SaveActivePack}"
+                          Command="{Binding MenuBar.SaveActivePackCommand}"
+                          Visibility="{Binding MenuBar.IsSaveActivePackVisible, Converter={StaticResource BoolToCollapsedConverter}}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenPack}" Command="{Binding MenuBar.OpenPackFileCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenRecentPacks}" ItemsSource="{Binding MenuBar.RecentPackFiles}">
                     <MenuItem.Style>

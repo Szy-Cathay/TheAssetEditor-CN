@@ -171,6 +171,46 @@ public class FolderProjectVersionControlViewModelTests
     }
 
     [NUnit.Framework.Test]
+    public async Task TreeFolderCommands_OperateOnEveryDescendantPath()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "src/first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "src/nested/second.txt",
+                            FolderProjectWorkingChangeKind.Added |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        var root = viewModel.UnstagedChangeTree.Single();
+        var folder = root.Children.Single();
+        var command = viewModel.GetType()
+            .GetProperty("StageTreeNodeCommand")?
+            .GetValue(viewModel) as IAsyncRelayCommand;
+
+        NUnit.Framework.Assert.That(command, Is.Not.Null);
+        await command!.ExecuteAsync(folder);
+
+        service.Verify(
+            item => item.StageChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(
+                        new[] { "src/first.txt", "src/nested/second.txt" }))),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
     public async Task StageSelected_OperatesOnEverySelectedChange()
     {
         var service = CreateService();
@@ -818,6 +858,77 @@ public class FolderProjectVersionControlViewModelTests
     }
 
     [NUnit.Framework.Test]
+    public async Task CommitTreeFolderCommands_UseEveryDescendantPath()
+    {
+        var commit = new FolderProjectCommitSummary(
+            MainCommit,
+            "提交 A",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T10:00:00+08:00"),
+            [FeatureCommit]);
+        var changes = new[]
+        {
+            new FolderProjectCommitChange(
+                "src/first.txt",
+                null,
+                FolderProjectCommitChangeKind.Modified,
+                false),
+            new FolderProjectCommitChange(
+                "src/nested/second.txt",
+                null,
+                FolderProjectCommitChangeKind.Added,
+                false),
+        };
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetHistory(ProjectRoot, "main", 100))
+            .Returns([commit]);
+        service.Setup(item => item.GetCommitChanges(ProjectRoot, MainCommit))
+            .Returns(changes);
+        service.Setup(item => item.EditLatestCommitChanges(
+                ProjectRoot,
+                MainCommit,
+                It.IsAny<IReadOnlyList<string>>(),
+                FolderProjectCommitChangeEditMode.KeepChanges))
+            .Returns(
+                new FolderProjectCommitEditSession(
+                    MainCommit,
+                    MainCommit,
+                    changes.Select(change => change.RepositoryPath).ToList(),
+                    true));
+        service.Setup(item => item.RevertCommitChanges(
+                ProjectRoot,
+                MainCommit,
+                It.IsAny<IReadOnlyList<string>>()))
+            .Returns(commit);
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+        var folder = viewModel.CommitChangeTree.Single().Children
+            .Single(node => node.Name == "src");
+
+        await viewModel.ResetCommitChangesKeepCommand.ExecuteAsync(folder);
+        await viewModel.RevertCommitChangesCommand.ExecuteAsync(folder);
+
+        service.Verify(item => item.EditLatestCommitChanges(
+            ProjectRoot,
+            MainCommit,
+            It.Is<IReadOnlyList<string>>(paths => paths.SequenceEqual(
+                new[] { "src/first.txt", "src/nested/second.txt" })),
+            FolderProjectCommitChangeEditMode.KeepChanges), Times.Once);
+        service.Verify(item => item.RevertCommitChanges(
+            ProjectRoot,
+            MainCommit,
+            It.Is<IReadOnlyList<string>>(paths => paths.SequenceEqual(
+                new[] { "src/first.txt", "src/nested/second.txt" }))),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
     public async Task RestoreCommitChangesToStage_AllowsExplicitReturnToOriginalCommit()
     {
         var original = new FolderProjectCommitSummary(
@@ -1423,6 +1534,37 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(
                 viewModel.SelectedTabIndex,
                 Is.EqualTo(1));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task OpenMergeProject_PrefillsSourceAndCurrentTarget()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status());
+        var viewModel = CreateViewModel(service);
+
+        viewModel.OpenMergeProject(
+            ProjectRoot,
+            "测试工程",
+            "feature");
+        await viewModel.RefreshCommand.ExecutionTask!;
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.SelectedMergeSource?.Name,
+                Is.EqualTo("feature"));
+            NUnit.Framework.Assert.That(
+                viewModel.SelectedMergeTarget?.Name,
+                Is.EqualTo("main"));
+            NUnit.Framework.Assert.That(
+                viewModel.SelectedTabIndex,
+                Is.EqualTo(1));
+            NUnit.Framework.Assert.That(
+                viewModel.IsMergeSectionExpanded,
+                Is.True);
         });
     }
 

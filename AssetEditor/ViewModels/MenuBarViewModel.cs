@@ -39,17 +39,13 @@ namespace AssetEditor.ViewModels
         private readonly IPackFileContainerLoader _packFileContainerLoader;
         private readonly IFolderProjectOpenService _folderProjectOpenService;
         private readonly IStandardDialogs _standardDialogs;
-        private readonly IFolderProjectUnsavedChangesService _unsavedChanges;
 
         public ObservableCollection<RecentPackFileItem> RecentPackFiles { get; set; } = [];
         public ObservableCollection<RecentPackFileItem> RecentFolderProjects { get; set; } = [];
         public ObservableCollection<EditorShortcutViewModel> Editors { get; set; } = [];
-        public string SaveActiveContainerText =>
-            _packfileService.GetEditablePack() is FolderProjectContainer
-                ? LocalizationManager.Instance.Get(
-                    "MenuBar.File.SaveFolderProject")
-                : LocalizationManager.Instance.Get(
-                    "MenuBar.File.SaveActivePack");
+        public bool IsSaveActivePackVisible =>
+            _packfileService.GetEditablePack() is not
+                FolderProjectContainer;
 
         public MenuBarViewModel(IPackFileService packfileService, 
             ApplicationSettingsService settingsService, 
@@ -60,7 +56,6 @@ namespace AssetEditor.ViewModels
             IPackFileContainerLoader packFileContainerLoader,
             IFolderProjectOpenService folderProjectOpenService,
             IStandardDialogs standardDialogs,
-            IFolderProjectUnsavedChangesService unsavedChanges,
             IEventHub eventHub)
         {
             _packfileService = packfileService;
@@ -72,7 +67,6 @@ namespace AssetEditor.ViewModels
             _packFileContainerLoader = packFileContainerLoader;
             _folderProjectOpenService = folderProjectOpenService;
             _standardDialogs = standardDialogs;
-            _unsavedChanges = unsavedChanges;
             var settings = settingsService.CurrentSettings;
             settings.RecentPackFilePaths.CollectionChanged += (sender, args) => CreateRecentPackFilesItems();
             settings.RecentFolderProjectPaths.CollectionChanged +=
@@ -87,7 +81,8 @@ namespace AssetEditor.ViewModels
                     OpenFolderProjectVersionControlCommand
                         .NotifyCanExecuteChanged();
                     GeneratePackCommand.NotifyCanExecuteChanged();
-                    OnPropertyChanged(nameof(SaveActiveContainerText));
+                    SaveActivePackCommand.NotifyCanExecuteChanged();
+                    OnPropertyChanged(nameof(IsSaveActivePackVisible));
                 });
         }
 
@@ -127,22 +122,20 @@ namespace AssetEditor.ViewModels
         
         [RelayCommand] private void CreateAnimPackWarhammer3() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDbWarhammer3();
         [RelayCommand] private void CreateAnimPack3k() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDb3k();
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSaveActivePack))]
         private void SaveActivePack()
         {
-            if (_packfileService.GetEditablePack() is
-                FolderProjectContainer folderProject)
-            {
-                _unsavedChanges.SaveUnsavedChanges(
-                    folderProject.ProjectRoot,
-                    null);
+            if (!CanSaveActivePack())
                 return;
-            }
 
             _uiCommandFactory
                 .Create<SavePackFileContainerCommand>()
                 .Execute();
         }
+
+        private bool CanSaveActivePack() =>
+            _packfileService.GetEditablePack() is not
+                FolderProjectContainer;
 
         [RelayCommand(CanExecute = nameof(CanGeneratePack))]
         private void GeneratePack() => _uiCommandFactory

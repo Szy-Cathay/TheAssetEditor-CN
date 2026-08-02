@@ -22,6 +22,12 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             set { SetValue(CustomContextMenuProperty, value); }
         }
 
+        public bool ShowTitle
+        {
+            get { return (bool)GetValue(ShowTitleProperty); }
+            set { SetValue(ShowTitleProperty, value); }
+        }
+
         private void TreeView_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left)
@@ -107,5 +113,6 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         }
 
         public static readonly DependencyProperty CustomContextMenuProperty = DependencyProperty.Register("CustomContextMenu", typeof(System.Windows.Controls.ContextMenu), typeof(PackFileBrowserView), new UIPropertyMetadata(null));
+        public static readonly DependencyProperty ShowTitleProperty = DependencyProperty.Register("ShowTitle", typeof(bool), typeof(PackFileBrowserView), new PropertyMetadata(true));
     }
 }

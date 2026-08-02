@@ -12,7 +12,8 @@ public sealed partial class FolderProjectVersionControlService
         FolderProjectCommitChangeEditMode mode)
     {
         if (mode is not FolderProjectCommitChangeEditMode.Discard and
-            not FolderProjectCommitChangeEditMode.StageForEdit)
+            not FolderProjectCommitChangeEditMode.StageForEdit and
+            not FolderProjectCommitChangeEditMode.KeepChanges)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(mode),
@@ -114,6 +115,11 @@ public sealed partial class FolderProjectVersionControlService
                                 CheckoutModifiers = CheckoutModifiers.Force,
                             });
                     }
+                    else if (mode ==
+                             FolderProjectCommitChangeEditMode.KeepChanges)
+                    {
+                        repository.Reset(ResetMode.Mixed, rewrittenHead);
+                    }
                 }
                 catch (Exception failure)
                 {
@@ -147,6 +153,182 @@ public sealed partial class FolderProjectVersionControlService
                         .ToList(),
                     rewrittenHead.Id != parent.Id);
             });
+    }
+
+    public FolderProjectCommitSummary RevertCommitChanges(
+        string projectRoot,
+        string commitId,
+        IReadOnlyList<string> relativePaths)
+    {
+        var objectId = ParseFullCommitId(commitId);
+        var requestedPaths = ValidateChangePaths(relativePaths);
+        return Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureCommitStateSupported(repository);
+                if (repository.Info.IsHeadDetached)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError
+                            .UnsupportedOperationState,
+                        "Commit files cannot be reverted from a detached HEAD.");
+                }
+                if (RetrieveWorkingStatus(repository).IsDirty)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.WorkingTreeNotClean,
+                        "A clean working tree is required before reverting commit files.");
+                }
+
+                var commit = LookupCommit(repository, objectId);
+                var originalHead = repository.Head.Tip!;
+                if (!IsAncestor(repository, commit, originalHead) ||
+                    commit.Parents.Count() != 1)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "Only files from an ordinary commit in the current branch can be reverted.");
+                }
+
+                var parent = commit.Parents.Single();
+                var changes = repository.Diff.Compare<TreeChanges>(
+                    parent.Tree,
+                    commit.Tree,
+                    new CompareOptions
+                    {
+                        Similarity = SimilarityOptions.Renames,
+                    });
+                var selectedChanges = changes
+                    .Where(
+                        change => requestedPaths.Contains(
+                            change.Path,
+                            StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+                if (selectedChanges.Count != requestedPaths.Count ||
+                    selectedChanges.Any(
+                        change => change.Status is not ChangeKind.Added and
+                                  not ChangeKind.Modified and
+                                  not ChangeKind.Deleted and
+                                  not ChangeKind.Renamed))
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.UnsupportedCommitPath,
+                        "Every selected path must be a reversible file change.");
+                }
+
+                var definition = TreeDefinition.From(originalHead.Tree);
+                foreach (var change in selectedChanges)
+                {
+                    EnsureCommitSideIsCurrent(
+                        originalHead.Tree,
+                        commit.Tree,
+                        change);
+                    definition.Remove(change.Path);
+                    var parentPath = change.Status == ChangeKind.Renamed
+                        ? change.OldPath
+                        : change.Path;
+                    if (change.Status == ChangeKind.Added ||
+                        string.IsNullOrWhiteSpace(parentPath))
+                    {
+                        continue;
+                    }
+
+                    var parentEntry = parent.Tree[parentPath];
+                    if (parentEntry?.Target is not Blob parentBlob)
+                    {
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError
+                                .UnsupportedCommitPath,
+                            "The selected path is not an ordinary file change.");
+                    }
+                    definition.Add(
+                        parentPath,
+                        parentBlob,
+                        parentEntry.Mode);
+                }
+
+                var revertedTree = repository.ObjectDatabase.CreateTree(
+                    definition);
+                if (revertedTree.Id == originalHead.Tree.Id)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "The selected file changes have already been reverted.");
+                }
+
+                var identity = ReadLocalIdentity(repository);
+                ValidateIdentity(identity);
+                var signature = CreateSignature(identity);
+                var reverted = repository.ObjectDatabase.CreateCommit(
+                    signature,
+                    signature,
+                    $"Revert \"{commit.MessageShort}\" (selected files)",
+                    revertedTree,
+                    [originalHead],
+                    prettifyMessage: false);
+                var headUpdated = false;
+                try
+                {
+                    repository.Refs.UpdateTarget(
+                        repository.Refs[repository.Head.CanonicalName],
+                        reverted.Sha);
+                    headUpdated = true;
+                    _platform.Reset(
+                        repository,
+                        reverted,
+                        new CheckoutOptions
+                        {
+                            CheckoutModifiers = CheckoutModifiers.Force,
+                        });
+                }
+                catch (Exception failure)
+                {
+                    if (!headUpdated)
+                        throw;
+
+                    RestoreHeadAfterFailedHistoryOperation(
+                        repository,
+                        originalHead,
+                        failure,
+                        "Selected-file revert failed and rollback was incomplete.");
+                }
+
+                return ToSummary(reverted);
+            });
+    }
+
+    private static void EnsureCommitSideIsCurrent(
+        Tree currentTree,
+        Tree commitTree,
+        TreeEntryChanges change)
+    {
+        var currentEntry = currentTree[change.Path];
+        var commitEntry = commitTree[change.Path];
+        var matchesCommitSide = change.Status == ChangeKind.Deleted
+            ? currentEntry == null
+            : TreeEntriesMatch(currentEntry, commitEntry);
+        if (change.Status == ChangeKind.Renamed)
+        {
+            matchesCommitSide = matchesCommitSide &&
+                                currentTree[change.OldPath] == null;
+        }
+        if (matchesCommitSide)
+            return;
+
+        throw new FolderProjectVersionControlException(
+            FolderProjectVersionControlError.CommitCannotBeUndone,
+            "The selected file changes could not be reverted cleanly because the files changed later.");
+    }
+
+    private static bool TreeEntriesMatch(
+        TreeEntry? currentEntry,
+        TreeEntry? commitEntry)
+    {
+        return currentEntry != null &&
+               commitEntry != null &&
+               currentEntry.Mode == commitEntry.Mode &&
+               currentEntry.Target.Id == commitEntry.Target.Id;
     }
 
     public FolderProjectCommitSummary CompleteLatestCommitEdit(

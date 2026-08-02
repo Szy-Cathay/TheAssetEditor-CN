@@ -78,8 +78,7 @@ public partial class FolderProjectGitRepositoryViewModel :
             OnBranchesChanged;
         VersionControl.PropertyChanged +=
             OnVersionControlPropertyChanged;
-        VersionControl.SelectedTabIndex = 1;
-        VersionControl.RefreshCommand.Execute(null);
+        VersionControl.OpenRepositoryHistory();
     }
 
     public void Close()

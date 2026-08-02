@@ -949,6 +949,93 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void EditLatestCommitChanges_KeepChangesLeavesSelectedChangeUnstaged()
+    {
+        using var project = new TemporaryDirectory("reset-commit-file-keep");
+        var service = new FolderProjectVersionControlService();
+        var firstPath = Path.Combine(project.Path, "first.txt");
+        var secondPath = Path.Combine(project.Path, "second.txt");
+        File.WriteAllText(firstPath, "first before");
+        File.WriteAllText(secondPath, "second before");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(firstPath, "first in A");
+        File.WriteAllText(secondPath, "second in A");
+        var original = service.CommitAll(project.Path, "提交 A");
+
+        var result = service.EditLatestCommitChanges(
+            project.Path,
+            original.Id,
+            ["first.txt"],
+            (FolderProjectCommitChangeEditMode)2);
+
+        var status = service.GetStatus(project.Path);
+        var rewrittenChanges = service.GetCommitChanges(
+            project.Path,
+            result.ExpectedHeadCommitId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                rewrittenChanges.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+            Assert.That(File.ReadAllText(firstPath), Is.EqualTo("first in A"));
+            Assert.That(status.Changes, Has.Count.EqualTo(1));
+            Assert.That(
+                status.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Unstaged),
+                Is.True);
+            Assert.That(
+                status.Changes[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged),
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void RevertCommitChanges_CreatesCommitForOnlySelectedFiles()
+    {
+        using var project = new TemporaryDirectory("revert-selected-files");
+        var service = new FolderProjectVersionControlService();
+        var firstPath = Path.Combine(project.Path, "first.txt");
+        var secondPath = Path.Combine(project.Path, "second.txt");
+        var laterPath = Path.Combine(project.Path, "later.txt");
+        File.WriteAllText(firstPath, "first before");
+        File.WriteAllText(secondPath, "second before");
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(firstPath, "first in A");
+        File.WriteAllText(secondPath, "second in A");
+        var target = service.CommitAll(project.Path, "提交 A");
+        File.WriteAllText(laterPath, "later");
+        var previousHead = service.CommitAll(project.Path, "提交 B");
+        var method = typeof(FolderProjectVersionControlService).GetMethod(
+            "RevertCommitChanges",
+            [
+                typeof(string),
+                typeof(string),
+                typeof(IReadOnlyList<string>),
+            ]);
+
+        Assert.That(method, Is.Not.Null);
+        var reverted = (FolderProjectCommitSummary)method!.Invoke(
+            service,
+            [project.Path, target.Id, new[] { "first.txt" }])!;
+
+        var revertedChanges = service.GetCommitChanges(
+            project.Path,
+            reverted.Id);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reverted.ParentIds, Is.EqualTo(new[] { previousHead.Id }));
+            Assert.That(
+                revertedChanges.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[] { "first.txt" }));
+            Assert.That(File.ReadAllText(firstPath), Is.EqualTo("first before"));
+            Assert.That(File.ReadAllText(secondPath), Is.EqualTo("second in A"));
+            Assert.That(File.ReadAllText(laterPath), Is.EqualTo("later"));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
     public void GetMergeState_StaleRevertPreservesInverseAndReturnsToIdle()
     {
         using var project = new TemporaryDirectory("stale-revert");

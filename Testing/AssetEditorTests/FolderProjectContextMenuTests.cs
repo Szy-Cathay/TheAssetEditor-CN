@@ -296,6 +296,81 @@ public class FolderProjectContextMenuTests
     }
 
     [NUnit.Framework.Test]
+    public void FolderProjectContextMenu_DoesNotOfferSaveProjectFolder()
+    {
+        var serviceProvider =
+            new DependencyInjectionConfig(false).Build(true);
+        var projectRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"ae-folder-save-menu-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(projectRoot);
+
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var services = scope.ServiceProvider;
+            services.GetRequiredService<LocalizationManager>()
+                .LoadLanguage();
+            using var project = FolderProjectContainer.Create(
+                projectRoot,
+                new FolderProjectSettings { Name = "工程" });
+            var folderRoot = new TreeNode(
+                project.Name,
+                NodeType.Root,
+                project,
+                null);
+            var folder = new TreeNode(
+                "子目录",
+                NodeType.Directory,
+                project,
+                folderRoot);
+            var ordinaryPack = new PackFileContainer("普通 Pack")
+            {
+                Header = new PFHeader(
+                    PackFileVersionConverter.ToString(
+                        PackFileVersion.PFH5),
+                    PackFileCAType.MOD),
+            };
+            var ordinaryRoot = new TreeNode(
+                ordinaryPack.Name,
+                NodeType.Root,
+                ordinaryPack,
+                null);
+            var menuBuilder = services
+                .GetServices<IContextMenuBuilder>()
+                .Single(
+                    builder =>
+                        builder.Type ==
+                        ContextMenuType.MainApplication);
+            const string displayName = "保存工程文件夹";
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    ContainsMenuItem(
+                        menuBuilder.Build(folderRoot),
+                        displayName),
+                    NUnit.Framework.Is.False);
+                NUnitAssert.That(
+                    ContainsMenuItem(
+                        menuBuilder.Build(folder),
+                        displayName),
+                    NUnit.Framework.Is.False);
+                NUnitAssert.That(
+                    ContainsMenuItem(
+                        menuBuilder.Build(ordinaryRoot),
+                        displayName),
+                    NUnit.Framework.Is.False);
+            });
+        }
+        finally
+        {
+            (serviceProvider as IDisposable)?.Dispose();
+            Directory.Delete(projectRoot, true);
+        }
+    }
+
+    [NUnit.Framework.Test]
     public void PackTreeContextMenus_ContainNoEnglishSectionNames()
     {
         var serviceProvider = new DependencyInjectionConfig(false).Build(true);

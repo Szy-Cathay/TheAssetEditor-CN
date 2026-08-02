@@ -133,7 +133,7 @@ public class MenuBarFolderProjectRecentTests
     }
 
     [Test]
-    public void SaveFolderProject_SavesEditorsWithoutGeneratingPack()
+    public void FolderProject_DisablesSaveActivePackWithoutGeneratingPack()
     {
         new LocalizationManager().LoadLanguage();
         using var directory = new TemporaryDirectory();
@@ -143,35 +143,30 @@ public class MenuBarFolderProjectRecentTests
         var packFileService = new Mock<IPackFileService>();
         packFileService.Setup(service => service.GetEditablePack())
             .Returns(project);
-        var unsavedChanges =
-            new Mock<IFolderProjectUnsavedChangesService>();
-        unsavedChanges.Setup(service => service.SaveUnsavedChanges(
-                project.ProjectRoot,
-                null))
-            .Returns(true);
         var commandFactory = new Mock<IUiCommandFactory>();
         var viewModel = CreateViewModel(
             packFileService.Object,
             new ApplicationSettingsService(GameTypeEnum.Warhammer3),
             commandFactory.Object,
             Mock.Of<IFolderProjectOpenService>(),
-            new TestEventHub(),
-            unsavedChanges.Object);
+            new TestEventHub());
 
+        var canSaveActivePack =
+            viewModel.SaveActivePackCommand.CanExecute(null);
         viewModel.SaveActivePackCommand.Execute(null);
 
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(
-                viewModel.SaveActiveContainerText,
-                Is.EqualTo("保存文件夹工程"));
+                canSaveActivePack,
+                Is.False);
+            NUnitAssert.That(
+                viewModel.IsSaveActivePackVisible,
+                Is.False);
             NUnitAssert.That(
                 viewModel.GeneratePackCommand.CanExecute(null),
                 Is.True);
         });
-        unsavedChanges.Verify(service => service.SaveUnsavedChanges(
-            project.ProjectRoot,
-            null), Times.Once);
         commandFactory.Verify(factory => factory.Create<
             SavePackFileContainerCommand>(
                 It.IsAny<Action<SavePackFileContainerCommand>?>()),
@@ -229,8 +224,7 @@ public class MenuBarFolderProjectRecentTests
         ApplicationSettingsService settingsService,
         IUiCommandFactory uiCommandFactory,
         IFolderProjectOpenService openService,
-        IEventHub eventHub,
-        IFolderProjectUnsavedChangesService? unsavedChanges = null)
+        IEventHub eventHub)
     {
         var editorDatabase = new Mock<IEditorDatabase>();
         editorDatabase
@@ -249,8 +243,6 @@ public class MenuBarFolderProjectRecentTests
             Mock.Of<IPackFileContainerLoader>(),
             openService,
             Mock.Of<IStandardDialogs>(),
-            unsavedChanges ??
-                Mock.Of<IFolderProjectUnsavedChangesService>(),
             eventHub);
     }
 
