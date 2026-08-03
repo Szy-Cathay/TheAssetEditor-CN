@@ -39,6 +39,68 @@ namespace Test.Shared.Core.PackFiles.Serialization
         }
 
         [Test]
+        public void SaveToByteArray_UncompressedFileSystemSource_DoesNotBufferWholeFile()
+        {
+            const int sourceLength = 8 * 1024 * 1024;
+            var directory = Path.Combine(
+                Path.GetTempPath(),
+                $"pack-streaming-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var sourcePath = Path.Combine(directory, "source.wem");
+                var outputPath = Path.Combine(directory, "output.pack");
+                File.WriteAllBytes(sourcePath, new byte[sourceLength]);
+                var container = new PackFileContainer("test")
+                {
+                    Header = new PFHeader(
+                        PackFileVersionConverter.ToString(
+                            PackFileVersion.PFH4),
+                        PackFileCAType.MOD),
+                };
+                container.FileList["audio\\source.wem"] =
+                    PackFile.CreateFromFileSystem(
+                        "source.wem",
+                        sourcePath);
+                var gameInfo = GameInformationDatabase.GetGameById(
+                    GameTypeEnum.Rome2);
+
+                var allocatedBefore =
+                    GC.GetAllocatedBytesForCurrentThread();
+                using (var stream = new FileStream(
+                           outputPath,
+                           FileMode.CreateNew,
+                           FileAccess.ReadWrite,
+                           FileShare.None))
+                using (var writer = new BinaryWriter(stream))
+                {
+                    PackFileSerializerWriter.SaveToByteArray(
+                        outputPath,
+                        container,
+                        writer,
+                        gameInfo,
+                        enableCompression: false);
+                }
+                var allocated =
+                    GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        new FileInfo(outputPath).Length,
+                        Is.GreaterThan(sourceLength));
+                    Assert.That(
+                        allocated,
+                        Is.LessThan(sourceLength / 2));
+                });
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [Test]
         public void SaveToByteArray_WhenLaterSourceReadFails_DoesNotReplaceEarlierSources()
         {
             var gameInfo = GameInformationDatabase.GetGameById(GameTypeEnum.Rome2);

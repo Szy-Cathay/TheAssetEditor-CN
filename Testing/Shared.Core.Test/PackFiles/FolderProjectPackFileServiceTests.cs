@@ -104,6 +104,539 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
+    public void ApplyFileWrites_FolderProjectPublishesSinglePathAwareChangeSet()
+    {
+        using var project = new TemporaryDirectory();
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+
+        service.ApplyFileWrites(
+            container,
+            [
+                new PackFileWrite(@"audio\first.wem", [1]),
+                new PackFileWrite(@"audio\second.wem", [2]),
+            ]);
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(
+                    change => change.Path),
+                Is.EqualTo(
+                    new[]
+                    {
+                        @"audio\first.wem",
+                        @"audio\second.wem",
+                    }));
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(
+                    change => change.Kind),
+                Is.All.EqualTo(FolderProjectFileChangeKind.Added));
+            Assert.That(
+                CountPublished<PackFileContainerFilesAddedEvent>(eventHub),
+                Is.Zero);
+            Assert.That(
+                CountPublished<PackFileContainerFilesUpdatedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void ApplyFileWrites_DuringDiskCommit_DoesNotBlockReadOnlyStateQueries()
+    {
+        using var project = new TemporaryDirectory();
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var commitStarted = new ManualResetEventSlim(false);
+        using var releaseCommit = new ManualResetEventSlim(false);
+        container.CommitPreparedFile = (source, destination) =>
+        {
+            commitStarted.Set();
+            if (!releaseCommit.Wait(TimeSpan.FromSeconds(10)))
+                throw new TimeoutException("The test did not release the commit.");
+            File.Move(source, destination);
+        };
+
+        var writeTask = Task.Run(
+            () => container.ApplyFileWrites(
+            [
+                new PackFileWrite(@"audio\item.wem", [1]),
+            ]));
+        try
+        {
+            Assert.That(
+                commitStarted.Wait(TimeSpan.FromSeconds(5)),
+                Is.True,
+                "The batch did not reach its disk commit phase.");
+
+            var readTask = Task.Run(
+                () => container.IsIgnored(@"audio\item.wem"));
+            Assert.That(
+                readTask.Wait(TimeSpan.FromSeconds(1)),
+                Is.True,
+                "A read-only query waited for the batch disk commit.");
+            Assert.That(readTask.Result, Is.False);
+        }
+        finally
+        {
+            releaseCommit.Set();
+        }
+
+        Assert.That(
+            writeTask.Wait(TimeSpan.FromSeconds(5)),
+            Is.True,
+            "The batch did not finish after the commit was released.");
+        writeTask.GetAwaiter().GetResult();
+    }
+
+    [Test]
+    public void AddFiles_DuringSourceRead_DoesNotBlockReadOnlyStateQueries()
+    {
+        using var project = new TemporaryDirectory();
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var source = new BlockingDataSource([1]);
+        var file = PackFile.CreateFromBytes("item.wem", [1]);
+        file.DataSource = source;
+
+        var writeTask = Task.Run(
+            () => container.AddFiles(
+            [
+                new NewPackFileEntry("audio", file),
+            ],
+            overwriteExisting: true));
+        try
+        {
+            Assert.That(
+                source.ReadStarted.Wait(TimeSpan.FromSeconds(5)),
+                Is.True,
+                "The add operation did not start reading its source.");
+
+            var readTask = Task.Run(
+                () => container.IsIgnored(@"audio\item.wem"));
+            Assert.That(
+                readTask.Wait(TimeSpan.FromSeconds(1)),
+                Is.True,
+                "A read-only query waited for the source read.");
+            Assert.That(readTask.Result, Is.False);
+        }
+        finally
+        {
+            source.ReleaseRead.Set();
+        }
+
+        Assert.That(
+            writeTask.Wait(TimeSpan.FromSeconds(5)),
+            Is.True,
+            "The add operation did not finish after the source was released.");
+        writeTask.GetAwaiter().GetResult();
+    }
+
+    [Test]
+    public void ApplyFileWrites_WhenCommitFails_RestoresEntireBatch()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"audio\first.wem", [9]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var original = container.FileList[@"audio\first.wem"];
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+        container.CommitPreparedFile = (source, destination) =>
+        {
+            if (destination.EndsWith(
+                    "second.wem",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new IOException("commit failed");
+            }
+            File.Move(source, destination);
+        };
+
+        Assert.That(
+            () => service.ApplyFileWrites(
+                container,
+                [
+                    new PackFileWrite(@"audio\first.wem", [1]),
+                    new PackFileWrite(@"audio\second.wem", [2]),
+                ]),
+            Throws.TypeOf<IOException>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllBytes(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "first.wem")),
+                Is.EqualTo(new byte[] { 9 }));
+            Assert.That(
+                File.Exists(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "second.wem")),
+                Is.False);
+            Assert.That(
+                container.FileList[@"audio\first.wem"],
+                Is.SameAs(original));
+            Assert.That(container.FileList.ContainsKey(
+                @"audio\second.wem"), Is.False);
+            Assert.That(
+                CountPublished<FolderProjectChangedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void ApplyFileWrites_NewFilesCommitConcurrently()
+    {
+        using var project = new TemporaryDirectory();
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var commitsStarted = new CountdownEvent(2);
+        container.CommitPreparedFile = (source, destination) =>
+        {
+            commitsStarted.Signal();
+            if (!commitsStarted.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException(
+                    "The batch committed new files sequentially.");
+            }
+            File.Move(source, destination);
+        };
+
+        Assert.That(
+            () => container.ApplyFileWrites(
+            [
+                new PackFileWrite(@"audio\first.wem", [1]),
+                new PackFileWrite(@"audio\second.wem", [2]),
+            ]),
+            Throws.Nothing);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllBytes(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "first.wem")),
+                Is.EqualTo(new byte[] { 1 }));
+            Assert.That(
+                File.ReadAllBytes(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "second.wem")),
+                Is.EqualTo(new byte[] { 2 }));
+        });
+    }
+
+    [Test]
+    public void AddFilesToPack_WhenCommitFails_RestoresEntireBatch()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"audio\first.wem", [9]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var original = container.FileList[@"audio\first.wem"];
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+        container.CommitPreparedFile = (source, destination) =>
+        {
+            if (destination.EndsWith(
+                    "second.wem",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new IOException("commit failed");
+            }
+            File.Move(source, destination);
+        };
+
+        Assert.That(
+            () => service.AddFilesToPack(
+                container,
+                [
+                    new NewPackFileEntry(
+                        "audio",
+                        PackFile.CreateFromBytes("first.wem", [1])),
+                    new NewPackFileEntry(
+                        "audio",
+                        PackFile.CreateFromBytes("second.wem", [2])),
+                ],
+                overwriteExisting: true),
+            Throws.TypeOf<IOException>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllBytes(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "first.wem")),
+                Is.EqualTo(new byte[] { 9 }));
+            Assert.That(
+                File.Exists(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "second.wem")),
+                Is.False);
+            Assert.That(
+                container.FileList[@"audio\first.wem"],
+                Is.SameAs(original));
+            Assert.That(
+                CountPublished<FolderProjectChangedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void AddFilesToPack_FolderProjectPublishesPathAwareChangeSet()
+    {
+        using var project = new TemporaryDirectory();
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+
+        service.AddFilesToPack(
+            container,
+            [
+                new NewPackFileEntry(
+                    "db",
+                    PackFile.CreateFromBytes("first.bin", [1])),
+                new NewPackFileEntry(
+                    "db",
+                    PackFile.CreateFromBytes("second.bin", [2])),
+            ]);
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(
+                    change => change.Path),
+                Is.EqualTo(
+                    new[]
+                    {
+                        @"db\first.bin",
+                        @"db\second.bin",
+                    }));
+            Assert.That(
+                CountPublished<PackFileContainerFilesAddedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void SaveFile_FolderProjectPublishesPathAwareChangeSet()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+
+        service.SaveFile(container.FileList[@"db\item.bin"], [2]);
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Single().Path,
+                Is.EqualTo(@"db\item.bin"));
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Single().Kind,
+                Is.EqualTo(FolderProjectFileChangeKind.Updated));
+            Assert.That(
+                CountPublished<PackFileContainerFilesUpdatedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void MoveFile_FolderProjectPublishesSingleMovedChange()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+        var file = container.FileList[@"db\item.bin"];
+
+        service.MoveFile(container, file, "moved");
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        var change = changeEvent.ChangeSet.FileChanges.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(change.Kind, Is.EqualTo(
+                FolderProjectFileChangeKind.Moved));
+            Assert.That(change.PreviousPath, Is.EqualTo(@"db\item.bin"));
+            Assert.That(change.Path, Is.EqualTo(@"moved\item.bin"));
+            Assert.That(
+                CountPublished<PackFileContainerFilesRemovedEvent>(eventHub),
+                Is.Zero);
+            Assert.That(
+                CountPublished<PackFileContainerFilesAddedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void DeleteFile_FolderProjectPublishesSingleRemovedChange()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+        var file = container.FileList[@"db\item.bin"];
+
+        service.DeleteFile(container, file);
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        var change = changeEvent.ChangeSet.FileChanges.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(change.Kind, Is.EqualTo(
+                FolderProjectFileChangeKind.Removed));
+            Assert.That(change.Path, Is.EqualTo(@"db\item.bin"));
+            Assert.That(change.File, Is.SameAs(file));
+            Assert.That(
+                CountPublished<PackFileContainerFilesRemovedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void RenameFile_FolderProjectPublishesSingleMovedChange()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+        var file = container.FileList[@"db\item.bin"];
+
+        service.RenameFile(container, file, "renamed.bin");
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        var change = changeEvent.ChangeSet.FileChanges.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(change.Kind, Is.EqualTo(
+                FolderProjectFileChangeKind.Moved));
+            Assert.That(change.PreviousPath, Is.EqualTo(@"db\item.bin"));
+            Assert.That(change.Path, Is.EqualTo(@"db\renamed.bin"));
+            Assert.That(
+                CountPublished<PackFileContainerFilesUpdatedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void RenameDirectory_FolderProjectPublishesSinglePathAwareChangeSet()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"old\nested\first.bin", [1]);
+        project.Write(@"old\second.bin", [2]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+
+        service.RenameDirectory(container, "old", "renamed");
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(change => change.Path),
+                Is.EquivalentTo(new[]
+                {
+                    @"renamed\nested\first.bin",
+                    @"renamed\second.bin",
+                }));
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(
+                    change => change.PreviousPath),
+                Is.EquivalentTo(new[]
+                {
+                    @"old\nested\first.bin",
+                    @"old\second.bin",
+                }));
+            Assert.That(
+                changeEvent.ChangeSet.DirectoryChanges,
+                Is.EqualTo(new[]
+                {
+                    new FolderProjectDirectoryChange(
+                        "renamed",
+                        FolderProjectDirectoryChangeKind.Moved,
+                        "old"),
+                }));
+            Assert.That(
+                CountPublished<PackFileContainerFolderRenamedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
     public void AddFiles_PathTraversal_ThrowsWithoutWritingOutsideProject()
     {
         using var project = new TemporaryDirectory();
@@ -157,6 +690,97 @@ public class FolderProjectPackFileServiceTests
                         "delete-more",
                         "b.bin")),
                 Is.True);
+        });
+    }
+
+    [Test]
+    public void DeleteFolder_FolderProjectPublishesSinglePathAwareChangeSet()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"delete\nested\first.bin", [1]);
+        project.Write(@"delete\second.bin", [2]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+
+        service.DeleteFolder(container, "delete");
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(change => change.Path),
+                Is.EquivalentTo(new[]
+                {
+                    @"delete\nested\first.bin",
+                    @"delete\second.bin",
+                }));
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(change => change.Kind),
+                Is.All.EqualTo(FolderProjectFileChangeKind.Removed));
+            Assert.That(
+                changeEvent.ChangeSet.DirectoryChanges,
+                Is.EqualTo(new[]
+                {
+                    new FolderProjectDirectoryChange(
+                        "delete",
+                        FolderProjectDirectoryChangeKind.Removed),
+                }));
+            Assert.That(
+                CountPublished<PackFileContainerFolderRemovedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
+    public void ExternalBatchDelete_PublishesOneFolderProjectChangeSet()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"wwise\nested\first.wem", [1]);
+        project.Write(@"wwise\second.wem", [2]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+        Directory.Delete(Path.Combine(project.Path, "wwise"), true);
+
+        container.ReconcileAfterWatcherEvent();
+
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(change => change.Path),
+                Is.EquivalentTo(new[]
+                {
+                    @"wwise\nested\first.wem",
+                    @"wwise\second.wem",
+                }));
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Select(change => change.Kind),
+                Is.All.EqualTo(FolderProjectFileChangeKind.Removed));
+            Assert.That(
+                CountPublished<PackFileContainerFilesRemovedEvent>(eventHub),
+                Is.Zero);
+            Assert.That(
+                CountPublished<PackFileContainerFilesAddedEvent>(eventHub),
+                Is.Zero);
+            Assert.That(
+                CountPublished<PackFileContainerFilesUpdatedEvent>(eventHub),
+                Is.Zero);
         });
     }
 
@@ -871,7 +1495,7 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
-    public void SavePackContainer_BlocksRefreshAndLookupUntilSerializationCompletes()
+    public void SavePackContainer_BlocksRefreshButAllowsLookupDuringSerialization()
     {
         using var project = new TemporaryDirectory();
         project.Write("keep.bin", [1, 2, 3]);
@@ -961,7 +1585,7 @@ public class FolderProjectPackFileServiceTests
             Assert.Multiple(() =>
             {
                 Assert.That(refreshCompletedDuringSave, Is.False);
-                Assert.That(lookupCompletedDuringSave, Is.False);
+                Assert.That(lookupCompletedDuringSave, Is.True);
                 Assert.That(lookupTask.Result, Is.SameAs(expectedFile));
                 Assert.That(
                     loadedPack.FileList["keep.bin"]
@@ -1106,18 +1730,33 @@ public class FolderProjectPackFileServiceTests
         };
         source.FileList[@"db\copied.bin"] =
             PackFile.CreateFromBytes("copied.bin", [7, 8]);
-        var service = CreateService();
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
         service.AddContainer(target, true);
+        eventHub.Invocations.Clear();
 
         service.CopyFileFromOtherPackFile(
             source,
             @"db\copied.bin",
             target);
 
-        Assert.That(
-            File.ReadAllBytes(
-                Path.Combine(project.Path, "db", "copied.bin")),
-            Is.EqualTo(new byte[] { 7, 8 }));
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllBytes(
+                    Path.Combine(project.Path, "db", "copied.bin")),
+                Is.EqualTo(new byte[] { 7, 8 }));
+            Assert.That(
+                changeEvent.ChangeSet.FileChanges.Single().Path,
+                Is.EqualTo(@"db\copied.bin"));
+            Assert.That(
+                CountPublished<PackFileContainerFilesAddedEvent>(eventHub),
+                Is.Zero);
+        });
     }
 
     [Test]
@@ -1127,18 +1766,35 @@ public class FolderProjectPackFileServiceTests
         using var container = FolderProjectContainer.Create(
             project.Path,
             new FolderProjectSettings { Name = "工程" });
-        var service = CreateService();
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
         service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
 
         service.CreateFolder(container, @"empty\nested");
 
-        Assert.That(
-            Directory.Exists(
-                Path.Combine(project.Path, "empty", "nested")),
-            Is.True);
-        Assert.That(
-            container.EmptyDirectories,
-            Does.Contain(@"empty\nested"));
+        var changeEvent = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>()
+            .Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                Directory.Exists(
+                    Path.Combine(project.Path, "empty", "nested")),
+                Is.True);
+            Assert.That(
+                container.EmptyDirectories,
+                Does.Contain(@"empty\nested"));
+            Assert.That(
+                changeEvent.ChangeSet.DirectoryChanges,
+                Is.EqualTo(new[]
+                {
+                    new FolderProjectDirectoryChange(
+                        @"empty\nested",
+                        FolderProjectDirectoryChangeKind.Added),
+                }));
+        });
     }
 
     private static PackFileService CreateService(

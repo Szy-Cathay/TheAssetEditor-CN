@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
+using Shared.Core.ToolCreation;
 using Does = NUnit.Framework.Does;
 using Has = NUnit.Framework.Has;
 using Is = NUnit.Framework.Is;
@@ -61,7 +62,7 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(viewModel.OpenWhenComplete, Is.True);
             NUnit.Framework.Assert.That(viewModel.IsInitialized, Is.True);
             NUnit.Framework.Assert.That(viewModel.CurrentBranch, Is.EqualTo("main"));
-            NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(1));
+            NUnit.Framework.Assert.That(viewModel.History, Is.Empty);
             NUnit.Framework.Assert.That(viewModel.Branches, Has.Count.EqualTo(2));
             NUnit.Framework.Assert.That(viewModel.MergeConflicts, Has.Count.EqualTo(1));
             NUnit.Framework.Assert.That(
@@ -144,7 +145,8 @@ public class FolderProjectVersionControlViewModelTests
         viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges[0];
         await ExecuteAsync(viewModel.StageSelectedCommand);
         await ExecuteAsync(viewModel.StageAllCommand);
-        viewModel.SelectedStagedChange = viewModel.StagedChanges.Single();
+        viewModel.SelectedStagedChange = viewModel.StagedChanges.Single(
+            change => change.RepositoryPath == "staged.txt");
         await ExecuteAsync(viewModel.UnstageSelectedCommand);
         await ExecuteAsync(viewModel.UnstageAllCommand);
         viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges[1];
@@ -158,13 +160,20 @@ public class FolderProjectVersionControlViewModelTests
                 ProjectRoot,
                 It.Is<IReadOnlyList<string>>(
                     paths =>
+                        paths.SequenceEqual(new[] { "second.txt" }))),
+            Times.Once);
+        service.Verify(
+            item => item.UnstageChanges(ProjectRoot, new[] { "staged.txt" }),
+            Times.Once);
+        service.Verify(
+            item => item.UnstageChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths =>
                         paths.Count == 2 &&
                         paths.Contains("first.txt") &&
                         paths.Contains("second.txt"))),
             Times.Once);
-        service.Verify(
-            item => item.UnstageChanges(ProjectRoot, new[] { "staged.txt" }),
-            Times.Exactly(2));
         service.Verify(
             item => item.DiscardChanges(ProjectRoot, new[] { "second.txt" }),
             Times.Once);
@@ -244,6 +253,143 @@ public class FolderProjectVersionControlViewModelTests
                         paths.Contains("first.txt") &&
                         paths.Contains("second.txt"))),
             Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StageSelected_UpdatesCachedSnapshotWithoutFullReload()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "second.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges[0];
+        service.Invocations.Clear();
+
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.StagedChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "first.txt" }));
+            NUnit.Framework.Assert.That(
+                viewModel.UnstagedChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+        });
+        VerifyNoRepositoryReload(service);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StageSelected_RenamePassesCurrentAndPreviousPaths()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "renamed.txt",
+                            FolderProjectWorkingChangeKind.Renamed |
+                            FolderProjectWorkingChangeKind.Unstaged,
+                            "original.txt"),
+                    ]));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges.Single();
+
+        await ExecuteAsync(viewModel.StageSelectedCommand);
+
+        service.Verify(
+            item => item.StageChanges(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(
+                        new[] { "renamed.txt", "original.txt" }))),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task UnstageSelected_UpdatesCachedSnapshotWithoutFullReload()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                        new FolderProjectWorkingChange(
+                            "second.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                    ]));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedStagedChange = viewModel.StagedChanges[0];
+        service.Invocations.Clear();
+
+        await ExecuteAsync(viewModel.UnstageSelectedCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.UnstagedChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "first.txt" }));
+            NUnit.Framework.Assert.That(
+                viewModel.StagedChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "second.txt" }));
+        });
+        VerifyNoRepositoryReload(service);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task DiscardSelected_RemovesCachedChangeWithoutFullReload()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "first.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "second.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedUnstagedChange = viewModel.UnstagedChanges[0];
+        service.Invocations.Clear();
+
+        await ExecuteAsync(viewModel.DiscardUnstagedCommand);
+
+        NUnit.Framework.Assert.That(
+            viewModel.WorkingChanges.Select(item => item.RepositoryPath),
+            Is.EqualTo(new[] { "second.txt" }));
+        VerifyNoRepositoryReload(service);
     }
 
     [NUnit.Framework.Test]
@@ -479,7 +625,7 @@ public class FolderProjectVersionControlViewModelTests
                             FolderProjectWorkingChangeKind.Modified |
                             FolderProjectWorkingChangeKind.Unstaged),
                     ]));
-        service.Setup(item => item.CommitAll(ProjectRoot, "保存全部修改"))
+        service.Setup(item => item.CommitStaged(ProjectRoot, "保存全部修改"))
             .Returns(Commit());
         var viewModel = CreateViewModel(service);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
@@ -498,13 +644,117 @@ public class FolderProjectVersionControlViewModelTests
         await ExecuteAsync(viewModel.CommitCommand);
 
         service.Verify(
-            item => item.CommitAll(ProjectRoot, "保存全部修改"),
+            item => item.StageChanges(
+                ProjectRoot,
+                new[] { "working.txt" }),
             Times.Once);
         service.Verify(
-            item => item.CommitStaged(
+            item => item.CommitStaged(ProjectRoot, "保存全部修改"),
+            Times.Once);
+        service.Verify(
+            item => item.CommitAll(
                 It.IsAny<string>(),
                 It.IsAny<string>()),
             Times.Never);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CommitAll_WhenCommitFails_RefreshesStagedState()
+    {
+        var service = CreateService();
+        service.SetupSequence(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "working.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "working.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                    ]));
+        service.Setup(item => item.CommitStaged(ProjectRoot, "保存全部修改"))
+            .Throws(
+                new FolderProjectVersionControlException(
+                    FolderProjectVersionControlError.RepositoryBusy,
+                    "commit failed"));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存全部修改";
+
+        await ExecuteAsync(viewModel.CommitAllCommand);
+
+        NUnit.Framework.Assert.That(
+            viewModel.StagedChanges.Select(item => item.RepositoryPath),
+            Is.EqualTo(new[] { "working.txt" }));
+        service.Verify(
+            item => item.GetStatus(ProjectRoot),
+            Times.Exactly(2));
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CommitStaged_UpdatesCachedSnapshotWithoutFullReload()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "staged.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                        new FolderProjectWorkingChange(
+                            "both.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "working.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        service.Setup(item => item.CommitStaged(ProjectRoot, "保存修改"))
+            .Returns(
+                new FolderProjectCommitSummary(
+                    RewrittenCommit,
+                    "保存修改",
+                    "测试者",
+                    "test@example.com",
+                    DateTimeOffset.Parse("2026-08-04T04:30:00+08:00"),
+                    [MainCommit]));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.CommitMessage = "保存修改";
+        service.Invocations.Clear();
+
+        await ExecuteAsync(viewModel.CommitStagedCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.StagedChanges,
+                Is.Empty);
+            NUnit.Framework.Assert.That(
+                viewModel.UnstagedChanges.Select(item => item.RepositoryPath),
+                Is.EqualTo(new[] { "both.txt", "working.txt" }));
+            NUnit.Framework.Assert.That(
+                viewModel.HeadCommitId,
+                Is.EqualTo(RewrittenCommit));
+            NUnit.Framework.Assert.That(
+                viewModel.History[0].Id,
+                Is.EqualTo(RewrittenCommit));
+        });
+        VerifyNoRepositoryReload(service);
     }
 
     [NUnit.Framework.Test]
@@ -699,8 +949,7 @@ public class FolderProjectVersionControlViewModelTests
             service,
             dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         viewModel.SelectedCommitChange = viewModel.CommitChanges.Single();
 
         await ExecuteAsync(viewModel.RestoreFileCommand);
@@ -759,8 +1008,7 @@ public class FolderProjectVersionControlViewModelTests
             service,
             dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         viewModel.SelectedCommitChanges = viewModel.CommitChanges.ToList();
         viewModel.SelectedCommitChange = viewModel.CommitChanges[0];
 
@@ -834,8 +1082,7 @@ public class FolderProjectVersionControlViewModelTests
             service,
             dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         viewModel.SelectedCommitChange = viewModel.CommitChanges[0];
 
         await ExecuteAsync(viewModel.DiscardCommitChangesCommand);
@@ -906,8 +1153,7 @@ public class FolderProjectVersionControlViewModelTests
             service,
             dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         var folder = viewModel.CommitChangeTree.Single().Children
             .Single(node => node.Name == "src");
 
@@ -1001,8 +1247,7 @@ public class FolderProjectVersionControlViewModelTests
             service,
             dialogs: ConfirmingDialogs().Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         viewModel.SelectedCommitChange = viewModel.CommitChanges[0];
 
         await ExecuteAsync(viewModel.RestoreCommitChangesToStageCommand);
@@ -1324,6 +1569,176 @@ public class FolderProjectVersionControlViewModelTests
             NUnit.Framework.Assert.That(viewModel.IsBusy, Is.False);
             NUnit.Framework.Assert.That(viewModel.IsInitialized, Is.True);
         });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task Initialize_ExposesRealFileProgressWhileIndexing()
+    {
+        var initialized = false;
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                () => initialized
+                    ? Status()
+                    : new FolderProjectRepositoryStatus(
+                        false,
+                        null,
+                        null,
+                        false,
+                        FolderProjectRepositoryOperationState.None,
+                        []));
+        service.Setup(
+                item => item.Initialize(
+                    ProjectRoot,
+                    It.IsAny<FolderProjectGitIdentity>(),
+                    It.IsAny<string>(),
+                    It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string _,
+                    FolderProjectGitIdentity _,
+                    string _,
+                    Action<FolderProjectVersionControlProgress> progress) =>
+                {
+                    progress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage.IndexingFiles,
+                        "audio/voice.wem",
+                        1,
+                        2));
+                    entered.Set();
+                    release.Wait(TimeSpan.FromSeconds(5));
+                    initialized = true;
+                    return Commit();
+                });
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(
+            viewModel,
+            ProjectRoot,
+            "测试工程",
+            false);
+
+        var operation = viewModel.InitializeCommand.ExecuteAsync(null);
+        NUnit.Framework.Assert.That(
+            entered.Wait(TimeSpan.FromSeconds(5)),
+            Is.True);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressStatusText,
+                Is.EqualTo("正在登记工程文件"));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressDetailText,
+                Is.EqualTo("audio/voice.wem"));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressValue,
+                Is.EqualTo(1));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressMaximum,
+                Is.EqualTo(2));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressIsIndeterminate,
+                Is.False);
+        });
+
+        release.Set();
+        await operation;
+    }
+
+    [NUnit.Framework.Test]
+    public async Task CommitChangesLoad_ReportsComparisonThenActualFiles()
+    {
+        using var comparisonReported = new ManualResetEventSlim();
+        using var allowFileProgress = new ManualResetEventSlim();
+        using var fileProgressReported = new ManualResetEventSlim();
+        using var allowCompletion = new ManualResetEventSlim();
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetCommitChanges(
+                ProjectRoot,
+                MainCommit,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string _,
+                    string commitId,
+                    Action<FolderProjectVersionControlProgress> progress) =>
+                {
+                    progress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage
+                            .ReadingCommitChanges,
+                        commitId));
+                    comparisonReported.Set();
+                    allowFileProgress.Wait(TimeSpan.FromSeconds(5));
+                    progress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage
+                            .ProcessingCommitChanges,
+                        "audio/voice.wem",
+                        1,
+                        2));
+                    fileProgressReported.Set();
+                    allowCompletion.Wait(TimeSpan.FromSeconds(5));
+                    return
+                    [
+                        new FolderProjectCommitChange(
+                            "audio/voice.wem",
+                            null,
+                            FolderProjectCommitChangeKind.Added,
+                            true),
+                    ];
+                });
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        viewModel.SelectedCommit = Commit();
+        NUnit.Framework.Assert.That(
+            comparisonReported.Wait(TimeSpan.FromSeconds(5)),
+            Is.True);
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressStatusText,
+                Is.EqualTo("正在比较提交内容"));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressDetailText,
+                Does.Contain(MainCommit[..7]));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressDetailText,
+                Is.Not.EqualTo(MainCommit));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressIsIndeterminate,
+                Is.True);
+        });
+
+        allowFileProgress.Set();
+        NUnit.Framework.Assert.That(
+            fileProgressReported.Wait(TimeSpan.FromSeconds(5)),
+            Is.True);
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressStatusText,
+                Is.EqualTo("正在读取提交文件"));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressDetailText,
+                Is.EqualTo("audio/voice.wem"));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressValue,
+                Is.EqualTo(1));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressMaximum,
+                Is.EqualTo(2));
+            NUnit.Framework.Assert.That(
+                viewModel.LoadingProgressIsIndeterminate,
+                Is.False);
+        });
+
+        allowCompletion.Set();
+        await viewModel.CommitChangesLoadTask;
     }
 
     [NUnit.Framework.Test]
@@ -1758,8 +2173,7 @@ public class FolderProjectVersionControlViewModelTests
                     "raw failure"));
         var viewModel = CreateViewModel(service);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         viewModel.SelectedCommitChange = viewModel.CommitChanges.Single();
 
         viewModel.SelectedCommit = secondCommit;
@@ -1775,6 +2189,386 @@ public class FolderProjectVersionControlViewModelTests
                 viewModel.RestoreFileCommand.CanExecute(null),
                 Is.False);
         });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task StatusPage_DefersHistoryUntilRepositoryHistoryOpens()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status());
+        var viewModel = CreateViewModel(service);
+
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        NUnit.Framework.Assert.That(viewModel.History, Is.Empty);
+        service.Verify(
+            item => item.GetHistory(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>()),
+            Times.Never);
+
+        viewModel.OpenRepositoryHistory();
+        if (viewModel.RefreshCommand.ExecutionTask != null)
+            await viewModel.RefreshCommand.ExecutionTask;
+
+        NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(1));
+        service.Verify(
+            item => item.GetHistory(ProjectRoot, "main", 100),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task OpenRepositoryHistory_SecondOpenReusesLoadedSnapshot()
+    {
+        var statusReads = 0;
+        var historyReads = 0;
+        var commitChangeReads = 0;
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                () =>
+                {
+                    statusReads++;
+                    return Status();
+                });
+        service.Setup(item => item.GetHistory(ProjectRoot, "main", 100))
+            .Returns(
+                () =>
+                {
+                    historyReads++;
+                    return [Commit()];
+                });
+        service.Setup(item => item.GetCommitChanges(ProjectRoot, MainCommit))
+            .Returns(
+                () =>
+                {
+                    commitChangeReads++;
+                    return [];
+                });
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+
+        var workspace = new FolderProjectGitWorkspaceViewModel(
+            viewModel,
+            Mock.Of<IEditorManager>(),
+            Mock.Of<IFolderProjectVersionControlWindowService>());
+        var firstRepository = new FolderProjectGitRepositoryViewModel();
+        firstRepository.Open(workspace);
+        if (viewModel.RefreshCommand.ExecutionTask != null)
+            await viewModel.RefreshCommand.ExecutionTask;
+        firstRepository.Close();
+        var reopenedRepository = new FolderProjectGitRepositoryViewModel();
+        reopenedRepository.Open(workspace);
+        if (viewModel.RefreshCommand.ExecutionTask != null)
+            await viewModel.RefreshCommand.ExecutionTask;
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(viewModel.History, Has.Count.EqualTo(1));
+            NUnit.Framework.Assert.That(statusReads, Is.EqualTo(2));
+            NUnit.Framework.Assert.That(historyReads, Is.EqualTo(1));
+            NUnit.Framework.Assert.That(commitChangeReads, Is.EqualTo(1));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task PreviouslyLoadedCommit_ReusesFilesAcrossSelectionAndRefresh()
+    {
+        var secondCommit = new FolderProjectCommitSummary(
+            FeatureCommit,
+            "第二次提交",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T11:00:00+08:00"),
+            [MainCommit]);
+        var mainReads = 0;
+        var featureReads = 0;
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetHistory(ProjectRoot, "main", 100))
+            .Returns([secondCommit, Commit()]);
+        service.Setup(item => item.GetCommitChanges(ProjectRoot, MainCommit))
+            .Returns(
+                () =>
+                {
+                    mainReads++;
+                    return
+                    [
+                        new FolderProjectCommitChange(
+                            "initial.txt",
+                            null,
+                            FolderProjectCommitChangeKind.Added,
+                            false),
+                    ];
+                });
+        service.Setup(
+                item => item.GetCommitChanges(ProjectRoot, FeatureCommit))
+            .Returns(
+                () =>
+                {
+                    featureReads++;
+                    return
+                    [
+                        new FolderProjectCommitChange(
+                            "new.txt",
+                            null,
+                            FolderProjectCommitChangeKind.Added,
+                            false),
+                    ];
+                });
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        await OpenRepositoryHistoryAsync(viewModel);
+        viewModel.SelectedCommit = viewModel.History.Single(
+            commit => commit.Id == MainCommit);
+        await viewModel.CommitChangesLoadTask;
+        var loadingStarts = 0;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.IsCommitChangesLoading) &&
+                viewModel.IsCommitChangesLoading)
+            {
+                loadingStarts++;
+            }
+        };
+
+        viewModel.SelectedCommit = secondCommit;
+        await viewModel.CommitChangesLoadTask;
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                viewModel.CommitChanges.Select(change =>
+                    change.RepositoryPath),
+                Is.EqualTo(new[] { "new.txt" }));
+            NUnit.Framework.Assert.That(mainReads, Is.EqualTo(1));
+            NUnit.Framework.Assert.That(featureReads, Is.EqualTo(1));
+            NUnit.Framework.Assert.That(loadingStarts, Is.Zero);
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task OpenProject_DoesNotReuseCommitFilesFromAnotherProject()
+    {
+        var otherProjectRoot = ProjectRoot + "-other";
+        var firstProjectReads = 0;
+        var otherProjectReads = 0;
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetCommitChanges(ProjectRoot, MainCommit))
+            .Returns(
+                () =>
+                {
+                    firstProjectReads++;
+                    return
+                    [
+                        new FolderProjectCommitChange(
+                            "first-project.txt",
+                            null,
+                            FolderProjectCommitChangeKind.Added,
+                            false),
+                    ];
+                });
+        service.Setup(item => item.GetStatus(otherProjectRoot))
+            .Returns(Status());
+        service.Setup(item => item.GetIdentity(otherProjectRoot))
+            .Returns(new FolderProjectGitIdentity(
+                "测试者",
+                "test@example.com"));
+        service.Setup(item => item.GetBranches(otherProjectRoot))
+            .Returns(
+                [
+                    new FolderProjectBranchInfo(
+                        "main",
+                        MainCommit,
+                        true),
+                ]);
+        service.Setup(item => item.GetStashes(otherProjectRoot)).Returns([]);
+        service.Setup(item => item.GetHistory(
+                otherProjectRoot,
+                "main",
+                100))
+            .Returns([Commit()]);
+        service.Setup(item => item.GetMergeState(otherProjectRoot))
+            .Returns(MergeState(FolderProjectMergePhase.None));
+        service.Setup(item => item.GetCommitChanges(
+                otherProjectRoot,
+                MainCommit))
+            .Returns(
+                () =>
+                {
+                    otherProjectReads++;
+                    return
+                    [
+                        new FolderProjectCommitChange(
+                            "other-project.txt",
+                            null,
+                            FolderProjectCommitChangeKind.Added,
+                            false),
+                    ];
+                });
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "第一个工程", false);
+        await OpenRepositoryHistoryAsync(viewModel);
+
+        viewModel.OpenProject(
+            otherProjectRoot,
+            "另一个工程",
+            false,
+            refresh: false);
+        await OpenRepositoryHistoryAsync(viewModel);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(firstProjectReads, Is.EqualTo(1));
+            NUnit.Framework.Assert.That(otherProjectReads, Is.EqualTo(1));
+            NUnit.Framework.Assert.That(
+                viewModel.CommitChanges.Select(change =>
+                    change.RepositoryPath),
+                Is.EqualTo(new[] { "other-project.txt" }));
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public async Task RefreshWorkingChanges_MergesSelectedPathsOnly()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(
+                Status(
+                    changes:
+                    [
+                        new FolderProjectWorkingChange(
+                            "changed.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                        new FolderProjectWorkingChange(
+                            "unrelated.txt",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Staged),
+                    ]));
+        service.Setup(item => item.GetStatus(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(new[] { "changed.txt" }))))
+            .Returns(Status());
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        service.Invocations.Clear();
+
+        await viewModel.RefreshWorkingChanges(["changed.txt"]);
+
+        NUnit.Framework.Assert.That(
+            viewModel.WorkingChanges.Select(item => item.RepositoryPath),
+            Is.EqualTo(new[] { "unrelated.txt" }));
+        service.Verify(
+            item => item.GetStatus(
+                ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(new[] { "changed.txt" }))),
+            Times.Once);
+        VerifyNoRepositoryReload(service);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task RefreshWorkingChanges_WhenPathReadFails_FallsBackToFullRefresh()
+    {
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status());
+        service.Setup(item => item.GetStatus(
+                ProjectRoot,
+                It.IsAny<IReadOnlyList<string>>()))
+            .Throws(
+                new FolderProjectVersionControlException(
+                    FolderProjectVersionControlError.RepositoryBusy,
+                    "path status failed"));
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        service.Invocations.Clear();
+
+        await viewModel.RefreshWorkingChanges(["changed.txt"]);
+
+        NUnit.Framework.Assert.That(
+            viewModel.HasRepositorySnapshot,
+            Is.True);
+        service.Verify(
+            item => item.GetStatus(
+                ProjectRoot,
+                It.IsAny<IReadOnlyList<string>>()),
+            Times.Once);
+        service.Verify(
+            item => item.GetStatus(ProjectRoot),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task SelectingCommit_WhileChangesLoad_DoesNotBlockRepository()
+    {
+        var secondCommit = new FolderProjectCommitSummary(
+            FeatureCommit,
+            "第二次提交",
+            "测试者",
+            "test@example.com",
+            DateTimeOffset.Parse("2026-07-31T11:00:00+08:00"),
+            [MainCommit]);
+        using var loadStarted = new ManualResetEventSlim();
+        using var allowLoad = new ManualResetEventSlim();
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status());
+        service.Setup(item => item.GetHistory(ProjectRoot, "main", 100))
+            .Returns([Commit(), secondCommit]);
+        service.Setup(
+                item => item.GetCommitChanges(ProjectRoot, FeatureCommit))
+            .Returns(
+                () =>
+                {
+                    loadStarted.Set();
+                    allowLoad.Wait();
+                    return [];
+                });
+        var viewModel = CreateViewModel(service);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedTabIndex = 1;
+        await viewModel.CommitChangesLoadTask;
+
+        viewModel.SelectedCommit = secondCommit;
+        NUnit.Framework.Assert.That(
+            loadStarted.Wait(TimeSpan.FromSeconds(5)),
+            Is.True);
+        try
+        {
+            var loadingProperty = viewModel.GetType().GetProperty(
+                "IsCommitChangesLoading");
+            NUnit.Framework.Assert.Multiple(() =>
+            {
+                NUnit.Framework.Assert.That(viewModel.IsBusy, Is.False);
+                NUnit.Framework.Assert.That(
+                    loadingProperty,
+                    Is.Not.Null);
+                NUnit.Framework.Assert.That(
+                    loadingProperty?.GetValue(viewModel),
+                    Is.True);
+                NUnit.Framework.Assert.That(
+                    viewModel.RefreshCommand.CanExecute(null),
+                    Is.True);
+            });
+        }
+        finally
+        {
+            allowLoad.Set();
+        }
+        await viewModel.CommitChangesLoadTask;
+
+        NUnit.Framework.Assert.That(
+            viewModel.GetType()
+                .GetProperty("IsCommitChangesLoading")?
+                .GetValue(viewModel),
+            Is.False);
     }
 
     [NUnit.Framework.Test]
@@ -1833,8 +2627,7 @@ public class FolderProjectVersionControlViewModelTests
             coordinator,
             dialogs.Object);
         await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", true);
-        viewModel.SelectedTabIndex = 1;
-        await viewModel.CommitChangesLoadTask;
+        await OpenRepositoryHistoryAsync(viewModel);
         viewModel.SelectedCommit = viewModel.History.Single();
         viewModel.SelectedCommitChange =
             viewModel.CommitChanges.Single();
@@ -2009,6 +2802,66 @@ public class FolderProjectVersionControlViewModelTests
 
         service.Verify(item => item.ApplyStash(ProjectRoot, 0), Times.Once);
         NUnit.Framework.Assert.That(coordinator.Calls, Has.Count.EqualTo(1));
+    }
+
+    [NUnit.Framework.Test]
+    public async Task DeleteStash_UpdatesCachedListWithoutRepositoryReload()
+    {
+        var newest = new FolderProjectStashInfo(
+            0,
+            "newest",
+            DateTimeOffset.Parse("2026-08-02T10:00:00+08:00"),
+            ["new.txt"]);
+        var older = new FolderProjectStashInfo(
+            1,
+            "older",
+            DateTimeOffset.Parse("2026-08-01T10:00:00+08:00"),
+            ["old.txt"]);
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetStashes(ProjectRoot))
+            .Returns([newest, older]);
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedStash = viewModel.Stashes[0];
+        service.Invocations.Clear();
+
+        await ExecuteAsync(viewModel.DeleteStashCommand);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(viewModel.Stashes, Has.Count.EqualTo(1));
+            NUnit.Framework.Assert.That(viewModel.Stashes[0].Index, Is.Zero);
+            NUnit.Framework.Assert.That(
+                viewModel.Stashes[0].Message,
+                Is.EqualTo("older"));
+        });
+        VerifyNoRepositoryReload(service);
+    }
+
+    [NUnit.Framework.Test]
+    public async Task ClearStashes_ClearsCachedListWithoutRepositoryReload()
+    {
+        var stash = new FolderProjectStashInfo(
+            0,
+            "stash",
+            DateTimeOffset.Parse("2026-08-01T10:00:00+08:00"),
+            ["file.txt"]);
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot)).Returns(Status());
+        service.Setup(item => item.GetStashes(ProjectRoot)).Returns([stash]);
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        service.Invocations.Clear();
+
+        await ExecuteAsync(viewModel.ClearStashesCommand);
+
+        NUnit.Framework.Assert.That(viewModel.Stashes, Is.Empty);
+        VerifyNoRepositoryReload(service);
     }
 
     [NUnit.Framework.Test]
@@ -2436,7 +3289,7 @@ public class FolderProjectVersionControlViewModelTests
 
         NUnit.Framework.Assert.Multiple(() =>
         {
-            NUnit.Framework.Assert.That(statusReads, Is.GreaterThanOrEqualTo(2));
+            NUnit.Framework.Assert.That(statusReads, Is.EqualTo(2));
             NUnit.Framework.Assert.That(
                 viewModel.StatusMessage,
                 Does.Not.Contain("SECRET RAW ERROR"));
@@ -2817,6 +3670,7 @@ public class FolderProjectVersionControlViewModelTests
         viewModel.SelectedBranch =
             viewModel.Branches.Single(item => item.Name == "feature");
         await ExecuteAsync(viewModel.SwitchBranchCommand);
+        await OpenRepositoryHistoryAsync(viewModel);
 
         NUnit.Framework.Assert.Multiple(() =>
         {
@@ -3035,6 +3889,14 @@ public class FolderProjectVersionControlViewModelTests
             await viewModel.RefreshCommand.ExecutionTask;
     }
 
+    private static async Task OpenRepositoryHistoryAsync(
+        FolderProjectVersionControlViewModel viewModel)
+    {
+        viewModel.OpenRepositoryHistory();
+        if (viewModel.RefreshCommand.ExecutionTask != null)
+            await viewModel.RefreshCommand.ExecutionTask;
+    }
+
     private static Task ExecuteAsync(IAsyncRelayCommand command)
     {
         return command.ExecuteAsync(null);
@@ -3043,6 +3905,43 @@ public class FolderProjectVersionControlViewModelTests
     private static Mock<IFolderProjectVersionControlService> CreateService()
     {
         var service = new Mock<IFolderProjectVersionControlService>();
+        service.Setup(item => item.GetStatus(
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+                It.IsAny<bool>()))
+            .Returns(
+                (
+                    string projectRoot,
+                    Action<FolderProjectVersionControlProgress> _,
+                    bool scanUnreadableEntries) =>
+                    service.Object.GetStatus(
+                        projectRoot,
+                        scanUnreadableEntries));
+        service.Setup(item => item.Initialize(
+                It.IsAny<string>(),
+                It.IsAny<FolderProjectGitIdentity>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string projectRoot,
+                    FolderProjectGitIdentity identity,
+                    string primaryBranchName,
+                    Action<FolderProjectVersionControlProgress> _) =>
+                    service.Object.Initialize(
+                        projectRoot,
+                        identity,
+                        primaryBranchName));
+        service.Setup(item => item.GetCommitChanges(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string projectRoot,
+                    string commitId,
+                    Action<FolderProjectVersionControlProgress> _) =>
+                    service.Object.GetCommitChanges(projectRoot, commitId));
         service.Setup(item => item.GetIdentity(ProjectRoot))
             .Returns(new FolderProjectGitIdentity("测试者", "test@example.com"));
         service.Setup(item => item.GetHistory(
@@ -3065,6 +3964,29 @@ public class FolderProjectVersionControlViewModelTests
         service.Setup(item => item.GetMergeState(ProjectRoot))
             .Returns(MergeState(FolderProjectMergePhase.None));
         return service;
+    }
+
+    private static void VerifyNoRepositoryReload(
+        Mock<IFolderProjectVersionControlService> service)
+    {
+        service.Verify(
+            item => item.GetStatus(It.IsAny<string>()),
+            Times.Never);
+        service.Verify(
+            item => item.GetBranches(It.IsAny<string>()),
+            Times.Never);
+        service.Verify(
+            item => item.GetStashes(It.IsAny<string>()),
+            Times.Never);
+        service.Verify(
+            item => item.GetHistory(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>()),
+            Times.Never);
+        service.Verify(
+            item => item.GetMergeState(It.IsAny<string>()),
+            Times.Never);
     }
 
     private static FolderProjectVersionControlViewModel CreateViewModel(

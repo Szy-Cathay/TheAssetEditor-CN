@@ -5,6 +5,7 @@ using AssetEditor.Views.FolderProject;
 
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using Shared.Ui.Common.OperationProgress;
 
 namespace AssetEditor.UiCommands;
 
@@ -31,7 +32,23 @@ public interface IFolderProjectProgressRunner
     FolderProjectContainer? Run(
         string title,
         string message,
-        Func<FolderProjectContainer?> operation);
+        Func<Action<OperationProgressUpdate>,
+            FolderProjectContainer?> operation);
+}
+
+internal static class FolderProjectVersionControlProgressAdapter
+{
+    public static OperationProgressUpdate ToOperationProgress(
+        FolderProjectVersionControlProgress progress,
+        LocalizationManager localizationManager)
+    {
+        return new OperationProgressUpdate(
+            localizationManager.Get(
+                $"FolderProject.VersionControl.Progress.{progress.Stage}"),
+            progress.Detail,
+            progress.Completed,
+            progress.Total);
+    }
 }
 
 public sealed class FolderProjectImportDialogs :
@@ -78,7 +95,8 @@ public sealed class FolderProjectProgressRunner :
     public FolderProjectContainer? Run(
         string title,
         string message,
-        Func<FolderProjectContainer?> operation)
+        Func<Action<OperationProgressUpdate>,
+            FolderProjectContainer?> operation)
     {
         return new FolderProjectProgressWindow(
             title,

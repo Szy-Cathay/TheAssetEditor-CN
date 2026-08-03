@@ -78,7 +78,30 @@ public enum FolderProjectWorkingChangeKind
 
 public sealed record FolderProjectWorkingChange(
     string RepositoryPath,
-    FolderProjectWorkingChangeKind Kind);
+    FolderProjectWorkingChangeKind Kind,
+    string? PreviousRepositoryPath = null);
+
+public enum FolderProjectVersionControlProgressStage
+{
+    PreparingRepository,
+    ScanningWorkingTree,
+    ProcessingWorkingChanges,
+    IndexingFiles,
+    CreatingInitialCommit,
+    ReadingIdentity,
+    ReadingBranches,
+    ReadingStashes,
+    ReadingHistory,
+    ReadingCommitChanges,
+    ProcessingCommitChanges,
+    ReadingMergeState,
+}
+
+public sealed record FolderProjectVersionControlProgress(
+    FolderProjectVersionControlProgressStage Stage,
+    string? Detail = null,
+    long Completed = 0,
+    long Total = 0);
 
 public enum FolderProjectCommitUndoMode
 {

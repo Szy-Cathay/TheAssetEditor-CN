@@ -14,6 +14,7 @@
     xmlns:AudioProjectViewer="clr-namespace:Editors.Audio.AudioEditor.Presentation.AudioProjectViewer"
     xmlns:WaveformVisualiser="clr-namespace:Editors.Audio.AudioEditor.Presentation.WaveformVisualiser"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=Local:AudioEditorViewModel}"
     mc:Ignorable="d" 
     d:DesignWidth="1200" d:DesignHeight="700">
@@ -101,26 +102,36 @@
                 </MenuItem>
             </Menu>
 
-            <StackPanel
+            <Grid
                 Grid.Row="0"
                 Grid.Column="1"
                 Margin="10, 5, 10, 0"
-                VerticalAlignment="Center"
-                Orientation="Horizontal">
-                <ProgressBar
-                    Width="110"
-                    Height="4"
-                    Margin="0, 0, 8, 0"
-                    IsIndeterminate="True"
-                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                VerticalAlignment="Center">
+                <progress:OperationProgressView
+                    Width="460"
+                    CurrentDetailText="{Binding CompileStatus}"
+                    IsOperationActive="{Binding IsBusy}"
+                    IsProgressIndeterminate="True"
+                    StatusText="{loc:Loc OperationProgress.AudioCompile}"
+                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     MinWidth="72"
                     MaxWidth="360"
                     VerticalAlignment="Center"
                     Text="{Binding CompileStatus}"
                     TextTrimming="CharacterEllipsis"
-                    ToolTip="{Binding CompileStatus}"/>
-            </StackPanel>
+                    ToolTip="{Binding CompileStatus}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
         </Grid>
 
         <Border 

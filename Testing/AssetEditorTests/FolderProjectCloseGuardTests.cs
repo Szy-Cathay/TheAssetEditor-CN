@@ -83,6 +83,55 @@ public class FolderProjectCloseGuardTests
         });
     }
 
+    [NUnit.Framework.Test]
+    public async Task CanCloseAsync_ReportsCloseCheckStagesAndChangeCount()
+    {
+        using var project = CreateInitializedProject();
+        var service = new Mock<IFolderProjectVersionControlService>();
+        service.Setup(item => item.GetStatus(project.ProjectRoot))
+            .Returns(
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "master",
+                    "1111111111111111111111111111111111111111",
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    [
+                        new FolderProjectWorkingChange(
+                            "audio/voice.wem",
+                            FolderProjectWorkingChangeKind.Modified),
+                        new FolderProjectWorkingChange(
+                            "audio/voice.wav",
+                            FolderProjectWorkingChangeKind.Added),
+                    ]));
+        var progress = new List<FolderProjectCloseProgress>();
+        var guard = new FolderProjectCloseGuard(
+            service.Object,
+            new TestEventHub(),
+            (_, _, _) => MessageBoxResult.Yes);
+
+        var canClose = await guard.CanCloseAsync(
+            project,
+            progress.Add);
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(canClose, NUnit.Framework.Is.True);
+            NUnit.Framework.Assert.That(
+                progress.Select(item => item.Stage),
+                NUnit.Framework.Is.EqualTo(
+                    new[]
+                    {
+                        FolderProjectCloseProgressStage.Preparing,
+                        FolderProjectCloseProgressStage.ReadingRepositoryStatus,
+                        FolderProjectCloseProgressStage.SummarizingChanges,
+                    }));
+            NUnit.Framework.Assert.That(
+                progress[^1].ChangeCount,
+                NUnit.Framework.Is.EqualTo(2));
+        });
+    }
+
     private static FolderProjectContainer CreateInitializedProject()
     {
         var projectRoot = Path.Combine(

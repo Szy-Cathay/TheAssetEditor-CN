@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using AssetEditor.Services;
+using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.ToolCreation;
 
@@ -12,17 +16,28 @@ namespace AssetEditor.ViewModels;
 
 public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 {
+    private const int MaxIncrementalStatusPaths = 512;
     private readonly IEditorManager _editorManager;
     private readonly IFolderProjectVersionControlWindowService
         _versionControlWindowService;
+    private readonly SynchronizationContext? _synchronizationContext;
+    private readonly object _pendingChangesLock = new();
+    private readonly HashSet<string> _pendingWorkingChangePaths =
+        new(StringComparer.OrdinalIgnoreCase);
     private string? _currentProjectRoot;
+    private bool _requiresFullRefresh;
 
     [ObservableProperty] private bool _isEnabled;
     [ObservableProperty] private int _selectedSidebarTabIndex;
     [ObservableProperty] private bool _isBranchPickerOpen;
     [ObservableProperty] private string _branchFilter = "";
+    [ObservableProperty] private bool _isRepositoryEditorOpen;
 
     public FolderProjectVersionControlViewModel VersionControl { get; }
+    public bool IsLoadingOperationVisibleInPanel =>
+        VersionControl.IsLoadingOperation && !IsRepositoryEditorOpen;
+    public Task WorkingChangesRefreshTask { get; private set; } =
+        Task.CompletedTask;
 
     public IEnumerable<FolderProjectBranchInfo> FilteredBranches =>
         string.IsNullOrWhiteSpace(BranchFilter)
@@ -36,13 +51,19 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         FolderProjectVersionControlViewModel versionControl,
         IEditorManager editorManager,
         IFolderProjectVersionControlWindowService
-            versionControlWindowService)
+            versionControlWindowService,
+        IGlobalEventHub? eventHub = null)
     {
         VersionControl = versionControl;
         _editorManager = editorManager;
         _versionControlWindowService = versionControlWindowService;
+        _synchronizationContext = SynchronizationContext.Current;
         VersionControl.Branches.CollectionChanged +=
             (_, _) => OnPropertyChanged(nameof(FilteredBranches));
+        VersionControl.PropertyChanged += OnVersionControlPropertyChanged;
+        eventHub?.Register<FolderProjectChangedEvent>(
+            this,
+            OnFolderProjectChanged);
     }
 
     public void SetEditableContainer(PackFileContainer? container)
@@ -58,26 +79,38 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         {
             CloseRepositoryEditor();
             _currentProjectRoot = null;
+            ClearPendingWorkingChanges();
             IsEnabled = false;
             SelectedSidebarTabIndex = 0;
             BranchFilter = "";
             return;
         }
 
-        if (!string.Equals(
+        var projectChanged = !string.Equals(
                 _currentProjectRoot,
                 project.ProjectRoot,
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.OrdinalIgnoreCase);
+        if (projectChanged)
         {
             CloseRepositoryEditor();
+            ClearPendingWorkingChanges();
         }
 
         _currentProjectRoot = project.ProjectRoot;
         IsEnabled = true;
+        if (!projectChanged)
+            return;
+
         VersionControl.OpenProject(
             project.ProjectRoot,
             project.ProjectSettings.Name,
-            false);
+            false,
+            refresh: false);
+        if (SelectedSidebarTabIndex == 1 &&
+            VersionControl.RefreshCommand.CanExecute(null))
+        {
+            VersionControl.RefreshCommand.Execute(null);
+        }
     }
 
     [RelayCommand]
@@ -164,12 +197,153 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
 
     partial void OnSelectedSidebarTabIndexChanged(int value)
     {
-        if (value == 1 &&
-            IsEnabled &&
+        if (value != 1 || !IsEnabled)
+            return;
+
+        if (!VersionControl.HasRepositorySnapshot &&
             VersionControl.RefreshCommand.CanExecute(null))
         {
+            ClearPendingWorkingChanges();
             VersionControl.RefreshCommand.Execute(null);
+            return;
         }
+
+        StartPendingWorkingChangesRefresh();
+    }
+
+    public void SetRepositoryEditorOpen(bool isOpen)
+    {
+        IsRepositoryEditorOpen = isOpen;
+    }
+
+    private void OnFolderProjectChanged(FolderProjectChangedEvent e)
+    {
+        var projectRoot = e.Container.ProjectRoot;
+        if (_currentProjectRoot == null ||
+            !string.Equals(
+                _currentProjectRoot,
+                projectRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        bool requiresFullRefresh;
+        lock (_pendingChangesLock)
+        {
+            _requiresFullRefresh |= e.ChangeSet.RequiresReload;
+            foreach (var change in e.ChangeSet.FileChanges)
+            {
+                _pendingWorkingChangePaths.Add(change.Path);
+                if (!string.IsNullOrWhiteSpace(change.PreviousPath))
+                    _pendingWorkingChangePaths.Add(change.PreviousPath);
+            }
+            if (_pendingWorkingChangePaths.Count >
+                MaxIncrementalStatusPaths)
+            {
+                _requiresFullRefresh = true;
+            }
+            requiresFullRefresh = _requiresFullRefresh;
+        }
+
+        RunOnSynchronizationContext(
+            () =>
+            {
+                if (!string.Equals(
+                        _currentProjectRoot,
+                        projectRoot,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                if (requiresFullRefresh)
+                {
+                    VersionControl.HasRepositorySnapshot = false;
+                    if (SelectedSidebarTabIndex == 1 &&
+                        VersionControl.RefreshCommand.CanExecute(null))
+                    {
+                        ClearPendingWorkingChanges();
+                        VersionControl.RefreshCommand.Execute(null);
+                    }
+                    return;
+                }
+
+                if (SelectedSidebarTabIndex != 1)
+                    return;
+
+                StartPendingWorkingChangesRefresh();
+            });
+    }
+
+    private void OnVersionControlPropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(VersionControl.IsLoadingOperation))
+        {
+            OnPropertyChanged(
+                nameof(IsLoadingOperationVisibleInPanel));
+        }
+
+        if (e.PropertyName == nameof(VersionControl.IsBusy) &&
+            !VersionControl.IsBusy &&
+            SelectedSidebarTabIndex == 1)
+        {
+            StartPendingWorkingChangesRefresh();
+        }
+    }
+
+    partial void OnIsRepositoryEditorOpenChanged(bool value) =>
+        OnPropertyChanged(nameof(IsLoadingOperationVisibleInPanel));
+
+    private void StartPendingWorkingChangesRefresh()
+    {
+        if (!VersionControl.HasRepositorySnapshot ||
+            VersionControl.IsBusy ||
+            VersionControl.IsStatusRefreshing)
+        {
+            return;
+        }
+
+        List<string> paths;
+        lock (_pendingChangesLock)
+        {
+            if (_requiresFullRefresh ||
+                _pendingWorkingChangePaths.Count == 0)
+            {
+                return;
+            }
+
+            paths = _pendingWorkingChangePaths.ToList();
+            _pendingWorkingChangePaths.Clear();
+        }
+
+        WorkingChangesRefreshTask =
+            VersionControl.RefreshWorkingChanges(paths);
+    }
+
+    private void ClearPendingWorkingChanges()
+    {
+        lock (_pendingChangesLock)
+        {
+            _pendingWorkingChangePaths.Clear();
+            _requiresFullRefresh = false;
+        }
+    }
+
+    private void RunOnSynchronizationContext(Action action)
+    {
+        if (_synchronizationContext == null ||
+            ReferenceEquals(
+                _synchronizationContext,
+                SynchronizationContext.Current))
+        {
+            action();
+            return;
+        }
+
+        _synchronizationContext.Post(_ => action(), null);
     }
 
     private void CloseRepositoryEditor()

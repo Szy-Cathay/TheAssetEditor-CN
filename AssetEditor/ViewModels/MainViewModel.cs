@@ -1,6 +1,9 @@
-﻿using System.Linq;
+﻿using System;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using AssetEditor.Services;
 using AssetEditor.Events;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -38,6 +41,10 @@ namespace AssetEditor.ViewModels
         [ObservableProperty] public partial GridLength FileTreeColumnWidth { get; set; } = new GridLength(0.28, GridUnitType.Star);
         [ObservableProperty] public partial bool IsLoadingPacks { get; set; } = false;
         [ObservableProperty] public partial string LoadingStatusText { get; set; } = "";
+        [ObservableProperty] public partial string LoadingProgressDetailText { get; set; } = "";
+        [ObservableProperty] public partial int LoadingProgressValue { get; set; }
+        [ObservableProperty] public partial int LoadingProgressMaximum { get; set; } = 3;
+        [ObservableProperty] public partial bool LoadingProgressIsIndeterminate { get; set; }
 
 
         public MainViewModel(
@@ -97,20 +104,75 @@ namespace AssetEditor.ViewModels
                 return;
             }
 
+            var stopwatch = Stopwatch.StartNew();
+            var currentProgress = new FolderProjectCloseProgress(
+                FolderProjectCloseProgressStage.Preparing,
+                1,
+                3);
+            var progressTimer = new DispatcherTimer(
+                DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromSeconds(1),
+            };
+            void ApplyProgress(FolderProjectCloseProgress progress)
+            {
+                currentProgress = progress;
+                LoadingProgressValue = progress.CurrentStep;
+                LoadingProgressMaximum = progress.TotalSteps;
+                LoadingProgressIsIndeterminate =
+                    progress.Stage ==
+                    FolderProjectCloseProgressStage.ReadingRepositoryStatus;
+                LoadingStatusText = progress.Stage switch
+                {
+                    FolderProjectCloseProgressStage.Preparing =>
+                        LocalizationManager.Instance.Get(
+                            "FolderProject.Close.Progress.Preparing"),
+                    FolderProjectCloseProgressStage
+                        .ReadingRepositoryStatus =>
+                        LocalizationManager.Instance.Get(
+                            "FolderProject.Close.Progress.ReadingStatus"),
+                    FolderProjectCloseProgressStage.SummarizingChanges =>
+                        LocalizationManager.Instance.GetFormat(
+                            "FolderProject.Close.Progress.Summarizing",
+                            progress.ChangeCount ?? 0),
+                    _ => "",
+                };
+                LoadingProgressDetailText =
+                    progress.Stage ==
+                    FolderProjectCloseProgressStage.ReadingRepositoryStatus
+                        ? LocalizationManager.Instance.GetFormat(
+                            "FolderProject.Close.Progress.StepWithElapsed",
+                            progress.CurrentStep,
+                            progress.TotalSteps,
+                            (int)stopwatch.Elapsed.TotalSeconds)
+                        : LocalizationManager.Instance.GetFormat(
+                            "FolderProject.Close.Progress.Step",
+                            progress.CurrentStep,
+                            progress.TotalSteps);
+            }
+            progressTimer.Tick += (_, _) => ApplyProgress(currentProgress);
+
             IsLoadingPacks = true;
-            LoadingStatusText = LocalizationManager.Instance.Get(
-                "FolderProject.Close.CheckingStatus");
+            ApplyProgress(currentProgress);
+            progressTimer.Start();
             try
             {
                 var project =
                     _packFileService.GetEditablePack() as
                         FolderProjectContainer;
                 IsClosingWithoutPrompt =
-                    await _folderProjectCloseGuard.CanCloseAsync(project);
+                    await _folderProjectCloseGuard.CanCloseAsync(
+                        project,
+                        ApplyProgress);
             }
             finally
             {
+                progressTimer.Stop();
+                stopwatch.Stop();
                 LoadingStatusText = "";
+                LoadingProgressDetailText = "";
+                LoadingProgressValue = 0;
+                LoadingProgressIsIndeterminate = false;
                 IsLoadingPacks = false;
             }
         }

@@ -57,7 +57,6 @@ namespace AssetEditor.ViewModels
         [ObservableProperty] private string _selectedFontWeight;
         [ObservableProperty] private bool _startMaximised;
         [ObservableProperty] private GameTypeEnum _currentGame;
-        [ObservableProperty] private bool _loadCaPacksByDefault;
         [ObservableProperty] private bool _showCAWemFiles;
         [ObservableProperty] private string _wwisePath;
         [ObservableProperty] private bool _onlyLoadLod0ForReferenceMeshes;
@@ -100,7 +99,6 @@ namespace AssetEditor.ViewModels
             StartMaximised = _settingsService.CurrentSettings.StartMaximised;
             Games = new ObservableCollection<GameTypeEnum>(GameInformationDatabase.Games.Values.OrderBy(game => game.DisplayName).Select(game => game.Type));
             CurrentGame = _settingsService.CurrentSettings.CurrentGame;
-            LoadCaPacksByDefault = _settingsService.CurrentSettings.LoadCaPacksByDefault;
             ShowCAWemFiles = _settingsService.CurrentSettings.ShowCAWemFiles;
             OnlyLoadLod0ForReferenceMeshes = _settingsService.CurrentSettings.OnlyLoadLod0ForReferenceMeshes;
             foreach (var game in GameInformationDatabase.Games.Values.OrderBy(game => game.DisplayName))
@@ -133,7 +131,6 @@ namespace AssetEditor.ViewModels
             _settingsService.CurrentSettings.RenderEngineBackgroundColour = CurrentRenderEngineBackgroundColour;
             _settingsService.CurrentSettings.StartMaximised = StartMaximised;
             _settingsService.CurrentSettings.CurrentGame = CurrentGame;
-            _settingsService.CurrentSettings.LoadCaPacksByDefault = LoadCaPacksByDefault;
             _settingsService.CurrentSettings.ShowCAWemFiles = ShowCAWemFiles;
             _settingsService.CurrentSettings.OnlyLoadLod0ForReferenceMeshes = OnlyLoadLod0ForReferenceMeshes;
             _settingsService.CurrentSettings.AppFont = SelectedFont;

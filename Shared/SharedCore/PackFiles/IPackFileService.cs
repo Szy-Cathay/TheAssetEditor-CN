@@ -19,6 +19,9 @@ namespace Shared.Core.PackFiles
             PackFileContainer container,
             List<NewPackFileEntry> newFiles,
             bool overwriteExisting = true);
+        IReadOnlyList<PackFile> ApplyFileWrites(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes);
         void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target);
         PackFileContainer CreateNewPackFileContainer(string name, PackFileVersion packFileVersion, PackFileCAType type, bool setEditablePack = false);
         void CreateFolder(PackFileContainer container, string folder);

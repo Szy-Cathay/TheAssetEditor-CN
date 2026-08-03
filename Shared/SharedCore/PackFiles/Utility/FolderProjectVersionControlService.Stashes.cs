@@ -83,7 +83,7 @@ public sealed partial class FolderProjectVersionControlService
             });
     }
 
-    private static void ApplyOrPopStash(
+    private void ApplyOrPopStash(
         string projectRoot,
         int index,
         bool pop)

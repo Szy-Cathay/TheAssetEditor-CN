@@ -14,7 +14,19 @@ public interface IFolderProjectFactory
         PackFileContainer source,
         string projectRoot,
         FolderProjectSettings settings);
+
+    FolderProjectContainer ImportPack(
+        PackFileContainer source,
+        string projectRoot,
+        FolderProjectSettings settings,
+        Action<FolderProjectImportProgress> reportProgress);
 }
+
+public sealed record FolderProjectImportProgress(
+    string RelativePath,
+    int CurrentIndex,
+    int Total,
+    bool IsCompressed);
 
 public sealed class FolderProjectFactory : IFolderProjectFactory
 {
@@ -35,6 +47,15 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
         string projectRoot,
         FolderProjectSettings settings)
     {
+        return ImportPack(source, projectRoot, settings, null);
+    }
+
+    public FolderProjectContainer ImportPack(
+        PackFileContainer source,
+        string projectRoot,
+        FolderProjectSettings settings,
+        Action<FolderProjectImportProgress>? reportProgress)
+    {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -44,16 +65,22 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
                 () => ImportPackCore(
                     source,
                     projectRoot,
-                    settings));
+                    settings,
+                    reportProgress));
         }
 
-        return ImportPackCore(source, projectRoot, settings);
+        return ImportPackCore(
+            source,
+            projectRoot,
+            settings,
+            reportProgress);
     }
 
     private static FolderProjectContainer ImportPackCore(
         PackFileContainer source,
         string projectRoot,
-        FolderProjectSettings settings)
+        FolderProjectSettings settings,
+        Action<FolderProjectImportProgress>? reportProgress)
     {
         var targetRoot = FolderProjectImportTargetValidator
             .ValidateEmptyTarget(projectRoot);
@@ -95,8 +122,18 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
         Directory.CreateDirectory(stagingRoot);
         try
         {
-            foreach (var (relativePath, file) in entries)
+            for (var index = 0; index < entries.Count; index++)
             {
+                var (relativePath, file) = entries[index];
+                reportProgress?.Invoke(
+                    new FolderProjectImportProgress(
+                        relativePath.Replace('\\', '/'),
+                        index + 1,
+                        entries.Count,
+                        file.DataSource is PackedFileSource
+                        {
+                            IsCompressed: true,
+                        }));
                 var outputPath = FolderProjectPathPolicy.ResolveFilePath(
                     stagingRoot,
                     relativePath);

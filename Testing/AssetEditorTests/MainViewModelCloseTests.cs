@@ -158,7 +158,7 @@ public class MainViewModelCloseTests
     }
 
     [NUnit.Framework.Test]
-    public async Task Closing_DirtyFolderProject_WaitsForCloseGuard()
+    public async Task Closing_DirtyFolderProject_ReportsProgressAndWaitsForCloseGuard()
     {
         var projectRoot = Path.Combine(
             Path.GetTempPath(),
@@ -181,8 +181,21 @@ public class MainViewModelCloseTests
                     TaskCreationOptions.RunContinuationsAsynchronously);
             var closeGuard = new Mock<IFolderProjectCloseGuard>();
             closeGuard
-                .Setup(guard => guard.CanCloseAsync(project))
-                .Returns(closeResult.Task);
+                .Setup(guard => guard.CanCloseAsync(
+                    project,
+                    It.IsAny<Action<FolderProjectCloseProgress>>()))
+                .Returns((
+                    FolderProjectContainer? _,
+                    Action<FolderProjectCloseProgress> reportProgress) =>
+                {
+                    reportProgress(
+                        new FolderProjectCloseProgress(
+                            FolderProjectCloseProgressStage
+                                .ReadingRepositoryStatus,
+                            2,
+                            3));
+                    return closeResult.Task;
+                });
             var viewModel = CreateMainViewModel(
                 editorManager.Object,
                 project,
@@ -198,6 +211,22 @@ public class MainViewModelCloseTests
                 NUnit.Framework.Assert.That(
                     viewModel.IsClosingWithoutPrompt,
                     NUnit.Framework.Is.False);
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingStatusText,
+                    NUnit.Framework.Is.EqualTo(
+                        "正在扫描本地文件和 Git 索引…"));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressValue,
+                    NUnit.Framework.Is.EqualTo(2));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressMaximum,
+                    NUnit.Framework.Is.EqualTo(3));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressIsIndeterminate,
+                    NUnit.Framework.Is.True);
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressDetailText,
+                    NUnit.Framework.Does.StartWith("第 2/3 步 · 已等待 "));
             });
 
             closeResult.SetResult(false);
@@ -211,6 +240,12 @@ public class MainViewModelCloseTests
                 NUnit.Framework.Assert.That(
                     viewModel.IsClosingWithoutPrompt,
                     NUnit.Framework.Is.False);
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingStatusText,
+                    NUnit.Framework.Is.Empty);
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressDetailText,
+                    NUnit.Framework.Is.Empty);
             });
             viewModel.FileTree.Dispose();
         }
@@ -302,7 +337,8 @@ public class MainViewModelCloseTests
             settings,
             closeGuard ?? Mock.Of<IFolderProjectCloseGuard>(
                 guard => guard.CanCloseAsync(
-                    It.IsAny<FolderProjectContainer>()) ==
+                    It.IsAny<FolderProjectContainer>(),
+                    It.IsAny<Action<FolderProjectCloseProgress>>()) ==
                     Task.FromResult(true)));
     }
 

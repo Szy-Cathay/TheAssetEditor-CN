@@ -1,10 +1,66 @@
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
+using Shared.Core.PackFiles;
 
 namespace Test.Shared.Core.PackFiles;
 
 public class FolderProjectWatcherTests
 {
+    [Test]
+    public void StartWatching_ReconcilesOffCallerThread()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var callerThreadId = Environment.CurrentManagedThreadId;
+        var scanThreadId = 0;
+        var enumerate = container.EnumerateFileSystemEntries;
+        container.EnumerateFileSystemEntries = path =>
+        {
+            Interlocked.CompareExchange(
+                ref scanThreadId,
+                Environment.CurrentManagedThreadId,
+                0);
+            return enumerate(path);
+        };
+
+        container.StartWatching();
+
+        Assert.That(WaitUntil(() => scanThreadId != 0), Is.True);
+        Assert.That(scanThreadId, Is.Not.EqualTo(callerThreadId));
+    }
+
+    [Test]
+    public void Watcher_KnownInternalBatchWrite_DoesNotRescanProject()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        container.StartWatching();
+        Thread.Sleep(500);
+        var scanCount = 0;
+        var enumerate = container.EnumerateFileSystemEntries;
+        container.EnumerateFileSystemEntries = path =>
+        {
+            Interlocked.Increment(ref scanCount);
+            return enumerate(path);
+        };
+
+        container.ApplyFileWrites(
+            [new PackFileWrite(@"db\item.bin", [2])]);
+        container.ProcessWatcherChange(
+            new FolderProjectFileSystemChangedEventArgs(
+                WatcherChangeTypes.Changed,
+                Path.Combine(project.Path, "db", "item.bin")));
+
+        Thread.Sleep(700);
+        Assert.That(scanCount, Is.Zero);
+    }
+
     [Test]
     public void Watcher_ExternalAddChangeDelete_ReconcilesAutomatically()
     {
@@ -282,7 +338,8 @@ public class FolderProjectWatcherTests
         container.StartWatching();
 
         Assert.That(
-            container.FileList.ContainsKey(@"db\late.bin"),
+            WaitUntil(() =>
+                container.FileList.ContainsKey(@"db\late.bin")),
             Is.True);
     }
 

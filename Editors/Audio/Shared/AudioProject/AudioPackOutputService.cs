@@ -61,6 +61,36 @@ namespace Editors.Audio.Shared.AudioProject
                 throw new InvalidOperationException(
                     LocalizationManager.Instance.Get(
                         "Msg.NoEditablePack"));
+            if (editablePack is FolderProjectContainer)
+            {
+                var folderProjectConflicts = uniqueOutputs
+                    .Where(output => _packFileService.FindFile(
+                        output.FilePath,
+                        editablePack) != null)
+                    .Select(output => output.FilePath)
+                    .ToList();
+                if (promptOnConflict &&
+                    folderProjectConflicts.Count > 0 &&
+                    _standardDialogs.ShowYesNoBox(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.ReplaceGeneratedFiles",
+                            string.Join("\n", folderProjectConflicts)),
+                        LocalizationManager.Instance.Get("Msg.AreYouSure")) !=
+                    ShowMessageBoxResult.OK)
+                {
+                    return false;
+                }
+
+                _packFileService.ApplyFileWrites(
+                    editablePack,
+                    uniqueOutputs
+                        .Select(output => new PackFileWrite(
+                            output.FilePath,
+                            output.Data))
+                        .ToList());
+                return true;
+            }
+
             var backups = uniqueOutputs
                 .Select(output =>
                 {

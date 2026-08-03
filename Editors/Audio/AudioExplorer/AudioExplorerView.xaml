@@ -10,6 +10,7 @@
     xmlns:ValueConverters="clr-namespace:Editors.Audio.Shared.UI.ValueConverters" 
     xmlns:AudioExplorer="clr-namespace:Editors.Audio.AudioExplorer"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=AudioExplorer:AudioExplorerViewModel}"
     mc:Ignorable="d" 
     d:DesignHeight="450" d:DesignWidth="800">
@@ -171,13 +172,16 @@
                     Text="{Binding LoadStatus}"
                     TextWrapping="Wrap"/>
 
-                <ProgressBar
+                <progress:OperationProgressView
                     Grid.Row="1"
                     Grid.Column="0"
-                    Height="16"
-                    Minimum="0"
-                    Maximum="100"
-                    Value="{Binding LoadProgress}"
+                    Margin="0,3,0,0"
+                    CurrentDetailText="{Binding LoadStatus}"
+                    IsOperationActive="{Binding IsLoading}"
+                    IsProgressIndeterminate="False"
+                    ProgressMaximum="100"
+                    ProgressValue="{Binding LoadProgress}"
+                    StatusText="{loc:Loc OperationProgress.AudioLoad}"
                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                 <Button
@@ -190,14 +194,16 @@
                     Command="{Binding LoadAudioRepositoryForSelectedLanguagesCancelCommand}"
                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                <ProgressBar
+                <progress:OperationProgressView
                     Grid.Row="2"
                     Grid.Column="0"
-                    Height="16"
                     Margin="0, 3, 0, 0"
-                    Minimum="0"
-                    Maximum="100"
-                    Value="{Binding ExportProgress}"
+                    CurrentDetailText="{Binding LoadStatus}"
+                    IsOperationActive="{Binding IsExporting}"
+                    IsProgressIndeterminate="False"
+                    ProgressMaximum="100"
+                    ProgressValue="{Binding ExportProgress}"
+                    StatusText="{loc:Loc OperationProgress.AudioExport}"
                     Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                 <Button
@@ -474,6 +480,8 @@
                             Height="Auto"/>
                         <RowDefinition
                             Height="Auto"/>
+                        <RowDefinition
+                            Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid
@@ -495,16 +503,19 @@
                                     Rect="{Binding AudioWaveformOverlayClip}"/>
                             </Image.Clip>
                         </Image>
-                        <ProgressBar
-                            Height="3"
-                            Margin="20, 0, 20, 0"
-                            IsIndeterminate="True"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding IsAudioPreviewLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </Grid>
 
-                    <Grid
+                    <progress:OperationProgressView
                         Grid.Row="1"
+                        Margin="0,6,0,0"
+                        CurrentDetailText="{Binding SelectedNode.DisplayName}"
+                        IsOperationActive="{Binding IsAudioPreviewLoading}"
+                        IsProgressIndeterminate="True"
+                        StatusText="{loc:Loc OperationProgress.AudioPreview}"
+                        Visibility="{Binding IsAudioPreviewLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                    <Grid
+                        Grid.Row="2"
                         Margin="0, 6, 0, 5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition
@@ -542,7 +553,7 @@
                     </Grid>
 
                     <StackPanel
-                        Grid.Row="2"
+                        Grid.Row="3"
                         HorizontalAlignment="Center"
                         Orientation="Horizontal">
                         <Button

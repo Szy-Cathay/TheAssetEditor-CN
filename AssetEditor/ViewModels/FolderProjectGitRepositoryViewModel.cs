@@ -69,6 +69,7 @@ public partial class FolderProjectGitRepositoryViewModel :
     public void Open(FolderProjectGitWorkspaceViewModel workspace)
     {
         Workspace = workspace;
+        Workspace.SetRepositoryEditorOpen(true);
         DisplayName = LocalizationManager.Instance.GetFormat(
             "FolderProject.Git.RepositoryTabTitle",
             VersionControl.ProjectName);
@@ -91,6 +92,7 @@ public partial class FolderProjectGitRepositoryViewModel :
                 OnBranchesChanged;
             VersionControl.PropertyChanged -=
                 OnVersionControlPropertyChanged;
+            Workspace.SetRepositoryEditorOpen(false);
         }
     }
 

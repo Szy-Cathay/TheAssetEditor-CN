@@ -361,6 +361,24 @@ public class FolderProjectContainerTests
     }
 
     [Test]
+    public void GetRelativePath_AfterMoveAndRename_ReturnsCurrentPath()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var file = container.FileList[@"db\item.bin"];
+
+        container.MoveFileOnDisk(file, "moved");
+        container.RenameFileOnDisk(file, "renamed.bin");
+
+        Assert.That(
+            container.GetRelativePath(file),
+            Is.EqualTo(@"moved\renamed.bin"));
+    }
+
+    [Test]
     public void Create_NestedControlNames_AreLoadedAsResources()
     {
         using var project = new TemporaryDirectory();
@@ -778,6 +796,56 @@ public class FolderProjectContainerTests
                     @"kept\b.bin",
                 }));
         Assert.That(reopened.IsIgnored(@"ignored\a.bin"), Is.True);
+    }
+
+    [Test]
+    public void RefreshFromDisk_DuringDirectoryScan_DoesNotBlockReadOnlyStateQueries()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var scanStarted = new ManualResetEventSlim(false);
+        using var releaseScan = new ManualResetEventSlim(false);
+        var blocked = 0;
+        container.EnumerateFileSystemEntries = directory =>
+        {
+            if (Interlocked.Exchange(ref blocked, 1) == 0)
+            {
+                scanStarted.Set();
+                if (!releaseScan.Wait(TimeSpan.FromSeconds(10)))
+                    throw new TimeoutException("The test did not release the scan.");
+            }
+            return Directory.EnumerateFileSystemEntries(directory);
+        };
+
+        var refreshTask = Task.Run(container.RefreshFromDisk);
+        try
+        {
+            Assert.That(
+                scanStarted.Wait(TimeSpan.FromSeconds(5)),
+                Is.True,
+                "The refresh did not start scanning.");
+
+            var readTask = Task.Run(
+                () => container.IsIgnored(@"db\item.bin"));
+            Assert.That(
+                readTask.Wait(TimeSpan.FromSeconds(1)),
+                Is.True,
+                "A read-only query waited for the directory scan.");
+            Assert.That(readTask.Result, Is.False);
+        }
+        finally
+        {
+            releaseScan.Set();
+        }
+
+        Assert.That(
+            refreshTask.Wait(TimeSpan.FromSeconds(5)),
+            Is.True,
+            "The refresh did not finish after the scan was released.");
+        refreshTask.GetAwaiter().GetResult();
     }
 
     private sealed class TemporaryDirectory : IDisposable

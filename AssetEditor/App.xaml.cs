@@ -7,6 +7,7 @@ using AssetEditor.Services;
 using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
 using AssetEditor.Views;
+using AssetEditor.Views.Startup;
 using CommunityToolkit.Diagnostics;
 using Editors.Ipc;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,60 +72,43 @@ namespace AssetEditor
             // Theme switching is handled by ThemesController (swaps colour dictionaries at runtime).
             ShowMainWindow();
 
-            // Load pack files asynchronously to avoid blocking the UI
-            if (settingsService.CurrentSettings.LoadCaPacksByDefault)
-                LoadCAPackFilesAsync(settingsService);
-            else
-                FinishStartup(devConfigManager);
+            if (!LoadCAPackFiles(settingsService, uiCommandFactory))
+            {
+                Shutdown();
+                return;
+            }
+
+            FinishStartup(devConfigManager);
         }
 
-        private async void LoadCAPackFilesAsync(ApplicationSettingsService settingsService)
+        private bool LoadCAPackFiles(
+            ApplicationSettingsService settingsService,
+            IUiCommandFactory uiCommandFactory)
         {
-            var mainWindow = (MainWindow?)MainWindow;
-            var viewModel = mainWindow?.DataContext as MainViewModel;
-            if (viewModel != null)
-            {
-                viewModel.IsLoadingPacks = true;
-                viewModel.LoadingStatusText = "Loading game packs...";
-            }
-
-            var gamePath = settingsService.GetGamePathForCurrentGame();
-            if (gamePath != null)
-            {
-                var packfileService = _serviceProvider.GetRequiredService<IPackFileService>();
-                var containerLoader = _serviceProvider.GetRequiredService<IPackFileContainerLoader>();
-
-                // Load packs on background thread
-                var loadRes = await Task.Run(() => containerLoader.LoadAllCaFiles(settingsService.CurrentSettings.CurrentGame));
-
-                // Update UI on dispatcher thread
-                await Current.Dispatcher.InvokeAsync(() =>
+            var packfileService = _serviceProvider
+                .GetRequiredService<IPackFileService>();
+            var containerLoader = _serviceProvider
+                .GetRequiredService<IPackFileContainerLoader>();
+            var loadingWindow = new StartupPackLoadingWindow(
+                reportProgress =>
                 {
-                    if (loadRes == null)
-                        MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.UnableToLoadAllCAPackfiles", gamePath));
-                    else
-                        packfileService.AddContainer(loadRes);
-
-                    if (viewModel != null)
+                    var gamePath =
+                        settingsService.GetGamePathForCurrentGame();
+                    if (string.IsNullOrWhiteSpace(gamePath) ||
+                        !System.IO.Directory.Exists(gamePath))
                     {
-                        viewModel.IsLoadingPacks = false;
-                        viewModel.LoadingStatusText = "";
+                        return null;
                     }
 
-                    var devConfigManager = _serviceProvider.GetRequiredService<DevelopmentConfigurationManager>();
-                    FinishStartup(devConfigManager);
-                });
-            }
-            else
-            {
-                if (viewModel != null)
-                {
-                    viewModel.IsLoadingPacks = false;
-                    viewModel.LoadingStatusText = "";
-                }
-                var devConfigManager = _serviceProvider.GetRequiredService<DevelopmentConfigurationManager>();
-                FinishStartup(devConfigManager);
-            }
+                    return containerLoader.LoadAllCaFiles(
+                        settingsService.CurrentSettings.CurrentGame,
+                        reportProgress);
+                },
+                container => packfileService.AddContainer(container),
+                () => uiCommandFactory
+                    .Create<OpenSettingsDialogCommand>()
+                    .Execute());
+            return loadingWindow.Run();
         }
 
         private void FinishStartup(DevelopmentConfigurationManager devConfigManager)

@@ -74,6 +74,11 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer
             _globalEventHub.Register<PackFileContainerFilesAddedEvent>(this, x => RefreshAudioFilesTreeIfWavChanged(x.Container, x.AddedFiles));
             _globalEventHub.Register<PackFileContainerFilesRemovedEvent>(this, x => RefreshAudioFilesTreeIfWavChanged(x.Container, x.RemovedFiles));
             _globalEventHub.Register<PackFileContainerFilesUpdatedEvent>(this, x => RefreshAudioFilesTreeIfWavChanged(x.Container, x.ChangedFiles));
+            _globalEventHub.Register<FolderProjectChangedEvent>(
+                this,
+                x => RefreshAudioFilesTreeIfWavChanged(
+                    x.Container,
+                    x.ChangeSet.FileChanges.Select(change => change.File)));
             _globalEventHub.Register<PackFileContainerFolderRemovedEvent>(
                 this,
                 x => RefreshAudioFilesTreeIfCurrent(x.Container));

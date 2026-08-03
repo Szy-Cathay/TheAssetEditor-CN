@@ -965,6 +965,11 @@ public class FolderProjectVersionControlRestoreAndBranchTests
     public void SwitchBranch_UnreadableWorktree_RejectsWithoutChanges()
     {
         using var project = CreateSwitchProject();
+        AdvanceBranchWithEntry(
+            project.Path,
+            "other",
+            "tracked.bin",
+            [4, 5, 6]);
         var service = new FolderProjectVersionControlService(
             new UnreadableStatusPlatform(
                 project.Path,
@@ -983,6 +988,28 @@ public class FolderProjectVersionControlRestoreAndBranchTests
             AssertRepositoryEqual(
                 before,
                 CaptureRepository(project.Path));
+        });
+    }
+
+    [Test]
+    public void SwitchBranch_UnreadableUnchangedFile_DoesNotBlockSwitch()
+    {
+        using var project = CreateSwitchProject();
+        var service = new FolderProjectVersionControlService(
+            new UnreadableStatusPlatform(
+                project.Path,
+                "tracked.bin"));
+
+        var branch = service.SwitchBranch(project.Path, "other");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(branch.Name, Is.EqualTo("other"));
+            Assert.That(branch.IsCurrent, Is.True);
+            Assert.That(
+                File.ReadAllBytes(
+                    Path.Combine(project.Path, "tracked.bin")),
+                Is.EqualTo(new byte[] { 1, 2, 3 }));
         });
     }
 

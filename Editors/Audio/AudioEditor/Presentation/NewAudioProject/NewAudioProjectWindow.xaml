@@ -8,10 +8,14 @@
     xmlns:ValueConverters="clr-namespace:Editors.Audio.Shared.UI.ValueConverters"
     xmlns:Local="clr-namespace:Editors.Audio.AudioEditor.Presentation.NewAudioProject"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=Local:NewAudioProjectViewModel}"
     mc:Ignorable="d"
     Width="500"
-    Height="225"
+    MinHeight="225"
+    MaxHeight="620"
+    SizeToContent="Height"
+    ResizeMode="CanResizeWithGrip"
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
     Title="{loc:Loc NewAudioProject.Title}" Background="#FF1C1C1C">
@@ -148,24 +152,14 @@
             </Grid>
         </Grid>
 
-        <StackPanel
+        <progress:OperationProgressView
             Grid.Row="2"
             Margin="10,0,10,6"
-            Orientation="Horizontal"
-            Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibilityConverter}}">
-            <ProgressBar
-                Width="90"
-                Height="4"
-                Margin="0,0,8,0"
-                VerticalAlignment="Center"
-                IsIndeterminate="True"/>
-            <TextBlock
-                MaxWidth="350"
-                VerticalAlignment="Center"
-                Text="{Binding CreationStatus}"
-                TextTrimming="CharacterEllipsis"
-                ToolTip="{Binding CreationStatus}"/>
-        </StackPanel>
+            CurrentDetailText="{Binding CreationStatus}"
+            IsOperationActive="{Binding IsCreating}"
+            IsProgressIndeterminate="True"
+            StatusText="{loc:Loc OperationProgress.AudioCreate}"
+            Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibilityConverter}}" />
 
         <StackPanel
             Grid.Row="3"

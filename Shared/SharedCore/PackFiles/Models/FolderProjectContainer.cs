@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.PackFiles.Serialization;
 
@@ -13,13 +15,15 @@ public sealed class FolderProjectReconciledEventArgs(
     IReadOnlyList<PackFile> addedFiles,
     IReadOnlyList<PackFile> removedFiles,
     IReadOnlyList<PackFile> updatedFiles,
-    bool directoriesChanged) : EventArgs
+    bool directoriesChanged,
+    FolderProjectChangeSet changeSet) : EventArgs
 {
     public FolderProjectReconciliation Changes { get; } = changes;
     public IReadOnlyList<PackFile> AddedFiles { get; } = addedFiles;
     public IReadOnlyList<PackFile> RemovedFiles { get; } = removedFiles;
     public IReadOnlyList<PackFile> UpdatedFiles { get; } = updatedFiles;
     public bool DirectoriesChanged { get; } = directoriesChanged;
+    public FolderProjectChangeSet ChangeSet { get; } = changeSet;
 }
 
 public sealed class FolderProjectContainer :
@@ -27,14 +31,18 @@ public sealed class FolderProjectContainer :
     IDisposable
 {
     private readonly object _stateGate = new();
+    private readonly object _mutationGate = new();
     private readonly object _watcherReconciliationGate = new();
-    private readonly SynchronizationContext? _synchronizationContext =
+    private SynchronizationContext? _synchronizationContext =
         SynchronizationContext.Current;
     private Dictionary<string, FileFingerprint> _fingerprints =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<PackFile, string> _pathsByFile =
+        new(ReferenceEqualityComparer.Instance);
     private FileSystemWatcherWrapper? _watcher;
     private Timer? _debounceTimer;
     private bool _watcherSettingsDirty;
+    private long _revision;
     private FolderProjectReconciledEventArgs?
         _pendingWatcherReconciliation;
     private bool _disposed;
@@ -51,6 +59,12 @@ public sealed class FolderProjectContainer :
         set;
     } = File.GetAttributes;
 
+    internal Action<string, string> CommitPreparedFile
+    {
+        get;
+        set;
+    } = File.Move;
+
     public string ProjectRoot => SystemFilePath;
     public FolderProjectSettings ProjectSettings { get; }
     public HashSet<string> EmptyDirectories { get; } =
@@ -66,6 +80,8 @@ public sealed class FolderProjectContainer :
 
     public event EventHandler<FolderProjectReconciledEventArgs>?
         FilesReconciled;
+
+    internal long NextRevision() => Interlocked.Increment(ref _revision);
 
     private FolderProjectContainer(
         string projectRoot,
@@ -143,14 +159,12 @@ public sealed class FolderProjectContainer :
 
     private FolderProjectReconciledEventArgs RefreshFromDiskDetailed()
     {
-        lock (_stateGate)
-        {
-            ThrowIfDisposed();
-            VirtualizeMaterializedCorruptionDetectionFiles();
-            var previousEmptyDirectories =
-                new HashSet<string>(
-                    EmptyDirectories,
-                    StringComparer.OrdinalIgnoreCase);
+        return ExecuteSerializedMutation(
+            () =>
+            {
+                ExecuteSynchronized(
+                    VirtualizeMaterializedCorruptionDetectionFiles);
+
             var scannedFiles =
                 new Dictionary<string, PackFile>(
                     StringComparer.OrdinalIgnoreCase);
@@ -165,69 +179,128 @@ public sealed class FolderProjectContainer :
                 scannedDirectories,
                 scannedFingerprints);
 
-            var removedFiles = FileList
-                .Where(pair => !scannedFiles.ContainsKey(pair.Key))
-                .Select(pair => pair.Value)
-                .ToList();
-            var addedFiles = new List<PackFile>();
-            var updatedFiles = new List<PackFile>();
-            foreach (var path in scannedFiles.Keys.ToList())
-            {
-                var scannedFile = scannedFiles[path];
-                if (!FileList.TryGetValue(path, out var existingFile))
-                {
-                    addedFiles.Add(scannedFile);
-                    continue;
-                }
+                return ExecuteSynchronized(
+                    () =>
+                    {
+                        var previousEmptyDirectories =
+                            new HashSet<string>(
+                                EmptyDirectories,
+                                StringComparer.OrdinalIgnoreCase);
+                        var removedEntries = FileList
+                            .Where(
+                                pair =>
+                                    !scannedFiles.ContainsKey(pair.Key))
+                            .ToList();
+                        var removedFiles = removedEntries
+                            .Select(pair => pair.Value)
+                            .ToList();
+                        var addedFiles = new List<PackFile>();
+                        var updatedFiles = new List<PackFile>();
+                        var fileChanges = removedEntries
+                            .Select(pair => new FolderProjectFileChange(
+                                pair.Key,
+                                FolderProjectFileChangeKind.Removed,
+                                pair.Value))
+                            .ToList();
+                        foreach (var path in scannedFiles.Keys.ToList())
+                        {
+                            var scannedFile = scannedFiles[path];
+                            if (!FileList.TryGetValue(
+                                    path,
+                                    out var existingFile))
+                            {
+                                addedFiles.Add(scannedFile);
+                                fileChanges.Add(
+                                    new FolderProjectFileChange(
+                                        path,
+                                        FolderProjectFileChangeKind.Added,
+                                        scannedFile));
+                                continue;
+                            }
 
-                var fingerprintChanged =
-                    !_fingerprints.TryGetValue(
-                        path,
-                        out var previousFingerprint) ||
-                    previousFingerprint != scannedFingerprints[path];
-                var nameChanged = !string.Equals(
-                    existingFile.Name,
-                    scannedFile.Name,
-                    StringComparison.Ordinal);
-                if (fingerprintChanged || nameChanged)
-                {
-                    existingFile.Name = scannedFile.Name;
-                    existingFile.DataSource = scannedFile.DataSource;
-                    updatedFiles.Add(existingFile);
-                }
+                            var fingerprintChanged =
+                                !_fingerprints.TryGetValue(
+                                    path,
+                                    out var previousFingerprint) ||
+                                previousFingerprint !=
+                                scannedFingerprints[path];
+                            var nameChanged = !string.Equals(
+                                existingFile.Name,
+                                scannedFile.Name,
+                                StringComparison.Ordinal);
+                            if (fingerprintChanged || nameChanged)
+                            {
+                                existingFile.Name = scannedFile.Name;
+                                existingFile.DataSource =
+                                    scannedFile.DataSource;
+                                updatedFiles.Add(existingFile);
+                                fileChanges.Add(
+                                    new FolderProjectFileChange(
+                                        path,
+                                        FolderProjectFileChangeKind.Updated,
+                                        existingFile));
+                            }
 
-                scannedFiles[path] = existingFile;
-            }
+                            scannedFiles[path] = existingFile;
+                        }
 
-            foreach (var removedPath in FileList.Keys
-                         .Where(path => !scannedFiles.ContainsKey(path))
-                         .ToList())
-            {
-                FileList.Remove(removedPath);
-            }
-            foreach (var (path, file) in scannedFiles)
-                FileList[path] = file;
+                        foreach (var removedPath in FileList.Keys
+                                     .Where(
+                                         path =>
+                                             !scannedFiles.ContainsKey(path))
+                                     .ToList())
+                        {
+                            FileList.Remove(removedPath);
+                        }
+                        foreach (var (path, file) in scannedFiles)
+                            FileList[path] = file;
 
-            _fingerprints = scannedFingerprints;
-            EmptyDirectories.Clear();
-            EmptyDirectories.UnionWith(scannedDirectories);
-            ProjectSettings.EmptyDirectories =
-                new HashSet<string>(
-                    scannedDirectories,
-                    StringComparer.OrdinalIgnoreCase);
+                        _pathsByFile.Clear();
+                        foreach (var (path, file) in scannedFiles)
+                            _pathsByFile[file] = path;
 
-            var changes = new FolderProjectReconciliation(
-                addedFiles.Count,
-                removedFiles.Count,
-                updatedFiles.Count);
-            return new FolderProjectReconciledEventArgs(
-                changes,
-                addedFiles,
-                removedFiles,
-                updatedFiles,
-                !previousEmptyDirectories.SetEquals(
-                    scannedDirectories));
-        }
+                        _fingerprints = scannedFingerprints;
+                        EmptyDirectories.Clear();
+                        EmptyDirectories.UnionWith(scannedDirectories);
+                        ProjectSettings.EmptyDirectories =
+                            new HashSet<string>(
+                                scannedDirectories,
+                                StringComparer.OrdinalIgnoreCase);
+
+                        var changes = new FolderProjectReconciliation(
+                            addedFiles.Count,
+                            removedFiles.Count,
+                            updatedFiles.Count);
+                        var directoryChanges = previousEmptyDirectories
+                            .Except(scannedDirectories)
+                            .Select(
+                                path => new FolderProjectDirectoryChange(
+                                    path,
+                                    FolderProjectDirectoryChangeKind
+                                        .Removed))
+                            .Concat(
+                                scannedDirectories
+                                    .Except(previousEmptyDirectories)
+                                    .Select(
+                                        path =>
+                                            new FolderProjectDirectoryChange(
+                                                path,
+                                                FolderProjectDirectoryChangeKind
+                                                    .Added)))
+                            .ToList();
+                        return new FolderProjectReconciledEventArgs(
+                            changes,
+                            addedFiles,
+                            removedFiles,
+                            updatedFiles,
+                            !previousEmptyDirectories.SetEquals(
+                                scannedDirectories),
+                            new FolderProjectChangeSet(
+                                ++_revision,
+                                fileChanges,
+                                directoryChanges));
+                    });
+            });
     }
 
     private void VirtualizeMaterializedCorruptionDetectionFiles()
@@ -273,6 +346,7 @@ public sealed class FolderProjectContainer :
             if (_watcher != null)
                 return;
 
+            _synchronizationContext ??= SynchronizationContext.Current;
             _debounceTimer = new Timer(
                 OnDebounceElapsed,
                 null,
@@ -281,14 +355,13 @@ public sealed class FolderProjectContainer :
             _watcher = new FileSystemWatcherWrapper(ProjectRoot);
             _watcher.ProjectChanged += OnProjectChanged;
             _watcher.Start();
+            _debounceTimer.Change(300, Timeout.Infinite);
         }
-
-        ReconcileAfterWatcherEvent();
     }
 
     public void SetIgnored(string relativePath, bool ignored)
     {
-        ExecuteSynchronized(
+        ExecuteSynchronizedMutation(
             () =>
             {
                 var normalized =
@@ -312,7 +385,7 @@ public sealed class FolderProjectContainer :
 
     public void SetPackFileCorruptionDetectionEnabled(bool enabled)
     {
-        ExecuteSynchronized(
+        ExecuteSynchronizedMutation(
             () =>
             {
                 ProjectSettings.EnablePackFileCorruptionDetection =
@@ -342,13 +415,13 @@ public sealed class FolderProjectContainer :
 
     public void SaveSettings()
     {
-        ExecuteSynchronized(
+        ExecuteSynchronizedMutation(
             () => ProjectSettings.Save(ProjectRoot));
     }
 
     public void CreateDirectoryOnDisk(string relativePath)
     {
-        ExecuteSynchronized(
+        ExecuteSynchronizedMutation(
             () =>
             {
                 var normalized =
@@ -367,14 +440,10 @@ public sealed class FolderProjectContainer :
         IReadOnlyList<Shared.Core.PackFiles.NewPackFileEntry> newFiles,
         bool overwriteExisting = false)
     {
-        return ExecuteSynchronized(
+        return ExecuteSerializedMutation(
             () =>
             {
-                var writes = new List<(
-                    string RelativePath,
-                    string FullPath,
-                    byte[] Data,
-                    bool Overwrite)>();
+                var writes = new List<Shared.Core.PackFiles.PackFileWrite>();
                 foreach (var entry in newFiles)
                 {
                     if (string.IsNullOrWhiteSpace(entry.PackFile.Name))
@@ -390,49 +459,223 @@ public sealed class FolderProjectContainer :
                                 entry.PackFile.Name.Trim()));
                     var fullPath =
                         FolderProjectPathPolicy.ResolveFilePath(
-                        ProjectRoot,
-                        relativePath);
-                    var overwrite = File.Exists(fullPath);
-                    if (overwrite && !overwriteExisting)
+                            ProjectRoot,
+                            relativePath);
+                    if (File.Exists(fullPath) && !overwriteExisting)
                     {
                         throw new IOException(
                             $"The destination already exists: {fullPath}");
                     }
-                    writes.Add(
-                        (
-                            relativePath,
-                            fullPath,
-                            entry.PackFile.DataSource.ReadData(),
-                            overwrite));
+                    writes.Add(new Shared.Core.PackFiles.PackFileWrite(
+                        relativePath,
+                        entry.PackFile.DataSource.ReadData()));
                 }
 
-                var addedFiles = new List<PackFile>();
-                foreach (var write in writes)
-                {
-                    WriteAllBytesAtomic(
-                        write.FullPath,
-                        write.Data,
-                        write.Overwrite);
-                    var packFile = PackFile.CreateFromFileSystem(
-                        Path.GetFileName(write.FullPath),
-                        write.FullPath);
-                    FileList[write.RelativePath.ToLowerInvariant()] =
-                        packFile;
-                    UpdateFingerprint(
-                        write.RelativePath,
-                        write.FullPath);
-                    MarkPathHasContent(write.RelativePath);
-                    addedFiles.Add(packFile);
-                }
-
-                SaveEmptyDirectorySettings();
-                return addedFiles;
+                return ApplyFileWritesCore(writes);
             });
+    }
+
+    public List<PackFile> ApplyFileWrites(
+        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
+    {
+        return ExecuteSerializedMutation(
+            () => ApplyFileWritesCore(writes));
+    }
+
+    private List<PackFile> ApplyFileWritesCore(
+        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
+    {
+        var prepared = new List<PreparedFileWrite>();
+        var uniquePaths = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        var createdDirectories = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var write in writes)
+            {
+                var relativePath = FolderProjectPathPolicy
+                    .EnsureResourcePath(write.Path);
+                if (!uniquePaths.Add(relativePath))
+                {
+                    throw new InvalidDataException(
+                        $"The batch contains duplicate path: {relativePath}");
+                }
+
+                var fullPath = FolderProjectPathPolicy.ResolveFilePath(
+                    ProjectRoot,
+                    relativePath);
+                var directoryPath = Path.GetDirectoryName(fullPath)!;
+                if (createdDirectories.Add(directoryPath))
+                    Directory.CreateDirectory(directoryPath);
+                var tempPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
+                prepared.Add(new PreparedFileWrite(
+                    relativePath,
+                    fullPath,
+                    tempPath,
+                    write.Content,
+                    File.Exists(fullPath)));
+            }
+
+            try
+            {
+                Parallel.ForEach(
+                    prepared,
+                    CreateParallelFileOptions(),
+                    write => File.WriteAllBytes(
+                        write.TempPath,
+                        write.Content));
+            }
+            catch (AggregateException exception)
+            {
+                RethrowSingleParallelFailure(exception);
+                throw;
+            }
+
+            var committed = new List<CommittedFileWrite>();
+            try
+            {
+                var newCommitted =
+                    new ConcurrentBag<CommittedFileWrite>();
+                try
+                {
+                    Parallel.ForEach(
+                        prepared.Where(
+                            write => !write.DestinationExisted),
+                        CreateParallelFileOptions(),
+                        write =>
+                        {
+                            CommitPreparedFile(
+                                write.TempPath,
+                                write.FullPath);
+                            newCommitted.Add(new CommittedFileWrite(
+                                write.FullPath,
+                                null));
+                        });
+                }
+                finally
+                {
+                    committed.AddRange(newCommitted);
+                }
+
+                foreach (var write in prepared.Where(
+                             write => write.DestinationExisted))
+                {
+                    string? backupPath = null;
+                    var restoreCurrent = false;
+                    try
+                    {
+                        if (File.Exists(write.FullPath))
+                        {
+                            var candidateBackupPath =
+                                $"{write.FullPath}.{Guid.NewGuid():N}.tmp";
+                            File.Move(
+                                write.FullPath,
+                                candidateBackupPath);
+                            backupPath = candidateBackupPath;
+                            restoreCurrent = true;
+                        }
+
+                        restoreCurrent = true;
+                        CommitPreparedFile(
+                            write.TempPath,
+                            write.FullPath);
+                        committed.Add(new CommittedFileWrite(
+                            write.FullPath,
+                            backupPath));
+                    }
+                    catch
+                    {
+                        if (restoreCurrent)
+                        {
+                            RestoreCommittedFile(
+                                write.FullPath,
+                                backupPath);
+                        }
+                        throw;
+                    }
+                }
+            }
+            catch (Exception failure)
+            {
+                for (var index = committed.Count - 1;
+                     index >= 0;
+                     index--)
+                {
+                    RestoreCommittedFile(
+                        committed[index].FullPath,
+                        committed[index].BackupPath);
+                }
+
+                if (failure is AggregateException parallelFailure)
+                    RethrowSingleParallelFailure(parallelFailure);
+                throw;
+            }
+
+            foreach (var write in committed)
+            {
+                if (write.BackupPath == null)
+                    continue;
+                try
+                {
+                    File.Delete(write.BackupPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+
+            var materialized = new List<MaterializedFileWrite>();
+            foreach (var write in prepared)
+            {
+                var packFile = PackFile.CreateFromFileSystem(
+                    Path.GetFileName(write.FullPath),
+                    write.FullPath);
+                var fileInfo = new FileInfo(write.FullPath);
+                materialized.Add(new MaterializedFileWrite(
+                    write.RelativePath.ToLowerInvariant(),
+                    packFile,
+                    new FileFingerprint(
+                        fileInfo.Length,
+                        fileInfo.LastWriteTimeUtc.Ticks)));
+            }
+
+            return ExecuteSynchronized(
+                () =>
+                {
+                    var addedFiles = new List<PackFile>();
+                    foreach (var write in materialized)
+                    {
+                        if (FileList.TryGetValue(
+                                write.RelativePath,
+                                out var replaced))
+                        {
+                            _pathsByFile.Remove(replaced);
+                        }
+                        FileList[write.RelativePath] = write.PackFile;
+                        _pathsByFile[write.PackFile] = write.RelativePath;
+                        _fingerprints[write.RelativePath] = write.Fingerprint;
+                        MarkPathHasContent(write.RelativePath);
+                        addedFiles.Add(write.PackFile);
+                    }
+
+                    SaveEmptyDirectorySettings();
+                    return addedFiles;
+                });
+        }
+        finally
+        {
+            foreach (var write in prepared)
+                File.Delete(write.TempPath);
+        }
     }
 
     public void SaveFileData(PackFile file, byte[] data)
     {
-        ExecuteSynchronized(
+        ExecuteSynchronizedMutation(
             () =>
             {
                 var key = FindKey(file);
@@ -447,7 +690,7 @@ public sealed class FolderProjectContainer :
 
     public PackFile DeleteFileFromDisk(PackFile file)
     {
-        return ExecuteSynchronized(
+        return ExecuteSynchronizedMutation(
             () =>
             {
                 var key = FindKey(file);
@@ -457,6 +700,7 @@ public sealed class FolderProjectContainer :
                 if (File.Exists(fullPath))
                     File.Delete(fullPath);
                 FileList.Remove(key);
+                _pathsByFile.Remove(file);
                 _fingerprints.Remove(key);
                 RemoveIgnoredPaths(key);
                 MarkParentEmptyIfNeeded(key);
@@ -467,7 +711,7 @@ public sealed class FolderProjectContainer :
 
     public IReadOnlyList<PackFile> DeleteFolderFromDisk(string folder)
     {
-        return ExecuteSynchronized(
+        return ExecuteSynchronizedMutation(
             () =>
             {
                 var normalized =
@@ -493,6 +737,7 @@ public sealed class FolderProjectContainer :
                     keys.Select(key => FileList[key]).ToList();
                 foreach (var key in keys)
                 {
+                    _pathsByFile.Remove(FileList[key]);
                     FileList.Remove(key);
                     _fingerprints.Remove(key);
                 }
@@ -516,7 +761,7 @@ public sealed class FolderProjectContainer :
         PackFile file,
         string newFolderPath)
     {
-        return ExecuteSynchronized(
+        return ExecuteSynchronizedMutation(
             () =>
             {
                 var oldKey = FindKey(file);
@@ -536,7 +781,7 @@ public sealed class FolderProjectContainer :
 
     public string RenameFileOnDisk(PackFile file, string newName)
     {
-        return ExecuteSynchronized(
+        return ExecuteSynchronizedMutation(
             () =>
             {
                 var oldKey = FindKey(file);
@@ -558,7 +803,7 @@ public sealed class FolderProjectContainer :
         string currentPath,
         string newName)
     {
-        return ExecuteSynchronized(
+        return ExecuteSynchronizedMutation(
             () =>
             {
                 var oldPath =
@@ -600,6 +845,7 @@ public sealed class FolderProjectContainer :
                             newKey);
                     file.DataSource = new FileSystemSource(filePath);
                     FileList[newKey] = file;
+                    _pathsByFile[file] = newKey;
                     UpdateFingerprint(newKey, filePath);
                 }
 
@@ -630,21 +876,25 @@ public sealed class FolderProjectContainer :
     {
         FileSystemWatcherWrapper? watcher;
         Timer? debounceTimer;
-        lock (_stateGate)
+        lock (_mutationGate)
         {
-            if (_disposed)
-                return;
+            lock (_stateGate)
+            {
+                if (_disposed)
+                    return;
 
-            PersistWatcherSettings();
-            _disposed = true;
-            watcher = _watcher;
-            _watcher = null;
-            debounceTimer = _debounceTimer;
-            _debounceTimer = null;
-            FileList.Clear();
-            _fingerprints.Clear();
-            EmptyDirectories.Clear();
-            _pendingWatcherReconciliation = null;
+                PersistWatcherSettings();
+                _disposed = true;
+                watcher = _watcher;
+                _watcher = null;
+                debounceTimer = _debounceTimer;
+                _debounceTimer = null;
+                FileList.Clear();
+                _pathsByFile.Clear();
+                _fingerprints.Clear();
+                EmptyDirectories.Clear();
+                _pendingWatcherReconciliation = null;
+            }
         }
 
         if (watcher != null)
@@ -779,6 +1029,10 @@ public sealed class FolderProjectContainer :
                FileList.Keys.Any(
                    path => path.StartsWith(
                        prefix,
+                       StringComparison.OrdinalIgnoreCase)) ||
+               ProjectSettings.IgnoredPaths.Any(
+                   path => path.StartsWith(
+                       prefix,
                        StringComparison.OrdinalIgnoreCase));
     }
 
@@ -840,14 +1094,18 @@ public sealed class FolderProjectContainer :
     {
         try
         {
-            lock (_stateGate)
+            lock (_mutationGate)
             {
-                if (_disposed)
-                    return;
+                lock (_stateGate)
+                {
+                    if (_disposed)
+                        return;
 
-                ApplyWatcherPathChange(e);
-                PersistWatcherSettings();
-                _debounceTimer?.Change(300, Timeout.Infinite);
+                    ApplyWatcherPathChange(e);
+                    PersistWatcherSettings();
+                    if (RequiresWatcherReconciliation(e))
+                        _debounceTimer?.Change(300, Timeout.Infinite);
+                }
             }
         }
         catch (ObjectDisposedException)
@@ -877,23 +1135,13 @@ public sealed class FolderProjectContainer :
 
     private void OnDebounceElapsed(object? state)
     {
-        SynchronizationContext? synchronizationContext;
         lock (_stateGate)
         {
             if (_disposed)
                 return;
-
-            synchronizationContext = _synchronizationContext;
         }
 
-        if (synchronizationContext != null)
-        {
-            synchronizationContext.Post(
-                _ => ReconcileAfterWatcherEvent(),
-                null);
-        }
-        else
-            ReconcileAfterWatcherEvent();
+        ReconcileAfterWatcherEvent();
     }
 
     internal void ReconcileAfterWatcherEvent()
@@ -946,14 +1194,109 @@ public sealed class FolderProjectContainer :
     private void PublishPendingWatcherReconciliation()
     {
         FolderProjectReconciledEventArgs? pending;
+        SynchronizationContext? synchronizationContext;
         lock (_stateGate)
         {
             pending = _pendingWatcherReconciliation;
             _pendingWatcherReconciliation = null;
+            synchronizationContext = _synchronizationContext;
         }
 
-        if (pending != null)
-            FilesReconciled?.Invoke(this, pending);
+        if (pending == null)
+            return;
+
+        if (synchronizationContext != null &&
+            !ReferenceEquals(
+                SynchronizationContext.Current,
+                synchronizationContext))
+        {
+            synchronizationContext.Post(
+                _ => FilesReconciled?.Invoke(this, pending),
+                null);
+            return;
+        }
+
+        FilesReconciled?.Invoke(this, pending);
+    }
+
+    private bool RequiresWatcherReconciliation(
+        FolderProjectFileSystemChangedEventArgs change)
+    {
+        if (change.ChangeType == WatcherChangeTypes.Renamed)
+        {
+            var isDirectory = Directory.Exists(change.FullPath);
+            var oldIsResource = TryGetProjectRelativePath(
+                change.OldFullPath,
+                out var oldPath,
+                isDirectory);
+            var newIsResource = TryGetProjectRelativePath(
+                change.FullPath,
+                out var newPath,
+                isDirectory);
+            if (!oldIsResource && !newIsResource)
+                return false;
+            if (!isDirectory &&
+                oldIsResource &&
+                MatchesKnownFingerprint(
+                    oldPath,
+                    change.OldFullPath))
+            {
+                return false;
+            }
+            return isDirectory ||
+                   !newIsResource ||
+                   !MatchesKnownFingerprint(newPath, change.FullPath);
+        }
+
+        if (change.ChangeType == WatcherChangeTypes.Deleted)
+        {
+            if (TryGetProjectRelativePath(
+                    change.FullPath,
+                    out var deletedPath))
+            {
+                return !MatchesKnownFingerprint(
+                    deletedPath,
+                    change.FullPath);
+            }
+            return TryGetDeletedResourceDirectoryPath(
+                change.FullPath,
+                out _);
+        }
+
+        var changedPathIsDirectory = Directory.Exists(change.FullPath);
+        if (!TryGetProjectRelativePath(
+                change.FullPath,
+                out var changedPath,
+                changedPathIsDirectory))
+        {
+            return false;
+        }
+
+        if (changedPathIsDirectory)
+            return change.ChangeType != WatcherChangeTypes.Changed;
+
+        return !MatchesKnownFingerprint(
+            changedPath,
+            change.FullPath);
+    }
+
+    private bool MatchesKnownFingerprint(
+        string relativePath,
+        string? fullPath)
+    {
+        if (fullPath == null ||
+            !_fingerprints.TryGetValue(
+                relativePath.ToLowerInvariant(),
+                out var fingerprint) ||
+            !File.Exists(fullPath))
+        {
+            return false;
+        }
+
+        var fileInfo = new FileInfo(fullPath);
+        return fingerprint == new FileFingerprint(
+            fileInfo.Length,
+            fileInfo.LastWriteTimeUtc.Ticks);
     }
 
     private static bool HasChanges(
@@ -1053,13 +1396,46 @@ public sealed class FolderProjectContainer :
         }
     }
 
+    internal void ExecuteSerializedMutation(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        lock (_mutationGate)
+        {
+            ExecuteSynchronized(ThrowIfDisposed);
+            action();
+        }
+    }
+
+    internal T ExecuteSerializedMutation<T>(Func<T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        lock (_mutationGate)
+        {
+            ExecuteSynchronized(ThrowIfDisposed);
+            return action();
+        }
+    }
+
+    private void ExecuteSynchronizedMutation(Action action)
+    {
+        ExecuteSerializedMutation(
+            () => ExecuteSynchronized(action));
+    }
+
+    private T ExecuteSynchronizedMutation<T>(Func<T> action)
+    {
+        return ExecuteSerializedMutation(
+            () => ExecuteSynchronized(action));
+    }
+
+    public string GetRelativePath(PackFile file)
+    {
+        return ExecuteSynchronized(() => FindKey(file));
+    }
+
     private string FindKey(PackFile file)
     {
-        var key = FileList
-            .FirstOrDefault(
-                pair => ReferenceEquals(pair.Value, file))
-            .Key;
-        if (string.IsNullOrWhiteSpace(key))
+        if (!_pathsByFile.TryGetValue(file, out var key))
             throw new InvalidOperationException(
                 $"The file '{file.Name}' is not part of this project.");
         return key;
@@ -1083,7 +1459,9 @@ public sealed class FolderProjectContainer :
         FileList.Remove(oldKey);
         _fingerprints.Remove(oldKey);
         file.DataSource = new FileSystemSource(newPath);
-        FileList[newKey.ToLowerInvariant()] = file;
+        var normalizedNewKey = newKey.ToLowerInvariant();
+        FileList[normalizedNewKey] = file;
+        _pathsByFile[file] = normalizedNewKey;
         UpdateFingerprint(newKey, newPath);
     }
 
@@ -1210,6 +1588,35 @@ public sealed class FolderProjectContainer :
         }
     }
 
+    private static void RestoreCommittedFile(
+        string fullPath,
+        string? backupPath)
+    {
+        if (File.Exists(fullPath))
+            File.Delete(fullPath);
+        if (backupPath != null && File.Exists(backupPath))
+            File.Move(backupPath, fullPath);
+    }
+
+    private static ParallelOptions CreateParallelFileOptions()
+    {
+        return new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 4,
+        };
+    }
+
+    private static void RethrowSingleParallelFailure(
+        AggregateException failure)
+    {
+        var flattened = failure.Flatten();
+        if (flattened.InnerExceptions.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(
+                flattened.InnerExceptions[0]).Throw();
+        }
+    }
+
     private void UpdateFingerprint(
         string relativePath,
         string fullPath)
@@ -1224,4 +1631,20 @@ public sealed class FolderProjectContainer :
     private readonly record struct FileFingerprint(
         long Length,
         long LastWriteTicks);
+
+    private sealed record PreparedFileWrite(
+        string RelativePath,
+        string FullPath,
+        string TempPath,
+        byte[] Content,
+        bool DestinationExisted);
+
+    private sealed record MaterializedFileWrite(
+        string RelativePath,
+        PackFile PackFile,
+        FileFingerprint Fingerprint);
+
+    private sealed record CommittedFileWrite(
+        string FullPath,
+        string? BackupPath);
 }

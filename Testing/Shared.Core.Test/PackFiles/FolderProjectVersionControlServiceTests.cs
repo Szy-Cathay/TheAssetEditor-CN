@@ -78,6 +78,43 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void Initialize_WithProgressReportsEachIndexedFile()
+    {
+        using var project = new TemporaryDirectory("initialize-progress");
+        Directory.CreateDirectory(Path.Combine(project.Path, "audio"));
+        File.WriteAllText(Path.Combine(project.Path, "first.txt"), "one");
+        File.WriteAllBytes(
+            Path.Combine(project.Path, "audio", "second.wem"),
+            [1, 2, 3]);
+        var progress = new List<FolderProjectVersionControlProgress>();
+        var service = new FolderProjectVersionControlService();
+
+        service.Initialize(
+            project.Path,
+            s_identity,
+            "master",
+            progress.Add);
+
+        var indexed = progress
+            .Where(item => item.Stage ==
+                FolderProjectVersionControlProgressStage.IndexingFiles)
+            .ToList();
+        using var repository = new Repository(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                indexed.Select(item => item.Detail),
+                Does.Contain("first.txt"));
+            Assert.That(
+                indexed.Select(item => item.Detail),
+                Does.Contain("audio/second.wem"));
+            Assert.That(indexed[^1].Completed, Is.EqualTo(indexed[^1].Total));
+            Assert.That(indexed[^1].Total, Is.EqualTo(repository.Index.Count));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
     public void Initialize_CustomPrimaryBranch_UsesAndRecordsRequestedName()
     {
         using var project = new TemporaryDirectory("custom-primary");
@@ -523,7 +560,9 @@ public class FolderProjectVersionControlServiceTests
             repositoryPath);
         var service = new FolderProjectVersionControlService(platform);
 
-        var status = service.GetStatus(project.Path);
+        var status = service.GetStatus(
+            project.Path,
+            scanUnreadableEntries: true);
         var change = status.Changes.Single(
             item => item.RepositoryPath == repositoryPath);
 
@@ -534,6 +573,64 @@ public class FolderProjectVersionControlServiceTests
                 change.Kind,
                 Is.EqualTo(FolderProjectWorkingChangeKind.Unreadable));
             Assert.That(platform.AccessedFailurePath, Is.True);
+        });
+    }
+
+    [Test]
+    public void GetStatus_DefaultScan_DoesNotOpenUnchangedTrackedFiles()
+    {
+        using var project = new TemporaryDirectory("fast-status");
+        var repositoryPath = "unchanged.bin";
+        File.WriteAllText(
+            Path.Combine(project.Path, repositoryPath),
+            "content");
+        var setupService = new FolderProjectVersionControlService();
+        setupService.Initialize(project.Path, s_identity);
+        var platform = new StatusFileSystemPlatform(
+            project.Path,
+            "open",
+            repositoryPath);
+        var service = new FolderProjectVersionControlService(platform);
+
+        var status = service.GetStatus(project.Path);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(status.IsClean, Is.True);
+            Assert.That(status.Changes, Is.Empty);
+            Assert.That(platform.AccessedFailurePath, Is.False);
+        });
+    }
+
+    [Test]
+    public void GetStatus_WithProgressReportsRealChangedPaths()
+    {
+        using var project = new TemporaryDirectory("status-progress");
+        var filePath = Path.Combine(project.Path, "changed.txt");
+        File.WriteAllText(filePath, "one");
+        var service = new FolderProjectVersionControlService();
+        service.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        var progress = new List<FolderProjectVersionControlProgress>();
+
+        var status = service.GetStatus(project.Path, progress.Add);
+
+        var processed = progress
+            .Where(item => item.Stage ==
+                FolderProjectVersionControlProgressStage
+                    .ProcessingWorkingChanges)
+            .ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                progress.Select(item => item.Stage),
+                Does.Contain(
+                    FolderProjectVersionControlProgressStage
+                        .ScanningWorkingTree));
+            Assert.That(status.Changes, Has.Count.EqualTo(1));
+            Assert.That(processed[^1].Detail, Is.EqualTo("changed.txt"));
+            Assert.That(processed[^1].Completed, Is.EqualTo(1));
+            Assert.That(processed[^1].Total, Is.EqualTo(1));
         });
     }
 
@@ -574,6 +671,140 @@ public class FolderProjectVersionControlServiceTests
                     !change.Kind.HasFlag(
                         FolderProjectWorkingChangeKind.Staged)),
             Is.True);
+    }
+
+    [Test]
+    public void GetStatus_SelectedPathsUsesExactPathspec()
+    {
+        using var project = new TemporaryDirectory("status-pathspec");
+        var setupService = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "selected.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "unrelated.txt"), "one");
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "selected.txt"), "two");
+        File.WriteAllText(Path.Combine(project.Path, "unrelated.txt"), "two");
+        var platform = new RecordingStatusPlatform();
+        var service = new FolderProjectVersionControlService(platform);
+
+        var status = service.GetStatus(project.Path, ["selected.txt"]);
+
+        var options = platform.StatusReads.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.DisablePathSpecMatch, Is.True);
+            Assert.That(
+                options.PathSpec,
+                Is.EqualTo(new[] { "selected.txt" }));
+            Assert.That(
+                status.Changes.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[] { "selected.txt" }));
+        });
+    }
+
+    [Test]
+    public void StageChanges_LimitsStatusReadToSelectedPaths()
+    {
+        using var project = new TemporaryDirectory("stage-pathspec");
+        var setupService = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "selected.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "unrelated.txt"), "one");
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "selected.txt"), "two");
+        File.WriteAllText(Path.Combine(project.Path, "unrelated.txt"), "two");
+        var platform = new RecordingStatusPlatform();
+        var service = new FolderProjectVersionControlService(platform);
+
+        service.StageChanges(project.Path, ["selected.txt"]);
+
+        var options = platform.StatusReads.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.DisablePathSpecMatch, Is.True);
+            Assert.That(
+                options.PathSpec,
+                Is.EqualTo(new[] { "selected.txt" }));
+        });
+    }
+
+    [Test]
+    public void DiscardChanges_LimitsStatusReadToSelectedPaths()
+    {
+        using var project = new TemporaryDirectory("discard-pathspec");
+        var setupService = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "selected.txt"), "one");
+        File.WriteAllText(Path.Combine(project.Path, "unrelated.txt"), "one");
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(Path.Combine(project.Path, "selected.txt"), "two");
+        File.WriteAllText(Path.Combine(project.Path, "unrelated.txt"), "two");
+        var platform = new RecordingStatusPlatform();
+        var service = new FolderProjectVersionControlService(platform);
+
+        service.DiscardChanges(project.Path, ["selected.txt"]);
+
+        var options = platform.StatusReads.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.DisablePathSpecMatch, Is.True);
+            Assert.That(
+                options.PathSpec,
+                Is.EqualTo(new[] { "selected.txt" }));
+            Assert.That(
+                File.ReadAllText(Path.Combine(project.Path, "selected.txt")),
+                Is.EqualTo("one"));
+            Assert.That(
+                File.ReadAllText(Path.Combine(project.Path, "unrelated.txt")),
+                Is.EqualTo("two"));
+        });
+    }
+
+    [Test]
+    public void StageChanges_RenameStagesBothSides()
+    {
+        using var project = new TemporaryDirectory("stage-rename");
+        var service = new FolderProjectVersionControlService();
+        var originalPath = Path.Combine(project.Path, "original.txt");
+        var renamedPath = Path.Combine(project.Path, "renamed.txt");
+        File.WriteAllText(originalPath, "content");
+        service.Initialize(project.Path, s_identity);
+        File.Move(originalPath, renamedPath);
+        var rename = service.GetStatus(project.Path).Changes.Single();
+
+        Assert.That(rename.PreviousRepositoryPath, Is.EqualTo("original.txt"));
+        service.StageChanges(
+            project.Path,
+            [rename.RepositoryPath, rename.PreviousRepositoryPath!]);
+
+        var staged = service.GetStatus(project.Path).Changes;
+        Assert.Multiple(() =>
+        {
+            Assert.That(staged, Has.Count.EqualTo(1));
+            Assert.That(
+                staged[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged),
+                Is.True);
+            Assert.That(
+                staged[0].Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Unstaged),
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void CommitStaged_DoesNotScanWorkingDirectoryBeforeCommit()
+    {
+        using var project = new TemporaryDirectory("commit-no-status-scan");
+        var filePath = Path.Combine(project.Path, "selected.txt");
+        File.WriteAllText(filePath, "one");
+        var setupService = new FolderProjectVersionControlService();
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        setupService.StageChanges(project.Path, ["selected.txt"]);
+        var platform = new RecordingStatusPlatform();
+        var service = new FolderProjectVersionControlService(platform);
+
+        service.CommitStaged(project.Path, "提交暂存内容");
+
+        Assert.That(platform.StatusReads, Is.Empty);
     }
 
     [Test]
@@ -679,6 +910,66 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void DiscardChanges_AddedFile_DoesNotBufferWholeFileForRollback()
+    {
+        const int fileLength = 16 * 1024 * 1024;
+        using var project = new TemporaryDirectory(
+            "discard-large-added-file");
+        var service = new FolderProjectVersionControlService();
+        service.Initialize(project.Path, s_identity);
+        var addedPath = Path.Combine(project.Path, "added.wem");
+        File.WriteAllBytes(addedPath, new byte[fileLength]);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        service.DiscardChanges(project.Path, ["added.wem"]);
+        var allocated =
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(addedPath), Is.False);
+            Assert.That(allocated, Is.LessThan(fileLength / 2));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+        });
+    }
+
+    [Test]
+    public void DiscardChanges_WhenTrackedRestoreMoveFails_RollsBackFilesAndIndex()
+    {
+        using var project = new TemporaryDirectory(
+            "discard-tracked-restore-failure");
+        var firstPath = Path.Combine(project.Path, "first.txt");
+        var secondPath = Path.Combine(project.Path, "second.txt");
+        File.WriteAllText(firstPath, "first original");
+        File.WriteAllText(secondPath, "second original");
+        var setupService = new FolderProjectVersionControlService();
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(firstPath, "first changed");
+        File.WriteAllText(secondPath, "second changed");
+        var service = new FolderProjectVersionControlService(
+            new FailDiscardRestoreMovePlatform("second.txt"));
+
+        Assert.That(
+            () => service.DiscardChanges(
+                project.Path,
+                ["first.txt", "second.txt"]),
+            Throws.TypeOf<FolderProjectVersionControlException>()
+                .With.InnerException.TypeOf<IOException>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllText(firstPath),
+                Is.EqualTo("first changed"));
+            Assert.That(
+                File.ReadAllText(secondPath),
+                Is.EqualTo("second changed"));
+            Assert.That(
+                service.GetStatus(project.Path).Changes,
+                Has.Count.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void DiscardChanges_RestoresBothSidesOfRename()
     {
         using var project = new TemporaryDirectory("discard-rename");
@@ -690,7 +981,9 @@ public class FolderProjectVersionControlServiceTests
         File.Move(originalPath, renamedPath);
         var rename = service.GetStatus(project.Path).Changes.Single();
 
-        service.DiscardChanges(project.Path, [rename.RepositoryPath]);
+        service.DiscardChanges(
+            project.Path,
+            [rename.RepositoryPath, rename.PreviousRepositoryPath!]);
 
         Assert.Multiple(() =>
         {
@@ -1224,7 +1517,9 @@ public class FolderProjectVersionControlServiceTests
             repositoryPath);
         var service = new FolderProjectVersionControlService(platform);
 
-        var change = service.GetStatus(project.Path).Changes.Single(
+        var change = service.GetStatus(
+                project.Path,
+                scanUnreadableEntries: true).Changes.Single(
             item => item.RepositoryPath == repositoryPath);
 
         Assert.That(
@@ -1255,7 +1550,9 @@ public class FolderProjectVersionControlServiceTests
             repositoryPath);
         var service = new FolderProjectVersionControlService(platform);
 
-        var status = service.GetStatus(project.Path);
+        var status = service.GetStatus(
+            project.Path,
+            scanUnreadableEntries: true);
 
         Assert.Multiple(() =>
         {
@@ -1291,7 +1588,9 @@ public class FolderProjectVersionControlServiceTests
             repositoryPath);
         var service = new FolderProjectVersionControlService(platform);
 
-        var status = service.GetStatus(project.Path);
+        var status = service.GetStatus(
+            project.Path,
+            scanUnreadableEntries: true);
         var change = status.Changes.Single(
             item => item.RepositoryPath == repositoryPath);
 
@@ -1327,7 +1626,9 @@ public class FolderProjectVersionControlServiceTests
             repositoryPath);
         var service = new FolderProjectVersionControlService(platform);
 
-        var change = service.GetStatus(project.Path).Changes.Single(
+        var change = service.GetStatus(
+                project.Path,
+                scanUnreadableEntries: true).Changes.Single(
             item => item.RepositoryPath == repositoryPath);
 
         Assert.Multiple(() =>
@@ -1364,7 +1665,9 @@ public class FolderProjectVersionControlServiceTests
             childPath);
         var service = new FolderProjectVersionControlService(platform);
 
-        var status = service.GetStatus(project.Path);
+        var status = service.GetStatus(
+            project.Path,
+            scanUnreadableEntries: true);
 
         Assert.Multiple(() =>
         {
@@ -1382,7 +1685,9 @@ public class FolderProjectVersionControlServiceTests
         var platform = new StatusFileSystemPlatform(project.Path);
         var service = new FolderProjectVersionControlService(platform);
 
-        var status = service.GetStatus(project.Path);
+        var status = service.GetStatus(
+            project.Path,
+            scanUnreadableEntries: true);
 
         Assert.Multiple(() =>
         {
@@ -1409,7 +1714,9 @@ public class FolderProjectVersionControlServiceTests
         var platform = new StatusFileSystemPlatform(project.Path);
         var service = new FolderProjectVersionControlService(platform);
 
-        _ = service.GetStatus(project.Path);
+        _ = service.GetStatus(
+            project.Path,
+            scanUnreadableEntries: true);
 
         Assert.That(platform.GitMetadataEnumerated, Is.False);
     }
@@ -2128,6 +2435,102 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void GetCommitChanges_ReportsActualFileProgress()
+    {
+        using var project = new TemporaryDirectory("commit-diff-progress");
+        var service = new FolderProjectVersionControlService();
+        File.WriteAllText(Path.Combine(project.Path, "initial.txt"), "initial");
+        service.Initialize(project.Path, s_identity);
+        var audioDirectory = Path.Combine(project.Path, "audio");
+        Directory.CreateDirectory(audioDirectory);
+        File.WriteAllBytes(
+            Path.Combine(audioDirectory, "voice-a.wem"),
+            [1, 2, 3]);
+        File.WriteAllBytes(
+            Path.Combine(audioDirectory, "voice-b.wem"),
+            [4, 5, 6]);
+        var commit = service.CommitAll(project.Path, "add audio");
+        var progress = new List<FolderProjectVersionControlProgress>();
+
+        var changes = service.GetCommitChanges(
+            project.Path,
+            commit.Id,
+            progress.Add);
+
+        var fileProgress = progress.Where(item => item.Stage ==
+            FolderProjectVersionControlProgressStage
+                .ProcessingCommitChanges).ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                changes.Select(change => change.RepositoryPath),
+                Is.EqualTo(new[]
+                {
+                    "audio/voice-a.wem",
+                    "audio/voice-b.wem",
+                }));
+            Assert.That(
+                fileProgress.Select(item => item.Detail),
+                Is.EqualTo(new[]
+                {
+                    "audio/voice-a.wem",
+                    "audio/voice-b.wem",
+                }));
+            Assert.That(
+                fileProgress.Select(item => item.Completed),
+                Is.EqualTo(new long[] { 1, 2 }));
+            Assert.That(
+                fileProgress.Select(item => item.Total),
+                Is.EqualTo(new long[] { 2, 2 }));
+        });
+    }
+
+    [Test]
+    public void GetCommitChanges_TextFile_RemainsText()
+    {
+        using var project = new TemporaryDirectory("binary-policy-diff");
+        File.WriteAllText(
+            Path.Combine(project.Path, "plain.txt"),
+            "plain text");
+        var service = new FolderProjectVersionControlService();
+        var initial = service.Initialize(project.Path, s_identity);
+
+        var change = service.GetCommitChanges(project.Path, initial.Id)
+            .Single(item => item.RepositoryPath == "plain.txt");
+
+        Assert.That(change.IsBinary, Is.False);
+    }
+
+    [Test]
+    public void GetCommitChanges_WemFile_DoesNotReadBlobContent()
+    {
+        using var project = new TemporaryDirectory("wem-binary-diff");
+        var wemPath = Path.Combine(project.Path, "audio", "voice.wem");
+        Directory.CreateDirectory(Path.GetDirectoryName(wemPath)!);
+        File.WriteAllBytes(wemPath, [0, 255, 13, 10, 42]);
+        var service = new FolderProjectVersionControlService();
+        var initial = service.Initialize(project.Path, s_identity);
+        string blobObjectPath;
+        using (var repository = new Repository(project.Path))
+        {
+            var commit = repository.Lookup<Commit>(initial.Id)!;
+            var blobId = commit.Tree["audio/voice.wem"].Target.Id.Sha;
+            blobObjectPath = Path.Combine(
+                repository.Info.Path,
+                "objects",
+                blobId[..2],
+                blobId[2..]);
+        }
+        File.SetAttributes(blobObjectPath, FileAttributes.Normal);
+        File.Delete(blobObjectPath);
+
+        var change = service.GetCommitChanges(project.Path, initial.Id)
+            .Single(item => item.RepositoryPath == "audio/voice.wem");
+
+        Assert.That(change.IsBinary, Is.True);
+    }
+
+    [Test]
     public void GetCommitChanges_LaterCommit_MapsModifyDeleteAndRename()
     {
         using var project = new TemporaryDirectory("later-diff");
@@ -2790,6 +3193,26 @@ public class FolderProjectVersionControlServiceTests
         }
     }
 
+    private sealed class FailDiscardRestoreMovePlatform(
+        string fileName) : FolderProjectVersionControlPlatform
+    {
+        public override void MoveFile(
+            string sourcePath,
+            string destinationPath,
+            bool overwrite)
+        {
+            if (Path.GetFileName(destinationPath).Equals(
+                    fileName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new IOException(
+                    "Injected tracked restore move failure.");
+            }
+
+            base.MoveFile(sourcePath, destinationPath, overwrite);
+        }
+    }
+
     private sealed class PostInitializeUnsafeStatePlatform :
         FolderProjectVersionControlPlatform,
         IDisposable
@@ -2968,6 +3391,20 @@ public class FolderProjectVersionControlServiceTests
                 }
                 Directory.Delete(Path, true);
             }
+        }
+    }
+
+    private sealed class RecordingStatusPlatform :
+        FolderProjectVersionControlPlatform
+    {
+        public List<StatusOptions> StatusReads { get; } = [];
+
+        public override RepositoryStatus RetrieveStatus(
+            Repository repository,
+            StatusOptions options)
+        {
+            StatusReads.Add(options);
+            return base.RetrieveStatus(repository, options);
         }
     }
 }

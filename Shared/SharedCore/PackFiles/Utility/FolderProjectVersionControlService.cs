@@ -5,12 +5,29 @@ namespace Shared.Core.PackFiles.Utility;
 
 public interface IFolderProjectVersionControlService
 {
-    FolderProjectRepositoryStatus GetStatus(string projectRoot);
+    FolderProjectRepositoryStatus GetStatus(
+        string projectRoot,
+        bool scanUnreadableEntries = false);
+
+    FolderProjectRepositoryStatus GetStatus(
+        string projectRoot,
+        Action<FolderProjectVersionControlProgress> reportProgress,
+        bool scanUnreadableEntries = false);
+
+    FolderProjectRepositoryStatus GetStatus(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths);
 
     FolderProjectCommitSummary Initialize(
         string projectRoot,
         FolderProjectGitIdentity identity,
         string primaryBranchName = "master");
+
+    FolderProjectCommitSummary Initialize(
+        string projectRoot,
+        FolderProjectGitIdentity identity,
+        string primaryBranchName,
+        Action<FolderProjectVersionControlProgress> reportProgress);
 
     FolderProjectGitIdentity GetIdentity(string projectRoot);
 
@@ -101,6 +118,11 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         string commitId);
 
+    IReadOnlyList<FolderProjectCommitChange> GetCommitChanges(
+        string projectRoot,
+        string commitId,
+        Action<FolderProjectVersionControlProgress> reportProgress);
+
     FolderProjectFileRestoreResult RestoreFile(
         string projectRoot,
         string commitId,
@@ -159,6 +181,13 @@ public interface IFolderProjectVersionControlService
 
 internal class FolderProjectVersionControlPlatform
 {
+    public virtual RepositoryStatus RetrieveStatus(
+        Repository repository,
+        StatusOptions options)
+    {
+        return repository.RetrieveStatus(options);
+    }
+
     public virtual void InitializeRepository(string projectRoot)
     {
         FolderProjectGitRepository.Initialize(projectRoot);
@@ -252,6 +281,13 @@ public sealed partial class FolderProjectVersionControlService :
         "asseteditor.primaryBranch";
     private const string InitialCommitConfigKey =
         "asseteditor.initialCommit";
+    private static readonly HashSet<string> s_knownBinaryAudioExtensions =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".bnk",
+            ".wav",
+            ".wem",
+        };
     private readonly FolderProjectVersionControlPlatform _platform;
 
     public FolderProjectVersionControlService()
@@ -265,7 +301,47 @@ public sealed partial class FolderProjectVersionControlService :
         _platform = platform;
     }
 
-    public FolderProjectRepositoryStatus GetStatus(string projectRoot)
+    public FolderProjectRepositoryStatus GetStatus(
+        string projectRoot,
+        bool scanUnreadableEntries = false)
+    {
+        return GetStatusCore(
+            projectRoot,
+            scanUnreadableEntries,
+            pathSpec: null,
+            reportProgress: null);
+    }
+
+    public FolderProjectRepositoryStatus GetStatus(
+        string projectRoot,
+        Action<FolderProjectVersionControlProgress> reportProgress,
+        bool scanUnreadableEntries = false)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        return GetStatusCore(
+            projectRoot,
+            scanUnreadableEntries,
+            pathSpec: null,
+            reportProgress);
+    }
+
+    public FolderProjectRepositoryStatus GetStatus(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths)
+    {
+        ArgumentNullException.ThrowIfNull(relativePaths);
+        return GetStatusCore(
+            projectRoot,
+            scanUnreadableEntries: false,
+            relativePaths,
+            reportProgress: null);
+    }
+
+    private FolderProjectRepositoryStatus GetStatusCore(
+        string projectRoot,
+        bool scanUnreadableEntries,
+        IReadOnlyList<string>? pathSpec,
+        Action<FolderProjectVersionControlProgress>? reportProgress)
     {
         var repositoryState = GetRepositoryState(projectRoot);
         if (repositoryState == RepositoryState.Unsupported)
@@ -292,7 +368,10 @@ public sealed partial class FolderProjectVersionControlService :
                 var head = repository.Head;
                 var changes = GetWorkingChanges(
                     repository,
-                    Path.GetFullPath(projectRoot));
+                    Path.GetFullPath(projectRoot),
+                    scanUnreadableEntries,
+                    pathSpec,
+                    reportProgress);
                 return new FolderProjectRepositoryStatus(
                     true,
                     repository.Info.IsHeadDetached
@@ -307,39 +386,71 @@ public sealed partial class FolderProjectVersionControlService :
 
     private IReadOnlyList<FolderProjectWorkingChange> GetWorkingChanges(
         Repository repository,
-        string projectRoot)
+        string projectRoot,
+        bool scanUnreadableEntries = true,
+        IReadOnlyList<string>? pathSpec = null,
+        Action<FolderProjectVersionControlProgress>? reportProgress = null)
     {
-        var trackedPaths = TrackedRepositoryPaths.Create(
-            repository.Index);
+        var trackedPaths = scanUnreadableEntries
+            ? TrackedRepositoryPaths.Create(repository.Index)
+            : null;
         var changes = new Dictionary<
             string,
             FolderProjectWorkingChangeKind>(
             StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in RetrieveWorkingStatus(repository))
+        var previousPaths = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        reportProgress?.Invoke(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ScanningWorkingTree,
+            projectRoot));
+        var statusEntries = RetrieveWorkingStatus(repository, pathSpec)
+            .Where(entry => entry.State != FileStatus.Ignored)
+            .ToList();
+        for (var index = 0; index < statusEntries.Count; index++)
         {
-            if (entry.State == FileStatus.Ignored)
-                continue;
-
+            var entry = statusEntries[index];
+            var repositoryPath = entry.FilePath.Replace('\\', '/');
             MergeWorkingChange(
                 changes,
-                entry.FilePath.Replace('\\', '/'),
+                repositoryPath,
                 MapWorkingChange(entry.State));
+            var previousPath = GetPreviousRepositoryPath(entry);
+            if (previousPath != null)
+                previousPaths[repositoryPath] = previousPath;
+            reportProgress?.Invoke(new FolderProjectVersionControlProgress(
+                FolderProjectVersionControlProgressStage
+                    .ProcessingWorkingChanges,
+                repositoryPath,
+                index + 1,
+                statusEntries.Count));
         }
 
-        ScanUnreadableEntries(
-            repository,
-            projectRoot,
-            "",
-            trackedPaths,
-            changes);
+        if (scanUnreadableEntries)
+        {
+            ScanUnreadableEntries(
+                repository,
+                projectRoot,
+                "",
+                trackedPaths!,
+                changes);
+        }
         return changes
             .Where(change =>
                 change.Value != FolderProjectWorkingChangeKind.None)
             .OrderBy(change => change.Key, StringComparer.Ordinal)
-            .Select(change => new FolderProjectWorkingChange(
-                change.Key,
-                change.Value))
+             .Select(change => new FolderProjectWorkingChange(
+                 change.Key,
+                 change.Value,
+                 previousPaths.GetValueOrDefault(change.Key)))
             .ToList();
+    }
+
+    private static string? GetPreviousRepositoryPath(StatusEntry entry)
+    {
+        var previousPath =
+            entry.IndexToWorkDirRenameDetails?.OldFilePath ??
+            entry.HeadToIndexRenameDetails?.OldFilePath;
+        return previousPath?.Replace('\\', '/');
     }
 
     private void ScanUnreadableEntries(
@@ -503,9 +614,40 @@ public sealed partial class FolderProjectVersionControlService :
         FolderProjectGitIdentity identity,
         string primaryBranchName = "master")
     {
+        return InitializeCore(
+            projectRoot,
+            identity,
+            primaryBranchName,
+            reportProgress: null);
+    }
+
+    public FolderProjectCommitSummary Initialize(
+        string projectRoot,
+        FolderProjectGitIdentity identity,
+        string primaryBranchName,
+        Action<FolderProjectVersionControlProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        return InitializeCore(
+            projectRoot,
+            identity,
+            primaryBranchName,
+            reportProgress);
+    }
+
+    private FolderProjectCommitSummary InitializeCore(
+        string projectRoot,
+        FolderProjectGitIdentity identity,
+        string primaryBranchName,
+        Action<FolderProjectVersionControlProgress>? reportProgress)
+    {
         ValidateIdentity(identity);
         primaryBranchName = primaryBranchName.Trim();
         ValidateBranchName(primaryBranchName);
+        reportProgress?.Invoke(
+            new FolderProjectVersionControlProgress(
+                FolderProjectVersionControlProgressStage.PreparingRepository,
+                Path.GetFullPath(projectRoot)));
         var repositoryState = GetRepositoryState(projectRoot);
         if (repositoryState == RepositoryState.Unsupported)
         {
@@ -560,12 +702,27 @@ public sealed partial class FolderProjectVersionControlService :
                                 $"refs/heads/{primaryBranchName}",
                                 "asseteditor: Set primary branch");
                         }
-                        Commands.Stage(repository, "*");
+                        if (reportProgress == null)
+                            Commands.Stage(repository, "*");
+                        else
+                            StageInitialFiles(repository, reportProgress);
+                        reportProgress?.Invoke(
+                            new FolderProjectVersionControlProgress(
+                                FolderProjectVersionControlProgressStage
+                                    .CreatingInitialCommit,
+                                Completed: 0,
+                                Total: 1));
                         var signature = CreateSignature(identity);
                         var initialCommit = repository.Commit(
                             "初始化文件夹工程",
                             signature,
                             signature);
+                        reportProgress?.Invoke(
+                            new FolderProjectVersionControlProgress(
+                                FolderProjectVersionControlProgressStage
+                                    .CreatingInitialCommit,
+                                Completed: 1,
+                                Total: 1));
                         SetRepositoryMetadata(
                             repository,
                             primaryBranchName,
@@ -596,6 +753,33 @@ public sealed partial class FolderProjectVersionControlService :
 
             throw;
         }
+    }
+
+    private void StageInitialFiles(
+        Repository repository,
+        Action<FolderProjectVersionControlProgress> reportProgress)
+    {
+        reportProgress(
+            new FolderProjectVersionControlProgress(
+                FolderProjectVersionControlProgressStage.ScanningWorkingTree));
+        var repositoryPaths = RetrieveWorkingStatus(repository)
+            .Where(entry => entry.State != FileStatus.Ignored)
+            .Select(entry => entry.FilePath.Replace('\\', '/'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+        for (var index = 0; index < repositoryPaths.Count; index++)
+        {
+            var repositoryPath = repositoryPaths[index];
+            repository.Index.Add(repositoryPath);
+            reportProgress(
+                new FolderProjectVersionControlProgress(
+                    FolderProjectVersionControlProgressStage.IndexingFiles,
+                    repositoryPath,
+                    index + 1,
+                    repositoryPaths.Count));
+        }
+        repository.Index.Write();
     }
 
     public FolderProjectGitIdentity GetIdentity(string projectRoot)
@@ -850,9 +1034,19 @@ public sealed partial class FolderProjectVersionControlService :
 
     public IReadOnlyList<FolderProjectCommitChange> GetCommitChanges(
         string projectRoot,
-        string commitId)
+        string commitId) =>
+        GetCommitChanges(projectRoot, commitId, _ => { });
+
+    public IReadOnlyList<FolderProjectCommitChange> GetCommitChanges(
+        string projectRoot,
+        string commitId,
+        Action<FolderProjectVersionControlProgress> reportProgress)
     {
+        ArgumentNullException.ThrowIfNull(reportProgress);
         var objectId = ParseFullCommitId(commitId);
+        reportProgress(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ReadingCommitChanges,
+            commitId));
         return Execute(
             () =>
             {
@@ -873,15 +1067,29 @@ public sealed partial class FolderProjectVersionControlService :
                     {
                         Similarity = SimilarityOptions.Renames,
                     });
-                return changes
+                var relevantChanges = changes
                     .Where(
                         change =>
                             change.Status != ChangeKind.Unmodified)
-                    .Select(
-                        change => ToCommitChange(
-                            commit,
-                            parent,
-                            change))
+                    .ToList();
+                var result = new List<FolderProjectCommitChange>(
+                    relevantChanges.Count);
+                for (var index = 0; index < relevantChanges.Count; index++)
+                {
+                    var mappedChange = ToCommitChange(
+                        commit,
+                        parent,
+                        relevantChanges[index]);
+                    result.Add(mappedChange);
+                    reportProgress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage
+                            .ProcessingCommitChanges,
+                        mappedChange.RepositoryPath,
+                        index + 1,
+                        relevantChanges.Count));
+                }
+
+                return result
                     .OrderBy(
                         change => change.RepositoryPath,
                         StringComparer.Ordinal)
@@ -1052,18 +1260,27 @@ public sealed partial class FolderProjectVersionControlService :
         }
     }
 
-    private static RepositoryStatus RetrieveWorkingStatus(
-        Repository repository)
+    private RepositoryStatus RetrieveWorkingStatus(
+        Repository repository,
+        IReadOnlyList<string>? pathSpec = null)
     {
-        return repository.RetrieveStatus(
-            new StatusOptions
-            {
-                DetectRenamesInIndex = true,
-                DetectRenamesInWorkDir = true,
-                IncludeIgnored = false,
-                IncludeUntracked = true,
-                RecurseUntrackedDirs = true,
-            });
+        var options = new StatusOptions
+        {
+            DetectRenamesInIndex = true,
+            DetectRenamesInWorkDir = true,
+            IncludeIgnored = false,
+            IncludeUntracked = true,
+            RecurseUntrackedDirs = true,
+        };
+        if (pathSpec != null)
+        {
+            options.PathSpec = pathSpec.ToArray();
+            options.DisablePathSpecMatch = true;
+        }
+
+        return _platform.RetrieveStatus(
+            repository,
+            options);
     }
 
     private static Signature CreateSignature(
@@ -1135,6 +1352,12 @@ public sealed partial class FolderProjectVersionControlService :
         Commit? parent,
         TreeEntryChanges change)
     {
+        if (IsKnownBinaryAudioPath(change.Path) ||
+            change.OldExists && IsKnownBinaryAudioPath(change.OldPath))
+        {
+            return true;
+        }
+
         TreeEntry? entry = null;
         if (change.Exists)
             entry = commit.Tree[change.Path];
@@ -1142,6 +1365,12 @@ public sealed partial class FolderProjectVersionControlService :
             entry = parent.Tree[change.OldPath];
 
         return entry?.Target is Blob blob && blob.IsBinary;
+    }
+
+    private static bool IsKnownBinaryAudioPath(string path)
+    {
+        return s_knownBinaryAudioExtensions.Contains(
+            Path.GetExtension(path));
     }
 
     private static FolderProjectCommitSummary ToSummary(

@@ -8,10 +8,26 @@ using Shared.Core.Settings;
 
 namespace Shared.Core.PackFiles.Utility
 {
+    public enum CaPackLoadProgressStage
+    {
+        DiscoveringPacks,
+        ReadingPacks,
+        MergingPacks,
+    }
+
+    public sealed record CaPackLoadProgress(
+        CaPackLoadProgressStage Stage,
+        string? Detail = null,
+        long Completed = 0,
+        long Total = 0);
+
     public interface IPackFileContainerLoader
     {
         PackFileContainer? Load(string packFileSystemPath);
         PackFileContainer? LoadAllCaFiles(GameTypeEnum gameEnum);
+        PackFileContainer? LoadAllCaFiles(
+            GameTypeEnum gameEnum,
+            Action<CaPackLoadProgress> reportProgress);
         PackFileContainer LoadSystemFolderAsPackFileContainer(string packFileSystemPath);
     }
 
@@ -89,7 +105,12 @@ namespace Shared.Core.PackFiles.Utility
             }
         }
 
-        public PackFileContainer? LoadAllCaFiles(GameTypeEnum gameEnum)
+        public PackFileContainer? LoadAllCaFiles(GameTypeEnum gameEnum) =>
+            LoadAllCaFiles(gameEnum, _ => { });
+
+        public PackFileContainer? LoadAllCaFiles(
+            GameTypeEnum gameEnum,
+            Action<CaPackLoadProgress> reportProgress)
         {
             var game = GameInformationDatabase.GetGameById(gameEnum);
             var gamePathInfo = _settingsService.CurrentSettings.GameDirectories.FirstOrDefault(x => x.Game == game.Type);
@@ -99,6 +120,9 @@ namespace Shared.Core.PackFiles.Utility
             try
             {
                 _logger.Here().Information($"Loading pack files for {gameName} located in {gameDataFolder}");
+                reportProgress(new CaPackLoadProgress(
+                    CaPackLoadProgressStage.DiscoveringPacks,
+                    gameDataFolder));
                 var allCaPackFiles = ManifestHelper.GetPackFilesFromManifest(gameDataFolder, out var manifestFileFound);
 
                 // When loading ca pack packs, we want to use the CA resolver as its faster. 
@@ -114,6 +138,9 @@ namespace Shared.Core.PackFiles.Utility
                 var packList = new List<PackFileContainer>();
                 var packsCompressionStats = new Dictionary<CompressionFormat, CompressionInformation>();
                 var mergeLock = new object();
+                var progressLock = new object();
+                var processedPackCount = 0;
+                var totalPackCount = allCaPackFiles.Count;
 
                 Parallel.ForEach(allCaPackFiles, packFilePath =>
                 {
@@ -141,6 +168,16 @@ namespace Shared.Core.PackFiles.Utility
                     }
                     else
                         _logger.Here().Warning($"{gameName} pack file '{path}' not found, loading skipped");
+
+                    lock (progressLock)
+                    {
+                        processedPackCount++;
+                        reportProgress(new CaPackLoadProgress(
+                            CaPackLoadProgressStage.ReadingPacks,
+                            packFilePath,
+                            processedPackCount,
+                            totalPackCount));
+                    }
                 }
                 );
 
@@ -149,17 +186,24 @@ namespace Shared.Core.PackFiles.Utility
                 var caPackFileContainer = new PackFileContainer($"All Game Packs - {gameName}");
                 caPackFileContainer.IsCaPackFile = true;
                 caPackFileContainer.SystemFilePath = gameDataFolder;
-                var packFilesOrderedByGroup = packList.GroupBy(x => x.Header.LoadOrder).OrderBy(x => x.Key);
+                var orderedPackFiles = packList
+                    .GroupBy(x => x.Header.LoadOrder)
+                    .OrderBy(x => x.Key)
+                    .SelectMany(group => group.OrderBy(x => x.Name))
+                    .ToList();
+                var mergedPackCount = 0;
 
-                foreach (var group in packFilesOrderedByGroup)
+                foreach (var packfile in orderedPackFiles)
                 {
-                    var packFilesOrderedByName = group.OrderBy(x => x.Name);
-                    foreach (var packfile in packFilesOrderedByName)
-                    {
-                        if (string.IsNullOrWhiteSpace(packfile.SystemFilePath) == false)
-                            caPackFileContainer.SourcePackFilePaths.Add(packfile.SystemFilePath);
-                        caPackFileContainer.MergePackFileContainer(packfile);
-                    }
+                    if (string.IsNullOrWhiteSpace(packfile.SystemFilePath) == false)
+                        caPackFileContainer.SourcePackFilePaths.Add(packfile.SystemFilePath);
+                    caPackFileContainer.MergePackFileContainer(packfile);
+                    mergedPackCount++;
+                    reportProgress(new CaPackLoadProgress(
+                        CaPackLoadProgressStage.MergingPacks,
+                        packfile.SystemFilePath ?? packfile.Name,
+                        mergedPackCount,
+                        orderedPackFiles.Count));
                 }
 
                 return caPackFileContainer;

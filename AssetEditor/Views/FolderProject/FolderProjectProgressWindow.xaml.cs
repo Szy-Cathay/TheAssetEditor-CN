@@ -7,12 +7,15 @@ using System.Windows;
 using CommonControls;
 
 using Shared.Core.PackFiles.Models;
+using Shared.Ui.Common.OperationProgress;
 
 namespace AssetEditor.Views.FolderProject;
 
 public partial class FolderProjectProgressWindow : Window
 {
-    private readonly Func<FolderProjectContainer?> _operation;
+    private readonly Func<
+        Action<OperationProgressUpdate>,
+        FolderProjectContainer?> _operation;
     private FolderProjectContainer? _result;
     private ExceptionDispatchInfo? _failure;
     private bool _operationCompleted;
@@ -20,13 +23,15 @@ public partial class FolderProjectProgressWindow : Window
     public FolderProjectProgressWindow(
         string title,
         string message,
-        Func<FolderProjectContainer?> operation)
+        Func<Action<OperationProgressUpdate>,
+            FolderProjectContainer?> operation)
     {
         _operation = operation;
         InitializeComponent();
         DarkTitleBarHelper.Enable(this);
         Title = title;
-        StatusTextBlock.Text = message;
+        FolderProjectOperationProgress.Report(
+            new OperationProgressUpdate(message));
         if (Application.Current?.MainWindow is { } owner &&
             !ReferenceEquals(owner, this))
         {
@@ -48,7 +53,9 @@ public partial class FolderProjectProgressWindow : Window
     {
         try
         {
-            _result = await Task.Run(_operation);
+            _result = await Task.Run(
+                () => _operation(
+                    FolderProjectOperationProgress.Report));
         }
         catch (Exception exception)
         {

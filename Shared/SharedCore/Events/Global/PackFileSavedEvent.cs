@@ -25,6 +25,10 @@ namespace Shared.Core.Events.Global
     public record PackFileContainerFilesRemovedEvent(PackFileContainer Container, List<PackFile> RemovedFiles) : PackFileContainerManipulationEvent;
     public record PackFileContainerFolderRemovedEvent(PackFileContainer Container, string Folder) : PackFileContainerManipulationEvent;
     public record PackFileContainerFolderRenamedEvent(PackFileContainer Container, string NewNodePath) : PackFileContainerManipulationEvent;
+    public record FolderProjectChangedEvent(
+        FolderProjectContainer Container,
+        FolderProjectChangeSet ChangeSet)
+        : PackFileContainerManipulationEvent;
 
     public class BeforePackFileContainerRemovedEvent(PackFileContainer removed)
     {

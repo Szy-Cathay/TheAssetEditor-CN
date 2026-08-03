@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using LibGit2Sharp;
 using Shared.Core.PackFiles.Models;
 
@@ -38,7 +40,9 @@ public sealed partial class FolderProjectVersionControlService
                         "The repository has no current commit.");
                 }
 
-                var status = RetrieveWorkingStatus(repository).ToList();
+                var status = RetrieveWorkingStatus(
+                    repository,
+                    requestedPaths).ToList();
                 var affectedPaths = GetAffectedChangePaths(
                     status,
                     requestedPaths);
@@ -49,32 +53,54 @@ public sealed partial class FolderProjectVersionControlService
                         ResolveRestoreTarget(root, path),
                         includeLeaf: true);
                 }
-                var snapshots = affectedPaths
+                var trackedPaths = affectedPaths
+                    .Where(path => head.Tree[path] != null)
+                    .ToList();
+                foreach (var path in trackedPaths)
+                {
+                    var entry = head.Tree[path];
+                    if (entry.TargetType != TreeEntryTargetType.Blob ||
+                        !s_regularFileModes.Contains(entry.Mode) ||
+                        entry.Target is not Blob)
+                    {
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError
+                                .UnsupportedCommitPath,
+                            "Only regular files can be discarded.");
+                    }
+                }
+                var addedPaths = affectedPaths
+                    .Except(trackedPaths, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var snapshots = trackedPaths
                     .Select(
                         path => PolicyFileSnapshot.Capture(
                             ResolveRestoreTarget(root, path)))
                     .ToList();
                 var indexSnapshot = GitIndexSnapshot.Capture(
                     Path.Combine(repository.Info.Path, "index"));
+                var stagedAddedFiles = new List<DiscardedFileBackup>();
+                var discardStagingPath = Path.Combine(
+                    repository.Info.Path,
+                    $"ae-discard-{Guid.NewGuid():N}");
+                var completed = false;
                 try
                 {
-                    var trackedPaths = affectedPaths
-                        .Where(path => head.Tree[path] != null)
-                        .ToList();
                     if (trackedPaths.Count != 0)
                     {
-                        repository.CheckoutPaths(
-                            head.Sha,
+                        Commands.Unstage(
+                            repository,
                             trackedPaths,
-                            new CheckoutOptions
+                            new ExplicitPathsOptions
                             {
-                                CheckoutModifiers = CheckoutModifiers.Force,
+                                ShouldFailOnUnmatchedPath = false,
                             });
+                        RestoreTrackedFilesInParallel(
+                            root,
+                            head.Sha,
+                            trackedPaths);
                     }
 
-                    var addedPaths = affectedPaths
-                        .Except(trackedPaths, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
                     if (addedPaths.Count != 0)
                     {
                         Commands.Unstage(
@@ -96,14 +122,45 @@ public sealed partial class FolderProjectVersionControlService
                             if (!File.Exists(fullPath))
                                 continue;
 
-                            File.SetAttributes(fullPath, FileAttributes.Normal);
-                            _platform.DeleteFile(fullPath);
+                            Directory.CreateDirectory(discardStagingPath);
+                            var stagedPath = Path.Combine(
+                                discardStagingPath,
+                                $"{stagedAddedFiles.Count:x8}.tmp");
+                            _platform.MoveFile(
+                                fullPath,
+                                stagedPath,
+                                overwrite: false);
+                            stagedAddedFiles.Add(new DiscardedFileBackup(
+                                fullPath,
+                                stagedPath));
                         }
                     }
+
+                    completed = true;
                 }
                 catch (Exception failure)
                 {
                     var rollbackFailures = new List<Exception>();
+                    for (var index = stagedAddedFiles.Count - 1;
+                         index >= 0;
+                         index--)
+                    {
+                        try
+                        {
+                            var backup = stagedAddedFiles[index];
+                            Directory.CreateDirectory(
+                                Path.GetDirectoryName(
+                                    backup.OriginalPath)!);
+                            _platform.MoveFile(
+                                backup.StagedPath,
+                                backup.OriginalPath,
+                                overwrite: true);
+                        }
+                        catch (Exception exception)
+                        {
+                            rollbackFailures.Add(exception);
+                        }
+                    }
                     foreach (var snapshot in snapshots)
                     {
                         try
@@ -132,10 +189,153 @@ public sealed partial class FolderProjectVersionControlService
                     }
                     throw;
                 }
+                finally
+                {
+                    if (completed)
+                    {
+                        TryDeleteDiscardStaging(
+                            discardStagingPath,
+                            stagedAddedFiles);
+                    }
+                    else if (Directory.Exists(discardStagingPath) &&
+                             stagedAddedFiles.All(
+                                 backup =>
+                                     !File.Exists(backup.StagedPath)))
+                    {
+                        TryDeleteDiscardStaging(
+                            discardStagingPath,
+                            stagedAddedFiles);
+                    }
+                }
 
                 return true;
             });
     }
+
+    private static void TryDeleteDiscardStaging(
+        string stagingPath,
+        IReadOnlyList<DiscardedFileBackup> backups)
+    {
+        if (!Directory.Exists(stagingPath))
+            return;
+
+        try
+        {
+            foreach (var backup in backups)
+            {
+                if (File.Exists(backup.StagedPath))
+                {
+                    File.SetAttributes(
+                        backup.StagedPath,
+                        FileAttributes.Normal);
+                }
+            }
+            Directory.Delete(stagingPath, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private void RestoreTrackedFilesInParallel(
+        string projectRoot,
+        string commitId,
+        IReadOnlyList<string> trackedPaths)
+    {
+        try
+        {
+            Parallel.ForEach(
+                Partitioner.Create(0, trackedPaths.Count),
+                new ParallelOptions { MaxDegreeOfParallelism = 4 },
+                range =>
+                {
+                    using var repository = OpenRepository(projectRoot);
+                    var commit = repository.Lookup<Commit>(commitId) ??
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError.CommitNotFound,
+                            "The current commit could not be loaded.");
+                    for (var index = range.Item1;
+                         index < range.Item2;
+                         index++)
+                    {
+                        var repositoryPath = trackedPaths[index];
+                        var entry = commit.Tree[repositoryPath];
+                        var blob = entry?.Target as Blob ??
+                            throw new FolderProjectVersionControlException(
+                                FolderProjectVersionControlError
+                                    .UnsupportedCommitPath,
+                                "Only regular files can be discarded.");
+                        WriteDiscardBlobAtomically(
+                            blob,
+                            projectRoot,
+                            repositoryPath);
+                    }
+                });
+        }
+        catch (AggregateException failure)
+        {
+            var flattened = failure.Flatten();
+            if (flattened.InnerExceptions.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(
+                    flattened.InnerExceptions[0]).Throw();
+            }
+            throw;
+        }
+    }
+
+    private void WriteDiscardBlobAtomically(
+        Blob blob,
+        string projectRoot,
+        string repositoryPath)
+    {
+        var targetPath = ResolveRestoreTarget(
+            projectRoot,
+            repositoryPath);
+        var targetDirectory = Path.GetDirectoryName(targetPath)!;
+        Directory.CreateDirectory(targetDirectory);
+        var temporaryPath = Path.Combine(
+            targetDirectory,
+            $".{Path.GetFileName(targetPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (var source = blob.GetContentStream())
+            using (var destination = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       128 * 1024,
+                       FileOptions.SequentialScan))
+            {
+                source.CopyTo(destination);
+            }
+
+            if (File.Exists(targetPath))
+                File.SetAttributes(targetPath, FileAttributes.Normal);
+            _platform.MoveFile(
+                temporaryPath,
+                targetPath,
+                overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.SetAttributes(
+                    temporaryPath,
+                    FileAttributes.Normal);
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private sealed record DiscardedFileBackup(
+        string OriginalPath,
+        string StagedPath);
 
     public FolderProjectCommitSummary CommitStaged(
         string projectRoot,
@@ -155,18 +355,21 @@ public sealed partial class FolderProjectVersionControlService
                 EnsureCommitStateSupported(repository);
                 var identity = ReadLocalIdentity(repository);
                 ValidateIdentity(identity);
-                if (!RetrieveWorkingStatus(repository).Any(
-                        entry => HasStagedChanges(entry.State)))
+                Commit commit;
+                try
+                {
+                    commit = _platform.Commit(
+                        repository,
+                        message.Trim(),
+                        CreateSignature(identity));
+                }
+                catch (EmptyCommitException exception)
                 {
                     throw new FolderProjectVersionControlException(
                         FolderProjectVersionControlError.NothingToCommit,
-                        "The folder project has no staged changes.");
+                        "The folder project has no staged changes.",
+                        exception);
                 }
-
-                var commit = _platform.Commit(
-                    repository,
-                    message.Trim(),
-                    CreateSignature(identity));
                 return ToSummary(commit);
             });
     }
@@ -442,7 +645,9 @@ public sealed partial class FolderProjectVersionControlService
                 using var repository = OpenRepository(projectRoot);
                 EnsureCommitStateSupported(repository);
                 var affectedPaths = GetAffectedChangePaths(
-                    RetrieveWorkingStatus(repository).ToList(),
+                    RetrieveWorkingStatus(
+                        repository,
+                        requestedPaths).ToList(),
                     requestedPaths);
                 if (stage)
                 {

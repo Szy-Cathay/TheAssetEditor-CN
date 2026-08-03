@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -31,12 +32,18 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private readonly Dictionary<string, FolderProjectTreeState>
             _detachedFolderProjectStates =
                 new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, FolderProjectRepositoryStatus>
+            _folderProjectGitStatusCache =
+                new(StringComparer.OrdinalIgnoreCase);
+        private int _gitStatusRequestId;
 
         public event FileSelectedDelegate FileOpen;
         public event NodeSelectedDelegate NodeSelected;
 
         public ObservableCollection<TreeNode> Files { get; set; } = [];
         public SearchFilter Filter { get; private set; }
+        public Task GitStatusRefreshTask { get; private set; } =
+            Task.CompletedTask;
 
         [ObservableProperty] TreeNode _selectedItem;
         [ObservableProperty] ObservableCollection<ContextMenuItem2> _contextMenu = [];
@@ -63,6 +70,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             _eventHub?.Register<PackFileContainerFilesRemovedEvent>(this, x => Database_PackFilesRemoved(x.Container, x.RemovedFiles));
             _eventHub?.Register<PackFileContainerFolderRemovedEvent>(this, x => Database_PackFileFolderRemoved(x.Container, x.Folder));
             _eventHub?.Register<PackFileContainerFolderRenamedEvent>(this, x => Database_PackFileFolderRenamed(x.Container, x.NewNodePath));
+            _eventHub?.Register<FolderProjectChangedEvent>(
+                this,
+                ApplyFolderProjectChangeSet);
             _eventHub?.Register<PackFileContainerSavedEvent>(this, ContainerSaved);
 
             Filter = new SearchFilter(Files);
@@ -188,6 +198,313 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             }
 
             AddFiles(e.Container, e.AddedFiles);
+        }
+
+        private void ApplyFolderProjectChangeSet(
+            FolderProjectChangedEvent e)
+        {
+            if (e.ChangeSet.RequiresReload)
+            {
+                ReloadFolderProjectTreeAndMarkChanged(e.Container);
+                return;
+            }
+
+            var root = GetPackFileCollectionRootNode(e.Container);
+            if (root == null)
+                return;
+
+            var directoryChanges = CoalesceRemovedDirectories(
+                e.Container,
+                e.ChangeSet);
+            foreach (var directoryChange in directoryChanges)
+                ApplyFolderProjectDirectoryChange(
+                    e.Container,
+                    root,
+                    directoryChange);
+
+            foreach (var change in e.ChangeSet.FileChanges)
+            {
+                if (IsCoveredByDirectoryChange(
+                        change,
+                        directoryChanges))
+                {
+                    continue;
+                }
+
+                var path = change.Path.Replace(
+                    Path.AltDirectorySeparatorChar,
+                    Path.DirectorySeparatorChar);
+                if (change.Kind == FolderProjectFileChangeKind.Removed)
+                {
+                    var removedNode = FindNodeByPath(root, path);
+                    if (removedNode == null)
+                        continue;
+
+                    var parent = removedNode.Parent;
+                    var selectionRemoved =
+                        ReferenceEquals(SelectedItem, removedNode);
+                    if (selectionRemoved)
+                        removedNode.IsSelected = false;
+
+                    parent?.Children.Remove(removedNode);
+                    removedNode.RemoveSelf();
+                    var retainedParent = PruneMissingAncestors(
+                        parent,
+                        root,
+                        e.Container);
+                    if (selectionRemoved)
+                        SelectedItem = retainedParent;
+                    while (parent != null)
+                    {
+                        parent.UnsavedChanged = true;
+                        parent = parent.Parent;
+                    }
+                    continue;
+                }
+
+                TreeNode? node;
+                if (change.Kind == FolderProjectFileChangeKind.Moved)
+                {
+                    var previousPath = change.PreviousPath?.Replace(
+                        Path.AltDirectorySeparatorChar,
+                        Path.DirectorySeparatorChar);
+                    node = previousPath == null
+                        ? null
+                        : FindNodeByPath(root, previousPath);
+                    if (node != null)
+                    {
+                        var oldParent = node.Parent;
+                        oldParent?.Children.Remove(node);
+                        var directory = Path.GetDirectoryName(path) ?? "";
+                        var newParent = GetNodeFromPath(
+                            root,
+                            e.Container,
+                            directory);
+                        node.Parent = newParent;
+                        node.Name = Path.GetFileName(path);
+                        node.Item = change.File;
+                        newParent.Children.Add(node);
+                    }
+                }
+                else
+                    node = FindNodeByPath(root, path);
+
+                if (node == null)
+                    node = AddFileAtPath(e.Container, root, path, change.File);
+                else
+                {
+                    node.Name = change.File.Name;
+                    node.Item = change.File;
+                }
+
+                node.IsIgnored = e.Container.IsIgnored(path);
+                while (node != null)
+                {
+                    node.UnsavedChanged = true;
+                    node = node.Parent;
+                }
+            }
+
+            Filter.Refresh();
+        }
+
+        private static IReadOnlyList<FolderProjectDirectoryChange>
+            CoalesceRemovedDirectories(
+                FolderProjectContainer container,
+                FolderProjectChangeSet changeSet)
+        {
+            var directoryChanges = changeSet.DirectoryChanges.ToList();
+            var removedDirectories = directoryChanges
+                .Where(change => change.Kind ==
+                    FolderProjectDirectoryChangeKind.Removed)
+                .Select(change => change.Path)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var directoryExists = new Dictionary<string, bool>(
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var fileChange in changeSet.FileChanges)
+            {
+                if (fileChange.Kind != FolderProjectFileChangeKind.Removed)
+                    continue;
+
+                var directory = Path.GetDirectoryName(
+                    fileChange.Path.Replace(
+                        Path.AltDirectorySeparatorChar,
+                        Path.DirectorySeparatorChar));
+                if (string.IsNullOrEmpty(directory))
+                    continue;
+
+                var candidate = "";
+                foreach (var segment in directory.Split(
+                             Path.DirectorySeparatorChar,
+                             StringSplitOptions.RemoveEmptyEntries))
+                {
+                    candidate = candidate.Length == 0
+                        ? segment
+                        : Path.Combine(candidate, segment);
+                    if (removedDirectories.Contains(candidate))
+                        break;
+
+                    if (!directoryExists.TryGetValue(
+                            candidate,
+                            out var exists))
+                    {
+                        exists = Directory.Exists(
+                            FolderProjectPathPolicy.ResolveFilePath(
+                                container.ProjectRoot,
+                                candidate));
+                        directoryExists[candidate] = exists;
+                    }
+
+                    if (exists)
+                        continue;
+
+                    removedDirectories.Add(candidate);
+                    directoryChanges.Add(
+                        new FolderProjectDirectoryChange(
+                            candidate,
+                            FolderProjectDirectoryChangeKind.Removed));
+                    break;
+                }
+            }
+
+            return directoryChanges;
+        }
+
+        private static TreeNode PruneMissingAncestors(
+            TreeNode? node,
+            TreeNode root,
+            FolderProjectContainer container)
+        {
+            while (node != null &&
+                   node != root &&
+                   node.Children.Count == 0 &&
+                   !container.EmptyDirectories.Contains(node.GetFullPath()))
+            {
+                var parent = node.Parent;
+                parent?.Children.Remove(node);
+                node.Parent = null;
+                node = parent;
+            }
+            return node ?? root;
+        }
+
+        private void ApplyFolderProjectDirectoryChange(
+            FolderProjectContainer container,
+            TreeNode root,
+            FolderProjectDirectoryChange change)
+        {
+            var path = change.Path.Replace(
+                Path.AltDirectorySeparatorChar,
+                Path.DirectorySeparatorChar);
+            if (change.Kind == FolderProjectDirectoryChangeKind.Added)
+            {
+                GetNodeFromPath(root, container, path).UnsavedChanged = true;
+                return;
+            }
+
+            var sourcePath = change.PreviousPath ?? path;
+            var node = FindNodeByPath(root, sourcePath);
+            if (node == null)
+                return;
+
+            var oldParent = node.Parent;
+            if (change.Kind == FolderProjectDirectoryChangeKind.Removed)
+            {
+                if (IsNodeOrDescendant(node, SelectedItem))
+                {
+                    SelectedItem.IsSelected = false;
+                    SelectedItem = oldParent ?? root;
+                }
+
+                oldParent?.Children.Remove(node);
+                node.RemoveSelf();
+            }
+            else
+            {
+                oldParent?.Children.Remove(node);
+                var directory = Path.GetDirectoryName(path) ?? "";
+                var newParent = GetNodeFromPath(root, container, directory);
+                node.Parent = newParent;
+                node.Name = Path.GetFileName(path);
+                newParent.Children.Add(node);
+            }
+
+            var changedNode = oldParent ?? root;
+            while (changedNode != null)
+            {
+                changedNode.UnsavedChanged = true;
+                changedNode = changedNode.Parent;
+            }
+        }
+
+        private static bool IsNodeOrDescendant(
+            TreeNode ancestor,
+            TreeNode? node)
+        {
+            while (node != null)
+            {
+                if (ReferenceEquals(ancestor, node))
+                    return true;
+                node = node.Parent;
+            }
+            return false;
+        }
+
+        private static bool IsCoveredByDirectoryChange(
+            FolderProjectFileChange fileChange,
+            IReadOnlyList<FolderProjectDirectoryChange> directoryChanges)
+        {
+            foreach (var directoryChange in directoryChanges)
+            {
+                if (directoryChange.Kind ==
+                        FolderProjectDirectoryChangeKind.Removed &&
+                    IsPathInside(fileChange.Path, directoryChange.Path))
+                {
+                    return true;
+                }
+
+                if (directoryChange.Kind ==
+                        FolderProjectDirectoryChangeKind.Moved &&
+                    fileChange.PreviousPath != null &&
+                    directoryChange.PreviousPath != null &&
+                    IsPathInside(
+                        fileChange.PreviousPath,
+                        directoryChange.PreviousPath) &&
+                    IsPathInside(fileChange.Path, directoryChange.Path))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsPathInside(string path, string directory)
+        {
+            return path.StartsWith(
+                directory.TrimEnd('\\', '/') + "\\",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static TreeNode AddFileAtPath(
+            FolderProjectContainer container,
+            TreeNode root,
+            string path,
+            PackFile file)
+        {
+            var directory = Path.GetDirectoryName(path) ?? "";
+            var parent = GetNodeFromPath(
+                root,
+                container,
+                directory);
+            var node = new TreeNode(
+                Path.GetFileName(path),
+                NodeType.File,
+                container,
+                parent,
+                file);
+            parent.Children.Add(node);
+            return node;
         }
 
         private void ReloadFolderProjectTreeAndMarkChanged(
@@ -509,7 +826,6 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                             node.NodeType != NodeType.Root &&
                             folderProject.IsIgnored(
                                 node.GetFullPath()));
-                MarkFolderProjectGitChanges(folderProject, root);
             }
 
             if (existingIndex == -1)
@@ -519,26 +835,66 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
             Filter.Refresh();
             RestoreTreeState(container, root, state);
+            if (container is FolderProjectContainer project)
+                QueueFolderProjectGitStatusRefresh(project, root);
         }
 
-        private void MarkFolderProjectGitChanges(
+        private void QueueFolderProjectGitStatusRefresh(
             FolderProjectContainer project,
             TreeNode root)
         {
             if (_versionControlService == null)
                 return;
 
+            if (_folderProjectGitStatusCache.TryGetValue(
+                    project.ProjectRoot,
+                    out var cachedStatus))
+            {
+                MarkFolderProjectGitChanges(cachedStatus, root);
+            }
+
+            var requestId = ++_gitStatusRequestId;
+            GitStatusRefreshTask = RefreshFolderProjectGitStatusAsync(
+                project,
+                root,
+                requestId);
+        }
+
+        private async Task RefreshFolderProjectGitStatusAsync(
+            FolderProjectContainer project,
+            TreeNode root,
+            int requestId)
+        {
             FolderProjectRepositoryStatus status;
             try
             {
-                status = _versionControlService.GetStatus(
-                    project.ProjectRoot);
+                status = await Task.Run(
+                    () => _versionControlService!.GetStatus(
+                        project.ProjectRoot));
             }
             catch (FolderProjectVersionControlException)
             {
                 return;
             }
 
+            if (requestId != _gitStatusRequestId ||
+                !ReferenceEquals(
+                    GetPackFileCollectionRootNode(project),
+                    root))
+            {
+                return;
+            }
+
+            _folderProjectGitStatusCache[project.ProjectRoot] = status;
+            root.UnsavedChanged = false;
+            root.ForeachNode(node => node.UnsavedChanged = false);
+            MarkFolderProjectGitChanges(status, root);
+        }
+
+        private static void MarkFolderProjectGitChanges(
+            FolderProjectRepositoryStatus status,
+            TreeNode root)
+        {
             foreach (var change in status.Changes)
             {
                 var path = change.RepositoryPath.Replace(
@@ -647,17 +1003,23 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             TreeNode root,
             string path)
         {
-            TreeNode? result = null;
-            root.ForeachNode(node =>
+            if (path.Length == 0)
+                return root;
+
+            var current = root;
+            foreach (var segment in path.Split(
+                         Path.DirectorySeparatorChar,
+                         StringSplitOptions.RemoveEmptyEntries))
             {
-                if (result == null && node.GetFullPath().Equals(
-                        path,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    result = node;
-                }
-            });
-            return result;
+                current = current.Children.FirstOrDefault(child =>
+                    child.Name.Equals(
+                        segment,
+                        StringComparison.OrdinalIgnoreCase));
+                if (current == null)
+                    return null;
+            }
+
+            return current;
         }
 
         private static string? GetParentPath(string path)
@@ -731,6 +1093,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         public void Dispose()
         {
+            _gitStatusRequestId++;
             _eventHub?.UnRegister(this);
         }
 

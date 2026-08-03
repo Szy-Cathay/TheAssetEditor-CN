@@ -1,3 +1,4 @@
+using System.Windows.Threading;
 using AssetEditor.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -857,6 +858,71 @@ public class FolderProjectGitOperationCoordinatorTests
     }
 
     [Test]
+    public void ExecuteAsync_ReopensProjectOffCapturedUiContext()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        var packFileService = CreateRealPackFileService();
+        packFileService.AddContainer(CreateProject(projectRoot.Path));
+        var factoryThreadId = 0;
+        var factory = new Mock<IFolderProjectFactory>();
+        factory.Setup(item => item.Open(Normalize(projectRoot.Path)))
+            .Returns(() =>
+            {
+                factoryThreadId = Environment.CurrentManagedThreadId;
+                return FolderProjectContainer.Open(projectRoot.Path);
+            });
+        var versionControl = CreateVersionControlMock(
+            projectRoot.Path,
+            FolderProjectMergePhase.None);
+        var coordinator = new FolderProjectGitOperationCoordinator(
+            packFileService,
+            factory.Object,
+            versionControl.Object);
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var previousContext = SynchronizationContext.Current;
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        SynchronizationContext.SetSynchronizationContext(
+            new DispatcherSynchronizationContext(dispatcher));
+
+        try
+        {
+            var operation = coordinator.ExecuteAsync(
+                projectRoot.Path,
+                () => 42);
+            var frame = new DispatcherFrame();
+            _ = operation.ContinueWith(
+                _ => frame.Continue = false,
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.FromCurrentSynchronizationContext());
+            Dispatcher.PushFrame(frame);
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(operation.GetAwaiter().GetResult(),
+                    Is.EqualTo(42));
+                NUnitAssert.That(factoryThreadId, Is.Not.EqualTo(uiThreadId));
+                NUnitAssert.That(
+                    packFileService.AddContainerThreadId,
+                    Is.EqualTo(uiThreadId));
+                NUnitAssert.That(
+                    packFileService.AddContainerCallCount,
+                    Is.EqualTo(2));
+            });
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+            foreach (var container in packFileService
+                         .GetAllPackfileContainers()
+                         .ToList())
+            {
+                packFileService.TryUnloadPackContainer(container);
+            }
+        }
+    }
+
+    [Test]
     public void DependencyInjection_ResolvesCoordinator()
     {
         var provider =
@@ -979,6 +1045,8 @@ public class FolderProjectGitOperationCoordinatorTests
         public bool EnableFileLookUpEvents { get; set; }
         public bool EnforceGameFilesMustBeLoaded { get; set; }
         public Exception? ExceptionAfterUnload { get; set; }
+        public int? AddContainerThreadId { get; private set; }
+        public int AddContainerCallCount { get; private set; }
 
         public PackFileContainer? AddContainer(
             PackFileContainer container,
@@ -997,6 +1065,8 @@ public class FolderProjectGitOperationCoordinatorTests
             bool setEditablePack,
             PackFileContainerAddedReason reason)
         {
+            AddContainerThreadId = Environment.CurrentManagedThreadId;
+            AddContainerCallCount++;
             _containers.Insert(
                 Math.Clamp(insertionIndex, 0, _containers.Count),
                 container);
@@ -1061,6 +1131,11 @@ public class FolderProjectGitOperationCoordinatorTests
             PackFileContainer container,
             List<NewPackFileEntry> newFiles,
             bool overwriteExisting = true) =>
+            throw new NotSupportedException();
+
+        public IReadOnlyList<PackFile> ApplyFileWrites(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes) =>
             throw new NotSupportedException();
 
         public void CopyFileFromOtherPackFile(

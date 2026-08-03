@@ -131,8 +131,9 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                     return false;
                 }
 
-                _audioPackOutputService.SaveBatch(
-                    compilationResult.Outputs);
+                await Task.Run(() =>
+                    _audioPackOutputService.SaveBatch(
+                        compilationResult.Outputs));
                 await Task.Run(MemoryOptimiser.Optimise);
                 return true;
             }
