@@ -25,6 +25,18 @@ namespace Shared.Core.PackFiles.Models
 
         public byte[] ReadData() => File.ReadAllBytes(_filepath);
 
+        public void CopyTo(Stream destination)
+        {
+            using var source = new FileStream(
+                _filepath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                128 * 1024,
+                FileOptions.SequentialScan);
+            source.CopyTo(destination);
+        }
+
         public byte[] PeekData(int size)
         {
             using (var reader = new BinaryReader(new FileStream(_filepath, FileMode.Open)))

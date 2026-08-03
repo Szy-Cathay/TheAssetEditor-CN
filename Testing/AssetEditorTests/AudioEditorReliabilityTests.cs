@@ -1581,6 +1581,75 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void AudioPackOutputBatch_FolderProjectUsesOneWorkspaceWrite()
+        {
+            var projectRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"ae-audio-batch-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(projectRoot);
+            try
+            {
+                using var editablePack = FolderProjectContainer.Create(
+                    projectRoot,
+                    new FolderProjectSettings { Name = "工程" });
+                IReadOnlyCollection<PackFileWrite>? capturedWrites = null;
+                var packFileService = new Mock<IPackFileService>();
+                packFileService
+                    .Setup(x => x.GetEditablePack())
+                    .Returns(editablePack);
+                packFileService
+                    .Setup(x => x.ApplyFileWrites(
+                        editablePack,
+                        It.IsAny<IReadOnlyCollection<PackFileWrite>>()))
+                    .Callback((
+                        PackFileContainer _,
+                        IReadOnlyCollection<PackFileWrite> writes) =>
+                        capturedWrites = writes)
+                    .Returns([]);
+                var fileSaveService = new Mock<IFileSaveService>();
+                fileSaveService
+                    .Setup(x => x.Save(
+                        It.IsAny<string>(),
+                        It.IsAny<byte[]>(),
+                        It.IsAny<bool>()))
+                    .Throws(
+                        new InvalidOperationException(
+                            "The per-file save path was used."));
+                var service = new AudioPackOutputService(
+                    packFileService.Object,
+                    fileSaveService.Object,
+                    Mock.Of<IStandardDialogs>());
+
+                var result = service.SaveBatch(
+                    [
+                        new AudioPackOutput(
+                            "first.wem",
+                            @"audio\first.wem",
+                            [1]),
+                        new AudioPackOutput(
+                            "second.wem",
+                            @"audio\second.wem",
+                            [2]),
+                    ]);
+
+                Assert.IsTrue(result);
+                CollectionAssert.AreEqual(
+                    new[]
+                    {
+                        @"audio\first.wem",
+                        @"audio\second.wem",
+                    },
+                    capturedWrites!
+                        .Select(write => write.Path)
+                        .ToArray());
+            }
+            finally
+            {
+                Directory.Delete(projectRoot, true);
+            }
+        }
+
+        [TestMethod]
         public void AudioPackOutputBatch_WhenSaveFails_RestoresExistingFiles()
         {
             var editablePack = new PackFileContainer("test.pack");

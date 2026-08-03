@@ -237,11 +237,13 @@ public sealed partial class FolderProjectVersionControlService
             {
                 using var repository = OpenRepository(projectRoot);
                 var branch = FindLocalBranch(repository, name);
+                var workingStatus = RetrieveWorkingStatus(repository);
                 EnsureSwitchStateSupported(
                     repository,
                     Path.GetFullPath(projectRoot),
-                    branch);
-                var hasChanges = RetrieveWorkingStatus(repository).IsDirty;
+                    branch,
+                    workingStatus);
+                var hasChanges = workingStatus.IsDirty;
                 var createdStash = false;
                 if (hasChanges &&
                     mode != FolderProjectBranchSwitchMode.CarryChanges)
@@ -582,7 +584,8 @@ public sealed partial class FolderProjectVersionControlService
     private void EnsureSwitchStateSupported(
         Repository repository,
         string projectRoot,
-        Branch targetBranch)
+        Branch targetBranch,
+        RepositoryStatus workingStatus)
     {
         if (repository.Info.IsHeadDetached ||
             repository.Info.CurrentOperation != CurrentOperation.None ||
@@ -598,10 +601,8 @@ public sealed partial class FolderProjectVersionControlService
                 FolderProjectVersionControlError.RepositoryBusy,
                 "The folder-project repository is busy.");
         }
-        if (GetWorkingChanges(repository, projectRoot).Any(
-                change => HasAny(
-                    change.Kind,
-                    FolderProjectWorkingChangeKind.Unreadable)))
+        if (workingStatus.Any(
+                entry => HasAny(entry.State, FileStatus.Unreadable)))
         {
             throw new FolderProjectVersionControlException(
                 FolderProjectVersionControlError.WorkingTreeNotClean,
@@ -609,10 +610,68 @@ public sealed partial class FolderProjectVersionControlService
         }
 
         EnsureTargetTreeSupported(targetBranch.Tip.Tree);
+        EnsureCheckoutPathsReadable(
+            repository,
+            projectRoot,
+            targetBranch);
         EnsureNoIgnoredTargetCollisions(
             repository,
             projectRoot,
             targetBranch);
+    }
+
+    private void EnsureCheckoutPathsReadable(
+        Repository repository,
+        string projectRoot,
+        Branch targetBranch)
+    {
+        var currentTree = repository.Head.Tip?.Tree;
+        if (currentTree == null)
+            return;
+
+        var paths = repository.Diff.Compare<TreeChanges>(
+                currentTree,
+                targetBranch.Tip.Tree)
+            .Where(change => change.OldExists)
+            .Select(change => change.OldPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var repositoryPath in paths)
+        {
+            var fullPath = FolderProjectPathPolicy.ResolveFilePath(
+                projectRoot,
+                repositoryPath);
+            if (!File.Exists(fullPath))
+                continue;
+
+            try
+            {
+                var attributes = _platform.GetAttributes(fullPath);
+                if ((attributes & (FileAttributes.Directory |
+                                   FileAttributes.ReparsePoint)) != 0)
+                {
+                    continue;
+                }
+
+                using var stream = _platform.OpenReadForStatus(fullPath);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                throw UnreadableCheckoutPath(exception);
+            }
+            catch (IOException exception)
+            {
+                throw UnreadableCheckoutPath(exception);
+            }
+        }
+
+        static FolderProjectVersionControlException UnreadableCheckoutPath(
+            Exception exception)
+        {
+            return new FolderProjectVersionControlException(
+                FolderProjectVersionControlError.WorkingTreeNotClean,
+                "A file changed by the target branch is unreadable.",
+                exception);
+        }
     }
 
     private static DateTimeOffset GetBranchCreationTime(

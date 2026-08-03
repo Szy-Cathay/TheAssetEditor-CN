@@ -10,6 +10,7 @@
         xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
         xmlns:common="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+        xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
         xmlns:local="clr-namespace:AssetEditor"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
@@ -352,10 +353,20 @@
                 <TextBlock Text="{Binding EditablePackFile}" Margin="5, 0, 5, 5"/>
             </StatusBarItem>
 
-            <StatusBarItem Grid.Column="3" Visibility="{Binding IsLoadingPacks, Converter={StaticResource BoolToVisibilityConverter}}">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding LoadingStatusText}" Margin="5, 0, 5, 5" Foreground="#FFAAAAAA"/>
-                </StackPanel>
+            <StatusBarItem
+                Grid.Column="3"
+                HorizontalContentAlignment="Right"
+                Visibility="{Binding IsLoadingPacks, Converter={StaticResource BoolToVisibilityConverter}}">
+                <progress:OperationProgressView
+                    x:Name="ApplicationLoadingProgress"
+                    Width="520"
+                    Margin="12,4,8,4"
+                    CurrentDetailText="{Binding LoadingProgressDetailText}"
+                    IsOperationActive="{Binding IsLoadingPacks}"
+                    IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding LoadingProgressMaximum}"
+                    ProgressValue="{Binding LoadingProgressValue}"
+                    StatusText="{Binding LoadingStatusText}" />
             </StatusBarItem>
         </StatusBar>
     </Grid>

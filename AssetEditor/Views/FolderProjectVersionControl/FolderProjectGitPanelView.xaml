@@ -7,6 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
     x:Name="Root"
@@ -640,24 +641,23 @@
             Grid.RowSpan="2"
             Panel.ZIndex="110"
             Background="#66000000"
-            IsHitTestVisible="{Binding VersionControl.IsBusy}"
-            Visibility="{Binding VersionControl.IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+            IsHitTestVisible="{Binding IsLoadingOperationVisibleInPanel}"
+            Visibility="{Binding IsLoadingOperationVisibleInPanel, Converter={StaticResource BoolToVisibilityConverter}}">
             <Border
-                MaxWidth="300"
+                Width="500"
+                MaxWidth="500"
                 Margin="18"
                 Padding="18"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Center"
                 Style="{StaticResource GitSurfaceBorderStyle}">
-                <StackPanel>
-                    <ProgressBar Width="210" Height="8" IsIndeterminate="True" />
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        HorizontalAlignment="Center"
-                        Text="{Binding VersionControl.BusyMessage}"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
-                </StackPanel>
+                <progress:OperationProgressView
+                    CurrentDetailText="{Binding VersionControl.LoadingProgressDetailText}"
+                    IsOperationActive="{Binding IsLoadingOperationVisibleInPanel}"
+                    IsProgressIndeterminate="{Binding VersionControl.LoadingProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding VersionControl.LoadingProgressMaximum}"
+                    ProgressValue="{Binding VersionControl.LoadingProgressValue}"
+                    StatusText="{Binding VersionControl.LoadingProgressStatusText}" />
             </Border>
         </Grid>
     </Grid>

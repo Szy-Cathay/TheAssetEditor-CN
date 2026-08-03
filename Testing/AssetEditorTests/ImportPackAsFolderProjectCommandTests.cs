@@ -7,6 +7,7 @@ using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Ui.Common;
+using Shared.Ui.Common.OperationProgress;
 
 using NUnitAssert = NUnit.Framework.Assert;
 
@@ -24,6 +25,8 @@ public class ImportPackAsFolderProjectCommandTests
         {
             Header = new PFHeader("PFH6", PackFileCAType.MOD),
         };
+        source.FileList[@"audio\voice.wav"] =
+            PackFile.CreateFromBytes("voice.wav", [1]);
         var loader = new Mock<IPackFileContainerLoader>();
         loader.Setup(item => item.Load("source.pack"))
             .Returns(source);
@@ -54,17 +57,23 @@ public class ImportPackAsFolderProjectCommandTests
         var progressRunner = new Mock<IFolderProjectProgressRunner>();
         var progressVisible = false;
         var initializedWhileProgressVisible = false;
+        var progressUpdates = new List<OperationProgressUpdate>();
         progressRunner.Setup(item => item.Run(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
-                It.IsAny<Func<FolderProjectContainer?>>()))
+                It.IsAny<Func<
+                    Action<OperationProgressUpdate>,
+                    FolderProjectContainer?>>()))
             .Returns(
-                (string _, string _, Func<FolderProjectContainer?> operation) =>
+                (string _,
+                 string _,
+                 Func<Action<OperationProgressUpdate>,
+                     FolderProjectContainer?> operation) =>
                 {
                     progressVisible = true;
                     try
                     {
-                        return operation();
+                        return operation(progressUpdates.Add);
                     }
                     finally
                     {
@@ -74,9 +83,22 @@ public class ImportPackAsFolderProjectCommandTests
         versionControl.Setup(item => item.Initialize(
                 project.Path,
                 It.IsAny<FolderProjectGitIdentity>(),
-                "master"))
-            .Callback(() =>
-                initializedWhileProgressVisible = progressVisible);
+                "master",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Callback(
+                (
+                    string _,
+                    FolderProjectGitIdentity _,
+                    string _,
+                    Action<FolderProjectVersionControlProgress> progress) =>
+                {
+                    initializedWhileProgressVisible = progressVisible;
+                    progress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage.IndexingFiles,
+                        "audio/git-index.wem",
+                        1,
+                        2));
+                });
         var command = new ImportPackAsFolderProjectCommand(
             packFileService.Object,
             loader.Object,
@@ -107,16 +129,27 @@ public class ImportPackAsFolderProjectCommandTests
                     settings.EnablePackFileCorruptionDetection,
                     Is.True);
                 NUnitAssert.That(initializedWhileProgressVisible, Is.True);
+                NUnitAssert.That(
+                    progressUpdates.Any(update =>
+                        update.Status == "正在登记工程文件" &&
+                        update.Detail == "audio/git-index.wem" &&
+                        update.Completed == 1 &&
+                        update.Total == 2),
+                    Is.True);
             });
             progressRunner.Verify(item => item.Run(
                 It.IsAny<string>(),
                 It.Is<string>(message =>
                     message.Contains("大型 Pack", StringComparison.Ordinal)),
-                It.IsAny<Func<FolderProjectContainer?>>()), Times.Once);
+                It.IsAny<Func<
+                    Action<OperationProgressUpdate>,
+                    FolderProjectContainer?>>()), Times.Once);
             versionControl.Verify(item => item.Initialize(
                 project.Path,
                 It.IsAny<FolderProjectGitIdentity>(),
-                "master"), Times.Once);
+                "master",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+                Times.Once);
         }
         finally
         {

@@ -6,6 +6,7 @@ using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using Shared.Ui.Common.OperationProgress;
 
 namespace AssetEditor.UiCommands;
 
@@ -60,11 +61,16 @@ public sealed class CreateFolderProjectCommand(
                 setupTitle,
                 localizationManager.Get(
                     "FolderProject.Create.Progress"),
-                () =>
+                reportProgress =>
                 {
                     FolderProjectContainer? createdProject = null;
                     try
                     {
+                        reportProgress(
+                            new OperationProgressUpdate(
+                                localizationManager.Get(
+                                    "FolderProject.Progress.CreateProject"),
+                                root));
                         var game = GameInformationDatabase.GetGameById(
                             settingsService.CurrentSettings.CurrentGame);
                         createdProject = folderProjectFactory.Create(
@@ -80,6 +86,12 @@ public sealed class CreateFolderProjectCommand(
                                     setup.EnablePackFileCorruptionDetection,
                             });
 
+                        reportProgress(
+                            new OperationProgressUpdate(
+                                localizationManager.Get(
+                                    "FolderProject.Progress.InitializeGit"),
+                                localizationManager.Get(
+                                    "FolderProject.Progress.InitializeGitDetail")));
                         _versionControlService.Initialize(
                             root,
                             new FolderProjectGitIdentity(
@@ -87,7 +99,17 @@ public sealed class CreateFolderProjectCommand(
                                     "FolderProject.VersionControl.DefaultIdentityName"),
                                 localizationManager.Get(
                                     "FolderProject.VersionControl.DefaultIdentityEmail")),
-                            setup.PrimaryBranchName);
+                            setup.PrimaryBranchName,
+                            progress => reportProgress(
+                                FolderProjectVersionControlProgressAdapter
+                                    .ToOperationProgress(
+                                        progress,
+                                        localizationManager)));
+                        reportProgress(
+                            new OperationProgressUpdate(
+                                localizationManager.Get(
+                                    "FolderProject.Progress.OpenProject"),
+                                root));
                         return createdProject;
                     }
                     catch

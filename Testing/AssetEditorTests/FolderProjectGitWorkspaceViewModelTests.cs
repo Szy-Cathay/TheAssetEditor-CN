@@ -9,7 +9,10 @@ using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
+using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Ui.Common.Behaviors;
+using Shared.Ui.Common.OperationProgress;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -66,8 +69,8 @@ public class FolderProjectGitWorkspaceViewModelTests
             new FolderProjectSettings { Name = "测试工程" });
         var workspace = CreateWorkspace(out var versionControl);
         workspace.SetEditableContainer(project);
-        await versionControl.RefreshCommand.ExecutionTask!;
         workspace.ShowGitManagement();
+        await versionControl.RefreshCommand.ExecutionTask!;
         versionControl.IsBusy = true;
 
         workspace.SetEditableContainer(null);
@@ -83,7 +86,7 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
-    public async Task SelectingGitManagement_RefreshesWorkingChanges()
+    public async Task SelectingGitManagement_LoadsOnceAndReusesSnapshot()
     {
         using var directory = new TemporaryDirectory();
         using var project = FolderProjectContainer.Create(
@@ -92,22 +95,25 @@ public class FolderProjectGitWorkspaceViewModelTests
         var workspace = CreateWorkspace(
             out var versionControl,
             out var service);
-        workspace.SetEditableContainer(project);
-        await versionControl.RefreshCommand.ExecutionTask!;
+        var statusReads = 0;
         service.Setup(item => item.GetStatus(project.ProjectRoot))
             .Returns(
-                new FolderProjectRepositoryStatus(
-                    true,
-                    "master",
-                    "1111111",
-                    false,
-                    FolderProjectRepositoryOperationState.None,
-                    [
-                        new FolderProjectWorkingChange(
-                            "db\\units_tables\\changed.bin",
-                            FolderProjectWorkingChangeKind.Modified |
-                            FolderProjectWorkingChangeKind.Unstaged),
-                    ]));
+                () =>
+                {
+                    statusReads++;
+                    return new FolderProjectRepositoryStatus(
+                        true,
+                        "master",
+                        "1111111",
+                        false,
+                        FolderProjectRepositoryOperationState.None,
+                        [
+                            new FolderProjectWorkingChange(
+                                "db\\units_tables\\changed.bin",
+                                FolderProjectWorkingChangeKind.Modified |
+                                FolderProjectWorkingChangeKind.Unstaged),
+                        ]);
+                });
         service.Setup(item => item.GetIdentity(project.ProjectRoot))
             .Returns(new FolderProjectGitIdentity("测试用户", "test@example.invalid"));
         service.Setup(item => item.GetBranches(project.ProjectRoot))
@@ -131,14 +137,293 @@ public class FolderProjectGitWorkspaceViewModelTests
                     null,
                     [],
                     null));
+        workspace.SetEditableContainer(project);
+
+        NUnitAssert.That(statusReads, Is.Zero);
 
         workspace.SelectedSidebarTabIndex = 1;
         if (versionControl.RefreshCommand.ExecutionTask != null)
             await versionControl.RefreshCommand.ExecutionTask;
+        workspace.SelectedSidebarTabIndex = 0;
+        workspace.SelectedSidebarTabIndex = 1;
+        if (versionControl.RefreshCommand.ExecutionTask != null)
+            await versionControl.RefreshCommand.ExecutionTask;
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                versionControl.UnstagedChanges.Select(
+                    item => item.RepositoryPath),
+                Is.EqualTo(new[] { "db\\units_tables\\changed.bin" }));
+            NUnitAssert.That(statusReads, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task VisibleGitManagement_RefreshesOnlyChangedFolderProjectPaths()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        Action<FolderProjectChangedEvent>? changed = null;
+        var eventHub = new Mock<IGlobalEventHub>();
+        eventHub.Setup(item => item.Register(
+                It.IsAny<object>(),
+                It.IsAny<Action<FolderProjectChangedEvent>>()))
+            .Callback<object, Action<FolderProjectChangedEvent>>(
+                (_, callback) => changed = callback);
+        var workspace = CreateWorkspace(
+            out var versionControl,
+            out var service,
+            eventHub: eventHub.Object);
+        service.Setup(item => item.GetStatus(project.ProjectRoot))
+            .Returns(
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "master",
+                    "1111111",
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    []));
+        service.Setup(item => item.GetIdentity(project.ProjectRoot))
+            .Returns(new FolderProjectGitIdentity(
+                "测试用户",
+                "test@example.invalid"));
+        service.Setup(item => item.GetBranches(project.ProjectRoot))
+            .Returns(
+                [new FolderProjectBranchInfo(
+                    "master",
+                    "1111111",
+                    true,
+                    true)]);
+        service.Setup(item => item.GetStashes(project.ProjectRoot)).Returns([]);
+        service.Setup(item => item.GetMergeState(project.ProjectRoot))
+            .Returns(
+                new FolderProjectMergeState(
+                    FolderProjectMergePhase.None,
+                    "master",
+                    null,
+                    null,
+                    null,
+                    null,
+                    [],
+                    null));
+        service.Setup(item => item.GetStatus(
+                project.ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(new[] { "audio/changed.wem" }))))
+            .Returns(
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "master",
+                    "1111111",
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    [
+                        new FolderProjectWorkingChange(
+                            "audio/changed.wem",
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        workspace.SetEditableContainer(project);
+        workspace.ShowGitManagement();
+        await versionControl.RefreshCommand.ExecutionTask!;
+        service.Invocations.Clear();
+
+        changed!(
+            new FolderProjectChangedEvent(
+                project,
+                new FolderProjectChangeSet(
+                    1,
+                    [
+                        new FolderProjectFileChange(
+                            "audio/changed.wem",
+                            FolderProjectFileChangeKind.Updated,
+                            PackFile.CreateFromBytes("changed.wem", [1])),
+                    ])));
+        await workspace.WorkingChangesRefreshTask;
 
         NUnitAssert.That(
-            versionControl.UnstagedChanges.Select(item => item.RepositoryPath),
-            Is.EqualTo(new[] { "db\\units_tables\\changed.bin" }));
+            versionControl.WorkingChanges.Select(item => item.RepositoryPath),
+            Is.EqualTo(new[] { "audio/changed.wem" }));
+        service.Verify(
+            item => item.GetStatus(project.ProjectRoot),
+            Times.Never);
+        service.Verify(
+            item => item.GetStatus(
+                project.ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(
+                        new[] { "audio/changed.wem" }))),
+            Times.Once);
+    }
+
+    [Test]
+    public async Task LargeFolderProjectChangeBatch_UsesOneFullStatusRefresh()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        Action<FolderProjectChangedEvent>? changed = null;
+        var eventHub = new Mock<IGlobalEventHub>();
+        eventHub.Setup(item => item.Register(
+                It.IsAny<object>(),
+                It.IsAny<Action<FolderProjectChangedEvent>>()))
+            .Callback<object, Action<FolderProjectChangedEvent>>(
+                (_, callback) => changed = callback);
+        var workspace = CreateWorkspace(
+            out var versionControl,
+            out var service,
+            eventHub: eventHub.Object);
+        var fullStatusReads = 0;
+        service.Setup(item => item.GetStatus(project.ProjectRoot))
+            .Returns(
+                () =>
+                {
+                    fullStatusReads++;
+                    return new FolderProjectRepositoryStatus(
+                        true,
+                        "master",
+                        "1111111",
+                        false,
+                        FolderProjectRepositoryOperationState.None,
+                        []);
+                });
+        service.Setup(item => item.GetIdentity(project.ProjectRoot))
+            .Returns(new FolderProjectGitIdentity(
+                "测试用户",
+                "test@example.invalid"));
+        service.Setup(item => item.GetBranches(project.ProjectRoot))
+            .Returns(
+                [new FolderProjectBranchInfo(
+                    "master",
+                    "1111111",
+                    true,
+                    true)]);
+        service.Setup(item => item.GetStashes(project.ProjectRoot)).Returns([]);
+        service.Setup(item => item.GetMergeState(project.ProjectRoot))
+            .Returns(
+                new FolderProjectMergeState(
+                    FolderProjectMergePhase.None,
+                    "master",
+                    null,
+                    null,
+                    null,
+                    null,
+                    [],
+                    null));
+        workspace.SetEditableContainer(project);
+        workspace.ShowGitManagement();
+        await versionControl.RefreshCommand.ExecutionTask!;
+        fullStatusReads = 0;
+        service.Invocations.Clear();
+        var file = PackFile.CreateFromBytes("changed.wem", [1]);
+        var changes = Enumerable.Range(0, 513)
+            .Select(
+                index => new FolderProjectFileChange(
+                    $"audio/changed-{index}.wem",
+                    FolderProjectFileChangeKind.Updated,
+                    file))
+            .ToList();
+
+        changed!(
+            new FolderProjectChangedEvent(
+                project,
+                new FolderProjectChangeSet(1, changes)));
+        await versionControl.RefreshCommand.ExecutionTask!;
+
+        NUnitAssert.That(fullStatusReads, Is.EqualTo(1));
+        service.Verify(
+            item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<IReadOnlyList<string>>()),
+            Times.Never);
+    }
+
+    [Test]
+    public void Refresh_KeepsPreviousSnapshotBrowsableAndBlocksMutations()
+    {
+        using var directory = new TemporaryDirectory();
+        _ = CreateWorkspace(
+            out var versionControl,
+            out var service);
+        versionControl.ProjectRoot = directory.Path;
+        versionControl.IsInitialized = true;
+        versionControl.HasIdentity = true;
+        var oldChange = new FolderProjectWorkingChangeRow(
+            new FolderProjectWorkingChange(
+                "audio/old.wem",
+                FolderProjectWorkingChangeKind.Modified |
+                FolderProjectWorkingChangeKind.Unstaged),
+            LocalizationManager.Instance);
+        var oldCommit = Commit(
+            new string('1', 40),
+            "旧提交",
+            "测试用户",
+            "旧快照");
+        versionControl.WorkingChanges.Add(oldChange);
+        versionControl.UnstagedChanges.Add(oldChange);
+        versionControl.History.Add(oldCommit);
+
+        var refreshStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowRefresh = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        service.Setup(item => item.GetStatus(directory.Path))
+            .Returns(() =>
+            {
+                refreshStarted.TrySetResult();
+                allowRefresh.Task.GetAwaiter().GetResult();
+                return new FolderProjectRepositoryStatus(
+                    false,
+                    null,
+                    null,
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    []);
+            });
+
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(null);
+        try
+        {
+            var refreshTask = versionControl.Refresh();
+            NUnitAssert.That(
+                refreshStarted.Task.Wait(TimeSpan.FromSeconds(5)),
+                Is.True);
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(versionControl.IsStatusRefreshing, Is.True);
+                NUnitAssert.That(versionControl.IsBusy, Is.False);
+                NUnitAssert.That(versionControl.StatusMessage,
+                    Is.EqualTo(LocalizationManager.Instance.Get(
+                        "FolderProject.VersionControl.Busy.Refreshing")));
+                NUnitAssert.That(versionControl.WorkingChanges,
+                    Is.EqualTo(new[] { oldChange }));
+                NUnitAssert.That(versionControl.History,
+                    Is.EqualTo(new[] { oldCommit }));
+                NUnitAssert.That(
+                    versionControl.StageAllCommand.CanExecute(null),
+                    Is.False);
+            });
+
+            allowRefresh.TrySetResult();
+            NUnitAssert.That(
+                refreshTask.Wait(TimeSpan.FromSeconds(5)),
+                Is.True);
+            NUnitAssert.That(
+                versionControl.IsStatusRefreshing,
+                Is.False);
+        }
+        finally
+        {
+            allowRefresh.TrySetResult();
+            SynchronizationContext.SetSynchronizationContext(
+                previousContext);
+        }
     }
 
     [Test]
@@ -205,6 +490,8 @@ public class FolderProjectGitWorkspaceViewModelTests
             NUnitAssert.That(
                 root.Children.Select(item => item.Name),
                 Is.EqualTo(new[] { "AssetEditor", "README.md" }));
+            NUnitAssert.That(root.IsExpanded, Is.True);
+            NUnitAssert.That(assetEditor.IsExpanded, Is.True);
             NUnitAssert.That(assetEditor.IsFolder, Is.True);
             NUnitAssert.That(panel.IsFolder, Is.False);
             NUnitAssert.That(
@@ -289,8 +576,14 @@ public class FolderProjectGitWorkspaceViewModelTests
         var folder = children.Cast<object>().Single();
         var descendants = (System.Collections.IEnumerable)nodeType
             .GetProperty("Changes")!.GetValue(folder)!;
+        var isExpanded = nodeType.GetProperty("IsExpanded");
 
-        NUnitAssert.That(descendants.Cast<object>(), Has.Count.EqualTo(2));
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(descendants.Cast<object>(), Has.Count.EqualTo(2));
+            NUnitAssert.That(isExpanded?.GetValue(root), Is.True);
+            NUnitAssert.That(isExpanded?.GetValue(folder), Is.True);
+        });
     }
 
     [Test]
@@ -563,6 +856,7 @@ public class FolderProjectGitWorkspaceViewModelTests
             Mock.Of<IEditorManager>(),
             Mock.Of<IFolderProjectVersionControlWindowService>());
         workspace.SetEditableContainer(project);
+        workspace.ShowGitManagement();
         await versionControl.RefreshCommand.ExecutionTask!;
         var targetBranch = versionControl.Branches.Single(
             branch => branch.Name == "feature");
@@ -608,6 +902,7 @@ public class FolderProjectGitWorkspaceViewModelTests
             Mock.Of<IEditorManager>(),
             Mock.Of<IFolderProjectVersionControlWindowService>());
         workspace.SetEditableContainer(project);
+        workspace.ShowGitManagement();
         await versionControl.RefreshCommand.ExecutionTask!;
         var repository = new FolderProjectGitRepositoryViewModel();
         repository.Open(workspace);
@@ -681,6 +976,7 @@ public class FolderProjectGitWorkspaceViewModelTests
             Mock.Of<IEditorManager>(),
             Mock.Of<IFolderProjectVersionControlWindowService>());
         workspace.SetEditableContainer(project);
+        workspace.ShowGitManagement();
         await versionControl.RefreshCommand.ExecutionTask!;
         var repository = new FolderProjectGitRepositoryViewModel();
         repository.Open(workspace);
@@ -1323,6 +1619,37 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
+    public void GitChangeTreeStyle_VirtualizesLargeFolders()
+    {
+        var styles = LoadView("FolderProjectGitStyles.xaml");
+        XNamespace presentation =
+            "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace xaml =
+            "http://schemas.microsoft.com/winfx/2006/xaml";
+        var treeStyle = styles.Descendants(presentation + "Style")
+            .Single(element =>
+                element.Attribute(xaml + "Key")?.Value ==
+                "GitChangeTreeStyle");
+        var setters = treeStyle.Elements(presentation + "Setter")
+            .ToDictionary(
+                element => element.Attribute("Property")?.Value ?? "",
+                element => element.Attribute("Value")?.Value ?? "");
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                setters["VirtualizingPanel.IsVirtualizing"],
+                Is.EqualTo("True"));
+            NUnitAssert.That(
+                setters["VirtualizingPanel.VirtualizationMode"],
+                Is.EqualTo("Recycling"));
+            NUnitAssert.That(
+                setters["ScrollViewer.CanContentScroll"],
+                Is.EqualTo("True"));
+        });
+    }
+
+    [Test]
     public void GitRepository_UsesCommitTreeWithFileLevelResetAndRevert()
     {
         var repository = LoadView("FolderProjectGitRepositoryView.xaml");
@@ -1377,7 +1704,7 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
-    public void GitManagementBusyStates_BlockTheUnderlyingInterface()
+    public void GitManagementLoadingStates_BlockTheUnderlyingInterface()
     {
         var overlays = new[]
         {
@@ -1405,9 +1732,157 @@ public class FolderProjectGitWorkspaceViewModelTests
                     Is.EqualTo("#66000000"));
                 NUnitAssert.That(
                     element.Attribute("IsHitTestVisible")?.Value,
-                    Does.Contain("IsBusy"));
+                    Does.Contain("IsLoadingOperation"));
             }
         });
+    }
+
+    [Test]
+    public void GitBackgroundLoads_ShowBlockingProgressOverlays()
+    {
+        var workspace = CreateWorkspace(out var versionControl);
+        var serviceProvider = new Mock<IServiceProvider>();
+        serviceProvider
+            .Setup(provider => provider.GetService(
+                typeof(LocalizationManager)))
+            .Returns(LocalizationManager.Instance);
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            serviceProvider.Object,
+            () =>
+            {
+                versionControl.IsStatusRefreshing = true;
+                var panel = new FolderProjectGitPanelView
+                {
+                    DataContext = workspace,
+                };
+                panel.Measure(new Size(500, 700));
+                panel.Arrange(new Rect(0, 0, 500, 700));
+                panel.UpdateLayout();
+
+                var panelOverlay = (Grid)panel.FindName(
+                    "GitPanelBusyOverlay");
+                var panelProgress = FindVisualDescendant<
+                    OperationProgressView>(panelOverlay);
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        panelOverlay.Visibility,
+                        Is.EqualTo(Visibility.Visible));
+                    NUnitAssert.That(
+                        panelOverlay.IsHitTestVisible,
+                        Is.True);
+                    NUnitAssert.That(
+                        panelProgress?.IsOperationActive,
+                        Is.True);
+                    NUnitAssert.That(
+                        panelProgress?.StatusText,
+                        Is.EqualTo(LocalizationManager.Instance.Get(
+                            "FolderProject.VersionControl.Busy.Refreshing")));
+                });
+
+                versionControl.IsStatusRefreshing = false;
+                versionControl.IsCommitChangesLoading = true;
+                var repository = new FolderProjectGitRepositoryView
+                {
+                    DataContext = workspace,
+                };
+                repository.Measure(new Size(900, 650));
+                repository.Arrange(new Rect(0, 0, 900, 650));
+                repository.UpdateLayout();
+
+                var repositoryOverlay = (Grid)repository.FindName(
+                    "RepositoryBusyOverlay");
+                var repositoryProgress = FindVisualDescendant<
+                    OperationProgressView>(repositoryOverlay);
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        repositoryOverlay.Visibility,
+                        Is.EqualTo(Visibility.Visible));
+                    NUnitAssert.That(
+                        repositoryOverlay.IsHitTestVisible,
+                        Is.True);
+                    NUnitAssert.That(
+                        repositoryProgress?.IsOperationActive,
+                        Is.True);
+                    NUnitAssert.That(
+                        repositoryProgress?.StatusText,
+                        Is.EqualTo(LocalizationManager.Instance.Get(
+                            "FolderProject.VersionControl.Busy.LoadingCommit")));
+                });
+            });
+    }
+
+    [Test]
+    public async Task RepositoryLoad_ShowsOnlyRepositoryProgressOverlay()
+    {
+        var workspace = CreateWorkspace(out var versionControl);
+        var repositoryEditor = new FolderProjectGitRepositoryViewModel();
+        repositoryEditor.Open(workspace);
+        if (versionControl.RefreshCommand.ExecutionTask != null)
+            await versionControl.RefreshCommand.ExecutionTask;
+        versionControl.IsCommitChangesLoading = true;
+        var serviceProvider = new Mock<IServiceProvider>();
+        serviceProvider
+            .Setup(provider => provider.GetService(
+                typeof(LocalizationManager)))
+            .Returns(LocalizationManager.Instance);
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            serviceProvider.Object,
+            () =>
+            {
+                var panel = new FolderProjectGitPanelView
+                {
+                    DataContext = workspace,
+                };
+                var repository = new FolderProjectGitRepositoryView
+                {
+                    DataContext = workspace,
+                };
+                panel.Measure(new Size(500, 700));
+                panel.Arrange(new Rect(0, 0, 500, 700));
+                repository.Measure(new Size(900, 650));
+                repository.Arrange(new Rect(0, 0, 900, 650));
+                panel.UpdateLayout();
+                repository.UpdateLayout();
+
+                var panelOverlay = (Grid)panel.FindName(
+                    "GitPanelBusyOverlay");
+                var repositoryOverlay = (Grid)repository.FindName(
+                    "RepositoryBusyOverlay");
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        panelOverlay.Visibility,
+                        Is.EqualTo(Visibility.Collapsed));
+                    NUnitAssert.That(
+                        panelOverlay.IsHitTestVisible,
+                        Is.False);
+                    NUnitAssert.That(
+                        repositoryOverlay.Visibility,
+                        Is.EqualTo(Visibility.Visible));
+                    NUnitAssert.That(
+                        repositoryOverlay.IsHitTestVisible,
+                        Is.True);
+                });
+
+                repositoryEditor.Close();
+                panel.UpdateLayout();
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        panelOverlay.Visibility,
+                        Is.EqualTo(Visibility.Visible));
+                    NUnitAssert.That(
+                        panelOverlay.IsHitTestVisible,
+                        Is.True);
+                });
+            });
     }
 
     [Test]
@@ -1960,23 +2435,52 @@ public class FolderProjectGitWorkspaceViewModelTests
     private static FolderProjectGitWorkspaceViewModel CreateWorkspace(
         out FolderProjectVersionControlViewModel versionControl,
         IEditorManager? editorManager = null,
-        IFolderProjectVersionControlWindowService? windowService = null)
+        IFolderProjectVersionControlWindowService? windowService = null,
+        IGlobalEventHub? eventHub = null)
     {
         return CreateWorkspace(
             out versionControl,
             out _,
             editorManager,
-            windowService);
+            windowService,
+            eventHub);
     }
 
     private static FolderProjectGitWorkspaceViewModel CreateWorkspace(
         out FolderProjectVersionControlViewModel versionControl,
         out Mock<IFolderProjectVersionControlService> service,
         IEditorManager? editorManager = null,
-        IFolderProjectVersionControlWindowService? windowService = null)
+        IFolderProjectVersionControlWindowService? windowService = null,
+        IGlobalEventHub? eventHub = null)
     {
-        service = new Mock<IFolderProjectVersionControlService>();
-        service.Setup(item => item.GetStatus(It.IsAny<string>()))
+        var createdService =
+            new Mock<IFolderProjectVersionControlService>();
+        service = createdService;
+        createdService.Setup(item => item.GetStatus(
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+                It.IsAny<bool>()))
+            .Returns(
+                (
+                    string projectRoot,
+                    Action<FolderProjectVersionControlProgress> _,
+                    bool scanUnreadableEntries) =>
+                    createdService.Object.GetStatus(
+                        projectRoot,
+                        scanUnreadableEntries));
+        createdService.Setup(item => item.GetCommitChanges(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string projectRoot,
+                    string commitId,
+                    Action<FolderProjectVersionControlProgress> _) =>
+                    createdService.Object.GetCommitChanges(
+                        projectRoot,
+                        commitId));
+        createdService.Setup(item => item.GetStatus(It.IsAny<string>()))
             .Returns(
                 new FolderProjectRepositoryStatus(
                     false,
@@ -1986,7 +2490,7 @@ public class FolderProjectGitWorkspaceViewModelTests
                     FolderProjectRepositoryOperationState.None,
                     []));
         versionControl = new FolderProjectVersionControlViewModel(
-            service.Object,
+            createdService.Object,
             Mock.Of<IFolderProjectGitOperationCoordinator>(),
             Mock.Of<IStandardDialogs>(),
             Mock.Of<IFolderProjectUnsavedChangesService>(),
@@ -1996,7 +2500,8 @@ public class FolderProjectGitWorkspaceViewModelTests
             versionControl,
             editorManager ?? Mock.Of<IEditorManager>(),
             windowService ??
-                Mock.Of<IFolderProjectVersionControlWindowService>());
+                Mock.Of<IFolderProjectVersionControlWindowService>(),
+            eventHub);
     }
 
     private static XDocument LoadView(string fileName)
@@ -2007,6 +2512,25 @@ public class FolderProjectGitWorkspaceViewModelTests
             "Views",
             "FolderProjectVersionControl",
             fileName));
+    }
+
+    private static T? FindVisualDescendant<T>(DependencyObject parent)
+        where T : DependencyObject
+    {
+        for (var index = 0;
+             index < VisualTreeHelper.GetChildrenCount(parent);
+             index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is T match)
+                return match;
+
+            var descendant = FindVisualDescendant<T>(child);
+            if (descendant != null)
+                return descendant;
+        }
+
+        return null;
     }
 
     private static FolderProjectCommitSummary Commit(

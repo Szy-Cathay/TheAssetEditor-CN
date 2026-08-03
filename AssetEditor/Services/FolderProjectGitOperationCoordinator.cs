@@ -170,7 +170,7 @@ public sealed class FolderProjectGitOperationCoordinator :
                 }
             }
 
-            return CompleteOperation(
+            return await CompleteOperationAsync(
                 normalizedRoot,
                 preparation.LoadedProject,
                 result,
@@ -271,42 +271,53 @@ public sealed class FolderProjectGitOperationCoordinator :
         Exception? hostException = null;
         try
         {
-            bool shouldReattach;
-            try
-            {
-                shouldReattach = _versionControl
-                    .GetMergeState(projectRoot)
-                    .Phase == FolderProjectMergePhase.None;
-            }
-            catch (FolderProjectVersionControlException exception)
-                when (operationException != null &&
-                      exception.Code ==
-                          FolderProjectVersionControlError
-                              .RepositoryNotInitialized)
-            {
-                shouldReattach =
-                    _pendingReattach.ContainsKey(projectRoot);
-            }
+            var reattachState = GetReattachState(
+                projectRoot,
+                loadedProject,
+                operationException,
+                openWhenComplete);
+            if (reattachState != null)
+                Reattach(projectRoot, reattachState);
+        }
+        catch (Exception exception)
+        {
+            hostException = exception;
+        }
 
-            if (shouldReattach)
+        if (hostException != null)
+        {
+            throw new FolderProjectGitHostException(
+                "The folder project could not be reattached after the Git operation.",
+                hostException,
+                operationException);
+        }
+
+        if (operationException != null)
+            ExceptionDispatchInfo.Capture(operationException).Throw();
+
+        return result!;
+    }
+
+    private async Task<T> CompleteOperationAsync<T>(
+        string projectRoot,
+        FolderProjectContainer? loadedProject,
+        T? result,
+        Exception? operationException,
+        bool openWhenComplete)
+    {
+        Exception? hostException = null;
+        try
+        {
+            var reattachState = GetReattachState(
+                projectRoot,
+                loadedProject,
+                operationException,
+                openWhenComplete);
+            if (reattachState != null)
             {
-                if (_pendingReattach.TryGetValue(
-                        projectRoot,
-                        out var reattachState))
-                {
-                    Reattach(projectRoot, reattachState);
-                }
-                else if (openWhenComplete && loadedProject == null)
-                {
-                    Reattach(
-                        projectRoot,
-                        new ReattachState(
-                            _packFileService
-                                .GetAllPackfileContainers()
-                                .Count,
-                            false,
-                            []));
-                }
+                var project = await Task.Run(
+                    () => OpenForReattach(projectRoot));
+                Attach(projectRoot, reattachState, project);
             }
         }
         catch (Exception exception)
@@ -328,12 +339,64 @@ public sealed class FolderProjectGitOperationCoordinator :
         return result!;
     }
 
+    private ReattachState? GetReattachState(
+        string projectRoot,
+        FolderProjectContainer? loadedProject,
+        Exception? operationException,
+        bool openWhenComplete)
+    {
+        bool shouldReattach;
+        try
+        {
+            shouldReattach = _versionControl
+                .GetMergeState(projectRoot)
+                .Phase == FolderProjectMergePhase.None;
+        }
+        catch (FolderProjectVersionControlException exception)
+            when (operationException != null &&
+                  exception.Code ==
+                      FolderProjectVersionControlError
+                          .RepositoryNotInitialized)
+        {
+            shouldReattach = _pendingReattach.ContainsKey(projectRoot);
+        }
+
+        if (!shouldReattach)
+            return null;
+        if (_pendingReattach.TryGetValue(
+                projectRoot,
+                out var reattachState))
+        {
+            return reattachState;
+        }
+        if (!openWhenComplete || loadedProject != null)
+            return null;
+
+        return new ReattachState(
+            _packFileService.GetAllPackfileContainers().Count,
+            false,
+            []);
+    }
+
     private void Reattach(
         string projectRoot,
         ReattachState reattachState)
     {
+        var project = OpenForReattach(projectRoot);
+        Attach(projectRoot, reattachState, project);
+    }
+
+    private FolderProjectContainer OpenForReattach(string projectRoot)
+    {
         PrepareProjectForOpen(projectRoot);
-        var project = _folderProjectFactory.Open(projectRoot);
+        return _folderProjectFactory.Open(projectRoot);
+    }
+
+    private void Attach(
+        string projectRoot,
+        ReattachState reattachState,
+        FolderProjectContainer project)
+    {
         try
         {
             var added = _packFileService.AddContainer(

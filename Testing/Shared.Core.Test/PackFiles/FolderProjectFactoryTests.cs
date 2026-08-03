@@ -109,6 +109,43 @@ public class FolderProjectFactoryTests
     }
 
     [Test]
+    public void ImportPack_ReportsEveryFileBeforeExtraction()
+    {
+        using var target = new TemporaryDirectory();
+        var source = new PackFileContainer("source")
+        {
+            Header = new PFHeader(
+                PackFileVersionConverter.ToString(PackFileVersion.PFH5),
+                PackFileCAType.MOD),
+        };
+        source.FileList[@"audio\first.wav"] =
+            PackFile.CreateFromBytes("first.wav", [1]);
+        source.FileList[@"audio\second.wem"] =
+            PackFile.CreateFromBytes("second.wem", [2]);
+        var reported = new List<FolderProjectImportProgress>();
+        var factory = new FolderProjectFactory();
+
+        using var project = factory.ImportPack(
+            source,
+            target.Path,
+            new FolderProjectSettings { Name = "进度测试" },
+            reported.Add);
+
+        Assert.That(
+            reported.Select(item => (
+                item.RelativePath,
+                item.CurrentIndex,
+                item.Total,
+                item.IsCompressed)),
+            Is.EqualTo(
+                new (string, int, int, bool)[]
+                {
+                    ("audio/first.wav", 1, 2, false),
+                    ("audio/second.wem", 2, 2, false),
+                }));
+    }
+
+    [Test]
     public void ImportPack_InvalidPath_DoesNotLeavePartialProject()
     {
         using var target = new TemporaryDirectory();

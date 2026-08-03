@@ -18,7 +18,7 @@ namespace AssetEditorTests;
 public class FolderProjectTreeStateTests
 {
     [Test]
-    public void LoadedFolderProject_MarksGitChangesAndAncestorsChanged()
+    public async Task LoadedFolderProject_MarksGitChangesAndAncestorsChangedOffUiThread()
     {
         using var projectRoot = new TemporaryDirectory();
         projectRoot.Write(@"folder\child\changed.bin", [1]);
@@ -26,7 +26,11 @@ public class FolderProjectTreeStateTests
             projectRoot.Path,
             new FolderProjectSettings { Name = "工程" });
         var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var callingThreadId = Environment.CurrentManagedThreadId;
+        var statusThreadId = callingThreadId;
         versionControl.Setup(service => service.GetStatus(projectRoot.Path))
+            .Callback(() =>
+                statusThreadId = Environment.CurrentManagedThreadId)
             .Returns(
                 new FolderProjectRepositoryStatus(
                     true,
@@ -44,10 +48,12 @@ public class FolderProjectTreeStateTests
         using var harness = CreateViewModelWithVersionControl(
             versionControl.Object,
             project);
+        await harness.ViewModel.GitStatusRefreshTask;
 
         var root = harness.ViewModel.Files.Single();
         NUnitAssert.Multiple(() =>
         {
+            NUnitAssert.That(statusThreadId, Is.Not.EqualTo(callingThreadId));
             NUnitAssert.That(root.UnsavedChanged, Is.True);
             NUnitAssert.That(
                 FindNode(root, "folder").UnsavedChanged,
@@ -62,7 +68,7 @@ public class FolderProjectTreeStateTests
     }
 
     [Test]
-    public void CleanInternalReattach_ClearsFolderProjectChangeMarkers()
+    public async Task CleanInternalReattach_ClearsFolderProjectChangeMarkers()
     {
         using var projectRoot = new TemporaryDirectory();
         projectRoot.Write(@"folder\changed.bin", [1]);
@@ -87,6 +93,7 @@ public class FolderProjectTreeStateTests
         using var harness = CreateViewModelWithVersionControl(
             versionControl.Object,
             original);
+        await harness.ViewModel.GitStatusRefreshTask;
         NUnitAssert.That(
             FindNode(
                 harness.ViewModel.Files.Single(),
@@ -99,6 +106,7 @@ public class FolderProjectTreeStateTests
         harness.EventHub.Publish(new PackFileContainerAddedEvent(
             reattached,
             PackFileContainerAddedReason.InternalReattach));
+        await harness.ViewModel.GitStatusRefreshTask;
 
         var root = harness.ViewModel.Files.Single();
         NUnitAssert.Multiple(() =>
@@ -193,6 +201,272 @@ public class FolderProjectTreeStateTests
             NUnitAssert.That(
                 FindNode(root, @"folder\child\added.bin").IsVisible,
                 Is.False);
+        });
+    }
+
+    [Test]
+    public void FolderProjectChangeSet_AddsNodesWithoutReplacingTreeRoot()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\selected.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var selected = FindNode(root, @"folder\selected.bin");
+        harness.ViewModel.SelectedItem = selected;
+        var added = project.AddFiles(
+            [
+                new NewPackFileEntry(
+                    "folder",
+                    PackFile.CreateFromBytes("added.bin", [2])),
+            ])
+            .Single();
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(
+                1,
+                [
+                    new FolderProjectFileChange(
+                        @"folder\added.bin",
+                        FolderProjectFileChangeKind.Added,
+                        added),
+                ])));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                harness.ViewModel.Files.Single(),
+                Is.SameAs(root));
+            NUnitAssert.That(
+                GetAllNodes(root).Any(node => node.GetFullPath().Equals(
+                    @"folder\added.bin",
+                    StringComparison.OrdinalIgnoreCase)),
+                Is.True);
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItem,
+                Is.SameAs(selected));
+        });
+    }
+
+    [Test]
+    public void FolderProjectChangeSet_MovesSelectedNodeWithoutReplacingRoot()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\moving.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var selected = FindNode(root, @"folder\moving.bin");
+        harness.ViewModel.SelectedItem = selected;
+        var newPath = project.MoveFileOnDisk(selected.Item!, "other");
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(
+                1,
+                [
+                    new FolderProjectFileChange(
+                        newPath,
+                        FolderProjectFileChangeKind.Moved,
+                        selected.Item!,
+                        @"folder\moving.bin"),
+                ])));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                harness.ViewModel.Files.Single(),
+                Is.SameAs(root));
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItem,
+                Is.SameAs(selected));
+            NUnitAssert.That(
+                selected.GetFullPath(),
+                Is.EqualTo(@"other\moving.bin").IgnoreCase);
+        });
+    }
+
+    [Test]
+    public void FolderProjectChangeSet_RemovesSelectedNodeWithoutReplacingRoot()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\selected.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var folder = FindNode(root, "folder");
+        var selected = FindNode(root, @"folder\selected.bin");
+        harness.ViewModel.SelectedItem = selected;
+        project.DeleteFileFromDisk(selected.Item!);
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(
+                1,
+                [
+                    new FolderProjectFileChange(
+                        @"folder\selected.bin",
+                        FolderProjectFileChangeKind.Removed,
+                        selected.Item!),
+                ])));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                harness.ViewModel.Files.Single(),
+                Is.SameAs(root));
+            NUnitAssert.That(
+                GetAllNodes(root).Any(node => ReferenceEquals(node, selected)),
+                Is.False);
+            NUnitAssert.That(harness.ViewModel.SelectedItem, Is.SameAs(folder));
+            NUnitAssert.That(folder.IsSelected, Is.True);
+        });
+    }
+
+    [Test]
+    public void FolderProjectChangeSet_RemovesDirectoryWithoutReplacingRoot()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"delete\nested\selected.bin", [1]);
+        projectRoot.Write(@"keep\other.bin", [2]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var selected = FindNode(root, @"delete\nested\selected.bin");
+        harness.ViewModel.SelectedItem = selected;
+        var removedFiles = project.FileList
+            .Where(pair => pair.Key.StartsWith("delete\\"))
+            .Select(pair => new FolderProjectFileChange(
+                pair.Key,
+                FolderProjectFileChangeKind.Removed,
+                pair.Value))
+            .ToList();
+        project.DeleteFolderFromDisk("delete");
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(
+                1,
+                removedFiles,
+                [
+                    new FolderProjectDirectoryChange(
+                        "delete",
+                        FolderProjectDirectoryChangeKind.Removed),
+                ])));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                harness.ViewModel.Files.Single(),
+                Is.SameAs(root));
+            NUnitAssert.That(
+                GetAllNodes(root).Any(node => node.GetFullPath().Equals(
+                    "delete",
+                    StringComparison.OrdinalIgnoreCase)),
+                Is.False);
+            NUnitAssert.That(harness.ViewModel.SelectedItem, Is.SameAs(root));
+            NUnitAssert.That(root.IsSelected, Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"keep\other.bin").Item,
+                Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public void ExternalBatchRemoval_PrunesDeletedDirectoriesWithoutReplacingRoot()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"wwise\nested\first.wem", [1]);
+        projectRoot.Write(@"wwise\second.wem", [2]);
+        projectRoot.Write(@"keep\other.bin", [3]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var removedDirectory = FindNode(root, "wwise");
+        var removedDirectoryMutations = 0;
+        removedDirectory.Children.CollectionChanged += (_, _) =>
+            removedDirectoryMutations++;
+        var removedFiles = project.FileList
+            .Where(pair => pair.Key.StartsWith("wwise\\"))
+            .Select(pair => new FolderProjectFileChange(
+                pair.Key,
+                FolderProjectFileChangeKind.Removed,
+                pair.Value))
+            .ToList();
+        Directory.Delete(Path.Combine(projectRoot.Path, "wwise"), true);
+        project.RefreshFromDisk();
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(1, removedFiles)));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(harness.ViewModel.Files.Single(), Is.SameAs(root));
+            NUnitAssert.That(
+                GetAllNodes(root).Any(node => node.GetFullPath().StartsWith(
+                    "wwise",
+                    StringComparison.OrdinalIgnoreCase)),
+                Is.False);
+            NUnitAssert.That(removedDirectoryMutations, Is.EqualTo(1));
+            NUnitAssert.That(FindNode(root, @"keep\other.bin").Item, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public void FolderProjectChangeSet_RenamesDirectoryWithoutReplacingNodes()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"old\nested\selected.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var directory = FindNode(root, "old");
+        var selected = FindNode(root, @"old\nested\selected.bin");
+        harness.ViewModel.SelectedItem = selected;
+        var oldFiles = project.FileList.ToList();
+        project.RenameDirectoryOnDisk("old", "renamed");
+        var fileChanges = oldFiles.Select(pair =>
+            new FolderProjectFileChange(
+                "renamed" + pair.Key["old".Length..],
+                FolderProjectFileChangeKind.Moved,
+                pair.Value,
+                pair.Key))
+            .ToList();
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(
+                1,
+                fileChanges,
+                [
+                    new FolderProjectDirectoryChange(
+                        "renamed",
+                        FolderProjectDirectoryChangeKind.Moved,
+                        "old"),
+                ])));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(harness.ViewModel.Files.Single(), Is.SameAs(root));
+            NUnitAssert.That(FindNode(root, "renamed"), Is.SameAs(directory));
+            NUnitAssert.That(harness.ViewModel.SelectedItem, Is.SameAs(selected));
+            NUnitAssert.That(
+                selected.GetFullPath(),
+                Is.EqualTo(@"renamed\nested\selected.bin").IgnoreCase);
         });
     }
 

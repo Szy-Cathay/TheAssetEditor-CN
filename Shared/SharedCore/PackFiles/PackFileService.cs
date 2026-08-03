@@ -202,13 +202,35 @@ namespace Shared.Core.PackFiles
 
             if (container is FolderProjectContainer folderProject)
             {
+                var paths = newFiles
+                    .Select(entry =>
+                        FolderProjectPathPolicy.EnsureResourcePath(
+                            Path.Combine(
+                                entry.DirectoyPath ?? "",
+                                entry.PackFile.Name.Trim())))
+                    .ToList();
+                var existingPaths = paths
+                    .Where(path => container.FileList.ContainsKey(
+                        path.ToLowerInvariant()))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var addedFiles = folderProject.AddFiles(
                     newFiles,
                     overwriteExisting);
+                var changeSet = new FolderProjectChangeSet(
+                    folderProject.NextRevision(),
+                    paths.Zip(
+                            addedFiles,
+                            (path, file) => new FolderProjectFileChange(
+                                path,
+                                existingPaths.Contains(path)
+                                    ? FolderProjectFileChangeKind.Updated
+                                    : FolderProjectFileChangeKind.Added,
+                                file))
+                        .ToList());
                 _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesAddedEvent(
-                        container,
-                        addedFiles));
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        changeSet));
                 return;
             }
 
@@ -233,6 +255,86 @@ namespace Shared.Core.PackFiles
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerFilesAddedEvent(container, files));
         }
 
+        public IReadOnlyList<PackFile> ApplyFileWrites(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes)
+        {
+            if (container.IsCaPackFile)
+                throw new Exception("Can not add files to ca pack file");
+
+            var normalizedWrites = writes
+                .Select(write => new
+                {
+                    Path = FolderProjectPathPolicy.EnsureResourcePath(
+                        write.Path),
+                    write.Content,
+                })
+                .ToList();
+            if (container is FolderProjectContainer folderProject)
+            {
+                var existingPaths = normalizedWrites
+                    .Where(write => container.FileList.ContainsKey(
+                        write.Path.ToLowerInvariant()))
+                    .Select(write => write.Path)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var files = folderProject.ApplyFileWrites(
+                    normalizedWrites
+                        .Select(write => new PackFileWrite(
+                            write.Path,
+                            write.Content))
+                        .ToList());
+                var changes = normalizedWrites
+                    .Zip(
+                        files,
+                        (write, file) => new FolderProjectFileChange(
+                            write.Path,
+                            existingPaths.Contains(write.Path)
+                                ? FolderProjectFileChangeKind.Updated
+                                : FolderProjectFileChangeKind.Added,
+                            file))
+                    .ToList();
+                var changeSet = new FolderProjectChangeSet(
+                    folderProject.NextRevision(),
+                    changes);
+                _globalEventHub?.PublishGlobalEvent(
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        changeSet));
+                return files;
+            }
+
+            var added = new List<PackFile>();
+            var updated = new List<PackFile>();
+            foreach (var write in normalizedWrites)
+            {
+                var key = write.Path.ToLowerInvariant();
+                if (container.FileList.TryGetValue(key, out var existing))
+                {
+                    existing.DataSource = new MemorySource(write.Content);
+                    updated.Add(existing);
+                    continue;
+                }
+
+                var file = PackFile.CreateFromBytes(
+                    Path.GetFileName(write.Path),
+                    write.Content);
+                container.FileList[key] = file;
+                added.Add(file);
+            }
+
+            if (added.Count != 0)
+            {
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesAddedEvent(container, added));
+            }
+            if (updated.Count != 0)
+            {
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesUpdatedEvent(container, updated));
+            }
+            return added.Concat(updated).ToList();
+        }
+
         public void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target)
         {
             var lowerPath = path.Replace('/', '\\').ToLower().Trim();
@@ -244,16 +346,13 @@ namespace Shared.Core.PackFiles
             {
                 if (target is FolderProjectContainer folderProject)
                 {
-                    var added = folderProject.AddFiles(
-                    [
-                        new NewPackFileEntry(
-                            Path.GetDirectoryName(lowerPath) ?? "",
-                            newFile),
-                    ]);
-                    _globalEventHub?.PublishGlobalEvent(
-                        new PackFileContainerFilesAddedEvent(
-                            target,
-                            added));
+                    AddFilesToPack(
+                        folderProject,
+                        [
+                            new NewPackFileEntry(
+                                Path.GetDirectoryName(lowerPath) ?? "",
+                                newFile),
+                        ]);
                     return;
                 }
 
@@ -283,7 +382,22 @@ namespace Shared.Core.PackFiles
                 throw new Exception("Can not create folders inside CA pack file");
 
             if (container is FolderProjectContainer folderProject)
-                folderProject.CreateDirectoryOnDisk(folder);
+            {
+                var normalized = FolderProjectPathPolicy
+                    .EnsureResourceDirectoryPath(folder);
+                folderProject.CreateDirectoryOnDisk(normalized);
+                _globalEventHub?.PublishGlobalEvent(
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            [],
+                            [
+                                new FolderProjectDirectoryChange(
+                                    normalized,
+                                    FolderProjectDirectoryChangeKind.Added),
+                            ])));
+            }
         }
 
         public void SetEditablePack(PackFileContainer? pf)
@@ -365,9 +479,30 @@ namespace Shared.Core.PackFiles
 
             if (pf is FolderProjectContainer folderProject)
             {
-                folderProject.DeleteFolderFromDisk(folder);
+                var normalized = FolderProjectPathPolicy
+                    .EnsureResourceDirectoryPath(folder);
+                var prefix = normalized + "\\";
+                var removedFiles = folderProject.FileList
+                    .Where(pair => pair.Key.StartsWith(
+                        prefix,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Select(pair => new FolderProjectFileChange(
+                        pair.Key,
+                        FolderProjectFileChangeKind.Removed,
+                        pair.Value))
+                    .ToList();
+                folderProject.DeleteFolderFromDisk(normalized);
                 _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFolderRemovedEvent(pf, folder));
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            removedFiles,
+                            [
+                                new FolderProjectDirectoryChange(
+                                    normalized,
+                                    FolderProjectDirectoryChangeKind.Removed),
+                            ])));
                 return;
             }
 
@@ -398,9 +533,19 @@ namespace Shared.Core.PackFiles
 
             if (pf is FolderProjectContainer folderProject)
             {
+                var path = folderProject.GetRelativePath(file);
                 folderProject.DeleteFileFromDisk(file);
                 _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesRemovedEvent(pf, [file]));
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            [
+                                new FolderProjectFileChange(
+                                    path,
+                                    FolderProjectFileChangeKind.Removed,
+                                    file),
+                            ])));
                 return;
             }
 
@@ -418,11 +563,22 @@ namespace Shared.Core.PackFiles
 
             if (pf is FolderProjectContainer folderProject)
             {
-                folderProject.MoveFileOnDisk(file, newFolderPath);
+                var oldPath = folderProject.GetRelativePath(file);
+                var newPath = folderProject.MoveFileOnDisk(
+                    file,
+                    newFolderPath);
                 _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesRemovedEvent(pf, [file]));
-                _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesAddedEvent(pf, [file]));
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            [
+                                new FolderProjectFileChange(
+                                    newPath,
+                                    FolderProjectFileChangeKind.Moved,
+                                    file,
+                                    oldPath),
+                            ])));
                 return;
             }
 
@@ -449,14 +605,37 @@ namespace Shared.Core.PackFiles
 
             if (pf is FolderProjectContainer folderProject)
             {
-                var projectNewNodePath =
+                var oldPath = FolderProjectPathPolicy
+                    .EnsureResourceDirectoryPath(currentNodeName);
+                var oldPrefix = oldPath + "\\";
+                var affectedFiles = folderProject.FileList
+                    .Where(pair => pair.Key.StartsWith(
+                        oldPrefix,
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var newPath =
                     folderProject.RenameDirectoryOnDisk(
-                        currentNodeName,
+                        oldPath,
                         newName);
+                var fileChanges = affectedFiles
+                    .Select(pair => new FolderProjectFileChange(
+                        newPath + pair.Key[oldPath.Length..],
+                        FolderProjectFileChangeKind.Moved,
+                        pair.Value,
+                        pair.Key))
+                    .ToList();
                 _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFolderRenamedEvent(
-                        pf,
-                        projectNewNodePath));
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            fileChanges,
+                            [
+                                new FolderProjectDirectoryChange(
+                                    newPath,
+                                    FolderProjectDirectoryChangeKind.Moved,
+                                    oldPath),
+                            ])));
                 return;
             }
 
@@ -487,9 +666,20 @@ namespace Shared.Core.PackFiles
 
             if (pf is FolderProjectContainer folderProject)
             {
-                folderProject.RenameFileOnDisk(file, newName);
+                var oldPath = folderProject.GetRelativePath(file);
+                var newPath = folderProject.RenameFileOnDisk(file, newName);
                 _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesUpdatedEvent(pf, [file]));
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            [
+                                new FolderProjectFileChange(
+                                    newPath,
+                                    FolderProjectFileChangeKind.Moved,
+                                    file,
+                                    oldPath),
+                            ])));
                 return;
             }
 
@@ -512,11 +702,28 @@ namespace Shared.Core.PackFiles
                 throw new Exception("Can not save ca pack file");
 
             if (pf is FolderProjectContainer folderProject)
+            {
+                var path = folderProject.GetRelativePath(file);
                 folderProject.SaveFileData(file, data);
+                _globalEventHub?.PublishGlobalEvent(
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            [
+                                new FolderProjectFileChange(
+                                    path,
+                                    FolderProjectFileChangeKind.Updated,
+                                    file),
+                            ])));
+            }
             else
+            {
                 file.DataSource = new MemorySource(data);
+                _globalEventHub?.PublishGlobalEvent(
+                    new PackFileContainerFilesUpdatedEvent(pf, [file]));
+            }
 
-            _globalEventHub?.PublishGlobalEvent(new PackFileContainerFilesUpdatedEvent(pf, [file]));
             _globalEventHub?.PublishGlobalEvent(new PackFileSavedEvent(file));
         }
 
@@ -598,47 +805,58 @@ namespace Shared.Core.PackFiles
                         outputPath));
             }
 
-            project.ExecuteSynchronized(
+            project.ExecuteSerializedMutation(
                 () =>
                 {
                     FolderProjectPathPolicy.EnsureOutputOutsideProject(
                         project.ProjectRoot,
                         path);
 
-                    var transient =
-                        new PackFileContainer(project.Name)
+                    var snapshot = project.ExecuteSynchronized(
+                        () =>
                         {
-                            Header = new PFHeader(
-                                PackFileVersionConverter.ToString(
-                                    project.ProjectSettings
-                                        .PackFileVersion),
-                                project.ProjectSettings.PackFileType)
+                            var transient =
+                                new PackFileContainer(project.Name)
+                                {
+                                    Header = new PFHeader(
+                                        PackFileVersionConverter.ToString(
+                                            project.ProjectSettings
+                                                .PackFileVersion),
+                                        project.ProjectSettings.PackFileType)
+                                    {
+                                        DependantFiles =
+                                            project.Header.DependantFiles
+                                                .ToList(),
+                                    },
+                                    SystemFilePath = path,
+                                };
+
+                            foreach (var (relativePath, file)
+                                     in project.FileList)
                             {
-                                DependantFiles =
-                                    project.Header.DependantFiles
-                                        .ToList(),
-                            },
-                            SystemFilePath = path,
-                        };
+                                if (FolderProjectPathPolicy.IsExcludedPath(
+                                        relativePath) ||
+                                    project.IsIgnored(relativePath))
+                                {
+                                    continue;
+                                }
 
-                    foreach (var (relativePath, file)
-                             in project.FileList)
-                    {
-                        if (FolderProjectPathPolicy.IsExcludedPath(
-                                relativePath) ||
-                            project.IsIgnored(relativePath))
-                        {
-                            continue;
-                        }
+                                transient.FileList[relativePath] =
+                                    new PackFile(
+                                        file.Name,
+                                        file.DataSource);
+                            }
 
-                        transient.FileList[relativePath] =
-                            new PackFile(
-                                file.Name,
-                                file.DataSource);
-                    }
+                            return (
+                                Container: transient,
+                                GameVersion:
+                                    project.ProjectSettings.GameVersion,
+                                EnableCorruptionDetection:
+                                    project.ProjectSettings
+                                        .EnablePackFileCorruptionDetection);
+                        });
 
-                    if (project.ProjectSettings.GameVersion
-                        is { } gameVersion)
+                    if (snapshot.GameVersion is { } gameVersion)
                     {
                         gameInformation =
                             GameInformationDatabase.GetGameById(
@@ -646,16 +864,20 @@ namespace Shared.Core.PackFiles
                     }
 
                     SavePackContainerCore(
-                        transient,
+                        snapshot.Container,
                         path,
                         createBackup,
                         gameInformation,
-                        project.ProjectSettings
-                            .EnablePackFileCorruptionDetection);
+                        snapshot.EnableCorruptionDetection);
 
-                    project.ProjectSettings.OutputPackPath =
-                        Path.GetFullPath(path);
-                    project.SaveSettings();
+                    project.ExecuteSynchronized(
+                        () =>
+                        {
+                            project.ProjectSettings.OutputPackPath =
+                                Path.GetFullPath(path);
+                            project.ProjectSettings.Save(
+                                project.ProjectRoot);
+                        });
                 });
         }
 
@@ -821,8 +1043,7 @@ namespace Shared.Core.PackFiles
                 {
                     var res =
                         pf is FolderProjectContainer folderProject
-                            ? folderProject.ExecuteSynchronized(
-                                () => FindPath(pf, file))
+                            ? folderProject.GetRelativePath(file)
                             : FindPath(pf, file);
                     if (string.IsNullOrWhiteSpace(res) == false)
                         return res;
@@ -832,8 +1053,7 @@ namespace Shared.Core.PackFiles
             {
                 var res =
                     container is FolderProjectContainer folderProject
-                        ? folderProject.ExecuteSynchronized(
-                            () => FindPath(container, file))
+                        ? folderProject.GetRelativePath(file)
                         : FindPath(container, file);
                 if (string.IsNullOrWhiteSpace(res) == false)
                     return res;
@@ -885,34 +1105,15 @@ namespace Shared.Core.PackFiles
             if (sender is not FolderProjectContainer folderProject)
                 return;
 
-            if (e.RemovedFiles.Count != 0)
-            {
-                _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesRemovedEvent(
-                        folderProject,
-                        e.RemovedFiles.ToList()));
-            }
-
-            if (e.AddedFiles.Count != 0)
-            {
-                _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesAddedEvent(
-                        folderProject,
-                        e.AddedFiles.ToList()));
-            }
-
-            if (e.UpdatedFiles.Count != 0 ||
-                e.DirectoriesChanged)
-            {
-                _globalEventHub?.PublishGlobalEvent(
-                    new PackFileContainerFilesUpdatedEvent(
-                        folderProject,
-                        e.UpdatedFiles.ToList()));
-            }
+            _globalEventHub?.PublishGlobalEvent(
+                new FolderProjectChangedEvent(
+                    folderProject,
+                    e.ChangeSet));
         }
     }
 
     public record NewPackFileEntry(string DirectoyPath, PackFile PackFile);
+    public record PackFileWrite(string Path, byte[] Content);
 
     public interface ISimpleMessageBox
     {

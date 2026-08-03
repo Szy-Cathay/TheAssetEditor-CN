@@ -7,6 +7,7 @@
     xmlns:sys="clr-namespace:System;assembly=netstandard"
     xmlns:DialogueEventMerger="clr-namespace:Editors.Audio.DialogueEventMerger"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=DialogueEventMerger:DialogueEventMergerViewModel}"
     mc:Ignorable="d"
     Width="700"
@@ -115,17 +116,30 @@
             </Grid>
         </Grid>
 
-        <StackPanel
+        <Grid
             Grid.Row="2"
             Margin="10,0,10,8">
-            <ProgressBar
-                Height="4"
-                IsIndeterminate="{Binding IsBusy}"/>
+            <progress:OperationProgressView
+                CurrentDetailText="{Binding LoadStatus}"
+                IsOperationActive="{Binding IsBusy}"
+                IsProgressIndeterminate="True"
+                StatusText="{loc:Loc OperationProgress.AudioMerge}"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
             <TextBlock
                 Margin="0,4,0,0"
                 Text="{Binding LoadStatus}"
-                TextWrapping="Wrap"/>
-        </StackPanel>
+                TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
 
         <StackPanel 
             Grid.Row="3"

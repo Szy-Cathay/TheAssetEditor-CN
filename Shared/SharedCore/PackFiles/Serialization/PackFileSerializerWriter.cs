@@ -368,17 +368,10 @@ namespace Shared.Core.PackFiles.Serialization
             foreach (var fileMetaData in fileMetaDataTabel)
             {
                 var packFile = fileMetaData.PackFile;
-                byte[] data;
                 uint uncompressedSize = 0;
-
-                // Read file data
-                if (fileMetaData.CompressionInfo.DecompressBeforeSaving == false && packFile.DataSource is PackedFileSource packedFileSource)
-                    data = packedFileSource.ReadDataWithoutDecompressing();
-                else
-                    data = packFile.DataSource.ReadData();
-
-                // Compress if needed
                 var shouldCompress = fileMetaData.CompressionInfo.IntendedCompressionFormat != CompressionFormat.None;
+                var offset = writer.BaseStream.Position;
+                int dataLength;
                 if (shouldCompress)
                 {
                     var uncompressedData = packFile.DataSource.ReadData();
@@ -386,22 +379,39 @@ namespace Shared.Core.PackFiles.Serialization
 
                     // Compress the data into the right format
                     var compressedData = FileCompression.Compress(uncompressedData, fileMetaData.CompressionInfo.IntendedCompressionFormat);
-                    data = compressedData;
 
                     // Validate new compression
                     var decompressedData = FileCompression.Decompress(compressedData, uncompressedData.Length, fileMetaData.CompressionInfo.IntendedCompressionFormat);
                     if (decompressedData.Length != uncompressedData.Length)
                         throw new InvalidDataException($"Decompressed bytes {decompressedData.Length:N0} does not match the expected uncompressed bytes {uncompressedData.Length:N0}.");
-                }
 
-                // Write the data
-                var offset = writer.BaseStream.Position;
-                writer.Write(data);
+                    writer.Write(compressedData);
+                    dataLength = compressedData.Length;
+                }
+                else if (!fileMetaData.CompressionInfo.DecompressBeforeSaving &&
+                         packFile.DataSource is PackedFileSource packedFileSource)
+                {
+                    var data = packedFileSource.ReadDataWithoutDecompressing();
+                    writer.Write(data);
+                    dataLength = data.Length;
+                }
+                else if (!fileMetaData.CompressionInfo.DecompressBeforeSaving)
+                {
+                    packFile.DataSource.CopyTo(writer.BaseStream);
+                    dataLength = checked((int)(
+                        writer.BaseStream.Position - offset));
+                }
+                else
+                {
+                    var data = packFile.DataSource.ReadData();
+                    writer.Write(data);
+                    dataLength = data.Length;
+                }
 
                 // Patch the size from the position stored earlier
                 var currentPosition = writer.BaseStream.Position;
                 writer.BaseStream.Position = fileMetaData.SizePosition;
-                writer.Write(data.Length);
+                writer.Write(dataLength);
                 writer.BaseStream.Position = currentPosition;
 
                 pendingUpdates.Add(new PendingDataSourceUpdate(
@@ -409,7 +419,7 @@ namespace Shared.Core.PackFiles.Serialization
                     new PackedFileSource(
                         outputParent,
                         offset,
-                        data.Length,
+                        dataLength,
                         false,     // We do not encrypt
                         shouldCompress,
                         fileMetaData.CompressionInfo.IntendedCompressionFormat,

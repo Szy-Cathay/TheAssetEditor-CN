@@ -65,6 +65,79 @@ namespace Test.Shared.Core.PackFiles
         }
 
         [Test]
+        public void LoadAllCaFiles_ReportsRealReadAndMergeProgress()
+        {
+            const int packCount = 8;
+            var packBytes = CreatePackBytes();
+            var manifestEntries = new string[packCount];
+
+            for (var index = 0; index < packCount; index++)
+            {
+                var fileName = $"progress_{index:D2}.pack";
+                File.WriteAllBytes(
+                    Path.Combine(_tempDirectory, fileName),
+                    packBytes);
+                manifestEntries[index] =
+                    $"{fileName}\t{packBytes.Length}";
+            }
+
+            File.WriteAllLines(
+                Path.Combine(_tempDirectory, "manifest.txt"),
+                manifestEntries);
+
+            var settings = new ApplicationSettingsService(
+                GameTypeEnum.Rome2);
+            settings.CurrentSettings.GameDirectories.Add(
+                new ApplicationSettings.GamePathPair
+                {
+                    Game = GameTypeEnum.Rome2,
+                    Path = _tempDirectory,
+                });
+            var loader = new PackFileContainerLoader(settings);
+            var updates = new System.Collections.Concurrent
+                .ConcurrentQueue<CaPackLoadProgress>();
+
+            var loaded = loader.LoadAllCaFiles(
+                GameTypeEnum.Rome2,
+                updates.Enqueue);
+
+            var recorded = updates.ToArray();
+            var readUpdates = recorded
+                .Where(update => update.Stage ==
+                    CaPackLoadProgressStage.ReadingPacks)
+                .ToArray();
+            var mergeUpdates = recorded
+                .Where(update => update.Stage ==
+                    CaPackLoadProgressStage.MergingPacks)
+                .ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(loaded, Is.Not.Null);
+                Assert.That(
+                    recorded.Any(update => update.Stage ==
+                        CaPackLoadProgressStage.DiscoveringPacks),
+                    Is.True);
+                Assert.That(readUpdates, Has.Length.EqualTo(packCount));
+                Assert.That(readUpdates[^1].Completed, Is.EqualTo(packCount));
+                Assert.That(readUpdates[^1].Total, Is.EqualTo(packCount));
+                Assert.That(
+                    readUpdates.Select(update => update.Detail),
+                    Is.EquivalentTo(
+                        Enumerable.Range(0, packCount)
+                            .Select(index =>
+                                $"progress_{index:D2}.pack")));
+                Assert.That(mergeUpdates, Has.Length.EqualTo(packCount));
+                Assert.That(
+                    mergeUpdates[^1].Completed,
+                    Is.EqualTo(packCount));
+                Assert.That(
+                    mergeUpdates[^1].Total,
+                    Is.EqualTo(packCount));
+            });
+        }
+
+        [Test]
         public async Task SavePackContainer_MultipleServiceInstancesSerializeSamePathSafely()
         {
             const int serviceCount = 8;

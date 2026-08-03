@@ -13,6 +13,7 @@ using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using Shared.Ui.Common.OperationProgress;
 
 namespace AssetEditorTests;
 
@@ -51,36 +52,28 @@ public class CreateFolderProjectCommandTests
     }
 
     [Test]
-    public void FolderProjectCreation_ShowsIndeterminateProgressBar()
+    public void FolderProjectCreation_UsesExpandableOperationProgress()
     {
         var viewDirectory = Path.Combine(
             FindSolutionRoot(),
             "AssetEditor",
             "Views",
             "FolderProject");
-        XNamespace presentation =
-            "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml =
             "http://schemas.microsoft.com/winfx/2006/xaml";
 
-        var progressBars = Directory
+        var progressViews = Directory
             .EnumerateFiles(viewDirectory, "*.xaml")
             .Select(XDocument.Load)
             .SelectMany(document =>
-                document.Descendants(presentation + "ProgressBar"))
+                document.Descendants())
             .Where(element =>
+                element.Name.LocalName == "OperationProgressView" &&
                 element.Attribute(xaml + "Name")?.Value ==
-                "FolderProjectCreationProgressBar")
+                "FolderProjectOperationProgress")
             .ToArray();
 
-        NUnitAssert.Multiple(() =>
-        {
-            NUnitAssert.That(progressBars, Has.Length.EqualTo(1));
-            NUnitAssert.That(
-                progressBars.SingleOrDefault()?
-                    .Attribute("IsIndeterminate")?.Value,
-                Is.EqualTo("True"));
-        });
+        NUnitAssert.That(progressViews, Has.Length.EqualTo(1));
     }
 
     [Test]
@@ -103,17 +96,23 @@ public class CreateFolderProjectCommandTests
         var progressRunner = new Mock<IFolderProjectProgressRunner>();
         var progressVisible = false;
         var initializedWhileProgressVisible = false;
+        var progressUpdates = new List<OperationProgressUpdate>();
         progressRunner.Setup(item => item.Run(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
-                It.IsAny<Func<FolderProjectContainer?>>()))
+                It.IsAny<Func<
+                    Action<OperationProgressUpdate>,
+                    FolderProjectContainer?>>()))
             .Returns(
-                (string _, string _, Func<FolderProjectContainer?> operation) =>
+                (string _,
+                 string _,
+                 Func<Action<OperationProgressUpdate>,
+                     FolderProjectContainer?> operation) =>
                 {
                     progressVisible = true;
                     try
                     {
-                        return operation();
+                        return operation(progressUpdates.Add);
                     }
                     finally
                     {
@@ -123,9 +122,22 @@ public class CreateFolderProjectCommandTests
         versionControl.Setup(item => item.Initialize(
                 project.Path,
                 It.IsAny<FolderProjectGitIdentity>(),
-                "main"))
-            .Callback(() =>
-                initializedWhileProgressVisible = progressVisible);
+                "main",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Callback(
+                (
+                    string _,
+                    FolderProjectGitIdentity _,
+                    string _,
+                    Action<FolderProjectVersionControlProgress> progress) =>
+                {
+                    initializedWhileProgressVisible = progressVisible;
+                    progress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage.IndexingFiles,
+                        "audio/voice.wem",
+                        1,
+                        2));
+                });
         var command = new CreateFolderProjectCommand(
             Mock.Of<IPackFileService>(),
             new FolderProjectFactory(),
@@ -151,16 +163,27 @@ public class CreateFolderProjectCommandTests
                 settings.EnablePackFileCorruptionDetection,
                 Is.True);
             NUnitAssert.That(initializedWhileProgressVisible, Is.True);
+            NUnitAssert.That(
+                progressUpdates.Any(update =>
+                    update.Status == "正在登记工程文件" &&
+                    update.Detail == "audio/voice.wem" &&
+                    update.Completed == 1 &&
+                    update.Total == 2),
+                Is.True);
         });
         progressRunner.Verify(item => item.Run(
             It.IsAny<string>(),
-            It.Is<string>(message =>
-                message.Contains("首次", StringComparison.Ordinal)),
-            It.IsAny<Func<FolderProjectContainer?>>()), Times.Once);
+                It.Is<string>(message =>
+                    message.Contains("首次", StringComparison.Ordinal)),
+            It.IsAny<Func<
+                Action<OperationProgressUpdate>,
+                FolderProjectContainer?>>()), Times.Once);
         versionControl.Verify(item => item.Initialize(
             project.Path,
             It.IsAny<FolderProjectGitIdentity>(),
-            "main"), Times.Once);
+            "main",
+            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+            Times.Once);
     }
 
     [Test]

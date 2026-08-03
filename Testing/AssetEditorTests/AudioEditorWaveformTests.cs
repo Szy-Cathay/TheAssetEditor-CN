@@ -303,6 +303,54 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void FolderProjectChangeSetWithWav_RebuildsAudioTreeOnce()
+        {
+            var projectRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"ae-audio-tree-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(projectRoot);
+            try
+            {
+                using var pack = FolderProjectContainer.Create(
+                    projectRoot,
+                    new FolderProjectSettings { Name = "工程" });
+                var treeBuilder = new Mock<IAudioFilesTreeBuilderService>();
+                treeBuilder
+                    .Setup(x => x.BuildTree(pack))
+                    .Returns(CreateAudioFilesTree("audio.wav"));
+                var packFileService = new Mock<IPackFileService>();
+                packFileService.Setup(x => x.GetEditablePack()).Returns(pack);
+                var eventHub = new TestEventHub();
+                _ = new AudioFilesExplorerViewModel(
+                    eventHub,
+                    eventHub,
+                    Mock.Of<IUiCommandFactory>(),
+                    packFileService.Object,
+                    new AudioEditorStateService(),
+                    treeBuilder.Object,
+                    Mock.Of<IAudioFilesTreeSearchFilterService>(),
+                    Mock.Of<IWaveformVisualisationCacheService>());
+
+                eventHub.Publish(new FolderProjectChangedEvent(
+                    pack,
+                    new FolderProjectChangeSet(
+                        1,
+                        [
+                            new FolderProjectFileChange(
+                                @"audio\changed.wav",
+                                FolderProjectFileChangeKind.Added,
+                                PackFile.CreateFromBytes("changed.wav", [1])),
+                        ])));
+
+                treeBuilder.Verify(x => x.BuildTree(pack), Times.Exactly(2));
+            }
+            finally
+            {
+                Directory.Delete(projectRoot, true);
+            }
+        }
+
+        [TestMethod]
         public async Task InvalidatingTheCache_RendersTheCurrentWaveformAgain()
         {
             var eventHub = new TestEventHub();

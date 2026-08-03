@@ -12,8 +12,23 @@ namespace AssetEditor.Services;
 
 public interface IFolderProjectCloseGuard
 {
-    Task<bool> CanCloseAsync(FolderProjectContainer? project);
+    Task<bool> CanCloseAsync(
+        FolderProjectContainer? project,
+        Action<FolderProjectCloseProgress>? reportProgress = null);
 }
+
+public enum FolderProjectCloseProgressStage
+{
+    Preparing,
+    ReadingRepositoryStatus,
+    SummarizingChanges,
+}
+
+public sealed record FolderProjectCloseProgress(
+    FolderProjectCloseProgressStage Stage,
+    int CurrentStep,
+    int TotalSteps,
+    int? ChangeCount = null);
 
 public sealed class FolderProjectCloseGuard :
     IFolderProjectCloseGuard
@@ -52,14 +67,25 @@ public sealed class FolderProjectCloseGuard :
     }
 
     public async Task<bool> CanCloseAsync(
-        FolderProjectContainer? project)
+        FolderProjectContainer? project,
+        Action<FolderProjectCloseProgress>? reportProgress = null)
     {
+        reportProgress?.Invoke(
+            new FolderProjectCloseProgress(
+                FolderProjectCloseProgressStage.Preparing,
+                1,
+                3));
         if (project == null ||
             !Directory.Exists(Path.Combine(project.ProjectRoot, ".git")))
         {
             return true;
         }
 
+        reportProgress?.Invoke(
+            new FolderProjectCloseProgress(
+                FolderProjectCloseProgressStage.ReadingRepositoryStatus,
+                2,
+                3));
         FolderProjectRepositoryStatus status;
         try
         {
@@ -77,6 +103,13 @@ public sealed class FolderProjectCloseGuard :
                 MessageBoxButton.OK);
             return false;
         }
+
+        reportProgress?.Invoke(
+            new FolderProjectCloseProgress(
+                FolderProjectCloseProgressStage.SummarizingChanges,
+                3,
+                3,
+                status.Changes.Count));
 
         if (status.IsClean)
             return true;

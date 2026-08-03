@@ -7,6 +7,10 @@ namespace Shared.Core.PackFiles.Models
     {
         long Size { get; }
         byte[] ReadData();
+        void CopyTo(Stream destination)
+        {
+            destination.Write(ReadData());
+        }
         byte[] PeekData(int size);
         ByteChunk ReadDataAsChunk();
 

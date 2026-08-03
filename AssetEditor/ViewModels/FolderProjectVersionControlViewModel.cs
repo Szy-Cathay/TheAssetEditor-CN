@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using AssetEditor.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -374,24 +375,44 @@ public partial class FolderProjectVersionControlViewModel :
     private readonly IFolderProjectUnsavedChangesPrompt
         _unsavedChangesPrompt;
     private readonly LocalizationManager _localization;
+    private readonly SynchronizationContext? _synchronizationContext;
+    private readonly object _progressUpdateGate = new();
+    private readonly object _commitChangesCacheGate = new();
+    private readonly Dictionary<string,
+        IReadOnlyList<FolderProjectCommitChange>> _commitChangesCache =
+            new(StringComparer.Ordinal);
     private readonly string _defaultIdentityName;
     private readonly string _defaultIdentityEmail;
     private readonly ILogger _logger =
         Logging.Create<FolderProjectVersionControlViewModel>();
     private bool _refreshing;
     private bool _suppressRepositoryTabHistoryLoad;
+    private bool _hasHistorySnapshot;
     private string? _requestedMergeSourceBranchName;
     private bool _mergeStateKnown;
     private int _commitChangesRequestId;
     private int _historyRequestId;
+    private int _workingChangesRevision;
+    private readonly SemaphoreSlim _workingChangesRefreshGate = new(1, 1);
     private FolderProjectCommitEditSession? _commitEditSession;
+    private FolderProjectVersionControlProgress? _pendingProgressUpdate;
+    private bool _progressUpdateScheduled;
 
     [ObservableProperty] private string _projectRoot = "";
     [ObservableProperty] private string _projectName = "";
     [ObservableProperty] private bool _openWhenComplete;
     [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private bool _isStatusRefreshing;
+    [ObservableProperty] private bool _isCommitChangesLoading;
+    [ObservableProperty] private bool _hasRepositorySnapshot;
     [ObservableProperty] private string _busyMessage = "";
     [ObservableProperty] private string _statusMessage = "";
+    [ObservableProperty] private string _loadingProgressStatusText = "";
+    [ObservableProperty] private string _loadingProgressDetailText = "";
+    [ObservableProperty] private long _loadingProgressValue;
+    [ObservableProperty] private long _loadingProgressMaximum = 1;
+    [ObservableProperty]
+    private bool _loadingProgressIsIndeterminate = true;
     [ObservableProperty] private int _selectedTabIndex;
     [ObservableProperty] private bool _isInitialized;
     [ObservableProperty] private string _currentBranch = "";
@@ -450,6 +471,20 @@ public partial class FolderProjectVersionControlViewModel :
     [ObservableProperty]
     private IReadOnlyList<FolderProjectMergeConflictRow>
         _selectedMergeConflicts = [];
+
+    public bool IsLoadingOperation =>
+        IsBusy || IsStatusRefreshing || IsCommitChangesLoading;
+
+    public string LoadingOperationMessage =>
+        IsBusy
+            ? BusyMessage
+            : IsStatusRefreshing
+                ? _localization.Get(
+                    "FolderProject.VersionControl.Busy.Refreshing")
+                : IsCommitChangesLoading
+                    ? _localization.Get(
+                        "FolderProject.VersionControl.Busy.LoadingCommit")
+                    : "";
 
     public ObservableCollection<FolderProjectWorkingChangeRow>
         WorkingChanges
@@ -570,6 +605,10 @@ public partial class FolderProjectVersionControlViewModel :
         _unsavedChanges = unsavedChanges;
         _unsavedChangesPrompt = unsavedChangesPrompt;
         _localization = localization;
+        _synchronizationContext =
+            SynchronizationContext.Current is DispatcherSynchronizationContext
+                ? SynchronizationContext.Current
+                : null;
         _defaultIdentityName = _localization.Get(
             "FolderProject.VersionControl.DefaultIdentityName");
         _defaultIdentityEmail = _localization.Get(
@@ -581,14 +620,37 @@ public partial class FolderProjectVersionControlViewModel :
     public void OpenProject(
         string projectRoot,
         string projectName,
-        bool openWhenComplete)
+        bool openWhenComplete,
+        bool refresh = true)
     {
-        ProjectRoot = Path.TrimEndingDirectorySeparator(
+        var normalizedProjectRoot = Path.TrimEndingDirectorySeparator(
             Path.GetFullPath(projectRoot));
+        var projectChanged = !string.Equals(
+            ProjectRoot,
+            normalizedProjectRoot,
+            StringComparison.OrdinalIgnoreCase);
+        if (projectChanged)
+        {
+            _refreshing = true;
+            try
+            {
+                IsInitialized = false;
+                ClearRepositoryData();
+                HasRepositorySnapshot = false;
+                _hasHistorySnapshot = false;
+            }
+            finally
+            {
+                _refreshing = false;
+            }
+        }
+
+        ProjectRoot = normalizedProjectRoot;
         ProjectName = projectName;
         OpenWhenComplete = openWhenComplete;
         _mergeStateKnown = false;
-        RefreshCommand.Execute(null);
+        if (refresh)
+            RefreshCommand.Execute(null);
     }
 
     public void OpenRepositoryHistory()
@@ -602,6 +664,9 @@ public partial class FolderProjectVersionControlViewModel :
         {
             _suppressRepositoryTabHistoryLoad = false;
         }
+
+        if (_hasHistorySnapshot && HasRepositorySnapshot)
+            return;
 
         RefreshCommand.Execute(null);
     }
@@ -629,15 +694,36 @@ public partial class FolderProjectVersionControlViewModel :
     [RelayCommand(CanExecute = nameof(CanRefresh))]
     public async Task Refresh()
     {
-        await RunOperationAsync(
-            async () =>
-            {
-                await RefreshCoreAsync();
-                return _localization.Get(
-                    "FolderProject.VersionControl.Status.Refreshed");
-            },
-            "FolderProject.VersionControl.Busy.Refreshing",
-            RefreshMode.None);
+        if (IsBusy || IsStatusRefreshing)
+            return;
+
+        BeginLoadingProgress(_localization.Get(
+            "FolderProject.VersionControl.Busy.Refreshing"));
+        IsStatusRefreshing = true;
+        StatusMessage = _localization.Get(
+            "FolderProject.VersionControl.Busy.Refreshing");
+        try
+        {
+            await RefreshCoreAsync();
+            HasRepositorySnapshot = true;
+            StatusMessage = _localization.Get(
+                "FolderProject.VersionControl.Status.Refreshed");
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            ShowVersionControlError(exception.Code);
+        }
+        catch (Exception exception)
+        {
+            _logger.Error(
+                exception,
+                "Folder-project version-control refresh failed.");
+            ShowGenericError();
+        }
+        finally
+        {
+            IsStatusRefreshing = false;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanInitialize))]
@@ -656,7 +742,8 @@ public partial class FolderProjectVersionControlViewModel :
                     () => _versionControlService.Initialize(
                         ProjectRoot,
                         identity,
-                        PrimaryBranchName));
+                        PrimaryBranchName,
+                        ReportVersionControlProgress));
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Initialized");
             },
@@ -721,32 +808,70 @@ public partial class FolderProjectVersionControlViewModel :
     private async Task CommitCore(bool commitStaged)
     {
         var message = CommitMessage.Trim();
+        var selection = CurrentSelection();
+        var knownChanges = WorkingChanges
+            .Select(change => change.Source)
+            .ToList();
+        var knownPaths = knownChanges
+            .Where(
+                change =>
+                    !change.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Conflicted) &&
+                    !change.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Unreadable))
+            .SelectMany(
+                change => new[]
+                {
+                    change.RepositoryPath,
+                    change.PreviousRepositoryPath,
+                })
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         await RunOperationAsync(
             async () =>
             {
+                FolderProjectCommitSummary? commit = null;
                 await Task.Run(
                     () =>
                     {
                         if (commitStaged)
                         {
-                            _versionControlService.CommitStaged(
+                            commit = _versionControlService.CommitStaged(
+                                ProjectRoot,
+                                message);
+                        }
+                        else if (knownPaths.Count != 0)
+                        {
+                            _versionControlService.StageChanges(
+                                ProjectRoot,
+                                knownPaths);
+                            commit = _versionControlService.CommitStaged(
                                 ProjectRoot,
                                 message);
                         }
                         else
                         {
-                            _versionControlService.CommitAll(
+                            commit = _versionControlService.CommitAll(
                                 ProjectRoot,
                                 message);
                         }
                     });
+                ApplyCommittedSnapshot(
+                    commit!,
+                    knownChanges,
+                    commitStaged,
+                    selection);
                 _commitEditSession = null;
                 CommitMessage = "";
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Committed");
             },
-            "FolderProject.VersionControl.Busy.Committing");
+            "FolderProject.VersionControl.Busy.Committing",
+            RefreshMode.None,
+            failureRefreshMode: RefreshMode.Full);
     }
 
     [RelayCommand(CanExecute = nameof(CanStageSelected))]
@@ -861,6 +986,8 @@ public partial class FolderProjectVersionControlViewModel :
     private async Task Stage(IEnumerable<string> paths)
     {
         var selectedPaths = paths.Distinct().ToList();
+        var servicePaths = ExpandWorkingChangePaths(selectedPaths);
+        var selection = CurrentSelection();
         if (_unsavedChanges.HasUnsavedChanges(ProjectRoot, selectedPaths))
         {
             var choice = _unsavedChangesPrompt.Show(
@@ -882,27 +1009,35 @@ public partial class FolderProjectVersionControlViewModel :
                 await Task.Run(
                     () => _versionControlService.StageChanges(
                         ProjectRoot,
-                        selectedPaths));
+                        servicePaths));
+                ApplyStagingSnapshot(selectedPaths, stage: true, selection);
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Staged");
             },
-            "FolderProject.VersionControl.Busy.UpdatingStage");
+            "FolderProject.VersionControl.Busy.UpdatingStage",
+            RefreshMode.None,
+            failureRefreshMode: RefreshMode.Full);
     }
 
     private async Task Unstage(IEnumerable<string> paths)
     {
         var selectedPaths = paths.Distinct().ToList();
+        var servicePaths = ExpandWorkingChangePaths(selectedPaths);
+        var selection = CurrentSelection();
         await RunOperationAsync(
             async () =>
             {
                 await Task.Run(
                     () => _versionControlService.UnstageChanges(
                         ProjectRoot,
-                        selectedPaths));
+                        servicePaths));
+                ApplyStagingSnapshot(selectedPaths, stage: false, selection);
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Unstaged");
             },
-            "FolderProject.VersionControl.Busy.UpdatingStage");
+            "FolderProject.VersionControl.Busy.UpdatingStage",
+            RefreshMode.None,
+            failureRefreshMode: RefreshMode.Full);
     }
 
     private async Task Discard(
@@ -913,6 +1048,8 @@ public partial class FolderProjectVersionControlViewModel :
             return;
 
         var selectedPaths = paths.Distinct().ToList();
+        var servicePaths = ExpandWorkingChangePaths(selectedPaths);
+        var selection = CurrentSelection();
         await RunOperationAsync(
             async () =>
             {
@@ -921,13 +1058,24 @@ public partial class FolderProjectVersionControlViewModel :
                     {
                         _versionControlService.DiscardChanges(
                             ProjectRoot,
-                            selectedPaths);
+                            servicePaths);
                         return true;
                     });
+                var discardedPaths = selectedPaths.ToHashSet(
+                    StringComparer.OrdinalIgnoreCase);
+                ApplyWorkingChanges(
+                    WorkingChanges
+                        .Select(change => change.Source)
+                        .Where(change => !discardedPaths.Contains(
+                            change.RepositoryPath))
+                        .ToList(),
+                    selection);
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.Discarded");
             },
-            "FolderProject.VersionControl.Busy.Discarding");
+            "FolderProject.VersionControl.Busy.Discarding",
+            RefreshMode.None,
+            failureRefreshMode: RefreshMode.Full);
     }
 
     [RelayCommand(CanExecute = nameof(CanRestoreStash))]
@@ -981,10 +1129,24 @@ public partial class FolderProjectVersionControlViewModel :
                     () => _versionControlService.DeleteStash(
                         ProjectRoot,
                         index));
+                var remainingStashes = Stashes
+                    .Where(stash => stash.Index != index)
+                    .Select(
+                        stash => stash.Index > index
+                            ? stash with { Index = stash.Index - 1 }
+                            : stash)
+                    .OrderBy(stash => stash.Index)
+                    .ToList();
+                Replace(Stashes, remainingStashes);
+                SelectedStash = Stashes.FirstOrDefault(
+                    stash => stash.Index == index) ??
+                    Stashes.LastOrDefault();
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.StashDeleted");
             },
-            "FolderProject.VersionControl.Busy.UpdatingStashes");
+            "FolderProject.VersionControl.Busy.UpdatingStashes",
+            RefreshMode.None,
+            failureRefreshMode: RefreshMode.Full);
     }
 
     [RelayCommand(CanExecute = nameof(CanClearStashes))]
@@ -998,10 +1160,14 @@ public partial class FolderProjectVersionControlViewModel :
             {
                 await Task.Run(
                     () => _versionControlService.ClearStashes(ProjectRoot));
+                Stashes.Clear();
+                SelectedStash = null;
                 return _localization.Get(
                     "FolderProject.VersionControl.Status.StashesCleared");
             },
-            "FolderProject.VersionControl.Busy.UpdatingStashes");
+            "FolderProject.VersionControl.Busy.UpdatingStashes",
+            RefreshMode.None,
+            failureRefreshMode: RefreshMode.Full);
     }
 
     [RelayCommand(CanExecute = nameof(CanRestoreFile))]
@@ -1866,13 +2032,15 @@ public partial class FolderProjectVersionControlViewModel :
     private async Task<bool> RunOperationAsync(
         Func<Task<string?>> operation,
         string busyMessageKey,
-        RefreshMode refreshMode = RefreshMode.Full)
+        RefreshMode refreshMode = RefreshMode.Full,
+        RefreshMode? failureRefreshMode = null)
     {
         if (IsBusy)
             return false;
 
         var succeeded = false;
         BusyMessage = _localization.Get(busyMessageKey);
+        BeginLoadingProgress(BusyMessage);
         IsBusy = true;
         try
         {
@@ -1906,7 +2074,10 @@ public partial class FolderProjectVersionControlViewModel :
         }
         finally
         {
-            await RefreshAfterOperationAsync(refreshMode);
+            await RefreshAfterOperationAsync(
+                succeeded
+                    ? refreshMode
+                    : failureRefreshMode ?? refreshMode);
             BusyMessage = "";
             IsBusy = false;
             NotifyCommands();
@@ -1961,21 +2132,23 @@ public partial class FolderProjectVersionControlViewModel :
     private async Task RefreshCoreAsync()
     {
         var selection = CurrentSelection();
-        var includeCommitChanges = SelectedTabIndex == 1;
+        var includeHistory = SelectedTabIndex == 1 || _hasHistorySnapshot;
         var snapshot = await Task.Run(
             () => CaptureRefreshSnapshot(
                 selection.SelectedCommitId,
                 selection.SelectedHistoryBranchName,
-                includeCommitChanges));
+                includeHistory));
         ApplyRefreshSnapshot(snapshot, selection);
     }
 
     private FolderProjectRefreshSnapshot CaptureRefreshSnapshot(
         string? selectedCommitId,
         string? selectedHistoryBranchName,
-        bool includeCommitChanges)
+        bool includeHistory)
     {
-        var status = _versionControlService.GetStatus(ProjectRoot);
+        var status = _versionControlService.GetStatus(
+            ProjectRoot,
+            ReportVersionControlProgress);
         if (!status.IsInitialized)
         {
             return new FolderProjectRefreshSnapshot(
@@ -1986,10 +2159,14 @@ public partial class FolderProjectVersionControlViewModel :
                 [],
                 null,
                 null,
-                []);
+                [],
+                includeHistory);
         }
 
         FolderProjectGitIdentity? identity = null;
+        ReportVersionControlProgress(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ReadingIdentity,
+            ProjectRoot));
         try
         {
             identity = _versionControlService.GetIdentity(ProjectRoot);
@@ -1999,31 +2176,70 @@ public partial class FolderProjectVersionControlViewModel :
                   FolderProjectVersionControlError.IdentityMissing)
         {
         }
+        ReportCompletedProgress(
+            FolderProjectVersionControlProgressStage.ReadingIdentity,
+            ProjectRoot);
 
+        ReportVersionControlProgress(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ReadingBranches,
+            ProjectRoot));
         var branches = _versionControlService.GetBranches(ProjectRoot);
+        ReportCompletedProgress(
+            FolderProjectVersionControlProgressStage.ReadingBranches,
+            ProjectRoot);
+        ReportVersionControlProgress(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ReadingStashes,
+            ProjectRoot));
         var stashes = _versionControlService.GetStashes(ProjectRoot);
+        ReportCompletedProgress(
+            FolderProjectVersionControlProgressStage.ReadingStashes,
+            ProjectRoot);
         var historyBranchName =
             branches.Any(
                 branch => branch.Name == selectedHistoryBranchName)
                 ? selectedHistoryBranchName!
                 : status.CurrentBranch ??
                   branches.FirstOrDefault()?.Name;
-        var history = historyBranchName == null
-            ? []
-            : _versionControlService.GetHistory(
+        IReadOnlyList<FolderProjectCommitSummary> history = [];
+        if (includeHistory && historyBranchName != null)
+        {
+            ReportVersionControlProgress(
+                new FolderProjectVersionControlProgress(
+                    FolderProjectVersionControlProgressStage.ReadingHistory,
+                    historyBranchName));
+            history = _versionControlService.GetHistory(
                 ProjectRoot,
                 historyBranchName,
                 100);
+            ReportCompletedProgress(
+                FolderProjectVersionControlProgressStage.ReadingHistory,
+                historyBranchName);
+        }
         var selectedCommit =
             history.FirstOrDefault(
                 commit => commit.Id == selectedCommitId) ??
             history.FirstOrDefault();
-        var commitChanges =
-            !includeCommitChanges || selectedCommit == null
-            ? []
-            : _versionControlService.GetCommitChanges(
-                ProjectRoot,
-                selectedCommit.Id);
+        IReadOnlyList<FolderProjectCommitChange> commitChanges = [];
+        if (includeHistory && selectedCommit != null)
+        {
+            if (!TryGetCachedCommitChanges(
+                    selectedCommit.Id,
+                    out commitChanges))
+            {
+                commitChanges = _versionControlService.GetCommitChanges(
+                    ProjectRoot,
+                    selectedCommit.Id,
+                    ReportVersionControlProgress);
+                CacheCommitChanges(selectedCommit.Id, commitChanges);
+            }
+        }
+        ReportVersionControlProgress(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ReadingMergeState,
+            ProjectRoot));
+        var mergeState = _versionControlService.GetMergeState(ProjectRoot);
+        ReportCompletedProgress(
+            FolderProjectVersionControlProgressStage.ReadingMergeState,
+            ProjectRoot);
         return new FolderProjectRefreshSnapshot(
             status,
             identity,
@@ -2031,8 +2247,9 @@ public partial class FolderProjectVersionControlViewModel :
             branches,
             stashes,
             historyBranchName,
-            _versionControlService.GetMergeState(ProjectRoot),
-            commitChanges);
+            mergeState,
+            commitChanges,
+            includeHistory);
     }
 
     private void ApplyRefreshSnapshot(
@@ -2050,48 +2267,7 @@ public partial class FolderProjectVersionControlViewModel :
             IsDetached = status.IsDetached;
             OperationState = status.OperationState;
             IsClean = status.IsClean;
-            var workingRows = status.Changes
-                .Select(
-                    change => new FolderProjectWorkingChangeRow(
-                        change,
-                        _localization))
-                .ToList();
-            Replace(WorkingChanges, workingRows);
-            var unstagedRows = workingRows.Where(
-                    change => change.Source.Kind.HasFlag(
-                        FolderProjectWorkingChangeKind.Unstaged))
-                .ToList();
-            var stagedRows = workingRows.Where(
-                    change => change.Source.Kind.HasFlag(
-                        FolderProjectWorkingChangeKind.Staged))
-                .ToList();
-            Replace(UnstagedChanges, unstagedRows);
-            Replace(StagedChanges, stagedRows);
-            Replace(
-                UnstagedChangeTree,
-                FolderProjectWorkingChangeTreeNode.Build(
-                    ProjectRoot,
-                    unstagedRows));
-            Replace(
-                StagedChangeTree,
-                FolderProjectWorkingChangeTreeNode.Build(
-                    ProjectRoot,
-                    stagedRows,
-                    isStagedTree: true));
-            OnPropertyChanged(nameof(HasStagedChanges));
-            OnPropertyChanged(nameof(CommitActionText));
-            SelectedUnstagedChanges = [];
-            SelectedStagedChanges = [];
-            SelectedUnstagedChange = UnstagedChanges.FirstOrDefault(
-                change =>
-                    change.RepositoryPath ==
-                    selection.SelectedUnstagedChangePath) ??
-                UnstagedChanges.FirstOrDefault();
-            SelectedStagedChange = StagedChanges.FirstOrDefault(
-                change =>
-                    change.RepositoryPath ==
-                    selection.SelectedStagedChangePath) ??
-                StagedChanges.FirstOrDefault();
+            ApplyWorkingChanges(status.Changes, selection);
 
             if (!status.IsInitialized)
             {
@@ -2123,15 +2299,19 @@ public partial class FolderProjectVersionControlViewModel :
                 ? null
                 : Stashes.FirstOrDefault(
                     stash => stash.Index == selection.SelectedStashIndex);
-            Replace(History, snapshot.History);
-            SelectedCommit =
-                History.FirstOrDefault(
-                    commit =>
-                        commit.Id == selection.SelectedCommitId) ??
-                History.FirstOrDefault();
-            ApplyCommitChanges(
-                snapshot.CommitChanges,
-                selection.SelectedCommitChangePath);
+            if (snapshot.IncludesHistory)
+            {
+                _hasHistorySnapshot = true;
+                Replace(History, snapshot.History);
+                SelectedCommit =
+                    History.FirstOrDefault(
+                        commit =>
+                            commit.Id == selection.SelectedCommitId) ??
+                    History.FirstOrDefault();
+                ApplyCommitChanges(
+                    snapshot.CommitChanges,
+                    selection.SelectedCommitChangePath);
+            }
             ApplyMergeState(
                 snapshot.MergeState!,
                 selection.SelectedConflictId,
@@ -2152,8 +2332,14 @@ public partial class FolderProjectVersionControlViewModel :
         var selectedHistoryBranchName = SelectedHistoryBranch?.Name;
         var selectedMergeSourceName = SelectedMergeSource?.Name;
         var selectedMergeTargetName = SelectedMergeTarget?.Name;
+        ReportVersionControlProgress(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ReadingBranches,
+            ProjectRoot));
         var branches = await Task.Run(
             () => _versionControlService.GetBranches(ProjectRoot));
+        ReportCompletedProgress(
+            FolderProjectVersionControlProgressStage.ReadingBranches,
+            ProjectRoot);
         _refreshing = true;
         try
         {
@@ -2264,6 +2450,8 @@ public partial class FolderProjectVersionControlViewModel :
 
     private void ClearRepositoryData()
     {
+        lock (_commitChangesCacheGate)
+            _commitChangesCache.Clear();
         CurrentBranch = "";
         HeadCommitId = "";
         IsDetached = false;
@@ -2277,6 +2465,7 @@ public partial class FolderProjectVersionControlViewModel :
         StagedChangeTree.Clear();
         Stashes.Clear();
         History.Clear();
+        _hasHistorySnapshot = false;
         CommitChanges.Clear();
         CommitChangeTree.Clear();
         Branches.Clear();
@@ -2332,21 +2521,33 @@ public partial class FolderProjectVersionControlViewModel :
             ref _commitChangesRequestId);
         if (commit == null)
         {
+            IsCommitChangesLoading = false;
             ApplyCommitChanges([], null);
+            return;
+        }
+
+        if (TryGetCachedCommitChanges(commit.Id, out var cachedChanges))
+        {
+            IsCommitChangesLoading = false;
+            ApplyCommitChanges(
+                cachedChanges,
+                SelectedCommitChange?.RepositoryPath);
             return;
         }
 
         var selectedPath = SelectedCommitChange?.RepositoryPath;
         ApplyCommitChanges([], null);
-        BusyMessage = _localization.Get(
-            "FolderProject.VersionControl.Busy.LoadingCommit");
-        IsBusy = true;
+        BeginLoadingProgress(_localization.Get(
+            "FolderProject.VersionControl.Busy.LoadingCommit"));
+        IsCommitChangesLoading = true;
         try
         {
             var changes = await Task.Run(
                 () => _versionControlService.GetCommitChanges(
                     ProjectRoot,
-                    commit.Id));
+                    commit.Id,
+                    ReportVersionControlProgress));
+            CacheCommitChanges(commit.Id, changes);
             if (requestId == _commitChangesRequestId &&
                 SelectedCommit?.Id == commit.Id)
             {
@@ -2372,8 +2573,7 @@ public partial class FolderProjectVersionControlViewModel :
         {
             if (requestId == _commitChangesRequestId)
             {
-                BusyMessage = "";
-                IsBusy = false;
+                IsCommitChangesLoading = false;
                 NotifyCommands();
             }
         }
@@ -2392,14 +2592,22 @@ public partial class FolderProjectVersionControlViewModel :
 
         BusyMessage = _localization.Get(
             "FolderProject.VersionControl.Busy.LoadingHistory");
+        BeginLoadingProgress(BusyMessage);
         IsBusy = true;
         try
         {
+            ReportVersionControlProgress(
+                new FolderProjectVersionControlProgress(
+                    FolderProjectVersionControlProgressStage.ReadingHistory,
+                    branch.Name));
             var history = await Task.Run(
                 () => _versionControlService.GetHistory(
                     ProjectRoot,
                     branch.Name,
                     100));
+            ReportCompletedProgress(
+                FolderProjectVersionControlProgressStage.ReadingHistory,
+                branch.Name);
             if (requestId != _historyRequestId ||
                 SelectedHistoryBranch?.Name != branch.Name)
             {
@@ -2577,7 +2785,9 @@ public partial class FolderProjectVersionControlViewModel :
     }
 
     private bool CanRefresh() =>
-        !IsBusy && !string.IsNullOrWhiteSpace(ProjectRoot);
+        !IsBusy &&
+        !IsStatusRefreshing &&
+        !string.IsNullOrWhiteSpace(ProjectRoot);
 
     private bool CanInitialize() =>
         CanRefresh() &&
@@ -2879,10 +3089,298 @@ public partial class FolderProjectVersionControlViewModel :
     private bool CanUseRepository() =>
         IsInitialized &&
         !IsBusy &&
+        !IsStatusRefreshing &&
         MergePhase == FolderProjectMergePhase.None &&
         OperationState == FolderProjectRepositoryOperationState.None;
 
-    partial void OnIsBusyChanged(bool value) => NotifyCommands();
+    partial void OnIsBusyChanged(bool value)
+    {
+        if (value)
+            BeginLoadingProgress(BusyMessage);
+        NotifyLoadingOperationChanged();
+        NotifyCommands();
+    }
+
+    private void ApplyWorkingChanges(
+        IReadOnlyList<FolderProjectWorkingChange> changes,
+        FolderProjectSelection selection)
+    {
+        Interlocked.Increment(ref _workingChangesRevision);
+        var workingRows = changes
+            .Select(
+                change => new FolderProjectWorkingChangeRow(
+                    change,
+                    _localization))
+            .ToList();
+        Replace(WorkingChanges, workingRows);
+        var unstagedRows = workingRows.Where(
+                change => change.Source.Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Unstaged))
+            .ToList();
+        var stagedRows = workingRows.Where(
+                change => change.Source.Kind.HasFlag(
+                    FolderProjectWorkingChangeKind.Staged))
+            .ToList();
+        Replace(UnstagedChanges, unstagedRows);
+        Replace(StagedChanges, stagedRows);
+        Replace(
+            UnstagedChangeTree,
+            FolderProjectWorkingChangeTreeNode.Build(
+                ProjectRoot,
+                unstagedRows));
+        Replace(
+            StagedChangeTree,
+            FolderProjectWorkingChangeTreeNode.Build(
+                ProjectRoot,
+                stagedRows,
+                isStagedTree: true));
+        IsClean = workingRows.Count == 0;
+        OnPropertyChanged(nameof(HasStagedChanges));
+        OnPropertyChanged(nameof(CommitActionText));
+        SelectedUnstagedChanges = [];
+        SelectedStagedChanges = [];
+        SelectedUnstagedChange = UnstagedChanges.FirstOrDefault(
+            change =>
+                string.Equals(
+                    change.RepositoryPath,
+                    selection.SelectedUnstagedChangePath,
+                    StringComparison.OrdinalIgnoreCase)) ??
+            UnstagedChanges.FirstOrDefault();
+        SelectedStagedChange = StagedChanges.FirstOrDefault(
+            change =>
+                string.Equals(
+                    change.RepositoryPath,
+                    selection.SelectedStagedChangePath,
+                    StringComparison.OrdinalIgnoreCase)) ??
+            StagedChanges.FirstOrDefault();
+    }
+
+    private void ApplyStagingSnapshot(
+        IReadOnlyCollection<string> paths,
+        bool stage,
+        FolderProjectSelection selection)
+    {
+        var selectedPaths = paths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var changes = WorkingChanges
+            .Select(change => change.Source)
+            .Select(
+                change => selectedPaths.Contains(change.RepositoryPath)
+                    ? change with
+                    {
+                        Kind = stage
+                            ? (change.Kind |
+                               FolderProjectWorkingChangeKind.Staged) &
+                              ~FolderProjectWorkingChangeKind.Unstaged
+                            : (change.Kind |
+                               FolderProjectWorkingChangeKind.Unstaged) &
+                              ~FolderProjectWorkingChangeKind.Staged,
+                    }
+                    : change)
+            .ToList();
+        ApplyWorkingChanges(changes, selection);
+    }
+
+    private IReadOnlyList<string> ExpandWorkingChangePaths(
+        IReadOnlyCollection<string> repositoryPaths)
+    {
+        var selectedPaths = repositoryPaths.ToHashSet(
+            StringComparer.OrdinalIgnoreCase);
+        return repositoryPaths
+            .Concat(
+                WorkingChanges
+                    .Select(change => change.Source)
+                    .Where(change => selectedPaths.Contains(
+                        change.RepositoryPath))
+                    .Select(change => change.PreviousRepositoryPath)
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(path => path!))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void ApplyCommittedSnapshot(
+        FolderProjectCommitSummary commit,
+        IReadOnlyList<FolderProjectWorkingChange> previousChanges,
+        bool commitStaged,
+        FolderProjectSelection selection)
+    {
+        var wasRefreshing = _refreshing;
+        _refreshing = true;
+        try
+        {
+            var remainingChanges = commitStaged
+                ? previousChanges
+                    .Where(change => change.Kind.HasFlag(
+                        FolderProjectWorkingChangeKind.Unstaged))
+                    .Select(
+                        change => change with
+                        {
+                            Kind = change.Kind &
+                                   ~FolderProjectWorkingChangeKind.Staged,
+                        })
+                    .ToList()
+                : [];
+            ApplyWorkingChanges(remainingChanges, selection);
+            HeadCommitId = commit.Id;
+            var currentBranch = Branches.FirstOrDefault(
+                branch => branch.IsCurrent);
+            if (currentBranch != null)
+            {
+                var updatedBranches = Branches
+                    .Select(
+                        branch => branch.IsCurrent
+                            ? branch with { TipCommitId = commit.Id }
+                            : branch)
+                    .ToList();
+                ApplyBranches(
+                    updatedBranches,
+                    SelectedBranch?.Name,
+                    SelectedMergeSource?.Name,
+                    SelectedMergeTarget?.Name,
+                    SelectedHistoryBranch?.Name);
+            }
+
+            var updatedHistory = History
+                .Where(item => item.Id != commit.Id)
+                .Prepend(commit)
+                .ToList();
+            Replace(History, updatedHistory);
+            SelectedCommit = commit;
+            ApplyCommitChanges([], null);
+        }
+        finally
+        {
+            _refreshing = wasRefreshing;
+        }
+    }
+
+    private bool TryGetCachedCommitChanges(
+        string commitId,
+        out IReadOnlyList<FolderProjectCommitChange> changes)
+    {
+        lock (_commitChangesCacheGate)
+            return _commitChangesCache.TryGetValue(commitId, out changes!);
+    }
+
+    private void CacheCommitChanges(
+        string commitId,
+        IReadOnlyList<FolderProjectCommitChange> changes)
+    {
+        lock (_commitChangesCacheGate)
+            _commitChangesCache[commitId] = changes;
+    }
+
+    public async Task RefreshWorkingChanges(
+        IReadOnlyCollection<string> repositoryPaths)
+    {
+        if (repositoryPaths.Count == 0 ||
+            !HasRepositorySnapshot ||
+            IsBusy ||
+            IsStatusRefreshing)
+        {
+            return;
+        }
+
+        var normalizedPaths = repositoryPaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Replace('\\', '/').TrimStart('/'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (normalizedPaths.Count == 0)
+            return;
+
+        var projectRoot = ProjectRoot;
+        var fallbackToFullRefresh = false;
+        await _workingChangesRefreshGate.WaitAsync();
+        try
+        {
+            if (!HasRepositorySnapshot ||
+                IsBusy ||
+                IsStatusRefreshing)
+            {
+                return;
+            }
+
+            var selection = CurrentSelection();
+            var workingChangesRevision = Volatile.Read(
+                ref _workingChangesRevision);
+            var status = await Task.Run(
+                () => _versionControlService.GetStatus(
+                    projectRoot,
+                    normalizedPaths));
+            if (!string.Equals(
+                    projectRoot,
+                    ProjectRoot,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            if (workingChangesRevision != Volatile.Read(
+                    ref _workingChangesRevision))
+            {
+                return;
+            }
+
+            var refreshedPaths = normalizedPaths.ToHashSet(
+                StringComparer.OrdinalIgnoreCase);
+            var mergedChanges = WorkingChanges
+                .Select(change => change.Source)
+                .Where(change => !refreshedPaths.Contains(
+                    change.RepositoryPath))
+                .Concat(status.Changes)
+                .GroupBy(
+                    change => change.RepositoryPath,
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.Last())
+                .OrderBy(
+                    change => change.RepositoryPath,
+                    StringComparer.Ordinal)
+                .ToList();
+            ApplyWorkingChanges(mergedChanges, selection);
+        }
+        catch (Exception exception)
+        {
+            if (string.Equals(
+                    projectRoot,
+                    ProjectRoot,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                HasRepositorySnapshot = false;
+                fallbackToFullRefresh = true;
+            }
+            _logger.Error(
+                exception,
+                "Folder-project incremental status refresh failed.");
+        }
+        finally
+        {
+            _workingChangesRefreshGate.Release();
+        }
+
+        if (fallbackToFullRefresh)
+            await Refresh();
+    }
+    partial void OnIsStatusRefreshingChanged(bool value)
+    {
+        if (value)
+        {
+            BeginLoadingProgress(_localization.Get(
+                "FolderProject.VersionControl.Busy.Refreshing"));
+        }
+        NotifyLoadingOperationChanged();
+        NotifyCommands();
+    }
+    partial void OnIsCommitChangesLoadingChanged(bool value)
+    {
+        if (value)
+        {
+            BeginLoadingProgress(_localization.Get(
+                "FolderProject.VersionControl.Busy.LoadingCommit"));
+        }
+        NotifyLoadingOperationChanged();
+    }
+    partial void OnBusyMessageChanged(string value) =>
+        OnPropertyChanged(nameof(LoadingOperationMessage));
     partial void OnIsInitializedChanged(bool value) => NotifyCommands();
     partial void OnIsCleanChanged(bool value)
     {
@@ -2966,6 +3464,110 @@ public partial class FolderProjectVersionControlViewModel :
     partial void OnSelectedStagedChangesChanged(
         IReadOnlyList<FolderProjectWorkingChangeRow> value) =>
         NotifyCommands();
+
+    private void BeginLoadingProgress(string status)
+    {
+        lock (_progressUpdateGate)
+            _pendingProgressUpdate = null;
+
+        LoadingProgressStatusText = status;
+        LoadingProgressDetailText = "";
+        LoadingProgressValue = 0;
+        LoadingProgressMaximum = 1;
+        LoadingProgressIsIndeterminate = true;
+    }
+
+    private void ReportCompletedProgress(
+        FolderProjectVersionControlProgressStage stage,
+        string? detail)
+    {
+        ReportVersionControlProgress(
+            new FolderProjectVersionControlProgress(
+                stage,
+                detail,
+                1,
+                1));
+    }
+
+    private void ReportVersionControlProgress(
+        FolderProjectVersionControlProgress progress)
+    {
+        if (_synchronizationContext == null ||
+            ReferenceEquals(
+                SynchronizationContext.Current,
+                _synchronizationContext))
+        {
+            ApplyVersionControlProgress(progress);
+            return;
+        }
+
+        lock (_progressUpdateGate)
+        {
+            _pendingProgressUpdate = progress;
+            if (_progressUpdateScheduled)
+                return;
+
+            _progressUpdateScheduled = true;
+        }
+
+        _synchronizationContext.Post(
+            _ => FlushVersionControlProgress(),
+            null);
+    }
+
+    private void FlushVersionControlProgress()
+    {
+        FolderProjectVersionControlProgress? progress;
+        lock (_progressUpdateGate)
+        {
+            progress = _pendingProgressUpdate;
+            _pendingProgressUpdate = null;
+            _progressUpdateScheduled = false;
+        }
+
+        if (progress != null)
+            ApplyVersionControlProgress(progress);
+    }
+
+    private void ApplyVersionControlProgress(
+        FolderProjectVersionControlProgress progress)
+    {
+        LoadingProgressStatusText = _localization.Get(
+            $"FolderProject.VersionControl.Progress.{progress.Stage}");
+        LoadingProgressDetailText = GetProgressDetail(progress);
+        LoadingProgressIsIndeterminate = progress.Total <= 0;
+        LoadingProgressMaximum = Math.Max(1, progress.Total);
+        LoadingProgressValue = Math.Clamp(
+            progress.Completed,
+            0,
+            LoadingProgressMaximum);
+    }
+
+    private string GetProgressDetail(
+        FolderProjectVersionControlProgress progress)
+    {
+        if (progress.Stage !=
+                FolderProjectVersionControlProgressStage
+                    .ReadingCommitChanges ||
+            string.IsNullOrEmpty(progress.Detail))
+        {
+            return progress.Detail ?? "";
+        }
+
+        var shortCommitId = progress.Detail.Length > 7
+            ? progress.Detail[..7]
+            : progress.Detail;
+        return _localization.GetFormat(
+            "FolderProject.VersionControl.Progress." +
+            "ReadingCommitChangesDetail",
+            shortCommitId);
+    }
+
+    private void NotifyLoadingOperationChanged()
+    {
+        OnPropertyChanged(nameof(IsLoadingOperation));
+        OnPropertyChanged(nameof(LoadingOperationMessage));
+    }
     partial void OnSelectedHistoryBranchChanged(
         FolderProjectBranchInfo? value)
     {
@@ -3091,5 +3693,6 @@ public partial class FolderProjectVersionControlViewModel :
         IReadOnlyList<FolderProjectStashInfo> Stashes,
         string? HistoryBranchName,
         FolderProjectMergeState? MergeState,
-        IReadOnlyList<FolderProjectCommitChange> CommitChanges);
+        IReadOnlyList<FolderProjectCommitChange> CommitChanges,
+        bool IncludesHistory);
 }
