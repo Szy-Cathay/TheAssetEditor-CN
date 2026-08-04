@@ -1,6 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
 using Shared.Core.Services;
 
+using System.Windows;
+using FontFamily = System.Windows.Media.FontFamily;
+
 namespace Shared.Core.Settings
 {
     public enum BackgroundColour
@@ -56,6 +59,9 @@ namespace Shared.Core.Settings
 
     public static class FontSettingsHelper
     {
+        private static readonly Uri FontResourceBaseUri = new(
+            "pack://application:,,,/AssetEditor.CN;component/");
+
         public static string[] GetAvailableWeights(AppFontFamily font) => font switch
         {
             AppFontFamily.Default => [],
@@ -71,22 +77,27 @@ namespace Shared.Core.Settings
             _ => "Regular"
         };
 
-        /// <summary>
-        /// Returns the WPF pack URI for the given font+weight, or null for system default.
-        /// </summary>
-        public static string? GetFontFamilyUri(AppFontFamily font, string? weight) => (font, weight) switch
+        public static FontFamily? GetFontFamily(AppFontFamily font) => font switch
         {
-            (AppFontFamily.Default, _) => null,
-            (AppFontFamily.AlibabaPuHuiTi, "Regular") => "pack://application:,,,/Fonts/#阿里巴巴普惠体 3.0 55 Regular",
-            (AppFontFamily.AlibabaPuHuiTi, "Medium") => "pack://application:,,,/Fonts/#阿里巴巴普惠体 3.0 65 Medium",
-            (AppFontFamily.AlibabaPuHuiTi, "ExtraBold") => "pack://application:,,,/Fonts/#阿里巴巴普惠体 3.0 95 ExtraBold",
-            (AppFontFamily.HarmonyOS, "Thin") => "pack://application:,,,/Fonts/HarmonyOS_Sans_SC_Thin.ttf#HarmonyOS Sans SC Thin",
-            (AppFontFamily.HarmonyOS, "Light") => "pack://application:,,,/Fonts/HarmonyOS_Sans_SC_Light.ttf#HarmonyOS Sans SC Light",
-            (AppFontFamily.HarmonyOS, "Regular") => "pack://application:,,,/Fonts/HarmonyOS_Sans_SC_Regular.ttf#HarmonyOS Sans SC",
-            (AppFontFamily.HarmonyOS, "Medium") => "pack://application:,,,/Fonts/HarmonyOS_Sans_SC_Medium.ttf#HarmonyOS Sans SC Medium",
-            (AppFontFamily.HarmonyOS, "Bold") => "pack://application:,,,/Fonts/HarmonyOS_Sans_SC_Bold.ttf#HarmonyOS Sans SC",
-            (AppFontFamily.HarmonyOS, "Black") => "pack://application:,,,/Fonts/HarmonyOS_Sans_SC_Black.ttf#HarmonyOS Sans SC Black",
+            AppFontFamily.Default => null,
+            AppFontFamily.AlibabaPuHuiTi => new FontFamily(
+                FontResourceBaseUri,
+                "./Fonts/#Alibaba PuHuiTi 3.0"),
+            AppFontFamily.HarmonyOS => new FontFamily(
+                FontResourceBaseUri,
+                "./Fonts/#HarmonyOS Sans SC"),
             _ => null
+        };
+
+        public static FontWeight GetFontWeight(string? weight) => weight switch
+        {
+            "Thin" => FontWeight.FromOpenTypeWeight(250),
+            "Light" => FontWeights.Light,
+            "Medium" => FontWeights.Medium,
+            "Bold" => FontWeights.Bold,
+            "ExtraBold" => FontWeights.ExtraBold,
+            "Black" => FontWeights.Black,
+            _ => FontWeights.Normal,
         };
 
         public static string GetFontDisplayName(AppFontFamily font)

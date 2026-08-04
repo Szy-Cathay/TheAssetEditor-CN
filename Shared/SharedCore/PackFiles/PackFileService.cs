@@ -748,14 +748,12 @@ namespace Shared.Core.PackFiles
 
         public bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation)
         {
+            if (pf is FolderProjectContainer)
+                return false;
+
             lock (s_saveGate)
             {
-                var currentPath =
-                    pf is FolderProjectContainer folderProject
-                        ? folderProject.ExecuteSynchronized(
-                            () => folderProject.ProjectSettings
-                                .OutputPackPath)
-                        : pf.SystemFilePath;
+                var currentPath = pf.SystemFilePath;
                 if (!ReferenceEquals(_packFileContainerSelectedForEdit, pf) ||
                     !string.Equals(
                         currentPath,
@@ -765,16 +763,11 @@ namespace Shared.Core.PackFiles
                     return false;
                 }
 
-                if (pf is FolderProjectContainer project)
-                {
-                    SaveFolderProjectContainerCore(
-                        project,
-                        expectedPath,
-                        false,
-                        gameInformation);
-                }
-                else
-                    SavePackContainerCore(pf, expectedPath, false, gameInformation);
+                SavePackContainerCore(
+                    pf,
+                    expectedPath,
+                    false,
+                    gameInformation);
             }
 
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
@@ -868,7 +861,8 @@ namespace Shared.Core.PackFiles
                         path,
                         createBackup,
                         gameInformation,
-                        snapshot.EnableCorruptionDetection);
+                        snapshot.EnableCorruptionDetection,
+                        false);
 
                     project.ExecuteSynchronized(
                         () =>
@@ -886,7 +880,8 @@ namespace Shared.Core.PackFiles
             string path,
             bool createBackup,
             GameInformation gameInformation,
-            bool enableCorruptionDetection = false)
+            bool enableCorruptionDetection = false,
+            bool createRotatingBackup = true)
         {
             var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
             try
@@ -937,7 +932,9 @@ namespace Shared.Core.PackFiles
                     parent.CloseStream();
 
                 // Auto-backup the original file before overwriting (only for non-CA packs with existing file)
-                if (!pf.IsCaPackFile && File.Exists(path))
+                if (createRotatingBackup &&
+                    !pf.IsCaPackFile &&
+                    File.Exists(path))
                 {
                     try
                     {

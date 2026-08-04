@@ -1350,6 +1350,45 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
+    public void SavePackContainer_FolderProjectDoesNotCreateBackup()
+    {
+        using var project = new TemporaryDirectory();
+        using var output = new TemporaryDirectory();
+        project.Write("keep.bin", [1, 2, 3]);
+        var outputPath = System.IO.Path.Combine(
+            output.Path,
+            "generated.pack");
+        File.WriteAllBytes(outputPath, [9, 9, 9]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings
+            {
+                Name = "工程",
+                OutputPackPath = outputPath,
+            });
+        var service = CreateService();
+        service.AddContainer(container, true);
+
+        service.SavePackContainer(
+            container,
+            outputPath,
+            false,
+            GameInformationDatabase.GetGameById(
+                GameTypeEnum.Warhammer3));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(outputPath), Is.True);
+            Assert.That(
+                Directory.Exists(
+                    System.IO.Path.Combine(
+                        output.Path,
+                        "AssetEditor-BackUp")),
+                Is.False);
+        });
+    }
+
+    [Test]
     public void SavePackContainer_CorruptionDetectionEnabled_WritesFreshValidationFiles()
     {
         using var project = new TemporaryDirectory();
@@ -1679,7 +1718,7 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
-    public void TryAutoSavePackContainer_UsesConfiguredOutputPath()
+    public void TryAutoSavePackContainer_FolderProjectIsRejected()
     {
         using var project = new TemporaryDirectory();
         project.Write("keep.bin", [4, 5, 6]);
@@ -1697,7 +1736,7 @@ public class FolderProjectPackFileServiceTests
         var service = CreateService();
         service.AddContainer(container, true);
 
-        try
+        Assert.Multiple(() =>
         {
             Assert.That(
                 service.TryAutoSavePackContainer(
@@ -1705,14 +1744,10 @@ public class FolderProjectPackFileServiceTests
                     outputPath,
                     GameInformationDatabase.GetGameById(
                         GameTypeEnum.Rome2)),
-                Is.True);
-            Assert.That(File.Exists(outputPath), Is.True);
+                Is.False);
+            Assert.That(File.Exists(outputPath), Is.False);
             Assert.That(container.SystemFilePath, Is.EqualTo(project.Path));
-        }
-        finally
-        {
-            File.Delete(outputPath);
-        }
+        });
     }
 
     [Test]

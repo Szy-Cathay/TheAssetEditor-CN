@@ -191,6 +191,8 @@ public class SettingsViewModelTests
             {
                 var originalFont = (FontFamily)Application.Current
                     .FindResource("AppFontFamily");
+                var originalWeight = (FontWeight)Application.Current
+                    .FindResource("AppFontWeight");
                 var viewModel = new SettingsViewModel(
                     settings,
                     new ApplicationSettingsApplier(
@@ -200,19 +202,195 @@ public class SettingsViewModelTests
                     Mock.Of<IStandardDialogs>());
 
                 viewModel.SelectedFont = AppFontFamily.HarmonyOS;
+                viewModel.SelectedFontWeight = "Bold";
                 var previewFont = (FontFamily)Application.Current
                     .FindResource("AppFontFamily");
-                NUnitAssert.That(
-                    previewFont.Source,
-                    Is.Not.EqualTo(originalFont.Source));
+                var previewWeight = (FontWeight)Application.Current
+                    .FindResource("AppFontWeight");
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        previewFont.Source,
+                        Does.Contain("HarmonyOS Sans SC"));
+                    NUnitAssert.That(
+                        previewFont.Source,
+                        Does.Not.Contain(".ttf"));
+                    NUnitAssert.That(
+                        previewWeight,
+                        Is.EqualTo(FontWeights.Bold));
+                });
 
                 viewModel.Cancel();
 
                 var restoredFont = (FontFamily)Application.Current
                     .FindResource("AppFontFamily");
+                var restoredWeight = (FontWeight)Application.Current
+                    .FindResource("AppFontWeight");
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        restoredFont.Source,
+                        Is.EqualTo(originalFont.Source));
+                    NUnitAssert.That(
+                        restoredWeight,
+                        Is.EqualTo(originalWeight));
+                });
+            });
+        autoSave.Stop();
+    }
+
+    [Test]
+    public void EmbeddedFontFamiliesAndWeights_ResolveToRealTypefaces()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            serviceProvider: Mock.Of<IServiceProvider>(),
+            () =>
+            {
+                var defaultFamily = (FontFamily)Application.Current
+                    .FindResource("AppFontFamily");
+                var defaultTypeface = new Typeface(
+                    defaultFamily,
+                    FontStyles.Normal,
+                    FontWeights.Normal,
+                    FontStretches.Normal);
                 NUnitAssert.That(
-                    restoredFont.Source,
-                    Is.EqualTo(originalFont.Source));
+                    defaultTypeface.TryGetGlyphTypeface(out _),
+                    Is.True,
+                    "The default embedded application font did not resolve.");
+
+                foreach (var font in new[]
+                         {
+                             AppFontFamily.AlibabaPuHuiTi,
+                             AppFontFamily.HarmonyOS,
+                         })
+                {
+                    var family = FontSettingsHelper.GetFontFamily(font)!;
+                    foreach (var weightName in
+                             FontSettingsHelper.GetAvailableWeights(font))
+                    {
+                        var expectedWeight =
+                            FontSettingsHelper.GetFontWeight(weightName);
+                        var typeface = new Typeface(
+                            family,
+                            FontStyles.Normal,
+                            expectedWeight,
+                            FontStretches.Normal);
+
+                        NUnitAssert.That(
+                            typeface.TryGetGlyphTypeface(
+                                out var glyphTypeface),
+                            Is.True,
+                            $"{font} {weightName} did not resolve.");
+                        NUnitAssert.That(
+                            glyphTypeface.Weight,
+                            Is.EqualTo(expectedWeight),
+                            $"{font} {weightName} resolved to the wrong weight.");
+                    }
+                }
+            });
+    }
+
+    [Test]
+    public void GlobalWindowStyle_AppliesSelectedFontAndWeight()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            serviceProvider: Mock.Of<IServiceProvider>(),
+            () =>
+            {
+                var originalFont = ThemesController.CurrentFontFamily;
+                var originalWeight = ThemesController.CurrentFontWeight;
+                ThemesController.ApplyCustomFont(
+                    FontSettingsHelper.GetFontFamily(
+                        AppFontFamily.HarmonyOS),
+                    FontWeights.Bold);
+
+                try
+                {
+                    var plainWindow = new Window();
+                    plainWindow.BeginInit();
+                    plainWindow.EndInit();
+                    var customWindow = new Window
+                    {
+                        Style = (Style)Application.Current.FindResource(
+                            "CustomWindowStyle"),
+                    };
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            plainWindow.FontFamily.Source,
+                            Does.Contain("HarmonyOS Sans SC"));
+                        NUnitAssert.That(
+                            plainWindow.FontWeight,
+                            Is.EqualTo(FontWeights.Bold));
+                        NUnitAssert.That(
+                            customWindow.FontFamily.Source,
+                            Does.Contain("HarmonyOS Sans SC"));
+                        NUnitAssert.That(
+                            customWindow.FontWeight,
+                            Is.EqualTo(FontWeights.Bold));
+                    });
+                }
+                finally
+                {
+                    ThemesController.ApplyCustomFont(
+                        originalFont,
+                        originalWeight);
+                }
+            });
+    }
+
+    [Test]
+    public void ColourPickers_PreviewExactBackgroundAndGridColours()
+    {
+        var settings = new ApplicationSettingsService();
+        var eventHub = new TestEventHub();
+        var previews = new List<ViewportRenderSettings>();
+        eventHub.Register<ViewportRenderSettingsChangedEvent>(
+            this,
+            value => previews.Add(value.Settings));
+        var autoSave = new PackAutoSaveService(
+            Mock.Of<IPackFileService>(),
+            settings);
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            serviceProvider: Mock.Of<IServiceProvider>(),
+            () =>
+            {
+                var viewModel = new SettingsViewModel(
+                    settings,
+                    new ApplicationSettingsApplier(
+                        settings,
+                        autoSave,
+                        eventHub),
+                    Mock.Of<IStandardDialogs>());
+
+                NUnitAssert.That(
+                    viewModel.IsCustomBackgroundVisible,
+                    Is.False);
+                viewModel.CurrentRenderEngineBackgroundColour =
+                    BackgroundColour.Custom;
+                NUnitAssert.That(
+                    viewModel.IsCustomBackgroundVisible,
+                    Is.True);
+                viewModel.CustomBackgroundColourPicker.PickedColor =
+                    Color.FromRgb(40, 50, 60);
+                viewModel.CustomBackgroundColourPicker
+                    .OnHandleColourChanged();
+                viewModel.ViewportGridColourPicker.PickedColor =
+                    Color.FromRgb(70, 80, 90);
+                viewModel.ViewportGridColourPicker
+                    .OnHandleColourChanged();
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        previews.Last().CustomBackgroundColour,
+                        Is.EqualTo("40,50,60"));
+                    NUnitAssert.That(
+                        previews.Last().GridColour,
+                        Is.EqualTo("70,80,90"));
+                });
             });
         autoSave.Stop();
     }

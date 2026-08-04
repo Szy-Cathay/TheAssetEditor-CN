@@ -203,6 +203,37 @@ namespace Test.Shared.Core.PackFiles
         }
 
         [Test]
+        public void SavePackContainer_RegularPackStillCreatesRotatingBackup()
+        {
+            var packPath = Path.Combine(
+                _tempDirectory,
+                "regular.pack");
+            var service = CreatePackFileService();
+            var pack = CreatePackContainer([1, 2, 3, 4]);
+            var gameInfo = GameInformationDatabase.GetGameById(
+                GameTypeEnum.Rome2);
+            service.SavePackContainer(
+                pack,
+                packPath,
+                false,
+                gameInfo);
+            pack.FileList["data\\entry.bin"].DataSource =
+                new MemorySource([4, 3, 2, 1]);
+
+            service.SavePackContainer(
+                pack,
+                packPath,
+                false,
+                gameInfo);
+
+            Assert.That(
+                Directory.GetFiles(
+                    Path.Combine(_tempDirectory, "backups"),
+                    "regular_*_backup.pack"),
+                Has.Length.EqualTo(1));
+        }
+
+        [Test]
         public void SavePackContainer_WhenFinalReplacementFails_PreservesPackModelState()
         {
             var originalPath = Path.Combine(_tempDirectory, "original.pack");

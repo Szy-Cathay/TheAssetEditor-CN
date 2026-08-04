@@ -5526,7 +5526,13 @@
         </ControlTemplate.Triggers>
     </ControlTemplate>
     
-    <Style x:Key="CustomWindowStyle" TargetType="{x:Type Window}">
+    <Style TargetType="{x:Type Window}">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource AppFontWeight}"/>
+    </Style>
+
+    <Style x:Key="CustomWindowStyle" TargetType="{x:Type Window}"
+           BasedOn="{StaticResource {x:Type Window}}">
         <Setter Property="Icon" Value="pack://application:,,,/AssetEditor.CN;component/AssetEditor.CN.ico"/>
         <Setter Property="Background" Value="{DynamicResource Window.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Window.Static.Border}"/>

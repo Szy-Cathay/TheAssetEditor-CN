@@ -6,6 +6,7 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:local="clr-namespace:AssetEditor.Views.Settings"
              xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
+             xmlns:colourpicker="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui"
              d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
              mc:Ignorable="d">
     <UserControl.Resources>
@@ -17,290 +18,431 @@
         <DataTemplate x:Key="FontWeightTemplate">
             <TextBlock Text="{Binding Converter={StaticResource FontWeightNameConverter}}"/>
         </DataTemplate>
+
+        <Style x:Key="PageTitleStyle" TargetType="{x:Type TextBlock}"
+               BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,18"/>
+        </Style>
         <Style x:Key="SectionTitleStyle" TargetType="{x:Type TextBlock}"
                BasedOn="{StaticResource {x:Type TextBlock}}">
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="5,16,0,0"/>
+            <Setter Property="Margin" Value="0,18,0,10"/>
         </Style>
         <Style x:Key="SettingsLabelStyle" TargetType="{x:Type TextBlock}"
                BasedOn="{StaticResource {x:Type TextBlock}}">
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="5,2,14,7"/>
+            <Setter Property="Margin" Value="0,2,18,10"/>
         </Style>
         <Style x:Key="ComboBoxFieldStyle" TargetType="{x:Type ComboBox}"
                BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Margin" Value="0,0,0,7"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="MinWidth" Value="220"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="CheckBoxFieldStyle" TargetType="{x:Type CheckBox}"
                BasedOn="{StaticResource {x:Type CheckBox}}">
-            <Setter Property="Margin" Value="0,0,0,7"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="TextBoxFieldStyle" TargetType="{x:Type TextBox}"
                BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Margin" Value="0,0,0,7"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SettingsNavigationItemStyle" TargetType="{x:Type TabItem}"
+               BasedOn="{StaticResource {x:Type TabItem}}">
+            <Setter Property="Width" Value="150"/>
+            <Setter Property="MinHeight" Value="42"/>
+            <Setter Property="Padding" Value="16,9"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
     </UserControl.Resources>
 
-    <StackPanel Margin="12,0,14,18" Grid.IsSharedSizeScope="True">
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230"/>
-                <ColumnDefinition Width="300"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+    <TabControl x:Name="SettingsCategories"
+                TabStripPlacement="Left"
+                SelectedIndex="0"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch">
+        <TabItem Header="{loc:Loc SettingsWindow.General}"
+                 Style="{StaticResource SettingsNavigationItemStyle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                    <TextBlock Text="{loc:Loc SettingsWindow.General}"
+                               Style="{StaticResource PageTitleStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="{loc:Loc SettingsWindow.SelectedGame}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.Restart}"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                  Style="{StaticResource ComboBoxFieldStyle}"
+                                  HorizontalAlignment="Left"
+                                  SelectedItem="{Binding CurrentGame, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding Games}"
+                                  ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+                        <TextBlock Grid.Row="1"
+                                   Text="{loc:Loc SettingsWindow.StartMaximised}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.NextStart}"/>
+                        <CheckBox Grid.Row="1" Grid.Column="1"
+                                  IsChecked="{Binding StartMaximised}"
+                                  Style="{StaticResource CheckBoxFieldStyle}"/>
+                    </Grid>
 
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                       Text="{loc:Loc SettingsWindow.Appearance}"
-                       Style="{StaticResource SectionTitleStyle}"/>
-            <Separator Grid.Row="1" Grid.ColumnSpan="2" Height="1" Margin="5,5,0,10"/>
+                    <TextBlock Text="{loc:Loc SettingsWindow.GameFiles}"
+                               Style="{StaticResource SectionTitleStyle}"/>
+                    <ItemsControl ItemsSource="{Binding GameDirectores}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,10"
+                                      ToolTip="{loc:Loc SettingsWindow.Timing.GamePath}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding GameName}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <TextBox Grid.Column="1"
+                                             Text="{Binding Path}"
+                                             IsReadOnly="True"
+                                             Padding="3,0"/>
+                                    <Button Grid.Column="2"
+                                            Content="{loc:Loc SettingsWindow.Browse}"
+                                            Command="{Binding BrowseCommand}"
+                                            MinWidth="72"
+                                            Margin="8,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
 
-            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.Theme}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ComboBoxFieldStyle}"
-                      SelectedItem="{Binding CurrentTheme, UpdateSourceTrigger=PropertyChanged}"
-                      ItemsSource="{Binding AvailableThemes}"
-                      ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+        <TabItem Header="{loc:Loc SettingsWindow.ThemeCategory}"
+                 Style="{StaticResource SettingsNavigationItemStyle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                    <TextBlock Text="{loc:Loc SettingsWindow.ThemeCategory}"
+                               Style="{StaticResource PageTitleStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="{loc:Loc SettingsWindow.Theme}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                  Style="{StaticResource ComboBoxFieldStyle}"
+                                  HorizontalAlignment="Left"
+                                  SelectedItem="{Binding CurrentTheme, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding AvailableThemes}"
+                                  ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+                        <TextBlock Grid.Row="1"
+                                   Text="{loc:Loc SettingsWindow.Font}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1"
+                                  Style="{StaticResource ComboBoxFieldStyle}"
+                                  HorizontalAlignment="Left"
+                                  SelectedItem="{Binding SelectedFont, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding AvailableFonts}"
+                                  ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+                        <TextBlock Grid.Row="2"
+                                   Text="{loc:Loc SettingsWindow.FontWeight}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  Style="{StaticResource ComboBoxFieldStyle}"
+                                  HorizontalAlignment="Left"
+                                  SelectedItem="{Binding SelectedFontWeight, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding AvailableFontWeights}"
+                                  ItemTemplate="{StaticResource FontWeightTemplate}"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
 
-            <TextBlock Grid.Row="3" Text="{loc:Loc SettingsWindow.Font}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <ComboBox Grid.Row="3" Grid.Column="1" Style="{StaticResource ComboBoxFieldStyle}"
-                      SelectedItem="{Binding SelectedFont, UpdateSourceTrigger=PropertyChanged}"
-                      ItemsSource="{Binding AvailableFonts}"
-                      ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+        <TabItem Header="{loc:Loc SettingsWindow.Rendering}"
+                 Style="{StaticResource SettingsNavigationItemStyle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                    <TextBlock Text="{loc:Loc SettingsWindow.Rendering}"
+                               Style="{StaticResource PageTitleStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="4" Text="{loc:Loc SettingsWindow.FontWeight}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <ComboBox Grid.Row="4" Grid.Column="1" Style="{StaticResource ComboBoxFieldStyle}"
-                      SelectedItem="{Binding SelectedFontWeight, UpdateSourceTrigger=PropertyChanged}"
-                      ItemsSource="{Binding AvailableFontWeights}"
-                      ItemTemplate="{StaticResource FontWeightTemplate}"/>
+                        <TextBlock Grid.Row="0"
+                                   Text="{loc:Loc SettingsWindow.RenderBackground}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                        <StackPanel Grid.Row="0" Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Margin="0,0,0,10">
+                            <ComboBox Width="220"
+                                      SelectedItem="{Binding CurrentRenderEngineBackgroundColour, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemsSource="{Binding RenderEngineBackgroundColours}"
+                                      ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+                            <colourpicker:ColourPickerButtonView
+                                Width="32" Height="32" Margin="10,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                DataContext="{Binding CustomBackgroundColourPicker}"
+                                IsEnabled="{Binding IsCustomBackgroundVisible}"
+                                ToolTip="{loc:Loc SettingsWindow.CustomBackgroundColour}"
+                                AutomationProperties.Name="{loc:Loc SettingsWindow.CustomBackgroundColour}"/>
+                        </StackPanel>
 
-            <TextBlock Grid.Row="5" Text="{loc:Loc SettingsWindow.StartMaximised}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.NextStart}"/>
-            <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding StartMaximised}" Style="{StaticResource CheckBoxFieldStyle}"/>
-        </Grid>
+                        <TextBlock Grid.Row="1"
+                                   Text="{loc:Loc SettingsWindow.BackfaceDisplay}"
+                                   Style="{StaticResource SettingsLabelStyle}">
+                            <TextBlock.ToolTip>
+                                <StackPanel MaxWidth="420">
+                                    <TextBlock Text="{loc:Loc SettingsWindow.BackfaceHelp}"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"
+                                               Margin="0,7,0,0" Opacity="0.72"/>
+                                </StackPanel>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                        <CheckBox Grid.Row="1" Grid.Column="1"
+                                  Content="{loc:Loc SettingsWindow.BackfaceSimulation}"
+                                  IsChecked="{Binding SimulateGameBackfaces, UpdateSourceTrigger=PropertyChanged}"
+                                  Style="{StaticResource CheckBoxFieldStyle}"/>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230"/>
-                <ColumnDefinition Width="300"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="2"
+                                   Text="{loc:Loc SettingsWindow.ShowGrid}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                        <StackPanel Grid.Row="2" Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Margin="0,0,0,10">
+                            <CheckBox IsChecked="{Binding ShowViewportGrid, UpdateSourceTrigger=PropertyChanged}"
+                                      VerticalAlignment="Center"/>
+                            <colourpicker:ColourPickerButtonView
+                                Width="32" Height="32" Margin="12,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                DataContext="{Binding ViewportGridColourPicker}"
+                                ToolTip="{loc:Loc SettingsWindow.GridColour}"
+                                AutomationProperties.Name="{loc:Loc SettingsWindow.GridColour}"/>
+                        </StackPanel>
 
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                       Text="{loc:Loc SettingsWindow.Viewport3D}"
-                       Style="{StaticResource SectionTitleStyle}"/>
-            <Separator Grid.Row="1" Grid.ColumnSpan="2" Height="1" Margin="5,5,0,10"/>
+                        <Expander Grid.Row="3" Grid.ColumnSpan="2"
+                                  Header="{loc:Loc SettingsWindow.PhotoStudioLighting}"
+                                  IsExpanded="False"
+                                  Margin="0,8,0,16">
+                            <Grid Margin="14,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Text="{loc:Loc SettingsWindow.LightIntensity}"
+                                           Style="{StaticResource SettingsLabelStyle}"
+                                           ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                                <TextBox Grid.Row="0" Grid.Column="1"
+                                         Text="{Binding ViewportLightIntensity, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="120" HorizontalAlignment="Left"
+                                         Style="{StaticResource TextBoxFieldStyle}"/>
+                                <TextBlock Grid.Row="1"
+                                           Text="{loc:Loc SettingsWindow.EnvironmentLightRotationY}"
+                                           Style="{StaticResource SettingsLabelStyle}"
+                                           ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                                <TextBox Grid.Row="1" Grid.Column="1"
+                                         Text="{Binding ViewportEnvironmentLightRotationY, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="120" HorizontalAlignment="Left"
+                                         Style="{StaticResource TextBoxFieldStyle}"/>
+                                <TextBlock Grid.Row="2"
+                                           Text="{loc:Loc SettingsWindow.DirectLightRotationX}"
+                                           Style="{StaticResource SettingsLabelStyle}"
+                                           ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                                <TextBox Grid.Row="2" Grid.Column="1"
+                                         Text="{Binding ViewportDirectLightRotationX, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="120" HorizontalAlignment="Left"
+                                         Style="{StaticResource TextBoxFieldStyle}"/>
+                                <TextBlock Grid.Row="3"
+                                           Text="{loc:Loc SettingsWindow.DirectLightRotationY}"
+                                           Style="{StaticResource SettingsLabelStyle}"
+                                           ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
+                                <TextBox Grid.Row="3" Grid.Column="1"
+                                         Text="{Binding ViewportDirectLightRotationY, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="120" HorizontalAlignment="Left"
+                                         Style="{StaticResource TextBoxFieldStyle}"/>
+                            </Grid>
+                        </Expander>
 
-            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.RenderBackground}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ComboBoxFieldStyle}"
-                      SelectedItem="{Binding CurrentRenderEngineBackgroundColour, UpdateSourceTrigger=PropertyChanged}"
-                      ItemsSource="{Binding RenderEngineBackgroundColours}"
-                      ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
+                        <TextBlock Grid.Row="4"
+                                   Text="{loc:Loc SettingsWindow.OnlyLoadLod0}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.NextModelLoad}"/>
+                        <CheckBox Grid.Row="4" Grid.Column="1"
+                                  IsChecked="{Binding OnlyLoadLod0ForReferenceMeshes}"
+                                  Style="{StaticResource CheckBoxFieldStyle}"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
 
-            <TextBlock Grid.Row="3" Text="{loc:Loc SettingsWindow.CustomBackgroundColour}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,7"
-                        IsEnabled="{Binding IsCustomBackgroundVisible}">
-                <TextBlock Text="R" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox Text="{Binding CustomBackgroundR, UpdateSourceTrigger=PropertyChanged}" Width="54" Margin="0,0,10,0"/>
-                <TextBlock Text="G" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox Text="{Binding CustomBackgroundG, UpdateSourceTrigger=PropertyChanged}" Width="54" Margin="0,0,10,0"/>
-                <TextBlock Text="B" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox Text="{Binding CustomBackgroundB, UpdateSourceTrigger=PropertyChanged}" Width="54"/>
-            </StackPanel>
-
-            <TextBlock Grid.Row="4" Text="{loc:Loc SettingsWindow.BackfaceDisplay}" Style="{StaticResource SettingsLabelStyle}">
-                <TextBlock.ToolTip>
-                    <StackPanel MaxWidth="420">
-                        <TextBlock Text="{loc:Loc SettingsWindow.BackfaceHelp}" TextWrapping="Wrap"/>
-                        <TextBlock Text="{loc:Loc SettingsWindow.Timing.ImmediatePreview}" Margin="0,7,0,0" Opacity="0.72"/>
-                    </StackPanel>
-                </TextBlock.ToolTip>
-            </TextBlock>
-            <CheckBox Grid.Row="4" Grid.Column="1" Content="{loc:Loc SettingsWindow.BackfaceSimulation}"
-                      IsChecked="{Binding SimulateGameBackfaces, UpdateSourceTrigger=PropertyChanged}"
-                      Style="{StaticResource CheckBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="6" Text="{loc:Loc SettingsWindow.ShowGrid}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding ShowViewportGrid, UpdateSourceTrigger=PropertyChanged}"
-                      Style="{StaticResource CheckBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="7" Text="{loc:Loc SettingsWindow.GridColour}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,7">
-                <TextBlock Text="R" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox Text="{Binding ViewportGridColourR, UpdateSourceTrigger=PropertyChanged}" Width="54" Margin="0,0,10,0"/>
-                <TextBlock Text="G" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox Text="{Binding ViewportGridColourG, UpdateSourceTrigger=PropertyChanged}" Width="54" Margin="0,0,10,0"/>
-                <TextBlock Text="B" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox Text="{Binding ViewportGridColourB, UpdateSourceTrigger=PropertyChanged}" Width="54"/>
-            </StackPanel>
-
-            <TextBlock Grid.Row="8" Text="{loc:Loc SettingsWindow.LightIntensity}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding ViewportLightIntensity, UpdateSourceTrigger=PropertyChanged}"
-                     Width="100" HorizontalAlignment="Left" Style="{StaticResource TextBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="9" Text="{loc:Loc SettingsWindow.EnvironmentLightRotationY}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding ViewportEnvironmentLightRotationY, UpdateSourceTrigger=PropertyChanged}"
-                     Width="100" HorizontalAlignment="Left" Style="{StaticResource TextBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="10" Text="{loc:Loc SettingsWindow.DirectLightRotationX}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <TextBox Grid.Row="10" Grid.Column="1" Text="{Binding ViewportDirectLightRotationX, UpdateSourceTrigger=PropertyChanged}"
-                     Width="100" HorizontalAlignment="Left" Style="{StaticResource TextBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="11" Text="{loc:Loc SettingsWindow.DirectLightRotationY}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
-            <TextBox Grid.Row="11" Grid.Column="1" Text="{Binding ViewportDirectLightRotationY, UpdateSourceTrigger=PropertyChanged}"
-                     Width="100" HorizontalAlignment="Left" Style="{StaticResource TextBoxFieldStyle}"/>
-        </Grid>
-
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230"/>
-                <ColumnDefinition Width="300"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="{loc:Loc SettingsWindow.ModelAndContent}" Style="{StaticResource SectionTitleStyle}"/>
-            <Separator Grid.Row="1" Grid.ColumnSpan="2" Height="1" Margin="5,5,0,10"/>
-
-            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.SelectedGame}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.Restart}"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ComboBoxFieldStyle}"
-                      SelectedItem="{Binding CurrentGame, UpdateSourceTrigger=PropertyChanged}"
-                      ItemsSource="{Binding Games}" ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
-
-            <TextBlock Grid.Row="3" Text="{loc:Loc SettingsWindow.ShowCaWems}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.SaveRefresh}"/>
-            <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ShowCAWemFiles}" Style="{StaticResource CheckBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="4" Text="{loc:Loc SettingsWindow.OnlyLoadLod0}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.NextModelLoad}"/>
-            <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding OnlyLoadLod0ForReferenceMeshes}" Style="{StaticResource CheckBoxFieldStyle}"/>
-        </Grid>
-
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="{loc:Loc SettingsWindow.GameFiles}" Style="{StaticResource SectionTitleStyle}"/>
-            <Separator Grid.Row="1" Height="1" Margin="5,5,0,10"/>
-            <ItemsControl Grid.Row="2" ItemsSource="{Binding GameDirectores}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Margin="5,0,0,7" ToolTip="{loc:Loc SettingsWindow.Timing.GamePath}">
+        <TabItem Header="{loc:Loc SettingsWindow.Audio}"
+                 Style="{StaticResource SettingsNavigationItemStyle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                    <TextBlock Text="{loc:Loc SettingsWindow.Audio}"
+                               Style="{StaticResource PageTitleStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="{loc:Loc SettingsWindow.WwiseCli}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.NextAudioCompile}"/>
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="42"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding GameName}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Column="1" Text="{Binding Path}" IsReadOnly="True" Padding="3,0"/>
-                            <Button Grid.Column="2" Content="..." Command="{Binding BrowseCommand}" Margin="6,0,0,0"/>
+                            <TextBox Text="{Binding WwisePath}"
+                                     IsReadOnly="True" Padding="3,0"/>
+                            <Button Grid.Column="1"
+                                    Content="{loc:Loc SettingsWindow.Browse}"
+                                    Command="{Binding BrowseCommand}"
+                                    MinWidth="72" Margin="8,0,0,0"/>
                         </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </Grid>
+                        <TextBlock Grid.Row="1"
+                                   Text="{loc:Loc SettingsWindow.ShowCaWems}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.SaveRefresh}"/>
+                        <CheckBox Grid.Row="1" Grid.Column="1"
+                                  IsChecked="{Binding ShowCAWemFiles}"
+                                  Style="{StaticResource CheckBoxFieldStyle}"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230"/>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="42"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="{loc:Loc SettingsWindow.AudioModding}" Style="{StaticResource SectionTitleStyle}"/>
-            <Separator Grid.Row="1" Grid.ColumnSpan="3" Height="1" Margin="5,5,0,10"/>
-            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.WwiseCli}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.NextAudioCompile}"/>
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding WwisePath}" IsReadOnly="True" Padding="3,0" Margin="0,0,0,7"/>
-            <Button Grid.Row="2" Grid.Column="2" Content="..." Command="{Binding BrowseCommand}" Margin="6,0,0,7"/>
-        </Grid>
+        <TabItem Header="{loc:Loc SettingsWindow.Save}"
+                 Style="{StaticResource SettingsNavigationItemStyle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                    <TextBlock Text="{loc:Loc SettingsWindow.Save}"
+                               Style="{StaticResource PageTitleStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="{loc:Loc SettingsWindow.EnableAutoSave}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.SaveImmediate}"/>
+                        <CheckBox Grid.Row="0" Grid.Column="1"
+                                  IsChecked="{Binding EnableAutoSave}"
+                                  Style="{StaticResource CheckBoxFieldStyle}"/>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230"/>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="42"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="{loc:Loc SettingsWindow.AutoSaveAndBackup}" Style="{StaticResource SectionTitleStyle}"/>
-            <Separator Grid.Row="1" Grid.ColumnSpan="3" Height="1" Margin="5,5,0,10"/>
+                        <TextBlock Grid.Row="1"
+                                   Text="{loc:Loc SettingsWindow.AutoSaveInterval}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.SaveImmediate}"/>
+                        <StackPanel Grid.Row="1" Grid.Column="1"
+                                    Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBox Text="{Binding AutoSaveIntervalMinutes, UpdateSourceTrigger=LostFocus}"
+                                     Width="60" HorizontalContentAlignment="Right"/>
+                            <TextBlock Text="{loc:Loc SettingsWindow.Minutes}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
 
-            <TextBlock Grid.Row="2" Text="{loc:Loc SettingsWindow.EnableAutoSave}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.SaveImmediate}"/>
-            <CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding EnableAutoSave}" Style="{StaticResource CheckBoxFieldStyle}"/>
+                        <TextBlock Grid.Row="2"
+                                   Text="{loc:Loc SettingsWindow.BackupPath}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.NextBackup}"/>
+                        <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Text="{Binding BackupPath}"
+                                     IsReadOnly="True" Padding="3,0"/>
+                            <Button Grid.Column="1"
+                                    Content="{loc:Loc SettingsWindow.Browse}"
+                                    Command="{Binding BrowseBackupPathCommand}"
+                                    MinWidth="72" Margin="8,0,0,0"/>
+                        </Grid>
 
-            <TextBlock Grid.Row="3" Text="{loc:Loc SettingsWindow.AutoSaveInterval}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.SaveImmediate}"/>
-            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,7">
-                <TextBox Text="{Binding AutoSaveIntervalMinutes, UpdateSourceTrigger=LostFocus}" Width="60" HorizontalContentAlignment="Right"/>
-                <TextBlock Text="{loc:Loc SettingsWindow.Minutes}" VerticalAlignment="Center" Margin="6,0,0,0"/>
-            </StackPanel>
+                        <TextBlock Grid.Row="3"
+                                   Text="{loc:Loc SettingsWindow.MaxBackupCount}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.NextBackup}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1"
+                                 Text="{Binding MaxBackupCount, UpdateSourceTrigger=LostFocus}"
+                                 Width="60" HorizontalAlignment="Left"
+                                 HorizontalContentAlignment="Right"
+                                 Style="{StaticResource TextBoxFieldStyle}"/>
 
-            <TextBlock Grid.Row="4" Text="{loc:Loc SettingsWindow.BackupPath}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.NextBackup}"/>
-            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding BackupPath}" IsReadOnly="True" Padding="3,0" Margin="0,0,0,7"/>
-            <Button Grid.Row="4" Grid.Column="2" Content="..." Command="{Binding BrowseBackupPathCommand}" Margin="6,0,0,7"/>
-
-            <TextBlock Grid.Row="5" Text="{loc:Loc SettingsWindow.MaxBackupCount}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.NextBackup}"/>
-            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding MaxBackupCount, UpdateSourceTrigger=LostFocus}" Width="60" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Style="{StaticResource TextBoxFieldStyle}"/>
-
-            <TextBlock Grid.Row="6" Text="{loc:Loc SettingsWindow.UseZstdCompression}" Style="{StaticResource SettingsLabelStyle}"
-                       ToolTip="{loc:Loc SettingsWindow.Timing.NextPackSave}"/>
-            <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding UseZstdCompression}" Style="{StaticResource CheckBoxFieldStyle}"/>
-        </Grid>
-    </StackPanel>
+                        <TextBlock Grid.Row="4"
+                                   Text="{loc:Loc SettingsWindow.UseZstdCompression}"
+                                   Style="{StaticResource SettingsLabelStyle}"
+                                   ToolTip="{loc:Loc SettingsWindow.Timing.NextPackSave}"/>
+                        <CheckBox Grid.Row="4" Grid.Column="1"
+                                  IsChecked="{Binding UseZstdCompression}"
+                                  Style="{StaticResource CheckBoxFieldStyle}"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+    </TabControl>
 </UserControl>
