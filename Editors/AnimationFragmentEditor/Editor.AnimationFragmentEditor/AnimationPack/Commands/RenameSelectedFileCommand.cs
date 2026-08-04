@@ -1,11 +1,18 @@
-﻿using CommonControls.BaseDialogs;
-using CommonControls.Editors.AnimationPack;
+﻿using CommonControls.Editors.AnimationPack;
 using Shared.Core.Events;
+using Shared.Core.Services;
 
 namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 {
     public class RenameSelectedFileCommand : IUiCommand
-    { 
+    {
+        private readonly IStandardDialogs _standardDialogs;
+
+        public RenameSelectedFileCommand(IStandardDialogs standardDialogs)
+        {
+            _standardDialogs = standardDialogs;
+        }
+
         public void Execute(AnimPackViewModel editor)
         {
             var animFile = editor.AnimationPackItems.PossibleValues.FirstOrDefault(file => file == editor.AnimationPackItems.SelectedItem);
@@ -25,9 +32,9 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
         protected virtual string? GetNewFileName(string currentFileName)
         {
-            var window = new TextInputWindow("Rename Anim File", currentFileName);
-            if (window.ShowDialog() == true)
-                return window.TextValue;
+            var input = _standardDialogs.ShowTextInputDialog("Rename Anim File", currentFileName);
+            if (input.Result)
+                return input.Text;
 
             return null;
         }

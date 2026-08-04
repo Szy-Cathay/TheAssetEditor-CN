@@ -1,6 +1,4 @@
-﻿using System.Windows;
-using CommonControls.BaseDialogs;
-using Shared.Core.Events;
+﻿using Shared.Core.Events;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -14,18 +12,23 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
     {
         private readonly IFileSaveService _saveHelper;
         private readonly IPackFileService _pfs;
+        private readonly IStandardDialogs _standardDialogs;
 
-        public CreateExampleAnimationDbCommand(IFileSaveService saveHelper, IPackFileService pfs)
+        public CreateExampleAnimationDbCommand(
+            IFileSaveService saveHelper,
+            IPackFileService pfs,
+            IStandardDialogs standardDialogs)
         {
             _saveHelper = saveHelper;
             _pfs = pfs;
+            _standardDialogs = standardDialogs;
         }
 
         public PackFile? CreateAnimationDbWarhammer3()
         {
-            var window = new TextInputWindow("New AnimPack name", "");
-            if (window.ShowDialog() == true)
-                return CreateAnimationDbWarhammer3(window.TextValue);
+            var input = _standardDialogs.ShowTextInputDialog("New AnimPack name", "");
+            if (input.Result)
+                return CreateAnimationDbWarhammer3(input.Text);
             return null;
         }
 
@@ -42,7 +45,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
             if (!SaveUtility.IsFilenameUnique(_pfs, filePath))
             {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.FilenameNotUnique"));
+                _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.FilenameNotUnique"));
                 return null;
             }
 
@@ -52,14 +55,14 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
         public void CreateAnimationDb3k()
         {
-            var window = new TextInputWindow("New AnimPack name", "");
-            if (window.ShowDialog() == true)
+            var input = _standardDialogs.ShowTextInputDialog("New AnimPack name", "");
+            if (input.Result)
             {
-                var fileName = SaveUtility.EnsureEnding(window.TextValue, ".animpack");
+                var fileName = SaveUtility.EnsureEnding(input.Text, ".animpack");
                 var filePath = @"animations/database/battle/bin/" + fileName;
                 if (!SaveUtility.IsFilenameUnique(_pfs, filePath))
                 {
-                    MessageBox.Show(LocalizationManager.Instance.Get("Msg.FilenameNotUnique"));
+                    _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.FilenameNotUnique"));
                     return;
                 }
 

@@ -4,6 +4,7 @@ using GameWorld.Core.Services;
 using Moq;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.AnimationMeta.Parsing;
@@ -18,7 +19,10 @@ namespace AssetEditorTests
         public void Create_Success_AddsFileAndMarksDirty()
         {
             var editor = CreateEditor();
-            var command = new StubCreateCommand("new.frg");
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("Fragment name", ""))
+                .Returns(new TextInputDialogResult(true, "new.frg"));
+            var command = new CreateEmptyWarhammer3AnimSetFileCommand(dialogs.Object);
 
             command.Execute(editor);
 
@@ -30,7 +34,10 @@ namespace AssetEditorTests
         public void Create_Cancel_DoesNotAddFileOrMarkDirty()
         {
             var editor = CreateEditor();
-            var command = new StubCreateCommand(null);
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("Fragment name", ""))
+                .Returns(new TextInputDialogResult(false, ""));
+            var command = new CreateEmptyWarhammer3AnimSetFileCommand(dialogs.Object);
 
             command.Execute(editor);
 
@@ -43,7 +50,10 @@ namespace AssetEditorTests
         {
             var editor = CreateEditor();
             var file = AddAndSelectFile(editor);
-            var command = new StubRenameCommand("renamed.bin");
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("Rename Anim File", "original.bin"))
+                .Returns(new TextInputDialogResult(true, "renamed.bin"));
+            var command = new RenameSelectedFileCommand(dialogs.Object);
 
             command.Execute(editor);
 
@@ -56,7 +66,10 @@ namespace AssetEditorTests
         {
             var editor = CreateEditor();
             var file = AddAndSelectFile(editor);
-            var command = new StubRenameCommand(null);
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("Rename Anim File", "original.bin"))
+                .Returns(new TextInputDialogResult(false, ""));
+            var command = new RenameSelectedFileCommand(dialogs.Object);
 
             command.Execute(editor);
 
@@ -68,7 +81,7 @@ namespace AssetEditorTests
         public void Rename_NoSelection_DoesNotMarkDirty()
         {
             var editor = CreateEditor();
-            var command = new StubRenameCommand("renamed.bin");
+            var command = new RenameSelectedFileCommand(Mock.Of<IStandardDialogs>());
 
             command.Execute(editor);
 
@@ -111,6 +124,88 @@ namespace AssetEditorTests
             Assert.IsFalse(editor.HasUnsavedChanges);
         }
 
+        [TestMethod]
+        public void CreateAnimationDbWarhammer3_Success_SavesGeneratedAnimPack()
+        {
+            const string filePath = @"animations/database/battle/bin/new.animpack";
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+                .Returns(new TextInputDialogResult(true, "new"));
+            var editablePack = new PackFileContainer("output.pack");
+            var packFileService = new Mock<IPackFileService>();
+            packFileService.Setup(x => x.GetEditablePack()).Returns(editablePack);
+            packFileService.Setup(x => x.FindFile(filePath, editablePack)).Returns((PackFile?)null);
+            var savedFile = new PackFile("new.animpack", new MemorySource([]));
+            var saveService = new Mock<IFileSaveService>();
+            saveService.Setup(x => x.Save(filePath, It.IsAny<byte[]>(), false)).Returns(savedFile);
+            var command = new CreateExampleAnimationDbCommand(saveService.Object, packFileService.Object, dialogs.Object);
+
+            var result = command.CreateAnimationDbWarhammer3();
+
+            Assert.AreSame(savedFile, result);
+            saveService.Verify(x => x.Save(filePath, It.IsAny<byte[]>(), false), Times.Once);
+        }
+
+        [TestMethod]
+        public void CreateAnimationDbWarhammer3_Cancel_DoesNotSave()
+        {
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+                .Returns(new TextInputDialogResult(false, ""));
+            var saveService = new Mock<IFileSaveService>();
+            var command = new CreateExampleAnimationDbCommand(
+                saveService.Object,
+                Mock.Of<IPackFileService>(),
+                dialogs.Object);
+
+            var result = command.CreateAnimationDbWarhammer3();
+
+            Assert.IsNull(result);
+            saveService.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
+        }
+
+        [TestMethod]
+        public void CreateAnimationDbWarhammer3_DuplicateName_ShowsStandardDialogAndDoesNotSave()
+        {
+            const string filePath = @"animations/database/battle/bin/existing.animpack";
+            _ = new LocalizationManager();
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+                .Returns(new TextInputDialogResult(true, "existing"));
+            var editablePack = new PackFileContainer("output.pack");
+            var packFileService = new Mock<IPackFileService>();
+            packFileService.Setup(x => x.GetEditablePack()).Returns(editablePack);
+            packFileService.Setup(x => x.FindFile(filePath, editablePack))
+                .Returns(new PackFile("existing.animpack", new MemorySource([])));
+            var saveService = new Mock<IFileSaveService>();
+            var command = new CreateExampleAnimationDbCommand(saveService.Object, packFileService.Object, dialogs.Object);
+
+            var result = command.CreateAnimationDbWarhammer3();
+
+            Assert.IsNull(result);
+            dialogs.Verify(x => x.ShowDialogBox(It.IsAny<string>(), "Error"), Times.Once);
+            saveService.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
+        }
+
+        [TestMethod]
+        public void CreateAnimationDb3k_Success_UsesStandardDialogAndSaves()
+        {
+            const string filePath = @"animations/database/battle/bin/new.animpack";
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+                .Returns(new TextInputDialogResult(true, "new"));
+            var editablePack = new PackFileContainer("output.pack");
+            var packFileService = new Mock<IPackFileService>();
+            packFileService.Setup(x => x.GetEditablePack()).Returns(editablePack);
+            packFileService.Setup(x => x.FindFile(filePath, editablePack)).Returns((PackFile?)null);
+            var saveService = new Mock<IFileSaveService>();
+            var command = new CreateExampleAnimationDbCommand(saveService.Object, packFileService.Object, dialogs.Object);
+
+            command.CreateAnimationDb3k();
+
+            saveService.Verify(x => x.Save(filePath, It.IsAny<byte[]>(), false), Times.Once);
+        }
+
         private static AnimPackViewModel CreateEditor()
         {
             return new AnimPackViewModel(
@@ -130,28 +225,5 @@ namespace AssetEditorTests
             return file;
         }
 
-        private sealed class StubCreateCommand : CreateEmptyWarhammer3AnimSetFileCommand
-        {
-            private readonly string? _fileName;
-
-            public StubCreateCommand(string? fileName)
-            {
-                _fileName = fileName;
-            }
-
-            protected override string? GetAnimSetFileName() => _fileName;
-        }
-
-        private sealed class StubRenameCommand : RenameSelectedFileCommand
-        {
-            private readonly string? _fileName;
-
-            public StubRenameCommand(string? fileName)
-            {
-                _fileName = fileName;
-            }
-
-            protected override string? GetNewFileName(string currentFileName) => _fileName;
-        }
     }
 }
