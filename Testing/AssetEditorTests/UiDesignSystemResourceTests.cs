@@ -96,6 +96,66 @@ public class UiDesignSystemResourceTests
         });
     }
 
+    [Test]
+    public void DesignTokens_ExposeApprovedMetricsAndDurations()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var dictionary = Load(
+                "Themes/DesignSystem/DesignTokens.xaml");
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(dictionary["AeSpace.1"], Is.EqualTo(4d));
+                NUnitAssert.That(dictionary["AeSpace.2"], Is.EqualTo(8d));
+                NUnitAssert.That(dictionary["AeSpace.3"], Is.EqualTo(12d));
+                NUnitAssert.That(dictionary["AeSpace.4"], Is.EqualTo(16d));
+                NUnitAssert.That(dictionary["AeSpace.6"], Is.EqualTo(24d));
+                NUnitAssert.That(dictionary["AeSpace.8"], Is.EqualTo(32d));
+                NUnitAssert.That(
+                    dictionary["AeSize.ActivityRailWidth"],
+                    Is.EqualTo(34d));
+                NUnitAssert.That(dictionary["AeSize.TabHeight"], Is.EqualTo(24d));
+                NUnitAssert.That(
+                    dictionary["AeSize.CompactRowHeight"],
+                    Is.EqualTo(28d));
+                NUnitAssert.That(
+                    dictionary["AeSize.ControlHeight"],
+                    Is.EqualTo(30d));
+                NUnitAssert.That(
+                    dictionary["AeSize.ProminentControlHeight"],
+                    Is.EqualTo(34d));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Compact"],
+                    Is.EqualTo(new CornerRadius(3)));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Control"],
+                    Is.EqualTo(new CornerRadius(4)));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Surface"],
+                    Is.EqualTo(new CornerRadius(6)));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Overlay"],
+                    Is.EqualTo(new CornerRadius(7)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Pressed"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(70)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Hover"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(120)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Selection"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(140)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Overlay"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(160)));
+                NUnitAssert.That(
+                    dictionary["AeMotion.OverlayOffset"],
+                    Is.EqualTo(2d));
+            });
+        });
+    }
+
     private static IEnumerable<string> ThemeNames() =>
         Enum.GetNames<ThemeType>();
 
