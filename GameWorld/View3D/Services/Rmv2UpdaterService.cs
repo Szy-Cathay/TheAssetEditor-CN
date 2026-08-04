@@ -159,15 +159,6 @@ namespace GameWorld.Core.Services
             return false;
         }
 
-        private static Bitmap BitMapFromTextureType(TextureType textureType, Dictionary<TextureType, Bitmap> textureDictionary)
-        {
-            var tempBitmap = textureDictionary[textureType];
-            using var texDiffuse = new Bitmap(tempBitmap, tempBitmap.Width, tempBitmap.Height);
-
-            return texDiffuse;
-        }
-
-
         /// <summary>
         /// Get per-pixel metalness, from simple "rules of thumb" (Heuristics)
         /// </summary>

@@ -10,8 +10,6 @@ namespace Editors.AnimatioReTarget.Editor.Settings
 {
     public class AnimationReTargetRenderingComponent : BaseComponent
     {
-        record RenderInfo(string Name, float Radius);
-
         private readonly RenderEngineComponent _renderEngineComponent;
         float _radius = 1;
         float _visualOffset = 2;

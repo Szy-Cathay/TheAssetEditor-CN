@@ -187,14 +187,6 @@ namespace GameWorld.Core.Components.Navigation
             _cameraTransition.StartTransition(view, _camera.LookAt);
         }
 
-        private void ExitOrthoView()
-        {
-            _isInOrthoView = false;
-            _currentOrthoView = ViewPresetType.Perspective;
-            _camera.AutoPerspectiveOnOrbit = false;
-            _cameraTransition.StartTransition(ViewPresetType.Perspective);
-        }
-
         private void ToggleProjectionType()
         {
             if (_isInOrthoView)
@@ -215,12 +207,6 @@ namespace GameWorld.Core.Components.Navigation
                 _camera.CurrentProjectionType = ProjectionType.Orthographic;
                 _camera.OrthoSize = _camera.Zoom * 0.5f;
             }
-        }
-
-        private void HandleOrthoPan()
-        {
-            var delta = _mouse.DeltaPosition();
-            _camera.MoveOrthoCamera(delta);
         }
 
         private void OnViewPresetRequested(ViewPresetType view)

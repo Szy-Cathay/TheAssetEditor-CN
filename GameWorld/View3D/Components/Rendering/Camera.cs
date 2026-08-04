@@ -393,17 +393,6 @@ namespace GameWorld.Core.Components.Rendering
             ) * Matrix.CreateScale(-1, 1, 1);
         }
 
-        /// <summary>
-        /// Move camera in orthographic view (screen-space panning)
-        /// </summary>
-        public void MoveOrthoCamera(Vector2 delta)
-        {
-            float factor = _orthoSize * 0.002f;
-            // Both X and Y are negated to match visual expectation (drag direction)
-            MoveCameraRight(-delta.X * factor);
-            MoveCameraUp(delta.Y * factor);
-        }
-
         public Ray CreateCameraRay(Vector2 mouseLocation)
         {
             var projection = ProjectionMatrix;
