@@ -115,13 +115,7 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         public bool JustFinishedModalTransform { get; private set; } = false;
 
-        // For precise ray-plane intersection calculation (like Blender's InputVector)
-        private Vector3 _lastModalIntersection = Vector3.Zero;
         private bool _suppressPointerGestureUntilRelease;
-
-        // Dashed line parameters from mouse to pivot during modal transform
-        private const int DASH_SCREEN_LENGTH = 20;  // Length of each dash in screen pixels
-        private const int MAX_DASHES = 200;          // Maximum number of dashes to draw
 
         // -- Numeric Input (Blender-style) -- //
         // User can type numbers directly after G/R/S for precise input
@@ -234,7 +228,6 @@ namespace GameWorld.Core.Components.Gizmo
             // Save pivot position
             UpdateGizmoPosition();
             _modalStartPivot = _position;
-            _lastModalIntersection = Vector3.Zero;
 
             // Set cursor based on mode (Blender-style)
             ModalCursorType cursorType = mode switch
@@ -300,7 +293,6 @@ namespace GameWorld.Core.Components.Gizmo
             _suppressPointerGestureUntilRelease =
                 _mouse.State().LeftButton == ButtonState.Pressed;
             _virtualMouse = default;
-            _lastModalIntersection = Vector3.Zero;
             _numericInput = "";
             IsInNumericInput = false;
             _numericValue = 0f;
@@ -862,312 +854,6 @@ namespace GameWorld.Core.Components.Gizmo
         }
 
         /// <summary>
-        /// Update gizmo world matrix for rendering (scale and position)
-        /// This is needed because modal transform early-exits from Update()
-        /// </summary>
-        private void UpdateGizmoWorldMatrix()
-        {
-            // -- Scale Gizmo to fit on-screen -- //
-            var vLength = _camera.Position - _position;
-            const float scaleFactor = 25;
-
-            _screenScale = vLength.Length() / scaleFactor;
-            var screenScaleMatrix = Matrix.CreateScale(new Vector3(_screenScale * ScaleModifier));
-
-            _localForward = Vector3.Transform(Vector3.Forward, Matrix.CreateFromQuaternion(Selection[0].Orientation));
-            _localUp = Vector3.Transform(Vector3.Up, Matrix.CreateFromQuaternion(Selection[0].Orientation));
-
-            // -- Vector Rotation (Local/World) -- //
-            _localForward.Normalize();
-            _localRight = Vector3.Cross(_localForward, _localUp);
-            _localUp = Vector3.Cross(_localRight, _localForward);
-            _localRight.Normalize();
-            _localUp.Normalize();
-
-            // -- Create Both World Matrices -- //
-            _objectOrientedWorld = screenScaleMatrix * Matrix.CreateWorld(_position, _localForward, _localUp);
-            _axisAlignedWorld = screenScaleMatrix * Matrix.CreateWorld(_position, SceneWorld.Forward, SceneWorld.Up);
-
-            // Assign World
-            if (GizmoDisplaySpace == TransformSpace.World || ActiveMode == GizmoMode.UniformScale)
-            {
-                _gizmoWorld = _axisAlignedWorld;
-
-                _rotationMatrix.Forward = SceneWorld.Forward;
-                _rotationMatrix.Up = SceneWorld.Up;
-                _rotationMatrix.Right = SceneWorld.Right;
-            }
-            else
-            {
-                _gizmoWorld = _objectOrientedWorld;
-
-                _rotationMatrix.Forward = _localForward;
-                _rotationMatrix.Up = _localUp;
-                _rotationMatrix.Right = _localRight;
-            }
-        }
-
-        /// <summary>
-        /// Calculate world-space transform delta from mouse movement
-        /// Like Blender's convertViewVec / ED_view3d_win_to_delta
-        /// Uses ray-plane intersection for accurate world-space movement
-        /// </summary>
-        private Vector3 CalculateModalTransformDelta(Vector2 mouseDelta)
-        {
-            if (ActiveAxis == GizmoAxis.None)
-            {
-                // Free translation on view plane using ray-plane intersection
-                // This ensures movement speed matches mouse movement visually
-
-                // Create a plane perpendicular to camera view direction, passing through pivot
-                Vector3 viewDir = _camera.LookAt - _camera.Position;
-                viewDir.Normalize();
-                Plane viewPlane = new Plane(viewDir, -Vector3.Dot(viewDir, _position));
-
-                // Get rays for current and last mouse positions
-                var currentRay = _camera.CreateCameraRay(_mouse.Position());
-                var lastRay = _camera.CreateCameraRay(_mouse.Position() - mouseDelta);
-
-                // Find intersections with view plane
-                var currentIntersect = currentRay.Intersects(viewPlane);
-                var lastIntersect = lastRay.Intersects(viewPlane);
-
-                if (currentIntersect.HasValue && lastIntersect.HasValue)
-                {
-                    var currentPoint = currentRay.Position + currentRay.Direction * currentIntersect.Value;
-                    var lastPoint = lastRay.Position + lastRay.Direction * lastIntersect.Value;
-                    return currentPoint - lastPoint;
-                }
-
-                // Fallback: use simple screen-space calculation
-                float distanceToObject = (_position - _camera.Position).Length();
-                float sensitivity = 0.001f * distanceToObject;
-
-                Vector3 cameraRight = Vector3.Cross(viewDir, Vector3.Up);
-                if (cameraRight.LengthSquared() < 0.001f)
-                    cameraRight = Vector3.Cross(viewDir, Vector3.UnitX);
-                cameraRight.Normalize();
-                Vector3 cameraUp = Vector3.Cross(cameraRight, viewDir);
-                cameraUp.Normalize();
-
-                return cameraRight * mouseDelta.X * sensitivity + cameraUp * -mouseDelta.Y * sensitivity;
-            }
-            else if (ActiveAxis == GizmoAxis.YZ || ActiveAxis == GizmoAxis.XZ || ActiveAxis == GizmoAxis.XY)
-            {
-                // Plane-locked: free movement then project out excluded axis
-                Vector3 viewDir = _camera.LookAt - _camera.Position;
-                viewDir.Normalize();
-                Plane viewPlane = new Plane(viewDir, -Vector3.Dot(viewDir, _position));
-
-                var currentRay = _camera.CreateCameraRay(_mouse.Position());
-                var lastRay = _camera.CreateCameraRay(_mouse.Position() - mouseDelta);
-
-                var currentIntersect = currentRay.Intersects(viewPlane);
-                var lastIntersect = lastRay.Intersects(viewPlane);
-
-                Vector3 result;
-                if (currentIntersect.HasValue && lastIntersect.HasValue)
-                {
-                    var currentPoint = currentRay.Position + currentRay.Direction * currentIntersect.Value;
-                    var lastPoint = lastRay.Position + lastRay.Direction * lastIntersect.Value;
-                    result = currentPoint - lastPoint;
-                }
-                else
-                {
-                    float distanceToObject = (_position - _camera.Position).Length();
-                    float sensitivity = 0.001f * distanceToObject;
-                    Vector3 cameraRight = Vector3.Cross(viewDir, Vector3.Up);
-                    if (cameraRight.LengthSquared() < 0.001f)
-                        cameraRight = Vector3.Cross(viewDir, Vector3.UnitX);
-                    cameraRight.Normalize();
-                    Vector3 cameraUp = Vector3.Cross(cameraRight, viewDir);
-                    cameraUp.Normalize();
-                    result = cameraRight * mouseDelta.X * sensitivity + cameraUp * -mouseDelta.Y * sensitivity;
-                }
-
-                Vector3 excludeAxis = ActiveAxis switch
-                {
-                    GizmoAxis.YZ => _rotationMatrix.Right,
-                    GizmoAxis.XZ => _rotationMatrix.Up,
-                    GizmoAxis.XY => _rotationMatrix.Forward,
-                    _ => Vector3.Zero
-                };
-                excludeAxis.Normalize();
-                result -= Vector3.Dot(result, excludeAxis) * excludeAxis;
-                return result;
-            }
-            else
-            {
-                // Axis-constrained translation using ray-plane intersection
-                return CalculateAxisConstrainedDelta(mouseDelta);
-            }
-        }
-
-        /// <summary>
-        /// Calculate frame-by-frame translation for incremental movement
-        /// This provides smooth, responsive feel like Blender
-        /// </summary>
-        private Vector3 CalculateFrameTranslation(Vector2 frameDelta)
-        {
-            if (ActiveAxis == GizmoAxis.None)
-            {
-                // Free translation - use simple screen-space to world-space conversion
-                Vector3 viewDir = _camera.LookAt - _camera.Position;
-                viewDir.Normalize();
-
-                float distanceToObject = (_position - _camera.Position).Length();
-                float sensitivity = 0.001f * distanceToObject;
-
-                Vector3 cameraRight = Vector3.Cross(viewDir, Vector3.Up);
-                if (cameraRight.LengthSquared() < 0.001f)
-                    cameraRight = Vector3.Cross(viewDir, Vector3.UnitX);
-                cameraRight.Normalize();
-                Vector3 cameraUp = Vector3.Cross(cameraRight, viewDir);
-                cameraUp.Normalize();
-
-                return cameraRight * -frameDelta.X * sensitivity + cameraUp * -frameDelta.Y * sensitivity;
-            }
-            else if (ActiveAxis == GizmoAxis.YZ || ActiveAxis == GizmoAxis.XZ || ActiveAxis == GizmoAxis.XY)
-            {
-                // Plane-locked: free movement then project out excluded axis
-                Vector3 viewDir = _camera.LookAt - _camera.Position;
-                viewDir.Normalize();
-
-                float distanceToObject = (_position - _camera.Position).Length();
-                float sensitivity = 0.001f * distanceToObject;
-
-                Vector3 cameraRight = Vector3.Cross(viewDir, Vector3.Up);
-                if (cameraRight.LengthSquared() < 0.001f)
-                    cameraRight = Vector3.Cross(viewDir, Vector3.UnitX);
-                cameraRight.Normalize();
-                Vector3 cameraUp = Vector3.Cross(cameraRight, viewDir);
-                cameraUp.Normalize();
-
-                Vector3 result = cameraRight * -frameDelta.X * sensitivity + cameraUp * -frameDelta.Y * sensitivity;
-
-                Vector3 excludeAxis = ActiveAxis switch
-                {
-                    GizmoAxis.YZ => _rotationMatrix.Right,
-                    GizmoAxis.XZ => _rotationMatrix.Up,
-                    GizmoAxis.XY => _rotationMatrix.Forward,
-                    _ => Vector3.Zero
-                };
-                excludeAxis.Normalize();
-                result -= Vector3.Dot(result, excludeAxis) * excludeAxis;
-                return result;
-            }
-            else
-            {
-                // Axis-constrained translation
-                return CalculateAxisConstrainedFrameDelta(frameDelta);
-            }
-        }
-
-        /// <summary>
-        /// Calculate axis-constrained frame delta for incremental movement
-        /// </summary>
-        private Vector3 CalculateAxisConstrainedFrameDelta(Vector2 frameDelta)
-        {
-            // Get axis direction
-            Vector3 axisDirection;
-            switch (ActiveAxis)
-            {
-                case GizmoAxis.X:
-                    axisDirection = _rotationMatrix.Right;
-                    break;
-                case GizmoAxis.Y:
-                    axisDirection = _rotationMatrix.Up;
-                    break;
-                case GizmoAxis.Z:
-                    axisDirection = _rotationMatrix.Forward;
-                    break;
-                default:
-                    return Vector3.Zero;
-            }
-
-            // Project axis to screen to get movement scale
-            var axisStart = _graphics.Viewport.Project(_position, _camera.ProjectionMatrix, _camera.ViewMatrix, Matrix.Identity);
-            var axisEnd = _graphics.Viewport.Project(_position + axisDirection, _camera.ProjectionMatrix, _camera.ViewMatrix, Matrix.Identity);
-            var screenAxis = new Vector2(axisEnd.X - axisStart.X, axisEnd.Y - axisStart.Y);
-            var screenAxisLength = screenAxis.Length();
-
-            if (screenAxisLength < 0.001f)
-                return Vector3.Zero;
-
-            // Calculate movement along axis based on mouse delta projected onto axis direction
-            // Use dot product to get movement along the axis
-            var movement = (frameDelta.X * screenAxis.X + frameDelta.Y * screenAxis.Y) / screenAxisLength;
-
-            // Scale: 1 pixel = small world unit, scale by distance for consistent feel
-            float distanceToObject = (_position - _camera.Position).Length();
-            float worldScale = distanceToObject * 0.001f;
-
-            return axisDirection * movement * worldScale;
-        }
-
-        /// <summary>
-        /// Calculate delta for axis-constrained movement using ray-plane intersection
-        /// Same method as HandleTranslateAndScale in normal gizmo operation
-        /// </summary>
-        private Vector3 CalculateAxisConstrainedDelta(Vector2 mouseDelta)
-        {
-            Plane plane;
-            switch (ActiveAxis)
-            {
-                case GizmoAxis.X:
-                    plane = new Plane(Vector3.Forward, Vector3.Transform(_position, Matrix.Invert(_rotationMatrix)).Z);
-                    break;
-                case GizmoAxis.Y:
-                case GizmoAxis.Z:
-                    plane = new Plane(Vector3.Left, Vector3.Transform(_position, Matrix.Invert(_rotationMatrix)).X);
-                    break;
-                default:
-                    return Vector3.Zero;
-            }
-
-            var ray = _camera.CreateCameraRay(_mouse.Position());
-            var transform = Matrix.Invert(_rotationMatrix);
-            ray.Position = Vector3.Transform(ray.Position, transform);
-            ray.Direction = Vector3.TransformNormal(ray.Direction, transform);
-
-            Vector3 deltaTransform = Vector3.Zero;
-            var intersection = ray.Intersects(plane);
-            if (intersection.HasValue)
-            {
-                var intersectPosition = ray.Position + ray.Direction * intersection.Value;
-                var mouseDragDelta = Vector3.Zero;
-                if (_lastModalIntersection != Vector3.Zero)
-                    mouseDragDelta = intersectPosition - _lastModalIntersection;
-
-                // Clamp large deltas
-                var length = mouseDragDelta.Length();
-                if (length > 0.5f)
-                {
-                    var direction = Vector3.Normalize(mouseDragDelta);
-                    mouseDragDelta = direction * 0.5f;
-                }
-
-                switch (ActiveAxis)
-                {
-                    case GizmoAxis.X:
-                        deltaTransform = new Vector3(mouseDragDelta.X, 0, 0);
-                        break;
-                    case GizmoAxis.Y:
-                        deltaTransform = new Vector3(0, mouseDragDelta.Y, 0);
-                        break;
-                    case GizmoAxis.Z:
-                        deltaTransform = new Vector3(0, 0, mouseDragDelta.Z);
-                        break;
-                }
-
-                _lastModalIntersection = intersectPosition;
-            }
-
-            // Convert from local to world space
-            return Vector3.Transform(deltaTransform, _rotationMatrix);
-        }
-
-        /// <summary>
         /// Apply rotation from initial state (called each frame with total rotation angle)
         /// Uses the event to transform from initial position around pivot
         /// </summary>
@@ -1274,15 +960,6 @@ namespace GameWorld.Core.Components.Gizmo
                 _ => right
             };
             return direction * value;
-        }
-
-        private void UpdateGizmoVisuals()
-        {
-            // Update visual elements for modal transform
-            // Highlight active axis
-            ApplyColor(GizmoAxis.X, ActiveAxis == GizmoAxis.X ? _highlightColor : _axisColors[0]);
-            ApplyColor(GizmoAxis.Y, ActiveAxis == GizmoAxis.Y ? _highlightColor : _axisColors[1]);
-            ApplyColor(GizmoAxis.Z, ActiveAxis == GizmoAxis.Z ? _highlightColor : _axisColors[2]);
         }
 
         public void Update(GameTime gameTime, bool enableMove)
@@ -1799,75 +1476,11 @@ namespace GameWorld.Core.Components.Gizmo
             var view = _camera.ViewMatrix;
             var projection = _camera.ProjectionMatrix;
 
-            // Get pivot position
-            UpdateGizmoPosition();
-            var pivotPos = _position;
-
-            // Get mouse screen position
-            var mouseScreenPos = _mouse.Position();
-
-            // Project pivot to screen
-            var pivotScreen = _graphics.Viewport.Project(pivotPos, projection, view, Matrix.Identity);
-            var mouseScreenStart = new Vector3(mouseScreenPos.X, mouseScreenPos.Y, pivotScreen.Z);
-
             // Draw axis indicator text
             DrawAxisIndicator(view, projection);
 
             // Draw numeric input display (Blender-style)
             DrawNumericInput();
-        }
-
-        /// <summary>
-        /// Draw a dashed line using screen-space dash length for consistent visual appearance
-        /// </summary>
-        private void DrawDashedLineScreenSpace(Vector2 screenStart, Vector2 screenEnd, Vector3 worldStart, Vector3 worldEnd)
-        {
-            // Calculate screen-space distance
-            var screenDelta = screenEnd - screenStart;
-            var screenDistance = screenDelta.Length();
-            if (screenDistance < 1f)
-                return;
-
-            // Calculate number of dashes based on screen-space length
-            var dashCount = Math.Min((int)(screenDistance / DASH_SCREEN_LENGTH), MAX_DASHES);
-            if (dashCount < 2)
-                dashCount = 2;
-
-            // Calculate world-space direction and step
-            var worldDirection = worldEnd - worldStart;
-            var worldDistance = worldDirection.Length();
-            if (worldDistance < 0.001f)
-                return;
-            worldDirection.Normalize();
-
-            var vertices = new List<VertexPositionColor>();
-            var worldDashLength = worldDistance / dashCount;
-
-            // Create dashed pattern (draw every other dash)
-            for (int i = 0; i < dashCount; i += 2)
-            {
-                var dashStart = worldStart + worldDirection * (i * worldDashLength);
-                var dashEnd = worldStart + worldDirection * (Math.Min(i + 1, dashCount) * worldDashLength);
-
-                vertices.Add(new VertexPositionColor(dashStart, Color.White));
-                vertices.Add(new VertexPositionColor(dashEnd, Color.White));
-            }
-
-            if (vertices.Count < 2)
-                return;
-
-            _graphics.BlendState = BlendState.AlphaBlend;
-            _graphics.DepthStencilState = DepthStencilState.None;
-            _graphics.RasterizerState = RasterizerState.CullNone;
-
-            _lineEffect.World = Matrix.Identity;
-            _lineEffect.View = _camera.ViewMatrix;
-            _lineEffect.Projection = _camera.ProjectionMatrix;
-            _lineEffect.CurrentTechnique.Passes[0].Apply();
-
-            _graphics.DrawUserPrimitives(PrimitiveType.LineList, vertices.ToArray(), 0, vertices.Count / 2);
-
-            _graphics.DepthStencilState = DepthStencilState.Default;
         }
 
         /// <summary>

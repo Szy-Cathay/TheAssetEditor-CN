@@ -48,7 +48,7 @@ public class MainViewModelCloseTests
             .BuildServiceProvider();
         WpfTestApplicationHost.InvokeWithThemeResources(serviceProvider, () =>
         {
-            var window = new MainWindow(settings, serviceProvider)
+            var window = new MainWindow(serviceProvider)
             {
                 DataContext = viewModel
             };

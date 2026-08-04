@@ -38,8 +38,6 @@ namespace Shared.Core.Events
     abstract class EventHub : IDisposable
     {
         private readonly ILogger _logger = Logging.Create<EventHub>();
-        bool _isDisposed = false;
-        
         Dictionary<Type, List<(Delegate Callback, object Owner)>> _callbackList = new();
         private readonly IScopeRepository _scopeRepository;
         private readonly string _hubName;
@@ -135,7 +133,6 @@ namespace Shared.Core.Events
 
         public void Dispose()
         {
-            _isDisposed = true;
             _callbackList?.Clear();
         }
     }

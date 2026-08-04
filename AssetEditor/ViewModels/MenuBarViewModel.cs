@@ -35,7 +35,6 @@ namespace AssetEditor.ViewModels
         private readonly IEditorDatabase _editorDatabase;
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly TouchedFilesRecorder _touchedFilesRecorder;
-        private readonly IFileSaveService _packFileSaveService;
         private readonly IPackFileContainerLoader _packFileContainerLoader;
         private readonly IFolderProjectOpenService _folderProjectOpenService;
         private readonly IStandardDialogs _standardDialogs;
@@ -51,8 +50,7 @@ namespace AssetEditor.ViewModels
             ApplicationSettingsService settingsService, 
             IEditorDatabase editorDatabase, 
             IUiCommandFactory uiCommandFactory,
-            TouchedFilesRecorder touchedFilesRecorder, 
-            IFileSaveService packFileSaveService,
+            TouchedFilesRecorder touchedFilesRecorder,
             IPackFileContainerLoader packFileContainerLoader,
             IFolderProjectOpenService folderProjectOpenService,
             IStandardDialogs standardDialogs,
@@ -63,7 +61,6 @@ namespace AssetEditor.ViewModels
             _editorDatabase = editorDatabase;
             _uiCommandFactory = uiCommandFactory;
             _touchedFilesRecorder = touchedFilesRecorder;
-            _packFileSaveService = packFileSaveService;
             _packFileContainerLoader = packFileContainerLoader;
             _folderProjectOpenService = folderProjectOpenService;
             _standardDialogs = standardDialogs;
