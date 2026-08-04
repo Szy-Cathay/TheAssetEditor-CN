@@ -1,5 +1,4 @@
 ﻿using System.Windows.Input;
-using CommonControls.BaseDialogs.ErrorListDialog;
 using Editors.KitbasherEditor.Core.MenuBarViews;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
@@ -16,11 +15,13 @@ namespace Editors.KitbasherEditor.UiCommands
 
         private readonly SelectionManager _selectionManager;
         private readonly ObjectEditor _objectEditor;
+        private readonly IStandardDialogs _standardDialogs;
 
-        public MergeObjectsCommand(SelectionManager selectionManager, ObjectEditor objectEditor)
+        public MergeObjectsCommand(SelectionManager selectionManager, ObjectEditor objectEditor, IStandardDialogs standardDialogs)
         {
             _selectionManager = selectionManager;
             _objectEditor = objectEditor;
+            _standardDialogs = standardDialogs;
         }
 
         public void Execute()
@@ -30,7 +31,7 @@ namespace Editors.KitbasherEditor.UiCommands
                 if (objectSelectionState.CurrentSelection().Count >= 2)
                 {
                     if (!_objectEditor.CombineMeshes(objectSelectionState, out var errorList))
-                        ErrorListWindow.ShowDialog(LocalizationManager.Instance.Get("Kitbash.Combine.Errors"), errorList, false);
+                        _standardDialogs.ShowErrorViewDialog(LocalizationManager.Instance.Get("Kitbash.Combine.Errors"), errorList, false);
                 }
             }
         }

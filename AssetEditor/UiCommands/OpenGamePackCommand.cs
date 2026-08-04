@@ -1,5 +1,4 @@
 ﻿using System.Linq;
-using System.Windows.Forms;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Utility;
@@ -13,12 +12,18 @@ namespace AssetEditor.UiCommands
         private readonly IPackFileService _packFileService;
         private readonly IPackFileContainerLoader _packFileContainerLoader;
         private readonly ApplicationSettingsService _applicationSettingsService;
+        private readonly IStandardDialogs _standardDialogs;
 
-        public OpenGamePackCommand(IPackFileService packFileService, IPackFileContainerLoader packFileContainerLoader, ApplicationSettingsService applicationSettingsService)
+        public OpenGamePackCommand(
+            IPackFileService packFileService,
+            IPackFileContainerLoader packFileContainerLoader,
+            ApplicationSettingsService applicationSettingsService,
+            IStandardDialogs standardDialogs)
         {
             _packFileService = packFileService;
             _packFileContainerLoader = packFileContainerLoader;
             _applicationSettingsService = applicationSettingsService;
+            _standardDialogs = standardDialogs;
         }
 
         public void Execute(GameTypeEnum game)
@@ -29,7 +34,7 @@ namespace AssetEditor.UiCommands
 
             if (gamePath == null || string.IsNullOrWhiteSpace(gamePath.Path))
             {
-                System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.NoGamePath"));
+                _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.NoGamePath"));
                 return;
             }
 
@@ -38,7 +43,11 @@ namespace AssetEditor.UiCommands
             {
                 if (packFile.SystemFilePath == gamePath.Path)
                 {
-                    MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.PackFilesAlreadyLoaded", GameInformationDatabase.GetGameById(game).DisplayName), LocalizationManager.Instance.Get("Msg.GeneralError"));
+                    _standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.PackFilesAlreadyLoaded",
+                            GameInformationDatabase.GetGameById(game).DisplayName),
+                        LocalizationManager.Instance.Get("Msg.GeneralError"));
                     return;
                 }
             }

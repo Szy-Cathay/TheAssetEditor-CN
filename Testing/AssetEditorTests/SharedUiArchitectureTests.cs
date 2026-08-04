@@ -80,6 +80,50 @@ public class SharedUiArchitectureTests
             string.Join(Environment.NewLine, failures));
     }
 
+    [TestMethod]
+    public void MigratedBusinessClasses_DoNotCreateStandardDialogsDirectly()
+    {
+        var solutionRoot = FindSolutionRoot();
+        string[] migratedFiles =
+        [
+            "AssetEditor/ViewModels/MenuBarViewModel.cs",
+            "AssetEditor/UiCommands/OpenGamePackCommand.cs",
+            "Editors/AnimationEditor/MountAnimationCreator/Services/BatchProcessorService.cs",
+            "Editors/AnimationFragmentEditor/Editor.AnimationFragmentEditor/AnimationBatchExporter/AnimationBatchExportViewModel.cs",
+            "Editors/AnimationFragmentEditor/Editor.AnimationFragmentEditor/AnimationPack/Commands/CreateEmptyWarhammer3AnimSetFileCommand.cs",
+            "Editors/AnimationFragmentEditor/Editor.AnimationFragmentEditor/AnimationPack/Commands/CreateExampleAnimationDbCommand.cs",
+            "Editors/AnimationFragmentEditor/Editor.AnimationFragmentEditor/AnimationPack/Commands/RenameSelectedFileCommand.cs",
+            "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/GltfImporter.cs",
+            "Editors/Kitbashing/KitbasherEditor/UiCommands/MergeObjectsCommand.cs",
+            "Editors/Reports/DeepSearch/DeepSearchReport.cs",
+            "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/SavePackFileContainerCommand.cs",
+        ];
+        string[] forbiddenCalls =
+        [
+            "new TextInputWindow",
+            "ErrorListWindow.ShowDialog",
+            "MessageBox.Show",
+        ];
+        var failures = new List<string>();
+
+        foreach (var relativePath in migratedFiles)
+        {
+            var text = File.ReadAllText(Path.Combine(
+                solutionRoot,
+                relativePath));
+            foreach (var forbiddenCall in forbiddenCalls)
+            {
+                if (text.Contains(forbiddenCall, StringComparison.Ordinal))
+                    failures.Add($"{relativePath}: {forbiddenCall}");
+            }
+        }
+
+        Assert.AreEqual(
+            0,
+            failures.Count,
+            string.Join(Environment.NewLine, failures));
+    }
+
     private static string[] FindForbiddenProjectReferences(
         XDocument project,
         string projectDirectory,

@@ -42,6 +42,7 @@ namespace AnimationEditor.MountAnimationCreator
         private readonly IPackFileService _pfs;
         private readonly SelectionManager _selectionManager;
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
+        private readonly IStandardDialogs _standardDialogs;
 
         SceneObject _mount;
         SceneObject _rider;
@@ -83,13 +84,15 @@ namespace AnimationEditor.MountAnimationCreator
             AnimationPlayerViewModel animationPlayerViewModel,
             SceneObjectEditor sceneObjectBuilder,
             IFileSaveService fileSaveService,
-            IUiCommandFactory uiCommandFactory)
+            IUiCommandFactory uiCommandFactory,
+            IStandardDialogs standardDialogs)
         {
             _sceneObjectViewModelBuilder = sceneObjectViewModelBuilder;
             _animationPlayerViewModel = animationPlayerViewModel;
             _sceneObjectBuilder = sceneObjectBuilder;
             _fileSaveService = fileSaveService;
             _uiCommandFactory = uiCommandFactory;
+            _standardDialogs = standardDialogs;
             _pfs = pfs;
 
             _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
@@ -314,7 +317,7 @@ namespace AnimationEditor.MountAnimationCreator
             var batchSettings = BatchProcessOptionsWindow.ShowDialog(newFileName, SavePrefixText.Value);
             if (batchSettings != null)
             {
-                var service = new BatchProcessorService(_pfs, _skeletonAnimationLookUpHelper, CreateAnimationGenerator(), batchSettings, _fileSaveService, SelectedAnimationOutputFormat.Value);
+                var service = new BatchProcessorService(_pfs, _skeletonAnimationLookUpHelper, CreateAnimationGenerator(), batchSettings, _fileSaveService, _standardDialogs, SelectedAnimationOutputFormat.Value);
                 service.Process(mountFrag, riderFrag);
                 MountLinkController.ReloadFragments(true, false);
 

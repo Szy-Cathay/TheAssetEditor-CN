@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using CommonControls.BaseDialogs;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
@@ -12,19 +11,24 @@ using Shared.Core.Services;
 namespace Editors.Reports.DeepSearch
 {
 
-    public class DeepSearchCommand(DeepSearchReport deepSearchReport) : IUiCommand
+    public class DeepSearchCommand(
+        DeepSearchReport deepSearchReport,
+        IStandardDialogs standardDialogs) : IUiCommand
     {
         public void Execute()
         {
-            var window = new TextInputWindow("Deep search - Output in console", "");
-            if (window.ShowDialog() == true)
+            var input = standardDialogs.ShowTextInputDialog(
+                "Deep search - Output in console",
+                "");
+            if (input.Result)
             {
-                if (string.IsNullOrWhiteSpace(window.TextValue))
+                if (string.IsNullOrWhiteSpace(input.Text))
                 {
-                    System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.InvalidInput"));
+                    standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.Get("Msg.InvalidInput"));
                     return;
                 }
-                deepSearchReport.DeepSearch(window.TextValue, false);
+                deepSearchReport.DeepSearch(input.Text, false);
             }
         }
     }
