@@ -78,18 +78,42 @@
 - 上游来源、版权、提交历史和说明性链接必须保留，不得作为旧身份残留批量删除。
 - 版本变更必须同步检查主程序、更新器和 `README.md`，不得全局替换版本字符串。
 
+## AI 项目上下文
+
+- 代码、项目引用和测试是当前实现的事实来源；仓库文档只补充代码不能稳定表达的约束、术语、入口和设计取舍。
+- 不要默认通读全部文档。领域词汇消歧读取 `CONTEXT.md`；跨模块定位读取 `docs/architecture.md`；文件夹工程或本地 Git 读取 `docs/folder-project-version-control.md`；IPC 读取 `docs/asseteditor-ipc.md`。完整路由见 `docs/README.md`。
+- 只有稳定契约、领域含义、关键入口或已知限制改变时才同步更新文档；内部重构、测试数量、性能快照、分支名和提交 SHA 不写入长期上下文。
+- 文档结论必须用当前代码或测试核验；历史对话、记忆、提交标题、PR 描述和上游文档只能用于定位，不能直接证明当前行为。
+- 不整包复制上游 `AiDocumentation`，也不为可由当前代码直接重建的类清单、方法说明或普通流程重复写文档。
+
 ## 仓库与编码约定
 
 - 主解决方案是 `AssetEditor.CN.sln`。
 - 主程序位于 `AssetEditor/`，是目标框架为 `net10.0-windows` 的 Windows WPF 应用。
 - `Editors/` 包含编辑器模块，`GameWorld/` 包含三维和渲染功能。
 - `Shared/` 包含共享核心、格式、资源和 UI，`Testing/` 包含主要测试项目。
-- 仓库仍有较旧目标框架的项目；未经明确要求，不批量升级框架、SDK 或依赖。
+- 当前所有项目统一目标框架为 `net10.0-windows`；框架、SDK 或依赖的全仓变更属于高影响任务，未经明确要求不得批量升级。
 - 在 Windows 环境中使用 PowerShell；文本和文件搜索优先使用 `rg`。
 - 文件操作使用明确路径和结构化 API，不跨 shell 拼接删除、移动或覆盖命令。
 - 遵循根目录 `.editorconfig`，包括空格缩进、命名、可空引用和分析器规则。
 - C# 通常使用 4 空格和 CRLF；代码注释保持简短且使用英文。
 - 不对整个仓库运行自动格式化，只格式化本次实际修改的代码。
+
+## 架构与模块边界
+
+- `AssetEditor` 是组合根；新增模块注册应沿用各项目的 `DependencyInjectionContainer` 和 `RegisterTools`，不要在视图或业务代码中临时拼装另一套服务容器。
+- `Shared/SharedCore` 放置无 WPF 业务界面的核心服务与模型，`Shared/GameFiles` 放置游戏格式，`Shared/SharedUI` 放置跨模块、无业务含义的通用 WPF 组件。
+- `Shared.Ui` 只能引用 `Shared/` 内项目，不得反向依赖 `AssetEditor`、`Editors` 或具体业务编辑器；已有 `SharedUiArchitectureTests` 是这条边界的自动门禁。
+- 只有被多个模块真实复用、无业务含义且可独立验证的 UI 才进入 `Shared.Ui`；对话框等通用依赖优先走 `IStandardDialogs` 等现有抽象。
+- 比较上游 `D:\TheAssetEditor` 时必须实时核对两边 HEAD、分支、工作区、行为、项目引用、本地化和测试；文件名相同或旧记忆不能证明功能等价。
+
+## Pack 与文件夹工程
+
+- 保持三层状态严格分离：编辑器内存中的未保存编辑、文件夹工程磁盘/Git 工作树、Git 暂存区与提交历史。不得把其中一层的状态伪装成另一层。
+- `Stage` 只选择下次提交内容，`Stash` 才会收起工作树修改；“生成 Pack”是从文件夹工程生成输出文件，不得隐式替代保存编辑器内容或 Git 提交。
+- 文件夹工程以 `aeproject.cn.json` 为当前配置文件，并要求工程根目录拥有有效的本地 Git 仓库；兼容旧配置只用于迁移，不得重新写回旧身份。
+- 输出 Pack 必须位于文件夹工程目录之外；资源路径必须是受 `FolderProjectPathPolicy` 约束的相对路径，不能绕过重解析点、保留名、控制文件和元数据目录检查。
+- 会改写大量磁盘文件的 Git 操作必须通过现有协调器关闭/重新加载工程并保留空目录状态；大型工程验收必须分别测量 Git、磁盘、重新对账和 UI 刷新阶段。
 
 ## 构建与验证
 
@@ -107,6 +131,9 @@
 - 发布链路修改必须使用全新的暂存目录验证主程序、更新器和运行时文件。
 - 不得把本地构建或本地发布目录准备完成描述为公网发布完成。
 - 报告验证时列出实际命令、退出状态、通过和跳过数量，以及未验证部分。
+- WPF 测试若涉及 `Application`、主题资源、`ResourceDictionary` 或 `Freezable`，使用 `Testing/AssetEditorTests/WpfTestApplicationHost.cs` 的单一 STA/Dispatcher 宿主；不要在各测试线程反复创建或搬运全局 WPF 状态。
+- 修改测试代码后，先重新构建受影响测试项目；不得用指向旧程序集的 `--no-build` 结果判断新代码。
+- `SharedUiArchitectureTests`、文件夹工程服务/ViewModel 测试和更新器路径安全测试属于架构门禁；修改对应边界时必须运行相关测试，不能只做编译检查。
 
 ## 版本发布
 
