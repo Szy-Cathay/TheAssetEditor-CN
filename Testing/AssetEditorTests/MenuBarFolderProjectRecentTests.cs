@@ -321,7 +321,6 @@ public class MenuBarFolderProjectRecentTests
                 packFileService,
                 Mock.Of<IGlobalEventHub>(),
                 settingsService),
-            Mock.Of<IFileSaveService>(),
             packFileContainerLoader ?? Mock.Of<IPackFileContainerLoader>(),
             openService,
             standardDialogs ?? Mock.Of<IStandardDialogs>(),

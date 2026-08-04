@@ -1072,32 +1072,6 @@ namespace Shared.Core.PackFiles
                 .Key;
         }
 
-        /// <summary>
-        /// Close all PackedFileSourceParent streams for files in a container,
-        /// releasing file handles so the pack file can be deleted/overwritten.
-        /// </summary>
-        private static void ClosePackedFileStreams(PackFileContainer container)
-        {
-            if (container is FolderProjectContainer folderProject)
-            {
-                folderProject.ExecuteSynchronized(
-                    () => ClosePackedFileStreamsCore(container));
-                return;
-            }
-
-            ClosePackedFileStreamsCore(container);
-        }
-
-        private static void ClosePackedFileStreamsCore(
-            PackFileContainer container)
-        {
-            foreach (var file in container.FileList.Values)
-            {
-                if (file.DataSource is PackedFileSource packedSource)
-                    packedSource.Parent.CloseStream();
-            }
-        }
-
         private void OnFolderProjectReconciled(
             object? sender,
             FolderProjectReconciledEventArgs e)

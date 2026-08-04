@@ -9,7 +9,6 @@ using AssetEditor.ViewModels;
 using CommonControls;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Services;
-using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.Common;
@@ -21,15 +20,13 @@ namespace AssetEditor.Views
         Point _lastMouseDown;
         IEditorInterface _draggedItem;
 
-        private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly IServiceProvider _serviceProvider;
         private readonly PackAutoSaveService _autoSaveService;
         private bool _closeCheckRunning;
         private bool _closeApproved;
 
-        public MainWindow(ApplicationSettingsService applicationSettingsService, IServiceProvider serviceProvider)
+        public MainWindow(IServiceProvider serviceProvider)
         {
-            _applicationSettingsService = applicationSettingsService;
             _serviceProvider = serviceProvider;
 
             InitializeComponent();
@@ -172,21 +169,6 @@ namespace AssetEditor.Views
             }
         }
 
-        private void OnMinimizeButtonClick(object sender, RoutedEventArgs e)
-        {
-            SystemCommands.MinimizeWindow(this);
-        }
-
-        private void OnMaximizeRestoreButtonClick(object sender, RoutedEventArgs e)
-        {
-            ToggleWindowState();
-        }
-
-        private void OnCloseButtonClick(object sender, RoutedEventArgs e)
-        {
-            SystemCommands.CloseWindow(this);
-        }
-
         private void NewWindowMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Create a new DI scope for the new window
@@ -208,11 +190,6 @@ namespace AssetEditor.Views
             // Ensure the window doesn't cover up the windows bar
             mainWindow.MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
             mainWindow.MaxWidth = SystemParameters.MaximizedPrimaryScreenWidth;
-        }
-
-        private void QuitMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
         }
 
         public void ToggleWindowState()

@@ -16,8 +16,6 @@ namespace Editors.AnimationMeta.Presentation.View
             DarkTitleBarHelper.Enable(this);
         }
 
-        private void OnOkClick(object sender, RoutedEventArgs e) => HandleOnClick();
-
         private void HandleOnClick()
         {
             var model = DataContext as NewTagWindowViewModel;
@@ -30,12 +28,6 @@ namespace Editors.AnimationMeta.Presentation.View
             }
 
             DialogResult = true;
-            Close();
-        }
-
-        private void OnCloseClick(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
             Close();
         }
 
