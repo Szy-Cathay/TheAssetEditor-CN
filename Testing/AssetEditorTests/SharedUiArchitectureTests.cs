@@ -124,6 +124,68 @@ public class SharedUiArchitectureTests
             string.Join(Environment.NewLine, failures));
     }
 
+    [TestMethod]
+    public void GripGridSplitters_UseSharedStyles()
+    {
+        const string resourcePath =
+            "pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml";
+        var solutionRoot = FindSolutionRoot();
+        var expectations = new Dictionary<string, string[]>
+        {
+            ["Editors/Kitbashing/KitbasherEditor/Core/KitbasherView.xaml"] =
+            [
+                "{StaticResource AeVerticalGridSplitterStyle}",
+                "{StaticResource AeHorizontalGridSplitterStyle}",
+            ],
+            ["Editors/Shared/Editors.Shared.Core/Common/BaseControl/EditorHostView.xaml"] =
+            ["{StaticResource AeVerticalGridSplitterStyle}"],
+            ["Editors/TwuiEditor/Editor.Twui/Editor/Presentation/TwuiMainView.xaml"] =
+            [
+                "{StaticResource AeVerticalGridSplitterStyle}",
+                "{StaticResource AeVerticalGridSplitterStyle}",
+            ],
+        };
+        XNamespace presentation =
+            "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var failures = new List<string>();
+
+        foreach (var expectation in expectations)
+        {
+            var document = XDocument.Load(Path.Combine(
+                solutionRoot,
+                expectation.Key));
+            var sources = document
+                .Descendants(presentation + "ResourceDictionary")
+                .Select(element => (string?)element.Attribute("Source"));
+            if (!sources.Contains(resourcePath, StringComparer.Ordinal))
+                failures.Add($"{expectation.Key}: shared resource missing");
+
+            var splitters = document
+                .Descendants(presentation + "GridSplitter")
+                .ToArray();
+            var styles = splitters
+                .Select(element => (string?)element.Attribute("Style"))
+                .ToArray();
+            if (!styles.SequenceEqual(expectation.Value))
+            {
+                failures.Add(
+                    $"{expectation.Key}: unexpected styles " +
+                    string.Join(", ", styles.Select(style => style ?? "<none>")));
+            }
+
+            if (splitters.Any(element =>
+                    element.Element(presentation + "GridSplitter.Template") != null))
+            {
+                failures.Add($"{expectation.Key}: inline template remains");
+            }
+        }
+
+        Assert.AreEqual(
+            0,
+            failures.Count,
+            string.Join(Environment.NewLine, failures));
+    }
+
     private static string[] FindForbiddenProjectReferences(
         XDocument project,
         string projectDirectory,

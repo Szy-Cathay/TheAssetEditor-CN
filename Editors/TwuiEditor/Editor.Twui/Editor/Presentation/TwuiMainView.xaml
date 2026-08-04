@@ -6,6 +6,14 @@
              xmlns:local="clr-namespace:Editors.Twui.Editor.Presentation" xmlns:componenteditor="clr-namespace:Editors.Twui.Editor.ComponentEditor"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto"/>
@@ -17,29 +25,13 @@
 
         <local:HierarchyView Grid.Column="0"/>
 
-        <GridSplitter Grid.Column="1"  HorizontalAlignment="Stretch">
-            <GridSplitter.Template>
-                <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⁞" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
-                </ControlTemplate>
-            </GridSplitter.Template>
-        </GridSplitter>
+        <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
+                      Style="{StaticResource AeVerticalGridSplitterStyle}" />
 
         <ContentControl  Grid.Column="2"  Content="{Binding Path=Scene, UpdateSourceTrigger=PropertyChanged, Mode=OneTime}"/>
 
-        <GridSplitter Grid.Column="3"  HorizontalAlignment="Stretch">
-            <GridSplitter.Template>
-                <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⁞" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
-                </ControlTemplate>
-            </GridSplitter.Template>
-        </GridSplitter>
+        <GridSplitter Grid.Column="3" HorizontalAlignment="Stretch"
+                      Style="{StaticResource AeVerticalGridSplitterStyle}" />
 
         <componenteditor:ComponentView Grid.Column="4" DataContext="{Binding ComponentManager, UpdateSourceTrigger=PropertyChanged}" />
 

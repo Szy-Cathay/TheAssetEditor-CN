@@ -14,6 +14,14 @@
              d:DesignHeight="450" d:DesignWidth="800"
              AllowDrop="True">
 
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.Style>
             <Style TargetType="{x:Type Grid}">
@@ -129,29 +137,14 @@
                       HorizontalAlignment="Stretch"
                       Cursor="SizeWE"
                       ResizeDirection="Columns"
-                      ResizeBehavior="PreviousAndNext">
-            <GridSplitter.Template>
-                <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⁞" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
-                </ControlTemplate>
-            </GridSplitter.Template>
-        </GridSplitter>
+                      ResizeBehavior="PreviousAndNext"
+                      Style="{StaticResource AeVerticalGridSplitterStyle}" />
 
         <local:SceneExplorerView DataContext="{Binding SceneExplorer}"  Grid.Row="0" Grid.RowSpan="3" Grid.Column="2"/>
 
-        <GridSplitter Grid.Row="3"  Grid.Column="2" HorizontalAlignment="Stretch">
-            <GridSplitter.Template>
-                <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⋯" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
-                </ControlTemplate>
-            </GridSplitter.Template>
-        </GridSplitter>
+        <GridSplitter Grid.Row="3" Grid.Column="2"
+                      HorizontalAlignment="Stretch"
+                      Style="{StaticResource AeHorizontalGridSplitterStyle}" />
 
         <local:SceneItemEditorView DataContext="{Binding SceneNodeEditor, Mode=OneTime}" Grid.Row="4" Grid.Column="2"/>
     </Grid>

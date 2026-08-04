@@ -10,7 +10,12 @@
              mc:Ignorable="d" >
 
     <UserControl.Resources>
-        <basecontrol:HostTemplateSelector x:Key="EditorSelector" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <basecontrol:HostTemplateSelector x:Key="EditorSelector" />
+        </ResourceDictionary>
     </UserControl.Resources>
     
     <Grid>
@@ -40,16 +45,8 @@
         <ContentControl Grid.Row="2" Grid.Column="0" Content="{Binding GameWorld, Mode=OneTime}"/>
 
         <GridSplitter Grid.Row="1" Grid.RowSpan="3" Grid.Column="1"  HorizontalAlignment="Stretch"
-                      ResizeBehavior="PreviousAndNext" ShowsPreview="False">
-            <GridSplitter.Template>
-                <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⁞" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
-                </ControlTemplate>
-            </GridSplitter.Template>
-        </GridSplitter>
+                      ResizeBehavior="PreviousAndNext" ShowsPreview="False"
+                      Style="{StaticResource AeVerticalGridSplitterStyle}" />
         <Grid Grid.Row="1" Grid.Column="2" Grid.RowSpan="3" >
             <Grid.RowDefinitions>
                 <RowDefinition Height="auto"/>
