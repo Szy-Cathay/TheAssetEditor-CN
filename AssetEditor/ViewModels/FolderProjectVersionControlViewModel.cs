@@ -1723,6 +1723,10 @@ public partial class FolderProjectVersionControlViewModel :
         await RunOperationAsync(
             async () =>
             {
+                ReportVersionControlProgress(
+                    new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage.PreparingMerge,
+                        $"{sourceBranch} → {targetBranch}"));
                 var result = await ExecuteCoordinatedAsync(
                     () => BeginMergeIntoTarget(
                         sourceBranch,
@@ -1757,7 +1761,8 @@ public partial class FolderProjectVersionControlViewModel :
 
             return _versionControlService.BeginMerge(
                 ProjectRoot,
-                sourceBranch);
+                sourceBranch,
+                ReportVersionControlProgress);
         }
         catch (Exception mergeException)
         {

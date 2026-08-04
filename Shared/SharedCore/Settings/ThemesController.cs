@@ -20,6 +20,8 @@ namespace Shared.Core.Settings
 
     public static class ThemesController
     {
+        private static FontFamily? _defaultFontFamily;
+
         public static ThemeType CurrentTheme { get; set; } = ThemeType.DarkTheme;
 
         // Callback for external theme systems (e.g. WPF-UI) that live outside Shared.Core
@@ -89,6 +91,8 @@ namespace Shared.Core.Settings
             CurrentTheme = theme;
             ThemeDictionary = new ResourceDictionary() { Source = new Uri($"Themes/ColourDictionaries/{themeName}.xaml", UriKind.Relative) };
             ControlColours = new ResourceDictionary() { Source = new Uri("Themes/ControlColours.xaml", UriKind.Relative) };
+            _defaultFontFamily =
+                ControlColours["AppFontFamily"] as FontFamily;
             RefreshControls();
 
             // Re-apply custom font since ControlColours.xaml was recreated
@@ -120,14 +124,25 @@ namespace Shared.Core.Settings
         /// Apply a custom font to the AppFontFamily resource.
         /// Call after SetTheme() and on startup to persist font across theme switches.
         /// </summary>
-        public static string CurrentFontUri { get; private set; }
+        public static string? CurrentFontUri { get; private set; }
 
-        public static void ApplyCustomFont(string fontPackUri)
+        public static void ApplyCustomFont(string? fontPackUri)
         {
             CurrentFontUri = fontPackUri;
             var colours = FindDictionary("ControlColours.xaml");
-            if (colours != null && !string.IsNullOrEmpty(fontPackUri))
+            if (colours == null)
+                return;
+
+            _defaultFontFamily ??=
+                colours["AppFontFamily"] as FontFamily;
+            if (!string.IsNullOrEmpty(fontPackUri))
+            {
                 colours["AppFontFamily"] = new FontFamily(fontPackUri);
+                return;
+            }
+
+            if (_defaultFontFamily != null)
+                colours["AppFontFamily"] = _defaultFontFamily;
         }
 
         internal static void ReApplyCustomFont()

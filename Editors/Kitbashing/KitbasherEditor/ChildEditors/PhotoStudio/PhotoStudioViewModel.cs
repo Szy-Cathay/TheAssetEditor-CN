@@ -13,7 +13,7 @@ using Shared.Ui.BaseDialogs.MathViews;
 
 namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
 {
-    public partial class PhotoStudioViewModel : ObservableObject
+    public partial class PhotoStudioViewModel : ObservableObject, IDisposable
     {
         private readonly Action<SaveRenderImageSettings>
             _requestCapture;
@@ -22,6 +22,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
         private readonly ArcBallCamera _arcBallCamera;
         private readonly IStandardDialogs _standardDialogs;
         private readonly SynchronizationContext? _uiContext;
+        private readonly IDisposable _lightingOverride;
         private bool _allowUpdates;
 
         [ObservableProperty]
@@ -82,6 +83,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
             _arcBallCamera = arcBallCamera;
             _standardDialogs = standardDialogs;
             _uiContext = SynchronizationContext.Current;
+            _lightingOverride =
+                sceneRenderParameterStore.BeginLightingOverride();
 
             _cameraPosition = new Vector3ViewModel(
                 arcBallCamera.Position,
@@ -548,6 +551,11 @@ namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
             return LocalizationManager.Instance is { } localization
                 ? localization.Get(key)
                 : fallback;
+        }
+
+        public void Dispose()
+        {
+            _lightingOverride.Dispose();
         }
     }
 }

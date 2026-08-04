@@ -168,6 +168,18 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
+    public void RenderingMenu_DoesNotExposeLegacyRenderSettingsWindow()
+    {
+        var renderingMenu = _editor.MenuBar.MenuItems.Single(
+            item => item.NameAttribute.Value == "渲染");
+
+        Assert.That(
+            renderingMenu.Children.Select(
+                item => item.NameAttribute.Value),
+            Has.None.EqualTo("打开渲染设置"));
+    }
+
+    [Test]
     public void CreateBoxUiCommand_CreatesSelectableUndoableMesh()
     {
         var commandFactory =

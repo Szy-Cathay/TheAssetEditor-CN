@@ -37,7 +37,19 @@ namespace GameWorld.Core.Components
         private readonly VertexPositionTexture[] _quadVertices = new VertexPositionTexture[4];
         private bool _firstRenderLogged = false;
 
-        public bool ShowGrid { get; set; } = true;
+        private bool _showGrid = true;
+        private bool? _visibilityOverride;
+
+        public bool ShowGrid
+        {
+            get => _visibilityOverride ?? _showGrid;
+            set => _showGrid = value;
+        }
+
+        public void SetVisibilityOverride(bool? isVisible)
+        {
+            _visibilityOverride = isVisible;
+        }
         // Pure black: grid lines invisible, only axis lines (red X / blue Z) visible
         public Vector3 GridColur { get; set; } = new Vector3(0f, 0f, 0f);
 

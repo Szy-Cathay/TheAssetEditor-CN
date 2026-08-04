@@ -9,6 +9,7 @@ using AssetEditor.ViewModels;
 using CommonControls;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.Common;
@@ -30,6 +31,11 @@ namespace AssetEditor.Views
             _serviceProvider = serviceProvider;
 
             InitializeComponent();
+            WindowState = serviceProvider
+                .GetRequiredService<ApplicationSettingsService>()
+                .CurrentSettings.StartMaximised
+                ? WindowState.Maximized
+                : WindowState.Normal;
 
             DarkTitleBarHelper.Enable(this);
             KeyDown += MainWindow_KeyDown;

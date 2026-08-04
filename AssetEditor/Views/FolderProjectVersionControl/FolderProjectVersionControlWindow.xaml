@@ -18,6 +18,9 @@
     ResizeMode="CanResize"
     WindowStartupLocation="CenterOwner"
     Style="{StaticResource CustomWindowStyle}">
+    <windowhandling:AssetEditorWindow.Resources>
+        <ResourceDictionary Source="FolderProjectGitStyles.xaml" />
+    </windowhandling:AssetEditorWindow.Resources>
     <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -166,7 +169,7 @@
                 Padding="18"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="{DynamicResource ABrush.Foreground.Deeper}">
+                Style="{StaticResource GitSurfaceBorderStyle}">
                 <progress:OperationProgressView
                     CurrentDetailText="{Binding LoadingProgressDetailText}"
                     IsOperationActive="{Binding IsLoadingOperation}"

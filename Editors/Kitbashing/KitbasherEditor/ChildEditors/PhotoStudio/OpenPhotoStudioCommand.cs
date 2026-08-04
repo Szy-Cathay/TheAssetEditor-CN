@@ -53,6 +53,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
             object? sender,
             EventArgs eventArgs)
         {
+            (_windowInstance?.DataContext as IDisposable)?.Dispose();
             if (_windowInstance != null)
                 _windowInstance.Closed -= OnWindowClosed;
 

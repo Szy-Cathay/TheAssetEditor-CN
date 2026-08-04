@@ -70,7 +70,7 @@ namespace Editors.CscEditor.Services
             _context.LookThroughElementId = -1;
             _camera.ViewMatrixOverride = null;
             _camera.ProjectionMatrixOverride = null;
-            _gridComponent.ShowGrid = true;
+            _gridComponent.SetVisibilityOverride(null);
             _renderEngine.SquareViewport = false;
             PortholeLiveFrame = null;
             PortholeFrameUpdated?.Invoke();
@@ -342,7 +342,7 @@ namespace Editors.CscEditor.Services
                 Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(fovDegrees), 1f, near, far) * Matrix.CreateScale(-1, 1, 1);
 
             // The editing grid shouldn't show through the transparent background (see CscEditorView.xaml's overlay).
-            _gridComponent.ShowGrid = false;
+            _gridComponent.SetVisibilityOverride(false);
         }
 
         /// <summary>World transform of the parent's attach bone (in the parent's local space) when

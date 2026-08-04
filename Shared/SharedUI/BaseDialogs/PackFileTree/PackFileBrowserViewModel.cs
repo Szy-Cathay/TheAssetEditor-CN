@@ -29,6 +29,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private readonly IContextMenuBuilder _contextMenuBuilder;
         private readonly IFolderProjectVersionControlService?
             _versionControlService;
+        private readonly bool _showCaFiles;
         private readonly Dictionary<string, FolderProjectTreeState>
             _detachedFolderProjectStates =
                 new(StringComparer.OrdinalIgnoreCase);
@@ -44,9 +45,12 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         public SearchFilter Filter { get; private set; }
         public Task GitStatusRefreshTask { get; private set; } =
             Task.CompletedTask;
+        public Task CaWemRefreshTask { get; private set; } =
+            Task.CompletedTask;
 
         [ObservableProperty] TreeNode _selectedItem;
         [ObservableProperty] ObservableCollection<ContextMenuItem2> _contextMenu = [];
+        [ObservableProperty] bool _isRefreshingCaWemFiles;
 
         public bool ShowFoldersOnly { get; }
 
@@ -57,6 +61,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             _applicationSettingsService = applicationSettingsService;
             _contextMenuBuilder = contextMenuBuilder;
             _versionControlService = versionControlService;
+            _showCaFiles = showCaFiles;
 
             ShowFoldersOnly = showFoldersOnly;
 
@@ -74,6 +79,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                 this,
                 ApplyFolderProjectChangeSet);
             _eventHub?.Register<PackFileContainerSavedEvent>(this, ContainerSaved);
+            _eventHub?.Register<ShowCaWemFilesChangedEvent>(
+                this,
+                OnShowCaWemFilesChanged);
 
             Filter = new SearchFilter(Files);
             Filter.ShowFoldersOnly = ShowFoldersOnly;
@@ -86,6 +94,34 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
                 if (loadFile)
                     ReloadTree(item);
+            }
+        }
+
+        private void OnShowCaWemFilesChanged(
+            ShowCaWemFilesChangedEvent changedEvent)
+        {
+            if (!_showCaFiles)
+                return;
+
+            CaWemRefreshTask = RefreshCaWemFilesAsync();
+        }
+
+        private async Task RefreshCaWemFilesAsync()
+        {
+            IsRefreshingCaWemFiles = true;
+            await Task.Yield();
+            try
+            {
+                foreach (var container in _packFileService
+                    .GetAllPackfileContainers()
+                    .Where(value => value.IsCaPackFile))
+                {
+                    ReloadTree(container);
+                }
+            }
+            finally
+            {
+                IsRefreshingCaWemFiles = false;
             }
         }
 

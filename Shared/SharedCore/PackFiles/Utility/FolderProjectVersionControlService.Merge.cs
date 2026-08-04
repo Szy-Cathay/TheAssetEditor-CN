@@ -32,7 +32,23 @@ public sealed partial class FolderProjectVersionControlService
         return ExecuteMergeLocked(
             projectRoot,
             root => Execute(
-                () => BeginMergeCore(root, sourceLocalBranch)));
+                () => BeginMergeCore(root, sourceLocalBranch, null)));
+    }
+
+    public FolderProjectMergeStartResult BeginMerge(
+        string projectRoot,
+        string sourceLocalBranch,
+        Action<FolderProjectVersionControlProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        ValidateBranchName(sourceLocalBranch);
+        return ExecuteMergeLocked(
+            projectRoot,
+            root => Execute(
+                () => BeginMergeCore(
+                    root,
+                    sourceLocalBranch,
+                    reportProgress)));
     }
 
     public FolderProjectMergeState ResolveMergeConflict(
@@ -83,7 +99,8 @@ public sealed partial class FolderProjectVersionControlService
 
     private FolderProjectMergeStartResult BeginMergeCore(
         string projectRoot,
-        string sourceLocalBranch)
+        string sourceLocalBranch,
+        Action<FolderProjectVersionControlProgress>? reportProgress)
     {
         using var repository = OpenRepository(projectRoot);
         var existingState = GetMergeStateCore(repository);
@@ -110,6 +127,11 @@ public sealed partial class FolderProjectVersionControlService
 
         var currentTip = currentBranch.Tip!;
         var sourceTip = sourceBranch.Tip;
+        var mergeDetail =
+            $"{sourceBranch.FriendlyName} → {currentBranch.FriendlyName}";
+        reportProgress?.Invoke(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.PreparingMerge,
+            mergeDetail));
         EnsureMergeTreeSupported(repository, currentTip.Tree);
         EnsureMergeTreeSupported(repository, sourceTip.Tree);
         EnsureNoIgnoredTargetCollisions(
@@ -131,6 +153,7 @@ public sealed partial class FolderProjectVersionControlService
 
         if (divergence.BehindBy == 0)
         {
+            ReportMergeVerificationCompleted(reportProgress, mergeDetail);
             return new FolderProjectMergeStartResult(
                 FolderProjectMergeOutcome.UpToDate,
                 ToSummary(currentTip),
@@ -210,6 +233,14 @@ public sealed partial class FolderProjectVersionControlService
                         targetPaths,
                         path,
                         flags),
+                OnCheckoutProgress = (path, completedSteps, totalSteps) =>
+                    reportProgress?.Invoke(
+                        new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage
+                                .MergingFiles,
+                            path?.Replace('\\', '/'),
+                            completedSteps,
+                            totalSteps)),
             });
         if (fastForward)
         {
@@ -225,6 +256,7 @@ public sealed partial class FolderProjectVersionControlService
             }
 
             store.Delete();
+            ReportMergeVerificationCompleted(reportProgress, mergeDetail);
             return new FolderProjectMergeStartResult(
                 FolderProjectMergeOutcome.FastForwarded,
                 ToSummary(sourceTip),
@@ -261,12 +293,24 @@ public sealed partial class FolderProjectVersionControlService
                 FolderProjectVersionControlError.MergeRecoveryRequired,
                 "The merge conflict state could not be verified.");
         }
+        ReportMergeVerificationCompleted(reportProgress, mergeDetail);
         return new FolderProjectMergeStartResult(
             state.Phase == FolderProjectMergePhase.Conflicts
                 ? FolderProjectMergeOutcome.Conflicts
                 : FolderProjectMergeOutcome.ReadyToCommit,
             null,
             state);
+    }
+
+    private static void ReportMergeVerificationCompleted(
+        Action<FolderProjectVersionControlProgress>? reportProgress,
+        string detail)
+    {
+        reportProgress?.Invoke(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.VerifyingMerge,
+            detail,
+            1,
+            1));
     }
 
     private FolderProjectMergeState ResolveMergeConflictCore(

@@ -2692,6 +2692,75 @@ public class FolderProjectVersionControlViewModelTests
     }
 
     [NUnit.Framework.Test]
+    public async Task BeginMerge_ExposesNativeFileProgress()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var service = CreateService();
+        service.Setup(item => item.GetStatus(ProjectRoot))
+            .Returns(Status());
+        service.Setup(item => item.BeginMerge(
+                ProjectRoot,
+                "feature",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string _,
+                    string _,
+                    Action<FolderProjectVersionControlProgress> progress) =>
+                {
+                    progress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage.MergingFiles,
+                        "db/units.tsv",
+                        3,
+                        7));
+                    entered.Set();
+                    release.Wait(TimeSpan.FromSeconds(5));
+                    return new FolderProjectMergeStartResult(
+                        FolderProjectMergeOutcome.UpToDate,
+                        Commit(),
+                        MergeState(FolderProjectMergePhase.None));
+                });
+        var viewModel = CreateViewModel(
+            service,
+            dialogs: ConfirmingDialogs().Object);
+        await OpenProjectAsync(viewModel, ProjectRoot, "测试工程", false);
+        viewModel.SelectedMergeSource =
+            viewModel.MergeSources.Single(item => item.Name == "feature");
+
+        var operation = ExecuteAsync(viewModel.BeginMergeCommand);
+        try
+        {
+            NUnit.Framework.Assert.That(
+                entered.Wait(TimeSpan.FromSeconds(5)),
+                Is.True);
+            NUnit.Framework.Assert.Multiple(() =>
+            {
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressStatusText,
+                    Is.EqualTo("正在写入合并文件"));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressDetailText,
+                    Is.EqualTo("db/units.tsv"));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressValue,
+                    Is.EqualTo(3));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressMaximum,
+                    Is.EqualTo(7));
+                NUnit.Framework.Assert.That(
+                    viewModel.LoadingProgressIsIndeterminate,
+                    Is.False);
+            });
+        }
+        finally
+        {
+            release.Set();
+            await operation;
+        }
+    }
+
+    [NUnit.Framework.Test]
     public async Task SwitchBranch_DirtyRepository_OpensVsChoiceWithoutSwitching()
     {
         var service = CreateService();
@@ -3942,6 +4011,16 @@ public class FolderProjectVersionControlViewModelTests
                     string commitId,
                     Action<FolderProjectVersionControlProgress> _) =>
                     service.Object.GetCommitChanges(projectRoot, commitId));
+        service.Setup(item => item.BeginMerge(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+                (
+                    string projectRoot,
+                    string sourceBranch,
+                    Action<FolderProjectVersionControlProgress> _) =>
+                    service.Object.BeginMerge(projectRoot, sourceBranch));
         service.Setup(item => item.GetIdentity(ProjectRoot))
             .Returns(new FolderProjectGitIdentity("测试者", "test@example.com"));
         service.Setup(item => item.GetHistory(

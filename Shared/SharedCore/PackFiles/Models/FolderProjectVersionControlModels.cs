@@ -95,6 +95,9 @@ public enum FolderProjectVersionControlProgressStage
     ReadingCommitChanges,
     ProcessingCommitChanges,
     ReadingMergeState,
+    PreparingMerge,
+    MergingFiles,
+    VerifyingMerge,
 }
 
 public sealed record FolderProjectVersionControlProgress(

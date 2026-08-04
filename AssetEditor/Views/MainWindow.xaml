@@ -17,9 +17,10 @@
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
         mc:Ignorable="d"
         x:Name="window"
-        Width="1920"
-        Height="1080"
+        Width="1440"
+        Height="900"
         ResizeMode="CanResize"
+        WindowStartupLocation="CenterScreen"
         Title="{Binding ApplicationTitle, UpdateSourceTrigger=PropertyChanged}"
         FontFamily="{DynamicResource AppFontFamily}"
         Background="{DynamicResource WindowBackground}">

@@ -167,6 +167,11 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         string sourceLocalBranch);
 
+    FolderProjectMergeStartResult BeginMerge(
+        string projectRoot,
+        string sourceLocalBranch,
+        Action<FolderProjectVersionControlProgress> reportProgress);
+
     FolderProjectMergeState ResolveMergeConflict(
         string projectRoot,
         string conflictId,
