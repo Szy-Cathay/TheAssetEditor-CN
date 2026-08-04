@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.Misc;
 using Shared.Core.Services;
 using Shared.Core.Settings;
@@ -72,11 +73,6 @@ namespace GameWorld.Core.Components.Rendering
             UpdateOrder = (int)ComponentUpdateOrderEnum.RenderEngine;
             DrawOrder = (int)ComponentDrawOrderEnum.RenderEngine;
 
-            var settings = applicationSettingsService.CurrentSettings;
-            if (settings.RenderEngineBackgroundColour == BackgroundColour.Custom)
-                _backgroundColour = ApplicationSettingsHelper.ParseCustomBackgroundColour(settings.CustomBackgroundColour);
-            else
-                _backgroundColour = ApplicationSettingsHelper.GetEnumAsColour(settings.RenderEngineBackgroundColour);
             _wpfGame = wpfGame;
             _resourceLibrary = resourceLibrary;
             _camera = camera;
@@ -86,12 +82,50 @@ namespace GameWorld.Core.Components.Rendering
             _eventHub = eventHub;
             _gridComponent = gridComponent;
 
+            ApplyViewportSettings(
+                ViewportRenderSettings.From(
+                    applicationSettingsService.CurrentSettings));
+
             foreach (RenderBuckedId value in Enum.GetValues(typeof(RenderBuckedId)))
                 _renderItems.Add(value, new List<IRenderItem>(100));
 
             _renderLines = new List<VertexPositionColor>(1000);
 
             _eventHub.Register<SelectionChangedEvent>(this, OnSelectionChanged);
+            _eventHub.Register<ViewportRenderSettingsChangedEvent>(
+                this,
+                OnViewportRenderSettingsChanged);
+        }
+
+        private void OnViewportRenderSettingsChanged(
+            ViewportRenderSettingsChangedEvent changedEvent)
+        {
+            ApplyViewportSettings(changedEvent.Settings);
+        }
+
+        private void ApplyViewportSettings(
+            ViewportRenderSettings settings)
+        {
+            _backgroundColour = settings.BackgroundColour ==
+                BackgroundColour.Custom
+                    ? ApplicationSettingsHelper.ParseCustomBackgroundColour(
+                        settings.CustomBackgroundColour)
+                    : ApplicationSettingsHelper.GetEnumAsColour(
+                        settings.BackgroundColour);
+
+            if (_rasterStates.Count == 0)
+                _cullingEnabled = settings.SimulateGameBackfaces;
+            else if (_cullingEnabled != settings.SimulateGameBackfaces)
+                RebuildRasterStates(
+                    settings.SimulateGameBackfaces,
+                    _bigSceneDepthBiasMode);
+
+            _gridComponent.ShowGrid = settings.ShowGrid;
+            _gridComponent.GridColur =
+                ApplicationSettingsHelper.ParseCustomBackgroundColour(
+                    settings.GridColour).ToVector3();
+
+            _sceneLightParameters.ApplyGlobalLighting(settings);
         }
 
         public void SaveNextFrame(

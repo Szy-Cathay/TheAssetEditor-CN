@@ -1,9 +1,14 @@
 ﻿using Microsoft.Xna.Framework;
 
+using Shared.Core.Settings;
+
 namespace GameWorld.Core.Components.Rendering
 {
     public class SceneRenderParametersStore
     {
+        private ViewportRenderSettings? _globalLighting;
+        private int _lightingOverrideCount;
+
         public float EnvLightRotationDegrees_Y { get; set; } = 20;
         public float DirLightRotationDegrees_X { get; set; } = 0;
         public float DirLightRotationDegrees_Y { get; set; } = 0;
@@ -18,5 +23,48 @@ namespace GameWorld.Core.Components.Rendering
         public Vector3 FactionColour0 { get; set; } = Color.Red.ToVector3();
         public Vector3 FactionColour1 { get; set; } = Color.Blue.ToVector3();
         public Vector3 FactionColour2 { get; set; } = Color.White.ToVector3();
+
+        public void ApplyGlobalLighting(ViewportRenderSettings settings)
+        {
+            _globalLighting = settings;
+            if (_lightingOverrideCount == 0)
+                ApplyLighting(settings);
+        }
+
+        public IDisposable BeginLightingOverride()
+        {
+            _lightingOverrideCount++;
+            return new LightingOverride(this);
+        }
+
+        private void EndLightingOverride()
+        {
+            if (_lightingOverrideCount == 0)
+                return;
+
+            _lightingOverrideCount--;
+            if (_lightingOverrideCount == 0 && _globalLighting != null)
+                ApplyLighting(_globalLighting);
+        }
+
+        private void ApplyLighting(ViewportRenderSettings settings)
+        {
+            LightIntensityMult = settings.LightIntensity;
+            EnvLightRotationDegrees_Y = settings.EnvironmentLightRotationY;
+            DirLightRotationDegrees_X = settings.DirectLightRotationX;
+            DirLightRotationDegrees_Y = settings.DirectLightRotationY;
+        }
+
+        private sealed class LightingOverride(
+            SceneRenderParametersStore owner) : IDisposable
+        {
+            private SceneRenderParametersStore? _owner = owner;
+
+            public void Dispose()
+            {
+                _owner?.EndLightingOverride();
+                _owner = null;
+            }
+        }
     }
 }

@@ -14,6 +14,7 @@
              x:Name="mystuff">
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <valueconverters:PackFileToImageValueConverter x:Key="ImageValueConverter"/>
         <valueconverters:SortedCollectionViewSource x:Key="SortedCollectionViewSource" Property0="NodeType" Property1="Name"/>
     </UserControl.Resources>
@@ -199,5 +200,31 @@
                 </HierarchicalDataTemplate>
             </TreeView.ItemTemplate>
         </TreeView>
+
+        <Border
+            Grid.RowSpan="3"
+            Panel.ZIndex="10"
+            Background="#B0202020"
+            Visibility="{Binding IsRefreshingCaWemFiles, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border
+                Width="280"
+                Padding="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{DynamicResource WindowBackground}"
+                BorderBrush="{DynamicResource TextBox.Static.Border}"
+                BorderThickness="1"
+                CornerRadius="4">
+                <StackPanel>
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        Text="{loc:Loc Shared.PackFileBrowser.RefreshingCaWem}"/>
+                    <ProgressBar
+                        Height="4"
+                        Margin="0,12,0,0"
+                        IsIndeterminate="True"/>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

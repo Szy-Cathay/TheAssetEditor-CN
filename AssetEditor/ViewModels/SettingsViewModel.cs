@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using System.Windows.Input;
+using AssetEditor.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Shared.Core.Misc;
@@ -15,6 +17,14 @@ namespace AssetEditor.ViewModels
     partial class SettingsViewModel : ObservableObject
     {
         private readonly ApplicationSettingsService _settingsService;
+        private readonly ApplicationSettingsApplier _settingsApplier;
+        private readonly IStandardDialogs _standardDialogs;
+        private readonly ThemeType _originalTheme;
+        private readonly AppFontFamily _originalFont;
+        private readonly string _originalFontWeight;
+        private bool _allowPreview;
+
+        public bool IsSaved { get; private set; }
 
         public ObservableCollection<ThemeType> AvailableThemes { get; set; } = [];
         public ObservableCollection<BackgroundColour> RenderEngineBackgroundColours { get; set; } = [];
@@ -26,18 +36,26 @@ namespace AssetEditor.ViewModels
         [ObservableProperty] private ThemeType _currentTheme;
         partial void OnCurrentThemeChanged(ThemeType value)
         {
-            ThemesController.SetTheme(value);
+            if (_allowPreview)
+                ThemesController.SetTheme(value);
         }
 
         [ObservableProperty] private BackgroundColour _currentRenderEngineBackgroundColour;
         partial void OnCurrentRenderEngineBackgroundColourChanged(BackgroundColour value)
         {
             IsCustomBackgroundVisible = value == BackgroundColour.Custom;
+            PreviewViewportIfValid();
         }
         [ObservableProperty] private bool _isCustomBackgroundVisible;
         [ObservableProperty] private string _customBackgroundR;
         [ObservableProperty] private string _customBackgroundG;
         [ObservableProperty] private string _customBackgroundB;
+        partial void OnCustomBackgroundRChanged(string value) =>
+            PreviewViewportIfValid();
+        partial void OnCustomBackgroundGChanged(string value) =>
+            PreviewViewportIfValid();
+        partial void OnCustomBackgroundBChanged(string value) =>
+            PreviewViewportIfValid();
         [ObservableProperty] private AppFontFamily _selectedFont;
         partial void OnSelectedFontChanged(AppFontFamily value)
         {
@@ -52,9 +70,13 @@ namespace AssetEditor.ViewModels
                 SelectedFontWeight = FontSettingsHelper.GetDefaultWeight(value);
             else if (weights.Length == 0)
                 SelectedFontWeight = null;
+
+            ApplyFontPreview();
         }
 
-        [ObservableProperty] private string _selectedFontWeight;
+        [ObservableProperty] private string? _selectedFontWeight;
+        partial void OnSelectedFontWeightChanged(string? value) =>
+            ApplyFontPreview();
         [ObservableProperty] private bool _startMaximised;
         [ObservableProperty] private GameTypeEnum _currentGame;
         [ObservableProperty] private bool _showCAWemFiles;
@@ -70,9 +92,46 @@ namespace AssetEditor.ViewModels
         // Compression settings
         [ObservableProperty] private bool _useZstdCompression;
 
-        public SettingsViewModel(ApplicationSettingsService settingsService)
+        [ObservableProperty] private bool _simulateGameBackfaces;
+        partial void OnSimulateGameBackfacesChanged(bool value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private bool _showViewportGrid;
+        partial void OnShowViewportGridChanged(bool value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportGridColourR;
+        partial void OnViewportGridColourRChanged(string value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportGridColourG;
+        partial void OnViewportGridColourGChanged(string value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportGridColourB;
+        partial void OnViewportGridColourBChanged(string value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportLightIntensity;
+        partial void OnViewportLightIntensityChanged(string value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportEnvironmentLightRotationY;
+        partial void OnViewportEnvironmentLightRotationYChanged(string value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportDirectLightRotationX;
+        partial void OnViewportDirectLightRotationXChanged(string value) =>
+            PreviewViewportIfValid();
+        [ObservableProperty] private string _viewportDirectLightRotationY;
+        partial void OnViewportDirectLightRotationYChanged(string value) =>
+            PreviewViewportIfValid();
+
+        public SettingsViewModel(
+            ApplicationSettingsService settingsService,
+            ApplicationSettingsApplier settingsApplier,
+            IStandardDialogs standardDialogs)
         {
             _settingsService = settingsService;
+            _settingsApplier = settingsApplier;
+            _standardDialogs = standardDialogs;
+            _originalTheme = settingsService.CurrentSettings.Theme;
+            _originalFont = settingsService.CurrentSettings.AppFont;
+            _originalFontWeight =
+                settingsService.CurrentSettings.AppFontWeight;
 
             AvailableThemes = new ObservableCollection<ThemeType>((ThemeType[])Enum.GetValues(typeof(ThemeType)));
             CurrentTheme = _settingsService.CurrentSettings.Theme;
@@ -86,6 +145,38 @@ namespace AssetEditor.ViewModels
             CustomBackgroundG = rgbParts.Length > 1 ? rgbParts[1].Trim() : "50";
             CustomBackgroundB = rgbParts.Length > 2 ? rgbParts[2].Trim() : "50";
             IsCustomBackgroundVisible = CurrentRenderEngineBackgroundColour == BackgroundColour.Custom;
+
+            SimulateGameBackfaces =
+                _settingsService.CurrentSettings.SimulateGameBackfaces;
+            ShowViewportGrid =
+                _settingsService.CurrentSettings.ShowViewportGrid;
+            var gridRgb = (_settingsService.CurrentSettings
+                    .ViewportGridColour ?? "0,0,0")
+                .Split(',');
+            ViewportGridColourR = gridRgb.Length > 0
+                ? gridRgb[0].Trim()
+                : "0";
+            ViewportGridColourG = gridRgb.Length > 1
+                ? gridRgb[1].Trim()
+                : "0";
+            ViewportGridColourB = gridRgb.Length > 2
+                ? gridRgb[2].Trim()
+                : "0";
+            ViewportLightIntensity =
+                _settingsService.CurrentSettings.ViewportLightIntensity
+                    .ToString(CultureInfo.InvariantCulture);
+            ViewportEnvironmentLightRotationY =
+                _settingsService.CurrentSettings
+                    .ViewportEnvironmentLightRotationY
+                    .ToString(CultureInfo.InvariantCulture);
+            ViewportDirectLightRotationX =
+                _settingsService.CurrentSettings
+                    .ViewportDirectLightRotationX
+                    .ToString(CultureInfo.InvariantCulture);
+            ViewportDirectLightRotationY =
+                _settingsService.CurrentSettings
+                    .ViewportDirectLightRotationY
+                    .ToString(CultureInfo.InvariantCulture);
 
             // Font settings
             AvailableFonts = new ObservableCollection<AppFontFamily>((AppFontFamily[])Enum.GetValues(typeof(AppFontFamily)));
@@ -108,7 +199,9 @@ namespace AssetEditor.ViewModels
                     {
                         GameName = $"{game.DisplayName}",
                         GameType = game.Type,
-                        Path = _settingsService.CurrentSettings.GameDirectories.FirstOrDefault(x => x.Game == game.Type)?.Path
+                        Path = _settingsService.CurrentSettings
+                            .GameDirectories.FirstOrDefault(
+                                x => x.Game == game.Type)?.Path ?? ""
                     });
             }
             WwisePath = _settingsService.CurrentSettings.WwisePath;
@@ -121,12 +214,23 @@ namespace AssetEditor.ViewModels
 
             // Compression settings
             UseZstdCompression = _settingsService.CurrentSettings.UseZstdCompression;
+            _allowPreview = true;
         }
 
 
         [RelayCommand]
         private void Save()
         {
+            if (!TryCreateViewportSettings(out var viewportSettings))
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "Msg.SettingsInvalidViewportValues"),
+                    LocalizationManager.Instance.Get(
+                        "SettingsWindow.Title"));
+                return;
+            }
+
             _settingsService.CurrentSettings.Theme = CurrentTheme;
             _settingsService.CurrentSettings.RenderEngineBackgroundColour = CurrentRenderEngineBackgroundColour;
             _settingsService.CurrentSettings.StartMaximised = StartMaximised;
@@ -134,8 +238,27 @@ namespace AssetEditor.ViewModels
             _settingsService.CurrentSettings.ShowCAWemFiles = ShowCAWemFiles;
             _settingsService.CurrentSettings.OnlyLoadLod0ForReferenceMeshes = OnlyLoadLod0ForReferenceMeshes;
             _settingsService.CurrentSettings.AppFont = SelectedFont;
-            _settingsService.CurrentSettings.AppFontWeight = SelectedFontWeight;
+            _settingsService.CurrentSettings.AppFontWeight =
+                SelectedFontWeight ??
+                FontSettingsHelper.GetDefaultWeight(SelectedFont);
             _settingsService.CurrentSettings.CustomBackgroundColour = $"{CustomBackgroundR},{CustomBackgroundG},{CustomBackgroundB}";
+            _settingsService.CurrentSettings.SimulateGameBackfaces =
+                viewportSettings.SimulateGameBackfaces;
+            _settingsService.CurrentSettings.ShowViewportGrid =
+                viewportSettings.ShowGrid;
+            _settingsService.CurrentSettings.ViewportGridColour =
+                viewportSettings.GridColour;
+            _settingsService.CurrentSettings.ViewportLightIntensity =
+                viewportSettings.LightIntensity;
+            _settingsService.CurrentSettings
+                .ViewportEnvironmentLightRotationY =
+                    viewportSettings.EnvironmentLightRotationY;
+            _settingsService.CurrentSettings
+                .ViewportDirectLightRotationX =
+                    viewportSettings.DirectLightRotationX;
+            _settingsService.CurrentSettings
+                .ViewportDirectLightRotationY =
+                    viewportSettings.DirectLightRotationY;
             _settingsService.CurrentSettings.GameDirectories.Clear();
             foreach (var item in GameDirectores)
                 _settingsService.CurrentSettings.GameDirectories.Add(new ApplicationSettings.GamePathPair() { Game = item.GameType, Path = item.Path });
@@ -150,8 +273,128 @@ namespace AssetEditor.ViewModels
             // Compression settings
             _settingsService.CurrentSettings.UseZstdCompression = UseZstdCompression;
 
-            _settingsService.Save();
-            MessageBox.Show(LocalizationManager.Instance.Get("Msg.RestartAfterSettings"));
+            var result = _settingsApplier.CompleteSave();
+            IsSaved = true;
+            if (result.RequiresApplicationRestart)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get(
+                        "Msg.SettingsRestartRequired"),
+                    LocalizationManager.Instance.Get(
+                        "SettingsWindow.Title"));
+            }
+        }
+
+        public void Cancel()
+        {
+            if (IsSaved)
+                return;
+
+            if (CurrentTheme != _originalTheme)
+                ThemesController.SetTheme(_originalTheme);
+            if (SelectedFont != _originalFont ||
+                SelectedFontWeight != _originalFontWeight)
+            {
+                ThemesController.ApplyCustomFont(
+                    FontSettingsHelper.GetFontFamilyUri(
+                        _originalFont,
+                        _originalFontWeight));
+            }
+            _settingsApplier.RestoreViewportPreview();
+        }
+
+        private void ApplyFontPreview()
+        {
+            if (!_allowPreview)
+                return;
+
+            ThemesController.ApplyCustomFont(
+                FontSettingsHelper.GetFontFamilyUri(
+                    SelectedFont,
+                    SelectedFontWeight));
+        }
+
+        private void PreviewViewportIfValid()
+        {
+            if (_allowPreview &&
+                TryCreateViewportSettings(out var settings))
+            {
+                _settingsApplier.PreviewViewport(settings);
+            }
+        }
+
+        private bool TryCreateViewportSettings(
+            out ViewportRenderSettings settings)
+        {
+            settings = default!;
+            if (!TryCreateRgb(
+                    CustomBackgroundR,
+                    CustomBackgroundG,
+                    CustomBackgroundB,
+                    out var backgroundColour) ||
+                !TryCreateRgb(
+                    ViewportGridColourR,
+                    ViewportGridColourG,
+                    ViewportGridColourB,
+                    out var gridColour) ||
+                !TryCreateFloat(
+                    ViewportLightIntensity,
+                    out var lightIntensity) ||
+                lightIntensity < 0 ||
+                !TryCreateFloat(
+                    ViewportEnvironmentLightRotationY,
+                    out var environmentLightRotationY) ||
+                !TryCreateFloat(
+                    ViewportDirectLightRotationX,
+                    out var directLightRotationX) ||
+                !TryCreateFloat(
+                    ViewportDirectLightRotationY,
+                    out var directLightRotationY))
+            {
+                return false;
+            }
+
+            settings = new ViewportRenderSettings(
+                CurrentRenderEngineBackgroundColour,
+                backgroundColour,
+                SimulateGameBackfaces,
+                ShowViewportGrid,
+                gridColour,
+                lightIntensity,
+                environmentLightRotationY,
+                directLightRotationX,
+                directLightRotationY);
+            return true;
+        }
+
+        private static bool TryCreateRgb(
+            string red,
+            string green,
+            string blue,
+            out string value)
+        {
+            value = "";
+            if (!byte.TryParse(red, out var r) ||
+                !byte.TryParse(green, out var g) ||
+                !byte.TryParse(blue, out var b))
+            {
+                return false;
+            }
+
+            value = $"{r},{g},{b}";
+            return true;
+        }
+
+        private static bool TryCreateFloat(
+            string value,
+            out float result)
+        {
+            return float.TryParse(
+                       value,
+                       NumberStyles.Float,
+                       CultureInfo.InvariantCulture,
+                       out result) &&
+                   float.IsFinite(result);
         }
 
         [RelayCommand]

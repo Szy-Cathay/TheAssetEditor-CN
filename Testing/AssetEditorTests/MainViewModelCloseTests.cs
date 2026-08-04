@@ -42,6 +42,7 @@ public class MainViewModelCloseTests
             GameTypeEnum.Warhammer3);
         var serviceProvider = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
+            .AddSingleton(settings)
             .AddSingleton(new PackAutoSaveService(
                 Mock.Of<IPackFileService>(),
                 settings))

@@ -3,6 +3,7 @@ using Shared.Core.Events;
 using AssetEditor.ViewModels;
 using AssetEditor.Views.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using System.Windows;
 
 namespace AssetEditor.UiCommands
 {
@@ -18,6 +19,7 @@ namespace AssetEditor.UiCommands
         public void Execute()
         {
             var window = _serviceProvider.GetRequiredService<SettingsWindow>();
+            window.Owner = Application.Current.MainWindow;
             window.DataContext = _serviceProvider.GetRequiredService<SettingsViewModel>();
             window.ShowDialog();
         }

@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework;
 using Moq;
 using Shared.Core.Misc;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.Ui.BaseDialogs.MathViews;
 
 namespace Test.KitbashEditor.PhotoStudio;
@@ -386,6 +387,47 @@ public class PhotoStudioViewModelTests
                 It.Is<string>(message =>
                     message.Contains("照片工作室"))),
             Times.Once);
+    }
+
+    [Test]
+    public void GlobalLightingChange_WaitsUntilPhotoStudioCloses()
+    {
+        var context = CreateViewModel();
+        SetProperty(context.ViewModel, "LightIntensity", 3.0f);
+        var globalSettings = new ViewportRenderSettings(
+            BackgroundColour.DarkGrey,
+            "0,0,0",
+            false,
+            true,
+            "0,0,0",
+            8.0f,
+            55.0f,
+            25.0f,
+            75.0f);
+
+        context.RenderParameters.ApplyGlobalLighting(globalSettings);
+
+        Assert.That(
+            context.RenderParameters.LightIntensityMult,
+            Is.EqualTo(3.0f));
+
+        ((IDisposable)context.ViewModel).Dispose();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                context.RenderParameters.LightIntensityMult,
+                Is.EqualTo(8.0f));
+            Assert.That(
+                context.RenderParameters.EnvLightRotationDegrees_Y,
+                Is.EqualTo(55.0f));
+            Assert.That(
+                context.RenderParameters.DirLightRotationDegrees_X,
+                Is.EqualTo(25.0f));
+            Assert.That(
+                context.RenderParameters.DirLightRotationDegrees_Y,
+                Is.EqualTo(75.0f));
+        });
     }
 
     private static ViewModelContext CreateViewModel()

@@ -17,6 +17,13 @@ namespace Shared.Core.Settings
         public ObservableCollection<string> RecentFolderProjectPaths { get; set; } = [];
         public ThemeType Theme { get; set; } = ThemeType.DarkTheme;
         public BackgroundColour RenderEngineBackgroundColour { get; set; } = BackgroundColour.DarkGrey;
+        public bool SimulateGameBackfaces { get; set; } = false;
+        public bool ShowViewportGrid { get; set; } = true;
+        public string ViewportGridColour { get; set; } = "0,0,0";
+        public float ViewportLightIntensity { get; set; } = 1.0f;
+        public float ViewportEnvironmentLightRotationY { get; set; } = 20.0f;
+        public float ViewportDirectLightRotationX { get; set; } = 0.0f;
+        public float ViewportDirectLightRotationY { get; set; } = 0.0f;
         public bool StartMaximised { get; set; } = false;
         public List<GamePathPair> GameDirectories { get; set; } = [];
         public GameTypeEnum CurrentGame { get; set; } = GameTypeEnum.Warhammer3;

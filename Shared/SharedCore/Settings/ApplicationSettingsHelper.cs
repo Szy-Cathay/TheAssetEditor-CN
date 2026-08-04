@@ -74,7 +74,7 @@ namespace Shared.Core.Settings
         /// <summary>
         /// Returns the WPF pack URI for the given font+weight, or null for system default.
         /// </summary>
-        public static string GetFontFamilyUri(AppFontFamily font, string weight) => (font, weight) switch
+        public static string? GetFontFamilyUri(AppFontFamily font, string? weight) => (font, weight) switch
         {
             (AppFontFamily.Default, _) => null,
             (AppFontFamily.AlibabaPuHuiTi, "Regular") => "pack://application:,,,/Fonts/#阿里巴巴普惠体 3.0 55 Regular",

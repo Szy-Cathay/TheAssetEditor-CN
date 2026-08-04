@@ -1,10 +1,13 @@
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
+using AssetEditor.Views.FolderProjectVersionControl;
 using Shared.Core.Services;
 using Shared.Ui.Common.OperationProgress;
+using Shared.Ui.Common.ValueConverters;
 
 using System.Xml.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -229,6 +232,82 @@ public class OperationProgressViewTests
         Assert.That(missingBindings, Is.Empty);
     }
 
+    [Test]
+    public void MergeLoadingSurface_MatchesGitLoadingSurfaceStyle()
+    {
+        InvokeWithWpfApplication(() =>
+        {
+            const string converterKey = "BoolToCollapsedConverter";
+            var resources = Application.Current.Resources;
+            var hadConverter = resources.Contains(converterKey);
+            var previousConverter = hadConverter
+                ? resources[converterKey]
+                : null;
+            var previousMainWindow = Application.Current.MainWindow;
+            var owner = new Window
+            {
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.None,
+                Left = -10000,
+                Top = -10000,
+            };
+            resources[converterKey] = new BoolToVisibilityConverter
+            {
+                TrueValue = Visibility.Visible,
+                FalseValue = Visibility.Collapsed,
+            };
+            Application.Current.MainWindow = owner;
+            owner.Show();
+            try
+            {
+                using var mergeWindow =
+                    new FolderProjectVersionControlWindow();
+                var repositoryView = new FolderProjectGitRepositoryView();
+                var mergeProgress =
+                    FindLogicalDescendant<OperationProgressView>(mergeWindow);
+                var repositoryProgress =
+                    FindLogicalDescendant<OperationProgressView>(
+                        repositoryView);
+                var mergeSurface = LogicalTreeHelper.GetParent(
+                    mergeProgress!) as Border;
+                var repositorySurface = LogicalTreeHelper.GetParent(
+                    repositoryProgress!) as Border;
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(mergeProgress, Is.Not.Null);
+                    Assert.That(repositoryProgress, Is.Not.Null);
+                    Assert.That(mergeSurface, Is.Not.Null);
+                    Assert.That(repositorySurface, Is.Not.Null);
+                    Assert.That(
+                        mergeSurface!.Background?.ToString(),
+                        Is.EqualTo(
+                            repositorySurface!.Background?.ToString()));
+                    Assert.That(
+                        mergeSurface.BorderBrush?.ToString(),
+                        Is.EqualTo(
+                            repositorySurface.BorderBrush?.ToString()));
+                    Assert.That(
+                        mergeSurface.BorderThickness,
+                        Is.EqualTo(repositorySurface.BorderThickness));
+                    Assert.That(
+                        mergeSurface.CornerRadius,
+                        Is.EqualTo(repositorySurface.CornerRadius));
+                });
+            }
+            finally
+            {
+                Application.Current.MainWindow = previousMainWindow;
+                owner.Close();
+                if (hadConverter)
+                    resources[converterKey] = previousConverter;
+                else
+                    resources.Remove(converterKey);
+            }
+        });
+    }
+
     private static string FindSolutionRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
@@ -258,5 +337,23 @@ public class OperationProgressViewTests
         WpfTestApplicationHost.InvokeWithThemeResources(
             services,
             action);
+    }
+
+    private static T? FindLogicalDescendant<T>(DependencyObject parent)
+        where T : DependencyObject
+    {
+        foreach (var child in LogicalTreeHelper
+                     .GetChildren(parent)
+                     .OfType<DependencyObject>())
+        {
+            if (child is T match)
+                return match;
+
+            var descendant = FindLogicalDescendant<T>(child);
+            if (descendant != null)
+                return descendant;
+        }
+
+        return null;
     }
 }

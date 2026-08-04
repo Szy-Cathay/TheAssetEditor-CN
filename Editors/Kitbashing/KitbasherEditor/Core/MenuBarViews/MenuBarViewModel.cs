@@ -102,7 +102,6 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RegisterUiCommand<ToggleViewSelectedCommand>();
             RegisterUiCommand<ResetCameraCommand>();
             RegisterUiCommand<FocusCameraCommand>();
-            RegisterUiCommand<OpenRenderSettingsWindowCommand>();
             RegisterUiCommand<OpenBlenderShortcutsHelpCommand>();
 
             RegisterUiCommand<DivideSubMeshCommand>();
@@ -162,7 +161,6 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             var renderingToolbar = builder.CreateRootToolBar(LocalizationManager.Instance.Get("Kitbash.Menu.Rendering"));
             builder.CreateToolBarItem<FocusCameraCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.FocusCamera"));
             builder.CreateToolBarItem<ResetCameraCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.ResetCamera"));
-            builder.CreateToolBarItem<OpenRenderSettingsWindowCommand>(renderingToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.OpenRenderSettings"));
             builder.CreateToolBarItem<OpenPhotoStudioCommand>(
                 renderingToolbar,
                 LocalizationManager.Instance.Get(

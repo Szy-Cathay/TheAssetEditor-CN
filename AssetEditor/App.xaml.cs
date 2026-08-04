@@ -146,13 +146,6 @@ namespace AssetEditor
             mainWindow.DataContext = _serviceProvider.GetRequiredService<MainViewModel>();
             mainWindow.Closed += OnMainWindowClosed;
             mainWindow.Show();
-
-            // Ensure the window doesn't cover up the windows bar
-            mainWindow.MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
-            mainWindow.MaxWidth = SystemParameters.MaximizedPrimaryScreenWidth;
-
-            if (applicationSettingsService.CurrentSettings.StartMaximised == true)
-                SystemCommands.MaximizeWindow(mainWindow);
         }
 
        private void OnMainWindowClosed(object sender, EventArgs e)

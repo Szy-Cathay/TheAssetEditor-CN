@@ -18,6 +18,59 @@ namespace AssetEditorTests;
 public class FolderProjectTreeStateTests
 {
     [Test]
+    public async Task CaWemSettingChanged_RefreshesCaPackAndPreservesSelection()
+    {
+        var settings = new ApplicationSettingsService();
+        settings.CurrentSettings.ShowCAWemFiles = false;
+        var caPack = new PackFileContainer("CA Pack")
+        {
+            IsCaPackFile = true,
+        };
+        caPack.FileList[@"audio\hidden.wem"] =
+            PackFile.CreateFromBytes("hidden.wem", [1]);
+        caPack.FileList[@"models\selected.bin"] =
+            PackFile.CreateFromBytes("selected.bin", [2]);
+        var editablePack = new PackFileContainer("Mod Pack");
+        editablePack.FileList["mod.bin"] =
+            PackFile.CreateFromBytes("mod.bin", [3]);
+        using var harness = CreateViewModelWithContainerList(
+            [caPack, editablePack],
+            settings: settings);
+        var caRoot = harness.ViewModel.Files.Single(
+            node => ReferenceEquals(node.FileOwner, caPack));
+        harness.ViewModel.SelectedItem =
+            FindNode(caRoot, @"models\selected.bin");
+        NUnitAssert.That(
+            GetAllNodes(caRoot).Any(node =>
+                node.GetFullPath().EndsWith(".wem")),
+            Is.False);
+
+        settings.CurrentSettings.ShowCAWemFiles = true;
+        harness.EventHub.Publish(
+            new ShowCaWemFilesChangedEvent(true));
+        await harness.ViewModel.CaWemRefreshTask;
+
+        caRoot = harness.ViewModel.Files.Single(
+            node => ReferenceEquals(node.FileOwner, caPack));
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                GetAllNodes(caRoot).Any(node =>
+                    node.GetFullPath().Equals(
+                        @"audio\hidden.wem",
+                        StringComparison.OrdinalIgnoreCase)),
+                Is.True);
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItem.GetFullPath(),
+                Is.EqualTo(@"models\selected.bin")
+                    .IgnoreCase);
+            NUnitAssert.That(
+                harness.ViewModel.IsRefreshingCaWemFiles,
+                Is.False);
+        });
+    }
+
+    [Test]
     public async Task LoadedFolderProject_MarksGitChangesAndAncestorsChangedOffUiThread()
     {
         using var projectRoot = new TemporaryDirectory();
@@ -850,7 +903,8 @@ public class FolderProjectTreeStateTests
 
     private static TreeHarness CreateViewModelWithContainerList(
         List<PackFileContainer> containers,
-        IFolderProjectVersionControlService? versionControl = null)
+        IFolderProjectVersionControlService? versionControl = null,
+        ApplicationSettingsService? settings = null)
     {
         var service = new Mock<IPackFileService>();
         service.Setup(x => x.GetAllPackfileContainers())
@@ -870,7 +924,9 @@ public class FolderProjectTreeStateTests
         return new TreeHarness(
             eventHub,
             new PackFileBrowserViewModel(
-                new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+                settings ??
+                    new ApplicationSettingsService(
+                        GameTypeEnum.Warhammer3),
                 contextMenu.Object,
                 service.Object,
                 eventHub,

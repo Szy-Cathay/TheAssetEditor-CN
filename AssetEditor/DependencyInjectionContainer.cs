@@ -1,4 +1,5 @@
 ﻿using AssetEditor.Services;
+using AssetEditor.Services.Settings;
 using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
 using AssetEditor.Views;
@@ -45,6 +46,7 @@ namespace AssetEditor
 
             serviceCollection.AddTransient<SettingsWindow>();
             serviceCollection.AddTransient<SettingsViewModel>();
+            serviceCollection.AddTransient<ApplicationSettingsApplier>();
             serviceCollection.AddTransient<UpdaterWindow>();
             serviceCollection.AddTransient<UpdaterViewModel>();
             serviceCollection.AddTransient<

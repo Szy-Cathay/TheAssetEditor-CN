@@ -79,6 +79,68 @@ public class FolderProjectVersionControlMergeTests
     }
 
     [Test]
+    public void BeginMerge_WithProgressReportsNativeCheckoutFileCounts()
+    {
+        using var project = CreateInitializedProject("merge-progress");
+        var service = new FolderProjectVersionControlService();
+        service.CreateBranch(project.Path, "source");
+        service.SwitchBranch(project.Path, "source");
+        File.WriteAllText(
+            Path.Combine(project.Path, "first.txt"),
+            "first");
+        File.WriteAllText(
+            Path.Combine(project.Path, "second.txt"),
+            "second");
+        service.CommitAll(project.Path, "source files");
+        service.SwitchBranch(project.Path, "master");
+        var progress = new List<FolderProjectVersionControlProgress>();
+        var progressOverload = typeof(IFolderProjectVersionControlService)
+            .GetMethod(
+                nameof(IFolderProjectVersionControlService.BeginMerge),
+                [
+                    typeof(string),
+                    typeof(string),
+                    typeof(Action<FolderProjectVersionControlProgress>),
+                ]);
+
+        Assert.That(
+            progressOverload,
+            Is.Not.Null,
+            "BeginMerge must expose native checkout progress.");
+        if (progressOverload == null)
+            return;
+
+        var result = (FolderProjectMergeStartResult)progressOverload.Invoke(
+            service,
+            [
+                project.Path,
+                "source",
+                (Action<FolderProjectVersionControlProgress>)progress.Add,
+            ])!;
+        var fileProgress = progress
+            .Where(item => item.Stage.ToString() == "MergingFiles")
+            .ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                result.Outcome,
+                Is.EqualTo(FolderProjectMergeOutcome.FastForwarded));
+            Assert.That(fileProgress, Is.Not.Empty);
+            Assert.That(
+                fileProgress.Select(item => item.Detail),
+                Does.Contain("first.txt"));
+            Assert.That(
+                fileProgress.Select(item => item.Detail),
+                Does.Contain("second.txt"));
+            Assert.That(fileProgress[^1].Total, Is.GreaterThan(0));
+            Assert.That(
+                fileProgress[^1].Completed,
+                Is.EqualTo(fileProgress[^1].Total));
+        });
+    }
+
+    [Test]
     public void BeginMerge_DivergentWithoutConflicts_LeavesMergeReadyToCommit()
     {
         using var project = CreateDivergentProject(
