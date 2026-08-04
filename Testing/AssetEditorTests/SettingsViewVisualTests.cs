@@ -1,10 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AssetEditor.Views.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Shared.Core.Services;
+using Shared.Ui.BaseDialogs.ColourPickerButton;
 using NUnitAssert = NUnit.Framework.Assert;
 
 namespace AssetEditorTests;
@@ -39,9 +41,15 @@ public class SettingsViewVisualTests
                             textBlock.Style,
                             view.Resources["SettingsLabelStyle"]))
                     .ToList();
-                var textBoxes = GetDescendants<TextBox>(view).ToList();
-                var comboBoxes = GetDescendants<ComboBox>(view).ToList();
-                var checkBoxes = GetDescendants<CheckBox>(view).ToList();
+                var textBoxes = GetDescendants<TextBox>(view)
+                    .Where(control => !IsInsideColourPicker(control))
+                    .ToList();
+                var comboBoxes = GetDescendants<ComboBox>(view)
+                    .Where(control => !IsInsideColourPicker(control))
+                    .ToList();
+                var checkBoxes = GetDescendants<CheckBox>(view)
+                    .Where(control => !IsInsideColourPicker(control))
+                    .ToList();
 
                 NUnitAssert.Multiple(() =>
                 {
@@ -77,6 +85,10 @@ public class SettingsViewVisualTests
             () =>
             {
                 var view = new SettingsView();
+                var tabs = (TabControl)view.FindName(
+                    "SettingsCategories");
+                tabs.SelectedIndex = 2;
+                view.UpdateLayout();
                 var localization = LocalizationManager.Instance;
                 var descriptionTexts = new[]
                 {
@@ -127,6 +139,93 @@ public class SettingsViewVisualTests
             });
     }
 
+    [Test]
+    public void Categories_UseLeftNavigationColourPickersAndCollapsedLighting()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var view = new SettingsView();
+                var localization = LocalizationManager.Instance;
+                var tabs = (TabControl)view.FindName(
+                    "SettingsCategories");
+                var headers = tabs.Items.OfType<TabItem>()
+                    .Select(item => item.Header)
+                    .ToList();
+                tabs.SelectedIndex = 2;
+                view.UpdateLayout();
+                var colourPickers = GetDescendants<
+                    ColourPickerButtonView>(view).ToList();
+                var lighting = GetDescendants<Expander>(view)
+                    .Single(item => Equals(
+                        item.Header,
+                        localization.Get(
+                            "SettingsWindow.PhotoStudioLighting")));
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        tabs.TabStripPlacement,
+                        Is.EqualTo(Dock.Left));
+                    NUnitAssert.That(
+                        headers,
+                        Is.EqualTo(new[]
+                        {
+                            localization.Get("SettingsWindow.General"),
+                            localization.Get("SettingsWindow.ThemeCategory"),
+                            localization.Get("SettingsWindow.Rendering"),
+                            localization.Get("SettingsWindow.Audio"),
+                            localization.Get("SettingsWindow.Save")
+                        }));
+                    NUnitAssert.That(colourPickers, Has.Count.EqualTo(2));
+                    NUnitAssert.That(lighting.IsExpanded, Is.False);
+                });
+            });
+    }
+
+    [Test]
+    public void AllCategories_RenderOffscreenAtMinimumContentSize()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var view = new SettingsView();
+                var tabs = (TabControl)view.FindName(
+                    "SettingsCategories");
+                var availableSize = new Size(780, 500);
+
+                view.Measure(availableSize);
+                view.Arrange(new Rect(availableSize));
+
+                for (var index = 0; index < tabs.Items.Count; index++)
+                {
+                    tabs.SelectedIndex = index;
+                    view.UpdateLayout();
+                    var bitmap = new RenderTargetBitmap(
+                        (int)availableSize.Width,
+                        (int)availableSize.Height,
+                        96,
+                        96,
+                        PixelFormats.Pbgra32);
+
+                    NUnitAssert.That(
+                        () => bitmap.Render(view),
+                        Throws.Nothing,
+                        $"Settings category {index} failed to render.");
+                }
+            });
+    }
+
     private static string GetThemeBrush(string resourceKey) =>
         GetBrushSignature((Brush)Application.Current.FindResource(resourceKey));
 
@@ -147,6 +246,23 @@ public class SettingsViewVisualTests
             foreach (var descendant in GetDescendants<T>(dependencyObject))
                 yield return descendant;
         }
+    }
+
+    private static bool IsInsideColourPicker(
+        DependencyObject control)
+    {
+        var current = control;
+        while (current != null)
+        {
+            if (current is ColourPickerButtonView)
+                return true;
+            current = LogicalTreeHelper.GetParent(current) ??
+                      (current is Visual
+                          ? VisualTreeHelper.GetParent(current)
+                          : null);
+        }
+
+        return false;
     }
 
     private static IEnumerable<string> GetToolTipTexts(object? toolTip)

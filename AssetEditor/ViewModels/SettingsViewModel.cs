@@ -8,9 +8,11 @@ using System.Windows.Input;
 using AssetEditor.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Xna.Framework;
 using Shared.Core.Misc;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using Shared.Ui.BaseDialogs.ColourPickerButton;
 
 namespace AssetEditor.ViewModels
 {
@@ -32,6 +34,10 @@ namespace AssetEditor.ViewModels
         public ObservableCollection<string> AvailableFontWeights { get; set; } = [];
         public ObservableCollection<GameTypeEnum> Games { get; set; } = [];
         public ObservableCollection<GamePathItem> GameDirectores { get; set; } = [];
+        public ColourPickerViewModel CustomBackgroundColourPicker
+            { get; private set; } = null!;
+        public ColourPickerViewModel ViewportGridColourPicker
+            { get; private set; } = null!;
 
         [ObservableProperty] private ThemeType _currentTheme;
         partial void OnCurrentThemeChanged(ThemeType value)
@@ -144,6 +150,12 @@ namespace AssetEditor.ViewModels
             CustomBackgroundR = rgbParts.Length > 0 ? rgbParts[0].Trim() : "50";
             CustomBackgroundG = rgbParts.Length > 1 ? rgbParts[1].Trim() : "50";
             CustomBackgroundB = rgbParts.Length > 2 ? rgbParts[2].Trim() : "50";
+            CustomBackgroundColourPicker = new ColourPickerViewModel(
+                CreateColourVector(
+                    CustomBackgroundR,
+                    CustomBackgroundG,
+                    CustomBackgroundB),
+                _ => ApplyCustomBackgroundPickerColour());
             IsCustomBackgroundVisible = CurrentRenderEngineBackgroundColour == BackgroundColour.Custom;
 
             SimulateGameBackfaces =
@@ -162,6 +174,12 @@ namespace AssetEditor.ViewModels
             ViewportGridColourB = gridRgb.Length > 2
                 ? gridRgb[2].Trim()
                 : "0";
+            ViewportGridColourPicker = new ColourPickerViewModel(
+                CreateColourVector(
+                    ViewportGridColourR,
+                    ViewportGridColourG,
+                    ViewportGridColourB),
+                _ => ApplyGridPickerColour());
             ViewportLightIntensity =
                 _settingsService.CurrentSettings.ViewportLightIntensity
                     .ToString(CultureInfo.InvariantCulture);
@@ -296,8 +314,8 @@ namespace AssetEditor.ViewModels
                 SelectedFontWeight != _originalFontWeight)
             {
                 ThemesController.ApplyCustomFont(
-                    FontSettingsHelper.GetFontFamilyUri(
-                        _originalFont,
+                    FontSettingsHelper.GetFontFamily(_originalFont),
+                    FontSettingsHelper.GetFontWeight(
                         _originalFontWeight));
             }
             _settingsApplier.RestoreViewportPreview();
@@ -309,9 +327,8 @@ namespace AssetEditor.ViewModels
                 return;
 
             ThemesController.ApplyCustomFont(
-                FontSettingsHelper.GetFontFamilyUri(
-                    SelectedFont,
-                    SelectedFontWeight));
+                FontSettingsHelper.GetFontFamily(SelectedFont),
+                FontSettingsHelper.GetFontWeight(SelectedFontWeight));
         }
 
         private void PreviewViewportIfValid()
@@ -383,6 +400,39 @@ namespace AssetEditor.ViewModels
 
             value = $"{r},{g},{b}";
             return true;
+        }
+
+        private static Vector3 CreateColourVector(
+            string red,
+            string green,
+            string blue)
+        {
+            byte.TryParse(red, out var r);
+            byte.TryParse(green, out var g);
+            byte.TryParse(blue, out var b);
+            return new Vector3(r / 255f, g / 255f, b / 255f);
+        }
+
+        private void ApplyCustomBackgroundPickerColour()
+        {
+            var colour = CustomBackgroundColourPicker.PickedColor;
+            CustomBackgroundR = colour.R.ToString(
+                CultureInfo.InvariantCulture);
+            CustomBackgroundG = colour.G.ToString(
+                CultureInfo.InvariantCulture);
+            CustomBackgroundB = colour.B.ToString(
+                CultureInfo.InvariantCulture);
+        }
+
+        private void ApplyGridPickerColour()
+        {
+            var colour = ViewportGridColourPicker.PickedColor;
+            ViewportGridColourR = colour.R.ToString(
+                CultureInfo.InvariantCulture);
+            ViewportGridColourG = colour.G.ToString(
+                CultureInfo.InvariantCulture);
+            ViewportGridColourB = colour.B.ToString(
+                CultureInfo.InvariantCulture);
         }
 
         private static bool TryCreateFloat(

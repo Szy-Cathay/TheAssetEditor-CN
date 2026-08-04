@@ -135,11 +135,13 @@ namespace AssetEditor
             ThemesController.SetTheme(applicationSettingsService.CurrentSettings.Theme);
 
             // Apply custom font after theme is set (ControlColours.xaml may define a default font)
-            var fontUri = FontSettingsHelper.GetFontFamilyUri(
-                applicationSettingsService.CurrentSettings.AppFont,
-                applicationSettingsService.CurrentSettings.AppFontWeight);
-            if (fontUri != null)
-                ThemesController.ApplyCustomFont(fontUri);
+            var fontFamily = FontSettingsHelper.GetFontFamily(
+                applicationSettingsService.CurrentSettings.AppFont);
+            ThemesController.ApplyCustomFont(
+                fontFamily,
+                FontSettingsHelper.GetFontWeight(
+                    applicationSettingsService.CurrentSettings
+                        .AppFontWeight));
 
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             MainWindow = mainWindow;

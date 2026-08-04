@@ -21,6 +21,7 @@ namespace Shared.Core.Settings
     public static class ThemesController
     {
         private static FontFamily? _defaultFontFamily;
+        private static FontWeight _defaultFontWeight = FontWeights.Normal;
 
         public static ThemeType CurrentTheme { get; set; } = ThemeType.DarkTheme;
 
@@ -93,6 +94,10 @@ namespace Shared.Core.Settings
             ControlColours = new ResourceDictionary() { Source = new Uri("Themes/ControlColours.xaml", UriKind.Relative) };
             _defaultFontFamily =
                 ControlColours["AppFontFamily"] as FontFamily;
+            _defaultFontWeight =
+                ControlColours["AppFontWeight"] is FontWeight weight
+                    ? weight
+                    : FontWeights.Normal;
             RefreshControls();
 
             // Re-apply custom font since ControlColours.xaml was recreated
@@ -124,34 +129,44 @@ namespace Shared.Core.Settings
         /// Apply a custom font to the AppFontFamily resource.
         /// Call after SetTheme() and on startup to persist font across theme switches.
         /// </summary>
-        public static string? CurrentFontUri { get; private set; }
+        public static FontFamily? CurrentFontFamily { get; private set; }
+        public static FontWeight CurrentFontWeight { get; private set; } =
+            FontWeights.Normal;
 
-        public static void ApplyCustomFont(string? fontPackUri)
+        public static void ApplyCustomFont(
+            FontFamily? fontFamily,
+            FontWeight fontWeight)
         {
-            CurrentFontUri = fontPackUri;
+            CurrentFontFamily = fontFamily;
+            CurrentFontWeight = fontWeight;
             var colours = FindDictionary("ControlColours.xaml");
             if (colours == null)
                 return;
 
             _defaultFontFamily ??=
                 colours["AppFontFamily"] as FontFamily;
-            if (!string.IsNullOrEmpty(fontPackUri))
+            if (fontFamily != null)
             {
-                colours["AppFontFamily"] = new FontFamily(fontPackUri);
+                colours["AppFontFamily"] = fontFamily;
+                colours["AppFontWeight"] = fontWeight;
                 return;
             }
 
             if (_defaultFontFamily != null)
                 colours["AppFontFamily"] = _defaultFontFamily;
+            colours["AppFontWeight"] = _defaultFontWeight;
         }
 
         internal static void ReApplyCustomFont()
         {
-            if (!string.IsNullOrEmpty(CurrentFontUri))
+            if (CurrentFontFamily != null)
             {
                 var colours = FindDictionary("ControlColours.xaml");
                 if (colours != null)
-                    colours["AppFontFamily"] = new FontFamily(CurrentFontUri);
+                {
+                    colours["AppFontFamily"] = CurrentFontFamily;
+                    colours["AppFontWeight"] = CurrentFontWeight;
+                }
             }
         }
     }

@@ -19,6 +19,7 @@ namespace WindowHandling
             Deactivated += AssetEdWindow_Deactivated;
             SetResourceReference(BackgroundProperty, "WindowBackground");
             SetResourceReference(FontFamilyProperty, "AppFontFamily");
+            SetResourceReference(FontWeightProperty, "AppFontWeight");
             DarkTitleBarHelper.Enable(this);
         }
 
