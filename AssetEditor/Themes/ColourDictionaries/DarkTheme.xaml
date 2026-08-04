@@ -225,4 +225,21 @@
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Selected"                  Color="{StaticResource AColour.Tone9.Border.Selected}"/>
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Selected.Inactive"         Color="{StaticResource AColour.Tone9.Border.Selected.Inactive}"/>
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Disabled"                  Color="{StaticResource AColour.Tone9.Border.Disabled}"/>
+    <!-- AE UI design-system semantic brushes -->
+    <SolidColorBrush x:Key="AeBrush.Canvas" Color="#151719" />
+    <SolidColorBrush x:Key="AeBrush.Surface1" Color="#1B1E21" />
+    <SolidColorBrush x:Key="AeBrush.Surface2" Color="#212529" />
+    <SolidColorBrush x:Key="AeBrush.Surface3" Color="#282D32" />
+    <SolidColorBrush x:Key="AeBrush.SurfaceHover" Color="#30363C" />
+    <SolidColorBrush x:Key="AeBrush.Border" Color="#343A40" />
+    <SolidColorBrush x:Key="AeBrush.BorderStrong" Color="#464E56" />
+    <SolidColorBrush x:Key="AeBrush.TextPrimary" Color="#E4E7E9" />
+    <SolidColorBrush x:Key="AeBrush.TextSecondary" Color="#B0B6BC" />
+    <SolidColorBrush x:Key="AeBrush.TextMuted" Color="#858D95" />
+    <SolidColorBrush x:Key="AeBrush.Accent" Color="#64A9E2" />
+    <SolidColorBrush x:Key="AeBrush.AccentHover" Color="#75B5E8" />
+    <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="#263A4B" />
+    <SolidColorBrush x:Key="AeBrush.Success" Color="#72BC91" />
+    <SolidColorBrush x:Key="AeBrush.Warning" Color="#E2B45F" />
+    <SolidColorBrush x:Key="AeBrush.Danger" Color="#E17979" />
 </ResourceDictionary>
