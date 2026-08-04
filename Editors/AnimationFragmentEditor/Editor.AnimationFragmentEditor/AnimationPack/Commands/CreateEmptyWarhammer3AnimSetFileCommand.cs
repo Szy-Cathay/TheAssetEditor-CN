@@ -1,7 +1,7 @@
-﻿using CommonControls.BaseDialogs;
-using CommonControls.Editors.AnimationPack;
+﻿using CommonControls.Editors.AnimationPack;
 using Shared.Core.Events;
 using Shared.Core.Misc;
+using Shared.Core.Services;
 using Shared.GameFormats.AnimationPack.AnimPackFileTypes;
 using Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3;
 using static Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3.AnimationBinEntry;
@@ -11,6 +11,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 {
     public class CreateEmptyWarhammer3AnimSetFileCommand : IUiCommand
     {
+        private readonly IStandardDialogs _standardDialogs;
+
+        public CreateEmptyWarhammer3AnimSetFileCommand(IStandardDialogs standardDialogs)
+        {
+            _standardDialogs = standardDialogs;
+        }
+
         public void Execute(AnimPackViewModel editor)
         {
             var fileName = GetAnimSetFileName();
@@ -25,10 +32,10 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
         protected virtual string? GetAnimSetFileName()
         {
-            var window = new TextInputWindow("Fragment name", "");
-            if (window.ShowDialog() == true)
+            var input = _standardDialogs.ShowTextInputDialog("Fragment name", "");
+            if (input.Result)
             {
-                var filename = SaveUtility.EnsureEnding(window.TextValue, ".frg");
+                var filename = SaveUtility.EnsureEnding(input.Text, ".frg");
                 return filename;
             }
 

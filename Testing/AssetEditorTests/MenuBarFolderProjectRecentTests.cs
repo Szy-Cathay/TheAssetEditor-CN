@@ -219,12 +219,94 @@ public class MenuBarFolderProjectRecentTests
             It.IsAny<GameInformation>()), Times.Once);
     }
 
+    [Test]
+    public void CreateNewPackFile_UsesStandardDialogAndTrimsName()
+    {
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(service => service.ShowTextInputDialog(
+                "New Pack Name",
+                ""))
+            .Returns(new TextInputDialogResult(true, "  test.pack  "));
+        var packFileService = new Mock<IPackFileService>();
+        var createdPack = new PackFileContainer("test.pack");
+        packFileService.Setup(service => service.CreateNewPackFileContainer(
+                "test.pack",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD,
+                false))
+            .Returns(createdPack);
+        var viewModel = CreateViewModel(
+            packFileService.Object,
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IUiCommandFactory>(),
+            Mock.Of<IFolderProjectOpenService>(),
+            new TestEventHub(),
+            dialogs.Object);
+
+        viewModel.CreateNewPackFileCommand.Execute(null);
+
+        packFileService.Verify(service => service.SetEditablePack(
+            createdPack), Times.Once);
+    }
+
+    [Test]
+    public void CreateNewPackFile_CancelDoesNotCreatePack()
+    {
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(service => service.ShowTextInputDialog(
+                "New Pack Name",
+                ""))
+            .Returns(new TextInputDialogResult(false, "ignored.pack"));
+        var packFileService = new Mock<IPackFileService>();
+        var viewModel = CreateViewModel(
+            packFileService.Object,
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IUiCommandFactory>(),
+            Mock.Of<IFolderProjectOpenService>(),
+            new TestEventHub(),
+            dialogs.Object);
+
+        viewModel.CreateNewPackFileCommand.Execute(null);
+
+        packFileService.Verify(service => service.CreateNewPackFileContainer(
+            It.IsAny<string>(),
+            It.IsAny<PackFileVersion>(),
+            It.IsAny<PackFileCAType>(),
+            It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public void RecentPackFile_LoadFailure_UsesStandardDialog()
+    {
+        _ = new LocalizationManager();
+        const string packPath = @"D:\packs\missing.pack";
+        var settingsService = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+        settingsService.CurrentSettings.RecentPackFilePaths.Add(packPath);
+        var loader = new Mock<IPackFileContainerLoader>();
+        loader.Setup(service => service.Load(packPath)).Returns((PackFileContainer?)null);
+        var dialogs = new Mock<IStandardDialogs>();
+        var viewModel = CreateViewModel(
+            Mock.Of<IPackFileService>(),
+            settingsService,
+            Mock.Of<IUiCommandFactory>(),
+            Mock.Of<IFolderProjectOpenService>(),
+            new TestEventHub(),
+            dialogs.Object,
+            loader.Object);
+
+        viewModel.RecentPackFiles.Single().Command.Execute(null);
+
+        dialogs.Verify(service => service.ShowDialogBox(It.IsAny<string>(), "Error"), Times.Once);
+    }
+
     private static MenuBarViewModel CreateViewModel(
         IPackFileService packFileService,
         ApplicationSettingsService settingsService,
         IUiCommandFactory uiCommandFactory,
         IFolderProjectOpenService openService,
-        IEventHub eventHub)
+        IEventHub eventHub,
+        IStandardDialogs? standardDialogs = null,
+        IPackFileContainerLoader? packFileContainerLoader = null)
     {
         var editorDatabase = new Mock<IEditorDatabase>();
         editorDatabase
@@ -239,9 +321,9 @@ public class MenuBarFolderProjectRecentTests
                 packFileService,
                 Mock.Of<IGlobalEventHub>(),
                 settingsService),
-            Mock.Of<IPackFileContainerLoader>(),
+            packFileContainerLoader ?? Mock.Of<IPackFileContainerLoader>(),
             openService,
-            Mock.Of<IStandardDialogs>(),
+            standardDialogs ?? Mock.Of<IStandardDialogs>(),
             eventHub);
     }
 

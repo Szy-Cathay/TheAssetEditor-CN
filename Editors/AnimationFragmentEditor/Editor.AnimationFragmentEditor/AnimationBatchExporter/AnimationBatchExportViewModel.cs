@@ -1,7 +1,5 @@
 ﻿using System.Collections.ObjectModel;
 using System.IO;
-using System.Windows;
-using CommonControls.BaseDialogs.ErrorListDialog;
 using GameWorld.Core.Services;
 using Serilog;
 using Shared.Core.ErrorHandling;
@@ -21,6 +19,7 @@ namespace CommonControls.Editors.AnimationBatchExporter
         private readonly ILogger _logger = Logging.Create<AnimationBatchExportViewModel>();
         private readonly IPackFileService _pfs;
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
+        private readonly IStandardDialogs _standardDialogs;
 
         public ObservableCollection<PackFileListItem> PackfileList { get; set; } = [];
         public ObservableCollection<uint> PossibleOutputFormats { get; set; } = [5, 6, 7];
@@ -31,10 +30,14 @@ namespace CommonControls.Editors.AnimationBatchExporter
 
      
 
-        public AnimationBatchExportViewModel(IPackFileService pfs, ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper)
+        public AnimationBatchExportViewModel(
+            IPackFileService pfs,
+            ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
+            IStandardDialogs standardDialogs)
         {
             _pfs = pfs;
             _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
+            _standardDialogs = standardDialogs;
 
             var containers = _pfs.GetAllPackfileContainers();
             foreach (var item in containers)
@@ -50,11 +53,15 @@ namespace CommonControls.Editors.AnimationBatchExporter
             var outputPack = _pfs.GetEditablePack();
             if (outputPack == null)
             {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.NoNameProvided"), LocalizationManager.Instance.Get("Msg.GeneralError"));
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.NoNameProvided"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
                 return;
             }
 
-            if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.AreYouSure"), "", MessageBoxButton.YesNo) == MessageBoxResult.No)
+            if (_standardDialogs.ShowYesNoBox(
+                    LocalizationManager.Instance.Get("Msg.AreYouSure"),
+                    "") == ShowMessageBoxResult.Cancel)
                 return;
 
             var errorList = new ErrorList();
@@ -86,7 +93,7 @@ namespace CommonControls.Editors.AnimationBatchExporter
                 }
             }
 
-            ErrorListWindow.ShowDialog("Bach result", errorList, true);
+            _standardDialogs.ShowErrorViewDialog("Bach result", errorList, true);
         }
 
         List<(PackFile file, string directory)> ConvertAnimFiles(List<PackFile> packFiles, uint outputAnimationFormat, ErrorList errorList)

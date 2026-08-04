@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using AssetEditor.Services;
 using AssetEditor.UiCommands;
-using CommonControls.BaseDialogs;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationFragmentEditor.AnimationPack.Commands;
@@ -100,19 +99,21 @@ namespace AssetEditor.ViewModels
                 FolderProjectContainer;
         [RelayCommand] private void CreateNewPackFile()
         {
-            var window = new TextInputWindow("New Pack Name", "");
-            if (window.ShowDialog() == true)
+            var input = _standardDialogs.ShowTextInputDialog(
+                "New Pack Name",
+                "");
+            if (input.Result)
             {
-                if (string.IsNullOrWhiteSpace(window.TextValue))
+                if (string.IsNullOrWhiteSpace(input.Text))
                 {
-                    _standardDialogs.ShowDialogBox($"'{window.TextValue}' is not a valid packfile name", "Error");
+                    _standardDialogs.ShowDialogBox($"'{input.Text}' is not a valid packfile name", "Error");
                     return;
                 }
 
                 var currentGame = _settingsService.CurrentSettings.CurrentGame;
                 var pfsVersion = GameInformationDatabase.Games[currentGame].PackFileVersion; 
 
-                var newPackFile = _packfileService.CreateNewPackFileContainer(window.TextValue.Trim(), pfsVersion, PackFileCAType.MOD);
+                var newPackFile = _packfileService.CreateNewPackFileContainer(input.Text.Trim(), pfsVersion, PackFileCAType.MOD);
                 _packfileService.SetEditablePack(newPackFile);
             }
         }
@@ -202,7 +203,7 @@ namespace AssetEditor.ViewModels
                     var container = _packFileContainerLoader.Load(path);
                     if (container == null)
                     {
-                        System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.UnableToLoadPackfiles", path));
+                        _standardDialogs.ShowDialogBox(LocalizationManager.Instance.GetFormat("Msg.UnableToLoadPackfiles", path));
                         return;
                     }
 

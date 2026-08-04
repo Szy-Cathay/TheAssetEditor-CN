@@ -48,7 +48,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 catch (Exception e)
                 {
                     _logger.Here().Error(e, "Exception while saving");
-                    System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ErrorSavingPack", e.Message), LocalizationManager.Instance.Get("Msg.GeneralError"));
+                    standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.ErrorSavingPack",
+                            e.Message),
+                        LocalizationManager.Instance.Get("Msg.GeneralError"));
                 }
             }
         }
@@ -85,7 +89,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 catch (Exception e)
                 {
                     _logger.Here().Error(e, "Exception while saving");
-                    System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ErrorSavingPack", e.Message), LocalizationManager.Instance.Get("Msg.GeneralError"));
+                    standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.GetFormat(
+                            "Msg.ErrorSavingPack",
+                            e.Message),
+                        LocalizationManager.Instance.Get("Msg.GeneralError"));
                 }
             }
         }

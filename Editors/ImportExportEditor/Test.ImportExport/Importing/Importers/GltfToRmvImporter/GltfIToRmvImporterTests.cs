@@ -5,7 +5,9 @@ using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using GameWorld.Core.Services;
 using Moq;
+using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.GameFormats.RigidModel;
@@ -82,6 +84,37 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             Assert.That(rmv2File!.ModelList[0][0]!.Material!.GetAllTextures().Count(), Is.EqualTo(TestData.Rmv2Expected.Lod0Mesh0TextureCount));
             Assert.That(rmv2File!.ModelList[0][0]!.Mesh.IndexList.Length, Is.EqualTo(TestData.Rmv2Expected.Lod0Mesh0IndexCount));
             Assert.That(rmv2File!.ModelList[0][0]!.Mesh.VertexList.Length, Is.EqualTo(TestData.Rmv2Expected.Lod0Mesh0VertexCount));
+        }
+
+        [Test]
+        public void InvalidGltf_UsesStandardErrorDialog()
+        {
+            var packFileService = new Mock<IPackFileService>();
+            var standardDialogs = new Mock<IStandardDialogs>();
+            var materialBuilder = new RmvMaterialBuilder(packFileService.Object, standardDialogs.Object);
+            var importer = new GltfImporter(
+                packFileService.Object,
+                standardDialogs.Object,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                materialBuilder);
+            var settings = new GltfImporterSettings(
+                Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.gltf"),
+                "models",
+                new PackFileContainer("new"),
+                Shared.Core.Settings.GameTypeEnum.Warhammer3,
+                false,
+                false,
+                false,
+                false,
+                false,
+                20.0f,
+                false);
+
+            Assert.DoesNotThrow(() => importer.Import(settings));
+
+            standardDialogs.Verify(
+                x => x.ShowErrorViewDialog("Advanced Import Error", It.IsAny<ErrorList>(), false),
+                Times.Once);
         }
     }
 

@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using CommonControls.BaseDialogs.ErrorListDialog;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using Editors.ImportExport.Misc;
 using Editors.Shared.Core.Services;
@@ -107,7 +106,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
 
         }
 
-        private static bool CreateModelRoot(GltfImporterSettings settings, out ModelRoot? outModelRoot)
+        private bool CreateModelRoot(GltfImporterSettings settings, out ModelRoot? outModelRoot)
         {
             ModelRoot? modelRoot = null;
             try // use GLTF api to verify that all needed files are present
@@ -119,7 +118,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             {
                 var errorList = new ErrorList();
                 errorList.Error("GLTF Load Error, might not be valid GLTF file.", ex.Message);
-                ErrorListWindow.ShowDialog("Advanced Import Error", errorList, false);
+                _exceptionService.ShowErrorViewDialog("Advanced Import Error", errorList, false);
                 outModelRoot = null;                
                 return false;
             }
@@ -151,7 +150,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     var errorList = new ErrorList();
                     errorList.Error("Skeleton Not Found", $"Skeleton named '{skeletonName}' could not be found\nHave you selected the correct game AND loaded all CA Pack Files?");
 
-                    ErrorListWindow.ShowDialog("Skeleton Error", errorList);
+                    _exceptionService.ShowErrorViewDialog("Skeleton Error", errorList);
 
                     return (skeletonName = null, skeletonAnimFile = null);
                 }

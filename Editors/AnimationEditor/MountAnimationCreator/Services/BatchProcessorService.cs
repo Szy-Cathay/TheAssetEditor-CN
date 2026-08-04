@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using AnimationEditor.MountAnimationCreator;
 using AnimationEditor.MountAnimationCreator.Services;
-using CommonControls.BaseDialogs.ErrorListDialog;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Services;
 using Shared.Core.ErrorHandling;
@@ -26,6 +25,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
         MountAnimationGeneratorService _animationGenerator;
         BatchProcessOptions _batchProcessOptions;
         private readonly IFileSaveService _packFileSaveService;
+        private readonly IStandardDialogs _standardDialogs;
         IAnimationBinGenericFormat _mountFragment;
         IAnimationBinGenericFormat _riderFragment;
 
@@ -43,6 +43,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
             MountAnimationGeneratorService animationGenerator,
             BatchProcessOptions batchProcessOptions,
             IFileSaveService packFileSaveService,
+            IStandardDialogs standardDialogs,
             uint animationOutputFormat)
         {
             _pfs = pfs;
@@ -50,6 +51,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
             _animationGenerator = animationGenerator;
             _batchProcessOptions = batchProcessOptions;
             _packFileSaveService = packFileSaveService;
+            _standardDialogs = standardDialogs;
             _animationOutputFormat = animationOutputFormat;
 
 
@@ -74,7 +76,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
             CreateFragmentAndAnimations(resultInfo);
             SaveFiles();
 
-            ErrorListWindow.ShowDialog("Mount creation result", resultInfo, false);
+            _standardDialogs.ShowErrorViewDialog("Mount creation result", resultInfo, false);
         }
 
         void CreateFragmentAndAnimations(ErrorList resultInfo)
