@@ -9,10 +9,22 @@
         Title="{loc:Loc Shared.ToolSelector.Title}"
         Height="250" Width="300"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner" Background="#FF1C1C1C">
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
     <DockPanel  >
      
-        <Button DockPanel.Dock="Bottom" Margin="5" Click="Button_Click" Content="{loc:Loc Shared.ToolSelector.Open}"/>
+        <Button DockPanel.Dock="Bottom" Margin="5" Click="Button_Click" Content="{loc:Loc Shared.ToolSelector.Open}" Style="{StaticResource AeButton.Primary}"/>
         <ListView DockPanel.Dock="Top" x:Name="PossibleTools"  Margin="5" >
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">

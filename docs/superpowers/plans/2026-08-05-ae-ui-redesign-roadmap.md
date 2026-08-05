@@ -26,7 +26,7 @@
 ## Source of Truth
 
 - Approved design: `docs/superpowers/specs/2026-08-05-ae-ui-design-system-design.md`
-- Current detailed plan: `docs/superpowers/plans/2026-08-05-ae-ui-editor-animation-metadata.md`
+- Current detailed plan: `docs/superpowers/plans/2026-08-05-ae-ui-editor-remaining.md`
 - Final canonical document after all implementation and user acceptance: `docs/ui-design-system.md`
 
 ## Plan Generation Rule
@@ -100,7 +100,7 @@
 | 6.1 | `docs/superpowers/plans/2026-08-05-ae-ui-editor-audio.md` | Audio Explorer、Audio Editor、转换、合并及音频设置 |
 | 6.2 | `docs/superpowers/plans/2026-08-05-ae-ui-editor-model-kitbash.md` | Kitbash、模型、材质、3D 工具与子窗口 |
 | 6.3 | `docs/superpowers/plans/2026-08-05-ae-ui-editor-animation-metadata.md` | 动画、重定向、Animation Meta 与属性编辑 |
-| 6.4 | `docs/superpowers/plans/YYYY-MM-DD-ae-ui-editor-remaining.md` | Texture、TWUI、CSC、导入导出、Reports 及剩余窗口 |
+| 6.4 | `docs/superpowers/plans/2026-08-05-ae-ui-editor-remaining.md` | Texture、TWUI、CSC、导入导出、Updater 及剩余共享窗口 |
 
 **Generation trigger:** 前一个家族通过用户验收后重新生成下一个家族计划，并更新 XAML 全覆盖清单。
 

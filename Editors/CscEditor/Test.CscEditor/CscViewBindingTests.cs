@@ -514,13 +514,41 @@ public class CscViewBindingTests
     [OneTimeSetUp]
     public void CreateApplication()
     {
-        if (Application.Current != null)
-            return;
-
-        var application =
+        var application = Application.Current ??
             new TestApplication(new LocalizationManager());
         application.ShutdownMode =
             ShutdownMode.OnExplicitShutdown;
+        EnsureThemeResources(application);
+    }
+
+    private static void EnsureThemeResources(Application application)
+    {
+        if (application.Resources.Contains("AeButton.Primary"))
+            return;
+
+        foreach (var path in new[]
+                 {
+                     "Themes/ColourDictionaries/DarkTheme.xaml",
+                     "Themes/ControlColours.xaml",
+                     "Themes/DesignSystem/DesignTokens.xaml",
+                     "Themes/DesignSystem/Typography.xaml",
+                     "Themes/DesignSystem/SurfaceStyles.xaml",
+                     "Themes/Controls.xaml",
+                     "Themes/DesignSystem/Controls/Buttons.xaml",
+                     "Themes/DesignSystem/Controls/Inputs.xaml",
+                     "Themes/DesignSystem/Controls/Collections.xaml",
+                     "Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
+                     "Themes/DesignSystem/Shell.xaml",
+                     "Themes/DesignSystem/Workflows.xaml",
+                 })
+        {
+            application.Resources.MergedDictionaries.Add(
+                new ResourceDictionary
+                {
+                    Source = new Uri(
+                        $"pack://application:,,,/AssetEditor.CN;component/{path}"),
+                });
+        }
     }
 
     private static Window CreateWindow(CscEditorView view) =>

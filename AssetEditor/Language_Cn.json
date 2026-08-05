@@ -1868,6 +1868,10 @@
   "ShaderTexture.PreviewTexture": "预览贴图",
 
   "Twui.ToggleSelected": "切换选中",
+  "Twui.Component.String": "字符串",
+  "Twui.Component.Float": "浮点数",
+  "Twui.Component.Vector2": "二维向量",
+  "Twui.Component.Bool": "布尔值",
 
   "RmvToGltfImporter.ToolTip.ImportMeshes": "从 Blender Material Map 创建 TW WH3/3K 兼容的 Material",
   "RmvToGltfImporter.ToolTip.ImportMaterials": "从 RMV 文件导入 Material，转换为 TW Material",

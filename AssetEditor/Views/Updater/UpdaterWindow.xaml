@@ -15,7 +15,19 @@
     WindowStartupLocation="CenterScreen"
     SizeToContent="Height"
     Width="1000"
-    Title="{Localisation:Loc UpdaterWindow.Title}" FontFamily="{DynamicResource AppFontFamily}" Background="{DynamicResource WindowBackground}">
+    Title="{Localisation:Loc UpdaterWindow.Title}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
     <Grid
         Margin="15, 15, 15, 15">
@@ -101,13 +113,15 @@
                 Width="75"
                 Height="25"
                 Margin="0, 0, 5, 0"
-                Command="{Binding UpdateCommand}"/>
+                Command="{Binding UpdateCommand}"
+                Style="{StaticResource AeButton.Primary}"/>
 
             <Button 
                 Content="{Localisation:Loc UpdaterWindow.CancelButton}" 
                 Width="75"
                 Margin="5, 0, 0, 0" 
-                Command="{Binding CloseWindowActionCommand}"/>
+                Command="{Binding CloseWindowActionCommand}"
+                Style="{StaticResource AeButton.Secondary}"/>
         </StackPanel>
     </Grid>
 </Window>

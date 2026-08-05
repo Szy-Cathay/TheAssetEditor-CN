@@ -6,7 +6,19 @@
         xmlns:local="clr-namespace:Editors.ImportExport.Exporting.Presentation"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc ExportWindow.Title}" Height="350" Width="600" Background="#FF1C1C1C">
+        Title="{loc:Loc ExportWindow.Title}" Height="350" Width="600"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
     <Grid Margin="4">
         <Grid.ColumnDefinitions>
@@ -45,7 +57,7 @@
                       Content="{Binding SelectedExporter, UpdateSourceTrigger=PropertyChanged}"       
                       ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
 
-        <Button Grid.Row="4" Grid.ColumnSpan="4" Content="{loc:Loc General.Export}" Click="ExportButton_Click"/>
+        <Button Grid.Row="4" Grid.ColumnSpan="4" Content="{loc:Loc General.Export}" Click="ExportButton_Click" Style="{StaticResource AeButton.Primary}"/>
 
     </Grid>
 </Window>
