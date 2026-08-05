@@ -5,7 +5,20 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc MetaData.NewEntryWindowTitle}" Height="450" Width="400" Background="{DynamicResource WindowBackground}" FontFamily="{DynamicResource AppFontFamily}">
+        Title="{loc:Loc MetaData.NewEntryWindowTitle}"
+        Height="450"
+        Width="400"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
     <Grid>
         <ListView
             ItemsSource="{Binding Items, UpdateSourceTrigger=PropertyChanged}"

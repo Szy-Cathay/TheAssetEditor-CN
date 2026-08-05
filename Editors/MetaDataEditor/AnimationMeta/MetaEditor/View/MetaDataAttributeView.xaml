@@ -13,7 +13,7 @@
 
         <System:Double x:Key="labelWidth">120</System:Double>
     </UserControl.Resources>
-    <Border BorderThickness="1" BorderBrush="LightGray" Margin="5,25,0,0">
+    <Border BorderThickness="1" BorderBrush="{DynamicResource AeBrush.Border}" Margin="5,25,0,0">
         <Grid >
             <Grid.RowDefinitions>
                 <RowDefinition Height="auto"/>
@@ -51,9 +51,9 @@
 
                             <DockPanel >
                                 <ContentControl Content="{materialIcons:MaterialIconExt Kind=Exclamation}" 
-                                                DockPanel.Dock="Left" Margin="-5" Foreground="Red" 
+                                                DockPanel.Dock="Left" Margin="-5" Foreground="{DynamicResource AeBrush.Danger}"
                                                 Visibility="{Binding IsValid, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InvBoolToHiddenConverter}}"/>
-                                <Border BorderThickness="0.5" Margin="3" BorderBrush="DarkGray" DockPanel.Dock="Bottom"/>
+            <Border BorderThickness="0.5" Margin="3" BorderBrush="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom"/>
                                 <Label  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
                                 <Label FontWeight="bold"  Content=":"/>
                                 <TextBox Text="{Binding ValueAsString, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  VerticalContentAlignment="Center" IsReadOnly="{Binding IsReadOnly}"/>
@@ -72,9 +72,9 @@
 
                             <DockPanel >
                                 <ContentControl Content="{materialIcons:MaterialIconExt Kind=Exclamation}" 
-                                         DockPanel.Dock="Left" Margin="-5" Foreground="Red" 
+                                         DockPanel.Dock="Left" Margin="-5" Foreground="{DynamicResource AeBrush.Danger}"
                                          Visibility="{Binding IsValid, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InvBoolToHiddenConverter}}"/>
-                                <Border BorderThickness="0.5" Margin="3" BorderBrush="DarkGray" DockPanel.Dock="Bottom"/>
+            <Border BorderThickness="0.5" Margin="3" BorderBrush="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom"/>
                                 <Label  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
                                 <Label FontWeight="bold"  Content=":"/>
                                 <mathviews:Vector3View VerticalContentAlignment="Center" Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" MinWidth="300" MaxWidth="300" HorizontalAlignment="Left"/>
@@ -92,9 +92,9 @@
 
                             <DockPanel >
                                 <ContentControl Content="{materialIcons:MaterialIconExt Kind=Exclamation}" 
-                                     DockPanel.Dock="Left" Margin="-5" Foreground="Red" 
+                                     DockPanel.Dock="Left" Margin="-5" Foreground="{DynamicResource AeBrush.Danger}"
                                      Visibility="{Binding IsValid, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InvBoolToHiddenConverter}}"/>
-                                <Border BorderThickness="0.5" Margin="3" BorderBrush="DarkGray" DockPanel.Dock="Bottom"/>
+            <Border BorderThickness="0.5" Margin="3" BorderBrush="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom"/>
                                 <Label  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
                                 <Label FontWeight="bold"  Content=":"/>
                                 <mathviews:Vector3View VerticalContentAlignment="Center" Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" MinWidth="300" MaxWidth="300" HorizontalAlignment="Left"/>

@@ -10,10 +10,19 @@
              xmlns:local="clr-namespace:CommonControls.Editors.AnimationPack"
              xmlns:converters="clr-namespace:Editors.AnimationFragmentEditor.AnimationPack.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        </ResourceDictionary>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -54,11 +63,12 @@
                      Text="{Binding AnimationPackItems.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                      behaviors:TextBoxExtensions.Watermark="{loc:Loc AnimPack.Watermark}">
                 <TextBox.Style>
-                    <Style TargetType="{x:Type TextBox}">
-                        <Setter Property="Background" Value="White"/>
+                    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}">
+                        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding AnimationPackItems.FilterValid, UpdateSourceTrigger=PropertyChanged}" Value="false">
-                                <Setter Property="Background" Value="OrangeRed" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
+                                <Setter Property="BorderThickness" Value="2" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -69,10 +79,10 @@
                     <Style TargetType="{x:Type ListViewItem}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsUnknownFile, UpdateSourceTrigger=PropertyChanged}" Value="True">
-                                <Setter Property="Foreground" Value="Red"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsUnknownFile, UpdateSourceTrigger=PropertyChanged}" Value="False">
-                                <Setter Property="Foreground" Value="Black"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

@@ -10,7 +10,7 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <Expander IsExpanded="True" Grid.Row="2" Header="{loc:Loc MountAnim.MountLinkHeader}">
-        <Border BorderBrush="Gray" BorderThickness="0" Margin="10,5,10,0">
+        <Border BorderThickness="0" Margin="10,5,10,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="auto"/>
@@ -67,7 +67,7 @@
                         <Style TargetType="{x:Type ComboBoxItem}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Path=IsValid.Value}" Value="false">
-                                    <Setter Property="Foreground" Value="Red" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -87,7 +87,7 @@
                         <Style TargetType="{x:Type ComboBoxItem}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Path=IsValid.Value}" Value="false">
-                                    <Setter Property="Foreground" Value="Red" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

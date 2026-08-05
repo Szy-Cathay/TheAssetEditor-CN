@@ -51,10 +51,10 @@
                     <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsDecodedCorrectly}" Value="true">
-                            <Setter Property="Foreground" Value="Black" />
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsDecodedCorrectly}" Value="false">
-                            <Setter Property="Foreground" Value="Red" />
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>

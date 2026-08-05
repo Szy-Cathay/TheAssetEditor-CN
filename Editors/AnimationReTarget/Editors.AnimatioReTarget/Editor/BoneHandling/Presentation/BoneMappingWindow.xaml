@@ -8,7 +8,20 @@
         xmlns:view="clr-namespace:CommonControls.Editors.BoneMapping.View;assembly=Editors.Shared.Core"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc AnimReTarget.BoneMappingWindowTitle}" Height="450" Width="800">
+        Title="{loc:Loc AnimReTarget.BoneMappingWindowTitle}"
+        Height="450"
+        Width="800"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <common:AssetEditorWindow.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </common:AssetEditorWindow.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -18,8 +31,8 @@
         <view:BoneMappingView Grid.Row="0"/>
 
         <DockPanel Grid.Row="1" LastChildFill="False" >
-            <Button DockPanel.Dock="Right" Width="50" Margin="3" Content="{loc:Loc General.Ok}" Click="OkButtonClick"/>
-            <Button DockPanel.Dock="Right" Width="50" Margin="3" Content="{loc:Loc General.Cancel}" Click="CancelButtonClick"/>
+            <Button DockPanel.Dock="Right" Width="72" Margin="3" Style="{StaticResource AeButton.Primary}" Content="{loc:Loc General.Ok}" Click="OkButtonClick"/>
+            <Button DockPanel.Dock="Right" Width="72" Margin="3" Style="{StaticResource AeButton.Quiet}" Content="{loc:Loc General.Cancel}" Click="CancelButtonClick"/>
         </DockPanel>
     </Grid>
 </common:AssetEditorWindow>

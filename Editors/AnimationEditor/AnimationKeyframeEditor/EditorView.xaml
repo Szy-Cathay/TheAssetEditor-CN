@@ -13,10 +13,11 @@
         <controls:BooleanToVisibilityConverter x:Key="boolConv"/>
     </UserControl.Resources>
 
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <DockPanel LastChildFill="False">
         <Label  DockPanel.Dock="Top" Content="{loc:Loc AnimKeyframe.Title}" FontSize="18" FontWeight="Bold"/>
         <Label  DockPanel.Dock="Top" FontSize="10" Content="{loc:Loc AnimKeyframe.DragBorderHint}"/>
-        <Label  DockPanel.Dock="Top" FontSize="20" Foreground="Red" Visibility="{Binding IsDirty.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource boolConv}}" Content="{loc:Loc AnimKeyframe.WarningDirty}"/>
+        <Label DockPanel.Dock="Top" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource AeBrush.Warning}" Visibility="{Binding IsDirty.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource boolConv}}" Content="{loc:Loc AnimKeyframe.WarningDirty}"/>
         <Grid  DockPanel.Dock="Top">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="20*"/>
@@ -289,8 +290,9 @@
             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" />
         </Grid>
 
-        <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc General.Save}" Click="{s:MethodBinding Save}"/>
+        <Button DockPanel.Dock="Top" Margin="5" Style="{StaticResource AeButton.Primary}" Content="{loc:Loc General.Save}" Click="{s:MethodBinding Save}"/>
         <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc AnimKeyframe.SaveAs}" Click="{s:MethodBinding SaveAs}"/>
 
     </DockPanel>
+    </ScrollViewer>
 </UserControl>

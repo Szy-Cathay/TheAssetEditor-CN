@@ -33,7 +33,7 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="0" Grid.ColumnSpan="4" Background="Gray" BorderThickness="2" />
+        <Border Grid.Row="0" Grid.ColumnSpan="4" Background="{DynamicResource AeBrush.Border}" BorderThickness="2" />
 
         <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc BoneMapping.RootScale}"/>
         <TextBlock Grid.Row="1" Grid.Column="1" Text=":"/>
@@ -55,7 +55,7 @@
         <TextBlock Grid.Row="4" Grid.Column="1" Text=":"/>
         <mathviews:Vector3View Grid.Row="4" Grid.Column="2" Width="350" VerticalContentAlignment="Center" Vector3="{Binding SkeletonDisplayOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2" HorizontalAlignment="Left"/>
 
-        <Border Grid.Row="5" Grid.ColumnSpan="3" Background="Gray" BorderThickness="2"/>
+        <Border Grid.Row="5" Grid.ColumnSpan="3" Background="{DynamicResource AeBrush.Border}" BorderThickness="2"/>
 
         <TextBlock Grid.Row="6" Grid.Column="0" Text="{loc:Loc BoneMapping.PosOffset}"/>
         <TextBlock Grid.Row="6" Grid.Column="1" Text=":"/>

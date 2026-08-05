@@ -6,10 +6,21 @@
         xmlns:System="clr-namespace:System;assembly=System.Runtime"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc AnimReTarget.SaveWindowTitle}" Height="450" Width="800" Background="#FF1C1C1C">
+        Title="{loc:Loc AnimReTarget.SaveWindowTitle}"
+        Height="450"
+        Width="800"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
     
     <Window.Resources>
-        <System:Double x:Key="labelWidth">140</System:Double>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <System:Double x:Key="labelWidth">140</System:Double>
+        </ResourceDictionary>
     </Window.Resources>
 
 
