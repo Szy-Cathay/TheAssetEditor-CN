@@ -105,6 +105,69 @@ public class UiModelKitbashFamilyTests
         });
     }
 
+    [Test]
+    public void ModelKitbashFamily_UsesCompactThemeNativeChrome()
+    {
+        var styles = ReadKitbashStyleSource();
+        var root = FindSolutionRoot();
+        var kitbasherView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "KitbasherView.xaml"));
+        var menuBarView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "MenuBarViews",
+            "MenuBarView.xaml"));
+        var sceneNodeEditor = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "SceneNodeEditor",
+            "SceneNodeEditorView.xaml"));
+        var combinedViews = string.Join(
+            Environment.NewLine,
+            kitbasherView,
+            menuBarView);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                styles,
+                Does.Contain("x:Key=\"Kitbash.ToolRadioButton\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("x:Key=\"Kitbash.Expander\""));
+            NUnitAssert.That(styles, Does.Not.Contain("<Ellipse"));
+            NUnitAssert.That(
+                styles,
+                Does.Contain(
+                    "TargetType=\"{x:Type ToolBar}\" BasedOn=\"{StaticResource {x:Type ToolBar}}\""));
+            NUnitAssert.That(
+                combinedViews,
+                Does.Not.Contain(
+                    "Style=\"{StaticResource {x:Type ToggleButton}}\""));
+            NUnitAssert.That(
+                kitbasherView,
+                Does.Contain("<ColumnDefinition Width=\"34\"/>"));
+            NUnitAssert.That(
+                combinedViews,
+                Does.Contain("Height=\"20\" Width=\"20\""));
+            NUnitAssert.That(
+                sceneNodeEditor,
+                Does.Contain(
+                    "Background=\"{DynamicResource AeBrush.Surface1}\""));
+        });
+    }
+
     private static IReadOnlyList<string> ReadProductSources()
     {
         var root = FindSolutionRoot();

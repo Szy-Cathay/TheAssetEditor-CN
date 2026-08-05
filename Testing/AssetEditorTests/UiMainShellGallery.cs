@@ -122,7 +122,7 @@ public class UiMainShellGallery
             {
                 NUnitAssert.That(
                     activityBar.ActualWidth,
-                    Is.EqualTo(34).Within(0.1));
+                    Is.EqualTo(30).Within(0.1));
                 NUnitAssert.That(activityBar.SelectedIndex, Is.EqualTo(0));
                 NUnitAssert.That(
                     workspaceSidebar.SelectedIndex,

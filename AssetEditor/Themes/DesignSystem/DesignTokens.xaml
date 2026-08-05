@@ -9,11 +9,12 @@
     <sys:Double x:Key="AeSpace.6">24</sys:Double>
     <sys:Double x:Key="AeSpace.8">32</sys:Double>
 
-    <sys:Double x:Key="AeSize.ActivityRailWidth">34</sys:Double>
+    <sys:Double x:Key="AeSize.ActivityRailWidth">30</sys:Double>
     <sys:Double x:Key="AeSize.TabHeight">24</sys:Double>
-    <sys:Double x:Key="AeSize.CompactRowHeight">28</sys:Double>
-    <sys:Double x:Key="AeSize.ControlHeight">30</sys:Double>
-    <sys:Double x:Key="AeSize.ProminentControlHeight">34</sys:Double>
+    <GridLength x:Key="AeSize.TabGridLength">24</GridLength>
+    <sys:Double x:Key="AeSize.CompactRowHeight">24</sys:Double>
+    <sys:Double x:Key="AeSize.ControlHeight">26</sys:Double>
+    <sys:Double x:Key="AeSize.ProminentControlHeight">30</sys:Double>
 
     <CornerRadius x:Key="AeRadius.Compact">3</CornerRadius>
     <CornerRadius x:Key="AeRadius.Control">4</CornerRadius>

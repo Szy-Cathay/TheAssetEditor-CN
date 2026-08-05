@@ -22,35 +22,166 @@
     <Style TargetType="{x:Type TabItem}" BasedOn="{StaticResource AeTab.Item}" />
     <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource AeScrollBar.Compact}" />
 
-    <Style TargetType="{x:Type Label}">
-        <Setter Property="MinHeight" Value="24" />
-        <Setter Property="Padding" Value="6,2" />
+    <Style TargetType="{x:Type Label}" BasedOn="{StaticResource {x:Type Label}}">
+        <Setter Property="MinHeight" Value="{StaticResource AeSize.CompactRowHeight}" />
+        <Setter Property="Padding" Value="4,0" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
-    <Style TargetType="{x:Type GroupBox}">
-        <Setter Property="Margin" Value="0,4,0,0" />
-        <Setter Property="Padding" Value="8" />
+    <Style TargetType="{x:Type GroupBox}" BasedOn="{StaticResource {x:Type GroupBox}}">
+        <Setter Property="Margin" Value="0,2,0,0" />
+        <Setter Property="Padding" Value="6" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
     </Style>
 
-    <Style TargetType="{x:Type Expander}">
-        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
-        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+    <Style x:Key="Kitbash.ToolRadioButton" TargetType="{x:Type RadioButton}">
+        <Setter Property="Width" Value="{StaticResource AeSize.ControlHeight}" />
+        <Setter Property="Height" Value="{StaticResource AeSize.ControlHeight}" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RadioButton}">
+                    <Border
+                        x:Name="Chrome"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{StaticResource AeRadius.Control}">
+                        <ContentPresenter
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    <Style TargetType="{x:Type Separator}">
+    <Style x:Key="Kitbash.Expander" TargetType="{x:Type Expander}">
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Expander}">
+                    <DockPanel Background="{TemplateBinding Background}">
+                        <ToggleButton
+                            x:Name="HeaderSite"
+                            DockPanel.Dock="Top"
+                            MinHeight="{StaticResource AeSize.CompactRowHeight}"
+                            Padding="6,0"
+                            HorizontalContentAlignment="Stretch"
+                            Background="Transparent"
+                            BorderBrush="{DynamicResource AeBrush.Border}"
+                            BorderThickness="0,0,0,1"
+                            Content="{TemplateBinding Header}"
+                            ContentTemplate="{TemplateBinding HeaderTemplate}"
+                            Focusable="False"
+                            Foreground="{TemplateBinding Foreground}"
+                            IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                    <Border
+                                        x:Name="HeaderBackground"
+                                        Padding="{TemplateBinding Padding}"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Path
+                                                x:Name="Chevron"
+                                                Width="5"
+                                                Height="8"
+                                                Margin="0,0,6,0"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Data="M 1,1 L 4,4 L 1,7"
+                                                RenderTransformOrigin="0.5,0.5"
+                                                Stroke="{DynamicResource AeBrush.TextMuted}"
+                                                StrokeEndLineCap="Round"
+                                                StrokeLineJoin="Round"
+                                                StrokeStartLineCap="Round"
+                                                StrokeThickness="1.4" />
+                                            <ContentPresenter
+                                                Grid.Column="1"
+                                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                VerticalAlignment="Center"
+                                                RecognizesAccessKey="True" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="HeaderBackground" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Chevron" Property="RenderTransform">
+                                                <Setter.Value>
+                                                    <RotateTransform Angle="90" />
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter
+                            x:Name="ExpandSite"
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                            ContentSource="Content"
+                            Focusable="False"
+                            Visibility="Collapsed" />
+                    </DockPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.48" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="{x:Type Expander}" BasedOn="{StaticResource Kitbash.Expander}" />
+
+    <Style TargetType="{x:Type Separator}" BasedOn="{StaticResource {x:Type Separator}}">
         <Setter Property="Background" Value="{DynamicResource AeBrush.Border}" />
     </Style>
 
-    <Style TargetType="{x:Type ToolBarTray}">
+    <Style TargetType="{x:Type ToolBarTray}" BasedOn="{StaticResource {x:Type ToolBarTray}}">
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
     </Style>
 
-    <Style TargetType="{x:Type ToolBar}">
+    <Style TargetType="{x:Type ToolBar}" BasedOn="{StaticResource {x:Type ToolBar}}">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
     </Style>
 </ResourceDictionary>

@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -252,6 +254,155 @@ public class UiCommonControlResourceTests
                     NUnitAssert.That(
                         visibleText,
                         Has.None.Contains(nameof(NamedOption)));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    public void TextBox_PreservesEstablishedEditableTemplate()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var style = (Style)Application.Current.FindResource(
+                    "AeInput.TextBox");
+                var establishedStyle = (Style)Application.Current.FindResource(
+                    typeof(TextBox));
+                var textBox = new TextBox { Style = style };
+                var peer = new TextBoxAutomationPeer(textBox);
+                var valueProvider = (IValueProvider)peer.GetPattern(
+                    PatternInterface.Value)!;
+                valueProvider.SetValue("帝国将军");
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(style.BasedOn, Is.SameAs(establishedStyle));
+                    NUnitAssert.That(textBox.Focusable, Is.True);
+                    NUnitAssert.That(textBox.IsReadOnly, Is.False);
+                    NUnitAssert.That(textBox.MinHeight, Is.EqualTo(26));
+                    NUnitAssert.That(
+                        textBox.VerticalContentAlignment,
+                        Is.EqualTo(VerticalAlignment.Center));
+                    NUnitAssert.That(textBox.Text, Is.EqualTo("帝国将军"));
+                });
+            });
+    }
+
+    [Test]
+    public void ComboBox_UsesEntireSurfaceAsDropDownToggle()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var comboBox = new ComboBox
+                {
+                    Width = 240,
+                    Style = (Style)Application.Current.FindResource(
+                        "AeInput.ComboBox"),
+                };
+                comboBox.Items.Add("战锤 III");
+                var window = new Window
+                {
+                    Width = 300,
+                    Height = 100,
+                    Content = comboBox,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var toggle = FindDescendants<ToggleButton>(comboBox)
+                        .Single();
+                    toggle.IsChecked = true;
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(comboBox.MinHeight, Is.EqualTo(26));
+                        NUnitAssert.That(
+                            toggle.ActualWidth,
+                            Is.EqualTo(comboBox.ActualWidth).Within(1));
+                        NUnitAssert.That(comboBox.IsDropDownOpen, Is.True);
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    public void TextOnlyMenu_DoesNotReserveAnIconRail()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var itemStyle = (Style)Application.Current.FindResource(
+                    "AeMenu.Item");
+                var rootItem = new MenuItem
+                {
+                    Header = "文件",
+                    Style = itemStyle,
+                };
+                rootItem.Items.Add(new MenuItem
+                {
+                    Header = "新建 Pack",
+                    Style = itemStyle,
+                });
+                var menu = new Menu
+                {
+                    Style = (Style)Application.Current.FindResource(
+                        "AeMenu.Bar"),
+                };
+                menu.Items.Add(rootItem);
+                var window = new Window
+                {
+                    Content = menu,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var templateRoot = (FrameworkElement)rootItem.Template
+                        .LoadContent();
+                    var reservedRails = FindDescendants<FrameworkElement>(
+                            templateRoot)
+                        .Where(element =>
+                            element is Canvas or Border &&
+                            element.Width is >= 22 and <= 23)
+                        .ToArray();
+                    var contextMenu = new ContextMenu
+                    {
+                        Style = (Style)Application.Current.FindResource(
+                            "AeMenu.Context"),
+                    };
+                    rootItem.IsSubmenuOpen = true;
+                    var popup = (Popup)rootItem.Template.FindName(
+                        "PART_Popup",
+                        rootItem);
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(reservedRails, Is.Empty);
+                        NUnitAssert.That(rootItem.MinHeight, Is.EqualTo(24));
+                        NUnitAssert.That(
+                            contextMenu.Padding,
+                            Is.EqualTo(new Thickness(2)));
+                        NUnitAssert.That(popup.IsOpen, Is.True);
+                    });
                 }
                 finally
                 {

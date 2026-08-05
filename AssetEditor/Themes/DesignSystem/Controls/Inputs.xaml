@@ -1,9 +1,12 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Style x:Key="AeInput.TextBox" TargetType="{x:Type TextBox}">
+    <Style
+        x:Key="AeInput.TextBox"
+        BasedOn="{StaticResource {x:Type TextBox}}"
+        TargetType="{x:Type TextBox}">
         <Setter Property="MinHeight" Value="{StaticResource AeSize.ControlHeight}" />
-        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Padding" Value="6,2" />
         <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
@@ -13,47 +16,15 @@
         <Setter Property="CaretBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type TextBox}">
-                    <Border
-                        x:Name="Chrome"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="{StaticResource AeRadius.Control}">
-                        <ScrollViewer
-                            x:Name="PART_ContentHost"
-                            Margin="{TemplateBinding Padding}"
-                            Focusable="False"
-                            HorizontalScrollBarVisibility="Hidden"
-                            VerticalScrollBarVisibility="Hidden" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                            <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
-                        </Trigger>
-                        <Trigger Property="Validation.HasError" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
-                            <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chrome" Property="Opacity" Value="0.48" />
-                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
-    <Style x:Key="AeInput.ComboBox" TargetType="{x:Type ComboBox}">
+    <Style
+        x:Key="AeInput.ComboBox"
+        BasedOn="{StaticResource {x:Type ComboBox}}"
+        TargetType="{x:Type ComboBox}">
         <Setter Property="MinHeight" Value="{StaticResource AeSize.ControlHeight}" />
-        <Setter Property="Padding" Value="8,0,30,0" />
+        <Setter Property="Padding" Value="6,0,22,0" />
         <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
@@ -61,11 +32,12 @@
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="ItemContainerStyle">
             <Setter.Value>
                 <Style TargetType="{x:Type ComboBoxItem}">
                     <Setter Property="MinHeight" Value="{StaticResource AeSize.CompactRowHeight}" />
-                    <Setter Property="Padding" Value="8,4" />
+                    <Setter Property="Padding" Value="8,2" />
                     <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
                     <Setter Property="Background" Value="Transparent" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -80,87 +52,6 @@
                         </Trigger>
                     </Style.Triggers>
                 </Style>
-            </Setter.Value>
-        </Setter>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type ComboBox}">
-                    <Grid>
-                        <Border
-                            x:Name="Chrome"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{StaticResource AeRadius.Control}" />
-                        <ContentPresenter
-                            Margin="{TemplateBinding Padding}"
-                            VerticalAlignment="Center"
-                            Content="{TemplateBinding SelectionBoxItem}"
-                            ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
-                            ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                            ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                            IsHitTestVisible="False" />
-                        <ToggleButton
-                            x:Name="DropDownToggle"
-                            Width="30"
-                            HorizontalAlignment="Right"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            ClickMode="Press"
-                            Focusable="False"
-                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
-                            <ToggleButton.Template>
-                                <ControlTemplate TargetType="{x:Type ToggleButton}">
-                                    <Grid Background="Transparent">
-                                        <Path
-                                            Width="10"
-                                            Height="6"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            Data="M 1,1 L 5,5 L 9,1"
-                                            Stroke="{DynamicResource AeBrush.TextSecondary}"
-                                            StrokeEndLineCap="Round"
-                                            StrokeLineJoin="Round"
-                                            StrokeStartLineCap="Round"
-                                            StrokeThickness="1.5" />
-                                    </Grid>
-                                </ControlTemplate>
-                            </ToggleButton.Template>
-                        </ToggleButton>
-                        <Popup
-                            x:Name="PART_Popup"
-                            AllowsTransparency="True"
-                            IsOpen="{TemplateBinding IsDropDownOpen}"
-                            Placement="Bottom"
-                            PopupAnimation="Fade">
-                            <Border
-                                MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
-                                MaxHeight="320"
-                                Margin="0,4,0,0"
-                                Background="{DynamicResource AeBrush.Surface2}"
-                                BorderBrush="{DynamicResource AeBrush.BorderStrong}"
-                                BorderThickness="1"
-                                CornerRadius="{StaticResource AeRadius.Surface}">
-                                <ScrollViewer Margin="4" SnapsToDevicePixels="True">
-                                    <ItemsPresenter />
-                                </ScrollViewer>
-                            </Border>
-                        </Popup>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                            <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chrome" Property="Opacity" Value="0.48" />
-                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>

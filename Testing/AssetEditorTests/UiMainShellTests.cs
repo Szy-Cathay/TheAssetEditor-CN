@@ -93,6 +93,16 @@ public class UiMainShellTests
             NUnitAssert.That(mainWindow, Does.Contain("HasUnsavedChanges"));
             NUnitAssert.That(mainWindow, Does.Not.Contain("Foreground=\"Red\""));
             NUnitAssert.That(mainWindow, Does.Not.Contain("搜索文件或命令"));
+            NUnitAssert.That(
+                mainWindow,
+                Does.Not.Contain("<RowDefinition Height=\"28\" />"));
+            NUnitAssert.That(
+                mainWindow,
+                Does.Contain(
+                    "<RowDefinition Height=\"{StaticResource AeSize.TabGridLength}\" />"));
+            NUnitAssert.That(
+                mainWindow,
+                Does.Contain("Margin=\"0,24,0,0\""));
             NUnitAssert.That(shell, Does.Contain("PART_ItemsHolder"));
             NUnitAssert.That(shell, Does.Contain("EmptyEditorState"));
         });

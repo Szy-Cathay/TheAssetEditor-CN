@@ -7,18 +7,174 @@
         TargetType="{x:Type Menu}">
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
-        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="Padding" Value="2,0" />
     </Style>
 
-    <Style
-        x:Key="AeMenu.Item"
-        BasedOn="{StaticResource {x:Type MenuItem}}"
+    <ControlTemplate
+        x:Key="AeMenu.TopLevelItemTemplate"
         TargetType="{x:Type MenuItem}">
+        <Grid>
+            <Border
+                x:Name="Chrome"
+                Padding="{TemplateBinding Padding}"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{StaticResource AeRadius.Compact}">
+                <ContentPresenter
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    ContentSource="Header"
+                    RecognizesAccessKey="True" />
+            </Border>
+            <Popup
+                x:Name="PART_Popup"
+                AllowsTransparency="True"
+                Focusable="False"
+                IsOpen="{Binding IsSubmenuOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                Placement="Bottom"
+                PopupAnimation="Fade">
+                <Border
+                    MaxHeight="640"
+                    Margin="0,2,0,0"
+                    Padding="2"
+                    Background="{DynamicResource AeBrush.Surface2}"
+                    BorderBrush="{DynamicResource AeBrush.BorderStrong}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource AeRadius.Control}">
+                    <ScrollViewer
+                        CanContentScroll="True"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </ScrollViewer>
+                </Border>
+            </Popup>
+        </Grid>
+    </ControlTemplate>
+
+    <ControlTemplate
+        x:Key="AeMenu.SubmenuItemTemplate"
+        TargetType="{x:Type MenuItem}">
+        <Grid>
+            <Border
+                x:Name="Chrome"
+                MinWidth="120"
+                Padding="{TemplateBinding Padding}"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{StaticResource AeRadius.Compact}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid VerticalAlignment="Center">
+                        <ContentPresenter
+                            x:Name="IconPresenter"
+                            Content="{TemplateBinding Icon}"
+                            ContentSource="Icon"
+                            VerticalAlignment="Center" />
+                        <Path
+                            x:Name="CheckMark"
+                            Width="10"
+                            Height="8"
+                            Margin="0,0,6,0"
+                            Data="M 1,4 L 4,7 L 9,1"
+                            Stroke="{TemplateBinding Foreground}"
+                            StrokeEndLineCap="Round"
+                            StrokeLineJoin="Round"
+                            StrokeStartLineCap="Round"
+                            StrokeThickness="1.6"
+                            Visibility="Collapsed" />
+                    </Grid>
+                    <ContentPresenter
+                        Grid.Column="1"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        ContentSource="Header"
+                        RecognizesAccessKey="True" />
+                    <TextBlock
+                        Grid.Column="2"
+                        Margin="16,0,0,0"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource AeBrush.TextMuted}"
+                        Text="{TemplateBinding InputGestureText}" />
+                    <Path
+                        x:Name="SubmenuArrow"
+                        Grid.Column="3"
+                        Width="5"
+                        Height="8"
+                        Margin="14,0,2,0"
+                        Data="M 1,1 L 4,4 L 1,7"
+                        Stroke="{TemplateBinding Foreground}"
+                        StrokeEndLineCap="Round"
+                        StrokeLineJoin="Round"
+                        StrokeStartLineCap="Round"
+                        StrokeThickness="1.4"
+                        Visibility="Collapsed" />
+                </Grid>
+            </Border>
+            <Popup
+                x:Name="PART_Popup"
+                AllowsTransparency="True"
+                Focusable="False"
+                HorizontalOffset="-2"
+                IsOpen="{Binding IsSubmenuOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                Placement="Right"
+                PopupAnimation="Fade"
+                VerticalOffset="-2">
+                <Border
+                    MaxHeight="640"
+                    Padding="2"
+                    Background="{DynamicResource AeBrush.Surface2}"
+                    BorderBrush="{DynamicResource AeBrush.BorderStrong}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource AeRadius.Control}">
+                    <ScrollViewer
+                        CanContentScroll="True"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </ScrollViewer>
+                </Border>
+            </Popup>
+        </Grid>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed" />
+            </Trigger>
+            <Trigger Property="HasItems" Value="True">
+                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="AeMenu.Item" TargetType="{x:Type MenuItem}">
         <Setter Property="MinHeight" Value="{StaticResource AeSize.CompactRowHeight}" />
-        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template" Value="{StaticResource AeMenu.SubmenuItemTemplate}" />
         <Style.Triggers>
+            <Trigger Property="Role" Value="TopLevelHeader">
+                <Setter Property="Template" Value="{StaticResource AeMenu.TopLevelItemTemplate}" />
+            </Trigger>
+            <Trigger Property="Role" Value="TopLevelItem">
+                <Setter Property="Template" Value="{StaticResource AeMenu.TopLevelItemTemplate}" />
+            </Trigger>
+            <Trigger Property="IsCheckable" Value="True">
+                <Setter Property="StaysOpenOnClick" Value="True" />
+            </Trigger>
             <Trigger Property="IsHighlighted" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                 <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
@@ -42,7 +198,7 @@
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="4" />
+        <Setter Property="Padding" Value="2" />
     </Style>
 
     <Style

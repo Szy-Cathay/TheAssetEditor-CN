@@ -6,7 +6,8 @@
              xmlns:local="clr-namespace:KitbasherEditor.Views" 
              xmlns:sceneexplorer="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneExplorer"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource AeBrush.Surface1}">
     <Grid>
         <ScrollViewer>
             <ContentControl Content="{Binding CurrentEditor}"

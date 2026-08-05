@@ -88,7 +88,7 @@
                     <TabItem>
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="28" />
+                                <RowDefinition Height="{StaticResource AeSize.TabGridLength}" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <Border
@@ -110,7 +110,7 @@
                         IsEnabled="{Binding DataContext.GitWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="28" />
+                                <RowDefinition Height="{StaticResource AeSize.TabGridLength}" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <Border
@@ -131,6 +131,7 @@
 
             <GridSplitter
                 Grid.Column="1"
+                Margin="0,24,0,0"
                 Style="{StaticResource AeShell.Splitter}"
                 Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
 

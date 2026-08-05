@@ -57,7 +57,7 @@
             </Grid.RowDefinitions>
 
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="48"/>
+                <ColumnDefinition Width="34"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -66,27 +66,27 @@
                 <ToolBar Band="0" BandIndex="0" ItemsSource="{Binding MenuBar.SidebarButtons, Mode=OneTime}">
                     <ToolBar.Resources>
                         <Style x:Key="SidebarSeparatorStyle" TargetType="Separator">
-                            <Setter Property="Margin" Value="4,8,4,8"/>
+                            <Setter Property="Margin" Value="3,4"/>
                             <Setter Property="Background" Value="{DynamicResource AeBrush.Border}"/>
                         </Style>
                         <DataTemplate x:Key="sidebarDefaultTemplate">
-                            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="2" Padding="6"
+                            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1" Padding="3"
                                     Style="{StaticResource AeButton.Icon}"
                                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}"
                                     Command="{Binding Path=Action.Command}"
                                     Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                                <Image Height="24" Width="24" Source="{Binding Image}"/>
+                                <Image Height="20" Width="20" Source="{Binding Image}"/>
                             </Button>
                         </DataTemplate>
                         <DataTemplate x:Key="sidebarRadioTemplate">
-                            <RadioButton ToolTip="{Binding Action.ToolTipAttribute.Value}" BorderThickness="0" Background="Transparent" Margin="2" Padding="6"
+                            <RadioButton ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1"
                                          IsChecked="{Binding IsChecked.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                                          Command="{Binding Path=Action.Command}"
                                          GroupName="{Binding GroupName}"
-                                         Style="{StaticResource {x:Type ToggleButton}}"
+                                         Style="{StaticResource Kitbash.ToolRadioButton}"
                                          IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}"
                                          Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                                <Image Height="24" Width="24" Source="{Binding Image}"/>
+                                <Image Height="20" Width="20" Source="{Binding Image}"/>
                             </RadioButton>
                         </DataTemplate>
                         <DataTemplate x:Key="sidebarSeparatorTemplate">

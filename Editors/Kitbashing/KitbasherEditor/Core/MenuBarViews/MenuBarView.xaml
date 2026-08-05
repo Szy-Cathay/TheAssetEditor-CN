@@ -34,7 +34,8 @@
         </Style>
 
         <Style x:Key="ImageStyle" TargetType="Image">
-            <Setter Property="Height" Value="28"/>
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.05"></Setter>
@@ -62,7 +63,7 @@
                             IsChecked="{Binding IsChecked.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                             Command="{Binding Path=Action.Command}"
                             GroupName="{Binding GroupName}" 
-                            Style="{StaticResource {x:Type ToggleButton}}"
+                            Style="{DynamicResource Kitbash.ToolRadioButton}"
                             IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                             ToolTipService.ShowOnDisabled="True"
                             Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToCollapsedConverter}}">
@@ -122,7 +123,7 @@
                                       IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       Focusable="False"
                                       BorderThickness="0" Background="Transparent" Padding="4,2">
-                            <Image Width="24" Height="24" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Image Width="20" Height="20" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
                         </ToggleButton>
                         <!-- Dropdown arrow - Focusable=False for same reason -->
                         <ToggleButton x:Name="PropArrowBtn" Content="▾" FontSize="10" FontWeight="Bold"

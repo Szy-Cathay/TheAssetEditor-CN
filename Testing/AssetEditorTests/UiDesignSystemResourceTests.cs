@@ -278,17 +278,20 @@ public class UiDesignSystemResourceTests
                 NUnitAssert.That(dictionary["AeSpace.8"], Is.EqualTo(32d));
                 NUnitAssert.That(
                     dictionary["AeSize.ActivityRailWidth"],
-                    Is.EqualTo(34d));
+                    Is.EqualTo(30d));
                 NUnitAssert.That(dictionary["AeSize.TabHeight"], Is.EqualTo(24d));
                 NUnitAssert.That(
+                    dictionary["AeSize.TabGridLength"],
+                    Is.EqualTo(new GridLength(24)));
+                NUnitAssert.That(
                     dictionary["AeSize.CompactRowHeight"],
-                    Is.EqualTo(28d));
+                    Is.EqualTo(24d));
                 NUnitAssert.That(
                     dictionary["AeSize.ControlHeight"],
-                    Is.EqualTo(30d));
+                    Is.EqualTo(26d));
                 NUnitAssert.That(
                     dictionary["AeSize.ProminentControlHeight"],
-                    Is.EqualTo(34d));
+                    Is.EqualTo(30d));
                 NUnitAssert.That(
                     dictionary["AeRadius.Compact"],
                     Is.EqualTo(new CornerRadius(3)));
