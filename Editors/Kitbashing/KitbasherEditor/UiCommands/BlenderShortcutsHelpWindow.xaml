@@ -4,7 +4,13 @@
         Title="Blender操作说明" Height="600" Width="520"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#2D2D30">
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AeFont.Family}"
+        FontWeight="{DynamicResource AeFont.Weight.Normal}">
+    <Window.Resources>
+        <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+    </Window.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -13,38 +19,38 @@
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="TitleText" Grid.Row="0" FontSize="16" FontWeight="Bold"
-                   Foreground="#569CD6" Margin="0,0,0,10"/>
+                   Foreground="{DynamicResource AeBrush.Accent}" Margin="0,0,0,10"/>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock x:Name="Header1" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,8,0,4"/>
-                <TextBlock x:Name="Content1" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header1" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,8,0,4"/>
+                <TextBlock x:Name="Content1" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header2" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content2" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header2" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content2" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header3" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content3" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header3" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content3" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header4" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content4" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header4" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content4" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header5" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content5" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header5" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content5" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header6" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content6" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header6" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content6" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header7" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content7" Foreground="#D4D4D4" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header7" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content7" Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" LineHeight="22"/>
 
-                <TextBlock x:Name="Header8" FontSize="14" FontWeight="Bold" Foreground="#DCDCAA" Margin="0,12,0,4"/>
-                <TextBlock x:Name="Content8" Foreground="#9CDCFE" TextWrapping="Wrap" FontSize="12" LineHeight="22"/>
+                <TextBlock x:Name="Header8" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,12,0,4"/>
+                <TextBlock x:Name="Content8" Foreground="{DynamicResource AeBrush.Accent}" TextWrapping="Wrap" FontSize="12" LineHeight="22"/>
             </StackPanel>
         </ScrollViewer>
 
         <Button x:Name="CloseBtn" Grid.Row="2" Width="80" Height="28" HorizontalAlignment="Right"
                 Margin="0,10,0,0" IsCancel="True" Click="CloseButton_Click"
-                Background="#3C3C3C" Foreground="White" BorderBrush="#4A4A4A"/>
+                Style="{StaticResource AeButton.Primary}"/>
     </Grid>
 </Window>

@@ -18,7 +18,7 @@
     <ContentControl x:Name="Shared" DockPanel.Dock="Top">
         <Expander DockPanel.Dock="Top" IsExpanded="True">
             <Expander.Header>
-                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}" ToolTip="{loc:Loc SpecGloss.ToolTip}">
+                <DockPanel DockPanel.Dock="Top" Background="{DynamicResource AeBrush.Surface2}" ToolTip="{loc:Loc SpecGloss.ToolTip}">
                     <Label Content="{loc:Loc SpecGloss.Header}" FontSize="{StaticResource HeaderFontSize}" HorizontalAlignment="Left"/>
 
                 </DockPanel>

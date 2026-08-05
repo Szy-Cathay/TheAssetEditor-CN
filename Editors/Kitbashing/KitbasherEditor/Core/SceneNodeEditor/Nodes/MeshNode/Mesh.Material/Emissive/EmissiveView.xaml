@@ -20,7 +20,7 @@
 
         <Expander DockPanel.Dock="Top" IsExpanded="True">
             <Expander.Header>
-                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}" ToolTip="{loc:Loc Emissive.ToolTip}">
+                <DockPanel DockPanel.Dock="Top" Background="{DynamicResource AeBrush.Surface2}" ToolTip="{loc:Loc Emissive.ToolTip}">
                     <Label Content="{loc:Loc Emissive.Header}" FontSize="{StaticResource HeaderFontSize}"/>
                     <Separator/>
                 </DockPanel>

@@ -98,7 +98,7 @@
 | Order | Detailed plan path | Coverage |
 |---:|---|---|
 | 6.1 | `docs/superpowers/plans/2026-08-05-ae-ui-editor-audio.md` | Audio Explorer、Audio Editor、转换、合并及音频设置 |
-| 6.2 | `docs/superpowers/plans/YYYY-MM-DD-ae-ui-editor-model-kitbash.md` | Kitbash、模型、材质、3D 工具与子窗口 |
+| 6.2 | `docs/superpowers/plans/2026-08-05-ae-ui-editor-model-kitbash.md` | Kitbash、模型、材质、3D 工具与子窗口 |
 | 6.3 | `docs/superpowers/plans/YYYY-MM-DD-ae-ui-editor-animation-metadata.md` | 动画、重定向、Animation Meta 与属性编辑 |
 | 6.4 | `docs/superpowers/plans/YYYY-MM-DD-ae-ui-editor-remaining.md` | Texture、TWUI、CSC、导入导出、Reports 及剩余窗口 |
 

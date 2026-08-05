@@ -12,11 +12,16 @@
              xmlns:menusystem="clr-namespace:Shared.Ui.Common.MenuSystem;assembly=Shared.Ui"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AeFont.Family}"
+             FontWeight="{DynamicResource AeFont.Weight.Normal}"
              AllowDrop="True">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
@@ -57,15 +62,16 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left sidebar: Blender-style tool icons (vertical toolbar) -->
-            <ToolBarTray Grid.Row="0" Grid.Column="0" Orientation="Vertical" Background="{DynamicResource ToolBarTrayBackground}">
+            <ToolBarTray Grid.Row="0" Grid.Column="0" Orientation="Vertical" Background="{DynamicResource AeBrush.Surface1}">
                 <ToolBar Band="0" BandIndex="0" ItemsSource="{Binding MenuBar.SidebarButtons, Mode=OneTime}">
                     <ToolBar.Resources>
                         <Style x:Key="SidebarSeparatorStyle" TargetType="Separator">
                             <Setter Property="Margin" Value="4,8,4,8"/>
-                            <Setter Property="Background" Value="#606060"/>
+                            <Setter Property="Background" Value="{DynamicResource AeBrush.Border}"/>
                         </Style>
                         <DataTemplate x:Key="sidebarDefaultTemplate">
-                            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" BorderThickness="0" Background="Transparent" Margin="2" Padding="6"
+                            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="2" Padding="6"
+                                    Style="{StaticResource AeButton.Icon}"
                                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}"
                                     Command="{Binding Path=Action.Command}"
                                     Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
@@ -103,8 +109,8 @@
             <Grid Grid.Row="0" Grid.Column="1" 
                   Visibility="{Binding MenuBar.TransformTool.IsVisible, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
                 <DockPanel HorizontalAlignment="Right" VerticalAlignment="Top" >
-                    <Rectangle Fill="{DynamicResource ToolBarTrayBackground}" DockPanel.Dock="Left" Width="2"/>
-                    <Rectangle Fill="{DynamicResource ToolBarTrayBackground}" DockPanel.Dock="Bottom" Height="2"/>
+                    <Rectangle Fill="{DynamicResource AeBrush.Border}" DockPanel.Dock="Left" Width="2"/>
+                    <Rectangle Fill="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom" Height="2"/>
 
                     <StackPanel Orientation="Vertical">
                         <StackPanel Orientation="Horizontal">
@@ -112,6 +118,7 @@
                             <mathviews:Vector3View Width="200" Vector3="{Binding MenuBar.TransformTool.Vector3, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                             <Button Content="{loc:Loc Kitbasher.Apply}"
                                     Width="50"
+                                    Style="{StaticResource AeButton.Primary}"
                                     Command="{Binding MenuBar.TransformTool.ApplyCommand}"
                                     IsEnabled="{Binding MenuBar.TransformTool.ButtonEnabled, UpdateSourceTrigger=PropertyChanged}"/> 
                         </StackPanel>

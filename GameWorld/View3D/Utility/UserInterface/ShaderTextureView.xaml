@@ -7,10 +7,16 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d" 
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AeFont.Family}"
+             FontWeight="{DynamicResource AeFont.Weight.Normal}"
              d:DesignHeight="40" d:DesignWidth="800">
     <UserControl.Resources>
+        <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Icon}" />
+        <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}" />
+        <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource AeInput.CheckBox}" />
         <ControlTemplate x:Key="ValidationErrorTemplate">
-            <Border BorderBrush="Red" BorderThickness="1">
+            <Border BorderBrush="{DynamicResource AeBrush.Danger}" BorderThickness="2">
                 <AdornedElementPlaceholder/>
                 <Border.ToolTip>
                     <ToolTip>
@@ -25,7 +31,7 @@
                                 </BeginStoryboard>
                             </EventTrigger>
                         </ToolTip.Triggers>
-                        <TextBlock Text="{Binding Path=AdornedElement.(Validation.Errors)[0].ErrorContent}"  Foreground="Red"/>
+                        <TextBlock Text="{Binding Path=AdornedElement.(Validation.Errors)[0].ErrorContent}" Foreground="{DynamicResource AeBrush.Danger}"/>
                     </ToolTip>
                 </Border.ToolTip>
             </Border>
@@ -35,12 +41,12 @@
     </UserControl.Resources>
     <DockPanel>
         <CheckBox Margin="2,0,2,0"  IsChecked="{Binding ShouldRenderTexture, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}"/>
-        <Button Content="{materialIcons:MaterialIconExt Kind=Delete}" Margin="1" Command="{Binding HandleClearTextureCommand}" DockPanel.Dock="Right" Width="20" ToolTip="{loc:Loc ShaderTexture.RemoveTexture}"/>
-        <Button Content="{materialIcons:MaterialIconExt Kind=Folder}" Margin="1" Command="{Binding HandleBrowseTextureCommand}" DockPanel.Dock="Right" Width="20" ToolTip="{loc:Loc ShaderTexture.BrowseFile}" />
-        <Button Content="{materialIcons:MaterialIconExt Kind=Eye}" Margin="1" Command="{Binding HandlePreviewTextureCommand}" DockPanel.Dock="Right" Width="20" ToolTip="{loc:Loc ShaderTexture.PreviewTexture}"/>
+        <Button Content="{materialIcons:MaterialIconExt Kind=Delete}" Margin="1" Command="{Binding HandleClearTextureCommand}" DockPanel.Dock="Right" ToolTip="{loc:Loc ShaderTexture.RemoveTexture}"/>
+        <Button Content="{materialIcons:MaterialIconExt Kind=Folder}" Margin="1" Command="{Binding HandleBrowseTextureCommand}" DockPanel.Dock="Right" ToolTip="{loc:Loc ShaderTexture.BrowseFile}" />
+        <Button Content="{materialIcons:MaterialIconExt Kind=Eye}" Margin="1" Command="{Binding HandlePreviewTextureCommand}" DockPanel.Dock="Right" ToolTip="{loc:Loc ShaderTexture.PreviewTexture}"/>
         <TextBox Margin="2,2,2,2" Text="{Binding Path, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center">
             <TextBox.Style>
-                <Style TargetType="TextBox"  BasedOn="{StaticResource {x:Type TextBox}}">
+                <Style TargetType="TextBox" BasedOn="{StaticResource AeInput.TextBox}">
                     <Setter Property="Validation.ErrorTemplate" Value="{StaticResource ValidationErrorTemplate}"/>
                     <Style.Triggers>
                         <Trigger Property="Validation.HasError" Value="true">

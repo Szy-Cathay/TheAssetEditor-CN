@@ -9,9 +9,31 @@
              xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AeFont.Family}"
+             FontWeight="{DynamicResource AeFont.Weight.Normal}"
              d:DesignHeight="850" d:DesignWidth="800">
-    <DockPanel LastChildFill="False">
-        <Label  DockPanel.Dock="Top" Content="{loc:Loc SkeletonEditor.Header}" FontSize="18" FontWeight="Bold"/>
+    <UserControl.Resources>
+        <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Secondary}" />
+        <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}" />
+        <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource AeInput.CheckBox}" />
+        <Style TargetType="{x:Type TreeView}" BasedOn="{StaticResource AeTree.View}" />
+        <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}" />
+        <Style TargetType="{x:Type Label}">
+            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="{x:Type GroupBox}">
+            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
+            <Setter Property="Padding" Value="8" />
+        </Style>
+    </UserControl.Resources>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <DockPanel Margin="12" LastChildFill="False">
+        <Label DockPanel.Dock="Top" Content="{loc:Loc SkeletonEditor.Header}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AeBrush.TextPrimary}"/>
 
         <Grid DockPanel.Dock="Top" Margin="5,0,5,5">
             <Grid.ColumnDefinitions>
@@ -46,7 +68,7 @@
             </b:Interaction.Behaviors>
 
             <TreeView.ItemContainerStyle>
-                <Style TargetType="{x:Type TreeViewItem}">
+                <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
                     <Setter Property="IsExpanded" Value="True" />
                 </Style>
             </TreeView.ItemContainerStyle>
@@ -72,7 +94,7 @@
 
             <Button Grid.Column="0" Content="{loc:Loc General.New}"  Click="{s:MethodBinding CreateBoneAction}" Margin="0,0,2,0"/>
             <Button Grid.Column="1" Content="{loc:Loc General.Duplicate}"  Click="{s:MethodBinding DuplicateBoneAction}"  Margin="2,0,2,0"/>
-            <Button Grid.Column="2" Content="{loc:Loc General.Delete}"  Click="{s:MethodBinding DeleteBoneAction}" Margin="2,0,0,0"/>
+            <Button Grid.Column="2" Content="{loc:Loc General.Delete}" Click="{s:MethodBinding DeleteBoneAction}" Margin="2,0,0,0" Style="{StaticResource AeButton.Danger}"/>
             <Button Grid.Column="3" Content="{loc:Loc General.Copy}"  Click="{s:MethodBinding CopyBoneAction}" Margin="2,0,0,0"/>
             <Button Grid.Column="4" Content="{loc:Loc General.Paste}"  Click="{s:MethodBinding PasteBoneAction}" Margin="2,0,0,0"/>
         </Grid>
@@ -140,16 +162,16 @@
 
                 <Label      Grid.Row="1" Grid.Column="0" Content="{loc:Loc SkeletonEditor.Translation}"/>
                 <Label      Grid.Row="1" Grid.Column="1" Content=":"/>
-                <mathviews:Vector3View Grid.Row="1" Grid.Column="3" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneTranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                <mathviews:Vector3View Grid.Row="1" Grid.Column="2" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneTranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
                 <Label      Grid.Row="2" Grid.Column="0" Content="{loc:Loc SkeletonEditor.Rotation}"/>
                 <Label      Grid.Row="2" Grid.Column="1" Content=":"/>
-                <mathviews:Vector3View Grid.Row="2" Grid.Column="3" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneRotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                <mathviews:Vector3View Grid.Row="2" Grid.Column="2" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneRotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
 
-                <Label      Grid.Row="4" Grid.Column="0" Content="{loc:Loc SkeletonEditor.LengthScale}"/>
-                <Label      Grid.Row="4" Grid.Column="1" Content=":"/>
-                <DockPanel Grid.Row="4" Grid.Column="2">
+                <Label Grid.Row="3" Grid.Column="0" Content="{loc:Loc SkeletonEditor.LengthScale}"/>
+                <Label Grid.Row="3" Grid.Column="1" Content=":"/>
+                <DockPanel Grid.Row="3" Grid.Column="2">
                     <Button Content="{loc:Loc SkeletonEditor.Bake}" DockPanel.Dock="Right" Width="60"  Click="{s:MethodBinding BakeSkeletonAction}" Margin="2"/>
                     <TextBox Text="{Binding BoneScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2" DockPanel.Dock="Left"/>
                 </DockPanel>
@@ -157,6 +179,7 @@
             </Grid>
         </GroupBox>
 
-        <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc General.Save}" Click="{s:MethodBinding SaveSkeletonAction}"/>
+        <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc General.Save}" Click="{s:MethodBinding SaveSkeletonAction}" Style="{StaticResource AeButton.Primary}"/>
     </DockPanel>
+    </ScrollViewer>
 </UserControl>

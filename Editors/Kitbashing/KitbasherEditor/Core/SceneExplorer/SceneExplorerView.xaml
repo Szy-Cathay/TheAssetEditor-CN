@@ -10,6 +10,10 @@
              xmlns:basedialogs="clr-namespace:Shared.Ui.BaseDialogs;assembly=Shared.Ui" 
              xmlns:valueconverters1="clr-namespace:Editors.KitbasherEditor.ValueConverters"
              mc:Ignorable="d" 
+             Background="{DynamicResource AeBrush.Surface1}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AeFont.Family}"
+             FontWeight="{DynamicResource AeFont.Weight.Normal}"
              d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -55,10 +59,10 @@
                         <TextBlock  Text="{Binding Path=Content.Name, UpdateSourceTrigger=PropertyChanged}" Margin="2,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsReference, UpdateSourceTrigger=PropertyChanged}" Value="true">
-                                            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -99,11 +103,11 @@
 
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding Path=IsSelected, UpdateSourceTrigger=PropertyChanged}" Value="true">
-                            <Setter Property="Background" Value="{StaticResource TreeViewItem.Selected.Background}"/>
+                            <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}"/>
 
                         </DataTrigger>
                         <DataTrigger Binding="{Binding Path=IsSelected, UpdateSourceTrigger=PropertyChanged}" Value="false">
-                            <Setter Property="Background" Value="{StaticResource TreeView.Static.Background}"/>
+                            <Setter Property="Background" Value="Transparent"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>

@@ -8,9 +8,18 @@
         xmlns:common="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc SaveDialog.Title}" Height="400" Width="800" Background="#FF1C1C1C">
-    
-    <Grid Margin="2">
+        Title="{loc:Loc SaveDialog.Title}" Height="480" Width="900"
+        MinHeight="420" MinWidth="760"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AeFont.Family}"
+        FontWeight="{DynamicResource AeFont.Weight.Normal}">
+    <Window.Resources>
+        <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+    </Window.Resources>
+
+    <Grid Margin="12">
         <DockPanel LastChildFill="true">
             <Grid DockPanel.Dock="Top">
                 <Grid.ColumnDefinitions>
@@ -28,7 +37,7 @@
 
                 <Label Grid.Row="0" Grid.Column="0" Content="{loc:Loc SaveDialog.Path}"/>
                 <DockPanel Grid.Row="0" Grid.Column="1" LastChildFill="True">
-                    <Button DockPanel.Dock="Right"  Command="{Binding HandleBrowseLocationCommand}" Content="{loc:Loc General.Browse}"/>
+                    <Button DockPanel.Dock="Right" Margin="8,0,0,0" Command="{Binding HandleBrowseLocationCommand}" Content="{loc:Loc General.Browse}" Style="{StaticResource AeButton.Secondary}"/>
                     <TextBox DockPanel.Dock="Left" Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"></TextBox>
                 </DockPanel>
 
@@ -64,28 +73,28 @@
             <Label DockPanel.Dock="top"  Margin="2,10,2,0" Content="{loc:Loc SaveDialog.LodInfo}"/>
             <DockPanel DockPanel.Dock="top" Margin="2,0,2,15">
                 <DockPanel DockPanel.Dock="Top">
-                    <DataGrid Style="{DynamicResource {x:Type DataGrid}}"
+                    <DataGrid Style="{StaticResource AeTable.Grid}"
                       ItemsSource="{Binding LodNodes, UpdateSourceTrigger=PropertyChanged}" 
                       AutoGenerateColumns="False" CanUserAddRows="False" ToolTipService.ShowOnDisabled="True" DockPanel.Dock="Top">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="{loc:Loc SaveDialog.Index}" Binding="{Binding LodIndex, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"  ElementStyle="{DynamicResource {x:Type TextBlock}}"/>
-                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.Distance}" Binding="{Binding CameraDistance, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{DynamicResource {x:Type TextBlock}}" EditingElementStyle="{DynamicResource {x:Type TextBox}}"/>
-                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.QltLevel}" Binding="{Binding QualityLvl, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{DynamicResource {x:Type TextBlock}}" EditingElementStyle="{DynamicResource {x:Type TextBox}}"/>
-                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.ReductionFactor}" Binding="{Binding LodReductionFactor, StringFormat={}{0:N2}, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{DynamicResource {x:Type TextBlock}}" EditingElementStyle="{DynamicResource {x:Type TextBox}}"/>
+                            <DataGridTextColumn Header="{loc:Loc SaveDialog.Index}" Binding="{Binding LodIndex, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"  ElementStyle="{StaticResource AeText.Body}"/>
+                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.Distance}" Binding="{Binding CameraDistance, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource AeText.Body}" EditingElementStyle="{StaticResource AeInput.TextBox}"/>
+                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.QltLevel}" Binding="{Binding QualityLvl, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource AeText.Body}" EditingElementStyle="{StaticResource AeInput.TextBox}"/>
+                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.ReductionFactor}" Binding="{Binding LodReductionFactor, StringFormat={}{0:N2}, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource AeText.Body}" EditingElementStyle="{StaticResource AeInput.TextBox}"/>
                             <DataGridCheckBoxColumn Header="{loc:Loc SaveDialog.MergeAlpha}" Binding="{Binding OptimizeLod_Alpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
                             <DataGridCheckBoxColumn Header="{loc:Loc SaveDialog.FastAnimVertex}" Binding="{Binding OptimizeLod_Vertex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
 
-                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumPolygons}" Binding="{Binding PolygonCount.Value}" IsReadOnly="True" ElementStyle="{DynamicResource {x:Type TextBlock}}" />
-                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumMeshes}" Binding="{Binding MeshCount.Value}" IsReadOnly="True" ElementStyle="{DynamicResource {x:Type TextBlock}}" />
-                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumTextures}" Binding="{Binding TextureCount.Value}" IsReadOnly="True" ElementStyle="{DynamicResource {x:Type TextBlock}}" />
+                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumPolygons}" Binding="{Binding PolygonCount.Value}" IsReadOnly="True" ElementStyle="{StaticResource AeText.Body}" />
+                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumMeshes}" Binding="{Binding MeshCount.Value}" IsReadOnly="True" ElementStyle="{StaticResource AeText.Body}" />
+                            <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumTextures}" Binding="{Binding TextureCount.Value}" IsReadOnly="True" ElementStyle="{StaticResource AeText.Body}" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
             </DockPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
-                <Button Width="100" Margin="0,0,2,0" Click="CancelButton_Click" Content="{loc:Loc General.Cancel}"/>
-                <Button Width="100" Margin="0,0,2,0" Click="SaveButton_Click" Content="{loc:Loc General.Save}"/>
+                <Button Margin="0,0,6,0" Click="CancelButton_Click" Content="{loc:Loc General.Cancel}" Style="{StaticResource AeButton.Quiet}"/>
+                <Button Click="SaveButton_Click" Content="{loc:Loc General.Save}" Style="{StaticResource AeButton.Primary}"/>
             </StackPanel>
 
             <CheckBox Margin="2" DockPanel.Dock="Bottom" FlowDirection="RightToLeft" IsChecked="{Binding OnlySaveVisible, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Content="{loc:Loc SaveDialog.OnlySaveVisibleNodes}"/>

@@ -21,7 +21,7 @@
 
         <Expander DockPanel.Dock="Top" IsExpanded="False">
             <Expander.Header>
-                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}" ToolTip="{loc:Loc AdvancedRmvMaterial.ToolTip}">
+                <DockPanel DockPanel.Dock="Top" Background="{DynamicResource AeBrush.Surface2}" ToolTip="{loc:Loc AdvancedRmvMaterial.ToolTip}">
                     <Label Content="{loc:Loc AdvancedRmvMaterial.Header}" FontSize="{StaticResource HeaderFontSize}"/>
                     <Separator/>
                 </DockPanel>

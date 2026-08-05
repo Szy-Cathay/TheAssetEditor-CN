@@ -13,11 +13,19 @@
     ResizeMode="NoResize"
     SizeToContent="WidthAndHeight"
     Style="{StaticResource CustomWindowStyle}"
-    Title="{loc:Loc KitbashTool.PhotoStudio.Title}">
-    <DockPanel Width="450" LastChildFill="False">
+    Title="{loc:Loc KitbashTool.PhotoStudio.Title}"
+    WindowStartupLocation="CenterOwner"
+    Background="{DynamicResource AeBrush.Canvas}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}">
+    <windowhandling:AssetEditorWindow.Resources>
+        <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+    </windowhandling:AssetEditorWindow.Resources>
+    <DockPanel Width="450" Margin="12" LastChildFill="False">
         <DockPanel
             DockPanel.Dock="Top"
-            Background="{DynamicResource GroupBox.Header.Static.Background}">
+            Background="{DynamicResource AeBrush.Surface2}">
             <Label
                 Content="{loc:Loc KitbashTool.PhotoStudio.CameraInformation}"
                 FontSize="10" />
@@ -81,11 +89,12 @@
             Margin="3"
             Command="{Binding RefreshCameraValuesCommand}"
             Content="{loc:Loc KitbashTool.PhotoStudio.RefreshCameraValues}"
+            Style="{StaticResource AeButton.Secondary}"
             DockPanel.Dock="Top" />
 
         <DockPanel
             DockPanel.Dock="Top"
-            Background="{DynamicResource GroupBox.Header.Static.Background}">
+            Background="{DynamicResource AeBrush.Surface2}">
             <Label
                 Content="{loc:Loc KitbashTool.PhotoStudio.LightInformation}"
                 FontSize="10" />
@@ -174,6 +183,7 @@
             Margin="3"
             Command="{Binding TakeScreenshotCommand}"
             Content="{loc:Loc KitbashTool.PhotoStudio.TakeScreenshot}"
+            Style="{StaticResource AeButton.Primary}"
             DockPanel.Dock="Bottom" />
     </DockPanel>
 </windowhandling:AssetEditorWindow>

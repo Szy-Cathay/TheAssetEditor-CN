@@ -8,6 +8,10 @@
              xmlns:viewmodel="clr-namespace:KitbasherEditor.ViewModels.MenuBarViews"
              xmlns:menusystem="clr-namespace:Shared.Ui.Common.MenuSystem;assembly=Shared.Ui"
              mc:Ignorable="d"
+             Background="{DynamicResource AeBrush.Surface1}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AeFont.Family}"
+             FontWeight="{DynamicResource AeFont.Weight.Normal}"
              Loaded="UserControl_Loaded"
              Unloaded="UserControl_Unloaded">
     <UserControl.Resources>
@@ -39,13 +43,13 @@
         </Style>
 
         <DataTemplate x:Key="defaultButtonTemplate">
-            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" BorderThickness="0" Background="Transparent" Margin="1" 
+            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1"
                     AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
                     Focusable="False"
                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                     Command="{Binding Path=Action.Command}" 
                     ToolTipService.ShowOnDisabled="True"
-                    Style="{StaticResource NoBackgroundOnDisabledButton}"
+                    Style="{StaticResource AeButton.Icon}"
                     Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToCollapsedConverter}}">
                 <Image Style="{StaticResource ImageStyle}" Source="{Binding Image}"/>
             </Button>
@@ -109,11 +113,11 @@
             <!-- Proportional editing toggle + dropdown -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="4,0"
                         Visibility="{Binding ProportionalEditing.IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                <Border Background="{DynamicResource ToolBarTrayBackground}" CornerRadius="3" Margin="0,0,2,0">
+                <Border Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}" Margin="0,0,2,0">
                     <StackPanel Orientation="Horizontal">
                         <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
                         <ToggleButton x:Name="PropToggleBtn"
-                                      ToolTip="衰减编辑 (Proportional Editing)"
+                                      ToolTip="衰减编辑"
                                       AutomationProperties.Name="衰减编辑"
                                       IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       Focusable="False"
@@ -132,9 +136,9 @@
                 <Popup x:Name="FalloffPopup" PlacementTarget="{Binding ElementName=PropArrowBtn}"
                        IsOpen="{Binding IsChecked, ElementName=PropArrowBtn, Mode=TwoWay}"
                        StaysOpen="False" AllowsTransparency="True">
-                    <Border Background="{DynamicResource ToolBarTrayBackground}" BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                    <Border Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Surface}" Padding="10,8">
                         <StackPanel>
-                            <TextBlock Text="衰减距离 (Falloff)" Margin="0,0,0,6" Foreground="White"/>
+                            <TextBlock Text="衰减距离" Margin="0,0,0,6" Foreground="{DynamicResource AeBrush.TextPrimary}"/>
                             <TextBox x:Name="FalloffTextBox"
                                      Text="{Binding ProportionalEditing.FalloffDistance, UpdateSourceTrigger=LostFocus, Mode=TwoWay, StringFormat='{}{0:0.###}'}"
                                      Width="100" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
