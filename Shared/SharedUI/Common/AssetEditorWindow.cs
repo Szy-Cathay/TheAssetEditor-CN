@@ -15,7 +15,9 @@ namespace WindowHandling
 
         public AssetEditorWindow()
         {
-            Owner = Application.Current.MainWindow;
+            var mainWindow = Application.Current?.MainWindow;
+            if (mainWindow != null && mainWindow != this && mainWindow.IsLoaded)
+                Owner = mainWindow;
             Deactivated += AssetEdWindow_Deactivated;
             SetResourceReference(BackgroundProperty, "WindowBackground");
             SetResourceReference(FontFamilyProperty, "AppFontFamily");

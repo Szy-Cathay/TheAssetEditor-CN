@@ -113,13 +113,20 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
 
         public void ShowDialogBox(string message, string title)
         {
-            MessageBox.Show(message, title);
+            var dialog = new MessageDialogWindow(
+                title,
+                message,
+                MessageDialogButtonSet.Ok);
+            dialog.ShowDialog();
         }
 
         public ShowMessageBoxResult ShowYesNoBox(string message, string title)
         {
-            var result = MessageBox.Show(message, title, MessageBoxButton.YesNo);
-            if (result == MessageBoxResult.Yes)
+            var dialog = new MessageDialogWindow(
+                title,
+                message,
+                MessageDialogButtonSet.YesNo);
+            if (dialog.ShowDialog() == true)
                 return ShowMessageBoxResult.OK;
             return ShowMessageBoxResult.Cancel;
         }

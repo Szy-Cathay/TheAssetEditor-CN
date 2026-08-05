@@ -28,6 +28,8 @@ namespace Shared.Core.Settings
         // Callback for external theme systems (e.g. WPF-UI) that live outside Shared.Core
         public static Action<ThemeType>? ExternalThemeApplier { get; set; }
 
+        public static event Action<ThemeType>? ThemeChanged;
+
         private static ResourceDictionary FindDictionary(string partialSource)
         {
             foreach (var d in Application.Current.Resources.MergedDictionaries)
@@ -115,6 +117,7 @@ namespace Shared.Core.Settings
 
             // Notify external theme system (WPF-UI)
             ExternalThemeApplier?.Invoke(theme);
+            ThemeChanged?.Invoke(theme);
         }
 
         public static object GetResource(object key)
