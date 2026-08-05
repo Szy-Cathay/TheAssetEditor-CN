@@ -45,7 +45,7 @@
                 </Grid.RowDefinitions>
 
                 <DockPanel Grid.Row="0"  >
-                    <Label Content="{loc:Loc SharedAnimPlayer.MainAnimation}" DockPanel.Dock="Left"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc SharedAnimPlayer.MainAnimation}" DockPanel.Dock="Left"/>
                     <ComboBox DisplayMemberPath="SlotName.Value" ItemsSource="{Binding PlayerItems, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" SelectedItem="{Binding SelectedMainAnimation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"   DockPanel.Dock="Right"/>
                 </DockPanel>
                  

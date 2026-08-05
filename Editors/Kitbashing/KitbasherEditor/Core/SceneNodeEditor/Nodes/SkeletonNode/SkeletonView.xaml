@@ -20,8 +20,7 @@
 
 
         <DockPanel DockPanel.Dock="Top">
-            <Label Content="{loc:Loc SkeletonInfo.NodeScale}" Width ="{StaticResource labelWidth}"  />
-            <Label Content=":" DockPanel.Dock="Left"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonInfo.NodeScale}" Width ="{StaticResource labelWidth}"  />
 
             <TextBox Text="{Binding BoneScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                 <TextBox.ToolTip>

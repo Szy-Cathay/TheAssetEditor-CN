@@ -124,7 +124,7 @@
                         </StackPanel>
 
                         <DockPanel Margin="2" Visibility="{Binding MenuBar.TransformTool.ShowVertexFalloff.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                            <TextBlock Text="{loc:Loc Kitbasher.VertexFalloff}" DockPanel.Dock="Left" Margin="0,0,4,0"/>
+                            <TextBlock Style="{StaticResource AeForm.TextLabel}" Text="{loc:Loc Kitbasher.VertexFalloff}" DockPanel.Dock="Left"/>
                             <TextBox  DockPanel.Dock="Right"
                                          Text="{Binding MenuBar.TransformTool.VertexMovementFalloff.Value.TextValue, 
                                          UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" 

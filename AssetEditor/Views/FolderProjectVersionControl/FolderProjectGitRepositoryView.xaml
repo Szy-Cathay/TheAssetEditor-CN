@@ -341,7 +341,7 @@
                         <ColumnDefinition Width="240" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource GitPageTitleStyle}">
-                        <Run Text="{loc:Loc FolderProject.VersionControl.HistoryBranch}" /><Run Text=": " /><Run Text="{Binding VersionControl.SelectedHistoryBranch.Name}" />
+                        <Run Text="{loc:Loc FolderProject.VersionControl.HistoryBranch}" /><Run Text=" " /><Run Text="{Binding VersionControl.SelectedHistoryBranch.Name}" />
                     </TextBlock>
                     <Grid Grid.Column="1">
                         <TextBox

@@ -35,34 +35,34 @@
                     <RowDefinition Height="auto"/>
                 </Grid.RowDefinitions>
 
-                <Label Grid.Row="0" Grid.Column="0" Content="{loc:Loc SaveDialog.Path}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Row="0" Grid.Column="0" Content="{loc:Loc SaveDialog.Path}"/>
                 <DockPanel Grid.Row="0" Grid.Column="1" LastChildFill="True">
                     <Button DockPanel.Dock="Right" Margin="8,0,0,0" Command="{Binding HandleBrowseLocationCommand}" Content="{loc:Loc General.Browse}" Style="{StaticResource AeButton.Secondary}"/>
                     <TextBox DockPanel.Dock="Left" Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"></TextBox>
                 </DockPanel>
 
-                <Label Grid.Row="1" Grid.Column="0" Content="{loc:Loc SaveDialog.MeshFormat}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Row="1" Grid.Column="0" Content="{loc:Loc SaveDialog.MeshFormat}"/>
                 <ComboBox Grid.Row="1" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1"
                       ItemsSource="{Binding MeshStrategies}" 
                       DisplayMemberPath="DisplayName" 
                       SelectedItem="{Binding SelectedMeshStrategy}"
                       ToolTip="{Binding Path=SelectedItem.Description, RelativeSource={RelativeSource Self}}"/>
 
-                <Label Grid.Row="2" Grid.Column="0" Content="{loc:Loc SaveDialog.WsModelFormat}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Row="2" Grid.Column="0" Content="{loc:Loc SaveDialog.WsModelFormat}"/>
                 <ComboBox Grid.Row="2" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1"
                          ItemsSource="{Binding WsStrategies}" 
                           DisplayMemberPath="DisplayName" 
                           SelectedItem="{Binding SelectedWsModelStrategy}"
                           ToolTip="{Binding Path=SelectedItem.Description, RelativeSource={RelativeSource Self}}"/>
 
-                <Label Grid.Row="3" Grid.Column="0" Content="{loc:Loc SaveDialog.LodStrategy}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Row="3" Grid.Column="0" Content="{loc:Loc SaveDialog.LodStrategy}"/>
                 <ComboBox Grid.Row="3" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1" 
                         ItemsSource="{Binding LodStrategies}" 
                         DisplayMemberPath="DisplayName" 
                         SelectedItem="{Binding SelectedLodStrategy}"
                         ToolTip="{Binding Path=SelectedItem.Description, RelativeSource={RelativeSource Self}}"/>
 
-                <Label Grid.Row="4" Grid.Column="0" Content="{loc:Loc SaveDialog.NumberOfLods}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Row="4" Grid.Column="0" Content="{loc:Loc SaveDialog.NumberOfLods}"/>
                 <ComboBox Grid.Row="4" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1" 
                    ItemsSource="{Binding PossibleLodNumbers}" 
 

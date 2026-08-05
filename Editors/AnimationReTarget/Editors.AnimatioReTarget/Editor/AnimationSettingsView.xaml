@@ -18,21 +18,19 @@
     <Expander IsExpanded="True" Header="{loc:Loc AnimReTarget.Settings}">
         <StackPanel>
             <DockPanel>
-                <Label Content="{loc:Loc AnimReTarget.VisibilityGenerated}" Width ="{StaticResource labelWidth}"  />
-                <Label Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.VisibilityGenerated}" Width ="{StaticResource labelWidth}"  />
 
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Generated.ShowMesh.Value, UpdateSourceTrigger=PropertyChanged}" Content="{loc:Loc AnimReTarget.Mesh}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Generated.ShowMesh.Value, UpdateSourceTrigger=PropertyChanged}" Content="{loc:Loc AnimReTarget.Mesh}"/>
                 <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Generated.ShowSkeleton.Value, UpdateSourceTrigger=PropertyChanged}" Content="{loc:Loc AnimReTarget.Skeleton}"/>
 
-                <Label Content="{loc:Loc AnimReTarget.Offset}"  />
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.Offset}"  />
                 <mathviews:Vector3View Vector3="{Binding AnimationSettings.DisplayOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2"/>
             </DockPanel>
 
           
 
             <DockPanel>
-                <Label Content="{loc:Loc AnimReTarget.SkeletonScale}" Width ="{StaticResource labelWidth}"  DockPanel.Dock="Left"/>
-                <Label Content=":" DockPanel.Dock="Left"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.SkeletonScale}" Width ="{StaticResource labelWidth}"  DockPanel.Dock="Left"/>
 
                 <TextBox Text="{Binding AnimationSettings.Scale.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                     <TextBox.ToolTip>
@@ -47,8 +45,7 @@
             </DockPanel>
 
             <DockPanel>
-                <Label Content="{loc:Loc AnimReTarget.AnimationSpeedMult}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
-                <Label Content=":" DockPanel.Dock="Left"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.AnimationSpeedMult}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
                 <TextBox Text="{Binding AnimationSettings.SpeedMult.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                     <b:Interaction.Behaviors>
                         <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
@@ -58,9 +55,8 @@
 
 
             <DockPanel >
-                <Label Content="{loc:Loc AnimReTarget.Config}" Width ="{StaticResource labelWidth}"/>
-                <Label Content=":"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding AnimationSettings.ApplyRelativeScale.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Content="{loc:Loc AnimReTarget.ApplyRelativeScale}" ToolTip="{loc:Loc AnimReTarget.ApplyRelativeScale.ToolTip}" Margin="0,0,5,0"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.Config}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding AnimationSettings.ApplyRelativeScale.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Content="{loc:Loc AnimReTarget.ApplyRelativeScale}" ToolTip="{loc:Loc AnimReTarget.ApplyRelativeScale.ToolTip}" Margin="0,0,5,0"/>
                 <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding AnimationSettings.FreezeUnmapped.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Content="{loc:Loc AnimReTarget.ZeroUnmappedBones}" ToolTip="{loc:Loc AnimReTarget.ZeroUnmappedBones.ToolTip}"/>
             </DockPanel>
 
@@ -68,8 +64,7 @@
             <DockPanel>
                 <StackPanel>
                     <DockPanel>
-                        <Label Content="{loc:Loc AnimReTarget.RootBoneWarBeast}" Width ="300"/>
-                        <Label Content=":"/>
+                        <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.RootBoneWarBeast}" Width ="300"/>
                         <ComboBox Grid.Column="2" Grid.ColumnSpan="2" Grid.Row="0" 
                           IsEditable="True"
                           IsTextSearchEnabled="false"

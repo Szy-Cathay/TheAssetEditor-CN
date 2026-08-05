@@ -36,17 +36,14 @@
             <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc ExportWindow.SystemPath}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="0" Grid.Column="1" Text=": "/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="0" Grid.Column="0" Text="{loc:Loc ExportWindow.SystemPath}"/>
         <TextBox Grid.Row="0" Grid.Column="2" Text="{Binding SystemPath}" HorizontalContentAlignment="Right" IsReadOnly="True"/>
         <Button Grid.Row="0" Grid.Column="3" Content="{loc:Loc General.Browse}" Command="{Binding BrowsePathCommandCommand}"/>
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc ExportWindow.CreateImportProject}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="1" Grid.Column="1" Text=": "/>
-        <CheckBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Left" IsChecked="{Binding CreateImportProject, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="1" Grid.Column="0" Text="{loc:Loc ExportWindow.CreateImportProject}"/>
+        <CheckBox HorizontalAlignment="Right" Grid.Row="1" Grid.Column="2" IsChecked="{Binding CreateImportProject, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc ExportWindow.AvailableExporters}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="2" Grid.Column="1" Text=": "/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="0" Text="{loc:Loc ExportWindow.AvailableExporters}"/>
         <ComboBox Grid.Row="2" Grid.Column="2"  HorizontalContentAlignment="Right"
                 ItemsSource="{Binding PossibleExporters, UpdateSourceTrigger=PropertyChanged}"
                 SelectedValue="{Binding SelectedExporter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 

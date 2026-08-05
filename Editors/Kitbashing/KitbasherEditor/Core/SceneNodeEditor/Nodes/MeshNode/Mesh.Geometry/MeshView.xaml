@@ -25,21 +25,19 @@
 
         <DockPanel LastChildFill="False" >
             <DockPanel DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.Name}" />
-                <Label DockPanel.Dock="Left">:</Label>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.Name}" />
                 <TextBox Text="{Binding Mesh.ModelName, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalAlignment="Center"/>
             </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.Size}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.Size}"/>
 
-                <Label DockPanel.Dock="Left" Content="{loc:Loc Mesh.VertexCount}"/>
+                <Label Style="{StaticResource AeForm.Label}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.VertexCount}"/>
                 <TextBlock Text="{Binding Mesh.VertexCount, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,30,0"/>
 
-                <Label DockPanel.Dock="Left" Content="{loc:Loc Mesh.IndexCount}"/>
+                <Label Style="{StaticResource AeForm.Label}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.IndexCount}"/>
                 <TextBlock  Text="{Binding Mesh.IndexCount, UpdateSourceTrigger=PropertyChanged}"  VerticalAlignment="Center" FontWeight="Bold"/>
-            </StackPanel>
+            </DockPanel>
 
             <Expander DockPanel.Dock="Top" IsExpanded="False">
                 <Expander.Header>
@@ -48,8 +46,7 @@
 
                 <DockPanel LastChildFill="False">
                     <DockPanel DockPanel.Dock="Top">
-                        <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.VertexType}"/>
-                        <Label>:</Label>
+                        <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.VertexType}"/>
                         <ComboBox ItemsSource="{Binding Mesh.PossibleVertexTypes}" SelectedItem="{Binding Mesh.VertexType}" VerticalAlignment="Center" HorizontalAlignment="Stretch">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
@@ -59,28 +56,24 @@
                         </ComboBox>
                     </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.ReduceLods}"/>
-                        <Label>:</Label>
-                        <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding Mesh.ReduceMeshOnLodGeneration, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-                    </StackPanel>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.ReduceLods}"/>
+                        <CheckBox HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding Mesh.ReduceMeshOnLodGeneration, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                    </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.RenderBbox}"/>
-                        <Label>:</Label>
-                        <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawBoundingBox, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-                    </StackPanel>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.RenderBbox}"/>
+                        <CheckBox HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawBoundingBox, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                    </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.ShowPivot}"/>
-                        <Label>:</Label>
-                        <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawPivotPoint, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-                    </StackPanel>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.ShowPivot}"/>
+                        <CheckBox HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawPivotPoint, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                    </DockPanel>
 
                     <DockPanel DockPanel.Dock="Top">
-                        <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.Pivot}"/>
-                        <Label>:</Label>
-                        <Button Content="{loc:Loc Mesh.CopyToAllMeshes}" Margin="3" Command="{Binding Mesh.CopyPivotToAllMeshesCommand}" DockPanel.Dock="Right"/>
+                        <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.Pivot}"/>
+                        <Button HorizontalAlignment="Right" Content="{loc:Loc Mesh.CopyToAllMeshes}" Margin="3" Command="{Binding Mesh.CopyPivotToAllMeshesCommand}" DockPanel.Dock="Right"/>
                         <mathviews:Vector3View VerticalContentAlignment="Center" Vector3="{Binding Mesh.Pivot, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2,0,2,0"/>
                     </DockPanel>
                 </DockPanel>

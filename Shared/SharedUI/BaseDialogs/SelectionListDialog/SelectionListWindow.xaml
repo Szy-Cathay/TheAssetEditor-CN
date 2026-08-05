@@ -33,10 +33,14 @@
             <Button DockPanel.Dock="Left" Content="{loc:Loc Shared.SelectionList.SelectAll}" Margin="2" Width="80" Click="{s:MethodBinding SelectAll}" Style="{StaticResource AeButton.Quiet}" />
             <Button DockPanel.Dock="Left" Content="{loc:Loc Shared.SelectionList.DeselectAll}" Margin="2" Width="80" Click="{s:MethodBinding DeselectAll}" Style="{StaticResource AeButton.Quiet}" />
             <Button DockPanel.Dock="Right" Content="{loc:Loc General.Ok}" Margin="2" Width="80" Click="OkButton_Click" Style="{StaticResource AeButton.Primary}"/>
-            <StackPanel>
-                <Label  DockPanel.Dock="Left" Content="{loc:Loc General.Filter}" VerticalContentAlignment="Center"/>
-                <TextBox x:Name="SearchTextBox" Height="20" behaviors:TextBoxExtensions.Watermark="{loc:Loc Shared.SelectionList.SearchHint}"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc General.Filter}" VerticalContentAlignment="Center"/>
+                <TextBox Grid.Column="1" x:Name="SearchTextBox" Height="20" behaviors:TextBoxExtensions.Watermark="{loc:Loc Shared.SelectionList.SearchHint}"/>
+            </Grid>
         </DockPanel>
 
     </Grid>

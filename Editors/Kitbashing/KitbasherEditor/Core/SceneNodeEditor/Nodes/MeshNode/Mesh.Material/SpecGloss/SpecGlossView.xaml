@@ -26,39 +26,33 @@
 
             <DockPanel LastChildFill="False">
 
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.UseAlpha}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
-                    <CheckBox Margin="2,0,2,0"  IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
-                </StackPanel>
+                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.UseAlpha}"/>
+                    <CheckBox HorizontalAlignment="Right" Margin="2,0,2,0"  IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
+                </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.DiffuseMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.DiffuseMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding DiffuseMap }"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.SpecularMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.SpecularMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding SpecularMap }"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.GlossMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.GlossMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding GlossMap }"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.NormalMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.NormalMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding NormalMap}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.Mask}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc SpecGloss.Mask}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding Mask}"/>
                 </DockPanel>
             </DockPanel>

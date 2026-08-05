@@ -26,19 +26,17 @@
 
     <StackPanel>
         <DockPanel >
-            <Label Content="{loc:Loc AnimReTarget.SavePrefix}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
-            <Label Content=":" DockPanel.Dock="Left"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.SavePrefix}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
             <ComboBox Margin="2" DockPanel.Dock="Right" Width="60" 
                       ItemsSource="{Binding PossibleAnimationFormats, UpdateSourceTrigger=PropertyChanged}" 
                       SelectedItem="{Binding AnimationFormat, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-            <Label Content="{loc:Loc AnimReTarget.Format}" DockPanel.Dock="Right"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.Format}" DockPanel.Dock="Right"/>
             <TextBox Text="{Binding SavePrefix, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalAlignment="Center" DockPanel.Dock="Left"/>
         </DockPanel>
 
         <DockPanel IsEnabled="False">
-            <Label Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}" Width ="{StaticResource labelWidth}"/>
-            <Label Content=":"/>
-            <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding UseScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}" Width ="{StaticResource labelWidth}"/>
+            <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding UseScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             <Button Content="{loc:Loc AnimReTarget.ExportMeshSkeletonAtScale}" Command="{Binding ExportScaledMesh}"  DockPanel.Dock="Right" Margin="2"/>
             <TextBox Text="{Binding ScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalAlignment="Center"/>
         </DockPanel>

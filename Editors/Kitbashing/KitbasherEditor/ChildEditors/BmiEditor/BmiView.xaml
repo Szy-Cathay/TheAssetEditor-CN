@@ -166,7 +166,7 @@
         </DockPanel>
             
         <DockPanel Grid.Row="2">
-            <Label DockPanel.Dock="Left" Content="{loc:Loc BmiEditor.ScaleFactor}"/>
+            <Label Style="{StaticResource AeForm.Label}" DockPanel.Dock="Left" Content="{loc:Loc BmiEditor.ScaleFactor}"/>
 
             <Button DockPanel.Dock="Right" Content="{loc:Loc General.Apply}" Width="150" Margin="10,0" Click="{s:MethodBinding Apply}" Style="{StaticResource AeButton.Primary}"/>
             <TextBox DockPanel.Dock="Right" Text="{Binding ScaleFactor.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center">

@@ -19,15 +19,13 @@
         </Expander.Header>
 
         <DockPanel LastChildFill="False" >
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.SkeletonName}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.SkeletonName}"/>
                 <TextBlock  Text="{Binding Animation.SkeletonName}"  VerticalAlignment="Center"/>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.Bones}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.Bones}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -53,12 +51,11 @@
                         </StackPanel>
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
 
             <DockPanel DockPanel.Dock="Top" >
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AttachTo}"/>
-                <Label>:</Label>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AttachTo}"/>
                 <ComboBox
                           IsEditable="True"
                           IsTextSearchEnabled="false"
@@ -71,8 +68,7 @@
             </DockPanel>
 
             <DockPanel DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AnimationMatrix}"/>
-                <Label>:</Label>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AnimationMatrix}"/>
                 <TextBox DockPanel.Dock="Top" Margin="0,2,0,2"  Text="{Binding Animation.AnimationMatrixOverride, UpdateSourceTrigger=LostFocus}" MaxLength="8"  VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
             </DockPanel>
             

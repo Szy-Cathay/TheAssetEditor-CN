@@ -28,37 +28,32 @@
         <DockPanel DockPanel.Dock="Right">
             <GroupBox>
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width="{StaticResource labelWidth}">Uv Channels</Label>
-                        <Label>:</Label>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}">Uv Channels</Label>
                         <ComboBox  HorizontalAlignment="Center" VerticalAlignment="Center" 
                                    SelectedValue="{Binding Path=ViewModel.UvChannelSelectedValue.Value, UpdateSourceTrigger=PropertyChanged}" 
                                    ItemsSource="{Binding Path=ViewModel.UvChannelPossibleValues, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width="{StaticResource labelWidth}">Format</Label>
-                        <Label>:</Label>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}">Format</Label>
                         <Label  HorizontalAlignment="Center" VerticalAlignment="Center" Content="{Binding Path=ViewModel.Format.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width="{StaticResource labelWidth}">Width</Label>
-                        <Label>:</Label>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}">Width</Label>
                         <Label  HorizontalAlignment="Center" VerticalAlignment="Center" Content="{Binding Path=ViewModel.Width.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width="{StaticResource labelWidth}">Height</Label>
-                        <Label>:</Label>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}">Height</Label>
                         <Label  HorizontalAlignment="Center" VerticalAlignment="Center" Content="{Binding Path=ViewModel.Height.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    </DockPanel>
 
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                        <Label Width="{StaticResource labelWidth}">Num MipMaps</Label>
-                        <Label>:</Label>
+                    <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                        <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}">Num MipMaps</Label>
                         <Label  HorizontalAlignment="Center" VerticalAlignment="Center" Content="{Binding ViewModel.NumMipMaps.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    </DockPanel>
 
                     <Button Content="{loc:Loc TextureEditor.ImageDetails}" DockPanel.Dock="Top" HorizontalAlignment="Stretch" Click="{s:MethodBinding ShowTextureDetailsInfo}"/>
                
@@ -105,10 +100,14 @@
             </GroupBox>
         </DockPanel>
 
-        <DockPanel DockPanel.Dock="Bottom" >
-            <Label DockPanel.Dock="Left" Content="{loc:Loc TextureEditor.ImagePath}" FontWeight="Bold"/>
-            <Label DockPanel.Dock="Left" HorizontalAlignment="Left" VerticalAlignment="Center" Content="{Binding Path=ViewModel.ImagePath.Value, UpdateSourceTrigger=PropertyChanged}"/>
-        </DockPanel>
+        <Grid DockPanel.Dock="Bottom">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc TextureEditor.ImagePath}" FontWeight="Bold"/>
+            <Label Grid.Column="1" HorizontalContentAlignment="Left" VerticalAlignment="Center" Content="{Binding Path=ViewModel.ImagePath.Value, UpdateSourceTrigger=PropertyChanged}"/>
+        </Grid>
 
         <Image  Source="{Binding Path=ViewModel.ActiveImage.Value, UpdateSourceTrigger=PropertyChanged}"/>
 

@@ -27,16 +27,21 @@
             <RowDefinition/>
         </Grid.RowDefinitions>
 
-        <StackPanel Orientation="Horizontal">
-            <Label Content="{loc:Loc VertexDebugger.NormalDebugScale}"/>
-            <TextBox Width="100" Text="{Binding DebugScale.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="100" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc VertexDebugger.NormalDebugScale}"/>
+            <TextBox Grid.Column="1" Text="{Binding DebugScale.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
                 <b:Interaction.Behaviors>
                     <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
                 </b:Interaction.Behaviors>
             </TextBox>
 
-            <Button Content="{loc:Loc VertexDebugger.ShowStatistics}" Margin="8,0,0,0" Click="Button_Click" Style="{StaticResource AeButton.Secondary}"/>
-        </StackPanel>
+            <Button Grid.Column="2" Content="{loc:Loc VertexDebugger.ShowStatistics}" Margin="8,0,0,0" Click="Button_Click" Style="{StaticResource AeButton.Secondary}"/>
+        </Grid>
 
         <DataGrid Grid.Row="1" 
                  ItemsSource="{Binding VertexList, UpdateSourceTrigger=PropertyChanged}" 

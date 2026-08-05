@@ -33,20 +33,17 @@
             </DockPanel>
 
             <DockPanel>
-                <Label      Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.TranslationOffset}"/>
-                <Label      Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}"      Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.TranslationOffset}"/>
                 <mathviews:Vector3View  VerticalContentAlignment="Center" Vector3="{Binding BoneManager.SelectedBone.TranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             </DockPanel>
 
             <DockPanel>
-                <Label     Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.RotationOffset}"/>
-                <Label     Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}"     Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.RotationOffset}"/>
                 <mathviews:Vector3View  VerticalContentAlignment="Center" Vector3="{Binding BoneManager.SelectedBone.RotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             </DockPanel>
 
             <DockPanel >
-                <Label Content="{loc:Loc AnimReTarget.BoneLengthMult}" Width ="{StaticResource labelWidth}"/>
-                <Label Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.BoneLengthMult}" Width ="{StaticResource labelWidth}"/>
                 <TextBox Text="{Binding BoneManager.SelectedBone.BoneLengthMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                     <b:Interaction.Behaviors>
                         <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
@@ -55,45 +52,38 @@
             </DockPanel>
 
             <DockPanel>
-                <Label Width ="{StaticResource labelWidth}"/>
-                <Label Content=":" Visibility="Hidden"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeTranslation}" Content="{loc:Loc AnimReTarget.FreezePosition}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezePosition.ToolTip}"/>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeTranslation}" Content="{loc:Loc AnimReTarget.FreezePosition}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezePosition.ToolTip}"/>
             </DockPanel>
 
             <DockPanel>
-                <Label Width ="{StaticResource labelWidth}"/>
-                <Label Content=":" Visibility="Hidden"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeRotation}" Content="{loc:Loc AnimReTarget.FreezeRotation}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezeRotation.ToolTip}"/>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeRotation}" Content="{loc:Loc AnimReTarget.FreezeRotation}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezeRotation.ToolTip}"/>
             </DockPanel>
 
             <DockPanel>
-                <Label Width ="{StaticResource labelWidth}"/>
-                <Label Content=":" Visibility="Hidden"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeRotationZ}" Content="{loc:Loc AnimReTarget.FreezeRotationZ}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezeRotationZ.ToolTip}"/>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeRotationZ}" Content="{loc:Loc AnimReTarget.FreezeRotationZ}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezeRotationZ.ToolTip}"/>
             </DockPanel>
 
             <DockPanel>
-                <Label Width ="{StaticResource labelWidth}"/>
-                <Label Content=":" Visibility="Hidden"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ForceSnapToWorld}" Content="{loc:Loc AnimReTarget.SnapWorldspace}" ToolTip="{loc:Loc AnimReTarget.SnapWorldspace.ToolTip}"/>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ForceSnapToWorld}" Content="{loc:Loc AnimReTarget.SnapWorldspace}" ToolTip="{loc:Loc AnimReTarget.SnapWorldspace.ToolTip}"/>
             </DockPanel>
 
             <DockPanel>
-                <Label Width ="{StaticResource labelWidth}"/>
-                <Label Content=":" Visibility="Hidden"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ApplyTranslation}" Content="{loc:Loc AnimReTarget.ApplyTranslation}" Margin="0,0,5,0"/>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ApplyTranslation}" Content="{loc:Loc AnimReTarget.ApplyTranslation}" Margin="0,0,5,0"/>
             </DockPanel>
 
             <DockPanel>
-                <Label Width ="{StaticResource labelWidth}"/>
-                <Label Content=":" Visibility="Hidden"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ApplyRotation}" Content="{loc:Loc AnimReTarget.ApplyRotation}"/>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ApplyRotation}" Content="{loc:Loc AnimReTarget.ApplyRotation}"/>
             </DockPanel>
 
             <DockPanel>
-                <Label     Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.IsRelativeTo}"/>
-                <Label       Content=":"/>
-                <Button DockPanel.Dock="Right" Content="{loc:Loc AnimReTarget.Clear}" Width="60" Command="{Binding BoneManager.ClearRelativeSelectedBoneCommand}" Margin="3,0,0,0"/>
+                <Label Style="{StaticResource AeForm.Label}"     Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.IsRelativeTo}"/>
+                <Button HorizontalAlignment="Right" DockPanel.Dock="Right" Content="{loc:Loc AnimReTarget.Clear}" Width="60" Command="{Binding BoneManager.ClearRelativeSelectedBoneCommand}" Margin="3,0,0,0"/>
                 <ComboBox ItemsSource="{Binding BoneManager.FlatBoneList}" SelectedItem="{Binding BoneManager.SelectedBone.SelectedRelativeBone, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" DisplayMemberPath="BoneName.Value"/>
             </DockPanel>
 

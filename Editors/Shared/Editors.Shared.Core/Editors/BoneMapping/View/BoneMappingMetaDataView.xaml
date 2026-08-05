@@ -35,38 +35,31 @@
 
         <Border Grid.Row="0" Grid.ColumnSpan="4" Background="{DynamicResource AeBrush.Border}" BorderThickness="2" />
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc BoneMapping.RootScale}"/>
-        <TextBlock Grid.Row="1" Grid.Column="1" Text=":"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="1" Grid.Column="0" Text="{loc:Loc BoneMapping.RootScale}"/>
         <TextBox Grid.Row="1" Grid.Column="2"  Width="116" Text="{Binding ScaleFactor.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" HorizontalAlignment="Left" Margin="2" >
             <b:Interaction.Behaviors>
                 <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
             </b:Interaction.Behaviors>
         </TextBox>
 
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc BoneMapping.OnlyMoveSelectedBone}"/>
-        <TextBlock Grid.Row="2" Grid.Column="1" Text=":"/>
-        <CheckBox Grid.Row="2" Grid.Column="2" IsChecked="{Binding OnlyMOveSelectedBone.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="0" Text="{loc:Loc BoneMapping.OnlyMoveSelectedBone}"/>
+        <CheckBox HorizontalAlignment="Right" Grid.Row="2" Grid.Column="2" IsChecked="{Binding OnlyMOveSelectedBone.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
 
-        <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Loc BoneMapping.RelativeScale}"/>
-        <TextBlock Grid.Row="3" Grid.Column="1" Text=":"/>
-        <CheckBox Grid.Row="3" Grid.Column="2" IsChecked="{Binding RelativeScale.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="3" Grid.Column="0" Text="{loc:Loc BoneMapping.RelativeScale}"/>
+        <CheckBox HorizontalAlignment="Right" Grid.Row="3" Grid.Column="2" IsChecked="{Binding RelativeScale.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-        <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Loc BoneMapping.DisplayOffset}"/>
-        <TextBlock Grid.Row="4" Grid.Column="1" Text=":"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="4" Grid.Column="0" Text="{loc:Loc BoneMapping.DisplayOffset}"/>
         <mathviews:Vector3View Grid.Row="4" Grid.Column="2" Width="350" VerticalContentAlignment="Center" Vector3="{Binding SkeletonDisplayOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2" HorizontalAlignment="Left"/>
 
         <Border Grid.Row="5" Grid.ColumnSpan="3" Background="{DynamicResource AeBrush.Border}" BorderThickness="2"/>
 
-        <TextBlock Grid.Row="6" Grid.Column="0" Text="{loc:Loc BoneMapping.PosOffset}"/>
-        <TextBlock Grid.Row="6" Grid.Column="1" Text=":"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="6" Grid.Column="0" Text="{loc:Loc BoneMapping.PosOffset}"/>
         <mathviews:Vector3View Grid.Row="6" Grid.Column="2" Width="350" VerticalContentAlignment="Center" Vector3="{Binding BonePositionOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2" HorizontalAlignment="Left" IsEnabled="{Binding IsBoneSelected.Value, UpdateSourceTrigger=PropertyChanged}"/>
 
-        <TextBlock Grid.Row="7" Grid.Column="0" Text="{loc:Loc BoneMapping.RotOffset}"/>
-        <TextBlock Grid.Row="7" Grid.Column="1" Text=":"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="7" Grid.Column="0" Text="{loc:Loc BoneMapping.RotOffset}"/>
         <mathviews:Vector3View Grid.Row="7" Grid.Column="2" Width="350" VerticalContentAlignment="Center" Vector3="{Binding BoneRotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2" HorizontalAlignment="Left" IsEnabled="{Binding IsBoneSelected.Value, UpdateSourceTrigger=PropertyChanged}"/>
 
-        <TextBlock Grid.Row="8" Grid.Column="0" Text="{loc:Loc BoneMapping.Scale}"/>
-        <TextBlock Grid.Row="8" Grid.Column="1" Text=":"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="8" Grid.Column="0" Text="{loc:Loc BoneMapping.Scale}"/>
         <TextBox Grid.Row="8" Grid.Column="2"  Width="116" Text="{Binding BoneScaleFactor.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" HorizontalAlignment="Left" Margin="2" IsEnabled="{Binding IsBoneSelected.Value, UpdateSourceTrigger=PropertyChanged}">
             <b:Interaction.Behaviors>
                 <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>

@@ -54,8 +54,7 @@
                                                 DockPanel.Dock="Left" Margin="-5" Foreground="{DynamicResource AeBrush.Danger}"
                                                 Visibility="{Binding IsValid, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InvBoolToHiddenConverter}}"/>
             <Border BorderThickness="0.5" Margin="3" BorderBrush="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom"/>
-                                <Label  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
-                                <Label FontWeight="bold"  Content=":"/>
+                                <Label Style="{StaticResource AeForm.Label}"  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
                                 <TextBox Text="{Binding ValueAsString, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  VerticalContentAlignment="Center" IsReadOnly="{Binding IsReadOnly}"/>
                         
                             </DockPanel>
@@ -75,8 +74,7 @@
                                          DockPanel.Dock="Left" Margin="-5" Foreground="{DynamicResource AeBrush.Danger}"
                                          Visibility="{Binding IsValid, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InvBoolToHiddenConverter}}"/>
             <Border BorderThickness="0.5" Margin="3" BorderBrush="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom"/>
-                                <Label  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
-                                <Label FontWeight="bold"  Content=":"/>
+                                <Label Style="{StaticResource AeForm.Label}"  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
                                 <mathviews:Vector3View VerticalContentAlignment="Center" Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" MinWidth="300" MaxWidth="300" HorizontalAlignment="Left"/>
                             </DockPanel>
                         </ContentControl>
@@ -95,8 +93,7 @@
                                      DockPanel.Dock="Left" Margin="-5" Foreground="{DynamicResource AeBrush.Danger}"
                                      Visibility="{Binding IsValid, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InvBoolToHiddenConverter}}"/>
             <Border BorderThickness="0.5" Margin="3" BorderBrush="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom"/>
-                                <Label  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
-                                <Label FontWeight="bold"  Content=":"/>
+                                <Label Style="{StaticResource AeForm.Label}"  FontWeight="bold"  Content="{Binding FieldName, UpdateSourceTrigger=PropertyChanged}" Width ="{StaticResource labelWidth}" />
                                 <mathviews:Vector3View VerticalContentAlignment="Center" Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" MinWidth="300" MaxWidth="300" HorizontalAlignment="Left"/>
                             </DockPanel>
                         </ContentControl>

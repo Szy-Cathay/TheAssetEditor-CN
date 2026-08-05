@@ -31,6 +31,8 @@ public class UiCommonControlResourceTests
             ["AeInput.CheckBox"] = typeof(CheckBox),
             ["AeInput.RadioButton"] = typeof(RadioButton),
             ["AeInput.Switch"] = typeof(ToggleButton),
+            ["AeForm.Label"] = typeof(Label),
+            ["AeForm.TextLabel"] = typeof(TextBlock),
             ["AeValidation.Message"] = typeof(TextBlock),
             ["AeTab.Item"] = typeof(TabItem),
             ["AeTag.Container"] = typeof(Border),

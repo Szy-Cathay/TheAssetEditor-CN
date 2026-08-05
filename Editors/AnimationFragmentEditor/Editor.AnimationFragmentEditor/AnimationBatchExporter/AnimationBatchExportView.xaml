@@ -47,7 +47,7 @@
         </GroupBox>
 
         <DockPanel Grid.Row="1" LastChildFill="True" Margin="0,5,0,0">
-            <Label Content="{loc:Loc AnimBatchExport.OutputFormat}"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimBatchExport.OutputFormat}"/>
             <ComboBox ItemsSource="{Binding PossibleOutputFormats, UpdateSourceTrigger=PropertyChanged}" 
                       SelectedItem="{Binding SelectedOutputFormat.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
         </DockPanel>

@@ -28,21 +28,18 @@
             </Expander.Header>
 
             <DockPanel LastChildFill="False">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.ReceivesBlood}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
-                    <CheckBox Margin="2,0,2,0"  IsChecked="{Binding UseBlood, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
-                </StackPanel>
+                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.ReceivesBlood}"/>
+                    <CheckBox HorizontalAlignment="Right" Margin="2,0,2,0"  IsChecked="{Binding UseBlood, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
+                </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.BloodUvScale}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.BloodUvScale}"/>
                     <mathviews1:Vector2View DataContext="{Binding BloodUvScale}" />
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.TextureBloodMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.TextureBloodMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding BloodMap}"/>
                 </DockPanel>
 

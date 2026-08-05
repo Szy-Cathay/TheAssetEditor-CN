@@ -226,7 +226,7 @@
 
                             <TextBlock FontWeight="Bold" Text="{Binding DisplayName}"/>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Loc Csc.Type}"/>
+                                <TextBlock Style="{StaticResource AeForm.TextLabel}" Text="{loc:Loc Csc.Type}"/>
                                 <TextBlock Text="{Binding KindName}"/>
                             </StackPanel>
 

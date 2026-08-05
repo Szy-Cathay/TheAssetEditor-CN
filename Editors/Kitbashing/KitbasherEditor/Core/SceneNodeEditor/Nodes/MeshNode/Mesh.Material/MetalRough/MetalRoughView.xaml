@@ -26,33 +26,28 @@
 
             <DockPanel LastChildFill="False">
 
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.UseAlpha}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
-                    <CheckBox Margin="2,0,2,0"  IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
-                </StackPanel>
+                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.UseAlpha}"/>
+                    <CheckBox HorizontalAlignment="Right" Margin="2,0,2,0"  IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
+                </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.BaseColour}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.BaseColour}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding BaseColour}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.MaterialMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.MaterialMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding MaterialMap}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.NormalMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.NormalMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding NormalMap}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.Mask}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.Mask}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding Mask}"/>
                 </DockPanel>
             </DockPanel>

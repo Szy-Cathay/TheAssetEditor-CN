@@ -19,20 +19,17 @@
             <StackPanel Margin="10,0,2,0">
 
                 <DockPanel>
-                    <Label Content="{loc:Loc AnimReTarget.GeneratedMesh}" Width ="{StaticResource labelWidth}"  />
-                    <Label Content=":"/>
-                    <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Rendering.ShowGeneratedMesh, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.GeneratedMesh}" Width ="{StaticResource labelWidth}"  />
+                    <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Rendering.ShowGeneratedMesh, UpdateSourceTrigger=PropertyChanged}"/>
                 </DockPanel>
 
                 <DockPanel>
-                    <Label Content="{loc:Loc AnimReTarget.GeneratedSkeleton}" Width ="{StaticResource labelWidth}" />
-                    <Label Content=":"/>
-                    <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Rendering.ShowGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.GeneratedSkeleton}" Width ="{StaticResource labelWidth}" />
+                    <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Rendering.ShowGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged}"/>
                 </DockPanel>
 
                 <DockPanel>
-                    <Label Content="{loc:Loc AnimReTarget.OffsetSpacing}" Width ="{StaticResource labelWidth}"  />
-                    <Label Content=":"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.OffsetSpacing}" Width ="{StaticResource labelWidth}"  />
 
                     <TextBox Text="{Binding Rendering.VisualOffset, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                         <b:Interaction.Behaviors>
@@ -46,8 +43,7 @@
         <Expander IsExpanded="True" Header="{loc:Loc AnimReTarget.AnimationSettings}" DockPanel.Dock="Bottom">
             <StackPanel Margin="10,0,2,0">
                 <DockPanel>
-                    <Label Content="{loc:Loc AnimReTarget.SkeletonScale}" Width ="{StaticResource labelWidth}"  DockPanel.Dock="Left"/>
-                    <Label Content=":" DockPanel.Dock="Left"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.SkeletonScale}" Width ="{StaticResource labelWidth}"  DockPanel.Dock="Left"/>
 
                     <TextBox Text="{Binding Settings.SkeletonScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                         <TextBox.ToolTip>
@@ -61,8 +57,7 @@
                 </DockPanel>
 
                 <DockPanel>
-                    <Label Content="{loc:Loc AnimReTarget.AnimationSpeedMult}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
-                    <Label Content=":" DockPanel.Dock="Left"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.AnimationSpeedMult}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
                     <TextBox Text="{Binding Settings.AnimationSpeedMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
                         <b:Interaction.Behaviors>
                             <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
@@ -71,16 +66,14 @@
                 </DockPanel>
 
                 <DockPanel >
-                    <Label Content="{loc:Loc AnimReTarget.ZeroUnmappedBones}" Width ="{StaticResource labelWidth}"/>
-                    <Label Content=":"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.ZeroUnmappedBones}" Width ="{StaticResource labelWidth}"/>
 
-                    <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Settings.ZeroUnmappedBones, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  ToolTip="{loc:Loc AnimReTarget.ZeroUnmappedBones.ToolTip}"/>
+                    <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Settings.ZeroUnmappedBones, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  ToolTip="{loc:Loc AnimReTarget.ZeroUnmappedBones.ToolTip}"/>
                 </DockPanel>
 
                 <DockPanel >
-                <Label Content="{loc:Loc AnimReTarget.ApplyRelativeScale}" Width ="{StaticResource labelWidth}"/>
-                <Label Content=":"/>
-                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Settings.ApplyRelativeScale, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  ToolTip="{loc:Loc AnimReTarget.ApplyRelativeScale.ToolTip}" Margin="0,0,5,0"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.ApplyRelativeScale}" Width ="{StaticResource labelWidth}"/>
+                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Settings.ApplyRelativeScale, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  ToolTip="{loc:Loc AnimReTarget.ApplyRelativeScale.ToolTip}" Margin="0,0,5,0"/>
             </DockPanel>
 
         </StackPanel>
