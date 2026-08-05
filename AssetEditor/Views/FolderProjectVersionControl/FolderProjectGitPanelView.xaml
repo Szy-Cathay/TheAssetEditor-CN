@@ -13,8 +13,8 @@
     x:Name="Root"
     d:DataContext="{d:DesignInstance Type=viewmodels:FolderProjectGitWorkspaceViewModel}"
     Background="{DynamicResource AeBrush.Canvas}"
-    FontFamily="{DynamicResource AeFont.Family}"
-    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
     Foreground="{DynamicResource AeBrush.TextPrimary}"
     mc:Ignorable="d">
     <UserControl.Resources>

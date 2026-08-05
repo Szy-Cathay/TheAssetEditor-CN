@@ -58,7 +58,8 @@ public class UiModelKitbashFamilyTests
         {
             NUnitAssert.That(sources.Count, Is.EqualTo(30));
             NUnitAssert.That(combined, Does.Contain("AeBrush."));
-            NUnitAssert.That(combined, Does.Contain("AeFont."));
+            NUnitAssert.That(combined, Does.Contain("AppFontFamily"));
+            NUnitAssert.That(combined, Does.Contain("AppFontWeight"));
             NUnitAssert.That(LegacyThemeResource.IsMatch(combined), Is.False);
             NUnitAssert.That(HardcodedThemeColor.IsMatch(combined), Is.False);
         });

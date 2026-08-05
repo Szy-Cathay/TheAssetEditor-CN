@@ -96,7 +96,6 @@
     <None Remove="Resources\Icons\Save.png" />
     <None Remove="Resources\Icons\Undo.png" />
     <None Remove="Resources\Icons\WordWrap.png" />
-    <None Remove="Resources\OptionalRadioButtonStyle.xaml" />
     <None Remove="Resources\AudioConversion\vgstream\avcodec-vgmstream-58.dll" />
     <None Remove="Resources\AudioConversion\vgstream\avformat-vgmstream-58.dll" />
     <None Remove="Resources\AudioConversion\vgstream\avutil-vgmstream-56.dll" />
@@ -168,13 +167,6 @@
     <EmbeddedResource Include="Resources\WsModelTemplates\MaterialTemplate_wh2_default.xml" />
     <EmbeddedResource Include="Resources\WsModelTemplates\MaterialTemplate_wh3_default.xml" />
     <EmbeddedResource Include="Resources\WsModelTemplates\MaterialTemplate_wh3_emissive.xml" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Page Include="Resources\OptionalRadioButtonStyle.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
   </ItemGroup>
 
   <ItemGroup>

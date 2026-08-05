@@ -9,8 +9,8 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              Background="{DynamicResource AeBrush.Surface1}"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
-             FontFamily="{DynamicResource AeFont.Family}"
-             FontWeight="{DynamicResource AeFont.Weight.Normal}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
              d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>

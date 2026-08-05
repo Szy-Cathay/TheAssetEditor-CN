@@ -4,13 +4,38 @@
     <Style
         x:Key="AeVerticalGridSplitterStyle"
         TargetType="{x:Type GridSplitter}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⁞" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
+                    <Border
+                        x:Name="Surface"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{DynamicResource AeRadius.Compact}"
+                        SnapsToDevicePixels="True">
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Vertical">
+                            <Ellipse Width="2" Height="2" Margin="0,1" Fill="{DynamicResource AeBrush.TextMuted}" />
+                            <Ellipse Width="2" Height="2" Margin="0,1" Fill="{DynamicResource AeBrush.TextMuted}" />
+                            <Ellipse Width="2" Height="2" Margin="0,1" Fill="{DynamicResource AeBrush.TextMuted}" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -19,13 +44,38 @@
     <Style
         x:Key="AeHorizontalGridSplitterStyle"
         TargetType="{x:Type GridSplitter}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Grid>
-                        <Button Content="⋯" />
-                        <Rectangle Fill="#00FFFFFF" />
-                    </Grid>
+                    <Border
+                        x:Name="Surface"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{DynamicResource AeRadius.Compact}"
+                        SnapsToDevicePixels="True">
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                            <Ellipse Width="2" Height="2" Margin="1,0" Fill="{DynamicResource AeBrush.TextMuted}" />
+                            <Ellipse Width="2" Height="2" Margin="1,0" Fill="{DynamicResource AeBrush.TextMuted}" />
+                            <Ellipse Width="2" Height="2" Margin="1,0" Fill="{DynamicResource AeBrush.TextMuted}" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

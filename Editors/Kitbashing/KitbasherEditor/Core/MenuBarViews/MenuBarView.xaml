@@ -10,8 +10,8 @@
              mc:Ignorable="d"
              Background="{DynamicResource AeBrush.Surface1}"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
-             FontFamily="{DynamicResource AeFont.Family}"
-             FontWeight="{DynamicResource AeFont.Weight.Normal}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
              Loaded="UserControl_Loaded"
              Unloaded="UserControl_Unloaded">
     <UserControl.Resources>

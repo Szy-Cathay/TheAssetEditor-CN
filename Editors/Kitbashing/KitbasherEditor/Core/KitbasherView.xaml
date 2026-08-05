@@ -14,8 +14,8 @@
              d:DesignHeight="450" d:DesignWidth="800"
              Background="{DynamicResource AeBrush.Canvas}"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
-             FontFamily="{DynamicResource AeFont.Family}"
-             FontWeight="{DynamicResource AeFont.Weight.Normal}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
              AllowDrop="True">
 
     <UserControl.Resources>

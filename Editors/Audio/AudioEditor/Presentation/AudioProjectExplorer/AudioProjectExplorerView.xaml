@@ -13,8 +13,8 @@
     d:DataContext="{d:DesignInstance Type=AudioProjectExplorer:AudioProjectExplorerViewModel}"
     mc:Ignorable="d" 
     Background="{DynamicResource AeBrush.Canvas}"
-    FontFamily="{DynamicResource AeFont.Family}"
-    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
     Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="550" d:DesignWidth="800">
 

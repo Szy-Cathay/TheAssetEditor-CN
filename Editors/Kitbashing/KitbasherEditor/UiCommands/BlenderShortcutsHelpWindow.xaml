@@ -6,8 +6,8 @@
         ResizeMode="NoResize"
         Background="{DynamicResource AeBrush.Canvas}"
         Foreground="{DynamicResource AeBrush.TextPrimary}"
-        FontFamily="{DynamicResource AeFont.Family}"
-        FontWeight="{DynamicResource AeFont.Weight.Normal}">
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
     <Window.Resources>
         <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
     </Window.Resources>

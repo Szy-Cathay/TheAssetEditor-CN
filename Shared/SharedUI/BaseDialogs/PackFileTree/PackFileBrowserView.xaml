@@ -12,8 +12,8 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800"
              Background="Transparent"
-             FontFamily="{DynamicResource AeFont.Family}"
-             FontWeight="{DynamicResource AeFont.Weight.Normal}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
              x:Name="mystuff">
 

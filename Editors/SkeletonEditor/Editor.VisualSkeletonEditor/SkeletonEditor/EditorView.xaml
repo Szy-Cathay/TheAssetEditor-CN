@@ -11,8 +11,8 @@
              mc:Ignorable="d"
              Background="{DynamicResource AeBrush.Canvas}"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
-             FontFamily="{DynamicResource AeFont.Family}"
-             FontWeight="{DynamicResource AeFont.Weight.Normal}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
              d:DesignHeight="850" d:DesignWidth="800">
     <UserControl.Resources>
         <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Secondary}" />

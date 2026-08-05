@@ -16,8 +16,8 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AeBrush.Canvas}"
         Foreground="{DynamicResource AeBrush.TextPrimary}"
-        FontFamily="{DynamicResource AeFont.Family}"
-        FontWeight="{DynamicResource AeFont.Weight.Normal}">
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
     <windowhandling:AssetEditorWindow.Resources>
         <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
     </windowhandling:AssetEditorWindow.Resources>

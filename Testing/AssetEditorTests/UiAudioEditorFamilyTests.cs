@@ -39,7 +39,8 @@ public class UiAudioEditorFamilyTests
         {
             NUnitAssert.That(sources.Count, Is.EqualTo(12));
             NUnitAssert.That(sources, Has.All.Contains("AeBrush."));
-            NUnitAssert.That(sources, Has.All.Contains("AeFont."));
+            NUnitAssert.That(sources, Has.All.Contains("AppFontFamily"));
+            NUnitAssert.That(sources, Has.All.Contains("AppFontWeight"));
             NUnitAssert.That(
                 sources,
                 Has.None.Matches<string>(source =>

@@ -26,7 +26,7 @@
 ## Source of Truth
 
 - Approved design: `docs/superpowers/specs/2026-08-05-ae-ui-design-system-design.md`
-- Current detailed plan: `docs/superpowers/plans/2026-08-05-ae-ui-editor-remaining.md`
+- Current detailed plan: `docs/superpowers/plans/2026-08-05-ae-ui-theme-legacy-cleanup.md`
 - Final canonical document after all implementation and user acceptance: `docs/ui-design-system.md`
 
 ## Plan Generation Rule
@@ -108,7 +108,7 @@
 
 ### Phase 7: Theme completion and legacy cleanup
 
-**Detailed plan path:** `docs/superpowers/plans/YYYY-MM-DD-ae-ui-theme-legacy-cleanup.md`
+**Detailed plan path:** `docs/superpowers/plans/2026-08-05-ae-ui-theme-legacy-cleanup.md`
 
 **Generation trigger:** XAML 全覆盖清单显示所有用户可见界面已迁移后，重新扫描隐式样式、资源键、XAML、代码创建、反射和测试消费者。
 
