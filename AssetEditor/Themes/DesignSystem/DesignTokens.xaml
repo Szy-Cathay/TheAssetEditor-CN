@@ -28,36 +28,45 @@
     <Duration x:Key="AeMotion.Overlay">0:0:0.160</Duration>
     <sys:Double x:Key="AeMotion.OverlayOffset">2</sys:Double>
 
-    <Storyboard x:Key="AeMotion.ButtonClickStoryboard" x:Shared="False">
-        <DoubleAnimationUsingKeyFrames
+    <Storyboard x:Key="AeMotion.ButtonPressStoryboard" x:Shared="False">
+        <DoubleAnimation
             Storyboard.TargetName="InteractionScale"
-            Storyboard.TargetProperty="ScaleX">
-            <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-            <EasingDoubleKeyFrame KeyTime="0:0:0.070" Value="0.985">
-                <EasingDoubleKeyFrame.EasingFunction>
-                    <CubicEase EasingMode="EaseOut" />
-                </EasingDoubleKeyFrame.EasingFunction>
-            </EasingDoubleKeyFrame>
-            <EasingDoubleKeyFrame KeyTime="0:0:0.190" Value="1">
-                <EasingDoubleKeyFrame.EasingFunction>
-                    <CubicEase EasingMode="EaseOut" />
-                </EasingDoubleKeyFrame.EasingFunction>
-            </EasingDoubleKeyFrame>
-        </DoubleAnimationUsingKeyFrames>
-        <DoubleAnimationUsingKeyFrames
+            Storyboard.TargetProperty="ScaleX"
+            To="0.985"
+            Duration="0:0:0.070">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+        <DoubleAnimation
             Storyboard.TargetName="InteractionScale"
-            Storyboard.TargetProperty="ScaleY">
-            <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-            <EasingDoubleKeyFrame KeyTime="0:0:0.070" Value="0.985">
-                <EasingDoubleKeyFrame.EasingFunction>
-                    <CubicEase EasingMode="EaseOut" />
-                </EasingDoubleKeyFrame.EasingFunction>
-            </EasingDoubleKeyFrame>
-            <EasingDoubleKeyFrame KeyTime="0:0:0.190" Value="1">
-                <EasingDoubleKeyFrame.EasingFunction>
-                    <CubicEase EasingMode="EaseOut" />
-                </EasingDoubleKeyFrame.EasingFunction>
-            </EasingDoubleKeyFrame>
-        </DoubleAnimationUsingKeyFrames>
+            Storyboard.TargetProperty="ScaleY"
+            To="0.985"
+            Duration="0:0:0.070">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+    </Storyboard>
+
+    <Storyboard x:Key="AeMotion.ButtonReleaseStoryboard" x:Shared="False">
+        <DoubleAnimation
+            Storyboard.TargetName="InteractionScale"
+            Storyboard.TargetProperty="ScaleX"
+            To="1"
+            Duration="0:0:0.120">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+        <DoubleAnimation
+            Storyboard.TargetName="InteractionScale"
+            Storyboard.TargetProperty="ScaleY"
+            To="1"
+            Duration="0:0:0.120">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
     </Storyboard>
 </ResourceDictionary>

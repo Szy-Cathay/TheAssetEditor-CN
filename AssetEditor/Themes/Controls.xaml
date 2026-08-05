@@ -52,9 +52,14 @@
                         RecognizesAccessKey="True" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.MouseOver.Background}" />
                             <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.MouseOver.Foreground}" />
@@ -96,9 +101,14 @@
                         RecognizesAccessKey="True"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.MouseOver.Background}"/>
                             <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.MouseOver.Foreground}"/>
@@ -1116,9 +1126,14 @@
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsDefaulted" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Defaulted.Background}"/>
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Defaulted.Border}"/>
@@ -1129,7 +1144,6 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Pressed.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Pressed.Border}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
                             <Setter Property="Background" TargetName="border" Value="Transparent"/>
@@ -1177,9 +1191,14 @@
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsDefaulted" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Defaulted.Background}"/>
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Defaulted.Border}"/>
@@ -1190,7 +1209,6 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Pressed.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Pressed.Border}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Disabled.Background}"/>
@@ -1238,9 +1256,14 @@
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="Button.IsDefaulted" Value="true">
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Defaulted.Border}"/>
                         </Trigger>
@@ -1250,7 +1273,6 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Pressed.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Pressed.Border}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Disabled.Background}"/>
@@ -2330,9 +2352,14 @@
                         <ContentPresenter x:Name="contentPresenter" Grid.Column="0" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="20,0,0,0" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="HasContent" Value="true">
                             <Setter Property="Padding" Value="4,-1,0,0"/>
                         </Trigger>
@@ -2348,7 +2375,6 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
                             <Setter Property="Background" TargetName="radioButtonBorder" Value="{DynamicResource RadioButton.Pressed.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="radioButtonBorder" Value="{DynamicResource RadioButton.Pressed.Border}"/>
                             <Setter Property="Fill" TargetName="optionMark" Value="{DynamicResource RadioButton.Pressed.Glyph}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="true">
@@ -3945,9 +3971,14 @@
                               StrokeThickness="1.4"/>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
                         </Trigger>
@@ -3993,9 +4024,14 @@
                               StrokeThickness="1.4"/>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
                         </Trigger>
@@ -4071,9 +4107,14 @@
                         <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}"/>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsDefaulted" Value="true">
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
                         </Trigger>
@@ -4083,7 +4124,6 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Pressed.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Pressed.Border}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Disabled.Background}"/>

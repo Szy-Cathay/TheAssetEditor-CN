@@ -98,9 +98,14 @@
                             VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}" />
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}" />
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}" />
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                         </Trigger>
@@ -148,9 +153,14 @@
                             VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}" />
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}" />
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}" />
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                         </Trigger>

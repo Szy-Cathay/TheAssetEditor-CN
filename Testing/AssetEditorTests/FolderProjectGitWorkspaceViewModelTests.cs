@@ -1470,10 +1470,13 @@ public class FolderProjectGitWorkspaceViewModelTests
                 Does.Not.Contain("To=\"0.94\""));
             NUnitAssert.That(
                 partStyle.ToString(),
-                Does.Contain("ButtonBase.Click"));
+                Does.Not.Contain("ButtonBase.Click"));
             NUnitAssert.That(
                 partStyle.ToString(),
-                Does.Contain("AeMotion.ButtonClickStoryboard"));
+                Does.Contain("AeMotion.ButtonPressStoryboard"));
+            NUnitAssert.That(
+                partStyle.ToString(),
+                Does.Contain("AeMotion.ButtonReleaseStoryboard"));
             NUnitAssert.That(
                 commitButton?.Attribute("Command")?.Value,
                 Is.EqualTo("{Binding VersionControl.CommitCommand}"));

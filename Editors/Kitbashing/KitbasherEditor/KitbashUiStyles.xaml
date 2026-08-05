@@ -60,9 +60,14 @@
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}" />
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}" />
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}" />
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Box" Property="Background" Value="{DynamicResource AeBrush.Accent}" />
                             <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
@@ -151,9 +156,14 @@
                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="ButtonBase.Click">
-                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}" />
-                        </EventTrigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}" />
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}" />
+                            </Trigger.ExitActions>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                         </Trigger>

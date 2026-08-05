@@ -481,13 +481,50 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void HoldingPressedState_DoesNotControlButtonScale()
+    public void SecondaryButton_PressUsesScaleWithoutAccentOutline()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
             () =>
             {
-                var button = new Button
+                var style = (Style)Application.Current.FindResource(
+                    "AeButton.Secondary");
+                var template = (ControlTemplate)FindSetter(
+                    style,
+                    Control.TemplateProperty)!.Value;
+                var pressedVisual = style.Triggers
+                    .OfType<Trigger>()
+                    .Single(item =>
+                        item.Property == ButtonBase.IsPressedProperty);
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        FindSetter(
+                            style,
+                            FrameworkElement.FocusVisualStyleProperty)
+                            ?.Value,
+                        Is.Null);
+                    NUnitAssert.That(
+                        pressedVisual.Setters
+                            .OfType<Setter>()
+                            .Any(item =>
+                                item.Property ==
+                                Control.BorderBrushProperty),
+                        Is.False);
+                });
+                AssertPressReleaseMotion(template);
+            });
+    }
+
+    [Test]
+    public void SecondaryButton_ShrinksWhilePressedAndReboundsOnRelease()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var button = new PressStateTestButton
                 {
                     Content = "Test",
                     Style = (Style)Application.Current.FindResource(
@@ -501,15 +538,40 @@ public class UiCommonControlResourceTests
                     window.UpdateLayout();
                     var scale = GetInteractionScale(button);
 
-                    NUnitAssert.That(
-                        VisualStateManager.GoToState(
-                            button,
-                            "Pressed",
-                            false),
-                        Is.True);
-                    PumpDispatcher(TimeSpan.FromMilliseconds(30));
-                    NUnitAssert.That(scale.ScaleX, Is.EqualTo(1));
-                    NUnitAssert.That(scale.ScaleY, Is.EqualTo(1));
+                    button.SetPressed(true);
+                    PumpDispatcher(TimeSpan.FromMilliseconds(90));
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            scale.ScaleX,
+                            Is.EqualTo(0.985).Within(0.001));
+                        NUnitAssert.That(
+                            scale.ScaleY,
+                            Is.EqualTo(0.985).Within(0.001));
+                    });
+
+                    PumpDispatcher(TimeSpan.FromMilliseconds(150));
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            scale.ScaleX,
+                            Is.EqualTo(0.985).Within(0.001));
+                        NUnitAssert.That(
+                            scale.ScaleY,
+                            Is.EqualTo(0.985).Within(0.001));
+                    });
+
+                    button.SetPressed(false);
+                    PumpDispatcher(TimeSpan.FromMilliseconds(150));
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            scale.ScaleX,
+                            Is.EqualTo(1).Within(0.001));
+                        NUnitAssert.That(
+                            scale.ScaleY,
+                            Is.EqualTo(1).Within(0.001));
+                    });
                 }
                 finally
                 {
@@ -519,7 +581,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void Click_PlaysOneShotShrinkAndReturnMotion()
+    public void PublicButtons_UsePressAndReleaseMotion()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -615,12 +677,17 @@ public class UiCommonControlResourceTests
                 };
 
                 foreach (var (name, control) in controls)
-                    AssertOneShotClickMotion(control, name);
+                {
+                    var template = (ControlTemplate)FindSetter(
+                        control.Style,
+                        Control.TemplateProperty)!.Value;
+                    AssertPressReleaseMotion(template, name);
+                }
             });
     }
 
     [Test]
-    public void PublicButtonTemplates_UseOneShotClickMotionAcrossFamilies()
+    public void PublicButtonTemplates_UsePressAndReleaseMotionAcrossFamilies()
     {
         var root = FindSolutionRoot();
         var paths = new[]
@@ -642,14 +709,22 @@ public class UiCommonControlResourceTests
             var scaleCount = source.Split(
                 "x:Name=\"InteractionScale\"",
                 StringSplitOptions.None).Length - 1;
-            var clickCount = source.Split(
-                "AeMotion.ButtonClickStoryboard",
+            var pressCount = source.Split(
+                "AeMotion.ButtonPressStoryboard",
+                StringSplitOptions.None).Length - 1;
+            var releaseCount = source.Split(
+                "AeMotion.ButtonReleaseStoryboard",
                 StringSplitOptions.None).Length - 1;
 
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(scaleCount, Is.GreaterThan(0), path);
-                NUnitAssert.That(clickCount, Is.EqualTo(scaleCount), path);
+                NUnitAssert.That(pressCount, Is.EqualTo(scaleCount), path);
+                NUnitAssert.That(releaseCount, Is.EqualTo(scaleCount), path);
+                NUnitAssert.That(
+                    source,
+                    Does.Not.Contain("ButtonBase.Click"),
+                    path);
                 NUnitAssert.That(
                     source,
                     Does.Not.Contain("To=\"0.94\""),
@@ -659,7 +734,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void Buttons_HighlightOnHoverAndAnimateOneClickWithoutFocusRings()
+    public void Buttons_HighlightOnHoverAndAnimatePressWithoutFocusRings()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -704,26 +779,33 @@ public class UiCommonControlResourceTests
                     NUnitAssert.That(persistentFocusRings, Is.Empty);
                     NUnitAssert.That(translucentStateOverlays, Is.Empty);
                 });
-                AssertOneShotClickMotion(template);
+                AssertPressReleaseMotion(template);
             });
     }
 
     [Test]
-    public void LegacyButtonBases_UseOneShotClickMotionWithoutFocusRings()
+    public void LegacyButtonBases_UsePressReleaseMotionWithoutFocusRings()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
             () =>
             {
-                foreach (var controlType in new[]
-                         {
-                             typeof(Button),
-                             typeof(ToggleButton),
-                             typeof(RadioButton),
-                         })
+                var styles = new (string Name, Style Style)[]
                 {
-                    var style = (Style)Application.Current.FindResource(
-                        controlType);
+                    ("button", (Style)Application.Current.FindResource(
+                        typeof(Button))),
+                    ("toggle", (Style)Application.Current.FindResource(
+                        typeof(ToggleButton))),
+                    ("radio", (Style)Application.Current.FindResource(
+                        typeof(RadioButton))),
+                    ("disabled-background", (Style)Application.Current
+                        .FindResource("NoBackgroundOnDisabledButton")),
+                    ("toolbar", (Style)Application.Current.FindResource(
+                        "ToolBarButtonBaseStyle")),
+                };
+
+                foreach (var (name, style) in styles)
+                {
                     var focusVisualSetter = FindSetter(
                         style,
                         FrameworkElement.FocusVisualStyleProperty);
@@ -741,8 +823,21 @@ public class UiCommonControlResourceTests
                             Is.Empty);
                         NUnitAssert.That(focusVisualSetter, Is.Not.Null);
                         NUnitAssert.That(focusVisualSetter!.Value, Is.Null);
+                        NUnitAssert.That(
+                            template.Triggers
+                                .OfType<Trigger>()
+                                .Where(item =>
+                                    item.Property ==
+                                    ButtonBase.IsPressedProperty)
+                                .SelectMany(item => item.Setters
+                                    .OfType<Setter>())
+                                .Any(item =>
+                                    item.Property ==
+                                    Control.BorderBrushProperty),
+                            Is.False,
+                            name);
                     });
-                    AssertOneShotClickMotion(template);
+                    AssertPressReleaseMotion(template, name);
                 }
             });
     }
@@ -791,7 +886,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void EditorToggleButtons_UseOneShotClickMotionWithoutFocusFrames()
+    public void EditorToggleButtons_UsePressReleaseMotionWithoutFocusFrames()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -835,8 +930,7 @@ public class UiCommonControlResourceTests
                                 .Where(item => item.Name == "FocusRing"),
                             Is.Empty);
                     });
-                    AssertOneShotClickMotion(template);
-                    AssertOneShotClickMotion(control, name);
+                    AssertPressReleaseMotion(template, name);
                 }
             });
     }
@@ -983,20 +1077,49 @@ public class UiCommonControlResourceTests
         Load("Themes/DesignSystem/Controls/MenusAndFeedback.xaml"),
     ];
 
-    private static void AssertOneShotClickMotion(ControlTemplate template)
+    private static void AssertPressReleaseMotion(
+        ControlTemplate template,
+        string? name = null)
     {
-        var clickTrigger = template.Triggers
-            .OfType<EventTrigger>()
-            .Single(item => item.RoutedEvent == ButtonBase.ClickEvent);
-        var storyboard = clickTrigger.Actions
+        var pressTrigger = template.Triggers
+            .OfType<Trigger>()
+            .Single(item =>
+                item.Property == ButtonBase.IsPressedProperty &&
+                Equals(item.Value, true) &&
+                item.EnterActions.Count > 0 &&
+                item.ExitActions.Count > 0);
+        var pressStoryboard = pressTrigger.EnterActions
             .OfType<BeginStoryboard>()
             .Single()
             .Storyboard;
+        var releaseStoryboard = pressTrigger.ExitActions
+            .OfType<BeginStoryboard>()
+            .Single()
+            .Storyboard;
+
+        AssertScaleStoryboard(
+            pressStoryboard,
+            0.985,
+            TimeSpan.FromMilliseconds(70),
+            name);
+        AssertScaleStoryboard(
+            releaseStoryboard,
+            1,
+            TimeSpan.FromMilliseconds(120),
+            name);
+    }
+
+    private static void AssertScaleStoryboard(
+        Storyboard storyboard,
+        double target,
+        TimeSpan duration,
+        string? name)
+    {
         var tracks = storyboard.Children
-            .OfType<DoubleAnimationUsingKeyFrames>()
+            .OfType<DoubleAnimation>()
             .ToArray();
 
-        NUnitAssert.That(tracks, Has.Length.EqualTo(2));
+        NUnitAssert.That(tracks, Has.Length.EqualTo(2), name);
         foreach (var track in tracks)
         {
             NUnitAssert.Multiple(() =>
@@ -1007,63 +1130,16 @@ public class UiCommonControlResourceTests
                 NUnitAssert.That(
                     Storyboard.GetTargetProperty(track).Path,
                     Is.EqualTo("ScaleX").Or.EqualTo("ScaleY"));
+                NUnitAssert.That(track.To, Is.EqualTo(target), name);
                 NUnitAssert.That(
-                    track.KeyFrames.Cast<DoubleKeyFrame>()
-                        .Select(item => item.Value),
-                    Is.EqualTo(new[] { 1d, 0.985d, 1d }));
-                NUnitAssert.That(
-                    track.KeyFrames.Cast<DoubleKeyFrame>()
-                        .Select(item => item.KeyTime.TimeSpan),
-                    Is.EqualTo(new[]
-                    {
-                        TimeSpan.Zero,
-                        TimeSpan.FromMilliseconds(70),
-                        TimeSpan.FromMilliseconds(190),
-                    }));
-            });
-        }
-    }
-
-    private static void AssertOneShotClickMotion(
-        ButtonBase control,
-        string name)
-    {
-        var window = CreateOffscreenWindow(control);
-        try
-        {
-            window.Show();
-            control.ApplyTemplate();
-            window.UpdateLayout();
-            var scale = GetInteractionScale(control);
-
-            control.RaiseEvent(new RoutedEventArgs(
-                ButtonBase.ClickEvent,
-                control));
-            PumpDispatcher(TimeSpan.FromMilliseconds(45));
-
-            NUnitAssert.Multiple(() =>
-            {
-                NUnitAssert.That(scale.ScaleX, Is.LessThan(0.997), name);
-                NUnitAssert.That(scale.ScaleY, Is.LessThan(0.997), name);
-            });
-
-            PumpDispatcher(TimeSpan.FromMilliseconds(220));
-
-            NUnitAssert.Multiple(() =>
-            {
-                NUnitAssert.That(
-                    scale.ScaleX,
-                    Is.EqualTo(1).Within(0.001),
+                    track.Duration.TimeSpan,
+                    Is.EqualTo(duration),
                     name);
                 NUnitAssert.That(
-                    scale.ScaleY,
-                    Is.EqualTo(1).Within(0.001),
+                    track.EasingFunction,
+                    Is.TypeOf<CubicEase>(),
                     name);
             });
-        }
-        finally
-        {
-            window.Close();
         }
     }
 
@@ -1103,6 +1179,11 @@ public class UiCommonControlResourceTests
         };
         timer.Start();
         Dispatcher.PushFrame(frame);
+    }
+
+    private sealed class PressStateTestButton : Button
+    {
+        public void SetPressed(bool value) => IsPressed = value;
     }
 
     private static T? FindDescendant<T>(DependencyObject root)
