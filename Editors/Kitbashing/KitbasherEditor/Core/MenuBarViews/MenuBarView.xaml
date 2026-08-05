@@ -114,25 +114,27 @@
             <!-- Proportional editing toggle + dropdown -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="4,0"
                         Visibility="{Binding ProportionalEditing.IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                <Border Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}" Margin="0,0,2,0">
-                    <StackPanel Orientation="Horizontal">
-                        <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
-                        <ToggleButton x:Name="PropToggleBtn"
-                                      ToolTip="衰减编辑"
-                                      AutomationProperties.Name="衰减编辑"
-                                      IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Focusable="False"
-                                      BorderThickness="0" Background="Transparent" Padding="4,2">
-                            <Image Width="20" Height="20" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
-                        </ToggleButton>
-                        <!-- Dropdown arrow - Focusable=False for same reason -->
-                        <ToggleButton x:Name="PropArrowBtn" Content="▾" FontSize="10" FontWeight="Bold"
-                                      BorderThickness="0" Background="Transparent" Padding="2,0,4,0"
-                                      Focusable="False"
-                                      AutomationProperties.Name="调整衰减距离"
-                                      ToolTip="调整衰减距离"/>
-                    </StackPanel>
-                </Border>
+                <StackPanel Orientation="Horizontal" Margin="0,0,2,0">
+                    <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
+                    <ToggleButton x:Name="PropToggleBtn"
+                                  Width="28"
+                                  Height="28"
+                                  Margin="0,0,2,0"
+                                  Padding="4"
+                                  ToolTip="衰减编辑"
+                                  AutomationProperties.Name="衰减编辑"
+                                  IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  Focusable="False">
+                        <Image Width="20" Height="20" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
+                    </ToggleButton>
+                    <!-- Dropdown arrow - Focusable=False for same reason -->
+                    <ToggleButton x:Name="PropArrowBtn"
+                                  Height="28"
+                                  Style="{StaticResource AeButton.DropdownArrow}"
+                                  Focusable="False"
+                                  AutomationProperties.Name="调整衰减距离"
+                                  ToolTip="调整衰减距离"/>
+                </StackPanel>
                 <!-- Popup for falloff value -->
                 <Popup x:Name="FalloffPopup" PlacementTarget="{Binding ElementName=PropArrowBtn}"
                        IsOpen="{Binding IsChecked, ElementName=PropArrowBtn, Mode=TwoWay}"

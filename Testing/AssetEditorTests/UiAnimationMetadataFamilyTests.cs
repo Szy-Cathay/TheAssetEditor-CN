@@ -158,6 +158,13 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 styles,
                 Does.Not.Contain("Property=\"IsKeyboardFocused\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain(
+                    "<Setter Property=\"FocusVisualStyle\" Value=\"{x:Null}\" />"));
+            NUnitAssert.That(styles, Does.Contain("To=\"1.015\""));
+            NUnitAssert.That(styles, Does.Contain("To=\"0.94\""));
+            NUnitAssert.That(styles, Does.Contain("AeMotion.Pressed"));
         });
     }
 

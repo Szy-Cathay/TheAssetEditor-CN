@@ -1450,6 +1450,25 @@ public class FolderProjectGitWorkspaceViewModelTests
                     .Attribute("Value")?.Value,
                 Is.EqualTo("26"));
             NUnitAssert.That(
+                partStyle.Elements(presentation + "Setter")
+                    .Single(element =>
+                        element.Attribute("Property")?.Value ==
+                        "FocusVisualStyle")
+                    .Attribute("Value")?.Value,
+                Is.EqualTo("{x:Null}"));
+            NUnitAssert.That(
+                partStyle.Descendants(presentation + "Trigger").Any(
+                    element =>
+                        element.Attribute("Property")?.Value ==
+                        "IsKeyboardFocused"),
+                Is.False);
+            NUnitAssert.That(
+                partStyle.ToString(),
+                Does.Contain("To=\"1.015\""));
+            NUnitAssert.That(
+                partStyle.ToString(),
+                Does.Contain("To=\"0.94\""));
+            NUnitAssert.That(
                 commitButton?.Attribute("Command")?.Value,
                 Is.EqualTo("{Binding VersionControl.CommitCommand}"));
             NUnitAssert.That(

@@ -21,6 +21,7 @@
     <ap:WatermarkComboBoxDropDownVisibilityConverter x:Key="watermarkComboBoxDropDownVisibilityConverter" />
 
     <Style x:Key="TitleBarButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource TitleBar.Button.Background}"/>
         <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.Foreground}"/>
         <Setter Property="Padding" Value="0"/>
@@ -337,16 +338,16 @@
                                         Background="{DynamicResource ComboBox.Static.Background}" CornerRadius="4">
                                         <Border 
                                             x:Name="splitBorder"
-                                            BorderBrush="Transparent"
-                                            BorderThickness="1"
+                                            Background="Transparent"
+                                            BorderThickness="0"
                                             HorizontalAlignment="Right"
                                             Margin="0"
                                             SnapsToDevicePixels="True"
                                             Width="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}">
-                                            <Path 
+                                            <Path
                                                 x:Name="Arrow"
                                                 Data="F1M0,0L2.667,2.66665 5.3334,0 5.3334,-1.78168 2.6667,0.88501 0,-1.78168 0,0z"
-                                                Fill="#FF606060"
+                                                Fill="{DynamicResource ComboBox.Static.Glyph}"
                                                 HorizontalAlignment="Center"
                                                 Margin="0"
                                                 VerticalAlignment="Center" />
@@ -362,8 +363,6 @@
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource ComboBox.Static.Editable.Background}"/>
                                             <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource ComboBox.Static.Editable.Border}"/>
-                                            <Setter Property="Background" TargetName="splitBorder" Value="{DynamicResource ComboBox.Static.Editable.Button.Background}"/>
-                                            <Setter Property="BorderBrush" TargetName="splitBorder" Value="{DynamicResource ComboBox.Static.Editable.Button.Border}"/>
                                         </MultiDataTrigger>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Fill" TargetName="Arrow" Value="{DynamicResource ComboBox.MouseOver.Glyph}"/>
@@ -383,8 +382,6 @@
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource ComboBox.MouseOver.Editable.Background}"/>
                                             <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource ComboBox.MouseOver.Editable.Border}"/>
-                                            <Setter Property="Background" TargetName="splitBorder" Value="{DynamicResource ComboBox.MouseOver.Editable.Button.Background}"/>
-                                            <Setter Property="BorderBrush" TargetName="splitBorder" Value="{DynamicResource ComboBox.MouseOver.Editable.Button.Border}"/>
                                         </MultiDataTrigger>
                                         <Trigger Property="IsPressed" Value="True">
                                             <Setter Property="Fill" TargetName="Arrow" Value="{DynamicResource ComboBox.Pressed.Glyph}"/>
@@ -404,8 +401,6 @@
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource ComboBox.Pressed.Editable.Background}"/>
                                             <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource ComboBox.Pressed.Editable.Border}"/>
-                                            <Setter Property="Background" TargetName="splitBorder" Value="{DynamicResource ComboBox.Pressed.Editable.Button.Background}"/>
-                                            <Setter Property="BorderBrush" TargetName="splitBorder" Value="{DynamicResource ComboBox.Pressed.Editable.Button.Border}"/>
                                         </MultiDataTrigger>
                                         <Trigger Property="IsEnabled" Value="False">
                                             <Setter Property="Fill" TargetName="Arrow" Value="{DynamicResource ComboBox.Disabled.Glyph}"/>
@@ -425,8 +420,6 @@
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource ComboBox.Disabled.Editable.Background}"/>
                                             <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource ComboBox.Disabled.Editable.Border}"/>
-                                            <Setter Property="Background" TargetName="splitBorder" Value="{DynamicResource ComboBox.Disabled.Editable.Button.Background}"/>
-                                            <Setter Property="BorderBrush" TargetName="splitBorder" Value="{DynamicResource ComboBox.Disabled.Editable.Button.Border}"/>
                                         </MultiDataTrigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -713,6 +706,7 @@
 
     <Style x:Key="SpinnerButtonStyleKey"
        TargetType="RepeatButton">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="2,2" />
         <Setter Property="Template">
@@ -1074,7 +1068,7 @@
     </ControlTemplate>
 
     <Style x:Key="NoBackgroundOnDisabledButton" TargetType="{x:Type Button}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{DynamicResource Button.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Button.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource Button.Static.Foreground}"/>
@@ -1089,7 +1083,39 @@
                     <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Background="{TemplateBinding Background}" SnapsToDevicePixels="true"
-                            CornerRadius="{TemplateBinding ap:CornerRadiusHelper.Value}">
+                            CornerRadius="{TemplateBinding ap:CornerRadiusHelper.Value}"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualStateGroup.Transitions>
+                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}"/>
+                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}"/>
+                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}"/>
+                                </VisualStateGroup.Transitions>
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1.015"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1.015"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled"/>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           Margin="{TemplateBinding Padding}" RecognizesAccessKey="True"
                                           SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
@@ -1120,7 +1146,7 @@
     </Style>
 
     <Style TargetType="{x:Type Button}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{DynamicResource Button.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Button.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource Button.Static.Foreground}"/>
@@ -1135,7 +1161,39 @@
                     <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Background="{TemplateBinding Background}" SnapsToDevicePixels="true"
-                            CornerRadius="{TemplateBinding ap:CornerRadiusHelper.Value}">
+                            CornerRadius="{TemplateBinding ap:CornerRadiusHelper.Value}"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualStateGroup.Transitions>
+                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}"/>
+                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}"/>
+                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}"/>
+                                </VisualStateGroup.Transitions>
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1.015"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1.015"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled"/>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           Margin="{TemplateBinding Padding}" RecognizesAccessKey="True"
                                           SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
@@ -1166,7 +1224,7 @@
     </Style>
 
     <Style TargetType="{x:Type ToggleButton}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{DynamicResource Button.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Button.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource Button.Static.Foreground}"/>
@@ -1181,7 +1239,39 @@
                     <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Background="{TemplateBinding Background}" SnapsToDevicePixels="true"
-                            CornerRadius="{TemplateBinding ap:CornerRadiusHelper.Value}">
+                            CornerRadius="{TemplateBinding ap:CornerRadiusHelper.Value}"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualStateGroup.Transitions>
+                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}"/>
+                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}"/>
+                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}"/>
+                                </VisualStateGroup.Transitions>
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1.015"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1.015"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94"/>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled"/>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           Margin="{TemplateBinding Padding}" RecognizesAccessKey="True"
                                           SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
@@ -1580,7 +1670,7 @@
     <!-- Buttons -->
 
     <Style x:Key="CompactScrollBarButton" TargetType="{x:Type RepeatButton}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{DynamicResource ScrollBar.Static.Background}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -2892,7 +2982,7 @@
                 <ControlTemplate TargetType="{x:Type Expander}">
                     <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" CornerRadius="0" SnapsToDevicePixels="true">
                         <DockPanel >
-                            <ToggleButton x:Name="HeaderSite" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}" Content="{TemplateBinding Header}" DockPanel.Dock="Top" Foreground="{TemplateBinding Foreground}" FontWeight="{TemplateBinding FontWeight}" FocusVisualStyle="{StaticResource ExpanderHeaderFocusVisual}" FontStyle="{TemplateBinding FontStyle}" FontStretch="{TemplateBinding FontStretch}" FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Margin="0" MinWidth="0" MinHeight="0" Padding="{TemplateBinding Padding}" Style="{StaticResource ExpanderDownHeaderWithBorderBackgroundStyle}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            <ToggleButton x:Name="HeaderSite" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}" Content="{TemplateBinding Header}" DockPanel.Dock="Top" Foreground="{TemplateBinding Foreground}" FontWeight="{TemplateBinding FontWeight}" FocusVisualStyle="{x:Null}" FontStyle="{TemplateBinding FontStyle}" FontStretch="{TemplateBinding FontStretch}" FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Margin="0" MinWidth="0" MinHeight="0" Padding="{TemplateBinding Padding}" Style="{StaticResource ExpanderDownHeaderWithBorderBackgroundStyle}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
                             <Border BorderBrush="{DynamicResource Button.Static.Border}" BorderThickness="1, 1, 1, 0" >
                                 <ContentPresenter x:Name="ExpandSite" DockPanel.Dock="Bottom" Focusable="false" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" Visibility="Collapsed" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                             </Border>
@@ -2923,7 +3013,7 @@
                 <ControlTemplate TargetType="{x:Type Expander}">
                     <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" CornerRadius="3" SnapsToDevicePixels="true">
                         <DockPanel>
-                            <ToggleButton x:Name="HeaderSite" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}" Content="{TemplateBinding Header}" DockPanel.Dock="Top" Foreground="{TemplateBinding Foreground}" FontWeight="{TemplateBinding FontWeight}" FocusVisualStyle="{StaticResource ExpanderHeaderFocusVisual}" FontStyle="{TemplateBinding FontStyle}" FontStretch="{TemplateBinding FontStretch}" FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Margin="1" MinWidth="0" MinHeight="0" Padding="{TemplateBinding Padding}" Style="{StaticResource ExpanderDownHeaderStyle}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            <ToggleButton x:Name="HeaderSite" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}" Content="{TemplateBinding Header}" DockPanel.Dock="Top" Foreground="{TemplateBinding Foreground}" FontWeight="{TemplateBinding FontWeight}" FocusVisualStyle="{x:Null}" FontStyle="{TemplateBinding FontStyle}" FontStretch="{TemplateBinding FontStretch}" FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Margin="1" MinWidth="0" MinHeight="0" Padding="{TemplateBinding Padding}" Style="{StaticResource ExpanderDownHeaderStyle}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
                             <ContentPresenter x:Name="ExpandSite" DockPanel.Dock="Bottom" Focusable="false" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" Visibility="Collapsed" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </DockPanel>
                     </Border>
@@ -3382,6 +3472,7 @@
     </Style>
 
     <Style x:Key="{ComponentResourceKey ResourceId=DataGridSelectAllButtonStyle, TypeInTargetAssembly={x:Type DataGrid}}" TargetType="{x:Type Button}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -3856,30 +3947,40 @@
     </Style>
 
     <Style x:Key="ToolBarVerticalOverflowButtonStyle" TargetType="{x:Type ToggleButton}">
-        <Setter Property="Background" Value="{DynamicResource ToolBarToggleButtonVerticalBackground}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ToolBarToggleButtonVerticalBorder}"/>
+        <Setter Property="Height" Value="17"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="0,0,3,3" SnapsToDevicePixels="true">
-                        <Canvas HorizontalAlignment="Right" Height="6" Margin="2,7,2,2" SnapsToDevicePixels="true" VerticalAlignment="Bottom" Width="7">
-                            <Path Data="M 1.5 1 L 1.5 6" Stroke="{DynamicResource ToolBarDropDownBackgroundVert}"/>
-                            <Path Data="M 0.5 0 L 0.5 5" Stroke="{DynamicResource ToolBarDropDownVert}"/>
-                            <Path Data="M 3.5 0.5 L 7 3.5 L 4 6.5 Z" Fill="{DynamicResource ToolBarDropDownBackgroundVert}"/>
-                            <Path Data="M 3 -0.5 L 6 2.5 L 3 5.5 Z"  Fill="{DynamicResource ToolBarDropDownVert}"/>
-                        </Canvas>
-                    </Border>
+                    <Grid Background="Transparent">
+                        <Path x:Name="Chevron"
+                              Width="5" Height="8"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M 1,1 L 4,4 L 1,7"
+                              Fill="Transparent"
+                              Stretch="Fill"
+                              Stroke="{DynamicResource AeBrush.TextMuted}"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"
+                              StrokeStartLineCap="Round"
+                              StrokeThickness="1.4"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource ToolBarButtonHover}"/>
+                            <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="true">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource ToolBarButtonHover}"/>
+                            <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="true">
+                            <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.Accent}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Foreground" Value="{DynamicResource ToolBarGripper}"/>
+                            <Setter Property="Opacity" TargetName="Chevron" Value="0.45"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -3888,40 +3989,45 @@
     </Style>
 
     <Style x:Key="ToolBarHorizontalOverflowButtonStyle" TargetType="{x:Type ToggleButton}">
-        <Setter Property="Background" Value="{DynamicResource ToolBarToggleButtonHorizontalBackground}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ToolBarToggleButtonHorizontalBorder}"/>
+        <Setter Property="Width" Value="17"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="0,3,3,0" SnapsToDevicePixels="true">
-                        <Canvas HorizontalAlignment="Right" Height="7" Margin="7,2,2,2" SnapsToDevicePixels="true" VerticalAlignment="Bottom" Width="6">
-                            <Path Data="M 1 1.5 L 6 1.5" Stroke="{DynamicResource ToolBarDropDownBackground}"/>
-                            <Path Data="M 0 0.5 L 5 0.5" Stroke="{DynamicResource ToolBarDropDown}"/>
-                            <Path Data="M 0.5 4 L 6.5 4 L 3.5 7 Z"  Fill="{DynamicResource ToolBarDropDownBackground}"/>
-                            <Path Data="M -0.5 3 L 5.5 3 L 2.5 6 Z" Fill="{DynamicResource ToolBarDropDown}"/>
-                        </Canvas>
-                    </Border>
+                    <Grid Background="Transparent">
+                        <Path x:Name="Chevron"
+                              Width="8" Height="5"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M 1,1 L 4,4 L 7,1"
+                              Fill="Transparent"
+                              Stretch="Fill"
+                              Stroke="{DynamicResource AeBrush.TextMuted}"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"
+                              StrokeStartLineCap="Round"
+                              StrokeThickness="1.4"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource ToolBarButtonHover}"/>
+                            <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="true">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource ToolBarButtonHover}"/>
+                            <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="true">
+                            <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.Accent}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Foreground" Value="{DynamicResource ToolBarGripper}"/>
+                            <Setter Property="Opacity" TargetName="Chevron" Value="0.45"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-        <Style.Triggers>
-            <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="true">
-                <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"/>
-            </DataTrigger>
-        </Style.Triggers>
     </Style>
 
     <Style x:Key="ToolBarThumbStyle" TargetType="{x:Type Thumb}">
@@ -3963,7 +4069,7 @@
     </Style>
 
     <Style x:Key="ToolBarButtonBaseStyle" TargetType="{x:Type ButtonBase}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{DynamicResource Button.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Button.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource Button.Static.Foreground}"/>

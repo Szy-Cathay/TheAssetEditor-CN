@@ -28,7 +28,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource AeButton.KeyboardFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -71,11 +71,11 @@
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleX"
-                                            To="1" />
+                                            To="1.015" />
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleY"
-                                            To="1" />
+                                            To="1.015" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
@@ -83,11 +83,11 @@
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleX"
-                                            To="0.98" />
+                                            To="0.94" />
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleY"
-                                            To="0.98" />
+                                            To="0.94" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Disabled" />
@@ -194,5 +194,56 @@
         <Setter Property="Width" Value="{StaticResource AeSize.ControlHeight}" />
         <Setter Property="MinWidth" Value="{StaticResource AeSize.ControlHeight}" />
         <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <Style x:Key="AeButton.DropdownArrow" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Grid Background="Transparent">
+                        <Path
+                            x:Name="Chevron"
+                            Width="8"
+                            Height="5"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Data="M 1,1 L 4,4 L 7,1"
+                            Fill="Transparent"
+                            SnapsToDevicePixels="True"
+                            Stretch="Fill"
+                            Stroke="{DynamicResource AeBrush.TextMuted}"
+                            StrokeEndLineCap="Round"
+                            StrokeLineJoin="Round"
+                            StrokeStartLineCap="Round"
+                            StrokeThickness="1.4" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter
+                                TargetName="Chevron"
+                                Property="Stroke"
+                                Value="{DynamicResource AeBrush.AccentHover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter
+                                TargetName="Chevron"
+                                Property="Stroke"
+                                Value="{DynamicResource AeBrush.Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chevron" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 </ResourceDictionary>

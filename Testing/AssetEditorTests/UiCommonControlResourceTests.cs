@@ -23,6 +23,7 @@ public class UiCommonControlResourceTests
             ["AeButton.Quiet"] = typeof(Button),
             ["AeButton.Danger"] = typeof(Button),
             ["AeButton.Icon"] = typeof(Button),
+            ["AeButton.DropdownArrow"] = typeof(ToggleButton),
             ["AeInput.TextBox"] = typeof(TextBox),
             ["AeInput.ComboBox"] = typeof(ComboBox),
             ["AeInput.CheckBox"] = typeof(CheckBox),
@@ -499,10 +500,20 @@ public class UiCommonControlResourceTests
                 var pressed = group.States
                     .Cast<VisualState>()
                     .Single(item => item.Name == "Pressed");
+                var hovered = group.States
+                    .Cast<VisualState>()
+                    .Single(item => item.Name == "MouseOver");
                 var pressedTargets = pressed.Storyboard.Children
                     .Select(Storyboard.GetTargetName)
                     .ToArray();
                 var pressedScales = pressed.Storyboard.Children
+                    .OfType<DoubleAnimation>()
+                    .Where(animation =>
+                        Storyboard.GetTargetName(animation) ==
+                        "InteractionScale")
+                    .Select(animation => animation.To)
+                    .ToArray();
+                var hoveredScales = hovered.Storyboard.Children
                     .OfType<DoubleAnimation>()
                     .Where(animation =>
                         Storyboard.GetTargetName(animation) ==
@@ -523,7 +534,7 @@ public class UiCommonControlResourceTests
                 {
                     NUnitAssert.That(
                         durations,
-                        Does.Contain(TimeSpan.FromMilliseconds(70)));
+                        Does.Contain(TimeSpan.FromMilliseconds(90)));
                     NUnitAssert.That(
                         durations,
                         Does.Contain(TimeSpan.FromMilliseconds(120)));
@@ -532,12 +543,122 @@ public class UiCommonControlResourceTests
                         Does.Contain("InteractionScale"));
                     NUnitAssert.That(
                         pressedScales,
-                        Is.All.EqualTo(0.98));
-                    NUnitAssert.That(focusVisual, Is.Not.Null);
+                        Is.All.EqualTo(0.94));
+                    NUnitAssert.That(
+                        hoveredScales,
+                        Is.All.EqualTo(1.015));
+                    NUnitAssert.That(focusVisual, Is.Null);
                     NUnitAssert.That(persistentFocusRings, Is.Empty);
                     NUnitAssert.That(translucentStateOverlays, Is.Empty);
                 });
             });
+    }
+
+    [Test]
+    public void LegacyButtonBases_UseTheSameVisibleScaleMotion()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                static double?[] ReadScales(VisualState state) =>
+                    state.Storyboard.Children
+                        .OfType<DoubleAnimation>()
+                        .Where(animation =>
+                            Storyboard.GetTargetName(animation) ==
+                            "InteractionScale")
+                        .Select(animation => animation.To)
+                        .ToArray();
+
+                foreach (var controlType in new[]
+                         {
+                             typeof(Button),
+                             typeof(ToggleButton),
+                         })
+                {
+                    var style = (Style)Application.Current.FindResource(
+                        controlType);
+                    var focusVisualSetter = FindSetter(
+                        style,
+                        FrameworkElement.FocusVisualStyleProperty);
+                    var template = FindSetter(
+                            style,
+                            Control.TemplateProperty)
+                        ?.Value as ControlTemplate;
+                    var root = (FrameworkElement)template!.LoadContent();
+                    var group = VisualStateManager.GetVisualStateGroups(root)
+                        .OfType<VisualStateGroup>()
+                        .Single(item => item.Name == "CommonStates");
+                    var hovered = group.States
+                        .Cast<VisualState>()
+                        .Single(item => item.Name == "MouseOver");
+                    var pressed = group.States
+                        .Cast<VisualState>()
+                        .Single(item => item.Name == "Pressed");
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            ReadScales(hovered),
+                            Is.All.EqualTo(1.015));
+                        NUnitAssert.That(
+                            ReadScales(pressed),
+                            Is.All.EqualTo(0.94));
+                        NUnitAssert.That(
+                            FindDescendants<Border>(root)
+                                .Where(item => item.Name == "StateOverlay"),
+                            Is.Empty);
+                        NUnitAssert.That(focusVisualSetter, Is.Not.Null);
+                        NUnitAssert.That(focusVisualSetter!.Value, Is.Null);
+                    });
+                }
+            });
+    }
+
+    [Test]
+    public void DropDownArrows_AreGlyphOnlyAcrossSharedTemplates()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "AssetEditor",
+            "Themes",
+            "Controls.xaml"));
+        var toolbarStart = source.IndexOf(
+            "x:Key=\"ToolBarVerticalOverflowButtonStyle\"",
+            StringComparison.Ordinal);
+        var toolbarEnd = source.IndexOf(
+            "x:Key=\"ToolBarThumbStyle\"",
+            StringComparison.Ordinal);
+        var toolbarArrows = source[toolbarStart..toolbarEnd];
+        var watermarkStart = source.IndexOf(
+            "x:Key=\"WatermarkComboBoxTemplate\"",
+            StringComparison.Ordinal);
+        var watermarkEnd = source.IndexOf(
+            "x:Key=\"WatermarkComboBox\"",
+            watermarkStart,
+            StringComparison.Ordinal);
+        var watermarkComboBox = source[watermarkStart..watermarkEnd];
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(toolbarStart, Is.GreaterThanOrEqualTo(0));
+            NUnitAssert.That(toolbarEnd, Is.GreaterThan(toolbarStart));
+            NUnitAssert.That(toolbarArrows, Does.Contain("x:Name=\"Chevron\""));
+            NUnitAssert.That(toolbarArrows, Does.Contain("AeBrush.AccentHover"));
+            NUnitAssert.That(toolbarArrows, Does.Not.Contain("ToolBarButtonHover"));
+            NUnitAssert.That(toolbarArrows, Does.Not.Contain("CornerRadius"));
+            NUnitAssert.That(watermarkStart, Is.GreaterThanOrEqualTo(0));
+            NUnitAssert.That(watermarkEnd, Is.GreaterThan(watermarkStart));
+            NUnitAssert.That(
+                watermarkComboBox,
+                Does.Not.Contain(
+                    "Property=\"Background\" TargetName=\"splitBorder\""));
+            NUnitAssert.That(
+                watermarkComboBox,
+                Does.Not.Contain(
+                    "Property=\"BorderBrush\" TargetName=\"splitBorder\""));
+            NUnitAssert.That(watermarkComboBox, Does.Not.Contain("#FF606060"));
+        });
     }
 
     [Test]

@@ -156,6 +156,11 @@ public class UiModelKitbashFamilyTests
                 Does.Not.Contain(
                     "Style=\"{StaticResource {x:Type ToggleButton}}\""));
             NUnitAssert.That(
+                menuBarView,
+                Does.Contain(
+                    "Style=\"{StaticResource AeButton.DropdownArrow}\""));
+            NUnitAssert.That(menuBarView, Does.Not.Contain("Content=\"▾\""));
+            NUnitAssert.That(
                 kitbasherView,
                 Does.Contain("<ColumnDefinition Width=\"34\"/>"));
             NUnitAssert.That(

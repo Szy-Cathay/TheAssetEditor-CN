@@ -21,7 +21,7 @@
     <CornerRadius x:Key="AeRadius.Surface">6</CornerRadius>
     <CornerRadius x:Key="AeRadius.Overlay">7</CornerRadius>
 
-    <Duration x:Key="AeMotion.Pressed">0:0:0.070</Duration>
+    <Duration x:Key="AeMotion.Pressed">0:0:0.090</Duration>
     <Duration x:Key="AeMotion.Hover">0:0:0.120</Duration>
     <Duration x:Key="AeMotion.Selection">0:0:0.140</Duration>
     <Duration x:Key="AeMotion.Overlay">0:0:0.160</Duration>

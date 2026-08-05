@@ -306,7 +306,7 @@ public class UiDesignSystemResourceTests
                     Is.EqualTo(new CornerRadius(7)));
                 NUnitAssert.That(
                     ((Duration)dictionary["AeMotion.Pressed"]).TimeSpan,
-                    Is.EqualTo(TimeSpan.FromMilliseconds(70)));
+                    Is.EqualTo(TimeSpan.FromMilliseconds(90)));
                 NUnitAssert.That(
                     ((Duration)dictionary["AeMotion.Hover"]).TimeSpan,
                     Is.EqualTo(TimeSpan.FromMilliseconds(120)));
