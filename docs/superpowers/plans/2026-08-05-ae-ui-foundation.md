@@ -769,13 +769,14 @@ git commit -m "style: add keyed UI surface styles"
 **Files:**
 
 - Modify: `AssetEditor/App.xaml:11-22`
+- Modify: `Shared/SharedCore/Settings/ThemesController.cs:87-105`
 - Modify: `Testing/AssetEditorTests/WpfTestApplicationHost.cs:62-75`
 - Modify: `Testing/AssetEditorTests/UiDesignSystemResourceTests.cs`
 
 **Interfaces:**
 
 - Consumes: the three dictionaries created by Tasks 2–4.
-- Produces: identical application/test resource order and runtime theme-switch behavior for future plans.
+- Produces: identical application/test resource order, assembly-independent theme resource URIs, and runtime theme-switch behavior for future plans.
 
 - [ ] **Step 1: Add a failing merged-resource and theme-switch test**
 
@@ -894,13 +895,34 @@ Resources.MergedDictionaries.Add(CreateResourceDictionary(
 
 Add `EmptyServices` as described in Step 1 and update the test to use it.
 
-- [ ] **Step 5: Run the focused resource tests**
+- [ ] **Step 5: Make runtime theme resource URIs assembly-independent**
+
+The focused theme-switch test runs inside `AssetEditorTests`, while production runs inside `AssetEditor.CN`. Relative `ResourceDictionary.Source` values therefore resolve against different calling assemblies. With the user's explicit approval, replace the two relative URIs created by `ThemesController.SetTheme` with these exact application-component Pack URIs:
+
+```csharp
+ThemeDictionary = new ResourceDictionary()
+{
+    Source = new Uri(
+        $"pack://application:,,,/AssetEditor.CN;component/Themes/ColourDictionaries/{themeName}.xaml",
+        UriKind.Absolute)
+};
+ControlColours = new ResourceDictionary()
+{
+    Source = new Uri(
+        "pack://application:,,,/AssetEditor.CN;component/Themes/ControlColours.xaml",
+        UriKind.Absolute)
+};
+```
+
+Do not change the theme-selection logic, dictionary positions, font reapplication, external theme callback, or any other `ThemesController` behavior.
+
+- [ ] **Step 6: Run the focused resource tests**
 
 Run the command from Step 2.
 
 Expected: PASS; a styled existing Border updates when `ThemesController` swaps the theme dictionary.
 
-- [ ] **Step 6: Run all design-system and settings visual tests**
+- [ ] **Step 7: Run all design-system and settings visual tests**
 
 Run:
 
@@ -910,12 +932,12 @@ dotnet test Testing/AssetEditorTests/AssetEditorTests.csproj --configuration Rel
 
 Expected: PASS with no resource-key, Dispatcher, font-preview, cancellation, or rendering failures.
 
-- [ ] **Step 7: Commit resource wiring**
+- [ ] **Step 8: Commit resource wiring**
 
 Run only when local commits are authorized for implementation:
 
 ```powershell
-git add AssetEditor/App.xaml Testing/AssetEditorTests/WpfTestApplicationHost.cs Testing/AssetEditorTests/UiDesignSystemResourceTests.cs
+git add AssetEditor/App.xaml Shared/SharedCore/Settings/ThemesController.cs Testing/AssetEditorTests/WpfTestApplicationHost.cs Testing/AssetEditorTests/UiDesignSystemResourceTests.cs
 git commit -m "style: load UI design-system resources"
 ```
 
