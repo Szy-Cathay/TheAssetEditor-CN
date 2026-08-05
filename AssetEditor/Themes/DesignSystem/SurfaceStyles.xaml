@@ -1,0 +1,26 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style x:Key="AeSurface.Canvas" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Canvas}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style x:Key="AeSurface.Panel" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource AeRadius.Surface}" />
+    </Style>
+    <Style x:Key="AeSurface.Control" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource AeRadius.Control}" />
+    </Style>
+    <Style x:Key="AeSurface.Overlay" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource AeRadius.Overlay}" />
+    </Style>
+</ResourceDictionary>

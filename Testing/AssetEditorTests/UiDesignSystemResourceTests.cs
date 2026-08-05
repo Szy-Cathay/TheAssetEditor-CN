@@ -48,6 +48,49 @@ public class UiDesignSystemResourceTests
         });
     }
 
+    [Test]
+    public void SurfaceStyles_AreKeyedAndDoNotReplaceImplicitBorderStyle()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var tokens = Load("Themes/DesignSystem/DesignTokens.xaml");
+            Application.Current.Resources.MergedDictionaries.Add(tokens);
+
+            try
+            {
+                var dictionary = Load(
+                    "Themes/DesignSystem/SurfaceStyles.xaml");
+                var keys = new[]
+                {
+                    "AeSurface.Canvas",
+                    "AeSurface.Panel",
+                    "AeSurface.Control",
+                    "AeSurface.Overlay",
+                };
+
+                NUnitAssert.Multiple(() =>
+                {
+                    foreach (var key in keys)
+                    {
+                        var style = (Style)dictionary[key];
+                        NUnitAssert.That(
+                            style.TargetType,
+                            Is.EqualTo(typeof(Border)));
+                    }
+
+                    NUnitAssert.That(
+                        dictionary.Contains(typeof(Border)),
+                        Is.False,
+                        "Foundation styles must not replace the implicit Border style.");
+                });
+            }
+            finally
+            {
+                Application.Current.Resources.MergedDictionaries.Remove(tokens);
+            }
+        });
+    }
+
     private static readonly string[] SemanticBrushKeys =
     [
         "AeBrush.Canvas",
