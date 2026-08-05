@@ -12,9 +12,9 @@
     <DockPanel>
         <Menu VerticalAlignment="Center"
               DockPanel.Dock="Left"
-              Background="Transparent">
+              Style="{StaticResource AeMenu.Bar}">
             <Menu.Resources>
-                <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}"/>
+                <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource AeMenu.Item}"/>
             </Menu.Resources>
 
             <MenuItem Header="{loc:Loc MenuBar.File}" BorderThickness="1.5">

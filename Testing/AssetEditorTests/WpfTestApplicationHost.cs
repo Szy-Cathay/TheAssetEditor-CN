@@ -121,6 +121,8 @@ internal static class WpfTestApplicationHost
                 "Themes/DesignSystem/Controls/Collections.xaml"));
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/DesignSystem/Controls/MenusAndFeedback.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Shell.xaml"));
             Resources["BoolToChangedPrefixStr"] =
                 new BoolToStringConverter { TrueValue = "*" };
             _themeResourcesLoaded = true;

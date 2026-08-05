@@ -448,6 +448,10 @@
   "MainWindow.TabContextMenu.CloseTabsToLeft": "关闭左侧标签",
   "MainWindow.TabContextMenu.CloseTabsToRight": "关闭右侧标签",
   "MainWindow.TabContextMenu.CloseMultiple": "关闭多个",
+  "MainWindow.Activity.Resources": "资源",
+  "MainWindow.Activity.Git": "本地 Git",
+  "MainWindow.EmptyEditor.Title": "尚未打开编辑器",
+  "MainWindow.EmptyEditor.Description": "从左侧资源树中双击资源以开始编辑。",
   "MainWindow.StatusBar.LoadingGamePacks": "正在加载游戏 Pack...",
 
   "StartupPackLoading.Title": "正在加载原版游戏数据",

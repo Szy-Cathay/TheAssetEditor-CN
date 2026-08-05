@@ -1928,6 +1928,12 @@ public class FolderProjectGitWorkspaceViewModelTests
             "AssetEditor",
             "Views",
             "MainWindow.xaml"));
+        var shell = XDocument.Load(Path.Combine(
+            solutionRoot,
+            "AssetEditor",
+            "Themes",
+            "DesignSystem",
+            "Shell.xaml"));
         var panel = LoadView("FolderProjectGitPanelView.xaml");
         var fileTree = XDocument.Load(Path.Combine(
             solutionRoot,
@@ -1938,33 +1944,31 @@ public class FolderProjectGitWorkspaceViewModelTests
             "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml =
             "http://schemas.microsoft.com/winfx/2006/xaml";
-        var editorHeader = mainWindow.Descendants(presentation + "TabPanel")
+        var editorHeader = shell.Descendants(presentation + "TabPanel")
             .Single(element =>
                 element.Attribute(xaml + "Name")?.Value == "HeaderPanel");
         var sidebarTabs = mainWindow.Descendants(presentation + "TabControl")
             .Single(element =>
-                element.Attribute("SelectedIndex")?.Value?.Contains(
-                    "GitWorkspace.SelectedSidebarTabIndex",
-                    StringComparison.Ordinal) == true);
+                element.Attribute(xaml + "Name")?.Value ==
+                "WorkspaceSidebar");
         var packBrowser = fileTree.Descendants()
             .Single(element => element.Name.LocalName == "PackFileBrowserView");
-        var emptyHeaderTrigger = editorHeader
-            .Ancestors(presentation + "ControlTemplate")
-            .Single()
-            .Descendants(presentation + "Trigger")
-            .SingleOrDefault(element =>
-                element.Attribute("Property")?.Value == "HasItems" &&
-                element.Attribute("Value")?.Value == "False");
+        var workspaceStyle = shell.Descendants(presentation + "Style")
+            .Single(element =>
+                element.Attribute(xaml + "Key")?.Value ==
+                "AeShell.WorkspaceSidebar");
 
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(
-                sidebarTabs.Attribute("TabStripPlacement")?.Value,
-                Is.EqualTo("Top"));
+                sidebarTabs.Attribute("Style")?.Value,
+                Is.EqualTo("{StaticResource AeShell.WorkspaceSidebar}"));
             NUnitAssert.That(
                 editorHeader.Attribute("Height")?.Value,
-                Is.EqualTo("24"));
-            NUnitAssert.That(emptyHeaderTrigger, Is.Null);
+                Is.EqualTo("{StaticResource AeSize.TabHeight}"));
+            NUnitAssert.That(
+                workspaceStyle.Descendants(presentation + "TabPanel"),
+                Is.Empty);
             NUnitAssert.That(
                 panel.Descendants().Any(element =>
                     element.Attribute(xaml + "Name")?.Value ==
@@ -1979,80 +1983,83 @@ public class FolderProjectGitWorkspaceViewModelTests
     [Test]
     public void SidebarAndEditorTabBands_UseContinuousMatchingGeometry()
     {
+        var solutionRoot = FindSolutionRoot();
         var mainWindow = XDocument.Load(Path.Combine(
-            FindSolutionRoot(),
+            solutionRoot,
             "AssetEditor",
             "Views",
             "MainWindow.xaml"));
+        var shell = XDocument.Load(Path.Combine(
+            solutionRoot,
+            "AssetEditor",
+            "Themes",
+            "DesignSystem",
+            "Shell.xaml"));
         XNamespace presentation =
             "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml =
             "http://schemas.microsoft.com/winfx/2006/xaml";
-        var sidebarTabs = mainWindow.Descendants(presentation + "TabControl")
-            .Single(element =>
-                element.Attribute("SelectedIndex")?.Value?.Contains(
-                    "GitWorkspace.SelectedSidebarTabIndex",
-                    StringComparison.Ordinal) == true);
         var editorTabs = mainWindow.Descendants()
             .Single(element =>
                 element.Attribute(xaml + "Name")?.Value ==
                 "EditorsTabControl");
-        var editorHeader = mainWindow.Descendants(presentation + "TabPanel")
+        var editorHeader = shell.Descendants(presentation + "TabPanel")
             .Single(element =>
                 element.Attribute(xaml + "Name")?.Value == "HeaderPanel");
         var splitter = mainWindow.Descendants(presentation + "GridSplitter")
             .Single(element => element.Attribute("Grid.Column")?.Value == "1");
-        var sidebarStyle = mainWindow.Descendants(presentation + "Style")
+        var sidebarStyle = shell.Descendants(presentation + "Style")
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
-                "SidebarWorkspaceTabControlStyle");
+                "AeShell.WorkspaceSidebar");
+        var editorStyle = shell.Descendants(presentation + "Style")
+            .Single(element =>
+                element.Attribute(xaml + "Key")?.Value ==
+                "AeShell.EditorTabs");
+        var splitterStyle = shell.Descendants(presentation + "Style")
+            .Single(element =>
+                element.Attribute(xaml + "Key")?.Value ==
+                "AeShell.Splitter");
         var borderThickness = sidebarStyle
             .Descendants(presentation + "Setter")
             .Single(element =>
                 element.Attribute("Property")?.Value == "BorderThickness");
-        var sidebarHeader = sidebarStyle.Descendants(presentation + "TabPanel")
-            .Single(element =>
-                element.Attribute(xaml + "Name")?.Value ==
-                "SidebarHeaderPanel");
 
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(
-                sidebarTabs.Attribute("Style")?.Value,
-                Is.EqualTo(
-                    "{StaticResource SidebarWorkspaceTabControlStyle}"));
-            NUnitAssert.That(
                 borderThickness.Attribute("Value")?.Value,
-                Is.EqualTo("0,1,0,0"));
+                Is.EqualTo("0,0,1,0"));
             NUnitAssert.That(
-                sidebarHeader.Attribute("Height")?.Value,
-                Is.EqualTo("24"));
+                editorTabs.Attribute("Style")?.Value,
+                Is.EqualTo("{StaticResource AeShell.EditorTabs}"));
             NUnitAssert.That(
-                sidebarHeader.Attribute("Background")?.Value,
-                Is.EqualTo(
-                    "{DynamicResource ABrush.Tone2.Background.Static}"));
-            NUnitAssert.That(
-                editorTabs.Attribute("Margin")?.Value,
-                Is.EqualTo("0"));
-            NUnitAssert.That(
-                editorTabs.Attribute("BorderThickness")?.Value,
-                Is.EqualTo("0,1,0,0"));
+                editorStyle.Descendants(presentation + "Setter").Any(
+                    setter =>
+                        setter.Attribute("Property")?.Value == "Margin" &&
+                        setter.Attribute("Value")?.Value == "0"),
+                Is.True);
             NUnitAssert.That(
                 editorHeader.Attribute("Height")?.Value,
-                Is.EqualTo("24"));
+                Is.EqualTo("{StaticResource AeSize.TabHeight}"));
             NUnitAssert.That(
-                editorHeader.Attribute("Background")?.Value,
-                Is.EqualTo(
-                    "{DynamicResource ABrush.Tone2.Background.Static}"));
+                editorHeader.Parent?.Attribute("Background")?.Value,
+                Is.EqualTo("{DynamicResource AeBrush.Surface1}"));
             NUnitAssert.That(
-                splitter.Attribute("Width")?.Value,
-                Is.EqualTo("3"));
+                splitter.Attribute("Style")?.Value,
+                Is.EqualTo("{StaticResource AeShell.Splitter}"));
             NUnitAssert.That(
-                splitter.Attribute("Background")?.Value,
-                Is.EqualTo("Transparent"));
+                splitterStyle.Descendants(presentation + "Setter").Any(
+                    setter =>
+                        setter.Attribute("Property")?.Value == "Width" &&
+                        setter.Attribute("Value")?.Value == "3"),
+                Is.True);
             NUnitAssert.That(
-                splitter.Attribute("SnapsToDevicePixels")?.Value,
-                Is.EqualTo("True"));
+                splitterStyle.Descendants(presentation + "Setter").Any(
+                    setter =>
+                        setter.Attribute("Property")?.Value == "Background" &&
+                        setter.Attribute("Value")?.Value == "Transparent"),
+                Is.True);
         });
     }
 
@@ -2075,7 +2082,9 @@ public class FolderProjectGitWorkspaceViewModelTests
         var itemContainerStyle = editorTabs.Descendants(
                 presentation + "Style")
             .Single(element =>
-                element.Attribute("TargetType")?.Value == "TabItem");
+                element.Attribute("TargetType")?.Value.Contains(
+                    "TabItem",
+                    StringComparison.Ordinal) == true);
         var eventNames = itemContainerStyle.Elements(
                 presentation + "EventSetter")
             .Select(element => element.Attribute("Event")?.Value)
@@ -2090,8 +2099,7 @@ public class FolderProjectGitWorkspaceViewModelTests
         {
             NUnitAssert.That(
                 itemContainerStyle.Attribute("BasedOn")?.Value,
-                Is.EqualTo(
-                    "{StaticResource SidebarWorkspaceTabItemStyle}"));
+                Is.EqualTo("{StaticResource AeShell.EditorTabItem}"));
             NUnitAssert.That(
                 eventNames,
                 Is.SupersetOf(new[]
@@ -2114,28 +2122,24 @@ public class FolderProjectGitWorkspaceViewModelTests
     [Test]
     public void SidebarWorkspaceTabs_StretchSelectedContentToAvailableWidth()
     {
-        var mainWindow = XDocument.Load(Path.Combine(
+        var shell = XDocument.Load(Path.Combine(
             FindSolutionRoot(),
             "AssetEditor",
-            "Views",
-            "MainWindow.xaml"));
+            "Themes",
+            "DesignSystem",
+            "Shell.xaml"));
         XNamespace presentation =
             "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml =
             "http://schemas.microsoft.com/winfx/2006/xaml";
-        var style = mainWindow.Descendants(presentation + "Style")
+        var style = shell.Descendants(presentation + "Style")
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
-                "SidebarWorkspaceTabControlStyle");
-        var tabItemStyle = mainWindow.Descendants(presentation + "Style")
+                "AeShell.WorkspaceSidebar");
+        var activityItemStyle = shell.Descendants(presentation + "Style")
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
-                "SidebarWorkspaceTabItemStyle");
-        var headerContent = tabItemStyle.Descendants(
-                presentation + "ContentPresenter")
-            .Single(element =>
-                element.Attribute(xaml + "Name")?.Value ==
-                "HeaderContent");
+                "AeShell.ActivityItem");
         var selectedContent = style.Descendants(
                 presentation + "ContentPresenter")
             .Single(element =>
@@ -2158,30 +2162,24 @@ public class FolderProjectGitWorkspaceViewModelTests
                 Is.True);
             NUnitAssert.That(
                 selectedContent.Attribute("HorizontalAlignment")?.Value,
-                Is.EqualTo("Stretch"));
+                Is.EqualTo("{TemplateBinding HorizontalContentAlignment}"));
             NUnitAssert.That(
                 selectedContent.Attribute("VerticalAlignment")?.Value,
-                Is.EqualTo("Stretch"));
+                Is.EqualTo("{TemplateBinding VerticalContentAlignment}"));
             NUnitAssert.That(
-                tabItemStyle.Descendants(presentation + "Setter").Any(
+                activityItemStyle.Descendants(presentation + "Setter").Any(
                     setter =>
                         setter.Attribute("Property")?.Value ==
                             "HorizontalContentAlignment" &&
-                        setter.Attribute("Value")?.Value == "Stretch"),
+                        setter.Attribute("Value")?.Value == "Center"),
                 Is.True);
             NUnitAssert.That(
-                tabItemStyle.Descendants(presentation + "Setter").Any(
+                activityItemStyle.Descendants(presentation + "Setter").Any(
                     setter =>
                         setter.Attribute("Property")?.Value ==
                             "VerticalContentAlignment" &&
-                        setter.Attribute("Value")?.Value == "Stretch"),
+                        setter.Attribute("Value")?.Value == "Center"),
                 Is.True);
-            NUnitAssert.That(
-                headerContent.Attribute("HorizontalAlignment")?.Value,
-                Is.EqualTo("Center"));
-            NUnitAssert.That(
-                headerContent.Attribute("VerticalAlignment")?.Value,
-                Is.EqualTo("Center"));
         });
     }
 
@@ -2189,85 +2187,62 @@ public class FolderProjectGitWorkspaceViewModelTests
     public void SidebarTabs_UseFlatSegmentedThemeStates()
     {
         var solutionRoot = FindSolutionRoot();
-        var mainWindow = XDocument.Load(Path.Combine(
+        var shell = XDocument.Load(Path.Combine(
             solutionRoot,
             "AssetEditor",
-            "Views",
-            "MainWindow.xaml"));
+            "Themes",
+            "DesignSystem",
+            "Shell.xaml"));
         XNamespace presentation =
             "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml =
             "http://schemas.microsoft.com/winfx/2006/xaml";
-        var style = mainWindow.Descendants(presentation + "Style")
+        var style = shell.Descendants(presentation + "Style")
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
-                "SidebarWorkspaceTabItemStyle");
-        var surface = style.Descendants(presentation + "Border")
-            .Single(element =>
-                element.Attribute(xaml + "Name")?.Value ==
-                "SegmentSurface");
+                "AeShell.ActivityItem");
         var indicator = style.Descendants(presentation + "Border")
             .Single(element =>
                 element.Attribute(xaml + "Name")?.Value ==
                 "SelectionIndicator");
+        var focusRing = style.Descendants(presentation + "Border")
+            .Single(element =>
+                element.Attribute(xaml + "Name")?.Value ==
+                "FocusRing");
         var selectedTrigger = style.Descendants(presentation + "Trigger")
             .Single(element =>
                 element.Attribute("Property")?.Value == "IsSelected" &&
                 element.Attribute("Value")?.Value == "True");
-        var focusTriggers = style.Descendants(presentation + "MultiTrigger")
-            .Where(trigger =>
-                trigger.Descendants(presentation + "Condition").Any(
-                    condition =>
-                        condition.Attribute("Property")?.Value ==
-                            "IsKeyboardFocusWithin" &&
-                        condition.Attribute("Value")?.Value == "True"))
-            .ToArray();
+        var hoverTrigger = style.Descendants(presentation + "Trigger")
+            .Single(element =>
+                element.Attribute("Property")?.Value == "IsMouseOver" &&
+                element.Attribute("Value")?.Value == "True");
+        var focusTrigger = style.Descendants(presentation + "Trigger")
+            .Single(element =>
+                element.Attribute("Property")?.Value ==
+                "IsKeyboardFocused" &&
+                element.Attribute("Value")?.Value == "True");
         var requiredThemeKeys = new[]
         {
-            "ABrush.Tone2.Background.Static",
-            "ABrush.Tone3.Background.Static",
-            "ABrush.Tone3.Background.MouseOver",
-            "ABrush.Tone4.Background.Static",
-            "ABrush.Tone4.Background.MouseOver",
-            "ABrush.AccentTone2.Background.Static",
-            "ABrush.Foreground.Static",
+            "AeBrush.Surface1",
+            "AeBrush.SurfaceHover",
+            "AeBrush.TextPrimary",
+            "AeBrush.TextMuted",
+            "AeBrush.Accent",
+            "AeBrush.AccentSoft",
         };
-
-        bool HasFocusSurfaceState(
-            string isSelected,
-            string background)
-        {
-            return focusTriggers.Any(trigger =>
-                trigger.Descendants(presentation + "Condition").Any(
-                    condition =>
-                        condition.Attribute("Property")?.Value ==
-                            "IsSelected" &&
-                        condition.Attribute("Value")?.Value ==
-                            isSelected) &&
-                trigger.Descendants(presentation + "Setter").Any(
-                    setter =>
-                        setter.Attribute("TargetName")?.Value ==
-                            "SegmentSurface" &&
-                        setter.Attribute("Property")?.Value ==
-                            "Background" &&
-                        setter.Attribute("Value")?.Value == background));
-        }
 
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(
-                surface.Attribute("CornerRadius")?.Value,
-                Is.EqualTo("3"));
-            NUnitAssert.That(
                 indicator.Attribute("Width")?.Value,
                 Is.EqualTo("2"));
             NUnitAssert.That(
-                indicator.Attribute("Height")?.Value,
-                Is.EqualTo("12"));
+                indicator.Attribute("Margin")?.Value,
+                Is.EqualTo("0,4,0,4"));
             NUnitAssert.That(
                 indicator.Attribute("Background")?.Value,
-                Is.EqualTo(
-                    "{DynamicResource ABrush.AccentTone2.Background.Static}"));
+                Is.EqualTo("{DynamicResource AeBrush.Accent}"));
             NUnitAssert.That(
                 selectedTrigger.Descendants(presentation + "Setter").Any(
                     setter =>
@@ -2279,26 +2254,27 @@ public class FolderProjectGitWorkspaceViewModelTests
             NUnitAssert.That(
                 selectedTrigger.Descendants(presentation + "Setter").Any(
                     setter =>
-                        setter.Attribute("TargetName")?.Value ==
-                            "SegmentSurface" &&
+                        setter.Attribute("Property")?.Value == "Background" &&
                         setter.Attribute("Value")?.Value ==
-                            "{DynamicResource ABrush.Tone4.Background.Static}"),
+                            "{DynamicResource AeBrush.AccentSoft}"),
                 Is.True);
             NUnitAssert.That(
-                HasFocusSurfaceState(
-                    "False",
-                    "{DynamicResource ABrush.Tone3.Background.MouseOver}"),
+                hoverTrigger.Descendants(presentation + "Setter").Any(
+                    setter =>
+                        setter.Attribute("Property")?.Value == "Background" &&
+                        setter.Attribute("Value")?.Value ==
+                            "{DynamicResource AeBrush.SurfaceHover}"),
                 Is.True);
             NUnitAssert.That(
-                HasFocusSurfaceState(
-                    "True",
-                    "{DynamicResource ABrush.Tone4.Background.MouseOver}"),
+                focusTrigger.Descendants(presentation + "Setter").Any(
+                    setter =>
+                        setter.Attribute("TargetName")?.Value == "FocusRing" &&
+                        setter.Attribute("Property")?.Value == "Visibility" &&
+                        setter.Attribute("Value")?.Value == "Visible"),
                 Is.True);
             NUnitAssert.That(
-                style.Descendants(presentation + "Border").Any(element =>
-                    element.Attribute(xaml + "Name")?.Value is
-                        "FocusBorder" or "FocusIndicator"),
-                Is.False);
+                focusRing.Attribute("BorderBrush")?.Value,
+                Is.EqualTo("{DynamicResource AeBrush.Accent}"));
             NUnitAssert.That(
                 style.Descendants(presentation + "LinearGradientBrush"),
                 Is.Empty);
