@@ -230,6 +230,35 @@ public class UiModelKitbashFamilyTests
     }
 
     [Test]
+    public void KitbashAnimationBar_UsesTheSharedCompactEditorLanguage()
+    {
+        var root = FindSolutionRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "Animation",
+            "AnimationView.xaml"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                source,
+                Does.Contain("Common/Styles/EditorWorkspaceStyles.xaml"));
+            NUnitAssert.That(source, Does.Contain("AeInput.Switch"));
+            NUnitAssert.That(source, Does.Contain("AeButton.Icon"));
+            NUnitAssert.That(source, Does.Contain("AeEditor.ToggleIcon"));
+            NUnitAssert.That(source, Does.Contain("AeBrush.Surface2"));
+            NUnitAssert.That(source, Does.Contain("<Path"));
+            NUnitAssert.That(source, Does.Not.Contain("<GroupBox"));
+            NUnitAssert.That(source, Does.Not.Contain("FontSize=\"20\""));
+            NUnitAssert.That(source, Does.Not.Contain("⏪"));
+        });
+    }
+
+    [Test]
     public void DynamicContextMenuSeparators_UseCompactRows()
     {
         var root = FindSolutionRoot();

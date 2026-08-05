@@ -1,6 +1,20 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style x:Key="AeButton.KeyboardFocusVisual" TargetType="{x:Type Control}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Control}">
+                    <Border
+                        Margin="-2"
+                        BorderBrush="{DynamicResource AeBrush.Accent}"
+                        BorderThickness="2"
+                        CornerRadius="{StaticResource AeRadius.Surface}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="AeButton.Base" TargetType="{x:Type Button}">
         <Setter Property="MinWidth" Value="64" />
         <Setter Property="Height" Value="{StaticResource AeSize.ControlHeight}" />
@@ -14,12 +28,20 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeButton.KeyboardFocusVisual}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Grid>
+                    <Grid
+                        x:Name="InteractionSurface"
+                        RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform
+                                x:Name="InteractionScale"
+                                ScaleX="1"
+                                ScaleY="1" />
+                        </Grid.RenderTransform>
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
                                 <VisualStateGroup.Transitions>
@@ -38,6 +60,14 @@
                                             Storyboard.TargetName="StateOverlay"
                                             Storyboard.TargetProperty="Opacity"
                                             To="0" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="InteractionScale"
+                                            Storyboard.TargetProperty="ScaleX"
+                                            To="1" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="InteractionScale"
+                                            Storyboard.TargetProperty="ScaleY"
+                                            To="1" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="MouseOver">
@@ -46,6 +76,14 @@
                                             Storyboard.TargetName="StateOverlay"
                                             Storyboard.TargetProperty="Opacity"
                                             To="0.10" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="InteractionScale"
+                                            Storyboard.TargetProperty="ScaleX"
+                                            To="1" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="InteractionScale"
+                                            Storyboard.TargetProperty="ScaleY"
+                                            To="1" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
@@ -54,6 +92,14 @@
                                             Storyboard.TargetName="StateOverlay"
                                             Storyboard.TargetProperty="Opacity"
                                             To="0.18" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="InteractionScale"
+                                            Storyboard.TargetProperty="ScaleX"
+                                            To="0.985" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="InteractionScale"
+                                            Storyboard.TargetProperty="ScaleY"
+                                            To="0.985" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Disabled" />
@@ -76,19 +122,8 @@
                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                             RecognizesAccessKey="True"
                             SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                        <Border
-                            x:Name="FocusRing"
-                            Margin="-2"
-                            BorderBrush="{DynamicResource AeBrush.Accent}"
-                            BorderThickness="2"
-                            CornerRadius="{StaticResource AeRadius.Surface}"
-                            IsHitTestVisible="False"
-                            Visibility="Collapsed" />
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />

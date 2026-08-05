@@ -496,6 +496,18 @@ public class UiCommonControlResourceTests
                     .Cast<VisualTransition>()
                     .Select(item => item.GeneratedDuration.TimeSpan)
                     .ToArray();
+                var pressed = group.States
+                    .Cast<VisualState>()
+                    .Single(item => item.Name == "Pressed");
+                var pressedTargets = pressed.Storyboard.Children
+                    .Select(Storyboard.GetTargetName)
+                    .ToArray();
+                var focusVisual = FindSetter(
+                    style,
+                    FrameworkElement.FocusVisualStyleProperty)?.Value as Style;
+                var persistentFocusRings = FindDescendants<Border>(root)
+                    .Where(item => item.Name == "FocusRing")
+                    .ToArray();
 
                 NUnitAssert.Multiple(() =>
                 {
@@ -505,8 +517,46 @@ public class UiCommonControlResourceTests
                     NUnitAssert.That(
                         durations,
                         Does.Contain(TimeSpan.FromMilliseconds(120)));
+                    NUnitAssert.That(
+                        pressedTargets,
+                        Does.Contain("InteractionScale"));
+                    NUnitAssert.That(focusVisual, Is.Not.Null);
+                    NUnitAssert.That(persistentFocusRings, Is.Empty);
                 });
             });
+    }
+
+    [Test]
+    public void TreeRows_HoverOnlyTheDirectRowRatherThanAncestorItems()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "AssetEditor",
+            "Themes",
+            "DesignSystem",
+            "Controls",
+            "Collections.xaml"));
+        var start = source.IndexOf(
+            "x:Key=\"AeTree.Item\"",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "x:Key=\"AeTree.View\"",
+            StringComparison.Ordinal);
+        var treeItemStyle = source[start..end];
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(start, Is.GreaterThanOrEqualTo(0));
+            NUnitAssert.That(end, Is.GreaterThan(start));
+            NUnitAssert.That(
+                treeItemStyle,
+                Does.Contain(
+                    "Binding=\"{Binding IsMouseOver, ElementName=Row}\""));
+            NUnitAssert.That(
+                treeItemStyle,
+                Does.Not.Contain(
+                    "<Trigger Property=\"IsMouseOver\" Value=\"True\">"));
+        });
     }
 
     [Test]

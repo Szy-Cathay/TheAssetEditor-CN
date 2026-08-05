@@ -166,10 +166,10 @@
                                 </BeginStoryboard>
                             </Trigger.ExitActions>
                         </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
+                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Row}" Value="True">
                             <Setter TargetName="Row" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-                        </Trigger>
+                        </DataTrigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Row" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
