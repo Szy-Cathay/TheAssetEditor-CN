@@ -11,6 +11,10 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800"
+             Background="Transparent"
+             FontFamily="{DynamicResource AeFont.Family}"
+             FontWeight="{DynamicResource AeFont.Weight.Normal}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
              x:Name="mystuff">
 
     <UserControl.Resources>
@@ -33,12 +37,11 @@
             Height="30"
             HorizontalAlignment="Left"
             VerticalAlignment="Center"
-            FontSize="12"
             Text="{loc:Loc Shared.PackFileBrowser.Title}">
             <TextBlock.Style>
                 <Style
                     TargetType="TextBlock"
-                    BasedOn="{StaticResource {x:Type TextBlock}}">
+                    BasedOn="{StaticResource AeText.SectionTitle}">
                     <Style.Triggers>
                         <DataTrigger
                             Binding="{Binding ShowTitle, ElementName=mystuff}"
@@ -56,36 +59,30 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border SnapsToDevicePixels="true" BorderBrush="{DynamicResource TextBox.Static.Border}" BorderThickness="1">
+            <Border
+                Background="{DynamicResource AeBrush.Control}"
+                BorderBrush="{DynamicResource AeBrush.BorderStrong}"
+                BorderThickness="1"
+                CornerRadius="4"
+                SnapsToDevicePixels="true">
                 <Grid>
                     <TextBox x:Name="FilterTextBoxItem" Style="{StaticResource HintedTextBox}" KeyboardNavigation.TabIndex="0" FontSize="12" BorderThickness="0"
-                             KeyboardNavigation.IsTabStop="True" HorizontalAlignment="Stretch" Padding="2.5, 0, 0, 0"  Height="24" VerticalContentAlignment="Center" 
+                             KeyboardNavigation.IsTabStop="True" HorizontalAlignment="Stretch" Padding="8, 0, 30, 0"  Height="30" VerticalContentAlignment="Center"
+                             Background="Transparent" Foreground="{DynamicResource AeBrush.TextPrimary}"
                              Text="{Binding Filter.FilterText, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Delay=350, ValidatesOnDataErrors=True}"
                              Tag="{loc:Loc Shared.PackFileBrowser.SearchHint}">
                     </TextBox>
 
-                    <Button Click="ClearButtonClick" Command="{Binding ClearTextCommand}" Padding="2" Width="24" Height="24" HorizontalAlignment="Right" 
+                    <Button Click="ClearButtonClick" Command="{Binding ClearTextCommand}" Width="28" Height="28" HorizontalAlignment="Right"
+                            Style="{StaticResource AeButton.Icon}"
                             VerticalContentAlignment="Center" HorizontalContentAlignment="Center" VerticalAlignment="Center">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Grid SnapsToDevicePixels="true" Background="{DynamicResource TextBox.Static.Background}">
-                                    <Path Data="M0,0 L8,8 M8,0 L0,8" StrokeThickness="1.5" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                        <Path.Style>
-                                            <Style TargetType="{x:Type Path}">
-                                                <Style.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="False">
-                                                        <Setter Property="Stroke" Value="{DynamicResource Button.Disabled.Foreground}" />
-                                                    </Trigger>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Stroke" Value="{DynamicResource Button.Static.Foreground}" />
-                                                    </Trigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Path.Style>
-                                    </Path>
-                                </Grid>
-                            </ControlTemplate>
-                        </Button.Template>
+                        <Path
+                            Width="9"
+                            Height="9"
+                            Data="M0,0 L8,8 M8,0 L0,8"
+                            Stretch="Uniform"
+                            Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            StrokeThickness="1.5" />
                     </Button>
                 </Grid>
             </Border>
@@ -95,22 +92,19 @@
         <TreeView x:Name="tvParameters" AllowDrop="True" Grid.Row="2" Margin="0, 2.5, 0, 5" behaviors:TreeViewExtension.SelectItemOnRightClick="True" 
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding Path=Files, UpdateSourceTrigger=PropertyChanged}" 
                   VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
-                  BorderBrush="Transparent" Background="Transparent">
+                  BorderBrush="Transparent" Background="Transparent"
+                  Style="{StaticResource AeTree.View}">
 
             <TreeView.Resources>
-                <ContextMenu x:Key="NodeContextMenu" ItemsSource="{Binding DataContext.ContextMenu, UpdateSourceTrigger=PropertyChanged,  RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" DisplayMemberPath="Name">
+                <ContextMenu x:Key="NodeContextMenu" ItemsSource="{Binding DataContext.ContextMenu, UpdateSourceTrigger=PropertyChanged,  RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" DisplayMemberPath="Name" Style="{StaticResource AeMenu.Context}">
                     <ContextMenu.Resources>
                         <ControlTemplate x:Key="MenuSeparatorTemplate">
                             <Separator />
                         </ControlTemplate>
                     </ContextMenu.Resources>
 
-                    <ContextMenu.Style>
-                        <Style TargetType="ContextMenu" BasedOn="{StaticResource {x:Type ContextMenu}}"  />
-                    </ContextMenu.Style>
-
                     <ContextMenu.ItemContainerStyle>
-                        <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"  >
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource AeMenu.Item}">
                             <Setter Property="Command" Value="{Binding Command}"/>
                             <Setter Property="ItemsSource" Value="{Binding ContextMenu}"/>
 
@@ -129,7 +123,7 @@
             </e1:Interaction.Behaviors>
 
             <TreeView.ItemContainerStyle>
-                <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
                     <EventSetter Event="TreeViewItem.MouseMove" Handler="treeView_MouseMove"/>
                     <EventSetter Event="TreeViewItem.Drop" Handler="treeView_Drop"/>
                     <EventSetter Event="TreeViewItem.PreviewMouseLeftButtonDown" Handler="TreeView_MouseDown"/>
@@ -139,7 +133,7 @@
                     <Setter Property="IsExpanded" Value="{Binding IsNodeExpanded, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     <Setter Property="IsSelected" Value="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     <Setter Property="Visibility" Value="Visible" />
-                    <Setter Property="Foreground" Value="Red"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsVisible}" Value="False">
                             <Setter Property="Visibility" Value="Collapsed" />
@@ -169,10 +163,10 @@
                                 <Style TargetType="{x:Type TextBlock}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding UnsavedChanged, UpdateSourceTrigger=PropertyChanged}" Value="True">
-                                            <Setter Property="Foreground" Value="Red"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding UnsavedChanged, UpdateSourceTrigger=PropertyChanged}" Value="False">
-                                            <Setter Property="Foreground" Value="{DynamicResource ABrush.Glyph.Static}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -187,10 +181,10 @@
                                             <Setter Property="Opacity" Value="0.55"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding UnsavedChanged, UpdateSourceTrigger=PropertyChanged}" Value="True">
-                                            <Setter Property="Foreground" Value="Red"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding UnsavedChanged, UpdateSourceTrigger=PropertyChanged}" Value="False">
-                                            <Setter Property="Foreground" Value="{DynamicResource ABrush.Glyph.Static}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -201,30 +195,30 @@
             </TreeView.ItemTemplate>
         </TreeView>
 
-        <Border
+        <Grid
             Grid.RowSpan="3"
             Panel.ZIndex="10"
-            Background="#B0202020"
+            Background="Transparent"
             Visibility="{Binding IsRefreshingCaWemFiles, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
             <Border
                 Width="280"
                 Padding="20"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="{DynamicResource WindowBackground}"
-                BorderBrush="{DynamicResource TextBox.Static.Border}"
-                BorderThickness="1"
-                CornerRadius="4">
+                Style="{StaticResource AeSurface.Overlay}">
                 <StackPanel>
                     <TextBlock
                         HorizontalAlignment="Center"
+                        Style="{StaticResource AeText.Body}"
                         Text="{loc:Loc Shared.PackFileBrowser.RefreshingCaWem}"/>
                     <ProgressBar
                         Height="4"
                         Margin="0,12,0,0"
-                        IsIndeterminate="True"/>
+                        IsIndeterminate="True"
+                        Style="{StaticResource AeProgress.Bar}"/>
                 </StackPanel>
             </Border>
-        </Border>
+        </Grid>
     </Grid>
 </UserControl>

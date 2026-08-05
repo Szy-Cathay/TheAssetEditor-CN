@@ -217,6 +217,50 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
+    public void ComboBox_DisplaysConfiguredMemberForSelectedObject()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var option = new NamedOption("master");
+                var comboBox = new ComboBox
+                {
+                    Width = 240,
+                    ItemsSource = new[] { option },
+                    SelectedItem = option,
+                    DisplayMemberPath = nameof(NamedOption.Name),
+                    Style = (Style)Application.Current.FindResource(
+                        "AeInput.ComboBox"),
+                };
+                var window = new Window
+                {
+                    Content = comboBox,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var visibleText = FindDescendants<TextBlock>(comboBox)
+                        .Select(text => text.Text)
+                        .ToArray();
+
+                    NUnitAssert.That(visibleText, Does.Contain("master"));
+                    NUnitAssert.That(
+                        visibleText,
+                        Has.None.Contains(nameof(NamedOption)));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
     public void Buttons_UseApprovedWeakInteractionDurations()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -272,6 +316,21 @@ public class UiCommonControlResourceTests
         return null;
     }
 
+    private static IEnumerable<T> FindDescendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0;
+             index < VisualTreeHelper.GetChildrenCount(root);
+             index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+                yield return match;
+            foreach (var descendant in FindDescendants<T>(child))
+                yield return descendant;
+        }
+    }
+
     private static Setter? FindSetter(Style? style, DependencyProperty property)
     {
         while (style != null)
@@ -292,4 +351,6 @@ public class UiCommonControlResourceTests
         Source = new Uri(
             $"pack://application:,,,/AssetEditor.CN;component/{path}"),
     };
+
+    private sealed record NamedOption(string Name);
 }

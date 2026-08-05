@@ -13,6 +13,10 @@
     xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
     x:Name="Root"
     d:DataContext="{d:DesignInstance Type=viewmodels:FolderProjectGitRepositoryViewModel}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     mc:Ignorable="d">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -33,7 +37,9 @@
                     Background="Transparent"
                     CornerRadius="3">
                     <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <ContextMenu
+                            DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                            Style="{StaticResource AeMenu.Context}">
                             <MenuItem Header="{loc:Loc FolderProject.VersionControl.ResetCommitChanges}">
                                 <MenuItem
                                     Command="{Binding Data.VersionControl.ResetCommitChangesKeepCommand, Source={StaticResource WorkspaceProxy}}"
@@ -63,7 +69,7 @@
                             Height="16"
                             Margin="0,0,6,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Foreground="{DynamicResource AeBrush.TextMuted}"
                             Kind="FileDocumentOutline" />
                         <TextBlock
                             x:Name="CommitNodeName"
@@ -114,18 +120,18 @@
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsRoot}" Value="True">
                         <Setter TargetName="CommitNodeIcon" Property="Kind" Value="SourceRepository" />
-                        <Setter TargetName="CommitNodeIcon" Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
+                        <Setter TargetName="CommitNodeIcon" Property="Foreground" Value="{DynamicResource AeBrush.Accent}" />
                         <Setter TargetName="CommitNodeName" Property="FontWeight" Value="SemiBold" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsDeleted}" Value="True">
                         <Setter TargetName="CommitNodeName" Property="TextDecorations" Value="Strikethrough" />
-                        <Setter TargetName="CommitNodeName" Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
+                        <Setter TargetName="CommitNodeName" Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
-                        <Setter TargetName="CommitNodeRow" Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
+                        <Setter TargetName="CommitNodeRow" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsMouseOver, ElementName=CommitNodeRow}" Value="True">
-                        <Setter TargetName="CommitNodeRow" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
+                        <Setter TargetName="CommitNodeRow" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                         <Setter TargetName="CommitNodeActions" Property="Opacity" Value="1" />
                         <Setter TargetName="CommitNodeActions" Property="IsHitTestVisible" Value="True" />
                     </DataTrigger>
@@ -144,8 +150,8 @@
         <Border
             x:Name="BranchNavigationPane"
             Grid.Column="0"
-            Background="{DynamicResource WindowBackground}"
-            BorderBrush="{DynamicResource App.Border}"
+            Background="{DynamicResource AeBrush.Surface1}"
+            BorderBrush="{DynamicResource AeBrush.Border}"
             BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
@@ -158,7 +164,7 @@
                 <Border
                     Height="46"
                     Padding="9,5"
-                    BorderBrush="{DynamicResource App.Border}"
+                    BorderBrush="{DynamicResource AeBrush.Border}"
                     BorderThickness="0,0,0,1">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -170,7 +176,7 @@
                             Height="16"
                             Margin="0,0,7,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                            Foreground="{DynamicResource AeBrush.Accent}"
                             Kind="SourceBranch" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock
@@ -197,6 +203,7 @@
                         Height="28"
                         Padding="8,0,28,0"
                         behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.SearchBranches}"
+                        Style="{StaticResource AeInput.TextBox}"
                         VerticalContentAlignment="Center"
                         Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged}"
                         ToolTip="{loc:Loc FolderProject.Git.SearchBranches}"
@@ -207,7 +214,7 @@
                         Margin="0,0,9,0"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center"
-                        Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                        Foreground="{DynamicResource AeBrush.TextMuted}"
                         IsHitTestVisible="False"
                         Kind="Magnify" />
                 </Grid>
@@ -216,7 +223,7 @@
                     Grid.Row="2"
                     Padding="9,4"
                     Background="Transparent"
-                    BorderBrush="{DynamicResource App.Border}"
+                    BorderBrush="{DynamicResource AeBrush.Border}"
                     BorderThickness="0,0,0,1">
                     <TextBlock
                         Style="{StaticResource GitSectionTitleStyle}"
@@ -229,6 +236,7 @@
                         Padding="0,2"
                         BorderThickness="0"
                         ItemsSource="{Binding FilteredBranches}"
+                        Style="{StaticResource AeList.View}"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                         SelectedItem="{Binding VersionControl.SelectedHistoryBranch, Mode=TwoWay}"
                         SelectionMode="Single">
@@ -239,7 +247,9 @@
                             <DataTemplate>
                                 <Grid MinHeight="24" Margin="4,0">
                                     <Grid.ContextMenu>
-                                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <ContextMenu
+                                            DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                            Style="{StaticResource AeMenu.Context}">
                                             <MenuItem
                                                 Command="{Binding Data.Workspace.DeleteBranchCommand, Source={StaticResource WorkspaceProxy}}"
                                                 CommandParameter="{Binding}"
@@ -259,7 +269,7 @@
                                         Width="15"
                                         Height="15"
                                         VerticalAlignment="Center"
-                                        Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                                        Foreground="{DynamicResource AeBrush.Accent}"
                                         Kind="Check"
                                         Visibility="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Converter={StaticResource BoolToVisibilityConverter}}" />
                                     <TextBlock
@@ -283,7 +293,7 @@
 
                     <Border
                         Padding="18"
-                        Background="{DynamicResource WindowBackground}">
+                        Background="{DynamicResource AeBrush.Surface1}">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -323,7 +333,7 @@
             <Border
                 Height="46"
                 Padding="10,6"
-                BorderBrush="{DynamicResource App.Border}"
+                BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="0,0,0,1">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -338,6 +348,7 @@
                             Height="28"
                             Padding="8,0,28,0"
                             behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.SearchHistory}"
+                            Style="{StaticResource AeInput.TextBox}"
                             VerticalContentAlignment="Center"
                             Text="{Binding HistoryFilter, UpdateSourceTrigger=PropertyChanged}"
                             ToolTip="{loc:Loc FolderProject.Git.SearchHistory}"
@@ -348,7 +359,7 @@
                             Margin="0,0,9,0"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Foreground="{DynamicResource AeBrush.TextMuted}"
                             IsHitTestVisible="False"
                             Kind="Magnify" />
                     </Grid>
@@ -375,10 +386,13 @@
                     SelectedItem="{Binding VersionControl.SelectedCommit, Mode=TwoWay}"
                     RowHeight="26"
                     RowStyle="{StaticResource GitHistoryDataGridRowStyle}"
+                    Style="{StaticResource AeTable.Grid}"
                     SelectionMode="Single"
                     SelectionUnit="FullRow">
                     <DataGrid.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <ContextMenu
+                            DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                            Style="{StaticResource AeMenu.Context}">
                             <MenuItem Command="{Binding VersionControl.RevertCommitCommand}" Header="{loc:Loc FolderProject.VersionControl.RevertCommit}" />
                             <MenuItem Header="{loc:Loc FolderProject.VersionControl.ResetCommit}">
                                 <MenuItem Command="{Binding VersionControl.ResetCommitKeepChangesCommand}" Header="{loc:Loc FolderProject.VersionControl.ResetCommitKeepChanges}" />
@@ -387,7 +401,7 @@
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Width="*" Binding="{Binding Title}" Header="{loc:Loc FolderProject.VersionControl.CommitTitleColumn}" />
+                        <DataGridTextColumn Width="*" MinWidth="240" Binding="{Binding Title}" Header="{loc:Loc FolderProject.VersionControl.CommitTitleColumn}" />
                         <DataGridTextColumn Width="150" Binding="{Binding AuthorName}" Header="{loc:Loc FolderProject.VersionControl.Author}" />
                         <DataGridTextColumn Width="145" Binding="{Binding CommittedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="{loc:Loc FolderProject.VersionControl.Time}" />
                         <DataGridTextColumn Width="82" Binding="{Binding ShortId}" Header="{loc:Loc FolderProject.VersionControl.CommitId}" />
@@ -396,7 +410,7 @@
 
                 <Border
                     Padding="18"
-                    Background="{DynamicResource WindowBackground}">
+                    Background="{DynamicResource AeBrush.Canvas}">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed" />
@@ -421,7 +435,7 @@
                 Margin="10,0"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
-                Background="{DynamicResource App.Border}"
+                Background="{DynamicResource AeBrush.Border}"
                 Cursor="SizeNS"
                 ResizeBehavior="PreviousAndNext"
                 ResizeDirection="Rows"
@@ -445,7 +459,7 @@
                             MaxWidth="180"
                             Margin="10,0,0,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                            Foreground="{DynamicResource AeBrush.Accent}"
                             Text="{Binding VersionControl.StatusMessage}"
                             TextTrimming="CharacterEllipsis"
                             ToolTip="{Binding VersionControl.StatusMessage}" />
@@ -505,6 +519,7 @@
                                     Background="Transparent"
                                     BorderThickness="0"
                                     IsReadOnly="True"
+                                    Style="{StaticResource AeInput.TextBox}"
                                     Text="{Binding VersionControl.SelectedCommit.Id}"
                                     TextWrapping="Wrap" />
                                 <TextBlock
@@ -522,7 +537,7 @@
                     <Border
                         Grid.ColumnSpan="3"
                         Padding="18"
-                        Background="{DynamicResource WindowBackground}">
+                        Background="{DynamicResource AeBrush.Canvas}">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -546,9 +561,10 @@
             x:Name="RepositoryBusyOverlay"
             Grid.ColumnSpan="3"
             Panel.ZIndex="100"
-            Background="#66000000"
+            Background="Transparent"
             IsHitTestVisible="{Binding VersionControl.IsLoadingOperation}"
             Visibility="{Binding VersionControl.IsLoadingOperation, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
             <Border
                 Width="500"
                 Padding="18"

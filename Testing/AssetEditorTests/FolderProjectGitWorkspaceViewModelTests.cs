@@ -1389,14 +1389,9 @@ public class FolderProjectGitWorkspaceViewModelTests
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
                 "GitIconButtonStyle");
-        var foreground = iconButtonStyle
-            .Elements(presentation + "Setter")
-            .SingleOrDefault(element =>
-                element.Attribute("Property")?.Value == "Foreground");
-
         NUnitAssert.That(
-            foreground?.Attribute("Value")?.Value,
-            Is.EqualTo("{DynamicResource ABrush.Foreground.Static}"));
+            iconButtonStyle.Attribute("BasedOn")?.Value,
+            Is.EqualTo("{StaticResource AeButton.Icon}"));
     }
 
     [Test]
@@ -1447,7 +1442,7 @@ public class FolderProjectGitWorkspaceViewModelTests
                     .Single(element =>
                         element.Attribute("Property")?.Value == "Background")
                     .Attribute("Value")?.Value,
-                Is.EqualTo("{DynamicResource Button.Static.Background}"));
+                Is.EqualTo("{DynamicResource AeBrush.Accent}"));
             NUnitAssert.That(
                 partStyle.Elements(presentation + "Setter")
                     .Single(element =>
@@ -1729,7 +1724,15 @@ public class FolderProjectGitWorkspaceViewModelTests
                         overlay.Name);
                 NUnitAssert.That(
                     element.Attribute("Background")?.Value,
-                    Is.EqualTo("#66000000"));
+                    Is.EqualTo("Transparent"));
+                var backdrop = element.Elements(presentation + "Border")
+                    .First();
+                NUnitAssert.That(
+                    backdrop.Attribute("Background")?.Value,
+                    Is.EqualTo("{DynamicResource AeBrush.Canvas}"));
+                NUnitAssert.That(
+                    backdrop.Attribute("Opacity")?.Value,
+                    Is.EqualTo("0.86"));
                 NUnitAssert.That(
                     element.Attribute("IsHitTestVisible")?.Value,
                     Does.Contain("IsLoadingOperation"));

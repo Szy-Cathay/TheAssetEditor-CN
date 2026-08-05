@@ -12,6 +12,10 @@
     xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
     x:Name="Root"
     d:DataContext="{d:DesignInstance Type=viewmodels:FolderProjectGitWorkspaceViewModel}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     mc:Ignorable="d">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -32,7 +36,9 @@
                     Background="Transparent"
                     CornerRadius="3">
                     <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <ContextMenu
+                            DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                            Style="{StaticResource AeMenu.Context}">
                             <MenuItem
                                 Command="{Binding Data.VersionControl.StageTreeNodeCommand, Source={StaticResource WorkspaceProxy}}"
                                 CommandParameter="{Binding}"
@@ -82,7 +88,7 @@
                             Height="16"
                             Margin="0,0,6,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Foreground="{DynamicResource AeBrush.TextMuted}"
                             Kind="FileDocumentOutline" />
                         <TextBlock
                             x:Name="NodeName"
@@ -144,7 +150,7 @@
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsRoot}" Value="True">
                         <Setter TargetName="NodeIcon" Property="Kind" Value="SourceRepository" />
-                        <Setter TargetName="NodeIcon" Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
+                        <Setter TargetName="NodeIcon" Property="Foreground" Value="{DynamicResource AeBrush.Accent}" />
                         <Setter TargetName="NodeName" Property="FontWeight" Value="SemiBold" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsStagedTree}" Value="True">
@@ -153,21 +159,21 @@
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsDeleted}" Value="True">
                         <Setter TargetName="NodeName" Property="TextDecorations" Value="Strikethrough" />
-                        <Setter TargetName="NodeName" Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
+                        <Setter TargetName="NodeName" Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsMouseOver, ElementName=NodeRow}" Value="True">
-                        <Setter TargetName="NodeRow" Property="Background" Value="{DynamicResource ABrush.Tone4.Background.Static}" />
+                        <Setter TargetName="NodeRow" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                         <Setter TargetName="NodeActions" Property="Opacity" Value="1" />
                         <Setter TargetName="NodeActions" Property="IsHitTestVisible" Value="True" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
-                        <Setter TargetName="NodeRow" Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
+                        <Setter TargetName="NodeRow" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                     </DataTrigger>
                 </HierarchicalDataTemplate.Triggers>
             </HierarchicalDataTemplate>
         </ResourceDictionary>
     </UserControl.Resources>
-    <Grid Background="{DynamicResource WindowBackground}">
+    <Grid Background="{DynamicResource AeBrush.Canvas}">
         <ScrollViewer
             VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="8,5,8,8">
@@ -228,6 +234,7 @@
                                         Height="30"
                                         Padding="8,0,28,0"
                                         behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.SearchBranches}"
+                                        Style="{StaticResource AeInput.TextBox}"
                                         VerticalContentAlignment="Center"
                                         Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged}"
                                         ToolTip="{loc:Loc FolderProject.Git.SearchBranches}"
@@ -238,7 +245,7 @@
                                         Margin="0,0,9,0"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center"
-                                        Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                                        Foreground="{DynamicResource AeBrush.TextMuted}"
                                         IsHitTestVisible="False"
                                         Kind="Magnify" />
                                 </Grid>
@@ -255,6 +262,7 @@
                                 Margin="0,8,0,0"
                                 BorderThickness="0"
                                 ItemsSource="{Binding FilteredBranches}"
+                                Style="{StaticResource AeList.View}"
                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem" BasedOn="{StaticResource GitBranchPickerListItemStyle}">
@@ -268,7 +276,9 @@
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource GitBranchPickerButtonStyle}">
                                             <Button.ContextMenu>
-                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                <ContextMenu
+                                                    DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                    Style="{StaticResource AeMenu.Context}">
                                                     <MenuItem
                                                         Command="{Binding Data.DeleteBranchCommand, Source={StaticResource WorkspaceProxy}}"
                                                         CommandParameter="{Binding}"
@@ -285,7 +295,7 @@
                                                     Width="15"
                                                     Height="15"
                                                     Margin="8,0,0,0"
-                                                    Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                                                    Foreground="{DynamicResource AeBrush.Accent}"
                                                     Kind="Check">
                                                     <materialIcons:MaterialIcon.Style>
                                                         <Style TargetType="materialIcons:MaterialIcon">
@@ -345,6 +355,7 @@
                     Padding="8"
                     AcceptsReturn="True"
                     behaviors:TextBoxExtensions.Watermark="{loc:Loc FolderProject.Git.CommitMessageHint}"
+                    Style="{StaticResource AeInput.TextBox}"
                     Text="{Binding VersionControl.CommitMessage, UpdateSourceTrigger=PropertyChanged}"
                     TextWrapping="Wrap"
                     ToolTip="{loc:Loc FolderProject.VersionControl.CommitMessage}" />
@@ -367,7 +378,7 @@
                         <Border
                             Grid.Column="1"
                             Margin="0,5"
-                            Background="{DynamicResource Button.Static.Border}"
+                            Background="{DynamicResource AeBrush.BorderStrong}"
                             IsHitTestVisible="False" />
                         <Button
                             x:Name="CommitOptionsButton"
@@ -381,7 +392,9 @@
                                 Height="12"
                                 Kind="ChevronDown" />
                             <Button.ContextMenu>
-                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <ContextMenu
+                                    DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                    Style="{StaticResource AeMenu.Context}">
                                     <MenuItem
                                         Command="{Binding VersionControl.CommitStagedCommand}"
                                         Header="{loc:Loc FolderProject.VersionControl.CommitStaged}" />
@@ -507,6 +520,7 @@
                                 BorderThickness="0"
                                 DisplayMemberPath="Message"
                                 ItemsSource="{Binding VersionControl.Stashes}"
+                                Style="{StaticResource AeList.View}"
                                 SelectedItem="{Binding VersionControl.SelectedStash}" />
                             <TextBlock Text="{loc:Loc FolderProject.Git.NoStashes}">
                                 <TextBlock.Style>
@@ -522,9 +536,9 @@
                             </TextBlock>
                         </Grid>
                         <WrapPanel Margin="0,6,0,0">
-                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.ApplyStashCommand}" Content="{loc:Loc FolderProject.VersionControl.ApplyStash}" />
-                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.PopStashCommand}" Content="{loc:Loc FolderProject.VersionControl.PopStash}" />
-                            <Button Command="{Binding VersionControl.DeleteStashCommand}" Content="{loc:Loc FolderProject.VersionControl.DeleteStash}" />
+                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.ApplyStashCommand}" Content="{loc:Loc FolderProject.VersionControl.ApplyStash}" Style="{StaticResource AeButton.Secondary}" />
+                            <Button Margin="0,0,5,0" Command="{Binding VersionControl.PopStashCommand}" Content="{loc:Loc FolderProject.VersionControl.PopStash}" Style="{StaticResource AeButton.Secondary}" />
+                            <Button Command="{Binding VersionControl.DeleteStashCommand}" Content="{loc:Loc FolderProject.VersionControl.DeleteStash}" Style="{StaticResource AeButton.Danger}" />
                         </WrapPanel>
                     </StackPanel>
                 </Expander>
@@ -541,25 +555,28 @@
                             Height="28"
                             Margin="0,0,0,5"
                             VerticalContentAlignment="Center"
+                            Style="{StaticResource AeInput.TextBox}"
                             Text="{Binding VersionControl.IdentityName, UpdateSourceTrigger=PropertyChanged}"
                             ToolTip="{loc:Loc FolderProject.VersionControl.IdentityName}" />
                         <TextBox
                             Height="28"
                             Margin="0,0,0,5"
                             VerticalContentAlignment="Center"
+                            Style="{StaticResource AeInput.TextBox}"
                             Text="{Binding VersionControl.IdentityEmail, UpdateSourceTrigger=PropertyChanged}"
                             ToolTip="{loc:Loc FolderProject.VersionControl.IdentityEmail}" />
                         <Button
                             HorizontalAlignment="Left"
                             Command="{Binding VersionControl.SaveIdentityCommand}"
-                            Content="{loc:Loc FolderProject.VersionControl.SaveIdentity}" />
+                            Content="{loc:Loc FolderProject.VersionControl.SaveIdentity}"
+                            Style="{StaticResource AeButton.Secondary}" />
                     </StackPanel>
                 </Expander>
 
                 <Border
                     Margin="0,8,0,0"
                     Padding="8,6"
-                    Background="{DynamicResource ABrush.Tone3.Background.Static}"
+                    Background="{DynamicResource AeBrush.Surface2}"
                     CornerRadius="4">
                     <Border.Style>
                         <Style TargetType="Border">
@@ -580,10 +597,10 @@
                             Height="15"
                             Margin="0,0,7,0"
                             VerticalAlignment="Top"
-                            Foreground="{DynamicResource Markdown.Hyperlink.Foreground}"
+                            Foreground="{DynamicResource AeBrush.Accent}"
                             Kind="InformationOutline" />
                         <TextBlock
-                            Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                            Foreground="{DynamicResource AeBrush.TextMuted}"
                             Text="{Binding VersionControl.StatusMessage}"
                             TextWrapping="Wrap" />
                     </DockPanel>
@@ -594,8 +611,9 @@
         <Grid
             Grid.RowSpan="2"
             Panel.ZIndex="100"
-            Background="#88000000"
+            Background="Transparent"
             Visibility="{Binding VersionControl.IsBranchSwitchChoiceOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
             <Border
                 MaxWidth="430"
                 Margin="18"
@@ -615,23 +633,27 @@
                         Margin="0,14,0,7"
                         HorizontalContentAlignment="Left"
                         Command="{Binding VersionControl.CarryChangesAndSwitchCommand}"
-                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Carry}" />
+                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Carry}"
+                        Style="{StaticResource AeButton.Secondary}" />
                     <Button
                         Height="34"
                         Margin="0,0,0,7"
                         HorizontalContentAlignment="Left"
                         Command="{Binding VersionControl.StashChangesAndSwitchCommand}"
-                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Stash}" />
+                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Stash}"
+                        Style="{StaticResource AeButton.Primary}" />
                     <Button
                         Height="34"
                         Margin="0,0,0,12"
                         HorizontalContentAlignment="Left"
                         Command="{Binding VersionControl.DiscardChangesAndSwitchCommand}"
-                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Discard}" />
+                        Content="{loc:Loc FolderProject.VersionControl.SwitchChoice.Discard}"
+                        Style="{StaticResource AeButton.Danger}" />
                     <Button
                         HorizontalAlignment="Right"
                         Command="{Binding VersionControl.CancelBranchSwitchCommand}"
-                        Content="取消" />
+                        Content="取消"
+                        Style="{StaticResource AeButton.Quiet}" />
                 </StackPanel>
             </Border>
         </Grid>
@@ -640,9 +662,10 @@
             x:Name="GitPanelBusyOverlay"
             Grid.RowSpan="2"
             Panel.ZIndex="110"
-            Background="#66000000"
+            Background="Transparent"
             IsHitTestVisible="{Binding IsLoadingOperationVisibleInPanel}"
             Visibility="{Binding IsLoadingOperationVisibleInPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
             <Border
                 Width="500"
                 MaxWidth="500"

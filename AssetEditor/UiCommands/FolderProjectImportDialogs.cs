@@ -69,7 +69,8 @@ public sealed class FolderProjectImportDialogs :
 }
 
 public sealed class FolderProjectSetupDialogs(
-    LocalizationManager localizationManager) : IFolderProjectSetupDialogs
+    LocalizationManager localizationManager,
+    IStandardDialogs dialogs) : IFolderProjectSetupDialogs
 {
     public FolderProjectSetupDialogResult? ShowSetup(
         string title,
@@ -77,6 +78,7 @@ public sealed class FolderProjectSetupDialogs(
     {
         var window = new FolderProjectSetupWindow(
             localizationManager,
+            dialogs,
             title,
             description);
         return window.ShowDialog() == true

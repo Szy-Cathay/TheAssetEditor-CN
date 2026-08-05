@@ -1,31 +1,34 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Style x:Key="GitPageTitleStyle" TargetType="TextBlock">
+    <Style
+        x:Key="GitPageTitleStyle"
+        TargetType="TextBlock"
+        BasedOn="{StaticResource AeText.SectionTitle}">
         <Setter Property="FontSize" Value="15" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <Style x:Key="GitSectionTitleStyle" TargetType="TextBlock">
+    <Style
+        x:Key="GitSectionTitleStyle"
+        TargetType="TextBlock"
+        BasedOn="{StaticResource AeText.SectionTitle}">
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <Style x:Key="GitCaptionStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
+    <Style
+        x:Key="GitCaptionStyle"
+        TargetType="TextBlock"
+        BasedOn="{StaticResource AeText.Caption}">
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
-    <Style x:Key="GitSurfaceBorderStyle" TargetType="Border">
+    <Style
+        x:Key="GitSurfaceBorderStyle"
+        TargetType="Border"
+        BasedOn="{StaticResource AeSurface.Panel}">
         <Setter Property="Padding" Value="10" />
-        <Setter Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource App.Border}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="4" />
     </Style>
 
     <Style x:Key="GitFlatPaneStyle" TargetType="Border">
@@ -36,44 +39,11 @@
 
     <Style
         x:Key="GitIconButtonStyle"
-        TargetType="Button">
+        TargetType="Button"
+        BasedOn="{StaticResource AeButton.Icon}">
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border
-                        x:Name="ButtonBorder"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="3"
-                        SnapsToDevicePixels="True">
-                        <ContentPresenter
-                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ABrush.Tone4.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ABrush.Tone2.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.4" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <Style
@@ -124,7 +94,7 @@
                                                 VerticalAlignment="Center"
                                                 Data="M 1,0 L 6,3.5 L 1,7"
                                                 Fill="Transparent"
-                                                Stroke="{DynamicResource ABrush.Foreground.Disabled}"
+                                                Stroke="{DynamicResource AeBrush.TextMuted}"
                                                 StrokeThickness="1.5" />
                                             <ContentPresenter
                                                 Grid.Column="1"
@@ -144,7 +114,7 @@
                                             </Setter>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource ABrush.Tone4.Background.Static}" />
+                                            <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                                         </Trigger>
                                         <Trigger Property="IsEnabled" Value="False">
                                             <Setter Property="Opacity" Value="0.4" />
@@ -176,121 +146,52 @@
     <Style
         x:Key="GitQuietButtonStyle"
         TargetType="Button"
-        BasedOn="{StaticResource {x:Type Button}}">
+        BasedOn="{StaticResource AeButton.Quiet}">
         <Setter Property="MinHeight" Value="30" />
         <Setter Property="Padding" Value="7,4" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Accent}" />
     </Style>
 
-    <Style x:Key="GitTextLinkButtonStyle" TargetType="Button">
+    <Style
+        x:Key="GitTextLinkButtonStyle"
+        TargetType="Button"
+        BasedOn="{StaticResource AeButton.Quiet}">
         <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="4,0" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <TextBlock
-                        x:Name="LinkText"
-                        Padding="{TemplateBinding Padding}"
-                        VerticalAlignment="Center"
-                        Foreground="{TemplateBinding Foreground}"
-                        Text="{TemplateBinding Content}" />
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.MouseOver.Foreground}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="LinkText" Property="TextDecorations" Value="Underline" />
-                            <Setter Property="Foreground" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
-                            <Setter Property="Opacity" Value="0.5" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Accent}" />
     </Style>
 
-    <Style x:Key="GitBranchPickerListItemStyle" TargetType="ListBoxItem">
+    <Style
+        x:Key="GitBranchPickerListItemStyle"
+        TargetType="ListBoxItem"
+        BasedOn="{StaticResource AeList.Item}">
         <Setter Property="Margin" Value="0,1" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <Border
-                        x:Name="PickerItemBackground"
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="3">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="PickerItemBackground" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="PickerItemBackground" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="PickerItemBackground" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
-    <Style x:Key="GitBranchPickerButtonStyle" TargetType="Button">
+    <Style
+        x:Key="GitListStyle"
+        TargetType="ListBox"
+        BasedOn="{StaticResource AeList.View}" />
+
+    <Style
+        x:Key="GitContextMenuStyle"
+        TargetType="ContextMenu"
+        BasedOn="{StaticResource AeMenu.Context}" />
+
+    <Style
+        x:Key="GitBranchPickerButtonStyle"
+        TargetType="Button"
+        BasedOn="{StaticResource AeButton.Quiet}">
         <Setter Property="MinHeight" Value="26" />
         <Setter Property="Padding" Value="6,3" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border
-                        x:Name="PickerButtonBackground"
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="3">
-                        <ContentPresenter
-                            Margin="{TemplateBinding Padding}"
-                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="PickerButtonBackground" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="PickerButtonBackground" Property="Background" Value="{DynamicResource ABrush.AccentTone2.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="PickerButtonBackground" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.4" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <Style x:Key="GitCommitSplitButtonStyle" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource Button.Static.Background}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource Button.Static.Border}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="4" />
     </Style>
@@ -303,7 +204,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{DynamicResource Button.Static.Foreground}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Canvas}" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Template">
@@ -323,17 +224,17 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="PartBackground" Property="Background" Value="{DynamicResource Button.MouseOver.Background}" />
+                            <Setter TargetName="PartBackground" Property="Background" Value="{DynamicResource AeBrush.AccentHover}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="PartBackground" Property="Background" Value="{DynamicResource Button.Pressed.Background}" />
+                            <Setter TargetName="PartBackground" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="PartBackground" Property="BorderBrush" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
+                            <Setter TargetName="PartBackground" Property="BorderBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
                             <Setter TargetName="PartBackground" Property="BorderThickness" Value="1" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource Button.Disabled.Foreground}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
                             <Setter Property="Opacity" Value="0.5" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -358,7 +259,7 @@
     <Style
         x:Key="GitChangeTreeStyle"
         TargetType="TreeView"
-        BasedOn="{StaticResource {x:Type TreeView}}">
+        BasedOn="{StaticResource AeTree.View}">
         <Setter Property="MaxHeight" Value="260" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="Background" Value="Transparent" />
@@ -374,7 +275,7 @@
     <Style
         x:Key="GitChangeTreeItemStyle"
         TargetType="TreeViewItem"
-        BasedOn="{StaticResource {x:Type TreeViewItem}}">
+        BasedOn="{StaticResource AeTree.Item}">
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
         <Setter Property="Padding" Value="0" />
@@ -382,72 +283,32 @@
 
     <Style
         x:Key="GitBranchListItemStyle"
-        TargetType="ListBoxItem">
+        TargetType="ListBoxItem"
+        BasedOn="{StaticResource AeList.Item}">
         <Setter Property="Margin" Value="2,0" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="2,0,0,0" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <Border
-                        x:Name="ItemBorder"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="3"
-                        SnapsToDevicePixels="True">
-                        <ContentPresenter
-                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="Transparent" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Markdown.Hyperlink.Foreground}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.4" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <Style
         x:Key="GitHistoryDataGridRowStyle"
         TargetType="DataGridRow"
-        BasedOn="{StaticResource {x:Type DataGridRow}}">
-        <Setter Property="Height" Value="26" />
-        <Setter Property="MinHeight" Value="26" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{DynamicResource App.Border}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
-        <Style.Triggers>
-            <Trigger Property="IsSelected" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
-            </Trigger>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ABrush.AccentTone1.Background.Static}" />
-            </Trigger>
-        </Style.Triggers>
+        BasedOn="{StaticResource AeTable.Row}">
+        <Setter Property="Height" Value="{StaticResource AeSize.CompactRowHeight}" />
     </Style>
 
-    <Style x:Key="GitEmptyStateTextStyle" TargetType="TextBlock">
+    <Style
+        x:Key="GitHistoryDataGridStyle"
+        TargetType="DataGrid"
+        BasedOn="{StaticResource AeTable.Grid}" />
+
+    <Style
+        x:Key="GitEmptyStateTextStyle"
+        TargetType="TextBlock"
+        BasedOn="{StaticResource AeText.Caption}">
         <Setter Property="Margin" Value="8" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}" />
         <Setter Property="IsHitTestVisible" Value="False" />
         <Setter Property="TextAlignment" Value="Center" />
         <Setter Property="TextWrapping" Value="Wrap" />

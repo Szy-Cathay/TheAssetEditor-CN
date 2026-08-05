@@ -21,7 +21,9 @@ public sealed class CreateFolderProjectCommand(
     IFolderProjectProgressRunner? progressRunner = null) : IUiCommand
 {
     private readonly IFolderProjectSetupDialogs _setupDialogs =
-        setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
+        setupDialogs ?? new FolderProjectSetupDialogs(
+            localizationManager,
+            dialogs);
     private readonly IFolderProjectVersionControlService
         _versionControlService =
             versionControlService ?? new FolderProjectVersionControlService();
