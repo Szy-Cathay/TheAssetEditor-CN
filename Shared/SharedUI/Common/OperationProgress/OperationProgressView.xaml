@@ -2,7 +2,8 @@
     x:Class="Shared.Ui.Common.OperationProgress.OperationProgressView"
     x:Name="ProgressView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Foreground="{DynamicResource AeBrush.TextPrimary}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -12,7 +13,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock
-            FontSize="14"
+            Style="{StaticResource AeText.SectionTitle}"
             Text="{Binding ElementName=ProgressView, Path=StatusText}"
             TextTrimming="CharacterEllipsis"
             TextWrapping="Wrap" />
@@ -20,7 +21,8 @@
         <TextBlock
             Grid.Row="1"
             Margin="0,8,0,0"
-            Opacity="0.72"
+            Foreground="{DynamicResource AeBrush.TextSecondary}"
+            Style="{StaticResource AeText.Caption}"
             Text="{Binding ElementName=ProgressView, Path=CurrentDetailText}"
             TextTrimming="CharacterEllipsis"
             ToolTip="{Binding ElementName=ProgressView, Path=CurrentDetailText}" />
@@ -31,14 +33,15 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <ProgressBar
-                Height="8"
+                Style="{StaticResource AeProgress.Bar}"
                 IsIndeterminate="{Binding ElementName=ProgressView, Path=IsProgressIndeterminate}"
                 Maximum="{Binding ElementName=ProgressView, Path=ProgressMaximum}"
                 Value="{Binding ElementName=ProgressView, Path=ProgressValue}" />
             <TextBlock
                 Grid.Column="1"
                 Margin="12,0,0,0"
-                Opacity="0.72"
+                Foreground="{DynamicResource AeBrush.TextMuted}"
+                Style="{StaticResource AeText.Caption}"
                 Text="{Binding ElementName=ProgressView, Path=ProgressSummaryText}"
                 VerticalAlignment="Center" />
         </Grid>
@@ -52,16 +55,12 @@
             Collapsed="OnDetailsExpansionChanged">
             <Border
                 Margin="0,8,0,0"
-                Padding="8"
-                BorderBrush="{DynamicResource TextBox.Static.Border}"
-                BorderThickness="1"
-                CornerRadius="3">
+                Style="{StaticResource AeWorkflow.ProgressHistory}">
                 <ListBox
                     x:Name="DetailsList"
                     MinHeight="96"
                     MaxHeight="260"
-                    Background="Transparent"
-                    BorderThickness="0"
+                    Style="{StaticResource AeList.View}"
                     ItemsSource="{Binding ElementName=ProgressView, Path=DetailHistory}"
                     ScrollViewer.CanContentScroll="True"
                     ScrollViewer.HorizontalScrollBarVisibility="Auto"

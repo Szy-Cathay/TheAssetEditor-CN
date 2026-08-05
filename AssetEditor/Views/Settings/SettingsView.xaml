@@ -20,54 +20,44 @@
         </DataTemplate>
 
         <Style x:Key="PageTitleStyle" TargetType="{x:Type TextBlock}"
-               BasedOn="{StaticResource {x:Type TextBlock}}">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+               BasedOn="{StaticResource AeText.PageTitle}">
             <Setter Property="Margin" Value="0,0,0,18"/>
         </Style>
         <Style x:Key="SectionTitleStyle" TargetType="{x:Type TextBlock}"
-               BasedOn="{StaticResource {x:Type TextBlock}}">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+               BasedOn="{StaticResource AeText.SectionTitle}">
             <Setter Property="Margin" Value="0,18,0,10"/>
         </Style>
         <Style x:Key="SettingsLabelStyle" TargetType="{x:Type TextBlock}"
-               BasedOn="{StaticResource {x:Type TextBlock}}">
+               BasedOn="{StaticResource AeText.Label}">
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,2,18,10"/>
         </Style>
         <Style x:Key="ComboBoxFieldStyle" TargetType="{x:Type ComboBox}"
-               BasedOn="{StaticResource {x:Type ComboBox}}">
+               BasedOn="{StaticResource AeInput.ComboBox}">
             <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="MinWidth" Value="220"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="CheckBoxFieldStyle" TargetType="{x:Type CheckBox}"
-               BasedOn="{StaticResource {x:Type CheckBox}}">
+               BasedOn="{StaticResource AeInput.CheckBox}">
             <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="TextBoxFieldStyle" TargetType="{x:Type TextBox}"
-               BasedOn="{StaticResource {x:Type TextBox}}">
+               BasedOn="{StaticResource AeInput.TextBox}">
             <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style x:Key="SettingsNavigationItemStyle" TargetType="{x:Type TabItem}"
-               BasedOn="{StaticResource {x:Type TabItem}}">
-            <Setter Property="Width" Value="150"/>
-            <Setter Property="MinHeight" Value="42"/>
-            <Setter Property="Padding" Value="16,9"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
     </UserControl.Resources>
 
     <TabControl x:Name="SettingsCategories"
+                Style="{StaticResource AeWorkflow.SettingsNavigation}"
                 TabStripPlacement="Left"
                 SelectedIndex="0"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch">
         <TabItem Header="{loc:Loc SettingsWindow.General}"
-                 Style="{StaticResource SettingsNavigationItemStyle}">
+                 Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
@@ -119,12 +109,13 @@
                                     <TextBox Grid.Column="1"
                                              Text="{Binding Path}"
                                              IsReadOnly="True"
-                                             Padding="3,0"/>
+                                             Style="{StaticResource AeInput.TextBox}"/>
                                     <Button Grid.Column="2"
                                             Content="{loc:Loc SettingsWindow.Browse}"
                                             Command="{Binding BrowseCommand}"
                                             MinWidth="72"
-                                            Margin="8,0,0,0"/>
+                                            Margin="8,0,0,0"
+                                            Style="{StaticResource AeButton.Secondary}"/>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -134,7 +125,7 @@
         </TabItem>
 
         <TabItem Header="{loc:Loc SettingsWindow.ThemeCategory}"
-                 Style="{StaticResource SettingsNavigationItemStyle}">
+                 Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
@@ -186,7 +177,7 @@
         </TabItem>
 
         <TabItem Header="{loc:Loc SettingsWindow.Rendering}"
-                 Style="{StaticResource SettingsNavigationItemStyle}">
+                 Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
@@ -213,6 +204,7 @@
                                     Orientation="Horizontal"
                                     Margin="0,0,0,10">
                             <ComboBox Width="220"
+                                      Style="{StaticResource AeInput.ComboBox}"
                                       SelectedItem="{Binding CurrentRenderEngineBackgroundColour, UpdateSourceTrigger=PropertyChanged}"
                                       ItemsSource="{Binding RenderEngineBackgroundColours}"
                                       ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
@@ -251,6 +243,7 @@
                                     Orientation="Horizontal"
                                     Margin="0,0,0,10">
                             <CheckBox IsChecked="{Binding ShowViewportGrid, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource AeInput.CheckBox}"
                                       VerticalAlignment="Center"/>
                             <colourpicker:ColourPickerButtonView
                                 Width="32" Height="32" Margin="12,0,0,0"
@@ -324,7 +317,7 @@
         </TabItem>
 
         <TabItem Header="{loc:Loc SettingsWindow.Audio}"
-                 Style="{StaticResource SettingsNavigationItemStyle}">
+                 Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
@@ -349,11 +342,13 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBox Text="{Binding WwisePath}"
-                                     IsReadOnly="True" Padding="3,0"/>
+                                     IsReadOnly="True"
+                                     Style="{StaticResource AeInput.TextBox}"/>
                             <Button Grid.Column="1"
                                     Content="{loc:Loc SettingsWindow.Browse}"
                                     Command="{Binding BrowseCommand}"
-                                    MinWidth="72" Margin="8,0,0,0"/>
+                                    MinWidth="72" Margin="8,0,0,0"
+                                    Style="{StaticResource AeButton.Secondary}"/>
                         </Grid>
                         <TextBlock Grid.Row="1"
                                    Text="{loc:Loc SettingsWindow.ShowCaWems}"
@@ -368,7 +363,7 @@
         </TabItem>
 
         <TabItem Header="{loc:Loc SettingsWindow.Save}"
-                 Style="{StaticResource SettingsNavigationItemStyle}">
+                 Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
@@ -401,7 +396,8 @@
                         <StackPanel Grid.Row="1" Grid.Column="1"
                                     Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBox Text="{Binding AutoSaveIntervalMinutes, UpdateSourceTrigger=LostFocus}"
-                                     Width="60" HorizontalContentAlignment="Right"/>
+                                     Width="60" HorizontalContentAlignment="Right"
+                                     Style="{StaticResource AeInput.TextBox}"/>
                             <TextBlock Text="{loc:Loc SettingsWindow.Minutes}"
                                        VerticalAlignment="Center" Margin="8,0,0,0"/>
                         </StackPanel>
@@ -416,11 +412,13 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBox Text="{Binding BackupPath}"
-                                     IsReadOnly="True" Padding="3,0"/>
+                                     IsReadOnly="True"
+                                     Style="{StaticResource AeInput.TextBox}"/>
                             <Button Grid.Column="1"
                                     Content="{loc:Loc SettingsWindow.Browse}"
                                     Command="{Binding BrowseBackupPathCommand}"
-                                    MinWidth="72" Margin="8,0,0,0"/>
+                                    MinWidth="72" Margin="8,0,0,0"
+                                    Style="{StaticResource AeButton.Secondary}"/>
                         </Grid>
 
                         <TextBlock Grid.Row="3"

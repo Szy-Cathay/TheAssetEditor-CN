@@ -6,14 +6,29 @@
         xmlns:packfiletree="clr-namespace:Shared.Ui.BaseDialogs.PackFileTree"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
         mc:Ignorable="d"
-        Title="{loc:Loc Shared.PackFileBrowserWindow.Title}" Height="460" Width="800" FontFamily="{DynamicResource AppFontFamily}" Background="{DynamicResource WindowBackground}">
-    <Grid Margin="10, 5, 10, 10">
+        Title="{loc:Loc Shared.PackFileBrowserWindow.Title}" Height="520" Width="860"
+        MinHeight="420" MinWidth="720" ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}"
+        Background="{DynamicResource AeBrush.Canvas}">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <packfiletree:PackFileBrowserView KeyboardNavigation.TabIndex="0" KeyboardNavigation.IsTabStop="True" Grid.Row="0" DataContext="{Binding ViewModel, Mode=OneTime}"/>
-        <Button HorizontalAlignment="Right" Margin="0, 10, 0, 0" Width="80" Grid.Row="1" Click="Button_Click" Content="{loc:Loc Shared.PackFileBrowserWindow.Ok}"/>
+        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
+            <packfiletree:PackFileBrowserView KeyboardNavigation.TabIndex="0" KeyboardNavigation.IsTabStop="True" DataContext="{Binding ViewModel, Mode=OneTime}"/>
+        </Border>
+        <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <Button
+                HorizontalAlignment="Right"
+                MinWidth="88"
+                Click="Button_Click"
+                Content="{loc:Loc Shared.PackFileBrowserWindow.Ok}"
+                IsDefault="True"
+                Style="{StaticResource AeButton.Primary}" />
+        </Border>
     </Grid>
 </Window>

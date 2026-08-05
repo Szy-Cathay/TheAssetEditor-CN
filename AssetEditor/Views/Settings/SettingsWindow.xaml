@@ -6,21 +6,35 @@
         xmlns:local="clr-namespace:AssetEditor.Views.Settings"
           xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc SettingsWindow.Title}" Height="660" Width="820" MinHeight="560" MinWidth="720"
+        Title="{loc:Loc SettingsWindow.Title}" Height="700" Width="860" MinHeight="600" MinWidth="760"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
         FontFamily="{DynamicResource AppFontFamily}"
-        Background="{DynamicResource WindowBackground}">
+        FontWeight="{DynamicResource AppFontWeight}"
+        Background="{DynamicResource AeBrush.Canvas}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <local:SettingsView Grid.Row="0"/>
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="8,10,8,8">
-            <Button Content="{loc:Loc SettingsWindow.CancelButton}" Width="82" Margin="0,0,8,0" Click="CancelButton_Click"/>
-            <Button Content="{loc:Loc SettingsWindow.SaveButton}" Width="82" Click="SaveButton_Click"/>
-        </StackPanel>
+        <local:SettingsView x:Name="SettingsContent" Grid.Row="0"/>
+        <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button
+                    Content="{loc:Loc SettingsWindow.CancelButton}"
+                    MinWidth="88"
+                    Margin="0,0,8,0"
+                    Click="CancelButton_Click"
+                    IsCancel="True"
+                    Style="{StaticResource AeButton.Secondary}" />
+                <Button
+                    Content="{loc:Loc SettingsWindow.SaveButton}"
+                    MinWidth="88"
+                    Click="SaveButton_Click"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+            </StackPanel>
+        </Border>
     </Grid>
 
 </Window>

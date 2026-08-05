@@ -11,54 +11,58 @@
     ShowInTaskbar="False"
     SizeToContent="Height"
     WindowStartupLocation="CenterOwner"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
     Background="{DynamicResource AeBrush.Canvas}"
     Foreground="{DynamicResource AeBrush.TextPrimary}">
-    <Grid Margin="16">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer
-            MaxHeight="420"
-            HorizontalScrollBarVisibility="Disabled"
-            VerticalScrollBarVisibility="Auto">
-            <TextBlock
-                x:Name="MessageText"
-                FontSize="12"
-                LineHeight="19"
-                TextWrapping="Wrap" />
-        </ScrollViewer>
+        <Border Style="{StaticResource AeWorkflow.DialogBody}">
+            <ScrollViewer
+                MaxHeight="420"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+                <TextBlock
+                    x:Name="MessageText"
+                    LineHeight="19"
+                    Style="{StaticResource AeText.Body}"
+                    TextWrapping="Wrap" />
+            </ScrollViewer>
+        </Border>
 
-        <StackPanel
+        <Border
             Grid.Row="1"
-            Margin="0,16,0,0"
-            HorizontalAlignment="Right"
-            Orientation="Horizontal">
-            <Button
-                x:Name="OkButton"
-                MinWidth="88"
-                Height="30"
-                Click="OkButton_Click"
-                Content="{loc:Loc General.Ok}"
-                IsDefault="True" />
-            <Button
-                x:Name="YesButton"
-                MinWidth="88"
-                Height="30"
-                Click="YesButton_Click"
-                Content="{loc:Loc General.Yes}"
-                IsDefault="True"
-                Visibility="Collapsed" />
-            <Button
-                x:Name="NoButton"
-                MinWidth="88"
-                Height="30"
-                Margin="8,0,0,0"
-                Click="NoButton_Click"
-                Content="{loc:Loc General.No}"
-                IsCancel="True"
-                Visibility="Collapsed" />
-        </StackPanel>
+            Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button
+                    x:Name="OkButton"
+                    MinWidth="88"
+                    Click="OkButton_Click"
+                    Content="{loc:Loc General.Ok}"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+                <Button
+                    x:Name="YesButton"
+                    MinWidth="88"
+                    Click="YesButton_Click"
+                    Content="{loc:Loc General.Yes}"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}"
+                    Visibility="Collapsed" />
+                <Button
+                    x:Name="NoButton"
+                    MinWidth="88"
+                    Margin="8,0,0,0"
+                    Click="NoButton_Click"
+                    Content="{loc:Loc General.No}"
+                    IsCancel="True"
+                    Style="{StaticResource AeButton.Secondary}"
+                    Visibility="Collapsed" />
+            </StackPanel>
+        </Border>
     </Grid>
 </windowhandling:AssetEditorWindow>

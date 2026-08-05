@@ -28,6 +28,7 @@
                 <ResourceDictionary Source="Themes/DesignSystem/Controls/Collections.xaml"/>
                 <ResourceDictionary Source="Themes/DesignSystem/Controls/MenusAndFeedback.xaml"/>
                 <ResourceDictionary Source="Themes/DesignSystem/Shell.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Workflows.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!--Value converters-->

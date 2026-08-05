@@ -6,33 +6,92 @@
         xmlns:local="clr-namespace:Shared.Ui.Common.Exceptions"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
         mc:Ignorable="d"
-        Title="{loc:Loc Shared.CustomException.Title}" Height="450" Width="800" Background="#FF1C1C1C">
-    <DockPanel>
+        Title="{loc:Loc Shared.CustomException.Title}"
+        Height="560" Width="860" MinHeight="440" MinWidth="720"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}"
+        Background="{DynamicResource AeBrush.Canvas}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <Button DockPanel.Dock="Bottom" Content="{loc:Loc Shared.CustomException.ForceClose}" Margin="5" Click="ForceCloseButtonPressed"/>
-        <Button DockPanel.Dock="Bottom" Content="{loc:Loc Shared.CustomException.CloseError}" Margin="5" Click="CloseButtonPressed"/>
-        <Button DockPanel.Dock="Bottom" Content="{loc:Loc Shared.CustomException.CopyToClipboard}" Margin="5" Click="CopyButtonPressed" />
+        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
+            <Grid Margin="14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    Text="{loc:Loc Shared.CustomException.ErrorMessageLabel}"
+                    Style="{StaticResource AeText.SectionTitle}" />
+                <TextBox
+                    x:Name="ErrorTextHandle"
+                    Grid.Row="1"
+                    Margin="0,8,0,0"
+                    IsReadOnly="True"
+                    TextWrapping="Wrap"
+                    VerticalScrollBarVisibility="Auto"
+                    Style="{StaticResource AeInput.TextBox}" />
+                <Expander
+                    Grid.Row="2"
+                    Margin="0,10,0,0"
+                    Header="{loc:Loc Shared.CustomException.ExtraInfoHeader}"
+                    IsExpanded="False">
+                    <TextBox
+                        x:Name="ExtraInfoHandle"
+                        MinHeight="110"
+                        Margin="0,8,0,0"
+                        IsReadOnly="True"
+                        TextWrapping="NoWrap"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        Style="{StaticResource AeInput.TextBox}" />
+                </Expander>
+            </Grid>
+        </Border>
 
-        <TextBox 
-            IsReadOnly="True"
-            Margin="5"
-            DockPanel.Dock="Bottom"   
-            TextWrapping="Wrap"
-            HorizontalContentAlignment="Center"
-            Text="{loc:Loc Shared.CustomException.InfoText}" />
+        <Border
+            Grid.Row="1"
+            Margin="12,0,12,12"
+            Padding="12"
+            Background="{DynamicResource AeBrush.Surface1}"
+            BorderBrush="{DynamicResource AeBrush.Border}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource AeRadius.Control}">
+            <TextBlock
+                Text="{loc:Loc Shared.CustomException.InfoText}"
+                Style="{StaticResource AeText.Caption}"
+                TextWrapping="Wrap" />
+        </Border>
 
-
-        <Expander DockPanel.Dock="Bottom" IsExpanded="False">
-            <Expander.Header>
-                <StackPanel Orientation="Horizontal" >
-                    <TextBlock Text="{loc:Loc Shared.CustomException.ExtraInfoHeader}" FontWeight="Bold" Margin="3"/>
+        <Border Grid.Row="2" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <Grid>
+                <Button
+                    HorizontalAlignment="Left"
+                    MinWidth="176"
+                    Content="{loc:Loc Shared.CustomException.ForceClose}"
+                    Click="ForceCloseButtonPressed"
+                    Style="{StaticResource AeButton.Danger}" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button
+                        MinWidth="120"
+                        Margin="0,0,8,0"
+                        Content="{loc:Loc Shared.CustomException.CopyToClipboard}"
+                        Click="CopyButtonPressed"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        MinWidth="112"
+                        Content="{loc:Loc Shared.CustomException.CloseError}"
+                        Click="CloseButtonPressed"
+                        IsDefault="True"
+                        Style="{StaticResource AeButton.Primary}" />
                 </StackPanel>
-            </Expander.Header>
-            <TextBox x:Name="ExtraInfoHandle" IsReadOnly="True" DockPanel.Dock="Top" Margin="5"/>
-        </Expander>
-
-        <TextBlock DockPanel.Dock="TOp" Text="{loc:Loc Shared.CustomException.ErrorMessageLabel}" FontWeight="Bold" Margin="3"/>
-        <TextBox x:Name="ErrorTextHandle" IsReadOnly="True"   TextWrapping="Wrap" DockPanel.Dock="Top" Margin="5,0,5,5"/>
-
-    </DockPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

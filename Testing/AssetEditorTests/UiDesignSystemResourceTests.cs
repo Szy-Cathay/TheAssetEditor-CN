@@ -34,6 +34,7 @@ public class UiDesignSystemResourceTests
                     "Themes/DesignSystem/Controls/Collections.xaml",
                     "Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
                     "Themes/DesignSystem/Shell.xaml",
+                    "Themes/DesignSystem/Workflows.xaml",
                 };
 
                 NUnitAssert.Multiple(() =>

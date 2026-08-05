@@ -18,7 +18,7 @@ public class SettingsViewVisualTests
     public void SetUp() => new LocalizationManager().LoadLanguage();
 
     [Test]
-    public void CustomLayoutStyles_PreserveApplicationThemeColours()
+    public void CustomLayoutStyles_UseSemanticApplicationThemeColours()
     {
         using var services = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
@@ -29,9 +29,9 @@ public class SettingsViewVisualTests
             () =>
             {
                 var view = new SettingsView();
-                var foreground = GetThemeBrush("ABrush.Foreground.Static");
-                var textBoxBackground = GetThemeBrush("TextBox.Static.Background");
-                var comboBoxBackground = GetThemeBrush("ComboBox.Static.Background");
+                var primary = GetThemeBrush("AeBrush.TextPrimary");
+                var secondary = GetThemeBrush("AeBrush.TextSecondary");
+                var inputBackground = GetThemeBrush("AeBrush.Surface2");
                 var layoutTextBlocks = GetDescendants<TextBlock>(view)
                     .Where(textBlock =>
                         ReferenceEquals(
@@ -56,19 +56,28 @@ public class SettingsViewVisualTests
                     NUnitAssert.That(layoutTextBlocks, Is.Not.Empty);
                     NUnitAssert.That(
                         layoutTextBlocks.Select(value => GetBrushSignature(value.Foreground)),
-                        Has.All.EqualTo(foreground));
+                        Has.All.Matches<string>(value =>
+                            value == primary || value == secondary));
+                    NUnitAssert.That(
+                        layoutTextBlocks.Select(value =>
+                            GetBrushSignature(value.Foreground)),
+                        Does.Contain(primary));
+                    NUnitAssert.That(
+                        layoutTextBlocks.Select(value =>
+                            GetBrushSignature(value.Foreground)),
+                        Does.Contain(secondary));
                     NUnitAssert.That(textBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         textBoxes.Select(value => GetBrushSignature(value.Background)),
-                        Has.All.EqualTo(textBoxBackground));
+                        Has.All.EqualTo(inputBackground));
                     NUnitAssert.That(comboBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         comboBoxes.Select(value => GetBrushSignature(value.Background)),
-                        Has.All.EqualTo(comboBoxBackground));
+                        Has.All.EqualTo(inputBackground));
                     NUnitAssert.That(checkBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         checkBoxes.Select(value => GetBrushSignature(value.Foreground)),
-                        Has.All.EqualTo(foreground));
+                        Has.All.EqualTo(secondary));
                 });
             });
     }

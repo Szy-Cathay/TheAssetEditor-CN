@@ -6,20 +6,39 @@
         xmlns:packfiletree="clr-namespace:Shared.Ui.BaseDialogs.PackFileTree"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
         mc:Ignorable="d"
-        Title="{loc:Loc Shared.SavePackFile.Title}" Height="450" Width="800" FontFamily="{DynamicResource AppFontFamily}" Background="{DynamicResource WindowBackground}">
+        Title="{loc:Loc Shared.SavePackFile.Title}" Height="520" Width="860"
+        MinHeight="420" MinWidth="720" ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}"
+        Background="{DynamicResource AeBrush.Canvas}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="auto"/>
-        </Grid.ColumnDefinitions>
+        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
+            <packfiletree:PackFileBrowserView DataContext="{Binding ViewModel, Mode=OneTime}"/>
+        </Border>
 
-        <packfiletree:PackFileBrowserView Grid.Row="0" Grid.ColumnSpan="2" DataContext="{Binding ViewModel, Mode=OneTime}"/>
-
-        <Button HorizontalAlignment="Right" Margin="5,2,5,2" Width="80" Grid.Row="1" Grid.Column="1" Click="Button_Click" Content="{loc:Loc General.Save}"/>
-        <TextBox Margin="5,2,5,2" Grid.Row="1" Grid.Column="0" Text="{Binding CurrentFileName, UpdateSourceTrigger=PropertyChanged}" />
+        <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    Margin="0,0,8,0"
+                    Text="{Binding CurrentFileName, UpdateSourceTrigger=PropertyChanged}"
+                    Style="{StaticResource AeInput.TextBox}" />
+                <Button
+                    Grid.Column="1"
+                    MinWidth="88"
+                    Click="Button_Click"
+                    Content="{loc:Loc General.Save}"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+            </Grid>
+        </Border>
     </Grid>
 </Window>
