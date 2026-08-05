@@ -29,6 +29,10 @@ public class UiDesignSystemResourceTests
                     "Themes/DesignSystem/Typography.xaml",
                     "Themes/DesignSystem/SurfaceStyles.xaml",
                     "Themes/Controls.xaml",
+                    "Themes/DesignSystem/Controls/Buttons.xaml",
+                    "Themes/DesignSystem/Controls/Inputs.xaml",
+                    "Themes/DesignSystem/Controls/Collections.xaml",
+                    "Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
                 };
 
                 NUnitAssert.Multiple(() =>

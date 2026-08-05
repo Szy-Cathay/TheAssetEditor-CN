@@ -113,6 +113,14 @@ internal static class WpfTestApplicationHost
                 "Themes/DesignSystem/SurfaceStyles.xaml"));
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/Controls.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Controls/Buttons.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Controls/Inputs.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Controls/Collections.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Controls/MenusAndFeedback.xaml"));
             Resources["BoolToChangedPrefixStr"] =
                 new BoolToStringConverter { TrueValue = "*" };
             _themeResourcesLoaded = true;

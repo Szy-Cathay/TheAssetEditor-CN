@@ -23,6 +23,10 @@
 
                 <!-- AE Control Templates (custom styles only) -->
                 <ResourceDictionary Source="Themes/Controls.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/Buttons.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/Inputs.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/Collections.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/MenusAndFeedback.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!--Value converters-->
