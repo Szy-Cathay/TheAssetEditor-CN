@@ -14,6 +14,9 @@ internal static class WpfTestApplicationHost
     private static TestApplication? _application;
     private static Exception? _startupException;
 
+    public static IServiceProvider EmptyServices { get; } =
+        EmptyServiceProvider.Instance;
+
     public static void Invoke(Action<Application> action)
     {
         EnsureStarted();
@@ -102,6 +105,12 @@ internal static class WpfTestApplicationHost
                 "Themes/ColourDictionaries/DarkTheme.xaml"));
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/ControlColours.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/DesignTokens.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Typography.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/SurfaceStyles.xaml"));
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/Controls.xaml"));
             Resources["BoolToChangedPrefixStr"] =

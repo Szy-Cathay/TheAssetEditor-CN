@@ -90,8 +90,18 @@ namespace Shared.Core.Settings
             if (string.IsNullOrEmpty(themeName))
                 return;
             CurrentTheme = theme;
-            ThemeDictionary = new ResourceDictionary() { Source = new Uri($"Themes/ColourDictionaries/{themeName}.xaml", UriKind.Relative) };
-            ControlColours = new ResourceDictionary() { Source = new Uri("Themes/ControlColours.xaml", UriKind.Relative) };
+            ThemeDictionary = new ResourceDictionary()
+            {
+                Source = new Uri(
+                    $"pack://application:,,,/AssetEditor.CN;component/Themes/ColourDictionaries/{themeName}.xaml",
+                    UriKind.Absolute)
+            };
+            ControlColours = new ResourceDictionary()
+            {
+                Source = new Uri(
+                    "pack://application:,,,/AssetEditor.CN;component/Themes/ControlColours.xaml",
+                    UriKind.Absolute)
+            };
             _defaultFontFamily =
                 ControlColours["AppFontFamily"] as FontFamily;
             _defaultFontWeight =

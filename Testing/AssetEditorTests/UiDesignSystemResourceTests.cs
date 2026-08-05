@@ -11,6 +11,83 @@ namespace AssetEditorTests;
 public class UiDesignSystemResourceTests
 {
     [Test]
+    public void ApplicationResources_LoadDesignSystemInRequiredOrder()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var sources = Application.Current.Resources.MergedDictionaries
+                    .Select(dictionary => dictionary.Source?.OriginalString)
+                    .Where(source => source != null)
+                    .ToList();
+                var expected = new[]
+                {
+                    "Themes/ColourDictionaries/DarkTheme.xaml",
+                    "Themes/ControlColours.xaml",
+                    "Themes/DesignSystem/DesignTokens.xaml",
+                    "Themes/DesignSystem/Typography.xaml",
+                    "Themes/DesignSystem/SurfaceStyles.xaml",
+                    "Themes/Controls.xaml",
+                };
+
+                NUnitAssert.Multiple(() =>
+                {
+                    for (var index = 0; index < expected.Length; index++)
+                    {
+                        NUnitAssert.That(
+                            sources[index],
+                            Does.EndWith(expected[index]),
+                            $"Merged dictionary position {index}.");
+                    }
+                });
+            });
+    }
+
+    [Test]
+    public void ThemeSwitch_UpdatesSemanticBrushConsumers()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var previousTheme = ThemesController.CurrentTheme;
+                Window? window = null;
+
+                try
+                {
+                    ThemesController.SetTheme(ThemeType.DarkTheme);
+                    var border = new Border
+                    {
+                        Style = (Style)Application.Current.FindResource(
+                            "AeSurface.Panel"),
+                    };
+                    border.SetResourceReference(
+                        Border.BackgroundProperty,
+                        "AeBrush.Surface1");
+                    window = new Window
+                    {
+                        Content = border,
+                        ShowActivated = false,
+                        ShowInTaskbar = false,
+                    };
+                    window.Show();
+                    var dark = ((SolidColorBrush)border.Background).Color;
+
+                    ThemesController.SetTheme(ThemeType.LightTheme);
+                    var light = ((SolidColorBrush)border.Background).Color;
+
+                    NUnitAssert.That(light, Is.Not.EqualTo(dark));
+                }
+                finally
+                {
+                    window?.Close();
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
     public void Typography_ExposesApprovedTextRoles()
     {
         WpfTestApplicationHost.Invoke(_ =>
