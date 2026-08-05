@@ -79,9 +79,14 @@
                             <Path Data="M 13,3 L 6,8 L 13,13 Z M 8,3 L 1,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}"/>
                         </Canvas>
                     </Button>
-                    <ToggleButton Style="{StaticResource AeEditor.ToggleIcon}" Click="{s:MethodBinding ToggleAnimationPausePlay}">
+                    <ToggleButton
+                        IsChecked="{Binding IsPlaying.Value, Mode=OneWay}"
+                        Style="{StaticResource AeEditor.PlaybackToggle}"
+                        Click="{s:MethodBinding ToggleAnimationPausePlay}">
                         <Canvas Width="16" Height="16">
-                            <Path Data="M 4,2 L 14,8 L 4,14 Z" Fill="{DynamicResource AeBrush.TextPrimary}"/>
+                            <Path
+                                Data="M 4,2 L 14,8 L 4,14 Z"
+                                Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
                         </Canvas>
                     </ToggleButton>
                     <Button Style="{StaticResource AeButton.Icon}" Click="{s:MethodBinding SetAnimationNextFrame}">

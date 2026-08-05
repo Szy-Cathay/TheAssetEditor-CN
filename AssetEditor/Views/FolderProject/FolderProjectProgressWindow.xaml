@@ -15,9 +15,7 @@
     FontWeight="{DynamicResource AppFontWeight}"
     Background="{DynamicResource AeBrush.Canvas}"
     WindowStartupLocation="CenterOwner">
-    <Border Margin="20" Style="{StaticResource AeSurface.Panel}">
-        <progress:OperationProgressView
-            x:Name="FolderProjectOperationProgress"
-            Margin="16" />
-    </Border>
+    <progress:OperationProgressView
+        x:Name="FolderProjectOperationProgress"
+        Margin="20" />
 </Window>

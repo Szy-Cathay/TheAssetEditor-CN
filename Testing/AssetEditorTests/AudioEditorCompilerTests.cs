@@ -3,6 +3,7 @@ using Editors.Audio.Shared.AudioProject.Compiler;
 using Editors.Audio.Shared.AudioProject.Models;
 using Editors.Audio.Shared.Dat;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
+using Editors.Audio.Shared.Storage;
 using Editors.Audio.Shared.Wwise;
 using Editors.Audio.Shared.Wwise.Generators;
 using Editors.Audio.Shared.Wwise.Generators.Hirc.V136;
@@ -157,11 +158,14 @@ namespace AssetEditorTests
                 wemGenerator.Object,
                 datGenerator.Object,
                 Mock.Of<IAudioPackOutputService>());
+            var progress = new RecordingProgress<AudioOperationProgress>();
 
-            var compileCompleted = await compiler.CompileAsync(
+            var compileCompleted = await ((IAudioProjectCompilerProgressService)
+                compiler).CompileAsync(
                 project,
                 "test.aproj",
-                "audio\\test.aproj");
+                "audio\\test.aproj",
+                progress);
 
             Assert.IsTrue(compileCompleted);
             wemGenerator.Verify(
@@ -173,6 +177,24 @@ namespace AssetEditorTests
                 Times.Once);
             Assert.IsFalse(Directory.Exists(
                 Path.GetDirectoryName(audioFile.WemDiskFilePath)));
+            CollectionAssert.IsSubsetOf(
+                new[]
+                {
+                    "AudioOperation.Compile.Preparing",
+                    "AudioOperation.Compile.Wems",
+                    "AudioOperation.Compile.SoundBanks",
+                    "AudioOperation.Saving",
+                    "AudioOperation.Completed",
+                },
+                progress.Values
+                    .Select(value => value.StageResourceKey)
+                    .Distinct()
+                    .ToArray());
+            Assert.IsTrue(progress.Values
+                .Where(value => value.Total > 0)
+                .All(value =>
+                    value.Completed >= 0 &&
+                    value.Completed <= value.Total));
         }
 
         [TestMethod]
@@ -249,6 +271,13 @@ namespace AssetEditorTests
                     It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
                     It.IsAny<bool>()),
                 Times.Never);
+        }
+
+        private sealed class RecordingProgress<T> : IProgress<T>
+        {
+            public List<T> Values { get; } = [];
+
+            public void Report(T value) => Values.Add(value);
         }
     }
 }

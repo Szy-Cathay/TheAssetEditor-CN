@@ -65,6 +65,9 @@ namespace Editors.KitbasherEditor.ViewModels
         bool _isEnabled;
         public bool IsEnabled { get { return _isEnabled; } set { SetAndNotify(ref _isEnabled, value); OnEnableChanged(IsEnabled); } }
 
+        bool _isPlaying;
+        public bool IsPlaying { get { return _isPlaying; } private set { SetAndNotify(ref _isPlaying, value); } }
+
         public AnimationControllerViewModel(IPackFileService pf,
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
             IEventHub eventHub,
@@ -76,7 +79,11 @@ namespace Editors.KitbasherEditor.ViewModels
             SkeletonList = _skeletonAnimationLookUpHelper.GetAllSkeletonFileNames();
 
             _player = _kitbasherRootScene.Player;
-            _player.OnFrameChanged += (currentFrame) => CurrentFrame = currentFrame + 1;
+            _player.OnFrameChanged += currentFrame =>
+            {
+                CurrentFrame = currentFrame + 1;
+                UpdatePlayingState();
+            };
 
             PausePlayCommand = new RelayCommand(OnPlayPause);
             NextFrameCommand = new RelayCommand(OnNextFrame);
@@ -96,30 +103,35 @@ namespace Editors.KitbasherEditor.ViewModels
                 player.Pause();
             else
                 player.Play();
+            UpdatePlayingState();
         }
 
         void OnNextFrame()
         {
             _player.Pause();
             _player.CurrentFrame++;
+            UpdatePlayingState();
         }
 
         void OnPrivFrame()
         {
             _player.Pause();
             _player.CurrentFrame--;
+            UpdatePlayingState();
         }
 
         void OnFirstFrame()
         {
             _player.Pause();
             _player.CurrentFrame = 0;
+            UpdatePlayingState();
         }
 
         void OnLastFrame()
         {
             _player.Pause();
             _player.CurrentFrame = _player.FrameCount();
+            UpdatePlayingState();
         }
 
         private void OnSkeletonChanged(KitbasherSkeletonChangedEvent e)
@@ -184,6 +196,7 @@ namespace Editors.KitbasherEditor.ViewModels
 
                 MaxFrames = _player.FrameCount();
                 CurrentFrame = 0;
+                UpdatePlayingState();
             }
         }
 
@@ -212,6 +225,10 @@ namespace Editors.KitbasherEditor.ViewModels
             }
 
             _player.IsEnabled = isEnabled;
+            UpdatePlayingState();
         }
+
+        private void UpdatePlayingState() =>
+            IsPlaying = _player.IsPlaying && _player.IsEnabled;
     }
 }

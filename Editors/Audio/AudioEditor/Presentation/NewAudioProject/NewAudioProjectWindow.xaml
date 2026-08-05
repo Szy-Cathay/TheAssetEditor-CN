@@ -18,6 +18,7 @@
     ResizeMode="CanResizeWithGrip"
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
+    Style="{StaticResource CustomWindowStyle}"
     Title="{loc:Loc NewAudioProject.Title}"
     Background="{DynamicResource AeBrush.Canvas}"
     FontFamily="{DynamicResource AppFontFamily}"
@@ -164,9 +165,11 @@
         <progress:OperationProgressView
             Grid.Row="2"
             Margin="10,0,10,6"
-            CurrentDetailText="{Binding CreationStatus}"
+            CurrentDetailText="{Binding CreationProgressDetail}"
             IsOperationActive="{Binding IsCreating}"
-            IsProgressIndeterminate="True"
+            IsProgressIndeterminate="{Binding CreationProgressIsIndeterminate}"
+            ProgressMaximum="{Binding CreationProgressMaximum}"
+            ProgressValue="{Binding CreationProgressValue}"
             StatusText="{loc:Loc OperationProgress.AudioCreate}"
             Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibilityConverter}}" />
 

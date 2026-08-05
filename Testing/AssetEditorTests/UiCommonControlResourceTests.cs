@@ -502,11 +502,21 @@ public class UiCommonControlResourceTests
                 var pressedTargets = pressed.Storyboard.Children
                     .Select(Storyboard.GetTargetName)
                     .ToArray();
+                var pressedScales = pressed.Storyboard.Children
+                    .OfType<DoubleAnimation>()
+                    .Where(animation =>
+                        Storyboard.GetTargetName(animation) ==
+                        "InteractionScale")
+                    .Select(animation => animation.To)
+                    .ToArray();
                 var focusVisual = FindSetter(
                     style,
                     FrameworkElement.FocusVisualStyleProperty)?.Value as Style;
                 var persistentFocusRings = FindDescendants<Border>(root)
                     .Where(item => item.Name == "FocusRing")
+                    .ToArray();
+                var translucentStateOverlays = FindDescendants<Border>(root)
+                    .Where(item => item.Name == "StateOverlay")
                     .ToArray();
 
                 NUnitAssert.Multiple(() =>
@@ -520,8 +530,12 @@ public class UiCommonControlResourceTests
                     NUnitAssert.That(
                         pressedTargets,
                         Does.Contain("InteractionScale"));
+                    NUnitAssert.That(
+                        pressedScales,
+                        Is.All.EqualTo(0.98));
                     NUnitAssert.That(focusVisual, Is.Not.Null);
                     NUnitAssert.That(persistentFocusRings, Is.Empty);
+                    NUnitAssert.That(translucentStateOverlays, Is.Empty);
                 });
             });
     }

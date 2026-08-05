@@ -108,6 +108,59 @@ public class UiAnimationMetadataFamilyTests
         });
     }
 
+    [Test]
+    public void AnimationPlayers_ExposePersistentPlayingStateWithoutMouseFocusShift()
+    {
+        var root = FindSolutionRoot();
+        var sharedPlayer = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Shared",
+            "Editors.Shared.Core",
+            "Common",
+            "AnimationPlayer",
+            "AnimationPlayerView.xaml"));
+        var kitbashPlayer = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "Animation",
+            "AnimationView.xaml"));
+        var cscPlayer = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "CscEditor",
+            "Editors.CscEditor",
+            "Views",
+            "CscEditorView.xaml"));
+        var styles = ReadEditorWorkspaceStyleSource();
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Contain("AeEditor.PlaybackToggle"));
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Contain("IsChecked=\"{Binding IsPlaying.Value"));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("AeEditor.PlaybackToggle"));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("IsChecked=\"{Binding IsPlaying"));
+            NUnitAssert.That(cscPlayer, Does.Contain("AeBrush.Danger"));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("x:Key=\"AeEditor.PlaybackToggle\""));
+            NUnitAssert.That(
+                styles,
+                Does.Not.Contain("Property=\"IsKeyboardFocused\""));
+        });
+    }
+
     private static IReadOnlyList<string> ReadProductSources()
     {
         var root = FindSolutionRoot();

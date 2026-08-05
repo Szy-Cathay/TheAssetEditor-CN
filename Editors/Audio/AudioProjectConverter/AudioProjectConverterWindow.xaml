@@ -15,6 +15,7 @@
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
     Closed="OnClosed"
+    Style="{StaticResource CustomWindowStyle}"
     Title="{loc:Loc AudioProjectConverter.Title}"
     Background="{DynamicResource AeBrush.Canvas}"
     FontFamily="{DynamicResource AppFontFamily}"
@@ -271,9 +272,11 @@
             Grid.Row="2"
             Margin="10,0,10,8">
             <progress:OperationProgressView
-                CurrentDetailText="{Binding Status}"
+                CurrentDetailText="{Binding ProgressDetail}"
                 IsOperationActive="{Binding IsBusy}"
-                IsProgressIndeterminate="True"
+                IsProgressIndeterminate="{Binding ProgressIsIndeterminate}"
+                ProgressMaximum="{Binding ProgressMaximum}"
+                ProgressValue="{Binding ProgressValue}"
                 StatusText="{loc:Loc OperationProgress.AudioConvert}"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
             <TextBlock

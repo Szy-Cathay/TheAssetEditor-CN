@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -40,6 +41,10 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
         [ObservableProperty] private bool _isCreating;
         [ObservableProperty] private string _validationMessage = string.Empty;
         [ObservableProperty] private string _creationStatus = string.Empty;
+        [ObservableProperty] private string _creationProgressDetail = string.Empty;
+        [ObservableProperty] private int _creationProgressValue;
+        [ObservableProperty] private int _creationProgressMaximum;
+        [ObservableProperty] private bool _creationProgressIsIndeterminate = true;
 
         public NewAudioProjectViewModel(
             IPackFileService packFileService,
@@ -145,13 +150,25 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
             IsCreating = true;
             CreationStatus = LocalizationManager.Instance.Get(
                 "NewAudioProject.Creating");
+            CreationProgressDetail = CreationStatus;
+            CreationProgressValue = 0;
+            CreationProgressMaximum = 0;
+            CreationProgressIsIndeterminate = true;
             var progress = new Progress<AudioLoadProgress>(
                 loadProgress =>
+                {
                     CreationStatus = LocalizationManager.Instance.GetFormat(
                         "AudioEditor.Load.Progress",
                         loadProgress.Completed,
                         loadProgress.Total,
-                        loadProgress.CurrentFile));
+                        loadProgress.CurrentFile);
+                    CreationProgressDetail = Path.GetFileName(
+                        loadProgress.CurrentFile);
+                    CreationProgressValue = loadProgress.Completed;
+                    CreationProgressMaximum = loadProgress.Total;
+                    CreationProgressIsIndeterminate =
+                        loadProgress.Total <= 0;
+                });
             try
             {
                 if (!_audioEditorFileService.Save(

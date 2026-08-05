@@ -97,7 +97,9 @@ public class UiPackGitWorkspaceTests
             NUnitAssert.That(source, Does.Contain("AeTree.View"));
             NUnitAssert.That(source, Does.Contain("AeButton.Icon"));
             NUnitAssert.That(source, Does.Contain("AeMenu.Context"));
-            NUnitAssert.That(source, Does.Contain("AeProgress.Bar"));
+            NUnitAssert.That(source, Does.Contain("progress:OperationProgressView"));
+            NUnitAssert.That(source, Does.Contain("CaWemRefreshValue"));
+            NUnitAssert.That(source, Does.Contain("CaWemRefreshMaximum"));
             NUnitAssert.That(source, Does.Contain("AeBrush.Danger"));
             NUnitAssert.That(source, Does.Not.Contain("Value=\"Red\""));
             NUnitAssert.That(source, Does.Not.Contain("#B0202020"));

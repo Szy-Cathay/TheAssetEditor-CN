@@ -39,7 +39,18 @@ namespace Editors.Audio.Shared.Wwise.Generators
             CancellationToken cancellationToken);
     }
 
-    public class SoundBankGeneratorService : ISoundBankGeneratorService
+    public interface ISoundBankGeneratorProgressService
+    {
+        Task<bool> GenerateMergedDialogueEventSoundBanksAsync(
+            List<string> moddedSoundBanks,
+            string soundBankSuffix,
+            IProgress<AudioOperationProgress> progress,
+            CancellationToken cancellationToken);
+    }
+
+    public class SoundBankGeneratorService :
+        ISoundBankGeneratorService,
+        ISoundBankGeneratorProgressService
     {
         private readonly IAudioPackOutputService _audioPackOutputService;
         private readonly ApplicationSettingsService _applicationSettingsService;
@@ -180,12 +191,28 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 hircItems);
         }
 
+        public Task<bool> GenerateMergedDialogueEventSoundBanksAsync(
+            List<string> moddedSoundBanks,
+            string soundBankSuffix,
+            CancellationToken cancellationToken) =>
+            GenerateMergedDialogueEventSoundBanksAsync(
+                moddedSoundBanks,
+                soundBankSuffix,
+                null,
+                cancellationToken);
+
         public async Task<bool> GenerateMergedDialogueEventSoundBanksAsync(
             List<string> moddedSoundBanks,
             string soundBankSuffix,
+            IProgress<AudioOperationProgress> progress,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Merge.Analysing",
+                soundBankSuffix,
+                0,
+                moddedSoundBanks.Count));
             if (!_audioEditorIntegrityService
                     .CheckMergingSoundBanksIdIntegrity(moddedSoundBanks))
             {
@@ -200,10 +227,36 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
-            return outputs.Count > 0 &&
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Merge.Analysing",
+                soundBankSuffix,
+                moddedSoundBanks.Count,
+                moddedSoundBanks.Count));
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Merge.Creating",
+                soundBankSuffix,
+                outputs.Count,
+                outputs.Count));
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Saving",
+                soundBankSuffix,
+                0,
+                outputs.Count));
+
+            var saved = outputs.Count > 0 &&
                 _audioPackOutputService.SaveBatch(
                     outputs,
                     promptOnConflict: true);
+            if (saved)
+            {
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Saving",
+                    soundBankSuffix,
+                    outputs.Count,
+                    outputs.Count));
+            }
+
+            return saved;
         }
 
         private List<AudioPackOutput> CreateMergedDialogueEventSoundBankOutputs(

@@ -183,20 +183,16 @@
             IsHitTestVisible="{Binding IsLoadingOperation}"
             Visibility="{Binding IsLoadingOperation, Converter={StaticResource BoolToCollapsedConverter}}">
             <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
-            <Border
+            <progress:OperationProgressView
                 Width="500"
-                Padding="18"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Style="{StaticResource GitSurfaceBorderStyle}">
-                <progress:OperationProgressView
-                    CurrentDetailText="{Binding LoadingProgressDetailText}"
-                    IsOperationActive="{Binding IsLoadingOperation}"
-                    IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
-                    ProgressMaximum="{Binding LoadingProgressMaximum}"
-                    ProgressValue="{Binding LoadingProgressValue}"
-                    StatusText="{Binding LoadingProgressStatusText}" />
-            </Border>
+                CurrentDetailText="{Binding LoadingProgressDetailText}"
+                IsOperationActive="{Binding IsLoadingOperation}"
+                IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
+                ProgressMaximum="{Binding LoadingProgressMaximum}"
+                ProgressValue="{Binding LoadingProgressValue}"
+                StatusText="{Binding LoadingProgressStatusText}" />
         </Grid>
     </Grid>
 </windowhandling:AssetEditorWindow>

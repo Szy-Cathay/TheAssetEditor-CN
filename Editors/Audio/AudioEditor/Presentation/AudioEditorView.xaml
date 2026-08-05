@@ -118,10 +118,12 @@
                 VerticalAlignment="Center">
                 <progress:OperationProgressView
                     Width="460"
-                    CurrentDetailText="{Binding CompileStatus}"
+                    CurrentDetailText="{Binding OperationDetail}"
                     IsOperationActive="{Binding IsBusy}"
-                    IsProgressIndeterminate="True"
-                    StatusText="{loc:Loc OperationProgress.AudioCompile}"
+                    IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding OperationProgressMaximum}"
+                    ProgressValue="{Binding OperationProgressValue}"
+                    StatusText="{Binding OperationStatus}"
                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     MinWidth="72"

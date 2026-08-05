@@ -61,6 +61,10 @@ namespace Editors.Audio.AudioProjectConverter
         [ObservableProperty] private string _status =
             LocalizationManager.Instance.Get(
                 "AudioProjectConverter.Loading");
+        [ObservableProperty] private string _progressDetail = string.Empty;
+        [ObservableProperty] private int _progressValue;
+        [ObservableProperty] private int _progressMaximum;
+        [ObservableProperty] private bool _progressIsIndeterminate = true;
         private bool _isInitialised;
         private bool _isRepositoryLoaded;
         private CancellationToken _lifetimeCancellationToken;
@@ -96,16 +100,27 @@ namespace Editors.Audio.AudioProjectConverter
             IsLoading = true;
             Status = LocalizationManager.Instance.Get(
                 "AudioProjectConverter.Loading");
+            ProgressDetail = Status;
+            ProgressValue = 0;
+            ProgressMaximum = 0;
+            ProgressIsIndeterminate = true;
             UpdateOkButtonIsEnabled();
             try
             {
+                var progress = new Progress<AudioLoadProgress>(value =>
+                {
+                    ProgressDetail = Path.GetFileName(value.CurrentFile);
+                    ProgressValue = value.Completed;
+                    ProgressMaximum = value.Total;
+                    ProgressIsIndeterminate = value.Total <= 0;
+                });
                 await Task.Run(
                     () => _audioRepository.Load(
                         [
                             Wh3LanguageInformation.GetLanguageAsString(
                                 Wh3Language.EnglishUK)
                         ],
-                        null,
+                        progress,
                         cancellationToken),
                     cancellationToken);
                 _isRepositoryLoaded = true;
@@ -220,9 +235,15 @@ namespace Editors.Audio.AudioProjectConverter
             IsProcessing = true;
             Status = LocalizationManager.Instance.Get(
                 "AudioProjectConverter.Processing");
+            ProgressDetail = Status;
+            ProgressValue = 0;
+            ProgressMaximum = 0;
+            ProgressIsIndeterminate = true;
             try
             {
                 DirectoryHelper.EnsureCreated(workspacePath);
+                var progress = new Progress<AudioOperationProgress>(
+                    UpdateOperationProgress);
                 var outputs = await Task.Run(
                     () => CreateConversionOutputs(
                         normalizedName,
@@ -231,14 +252,25 @@ namespace Editors.Audio.AudioProjectConverter
                         soundBankPaths,
                         workspacePath,
                         voActorSubstrings,
+                        progress,
                         linkedCancellation.Token),
                     linkedCancellation.Token);
                 linkedCancellation.Token.ThrowIfCancellationRequested();
 
+                UpdateOperationProgress(new AudioOperationProgress(
+                    "AudioOperation.Saving",
+                    filePath,
+                    0,
+                    outputs.Count));
                 if (_audioPackOutputService.SaveBatch(
                         outputs,
                         true))
                 {
+                    UpdateOperationProgress(new AudioOperationProgress(
+                        "AudioOperation.Saving",
+                        filePath,
+                        outputs.Count,
+                        outputs.Count));
                     Status = string.Empty;
                     CloseWindowAction();
                 }
@@ -275,6 +307,7 @@ namespace Editors.Audio.AudioProjectConverter
             List<string> soundBankPaths,
             string workspacePath,
             string[] voActorSubstrings,
+            IProgress<AudioOperationProgress> progress,
             CancellationToken cancellationToken)
         {
             const string language = "english(uk)";
@@ -288,9 +321,19 @@ namespace Editors.Audio.AudioProjectConverter
             var moddedStateGroups = new Dictionary<string, List<string>>();
             var globalBaseNameUsage = new Dictionary<string, int>();
 
+            progress.Report(new AudioOperationProgress(
+                "AudioOperation.Convert.Parsing",
+                Path.GetFileName(soundBankPaths[0]),
+                0,
+                soundBankPaths.Count));
             var hircItems = GetHircItems(
                 soundBankPaths,
                 cancellationToken);
+            progress.Report(new AudioOperationProgress(
+                "AudioOperation.Convert.Parsing",
+                Path.GetFileName(soundBankPaths[^1]),
+                soundBankPaths.Count,
+                soundBankPaths.Count));
             var hircLookupById = BuildHircLookupById(
                 hircItems,
                 cancellationToken);
@@ -304,9 +347,12 @@ namespace Editors.Audio.AudioProjectConverter
             }
 
             var dialogueEvents = hircItems.OfType<ICAkDialogueEvent>().ToList();
-            foreach (var dialogueEvent in dialogueEvents)
+            for (var dialogueEventIndex = 0;
+                 dialogueEventIndex < dialogueEvents.Count;
+                 dialogueEventIndex++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var dialogueEvent = dialogueEvents[dialogueEventIndex];
                 SetDialogueEventData(
                     dialogueEvent,
                     dialogueEventsLookupByWemId,
@@ -317,15 +363,24 @@ namespace Editors.Audio.AudioProjectConverter
                     moddedStateGroups,
                     voActorSubstrings,
                     cancellationToken);
+                progress.Report(new AudioOperationProgress(
+                    "AudioOperation.Convert.Analysing",
+                    $"{dialogueEventIndex + 1} / {dialogueEvents.Count}",
+                    dialogueEventIndex + 1,
+                    dialogueEvents.Count));
             }
 
             var usedHircIds = IdGenerator.GetUsedHircIds(_audioRepository, audioProject);
             var usedSourceIds = IdGenerator.GetUsedSourceIds(_audioRepository, audioProject);
             var outputs = new List<AudioPackOutput>();
 
-            foreach (var dialogueEvent in dialogueEventsToProcess)
+            for (var dialogueEventIndex = 0;
+                 dialogueEventIndex < dialogueEventsToProcess.Count;
+                 dialogueEventIndex++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var dialogueEvent =
+                    dialogueEventsToProcess[dialogueEventIndex];
                 ProcessDialogueEvent(
                     audioProject,
                     dialogueEvent,
@@ -338,6 +393,11 @@ namespace Editors.Audio.AudioProjectConverter
                     workspacePath,
                     voActorSubstrings,
                     cancellationToken);
+                progress.Report(new AudioOperationProgress(
+                    "AudioOperation.Convert.Creating",
+                    $"{dialogueEventIndex + 1} / {dialogueEventsToProcess.Count}",
+                    dialogueEventIndex + 1,
+                    dialogueEventsToProcess.Count));
             }
 
             ProcessModdedStateGroups(audioProject, moddedStateGroups);
@@ -346,6 +406,16 @@ namespace Editors.Audio.AudioProjectConverter
                 fileName,
                 filePath));
             return outputs;
+        }
+
+        private void UpdateOperationProgress(AudioOperationProgress progress)
+        {
+            Status = LocalizationManager.Instance.Get(
+                progress.StageResourceKey);
+            ProgressDetail = progress.Detail;
+            ProgressValue = progress.Completed;
+            ProgressMaximum = progress.Total;
+            ProgressIsIndeterminate = progress.Total <= 0;
         }
 
         private void TryDeleteWorkspace(string workspacePath)

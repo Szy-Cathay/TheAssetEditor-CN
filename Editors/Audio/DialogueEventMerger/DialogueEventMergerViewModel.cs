@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System;
 using System.ComponentModel;
 using System.Linq;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -36,6 +37,10 @@ namespace Editors.Audio.DialogueEventMerger
         [ObservableProperty] private string _loadStatus =
             LocalizationManager.Instance.Get(
                 "DialogueEventMerger.Loading");
+        [ObservableProperty] private string _progressDetail = string.Empty;
+        [ObservableProperty] private int _progressValue;
+        [ObservableProperty] private int _progressMaximum;
+        [ObservableProperty] private bool _progressIsIndeterminate = true;
         [ObservableProperty] private string _soundBankSuffixError = string.Empty;
         public ObservableCollection<ModdedSoundBank> ModdedSoundBanks { get; } = [];
         private bool _isInitialised;
@@ -67,6 +72,10 @@ namespace Editors.Audio.DialogueEventMerger
             IsLoading = true;
             LoadStatus = LocalizationManager.Instance.Get(
                 "DialogueEventMerger.Loading");
+            ProgressDetail = LoadStatus;
+            ProgressValue = 0;
+            ProgressMaximum = 0;
+            ProgressIsIndeterminate = true;
             UpdateOkButtonIsEnabled();
             try
             {
@@ -77,13 +86,20 @@ namespace Editors.Audio.DialogueEventMerger
                     return;
                 }
 
+                var progress = new Progress<AudioLoadProgress>(value =>
+                {
+                    ProgressDetail = Path.GetFileName(value.CurrentFile);
+                    ProgressValue = value.Completed;
+                    ProgressMaximum = value.Total;
+                    ProgressIsIndeterminate = value.Total <= 0;
+                });
                 var loadWasCancelled = await Task.Run(() =>
                 {
                     try
                     {
                         _audioRepository.Load(
                             Wh3LanguageInformation.GetAllLanguages(),
-                            null,
+                            progress,
                             cancellationToken);
                         return false;
                     }
@@ -222,10 +238,24 @@ namespace Editors.Audio.DialogueEventMerger
             IsGenerating = true;
             LoadStatus = LocalizationManager.Instance.Get(
                 "DialogueEventMerger.Generating");
+            ProgressDetail = LoadStatus;
+            ProgressValue = 0;
+            ProgressMaximum = 0;
+            ProgressIsIndeterminate = true;
             try
             {
-                var generated = await _soundBankGeneratorService
-                    .GenerateMergedDialogueEventSoundBanksAsync(
+                var progress = new Progress<AudioOperationProgress>(
+                    UpdateOperationProgress);
+                var generated = _soundBankGeneratorService is
+                    ISoundBankGeneratorProgressService progressService
+                    ? await progressService
+                        .GenerateMergedDialogueEventSoundBanksAsync(
+                            SelectedModdedSoundBanks.ToList(),
+                            normalizedSuffix,
+                            progress,
+                            linkedCancellation.Token)
+                    : await _soundBankGeneratorService
+                        .GenerateMergedDialogueEventSoundBanksAsync(
                         SelectedModdedSoundBanks.ToList(),
                         normalizedSuffix,
                         linkedCancellation.Token);
@@ -252,6 +282,16 @@ namespace Editors.Audio.DialogueEventMerger
             {
                 IsGenerating = false;
             }
+        }
+
+        private void UpdateOperationProgress(AudioOperationProgress progress)
+        {
+            LoadStatus = LocalizationManager.Instance.Get(
+                progress.StageResourceKey);
+            ProgressDetail = progress.Detail;
+            ProgressValue = progress.Completed;
+            ProgressMaximum = progress.Total;
+            ProgressIsIndeterminate = progress.Total <= 0;
         }
 
         private static bool TryNormalizeSoundBankSuffix(

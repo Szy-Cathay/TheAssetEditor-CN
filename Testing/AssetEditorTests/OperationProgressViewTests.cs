@@ -1,9 +1,7 @@
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
-using AssetEditor.Views.FolderProjectVersionControl;
 using Shared.Core.Services;
 using Shared.Ui.Common.OperationProgress;
-using Shared.Ui.Common.ValueConverters;
 
 using System.Xml.Linq;
 using System.Windows;
@@ -25,17 +23,27 @@ public class OperationProgressViewTests
         ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitRepositoryView.xaml"],
         ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectVersionControlWindow.xaml"],
         ["AssetEditor", "Views", "MainWindow.xaml"],
+        ["AssetEditor", "Views", "Startup", "StartupPackLoadingWindow.xaml"],
         ["Editors", "Audio", "AudioEditor", "Presentation", "AudioEditorView.xaml"],
         ["Editors", "Audio", "AudioEditor", "Presentation", "NewAudioProject", "NewAudioProjectWindow.xaml"],
         ["Editors", "Audio", "AudioExplorer", "AudioExplorerView.xaml"],
         ["Editors", "Audio", "AudioProjectConverter", "AudioProjectConverterWindow.xaml"],
         ["Editors", "Audio", "DialogueEventMerger", "DialogueEventMergerWindow.xaml"],
+        ["Shared", "SharedUI", "BaseDialogs", "PackFileTree", "PackFileBrowserView.xaml"],
     ];
     private static readonly string[][] GitLoadingSurfacePaths =
     [
         ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitPanelView.xaml"],
         ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitRepositoryView.xaml"],
         ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectVersionControlWindow.xaml"],
+    ];
+    private static readonly string[][] LoadingWindowPaths =
+    [
+        ["AssetEditor", "Views", "FolderProject", "FolderProjectProgressWindow.xaml"],
+        ["AssetEditor", "Views", "Startup", "StartupPackLoadingWindow.xaml"],
+        ["Editors", "Audio", "AudioEditor", "Presentation", "NewAudioProject", "NewAudioProjectWindow.xaml"],
+        ["Editors", "Audio", "AudioProjectConverter", "AudioProjectConverterWindow.xaml"],
+        ["Editors", "Audio", "DialogueEventMerger", "DialogueEventMergerWindow.xaml"],
     ];
 
     [Test]
@@ -233,78 +241,90 @@ public class OperationProgressViewTests
     }
 
     [Test]
-    public void MergeLoadingSurface_MatchesGitLoadingSurfaceStyle()
+    public void AudioLoadingSurfaces_BindRawDetailAndCounts()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var paths = LoadingSurfacePaths.Where(parts =>
+            parts.Contains("AudioEditorView.xaml") ||
+            parts.Contains("NewAudioProjectWindow.xaml") ||
+            parts.Contains("AudioExplorerView.xaml") ||
+            parts.Contains("AudioProjectConverterWindow.xaml") ||
+            parts.Contains("DialogueEventMergerWindow.xaml"));
+        var missingBindings = new List<string>();
+
+        foreach (var parts in paths)
+        {
+            var progressViews = XDocument
+                .Load(Path.Combine([solutionRoot, .. parts]))
+                .Descendants()
+                .Where(element =>
+                    element.Name.LocalName == nameof(OperationProgressView) &&
+                    !element.Attributes().Any(attribute =>
+                        attribute.Value.Contains(
+                            "OperationProgress.AudioPreview",
+                            StringComparison.Ordinal)));
+            foreach (var progressView in progressViews)
+            {
+                var attributes = progressView.Attributes().ToDictionary(
+                    attribute => attribute.Name.LocalName,
+                    attribute => attribute.Value);
+                foreach (var required in new[]
+                         {
+                             "CurrentDetailText",
+                             "ProgressValue",
+                             "ProgressMaximum",
+                             "IsProgressIndeterminate",
+                         })
+                {
+                    if (!attributes.ContainsKey(required))
+                    {
+                        missingBindings.Add(
+                            $"{string.Join('/', parts)}: {required}");
+                    }
+                }
+            }
+        }
+
+        Assert.That(missingBindings, Is.Empty);
+    }
+
+    [Test]
+    public void BlockingLoadingWindows_UseTheUnifiedWindowChrome()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var mismatches = LoadingWindowPaths
+            .Where(parts => !XDocument
+                .Load(Path.Combine([solutionRoot, .. parts]))
+                .Root!
+                .Attributes()
+                .Any(attribute =>
+                    attribute.Name.LocalName == "Style" &&
+                    attribute.Value.Contains(
+                        "CustomWindowStyle",
+                        StringComparison.Ordinal)))
+            .Select(parts => string.Join("/", parts))
+            .ToArray();
+
+        Assert.That(mismatches, Is.Empty);
+    }
+
+    [Test]
+    public void OperationProgressView_OwnsTheUnifiedLoadingSurface()
     {
         InvokeWithWpfApplication(() =>
         {
-            const string converterKey = "BoolToCollapsedConverter";
-            var resources = Application.Current.Resources;
-            var hadConverter = resources.Contains(converterKey);
-            var previousConverter = hadConverter
-                ? resources[converterKey]
-                : null;
-            var previousMainWindow = Application.Current.MainWindow;
-            var owner = new Window
-            {
-                ShowActivated = false,
-                ShowInTaskbar = false,
-                WindowStyle = WindowStyle.None,
-                Left = -10000,
-                Top = -10000,
-            };
-            resources[converterKey] = new BoolToVisibilityConverter
-            {
-                TrueValue = Visibility.Visible,
-                FalseValue = Visibility.Collapsed,
-            };
-            Application.Current.MainWindow = owner;
-            owner.Show();
-            try
-            {
-                using var mergeWindow =
-                    new FolderProjectVersionControlWindow();
-                var repositoryView = new FolderProjectGitRepositoryView();
-                var mergeProgress =
-                    FindLogicalDescendant<OperationProgressView>(mergeWindow);
-                var repositoryProgress =
-                    FindLogicalDescendant<OperationProgressView>(
-                        repositoryView);
-                var mergeSurface = LogicalTreeHelper.GetParent(
-                    mergeProgress!) as Border;
-                var repositorySurface = LogicalTreeHelper.GetParent(
-                    repositoryProgress!) as Border;
+            var view = new OperationProgressView();
+            var surface = view.Content as Border;
 
-                Assert.Multiple(() =>
-                {
-                    Assert.That(mergeProgress, Is.Not.Null);
-                    Assert.That(repositoryProgress, Is.Not.Null);
-                    Assert.That(mergeSurface, Is.Not.Null);
-                    Assert.That(repositorySurface, Is.Not.Null);
-                    Assert.That(
-                        mergeSurface!.Background?.ToString(),
-                        Is.EqualTo(
-                            repositorySurface!.Background?.ToString()));
-                    Assert.That(
-                        mergeSurface.BorderBrush?.ToString(),
-                        Is.EqualTo(
-                            repositorySurface.BorderBrush?.ToString()));
-                    Assert.That(
-                        mergeSurface.BorderThickness,
-                        Is.EqualTo(repositorySurface.BorderThickness));
-                    Assert.That(
-                        mergeSurface.CornerRadius,
-                        Is.EqualTo(repositorySurface.CornerRadius));
-                });
-            }
-            finally
+            Assert.Multiple(() =>
             {
-                Application.Current.MainWindow = previousMainWindow;
-                owner.Close();
-                if (hadConverter)
-                    resources[converterKey] = previousConverter;
-                else
-                    resources.Remove(converterKey);
-            }
+                Assert.That(surface, Is.Not.Null);
+                Assert.That(surface!.Padding, Is.EqualTo(new Thickness(12)));
+                Assert.That(surface.Background, Is.Not.Null);
+                Assert.That(surface.BorderBrush, Is.Not.Null);
+                Assert.That(surface.BorderThickness, Is.EqualTo(new Thickness(1)));
+                Assert.That(surface.CornerRadius.TopLeft, Is.GreaterThan(0));
+            });
         });
     }
 
@@ -339,21 +359,4 @@ public class OperationProgressViewTests
             action);
     }
 
-    private static T? FindLogicalDescendant<T>(DependencyObject parent)
-        where T : DependencyObject
-    {
-        foreach (var child in LogicalTreeHelper
-                     .GetChildren(parent)
-                     .OfType<DependencyObject>())
-        {
-            if (child is T match)
-                return match;
-
-            var descendant = FindLogicalDescendant<T>(child);
-            if (descendant != null)
-                return descendant;
-        }
-
-        return null;
-    }
 }

@@ -249,7 +249,8 @@ public class UiModelKitbashFamilyTests
                 Does.Contain("Common/Styles/EditorWorkspaceStyles.xaml"));
             NUnitAssert.That(source, Does.Contain("AeInput.Switch"));
             NUnitAssert.That(source, Does.Contain("AeButton.Icon"));
-            NUnitAssert.That(source, Does.Contain("AeEditor.ToggleIcon"));
+            NUnitAssert.That(source, Does.Contain("AeEditor.PlaybackToggle"));
+            NUnitAssert.That(source, Does.Contain("IsChecked=\"{Binding IsPlaying"));
             NUnitAssert.That(source, Does.Contain("AeBrush.Surface2"));
             NUnitAssert.That(source, Does.Contain("<Path"));
             NUnitAssert.That(source, Does.Not.Contain("<GroupBox"));

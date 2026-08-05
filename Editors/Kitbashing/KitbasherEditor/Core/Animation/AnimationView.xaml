@@ -110,11 +110,12 @@
                             Height="26"
                             Padding="5"
                             Command="{Binding PausePlayCommand}"
-                            Style="{StaticResource AeEditor.ToggleIcon}">
+                            IsChecked="{Binding IsPlaying, Mode=OneWay}"
+                            Style="{StaticResource AeEditor.PlaybackToggle}">
                             <Canvas Width="16" Height="16">
                                 <Path
                                     Data="M 4,2 L 14,8 L 4,14 Z"
-                                    Fill="{DynamicResource AeBrush.TextPrimary}" />
+                                    Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
                             </Canvas>
                         </ToggleButton>
                         <Button

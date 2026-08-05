@@ -57,10 +57,6 @@
                                 <VisualState x:Name="Normal">
                                     <Storyboard>
                                         <DoubleAnimation
-                                            Storyboard.TargetName="StateOverlay"
-                                            Storyboard.TargetProperty="Opacity"
-                                            To="0" />
-                                        <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleX"
                                             To="1" />
@@ -72,10 +68,6 @@
                                 </VisualState>
                                 <VisualState x:Name="MouseOver">
                                     <Storyboard>
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="StateOverlay"
-                                            Storyboard.TargetProperty="Opacity"
-                                            To="0.10" />
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleX"
@@ -89,17 +81,13 @@
                                 <VisualState x:Name="Pressed">
                                     <Storyboard>
                                         <DoubleAnimation
-                                            Storyboard.TargetName="StateOverlay"
-                                            Storyboard.TargetProperty="Opacity"
-                                            To="0.18" />
-                                        <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleX"
-                                            To="0.985" />
+                                            To="0.98" />
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleY"
-                                            To="0.985" />
+                                            To="0.98" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Disabled" />
@@ -111,11 +99,6 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{StaticResource AeRadius.Control}" />
-                        <Border
-                            x:Name="StateOverlay"
-                            Background="{DynamicResource AeBrush.TextPrimary}"
-                            CornerRadius="{StaticResource AeRadius.Control}"
-                            Opacity="0" />
                         <ContentPresenter
                             Margin="{TemplateBinding Padding}"
                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -141,12 +124,32 @@
         <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.Canvas}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.AccentHover}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style
         x:Key="AeButton.Secondary"
         BasedOn="{StaticResource AeButton.Base}"
-        TargetType="{x:Type Button}" />
+        TargetType="{x:Type Button}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <Style
         x:Key="AeButton.Quiet"
@@ -155,6 +158,16 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style
@@ -164,6 +177,14 @@
         <Setter Property="Background" Value="{DynamicResource AeBrush.Danger}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.Canvas}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="0.9" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Opacity" Value="0.78" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style

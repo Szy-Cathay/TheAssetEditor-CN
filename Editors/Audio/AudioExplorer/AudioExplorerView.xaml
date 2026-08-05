@@ -185,11 +185,11 @@
                     Grid.Row="1"
                     Grid.Column="0"
                     Margin="0,3,0,0"
-                    CurrentDetailText="{Binding LoadStatus}"
+                    CurrentDetailText="{Binding LoadProgressDetail}"
                     IsOperationActive="{Binding IsLoading}"
-                    IsProgressIndeterminate="False"
-                    ProgressMaximum="100"
-                    ProgressValue="{Binding LoadProgress}"
+                    IsProgressIndeterminate="{Binding LoadProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding LoadProgressMaximum}"
+                    ProgressValue="{Binding LoadProgressValue}"
                     StatusText="{loc:Loc OperationProgress.AudioLoad}"
                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
@@ -208,11 +208,11 @@
                     Grid.Row="2"
                     Grid.Column="0"
                     Margin="0, 3, 0, 0"
-                    CurrentDetailText="{Binding LoadStatus}"
+                    CurrentDetailText="{Binding ExportProgressDetail}"
                     IsOperationActive="{Binding IsExporting}"
                     IsProgressIndeterminate="False"
-                    ProgressMaximum="100"
-                    ProgressValue="{Binding ExportProgress}"
+                    ProgressMaximum="{Binding ExportProgressMaximum}"
+                    ProgressValue="{Binding ExportProgressValue}"
                     StatusText="{loc:Loc OperationProgress.AudioExport}"
                     Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 

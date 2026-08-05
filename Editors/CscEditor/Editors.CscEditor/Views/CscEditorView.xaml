@@ -550,11 +550,14 @@
             <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="4,2">
                 <Button Command="{Binding PlayPauseCommand}" Width="60" Margin="0,0,4,0">
                     <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style TargetType="Button" BasedOn="{StaticResource AeButton.Secondary}">
                             <Setter Property="Content" Value="{loc:Loc Csc.Play}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsPlaying}" Value="True">
                                     <Setter Property="Content" Value="{loc:Loc Csc.Pause}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
