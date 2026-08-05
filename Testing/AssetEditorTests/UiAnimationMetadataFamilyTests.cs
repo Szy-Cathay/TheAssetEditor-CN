@@ -163,9 +163,11 @@ public class UiAnimationMetadataFamilyTests
                 Does.Contain(
                     "<Setter Property=\"FocusVisualStyle\" Value=\"{x:Null}\" />"));
             NUnitAssert.That(styles, Does.Not.Contain("To=\"1.015\""));
-            NUnitAssert.That(styles, Does.Contain("To=\"0.94\""));
-            NUnitAssert.That(styles, Does.Contain("AeMotion.Pressed"));
-            NUnitAssert.That(styles, Does.Contain("AeMotion.Release"));
+            NUnitAssert.That(styles, Does.Not.Contain("To=\"0.94\""));
+            NUnitAssert.That(styles, Does.Contain("ButtonBase.Click"));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("AeMotion.ButtonClickStoryboard"));
         });
     }
 

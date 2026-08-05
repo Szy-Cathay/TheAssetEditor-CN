@@ -5,8 +5,10 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using NUnit.Framework;
 using Shared.Core.Settings;
+using Shared.Ui.BaseDialogs;
 using NUnitAssert = NUnit.Framework.Assert;
 using ShapePath = System.Windows.Shapes.Path;
 
@@ -479,7 +481,185 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void Buttons_HighlightOnHoverAndBounceAfterPressWithoutFocusRings()
+    public void HoldingPressedState_DoesNotControlButtonScale()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var button = new Button
+                {
+                    Content = "Test",
+                    Style = (Style)Application.Current.FindResource(
+                        "AeButton.Secondary"),
+                };
+                var window = CreateOffscreenWindow(button);
+                try
+                {
+                    window.Show();
+                    button.ApplyTemplate();
+                    window.UpdateLayout();
+                    var scale = GetInteractionScale(button);
+
+                    NUnitAssert.That(
+                        VisualStateManager.GoToState(
+                            button,
+                            "Pressed",
+                            false),
+                        Is.True);
+                    PumpDispatcher(TimeSpan.FromMilliseconds(30));
+                    NUnitAssert.That(scale.ScaleX, Is.EqualTo(1));
+                    NUnitAssert.That(scale.ScaleY, Is.EqualTo(1));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    public void Click_PlaysOneShotShrinkAndReturnMotion()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                static Style Style(object key) =>
+                    (Style)Application.Current.FindResource(key);
+                var editorStyles = Load(
+                    "Shared.Ui",
+                    "Common/Styles/EditorWorkspaceStyles.xaml");
+                var optionalRadioStyles = Load(
+                    "Shared.Ui",
+                    "BaseDialogs/OptionalRadioButtonStyle.xaml");
+                var gitStyles = Load(
+                    "Views/FolderProjectVersionControl/FolderProjectGitStyles.xaml");
+
+                var controls = new (string Name, ButtonBase Control)[]
+                {
+                    ("design button", new Button
+                    {
+                        Content = "Test",
+                        Style = Style("AeButton.Secondary"),
+                    }),
+                    ("legacy button", new Button
+                    {
+                        Content = "Test",
+                        Style = Style(typeof(Button)),
+                    }),
+                    ("legacy toggle", new ToggleButton
+                    {
+                        Content = "Test",
+                        Style = Style(typeof(ToggleButton)),
+                    }),
+                    ("legacy radio", new RadioButton
+                    {
+                        Content = "Test",
+                        Style = Style(typeof(RadioButton)),
+                    }),
+                    ("dropdown arrow", new ToggleButton
+                    {
+                        Style = Style("AeButton.DropdownArrow"),
+                    }),
+                    ("switch", new ToggleButton
+                    {
+                        Style = Style("AeInput.Switch"),
+                    }),
+                    ("radio input", new RadioButton
+                    {
+                        Content = "Test",
+                        Style = Style("AeInput.RadioButton"),
+                    }),
+                    ("title bar", new Button
+                    {
+                        Content = "Test",
+                        Style = Style("TitleBarButtonStyle"),
+                    }),
+                    ("disabled-background button", new Button
+                    {
+                        Content = "Test",
+                        Style = Style("NoBackgroundOnDisabledButton"),
+                    }),
+                    ("toolbar button", new Button
+                    {
+                        Content = "Test",
+                        Style = Style("ToolBarButtonBaseStyle"),
+                    }),
+                    ("toolbar overflow", new ToggleButton
+                    {
+                        Style = Style("ToolBarHorizontalOverflowButtonStyle"),
+                    }),
+                    ("editor toggle", new ToggleButton
+                    {
+                        Content = "Test",
+                        Style = (Style)editorStyles["AeEditor.ToggleIcon"],
+                    }),
+                    ("editor playback", new ToggleButton
+                    {
+                        Content = "Test",
+                        Style = (Style)editorStyles["AeEditor.PlaybackToggle"],
+                    }),
+                    ("optional radio", new OptionalRadioButton
+                    {
+                        Content = "Test",
+                        Style = (Style)optionalRadioStyles[
+                            "OptionalRadioButtonStyle"],
+                    }),
+                    ("git split button", new Button
+                    {
+                        Content = "Test",
+                        Style = (Style)gitStyles[
+                            "GitCommitSplitButtonPartStyle"],
+                    }),
+                };
+
+                foreach (var (name, control) in controls)
+                    AssertOneShotClickMotion(control, name);
+            });
+    }
+
+    [Test]
+    public void PublicButtonTemplates_UseOneShotClickMotionAcrossFamilies()
+    {
+        var root = FindSolutionRoot();
+        var paths = new[]
+        {
+            "AssetEditor/Themes/Controls.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/Buttons.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/Inputs.xaml",
+            "Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml",
+            "Shared/SharedUI/BaseDialogs/OptionalRadioButtonStyle.xaml",
+            "AssetEditor/Views/FolderProjectVersionControl/FolderProjectGitStyles.xaml",
+            "Editors/Kitbashing/KitbasherEditor/KitbashUiStyles.xaml",
+        };
+
+        foreach (var path in paths)
+        {
+            var source = File.ReadAllText(Path.Combine(
+                root,
+                path.Replace('/', Path.DirectorySeparatorChar)));
+            var scaleCount = source.Split(
+                "x:Name=\"InteractionScale\"",
+                StringSplitOptions.None).Length - 1;
+            var clickCount = source.Split(
+                "AeMotion.ButtonClickStoryboard",
+                StringSplitOptions.None).Length - 1;
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(scaleCount, Is.GreaterThan(0), path);
+                NUnitAssert.That(clickCount, Is.EqualTo(scaleCount), path);
+                NUnitAssert.That(
+                    source,
+                    Does.Not.Contain("To=\"0.94\""),
+                    path);
+            });
+        }
+    }
+
+    [Test]
+    public void Buttons_HighlightOnHoverAndAnimateOneClickWithoutFocusRings()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -493,39 +673,9 @@ public class UiCommonControlResourceTests
                 var group = VisualStateManager.GetVisualStateGroups(root)
                     .OfType<VisualStateGroup>()
                     .Single(item => item.Name == "CommonStates");
-                var durations = group.Transitions
-                    .Cast<VisualTransition>()
-                    .Select(item => item.GeneratedDuration.TimeSpan)
-                    .ToArray();
                 var pressed = group.States
                     .Cast<VisualState>()
                     .Single(item => item.Name == "Pressed");
-                var hovered = group.States
-                    .Cast<VisualState>()
-                    .Single(item => item.Name == "MouseOver");
-                var pressedTargets = pressed.Storyboard.Children
-                    .Select(Storyboard.GetTargetName)
-                    .ToArray();
-                var pressedScales = pressed.Storyboard.Children
-                    .OfType<DoubleAnimation>()
-                    .Where(animation =>
-                        Storyboard.GetTargetName(animation) ==
-                        "InteractionScale")
-                    .Select(animation => animation.To)
-                    .ToArray();
-                var hoveredScales = hovered.Storyboard.Children
-                    .OfType<DoubleAnimation>()
-                    .Where(animation =>
-                        Storyboard.GetTargetName(animation) ==
-                        "InteractionScale")
-                    .Select(animation => animation.To)
-                    .ToArray();
-                var releaseTransitions = group.Transitions
-                    .Cast<VisualTransition>()
-                    .Where(item =>
-                        item.From == "Pressed" &&
-                        item.To is "MouseOver" or "Normal")
-                    .ToArray();
                 var hoverTrigger = style.Triggers
                     .OfType<Trigger>()
                     .Single(item =>
@@ -542,27 +692,7 @@ public class UiCommonControlResourceTests
 
                 NUnitAssert.Multiple(() =>
                 {
-                    NUnitAssert.That(
-                        durations,
-                        Does.Contain(TimeSpan.FromMilliseconds(90)));
-                    NUnitAssert.That(
-                        durations,
-                        Does.Contain(TimeSpan.FromMilliseconds(160)));
-                    NUnitAssert.That(
-                        pressedTargets,
-                        Does.Contain("InteractionScale"));
-                    NUnitAssert.That(
-                        pressedScales,
-                        Is.All.EqualTo(0.94));
-                    NUnitAssert.That(
-                        hoveredScales,
-                        Is.All.EqualTo(1));
-                    NUnitAssert.That(releaseTransitions, Has.Length.EqualTo(2));
-                    NUnitAssert.That(
-                        releaseTransitions.Select(item =>
-                            item.GeneratedDuration.TimeSpan),
-                        Has.All.EqualTo(
-                            TimeSpan.FromMilliseconds(160)));
+                    NUnitAssert.That(pressed.Storyboard, Is.Null);
                     NUnitAssert.That(
                         hoverTrigger.Setters
                             .OfType<Setter>()
@@ -574,29 +704,22 @@ public class UiCommonControlResourceTests
                     NUnitAssert.That(persistentFocusRings, Is.Empty);
                     NUnitAssert.That(translucentStateOverlays, Is.Empty);
                 });
+                AssertOneShotClickMotion(template);
             });
     }
 
     [Test]
-    public void LegacyButtonBases_UseHighlightAndReleaseBounceMotion()
+    public void LegacyButtonBases_UseOneShotClickMotionWithoutFocusRings()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
             () =>
             {
-                static double?[] ReadScales(VisualState state) =>
-                    state.Storyboard.Children
-                        .OfType<DoubleAnimation>()
-                        .Where(animation =>
-                            Storyboard.GetTargetName(animation) ==
-                            "InteractionScale")
-                        .Select(animation => animation.To)
-                        .ToArray();
-
                 foreach (var controlType in new[]
                          {
                              typeof(Button),
                              typeof(ToggleButton),
+                             typeof(RadioButton),
                          })
                 {
                     var style = (Style)Application.Current.FindResource(
@@ -609,38 +732,9 @@ public class UiCommonControlResourceTests
                             Control.TemplateProperty)
                         ?.Value as ControlTemplate;
                     var root = (FrameworkElement)template!.LoadContent();
-                    var group = VisualStateManager.GetVisualStateGroups(root)
-                        .OfType<VisualStateGroup>()
-                        .Single(item => item.Name == "CommonStates");
-                    var hovered = group.States
-                        .Cast<VisualState>()
-                        .Single(item => item.Name == "MouseOver");
-                    var pressed = group.States
-                        .Cast<VisualState>()
-                        .Single(item => item.Name == "Pressed");
-                    var releaseTransitions = group.Transitions
-                        .Cast<VisualTransition>()
-                        .Where(item =>
-                            item.From == "Pressed" &&
-                            item.To is "MouseOver" or "Normal")
-                        .ToArray();
 
                     NUnitAssert.Multiple(() =>
                     {
-                        NUnitAssert.That(
-                            ReadScales(hovered),
-                            Is.All.EqualTo(1));
-                        NUnitAssert.That(
-                            ReadScales(pressed),
-                            Is.All.EqualTo(0.94));
-                        NUnitAssert.That(
-                            releaseTransitions,
-                            Has.Length.EqualTo(2));
-                        NUnitAssert.That(
-                            releaseTransitions.Select(item =>
-                                item.GeneratedDuration.TimeSpan),
-                            Has.All.EqualTo(
-                                TimeSpan.FromMilliseconds(160)));
                         NUnitAssert.That(
                             FindDescendants<Border>(root)
                                 .Where(item => item.Name == "StateOverlay"),
@@ -648,6 +742,7 @@ public class UiCommonControlResourceTests
                         NUnitAssert.That(focusVisualSetter, Is.Not.Null);
                         NUnitAssert.That(focusVisualSetter!.Value, Is.Null);
                     });
+                    AssertOneShotClickMotion(template);
                 }
             });
     }
@@ -696,7 +791,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void EditorToggleButtons_UsePressMotionWithoutFocusFrames()
+    public void EditorToggleButtons_UseOneShotClickMotionWithoutFocusFrames()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -705,24 +800,27 @@ public class UiCommonControlResourceTests
                 var kitbash = Load(
                     "Editors.KitbasherEditor",
                     "KitbashUiStyles.xaml");
-                var styles = new[]
+                var controls = new (string Name, ButtonBase Control)[]
                 {
-                    (Style)kitbash["Kitbash.ToolRadioButton"],
-                    (Style)Application.Current.FindResource(
-                        "AeInput.Switch"),
+                    ("kitbash tool", new RadioButton
+                    {
+                        Content = "Test",
+                        Style = (Style)kitbash["Kitbash.ToolRadioButton"],
+                    }),
+                    ("switch", new ToggleButton
+                    {
+                        Style = (Style)Application.Current.FindResource(
+                            "AeInput.Switch"),
+                    }),
                 };
 
-                foreach (var style in styles)
+                foreach (var (name, control) in controls)
                 {
+                    var style = control.Style;
                     var template = (ControlTemplate)FindSetter(
                         style,
                         Control.TemplateProperty)!.Value;
                     var root = (FrameworkElement)template.LoadContent();
-                    var group = VisualStateManager
-                        .GetVisualStateGroups(root)
-                        .OfType<VisualStateGroup>()
-                        .SingleOrDefault(item =>
-                            item.Name == "CommonStates");
 
                     NUnitAssert.Multiple(() =>
                     {
@@ -736,15 +834,9 @@ public class UiCommonControlResourceTests
                             FindDescendants<Border>(root)
                                 .Where(item => item.Name == "FocusRing"),
                             Is.Empty);
-                        NUnitAssert.That(group, Is.Not.Null);
-                        NUnitAssert.That(
-                            group?.Transitions
-                                .Cast<VisualTransition>()
-                                .Count(item =>
-                                    item.From == "Pressed" &&
-                                    item.To is "MouseOver" or "Normal"),
-                            Is.EqualTo(2));
                     });
+                    AssertOneShotClickMotion(template);
+                    AssertOneShotClickMotion(control, name);
                 }
             });
     }
@@ -890,6 +982,128 @@ public class UiCommonControlResourceTests
         Load("Themes/DesignSystem/Controls/Collections.xaml"),
         Load("Themes/DesignSystem/Controls/MenusAndFeedback.xaml"),
     ];
+
+    private static void AssertOneShotClickMotion(ControlTemplate template)
+    {
+        var clickTrigger = template.Triggers
+            .OfType<EventTrigger>()
+            .Single(item => item.RoutedEvent == ButtonBase.ClickEvent);
+        var storyboard = clickTrigger.Actions
+            .OfType<BeginStoryboard>()
+            .Single()
+            .Storyboard;
+        var tracks = storyboard.Children
+            .OfType<DoubleAnimationUsingKeyFrames>()
+            .ToArray();
+
+        NUnitAssert.That(tracks, Has.Length.EqualTo(2));
+        foreach (var track in tracks)
+        {
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    Storyboard.GetTargetName(track),
+                    Is.EqualTo("InteractionScale"));
+                NUnitAssert.That(
+                    Storyboard.GetTargetProperty(track).Path,
+                    Is.EqualTo("ScaleX").Or.EqualTo("ScaleY"));
+                NUnitAssert.That(
+                    track.KeyFrames.Cast<DoubleKeyFrame>()
+                        .Select(item => item.Value),
+                    Is.EqualTo(new[] { 1d, 0.985d, 1d }));
+                NUnitAssert.That(
+                    track.KeyFrames.Cast<DoubleKeyFrame>()
+                        .Select(item => item.KeyTime.TimeSpan),
+                    Is.EqualTo(new[]
+                    {
+                        TimeSpan.Zero,
+                        TimeSpan.FromMilliseconds(70),
+                        TimeSpan.FromMilliseconds(190),
+                    }));
+            });
+        }
+    }
+
+    private static void AssertOneShotClickMotion(
+        ButtonBase control,
+        string name)
+    {
+        var window = CreateOffscreenWindow(control);
+        try
+        {
+            window.Show();
+            control.ApplyTemplate();
+            window.UpdateLayout();
+            var scale = GetInteractionScale(control);
+
+            control.RaiseEvent(new RoutedEventArgs(
+                ButtonBase.ClickEvent,
+                control));
+            PumpDispatcher(TimeSpan.FromMilliseconds(45));
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(scale.ScaleX, Is.LessThan(0.997), name);
+                NUnitAssert.That(scale.ScaleY, Is.LessThan(0.997), name);
+            });
+
+            PumpDispatcher(TimeSpan.FromMilliseconds(220));
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    scale.ScaleX,
+                    Is.EqualTo(1).Within(0.001),
+                    name);
+                NUnitAssert.That(
+                    scale.ScaleY,
+                    Is.EqualTo(1).Within(0.001),
+                    name);
+            });
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static Window CreateOffscreenWindow(UIElement content) => new()
+    {
+        Width = 160,
+        Height = 80,
+        Left = -10000,
+        Top = -10000,
+        ShowActivated = false,
+        ShowInTaskbar = false,
+        WindowStyle = WindowStyle.None,
+        Content = content,
+    };
+
+    private static ScaleTransform GetInteractionScale(ButtonBase button)
+    {
+        var templateRoot = (FrameworkElement)VisualTreeHelper.GetChild(
+            button,
+            0);
+        return (ScaleTransform)templateRoot.RenderTransform;
+    }
+
+    private static void PumpDispatcher(TimeSpan duration)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer(
+            DispatcherPriority.Background,
+            Dispatcher.CurrentDispatcher)
+        {
+            Interval = duration,
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            frame.Continue = false;
+        };
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+    }
 
     private static T? FindDescendant<T>(DependencyObject root)
         where T : DependencyObject

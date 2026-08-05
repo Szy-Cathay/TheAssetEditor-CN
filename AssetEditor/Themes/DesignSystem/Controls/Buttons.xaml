@@ -44,60 +44,9 @@
                         </Grid.RenderTransform>
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
-                                <VisualStateGroup.Transitions>
-                                    <VisualTransition
-                                        From="Normal"
-                                        GeneratedDuration="{StaticResource AeMotion.Hover}"
-                                        To="MouseOver" />
-                                    <VisualTransition
-                                        GeneratedDuration="{StaticResource AeMotion.Pressed}"
-                                        To="Pressed" />
-                                    <VisualTransition
-                                        From="Pressed"
-                                        GeneratedDuration="{StaticResource AeMotion.Release}"
-                                        To="MouseOver" />
-                                    <VisualTransition
-                                        From="Pressed"
-                                        GeneratedDuration="{StaticResource AeMotion.Release}"
-                                        To="Normal" />
-                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}" />
-                                </VisualStateGroup.Transitions>
-                                <VisualState x:Name="Normal">
-                                    <Storyboard>
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="InteractionScale"
-                                            Storyboard.TargetProperty="ScaleX"
-                                            To="1" />
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="InteractionScale"
-                                            Storyboard.TargetProperty="ScaleY"
-                                            To="1" />
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="MouseOver">
-                                    <Storyboard>
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="InteractionScale"
-                                            Storyboard.TargetProperty="ScaleX"
-                                            To="1" />
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="InteractionScale"
-                                            Storyboard.TargetProperty="ScaleY"
-                                            To="1" />
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <Storyboard>
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="InteractionScale"
-                                            Storyboard.TargetProperty="ScaleX"
-                                            To="0.94" />
-                                        <DoubleAnimation
-                                            Storyboard.TargetName="InteractionScale"
-                                            Storyboard.TargetProperty="ScaleY"
-                                            To="0.94" />
-                                    </Storyboard>
-                                </VisualState>
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="MouseOver" />
+                                <VisualState x:Name="Pressed" />
                                 <VisualState x:Name="Disabled" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
@@ -115,6 +64,9 @@
                             SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}" />
+                        </EventTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
@@ -216,7 +168,13 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Grid Background="Transparent">
+                    <Grid
+                        x:Name="InteractionSurface"
+                        Background="Transparent"
+                        RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1" />
+                        </Grid.RenderTransform>
                         <Path
                             x:Name="Chevron"
                             Width="8"
@@ -234,6 +192,9 @@
                             StrokeThickness="1.4" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}" />
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter
                                 TargetName="Chevron"

@@ -38,7 +38,11 @@
                     x:Name="border"
                     Background="{TemplateBinding Background}"
                     BorderThickness="0"
+                    RenderTransformOrigin="0.5,0.5"
                     SnapsToDevicePixels="True">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
                         <ContentPresenter
                         x:Name="contentPresenter"
                         Margin="0"
@@ -48,6 +52,9 @@
                         RecognizesAccessKey="True" />
                     </Border>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.MouseOver.Background}" />
                             <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.MouseOver.Foreground}" />
@@ -75,7 +82,11 @@
                     x:Name="border"
                     Background="{TemplateBinding Background}"
                     BorderThickness="0"
+                    RenderTransformOrigin="0.5,0.5"
                     SnapsToDevicePixels="True">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
                         <ContentPresenter
                         x:Name="contentPresenter"
                         Margin="0"
@@ -85,6 +96,9 @@
                         RecognizesAccessKey="True"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.MouseOver.Background}"/>
                             <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.MouseOver.Foreground}"/>
@@ -1090,31 +1104,9 @@
                         </Border.RenderTransform>
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
-                                <VisualStateGroup.Transitions>
-                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}"/>
-                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}"/>
-                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}"/>
-                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}"/>
-                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}"/>
-                                </VisualStateGroup.Transitions>
-                                <VisualState x:Name="Normal">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="MouseOver">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94"/>
-                                    </Storyboard>
-                                </VisualState>
+                                <VisualState x:Name="Normal"/>
+                                <VisualState x:Name="MouseOver"/>
+                                <VisualState x:Name="Pressed"/>
                                 <VisualState x:Name="Disabled"/>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
@@ -1124,6 +1116,9 @@
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsDefaulted" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Defaulted.Background}"/>
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Defaulted.Border}"/>
@@ -1170,31 +1165,9 @@
                         </Border.RenderTransform>
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
-                                <VisualStateGroup.Transitions>
-                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}"/>
-                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}"/>
-                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}"/>
-                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}"/>
-                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}"/>
-                                </VisualStateGroup.Transitions>
-                                <VisualState x:Name="Normal">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="MouseOver">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94"/>
-                                    </Storyboard>
-                                </VisualState>
+                                <VisualState x:Name="Normal"/>
+                                <VisualState x:Name="MouseOver"/>
+                                <VisualState x:Name="Pressed"/>
                                 <VisualState x:Name="Disabled"/>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
@@ -1204,6 +1177,9 @@
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsDefaulted" Value="true">
                             <Setter Property="Background" TargetName="border" Value="{DynamicResource Button.Defaulted.Background}"/>
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Defaulted.Border}"/>
@@ -1250,31 +1226,9 @@
                         </Border.RenderTransform>
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
-                                <VisualStateGroup.Transitions>
-                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}"/>
-                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}"/>
-                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}"/>
-                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}"/>
-                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}"/>
-                                </VisualStateGroup.Transitions>
-                                <VisualState x:Name="Normal">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="MouseOver">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1"/>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94"/>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94"/>
-                                    </Storyboard>
-                                </VisualState>
+                                <VisualState x:Name="Normal"/>
+                                <VisualState x:Name="MouseOver"/>
+                                <VisualState x:Name="Pressed"/>
                                 <VisualState x:Name="Disabled"/>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
@@ -1284,6 +1238,9 @@
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="Button.IsDefaulted" Value="true">
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource Button.Defaulted.Border}"/>
                         </Trigger>
@@ -2344,7 +2301,7 @@
     </Style>
 
     <Style TargetType="{x:Type RadioButton}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{DynamicResource RadioButton.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource RadioButton.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
@@ -2354,7 +2311,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type RadioButton}">
-                    <Grid x:Name="templateRoot" Background="Transparent" SnapsToDevicePixels="True">
+                    <Grid
+                        x:Name="templateRoot"
+                        Background="Transparent"
+                        RenderTransformOrigin="0.5,0.5"
+                        SnapsToDevicePixels="True">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -2366,8 +2330,10 @@
                         <ContentPresenter x:Name="contentPresenter" Grid.Column="0" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="20,0,0,0" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="HasContent" Value="true">
-                            <Setter Property="FocusVisualStyle" Value="{StaticResource OptionMarkFocusVisual}"/>
                             <Setter Property="Padding" Value="4,-1,0,0"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
@@ -3962,7 +3928,10 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Grid Background="Transparent">
+                    <Grid Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
                         <Path x:Name="Chevron"
                               Width="5" Height="8"
                               HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -3976,6 +3945,9 @@
                               StrokeThickness="1.4"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
                         </Trigger>
@@ -4004,7 +3976,10 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Grid Background="Transparent">
+                    <Grid Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
                         <Path x:Name="Chevron"
                               Width="8" Height="5"
                               HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -4018,6 +3993,9 @@
                               StrokeThickness="1.4"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="true">
                             <Setter Property="Stroke" TargetName="Chevron" Value="{DynamicResource AeBrush.AccentHover}"/>
                         </Trigger>
@@ -4086,10 +4064,16 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="true">
+                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="true">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
                         <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="ButtonBase.Click">
+                            <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonClickStoryboard}"/>
+                        </EventTrigger>
                         <Trigger Property="IsDefaulted" Value="true">
                             <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
                         </Trigger>
