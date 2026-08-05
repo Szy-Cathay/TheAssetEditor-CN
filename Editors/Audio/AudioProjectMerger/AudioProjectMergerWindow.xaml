@@ -12,7 +12,15 @@
     Width="850"
     SizeToContent="Height"
     WindowStartupLocation="CenterOwner"
-    Title="{loc:Loc AudioProjectMerger.Title}" Background="#FF1C1C1C">
+    Title="{loc:Loc AudioProjectMerger.Title}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}">
+
+    <Window.Resources>
+        <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -176,6 +184,7 @@
 
             <Button 
                 Content="{loc:Loc General.Ok}"
+                Style="{StaticResource AeButton.Primary}"
                 Width="75"
                 Margin="0, 0, 5, 0"
                 Command="{Binding MergeAudioProjectsCommand}" 
@@ -184,6 +193,7 @@
 
             <Button 
                 Content="{loc:Loc General.Cancel}"
+                Style="{StaticResource AeButton.Secondary}"
                 Width="75"
                 Margin="5, 0, 0, 0"
                 IsCancel="True"

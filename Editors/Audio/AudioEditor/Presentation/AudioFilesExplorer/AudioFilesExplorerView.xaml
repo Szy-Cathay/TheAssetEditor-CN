@@ -11,14 +11,23 @@
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=AudioFilesExplorer:AudioFilesExplorerViewModel}"
     mc:Ignorable="d"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="250" 
     d:DesignWidth="500">
 
     <UserControl.Resources>
-        <ValueConverters:ImageConverter 
-            x:Key="ImageValueConverter"/>
-        <BooleanToVisibilityConverter 
-            x:Key="BoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <ValueConverters:ImageConverter
+                x:Key="ImageValueConverter"/>
+            <BooleanToVisibilityConverter
+                x:Key="BoolToVisibilityConverter"/>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -57,6 +66,7 @@
                 Width="180" 
                 VerticalAlignment="Center" 
                 HorizontalAlignment="Left"
+                Style="{StaticResource AeButton.Quiet}"
                 Content="{loc:Loc AudioFilesExplorer.ToggleCollapseExpand}"
                 ToolTip="{loc:Loc AudioFilesExplorer.ToggleCollapseExpand.ToolTip}" 
                 Command="{Binding CollapseOrExpandTreeCommand}"/>
@@ -65,6 +75,7 @@
                 Grid.Column="1"
                 Margin="5, 0, 0, 0" 
                 Width="100" 
+                Style="{StaticResource AeButton.Primary}"
                 Content="{loc:Loc AudioFilesExplorer.SetAudioFiles}"
                 ToolTip="{loc:Loc AudioFilesExplorer.SetAudioFiles.ToolTip}"
                 ToolTipService.ShowOnDisabled="True"
@@ -98,7 +109,7 @@
 
             <Border 
                 SnapsToDevicePixels="True" 
-                BorderBrush="{DynamicResource TextBox.Static.Border}" 
+                BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="1">
                 
                 <Grid>
@@ -122,51 +133,10 @@
                         VerticalContentAlignment="Center"
                         HorizontalContentAlignment="Center"
                         VerticalAlignment="Center"
+                        Style="{StaticResource AeButton.Icon}"
                         Click="OnClearButtonClick" 
-                        Command="{Binding ClearTextCommand}">
-                        
-                        <Button.Template>
-                            <ControlTemplate 
-                                TargetType="Button">
-                                
-                                <Grid 
-                                    SnapsToDevicePixels="true" 
-                                    Background="{DynamicResource TextBox.Static.Background}">
-                                    
-                                    <Path 
-                                        Data="M0,0 L8,8 M8,0 L0,8" 
-                                        StrokeThickness="1.5" 
-                                        VerticalAlignment="Center" 
-                                        HorizontalAlignment="Center">
-                                        
-                                        <Path.Style>
-                                            <Style 
-                                                TargetType="{x:Type Path}">
-                                                
-                                                <Style.Triggers>
-                                                    <Trigger 
-                                                        Property="IsMouseOver" 
-                                                        Value="False">
-                                                        <Setter
-                                                            Property="Stroke" 
-                                                            Value="{DynamicResource Button.Disabled.Foreground}" />
-                                                    </Trigger>
-
-                                                    <Trigger 
-                                                        Property="IsMouseOver" 
-                                                        Value="True">
-                                                        <Setter 
-                                                            Property="Stroke" 
-                                                            Value="{DynamicResource Button.Static.Foreground}" />
-                                                    </Trigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Path.Style>
-                                    </Path>
-                                </Grid>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+                        Command="{Binding ClearTextCommand}"
+                        Content="×" />
                 </Grid>
             </Border>
         </Grid>
@@ -179,7 +149,7 @@
             Padding="0, 5, 0, 5"
             ItemsSource="{Binding AudioFilesTree}"
             ScrollViewer.HorizontalScrollBarVisibility="Auto"
-            Background="{DynamicResource TreeView.Static.Background}"
+            Background="{DynamicResource AeBrush.Surface1}"
             BorderBrush="Transparent"
             SelectedItems="{Binding SelectedTreeNodes, Mode=TwoWay}"
             MouseDoubleClick="OnMouseDoubleClick"
@@ -206,13 +176,13 @@
                             Value="True">
                             <Setter 
                                 Property="Background" 
-                                Value="{DynamicResource TreeViewItem.Selected.Background}" />
+                                Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter 
                                 Property="BorderBrush" 
-                                Value="{DynamicResource TreeViewItem.Selected.Border}" />
+                                Value="{DynamicResource AeBrush.Accent}" />
                             <Setter 
                                 Property="Foreground" 
-                                Value="{DynamicResource ABrush.Foreground.Deeper}" />
+                                Value="{DynamicResource AeBrush.TextPrimary}" />
                         </Trigger>
                     </Style.Triggers>
                 </Style>

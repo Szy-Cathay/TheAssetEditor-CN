@@ -13,18 +13,27 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=AudioExplorer:AudioExplorerViewModel}"
     mc:Ignorable="d" 
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter
-            x:Key="BooleanToVisibilityConverter"/>
-        <ValueConverters:EnumConverter 
-            x:Key="EnumConverter"/>
-        <DataTemplate 
-            x:Key="EnumToStringTemplate">
-            <TextBlock 
-                Text="{Binding Converter={StaticResource EnumConverter}}"/>
-        </DataTemplate>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter
+                x:Key="BooleanToVisibilityConverter"/>
+            <ValueConverters:EnumConverter
+                x:Key="EnumConverter"/>
+            <DataTemplate
+                x:Key="EnumToStringTemplate">
+                <TextBlock
+                    Text="{Binding Converter={StaticResource EnumConverter}}"/>
+            </DataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -187,6 +196,7 @@
                 <Button
                     Grid.Row="1"
                     Grid.Column="1"
+                    Style="{StaticResource AeButton.Secondary}"
                     MinWidth="60"
                     Height="25"
                     Margin="5, 0, 0, 0"
@@ -209,6 +219,7 @@
                 <Button
                     Grid.Row="2"
                     Grid.Column="1"
+                    Style="{StaticResource AeButton.Secondary}"
                     MinWidth="60"
                     Height="25"
                     Margin="5, 3, 0, 0"
@@ -254,6 +265,7 @@
                         Margin="0, 5, 0, 0"
                         Grid.Row="1"
                         Content="{loc:Loc AudioExplorer.LoadLanguages}"
+                        Style="{StaticResource AeButton.Primary}"
                         Height="25"
                         Command="{Binding LoadAudioRepositoryForSelectedLanguagesCommand}"/>
                     
@@ -312,7 +324,7 @@
             <Border 
                 Grid.Row="5"
                 Height="5" 
-                Background="{DynamicResource App.Border}"/>
+                Background="{DynamicResource AeBrush.Border}"/>
 
             <Label 
                 Grid.Row="6" 
@@ -323,7 +335,7 @@
                 Grid.Row="7"
                 Margin="0, 2, 0, 0"
                 Padding="0, 5, 0, 0"
-                BorderBrush="{DynamicResource App.Border}"
+                BorderBrush="{DynamicResource AeBrush.Border}"
                 ItemsSource="{Binding TreeList, UpdateSourceTrigger=PropertyChanged}"
                 VirtualizingPanel.IsVirtualizing="True"
                 VirtualizingPanel.VirtualizationMode="Recycling"
@@ -404,14 +416,14 @@
                                             <Setter 
                                                 Property="Background" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource TreeViewItem.Selected.Background}"/>
+                                                Value="{DynamicResource AeBrush.AccentSoft}"/>
                                             <Setter 
                                                 Property="BorderBrush" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource TreeViewItem.Selected.Border}"/>
+                                                Value="{DynamicResource AeBrush.Accent}"/>
                                             <Setter 
                                                 Property="Foreground" 
-                                                Value="{DynamicResource ABrush.Foreground.Deeper}"/>
+                                                Value="{DynamicResource AeBrush.TextPrimary}"/>
                                         </Trigger>
                                         <MultiTrigger>
                                             <MultiTrigger.Conditions>
@@ -425,21 +437,21 @@
                                             <Setter 
                                                 Property="Background" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource TreeViewItem.Selected.Inactive.Background}"/>
+                                                Value="{DynamicResource AeBrush.SurfaceHover}"/>
                                             <Setter 
                                                 Property="BorderBrush" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource TreeViewItem.Selected.Inactive.Border}"/>
+                                                Value="{DynamicResource AeBrush.BorderStrong}"/>
                                             <Setter 
                                                 Property="Foreground" 
-                                                Value="{DynamicResource ABrush.Foreground.Disabled}"/>
+                                                Value="{DynamicResource AeBrush.TextMuted}"/>
                                         </MultiTrigger>
                                         <Trigger 
                                             Property="IsEnabled" 
                                             Value="false">
                                             <Setter 
                                                 Property="Foreground" 
-                                                Value="{DynamicResource ABrush.Foreground.Disabled}"/>
+                                                Value="{DynamicResource AeBrush.TextMuted}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -468,9 +480,9 @@
             <Border
                 Grid.Row="8"
                 Padding="8, 7, 8, 8"
-                BorderBrush="{DynamicResource App.Border}"
+                BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="0, 1, 0, 0"
-                Background="{DynamicResource TreeView.Static.Background}"
+                Background="{DynamicResource AeBrush.Surface1}"
                 Visibility="{Binding IsAudioPlaybackVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -560,6 +572,7 @@
                             MinWidth="95"
                             Height="25"
                             Content="{loc:Loc AudioExplorer.PlayPauseAudio}"
+                            Style="{StaticResource AeButton.Primary}"
                             Command="{Binding PlayAudioCommand}"
                             IsEnabled="{Binding IsPlayAudioButtonEnabled}"/>
                         <Button
@@ -567,6 +580,7 @@
                             Height="25"
                             Margin="5, 0, 0, 0"
                             Content="{loc:Loc AudioExplorer.StopAudio}"
+                            Style="{StaticResource AeButton.Secondary}"
                             Command="{Binding StopAudioCommand}"
                             IsEnabled="{Binding IsStopAudioButtonEnabled}"/>
                     </StackPanel>
@@ -578,7 +592,7 @@
             Grid.Row="0"
             Grid.Column="1" 
             Width="5" 
-            Background="{DynamicResource App.Border}" 
+            Background="{DynamicResource AeBrush.Border}"
             VerticalAlignment="Stretch" 
             HorizontalAlignment="Center"
             ResizeBehavior="PreviousAndNext" 
@@ -587,7 +601,7 @@
         <Grid 
             Grid.Row="1" 
             Grid.Column="2"
-            Background="{DynamicResource TreeView.Static.Background}">
+            Background="{DynamicResource AeBrush.Surface1}">
 
             <Grid.RowDefinitions>
                 <RowDefinition
@@ -600,8 +614,8 @@
                 Grid.Row="0"
                 Padding="5, 5, 5, 7"
                 Content="{Binding WwiseObjectLabel}"
-                Background="{DynamicResource Window.Static.Background}"
-                BorderBrush="{DynamicResource App.Border}"
+                Background="{DynamicResource AeBrush.Canvas}"
+                BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="0, 0, 0, 1"/>
             
             <ScrollViewer
@@ -610,7 +624,7 @@
                 <TextBox 
                     DockPanel.Dock="Top"
                     IsReadOnly="True" 
-                    Background="{DynamicResource TreeView.Static.Background}"
+                    Background="{DynamicResource AeBrush.Surface1}"
                     BorderThickness="0, 0, 0, 0"
                     Text="{Binding SelectedNodeText, UpdateSourceTrigger=PropertyChanged}"/>
             </ScrollViewer>

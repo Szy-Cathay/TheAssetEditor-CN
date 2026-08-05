@@ -18,18 +18,27 @@
     ResizeMode="CanResizeWithGrip"
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
-    Title="{loc:Loc NewAudioProject.Title}" Background="#FF1C1C1C">
+    Title="{loc:Loc NewAudioProject.Title}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}">
 
     <Window.Resources>
-        <ValueConverters:EnumConverter 
-            x:Key="EnumConverter"/>
-        <BooleanToVisibilityConverter
-            x:Key="BoolToVisibilityConverter"/>
-        <DataTemplate 
-            x:Key="EnumToStringTemplate">
-            <TextBlock 
-                Text="{Binding Converter={StaticResource EnumConverter}}"/>
-        </DataTemplate>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <ValueConverters:EnumConverter
+                x:Key="EnumConverter"/>
+            <BooleanToVisibilityConverter
+                x:Key="BoolToVisibilityConverter"/>
+            <DataTemplate
+                x:Key="EnumToStringTemplate">
+                <TextBlock
+                    Text="{Binding Converter={StaticResource EnumConverter}}"/>
+            </DataTemplate>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid>
@@ -89,7 +98,7 @@
                     Grid.Row="1"
                     Grid.Column="1"
                     Margin="0,2,0,0"
-                    Foreground="#FFE57373"
+                    Foreground="{DynamicResource AeBrush.Danger}"
                     FontSize="11"
                     TextWrapping="Wrap"
                     Text="{Binding ValidationMessage}"/>
@@ -169,6 +178,7 @@
             
             <Button 
                 Content="{loc:Loc General.Ok}"
+                Style="{StaticResource AeButton.Primary}"
                 Width="75"
                 Margin="0, 0, 5, 0"
                 Command="{Binding CreateAudioProjectCommand}" 
@@ -177,6 +187,7 @@
             
             <Button 
                 Content="{loc:Loc General.Cancel}"
+                Style="{StaticResource AeButton.Secondary}"
                 Width="75"
                 Margin="5, 0, 0, 0"
                 Command="{Binding CancelOrCloseCommand}"/>

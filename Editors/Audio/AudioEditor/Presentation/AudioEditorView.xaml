@@ -17,10 +17,19 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=Local:AudioEditorViewModel}"
     mc:Ignorable="d" 
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignWidth="1200" d:DesignHeight="700">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -137,7 +146,7 @@
         <Border 
             Grid.Row="1" 
             Height="1" 
-            Background="{DynamicResource App.Border}" 
+            Background="{DynamicResource AeBrush.Border}"
             Margin="0, 5, 0, 0"/>
 
         <Grid 
@@ -185,7 +194,7 @@
                     <GridSplitter
                         Grid.Row="1"
                         Height="5"
-                        Background="{DynamicResource App.Border}"
+                        Background="{DynamicResource AeBrush.Border}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"
@@ -199,7 +208,7 @@
                     <GridSplitter
                         Grid.Row="3"
                         Height="5"
-                        Background="{DynamicResource App.Border}"
+                        Background="{DynamicResource AeBrush.Border}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"
@@ -217,7 +226,7 @@
             <GridSplitter 
                 Grid.Column="1" 
                 Width="5" 
-                Background="{DynamicResource App.Border}" 
+                Background="{DynamicResource AeBrush.Border}"
                 VerticalAlignment="Stretch" 
                 HorizontalAlignment="Center"
                 ResizeBehavior="PreviousAndNext" 
@@ -245,7 +254,7 @@
                 <Border 
                     Grid.Row="1"
                     Height="5" 
-                    Background="{DynamicResource App.Border}"
+                    Background="{DynamicResource AeBrush.Border}"
                     Visibility="{Binding IsSettingsBorderVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                 <Settings:SettingsView 
@@ -263,7 +272,7 @@
         <Border
             Grid.Row="2"
             Panel.ZIndex="2"
-            Background="{DynamicResource TreeView.Static.Background}">
+            Background="{DynamicResource AeBrush.Surface1}">
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -280,7 +289,7 @@
                 Margin="20"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Foreground="{DynamicResource AeBrush.TextMuted}"
                 Text="{Binding EmptyStateText}"
                 TextAlignment="Center"
                 TextWrapping="Wrap"/>

@@ -15,7 +15,15 @@
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
     Closed="OnClosed"
-    Title="{loc:Loc DialogueEventMerger.Title}" Background="#FF1C1C1C">
+    Title="{loc:Loc DialogueEventMerger.Title}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AeFont.Family}"
+    FontWeight="{DynamicResource AeFont.Weight.Normal}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}">
+
+    <Window.Resources>
+        <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -60,7 +68,7 @@
                 
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition 
-                        Width="130"/>
+                        Width="180"/>
                     <ColumnDefinition 
                         Width="*"/>
                 </Grid.ColumnDefinitions>
@@ -82,7 +90,7 @@
                     Grid.Row="1"
                     Grid.Column="1"
                     Margin="0,4,0,0"
-                    Foreground="#FFF2B84B"
+                    Foreground="{DynamicResource AeBrush.Warning}"
                     Text="{Binding SoundBankSuffixError}"
                     TextWrapping="Wrap"/>
 
@@ -149,18 +157,21 @@
 
             <Button
                 Content="{loc:Loc General.SelectAll}"
+                Style="{StaticResource AeButton.Quiet}"
                 Margin="0,0,5,0"
                 Command="{Binding SelectAllCommand}"
                 IsEnabled="{Binding IsBusy, Converter={StaticResource InvBoolConverter}}"/>
 
             <Button
                 Content="{loc:Loc General.SelectNone}"
+                Style="{StaticResource AeButton.Quiet}"
                 Margin="0,0,15,0"
                 Command="{Binding SelectNoneCommand}"
                 IsEnabled="{Binding IsBusy, Converter={StaticResource InvBoolConverter}}"/>
 
             <Button 
                 Content="{loc:Loc General.Ok}"
+                Style="{StaticResource AeButton.Primary}"
                 Width="75"
                 Margin="0, 0, 5, 0"
                 Command="{Binding GenerateMergedDialogueEventSoundBankCommand}" 
@@ -169,6 +180,7 @@
 
             <Button 
                 Content="{loc:Loc General.Cancel}"
+                Style="{StaticResource AeButton.Secondary}"
                 Width="75"
                 Margin="5, 0, 0, 0"
                 IsCancel="True"

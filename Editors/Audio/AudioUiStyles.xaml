@@ -1,0 +1,22 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Secondary}" />
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}" />
+    <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource AeInput.ComboBox}" />
+    <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource AeInput.CheckBox}" />
+    <Style TargetType="{x:Type RadioButton}" BasedOn="{StaticResource AeInput.RadioButton}" />
+    <Style TargetType="{x:Type TreeView}" BasedOn="{StaticResource AeTree.View}" />
+    <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}" />
+    <Style TargetType="{x:Type ListBox}" BasedOn="{StaticResource AeList.View}" />
+    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource AeList.Item}" />
+    <Style TargetType="{x:Type ListView}" BasedOn="{StaticResource AeList.View}" />
+    <Style TargetType="{x:Type DataGrid}" BasedOn="{StaticResource AeTable.Grid}" />
+    <Style TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource AeTable.Row}" />
+    <Style TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource AeTable.Cell}" />
+    <Style TargetType="{x:Type DataGridColumnHeader}" BasedOn="{StaticResource AeTable.Header}" />
+    <Style TargetType="{x:Type ProgressBar}" BasedOn="{StaticResource AeProgress.Bar}" />
+    <Style TargetType="{x:Type Menu}" BasedOn="{StaticResource AeMenu.Bar}" />
+    <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource AeMenu.Item}" />
+    <Style TargetType="{x:Type ContextMenu}" BasedOn="{StaticResource AeMenu.Context}" />
+</ResourceDictionary>
