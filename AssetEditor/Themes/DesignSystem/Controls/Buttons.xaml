@@ -52,6 +52,14 @@
                                     <VisualTransition
                                         GeneratedDuration="{StaticResource AeMotion.Pressed}"
                                         To="Pressed" />
+                                    <VisualTransition
+                                        From="Pressed"
+                                        GeneratedDuration="{StaticResource AeMotion.Release}"
+                                        To="MouseOver" />
+                                    <VisualTransition
+                                        From="Pressed"
+                                        GeneratedDuration="{StaticResource AeMotion.Release}"
+                                        To="Normal" />
                                     <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}" />
                                 </VisualStateGroup.Transitions>
                                 <VisualState x:Name="Normal">
@@ -71,11 +79,11 @@
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleX"
-                                            To="1.015" />
+                                            To="1" />
                                         <DoubleAnimation
                                             Storyboard.TargetName="InteractionScale"
                                             Storyboard.TargetProperty="ScaleY"
-                                            To="1.015" />
+                                            To="1" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">

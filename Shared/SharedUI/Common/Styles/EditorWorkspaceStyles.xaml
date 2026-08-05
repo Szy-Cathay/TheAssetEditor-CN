@@ -43,7 +43,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
     </Style>
 
-    <Style TargetType="{x:Type Expander}">
+    <Style TargetType="{x:Type Expander}" BasedOn="{StaticResource {x:Type Expander}}">
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
     </Style>
@@ -90,6 +90,8 @@
                                 <VisualStateGroup.Transitions>
                                     <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}" />
                                     <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}" />
+                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}" />
+                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}" />
                                     <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}" />
                                 </VisualStateGroup.Transitions>
                                 <VisualState x:Name="Normal">
@@ -100,8 +102,8 @@
                                 </VisualState>
                                 <VisualState x:Name="MouseOver">
                                     <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1.015" />
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1.015" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
@@ -157,6 +159,8 @@
                                 <VisualStateGroup.Transitions>
                                     <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}" />
                                     <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}" />
+                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}" />
+                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}" />
                                     <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}" />
                                 </VisualStateGroup.Transitions>
                                 <VisualState x:Name="Normal">
@@ -167,8 +171,8 @@
                                 </VisualState>
                                 <VisualState x:Name="MouseOver">
                                     <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1.015" />
-                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1.015" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">

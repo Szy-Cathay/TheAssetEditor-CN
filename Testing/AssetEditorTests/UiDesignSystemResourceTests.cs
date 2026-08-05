@@ -308,6 +308,9 @@ public class UiDesignSystemResourceTests
                     ((Duration)dictionary["AeMotion.Pressed"]).TimeSpan,
                     Is.EqualTo(TimeSpan.FromMilliseconds(90)));
                 NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Release"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(160)));
+                NUnitAssert.That(
                     ((Duration)dictionary["AeMotion.Hover"]).TimeSpan,
                     Is.EqualTo(TimeSpan.FromMilliseconds(120)));
                 NUnitAssert.That(

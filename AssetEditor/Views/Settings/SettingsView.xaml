@@ -21,37 +21,45 @@
 
         <Style x:Key="PageTitleStyle" TargetType="{x:Type TextBlock}"
                BasedOn="{StaticResource AeText.PageTitle}">
-            <Setter Property="Margin" Value="0,0,0,18"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
         <Style x:Key="SectionTitleStyle" TargetType="{x:Type TextBlock}"
                BasedOn="{StaticResource AeText.SectionTitle}">
-            <Setter Property="Margin" Value="0,18,0,10"/>
+            <Setter Property="Margin" Value="0,12,0,6"/>
         </Style>
         <Style x:Key="SettingsLabelStyle" TargetType="{x:Type TextBlock}"
                BasedOn="{StaticResource AeText.Label}">
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,2,18,10"/>
+            <Setter Property="Margin" Value="0,0,14,6"/>
         </Style>
         <Style x:Key="ComboBoxFieldStyle" TargetType="{x:Type ComboBox}"
                BasedOn="{StaticResource AeInput.ComboBox}">
-            <Setter Property="Margin" Value="0,0,0,10"/>
-            <Setter Property="MinWidth" Value="220"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="MinWidth" Value="200"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="CheckBoxFieldStyle" TargetType="{x:Type CheckBox}"
                BasedOn="{StaticResource AeInput.CheckBox}">
-            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="TextBoxFieldStyle" TargetType="{x:Type TextBox}"
                BasedOn="{StaticResource AeInput.TextBox}">
-            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="SettingsPageStyle" TargetType="{x:Type StackPanel}">
-            <Setter Property="Margin" Value="18,16"/>
+            <Setter Property="Margin" Value="12,10"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style x:Key="SettingsPageScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Top"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
     </UserControl.Resources>
 
@@ -63,8 +71,7 @@
                 VerticalContentAlignment="Stretch">
         <TabItem Header="{loc:Loc SettingsWindow.General}"
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Style="{StaticResource SettingsPageScrollViewerStyle}">
                 <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.General}"
                                Style="{StaticResource PageTitleStyle}"/>
@@ -101,7 +108,7 @@
                     <ItemsControl ItemsSource="{Binding GameDirectores}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,0,0,10"
+                                <Grid Margin="0,0,0,6"
                                       ToolTip="{loc:Loc SettingsWindow.Timing.GamePath}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="180"/>
@@ -131,8 +138,7 @@
 
         <TabItem Header="{loc:Loc SettingsWindow.ThemeCategory}"
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Style="{StaticResource SettingsPageScrollViewerStyle}">
                 <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.ThemeCategory}"
                                Style="{StaticResource PageTitleStyle}"/>
@@ -183,8 +189,7 @@
 
         <TabItem Header="{loc:Loc SettingsWindow.Rendering}"
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Style="{StaticResource SettingsPageScrollViewerStyle}">
                 <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.Rendering}"
                                Style="{StaticResource PageTitleStyle}"/>
@@ -207,14 +212,14 @@
                                    ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
                         <StackPanel Grid.Row="0" Grid.Column="1"
                                     Orientation="Horizontal"
-                                    Margin="0,0,0,10">
+                                    Margin="0,0,0,6">
                             <ComboBox Width="220"
                                       Style="{StaticResource AeInput.ComboBox}"
                                       SelectedItem="{Binding CurrentRenderEngineBackgroundColour, UpdateSourceTrigger=PropertyChanged}"
                                       ItemsSource="{Binding RenderEngineBackgroundColours}"
                                       ItemTemplate="{StaticResource SettingsEnumConverterTemplate}"/>
                             <colourpicker:ColourPickerButtonView
-                                Width="32" Height="32" Margin="10,0,0,0"
+                                Width="28" Height="28" Margin="8,0,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Center"
                                 DataContext="{Binding CustomBackgroundColourPicker}"
@@ -246,12 +251,12 @@
                                    ToolTip="{loc:Loc SettingsWindow.Timing.ImmediatePreview}"/>
                         <StackPanel Grid.Row="2" Grid.Column="1"
                                     Orientation="Horizontal"
-                                    Margin="0,0,0,10">
+                                    Margin="0,0,0,6">
                             <CheckBox IsChecked="{Binding ShowViewportGrid, UpdateSourceTrigger=PropertyChanged}"
                                       Style="{StaticResource AeInput.CheckBox}"
                                       VerticalAlignment="Center"/>
                             <colourpicker:ColourPickerButtonView
-                                Width="32" Height="32" Margin="12,0,0,0"
+                                Width="28" Height="28" Margin="8,0,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Center"
                                 DataContext="{Binding ViewportGridColourPicker}"
@@ -262,8 +267,8 @@
                         <Expander Grid.Row="3" Grid.ColumnSpan="2"
                                   Header="{loc:Loc SettingsWindow.PhotoStudioLighting}"
                                   IsExpanded="False"
-                                  Margin="0,8,0,16">
-                            <Grid Margin="14,12,0,0">
+                                  Margin="0,6,0,10">
+                            <Grid Margin="12,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsLabels"/>
                                     <ColumnDefinition Width="*"/>
@@ -323,8 +328,7 @@
 
         <TabItem Header="{loc:Loc SettingsWindow.Audio}"
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Style="{StaticResource SettingsPageScrollViewerStyle}">
                 <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.Audio}"
                                Style="{StaticResource PageTitleStyle}"/>
@@ -341,7 +345,7 @@
                                    Text="{loc:Loc SettingsWindow.WwiseCli}"
                                    Style="{StaticResource SettingsLabelStyle}"
                                    ToolTip="{loc:Loc SettingsWindow.Timing.NextAudioCompile}"/>
-                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -369,8 +373,7 @@
 
         <TabItem Header="{loc:Loc SettingsWindow.Save}"
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Style="{StaticResource SettingsPageScrollViewerStyle}">
                 <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.Save}"
                                Style="{StaticResource PageTitleStyle}"/>
@@ -399,7 +402,7 @@
                                    Style="{StaticResource SettingsLabelStyle}"
                                    ToolTip="{loc:Loc SettingsWindow.Timing.SaveImmediate}"/>
                         <StackPanel Grid.Row="1" Grid.Column="1"
-                                    Orientation="Horizontal" Margin="0,0,0,10">
+                                    Orientation="Horizontal" Margin="0,0,0,6">
                             <TextBox Text="{Binding AutoSaveIntervalMinutes, UpdateSourceTrigger=LostFocus}"
                                      Width="60" HorizontalContentAlignment="Right"
                                      Style="{StaticResource AeInput.TextBox}"/>
@@ -411,7 +414,7 @@
                                    Text="{loc:Loc SettingsWindow.BackupPath}"
                                    Style="{StaticResource SettingsLabelStyle}"
                                    ToolTip="{loc:Loc SettingsWindow.Timing.NextBackup}"/>
-                        <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,10">
+                        <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>

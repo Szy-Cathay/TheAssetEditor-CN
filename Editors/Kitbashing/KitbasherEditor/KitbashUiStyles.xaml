@@ -127,7 +127,41 @@
                         Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="{StaticResource AeRadius.Control}">
+                        CornerRadius="{StaticResource AeRadius.Control}"
+                        RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1" />
+                        </Border.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualStateGroup.Transitions>
+                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}" />
+                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}" />
+                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}" />
+                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}" />
+                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}" />
+                                </VisualStateGroup.Transitions>
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <ContentPresenter
                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />

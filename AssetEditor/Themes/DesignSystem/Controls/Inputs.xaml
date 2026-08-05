@@ -181,7 +181,40 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Grid>
+                    <Grid RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1" />
+                        </Grid.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualStateGroup.Transitions>
+                                    <VisualTransition From="Normal" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Hover}" />
+                                    <VisualTransition To="Pressed" GeneratedDuration="{StaticResource AeMotion.Pressed}" />
+                                    <VisualTransition From="Pressed" To="MouseOver" GeneratedDuration="{StaticResource AeMotion.Release}" />
+                                    <VisualTransition From="Pressed" To="Normal" GeneratedDuration="{StaticResource AeMotion.Release}" />
+                                    <VisualTransition GeneratedDuration="{StaticResource AeMotion.Hover}" />
+                                </VisualStateGroup.Transitions>
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="1" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="1" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleX" To="0.94" />
+                                        <DoubleAnimation Storyboard.TargetName="InteractionScale" Storyboard.TargetProperty="ScaleY" To="0.94" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <Border
                             x:Name="Track"
                             Background="{TemplateBinding Background}"
@@ -195,13 +228,6 @@
                             Margin="3"
                             HorizontalAlignment="Left"
                             Fill="{DynamicResource AeBrush.TextPrimary}" />
-                        <Border
-                            x:Name="FocusRing"
-                            Margin="-2"
-                            BorderBrush="{DynamicResource AeBrush.Accent}"
-                            BorderThickness="2"
-                            CornerRadius="13"
-                            Visibility="Collapsed" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
@@ -212,9 +238,6 @@
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />

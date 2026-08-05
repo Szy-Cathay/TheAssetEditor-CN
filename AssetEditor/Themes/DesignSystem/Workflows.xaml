@@ -4,13 +4,13 @@
     <Style
         x:Key="AeWorkflow.SettingsNavigationItem"
         TargetType="{x:Type TabItem}">
-        <Setter Property="Width" Value="164" />
-        <Setter Property="MinHeight" Value="38" />
-        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Width" Value="144" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,0" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="HorizontalContentAlignment" Value="Left" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
@@ -31,8 +31,8 @@
                             Visibility="Collapsed" />
                         <ContentPresenter
                             Margin="{TemplateBinding Padding}"
-                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
                             ContentSource="Header"
                             RecognizesAccessKey="True" />
                         <Border
@@ -93,7 +93,7 @@
                 <ControlTemplate TargetType="{x:Type TabControl}">
                     <Grid KeyboardNavigation.TabNavigation="Local">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="164" />
+                            <ColumnDefinition Width="144" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border
@@ -102,7 +102,7 @@
                             BorderThickness="0,0,1,0">
                             <TabPanel
                                 x:Name="HeaderPanel"
-                                Margin="0,8"
+                                Margin="0,4"
                                 IsItemsHost="True"
                                 KeyboardNavigation.TabIndex="1" />
                         </Border>

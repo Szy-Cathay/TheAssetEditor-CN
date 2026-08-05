@@ -479,14 +479,14 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void Buttons_UseApprovedWeakInteractionDurations()
+    public void Buttons_HighlightOnHoverAndBounceAfterPressWithoutFocusRings()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
             () =>
             {
                 var style = (Style)Application.Current.FindResource(
-                    "AeButton.Primary");
+                    "AeButton.Secondary");
                 var template = FindSetter(style, Control.TemplateProperty)
                     ?.Value as ControlTemplate;
                 var root = (FrameworkElement)template!.LoadContent();
@@ -520,6 +520,16 @@ public class UiCommonControlResourceTests
                         "InteractionScale")
                     .Select(animation => animation.To)
                     .ToArray();
+                var releaseTransitions = group.Transitions
+                    .Cast<VisualTransition>()
+                    .Where(item =>
+                        item.From == "Pressed" &&
+                        item.To is "MouseOver" or "Normal")
+                    .ToArray();
+                var hoverTrigger = style.Triggers
+                    .OfType<Trigger>()
+                    .Single(item =>
+                        item.Property == UIElement.IsMouseOverProperty);
                 var focusVisual = FindSetter(
                     style,
                     FrameworkElement.FocusVisualStyleProperty)?.Value as Style;
@@ -537,7 +547,7 @@ public class UiCommonControlResourceTests
                         Does.Contain(TimeSpan.FromMilliseconds(90)));
                     NUnitAssert.That(
                         durations,
-                        Does.Contain(TimeSpan.FromMilliseconds(120)));
+                        Does.Contain(TimeSpan.FromMilliseconds(160)));
                     NUnitAssert.That(
                         pressedTargets,
                         Does.Contain("InteractionScale"));
@@ -546,7 +556,20 @@ public class UiCommonControlResourceTests
                         Is.All.EqualTo(0.94));
                     NUnitAssert.That(
                         hoveredScales,
-                        Is.All.EqualTo(1.015));
+                        Is.All.EqualTo(1));
+                    NUnitAssert.That(releaseTransitions, Has.Length.EqualTo(2));
+                    NUnitAssert.That(
+                        releaseTransitions.Select(item =>
+                            item.GeneratedDuration.TimeSpan),
+                        Has.All.EqualTo(
+                            TimeSpan.FromMilliseconds(160)));
+                    NUnitAssert.That(
+                        hoverTrigger.Setters
+                            .OfType<Setter>()
+                            .Any(item =>
+                                item.Property ==
+                                Control.BackgroundProperty),
+                        Is.True);
                     NUnitAssert.That(focusVisual, Is.Null);
                     NUnitAssert.That(persistentFocusRings, Is.Empty);
                     NUnitAssert.That(translucentStateOverlays, Is.Empty);
@@ -555,7 +578,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void LegacyButtonBases_UseTheSameVisibleScaleMotion()
+    public void LegacyButtonBases_UseHighlightAndReleaseBounceMotion()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -595,21 +618,132 @@ public class UiCommonControlResourceTests
                     var pressed = group.States
                         .Cast<VisualState>()
                         .Single(item => item.Name == "Pressed");
+                    var releaseTransitions = group.Transitions
+                        .Cast<VisualTransition>()
+                        .Where(item =>
+                            item.From == "Pressed" &&
+                            item.To is "MouseOver" or "Normal")
+                        .ToArray();
 
                     NUnitAssert.Multiple(() =>
                     {
                         NUnitAssert.That(
                             ReadScales(hovered),
-                            Is.All.EqualTo(1.015));
+                            Is.All.EqualTo(1));
                         NUnitAssert.That(
                             ReadScales(pressed),
                             Is.All.EqualTo(0.94));
+                        NUnitAssert.That(
+                            releaseTransitions,
+                            Has.Length.EqualTo(2));
+                        NUnitAssert.That(
+                            releaseTransitions.Select(item =>
+                                item.GeneratedDuration.TimeSpan),
+                            Has.All.EqualTo(
+                                TimeSpan.FromMilliseconds(160)));
                         NUnitAssert.That(
                             FindDescendants<Border>(root)
                                 .Where(item => item.Name == "StateOverlay"),
                             Is.Empty);
                         NUnitAssert.That(focusVisualSetter, Is.Not.Null);
                         NUnitAssert.That(focusVisualSetter!.Value, Is.Null);
+                    });
+                }
+            });
+    }
+
+    [Test]
+    public void EditorWorkspace_UsesTheGlobalGlyphOnlyExpanderTemplate()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var dictionary = Load(
+                    "Shared.Ui",
+                    "Common/Styles/EditorWorkspaceStyles.xaml");
+                var style = (Style)dictionary[typeof(Expander)];
+                var template = FindSetter(
+                        style,
+                        Control.TemplateProperty)
+                    ?.Value as ControlTemplate;
+
+                NUnitAssert.That(template, Is.Not.Null);
+                var expander = new Expander
+                {
+                    Style = style,
+                    Header = "Header",
+                    Content = new TextBlock { Text = "Content" },
+                    IsExpanded = true,
+                };
+                expander.Measure(new Size(320, 200));
+                expander.Arrange(new Rect(0, 0, 320, 200));
+                expander.ApplyTemplate();
+                expander.UpdateLayout();
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(style.BasedOn, Is.Not.Null);
+                    NUnitAssert.That(
+                        FindDescendants<ShapePath>(expander),
+                        Is.Not.Empty);
+                    NUnitAssert.That(
+                        FindDescendants<System.Windows.Shapes.Ellipse>(
+                            expander),
+                        Is.Empty);
+                });
+            });
+    }
+
+    [Test]
+    public void EditorToggleButtons_UsePressMotionWithoutFocusFrames()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var kitbash = Load(
+                    "Editors.KitbasherEditor",
+                    "KitbashUiStyles.xaml");
+                var styles = new[]
+                {
+                    (Style)kitbash["Kitbash.ToolRadioButton"],
+                    (Style)Application.Current.FindResource(
+                        "AeInput.Switch"),
+                };
+
+                foreach (var style in styles)
+                {
+                    var template = (ControlTemplate)FindSetter(
+                        style,
+                        Control.TemplateProperty)!.Value;
+                    var root = (FrameworkElement)template.LoadContent();
+                    var group = VisualStateManager
+                        .GetVisualStateGroups(root)
+                        .OfType<VisualStateGroup>()
+                        .SingleOrDefault(item =>
+                            item.Name == "CommonStates");
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            FindSetter(
+                                style,
+                                FrameworkElement.FocusVisualStyleProperty)
+                                ?.Value,
+                            Is.Null);
+                        NUnitAssert.That(
+                            FindDescendants<Border>(root)
+                                .Where(item => item.Name == "FocusRing"),
+                            Is.Empty);
+                        NUnitAssert.That(group, Is.Not.Null);
+                        NUnitAssert.That(
+                            group?.Transitions
+                                .Cast<VisualTransition>()
+                                .Count(item =>
+                                    item.From == "Pressed" &&
+                                    item.To is "MouseOver" or "Normal"),
+                            Is.EqualTo(2));
                     });
                 }
             });
@@ -807,6 +941,14 @@ public class UiCommonControlResourceTests
     {
         Source = new Uri(
             $"pack://application:,,,/AssetEditor.CN;component/{path}"),
+    };
+
+    private static ResourceDictionary Load(
+        string assemblyName,
+        string path) => new()
+    {
+        Source = new Uri(
+            $"pack://application:,,,/{assemblyName};component/{path}"),
     };
 
     private static string FindSolutionRoot()
