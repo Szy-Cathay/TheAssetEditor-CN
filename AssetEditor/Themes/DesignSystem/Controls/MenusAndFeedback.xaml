@@ -21,11 +21,19 @@
                 BorderBrush="{TemplateBinding BorderBrush}"
                 BorderThickness="{TemplateBinding BorderThickness}"
                 CornerRadius="{StaticResource AeRadius.Compact}">
-                <ContentPresenter
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    ContentSource="Header"
-                    RecognizesAccessKey="True" />
+                <Grid>
+                    <Border
+                        x:Name="StateOverlay"
+                        Background="{DynamicResource AeBrush.SurfaceHover}"
+                        CornerRadius="{StaticResource AeRadius.Compact}"
+                        IsHitTestVisible="False"
+                        Opacity="0" />
+                    <ContentPresenter
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        ContentSource="Header"
+                        RecognizesAccessKey="True" />
+                </Grid>
             </Border>
             <Popup
                 x:Name="PART_Popup"
@@ -51,6 +59,24 @@
                 </Border>
             </Popup>
         </Grid>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Trigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource AeMotion.Hover}" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource AeMotion.Hover}" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
+            </Trigger>
+        </ControlTemplate.Triggers>
     </ControlTemplate>
 
     <ControlTemplate
@@ -72,6 +98,13 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <Border
+                        x:Name="StateOverlay"
+                        Grid.ColumnSpan="4"
+                        Background="{DynamicResource AeBrush.SurfaceHover}"
+                        CornerRadius="{StaticResource AeRadius.Compact}"
+                        IsHitTestVisible="False"
+                        Opacity="0" />
                     <Grid VerticalAlignment="Center">
                         <ContentPresenter
                             x:Name="IconPresenter"
@@ -151,6 +184,22 @@
             <Trigger Property="HasItems" Value="True">
                 <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
             </Trigger>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Trigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource AeMotion.Hover}" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource AeMotion.Hover}" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
+            </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
 
@@ -176,7 +225,6 @@
                 <Setter Property="StaysOpenOnClick" Value="True" />
             </Trigger>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
                 <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">

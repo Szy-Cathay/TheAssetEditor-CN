@@ -18,7 +18,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/BaseDialogs/OptionalRadioButtonStyle.xaml" />
+                <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <valueconverters:SceneNodeToImageConverter x:Key="ImageValueConverter"/>
@@ -42,8 +42,8 @@
             <TreeView.ItemTemplate>
                 <HierarchicalDataTemplate ItemsSource="{Binding Children, UpdateSourceTrigger=PropertyChanged}">
                     <StackPanel Orientation="Horizontal" >
-                        <basedialogs:OptionalRadioButton Focusable="true"  VerticalAlignment="Center"
-                             Style="{StaticResource OptionalRadioButtonStyle}"                     
+                        <basedialogs:OptionalRadioButton VerticalAlignment="Center"
+                             Style="{StaticResource Kitbash.VisibilityToggle}"
                              IsChecked="{Binding Content.IsVisible, UpdateSourceTrigger=PropertyChanged , Mode=TwoWay}"
                              GroupName="{Binding Path=. , Converter={StaticResource RadioButtonGroupConverter}}"/>
                         <Image Width="18" Margin="2,0" Source="{Binding Source={x:Static resources:IconLibrary.LockIcon}, UpdateSourceTrigger=PropertyChanged}" >
@@ -74,19 +74,22 @@
         
             
             <local:MultiSelectTreeView.Resources>
-                <ContextMenu x:Key="NodeContextMenu" ItemsSource="{Binding DataContext.ContextMenu.Items, UpdateSourceTrigger=PropertyChanged,  RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" DisplayMemberPath="Name">
+                <ContextMenu x:Key="NodeContextMenu" ItemsSource="{Binding DataContext.ContextMenu.Items, UpdateSourceTrigger=PropertyChanged,  RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" DisplayMemberPath="Name" Style="{StaticResource AeMenu.Context}">
                     <ContextMenu.Resources>
                         <ControlTemplate x:Key="MenuSeparatorTemplate">
-                            <Separator />
+                            <Separator Margin="4,2" />
                         </ControlTemplate>
                     </ContextMenu.Resources>
 
                     <ContextMenu.ItemContainerStyle>
-                        <Style TargetType="MenuItem">
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource AeMenu.Item}">
                             <Setter Property="Command" Value="{Binding Command}"/>
                             <Setter Property="ItemsSource" Value="{Binding ContextMenu}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding }" Value="{x:Null}">
+                                    <Setter Property="MinHeight" Value="0" />
+                                    <Setter Property="Height" Value="5" />
+                                    <Setter Property="Padding" Value="0" />
                                     <Setter Property="Template" Value="{StaticResource MenuSeparatorTemplate}" />
                                 </DataTrigger>
                             </Style.Triggers>

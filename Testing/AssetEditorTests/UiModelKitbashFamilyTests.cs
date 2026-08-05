@@ -168,6 +168,96 @@ public class UiModelKitbashFamilyTests
         });
     }
 
+    [Test]
+    public void Kitbash_UsesClearVisibilityChecksAndCompactPropertyChrome()
+    {
+        var root = FindSolutionRoot();
+        var styles = ReadKitbashStyleSource();
+        var sceneExplorer = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "SceneExplorer",
+            "SceneExplorerView.xaml"));
+        var sceneNodeEditor = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "SceneNodeEditor",
+            "SceneNodeEditorView.xaml"));
+        var propertyViews = new[]
+        {
+            "Nodes/SkeletonNode/SkeletonView.xaml",
+            "Nodes/GroupNode/GroupView.xaml",
+            "Nodes/MainEditableNode/MainEditableNodeView.xaml",
+        }.Select(path => File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "SceneNodeEditor",
+            path.Replace('/', Path.DirectorySeparatorChar))));
+        var propertySource = string.Join(Environment.NewLine, propertyViews);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                styles,
+                Does.Contain("x:Key=\"Kitbash.VisibilityToggle\""));
+            NUnitAssert.That(styles, Does.Contain("x:Name=\"CheckMark\""));
+            NUnitAssert.That(styles, Does.Contain("x:Key=\"Kitbash.PropertyTitle\""));
+            NUnitAssert.That(styles, Does.Not.Contain("<Ellipse"));
+            NUnitAssert.That(
+                sceneExplorer,
+                Does.Contain("Style=\"{StaticResource Kitbash.VisibilityToggle}\""));
+            NUnitAssert.That(sceneExplorer, Does.Contain("Content.IsVisible"));
+            NUnitAssert.That(propertySource, Does.Not.Contain("FontSize=\"20\""));
+            NUnitAssert.That(
+                propertySource,
+                Does.Contain("Style=\"{DynamicResource Kitbash.PropertyTitle}\""));
+            NUnitAssert.That(
+                sceneNodeEditor,
+                Does.Contain("HorizontalContentAlignment=\"Stretch\""));
+            NUnitAssert.That(
+                sceneNodeEditor,
+                Does.Contain("Background=\"{DynamicResource AeBrush.Surface1}\""));
+        });
+    }
+
+    [Test]
+    public void DynamicContextMenuSeparators_UseCompactRows()
+    {
+        var root = FindSolutionRoot();
+        var sources = new[]
+        {
+            "Editors/Kitbashing/KitbasherEditor/Core/SceneExplorer/SceneExplorerView.xaml",
+            "Shared/SharedUI/BaseDialogs/PackFileTree/PackFileBrowserView.xaml",
+        }.Select(path => File.ReadAllText(Path.Combine(
+            root,
+            path.Replace('/', Path.DirectorySeparatorChar))));
+
+        NUnitAssert.Multiple(() =>
+        {
+            foreach (var source in sources)
+            {
+                NUnitAssert.That(
+                    source,
+                    Does.Contain("Property=\"MinHeight\" Value=\"0\""));
+                NUnitAssert.That(
+                    source,
+                    Does.Contain("Property=\"Height\" Value=\"5\""));
+                NUnitAssert.That(
+                    source,
+                    Does.Contain("Property=\"Padding\" Value=\"0\""));
+            }
+        });
+    }
+
     private static IReadOnlyList<string> ReadProductSources()
     {
         var root = FindSolutionRoot();

@@ -48,6 +48,11 @@
             <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+        <Style x:Key="SettingsPageStyle" TargetType="{x:Type StackPanel}">
+            <Setter Property="Margin" Value="18,16"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
     </UserControl.Resources>
 
     <TabControl x:Name="SettingsCategories"
@@ -60,7 +65,7 @@
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.General}"
                                Style="{StaticResource PageTitleStyle}"/>
                     <Grid>
@@ -128,7 +133,7 @@
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.ThemeCategory}"
                                Style="{StaticResource PageTitleStyle}"/>
                     <Grid>
@@ -180,7 +185,7 @@
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.Rendering}"
                                Style="{StaticResource PageTitleStyle}"/>
                     <Grid>
@@ -320,7 +325,7 @@
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.Audio}"
                                Style="{StaticResource PageTitleStyle}"/>
                     <Grid>
@@ -366,7 +371,7 @@
                  Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="26,24" Grid.IsSharedSizeScope="True">
+                <StackPanel Style="{StaticResource SettingsPageStyle}" Grid.IsSharedSizeScope="True">
                     <TextBlock Text="{loc:Loc SettingsWindow.Save}"
                                Style="{StaticResource PageTitleStyle}"/>
                     <Grid>

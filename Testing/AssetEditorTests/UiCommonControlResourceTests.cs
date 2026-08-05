@@ -4,6 +4,7 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using NUnit.Framework;
 using Shared.Core.Settings;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -341,6 +342,71 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
+    public void ComboBox_UsesGlyphOnlyAnimatedDropDownArrow()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var comboBox = new ComboBox
+                {
+                    Width = 240,
+                    Style = (Style)Application.Current.FindResource(
+                        "AeInput.ComboBox"),
+                };
+                comboBox.Items.Add("战锤 III");
+                var window = new Window
+                {
+                    Width = 300,
+                    Height = 100,
+                    Content = comboBox,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var toggle = FindDescendants<ToggleButton>(comboBox)
+                        .Single();
+                    var arrow = FindDescendants<ShapePath>(toggle).Single();
+                    var arrowHost = (Border)VisualTreeHelper.GetParent(arrow);
+                    var hoverTrigger = arrow.Style.Triggers
+                        .OfType<Trigger>()
+                        .Single(trigger =>
+                            trigger.Property == UIElement.IsMouseOverProperty);
+                    var animations = hoverTrigger.EnterActions
+                        .OfType<BeginStoryboard>()
+                        .SelectMany(action => action.Storyboard.Children)
+                        .OfType<DoubleAnimation>()
+                        .ToArray();
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            FindDescendants<System.Windows.Shapes.Ellipse>(
+                                toggle),
+                            Is.Empty);
+                        NUnitAssert.That(arrowHost.Width, Is.EqualTo(20));
+                        NUnitAssert.That(
+                            arrowHost.Background,
+                            Is.EqualTo(Brushes.Transparent));
+                        NUnitAssert.That(animations, Is.Not.Empty);
+                        NUnitAssert.That(
+                            animations.Select(animation =>
+                                animation.Duration.TimeSpan),
+                            Does.Contain(TimeSpan.FromMilliseconds(120)));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
     public void TextOnlyMenu_DoesNotReserveAnIconRail()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -443,6 +509,61 @@ public class UiCommonControlResourceTests
             });
     }
 
+    [Test]
+    public void GlobalExpanderArrows_AreGlyphOnlyAndUseWeakHoverMotion()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "AssetEditor",
+            "Themes",
+            "Controls.xaml"));
+        var start = source.IndexOf(
+            "x:Key=\"ExpanderArrowGlyphStyle\"",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "x:Key=\"ExpanderWithBorderBackground\"",
+            StringComparison.Ordinal);
+        var expanderHeaders = source[start..end];
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(start, Is.GreaterThanOrEqualTo(0));
+            NUnitAssert.That(end, Is.GreaterThan(start));
+            NUnitAssert.That(expanderHeaders, Does.Not.Contain("<Ellipse"));
+            NUnitAssert.That(
+                expanderHeaders,
+                Does.Contain("AeBrush.AccentHover"));
+            NUnitAssert.That(
+                expanderHeaders,
+                Does.Contain("AeMotion.Hover"));
+            NUnitAssert.That(expanderHeaders, Does.Contain("DoubleAnimation"));
+        });
+    }
+
+    [Test]
+    public void MenusCollectionsAndSettingsNavigation_UseWeakInteractionMotion()
+    {
+        var root = FindSolutionRoot();
+        var paths = new[]
+        {
+            "AssetEditor/Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/Collections.xaml",
+            "AssetEditor/Themes/DesignSystem/Workflows.xaml",
+        };
+
+        foreach (var path in paths)
+        {
+            var source = File.ReadAllText(Path.Combine(
+                root,
+                path.Replace('/', Path.DirectorySeparatorChar)));
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(source, Does.Contain("AeMotion.Hover"));
+                NUnitAssert.That(source, Does.Contain("DoubleAnimation"));
+            });
+        }
+    }
+
     private static ResourceDictionary[] LoadDictionaries() =>
     [
         Load("Themes/DesignSystem/Controls/Buttons.xaml"),
@@ -502,6 +623,25 @@ public class UiCommonControlResourceTests
         Source = new Uri(
             $"pack://application:,,,/AssetEditor.CN;component/{path}"),
     };
+
+    private static string FindSolutionRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(
+                    directory.FullName,
+                    "AssetEditor.CN.sln")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "Could not locate the solution root.");
+    }
 
     private sealed record NamedOption(string Name);
 }

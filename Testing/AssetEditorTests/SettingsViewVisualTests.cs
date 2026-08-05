@@ -198,6 +198,39 @@ public class SettingsViewVisualTests
     }
 
     [Test]
+    public void CategoryPages_AreAnchoredToTheUpperLeft()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var view = new SettingsView();
+                var pageStyle = (Style)view.Resources["SettingsPageStyle"];
+                var pages = GetDescendants<StackPanel>(view)
+                    .Where(panel => ReferenceEquals(panel.Style, pageStyle))
+                    .ToList();
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(pages, Has.Count.EqualTo(5));
+                    NUnitAssert.That(
+                        pages.Select(page => page.HorizontalAlignment),
+                        Has.All.EqualTo(HorizontalAlignment.Left));
+                    NUnitAssert.That(
+                        pages.Select(page => page.VerticalAlignment),
+                        Has.All.EqualTo(VerticalAlignment.Top));
+                    NUnitAssert.That(
+                        pages.Select(page => page.Margin),
+                        Has.All.EqualTo(new Thickness(18, 16, 18, 16)));
+                });
+            });
+    }
+
+    [Test]
     public void AllCategories_RenderOffscreenAtMinimumContentSize()
     {
         using var services = new ServiceCollection()

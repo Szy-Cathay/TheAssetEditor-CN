@@ -14,7 +14,9 @@
     </UserControl.Resources>
     <DockPanel LastChildFill="False">
 
-        <Label Content="{loc:Loc SkeletonInfo.SkeletonInformation}" FontSize="20" FontWeight="Bold" DockPanel.Dock="Top"/>
+        <TextBlock Text="{loc:Loc SkeletonInfo.SkeletonInformation}"
+                   Style="{DynamicResource Kitbash.PropertyTitle}"
+                   DockPanel.Dock="Top"/>
 
 
         <DockPanel DockPanel.Dock="Top">
