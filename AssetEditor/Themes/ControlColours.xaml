@@ -292,6 +292,6 @@
 
     <SolidColorBrush x:Key="WindowBackground"                         Color="{DynamicResource AColour.Tone2.Background.Static}"/>
 
-    <FontFamily x:Key="AppFontFamily">/AssetEditor.CN;component/Fonts/#Alibaba PuHuiTi 3.0</FontFamily>
+    <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI</FontFamily>
     <FontWeight x:Key="AppFontWeight">Normal</FontWeight>
 </ResourceDictionary>

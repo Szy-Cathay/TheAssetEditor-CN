@@ -10,6 +10,44 @@ namespace AssetEditorTests;
 [NonParallelizable]
 public class UiDesignSystemResourceTests
 {
+    [Test]
+    public void Typography_ExposesApprovedTextRoles()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var dictionary = Load(
+                "Themes/DesignSystem/Typography.xaml");
+            var expected = new Dictionary<string, double>
+            {
+                ["AeText.PageTitle"] = 20,
+                ["AeText.SectionTitle"] = 13,
+                ["AeText.Body"] = 12,
+                ["AeText.Label"] = 11,
+                ["AeText.Caption"] = 11,
+                ["AeText.Technical"] = 11,
+            };
+
+            NUnitAssert.Multiple(() =>
+            {
+                foreach (var pair in expected)
+                {
+                    var style = (Style)dictionary[pair.Key];
+                    NUnitAssert.That(
+                        style.TargetType,
+                        Is.EqualTo(typeof(TextBlock)),
+                        pair.Key);
+                    NUnitAssert.That(
+                        style.Setters.OfType<Setter>()
+                            .Single(setter =>
+                                setter.Property == TextBlock.FontSizeProperty)
+                            .Value,
+                        Is.EqualTo(pair.Value),
+                        pair.Key);
+                }
+            });
+        });
+    }
+
     private static readonly string[] SemanticBrushKeys =
     [
         "AeBrush.Canvas",
