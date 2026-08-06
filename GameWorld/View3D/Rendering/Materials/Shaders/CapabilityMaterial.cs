@@ -88,7 +88,11 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
             var tintCapability = TryGetCapability<TintCapability>();
 
             if (tintCapability != null)
+            {
                 tintCapability.FactionColours = commonShaderParameters.FactionColours;
+                tintCapability.UseFactionColours =
+                    commonShaderParameters.FactionColoursEnabled;
+            }
 
             var effect = GetEffect();
             OnApply(effect);

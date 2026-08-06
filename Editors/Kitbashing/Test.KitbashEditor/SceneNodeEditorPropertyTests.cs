@@ -13,6 +13,7 @@ using Moq;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.RigidModel.Transforms;
@@ -206,7 +207,10 @@ namespace Test.KitbashEditor
         {
             var commandExecutor = new CommandExecutor(Mock.Of<IEventHub>());
             var sceneParameters = new SceneRenderParametersStore();
-            var capability = new TintCapability();
+            var capability = new TintCapability
+            {
+                ApplyCapability = true
+            };
             var viewModel = new TintViewModel(capability, sceneParameters);
 
             viewModel.FactionColour0.PickedColor =
@@ -217,13 +221,13 @@ namespace Test.KitbashEditor
             {
                 Assert.That(
                     sceneParameters.FactionColour0.X,
-                    Is.EqualTo(64f / 256f));
+                    Is.EqualTo(64f / 255f));
                 Assert.That(
                     sceneParameters.FactionColour0.Y,
-                    Is.EqualTo(128f / 256f));
+                    Is.EqualTo(128f / 255f));
                 Assert.That(
                     sceneParameters.FactionColour0.Z,
-                    Is.EqualTo(255f / 256f));
+                    Is.EqualTo(1f));
                 Assert.That(commandExecutor.CanUndo(), Is.False);
             });
 
@@ -231,8 +235,42 @@ namespace Test.KitbashEditor
 
             Assert.Multiple(() =>
             {
-                Assert.That(capability.ApplyCapability, Is.False);
+                Assert.That(sceneParameters.FactionColoursEnabled, Is.False);
+                Assert.That(capability.UseFactionColours, Is.False);
+                Assert.That(capability.ApplyCapability, Is.True);
                 Assert.That(commandExecutor.CanUndo(), Is.False);
+            });
+        }
+
+        [Test]
+        public void SaveFactionPreview_PersistsSharedViewportSettings()
+        {
+            var sceneParameters = new SceneRenderParametersStore();
+            var applicationSettings = new ApplicationSettingsService();
+            var settingsService = new FactionColourSettingsService(
+                applicationSettings,
+                Mock.Of<IGlobalEventHub>());
+            var viewModel = new TintViewModel(
+                new TintCapability(),
+                sceneParameters,
+                settingsService);
+            viewModel.ApplyFactionColours = false;
+            viewModel.FactionColour1.PickedColor =
+                System.Windows.Media.Color.FromRgb(90, 150, 210);
+            viewModel.FactionColour1.OnHandleColourChanged();
+
+            viewModel.SaveFactionColourSettingsCommand.Execute(null);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    applicationSettings.CurrentSettings
+                        .ViewportFactionColoursEnabled,
+                    Is.False);
+                Assert.That(
+                    applicationSettings.CurrentSettings
+                        .ViewportFactionColour1,
+                    Is.EqualTo("90,150,210"));
             });
         }
 

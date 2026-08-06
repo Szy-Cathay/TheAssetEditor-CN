@@ -371,16 +371,21 @@ namespace AssetEditor.ViewModels
                 return false;
             }
 
-            settings = new ViewportRenderSettings(
-                CurrentRenderEngineBackgroundColour,
-                backgroundColour,
-                SimulateGameBackfaces,
-                ShowViewportGrid,
-                gridColour,
-                lightIntensity,
-                environmentLightRotationY,
-                directLightRotationX,
-                directLightRotationY);
+            settings = ViewportRenderSettings.From(
+                _settingsService.CurrentSettings) with
+            {
+                BackgroundColour =
+                    CurrentRenderEngineBackgroundColour,
+                CustomBackgroundColour = backgroundColour,
+                SimulateGameBackfaces = SimulateGameBackfaces,
+                ShowGrid = ShowViewportGrid,
+                GridColour = gridColour,
+                LightIntensity = lightIntensity,
+                EnvironmentLightRotationY =
+                    environmentLightRotationY,
+                DirectLightRotationX = directLightRotationX,
+                DirectLightRotationY = directLightRotationY
+            };
             return true;
         }
 

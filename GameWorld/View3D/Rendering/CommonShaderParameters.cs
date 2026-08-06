@@ -15,7 +15,8 @@ namespace GameWorld.Core.Rendering
         Vector3 LightColour,
         Vector3[] FactionColours,
         float ViewportHeight = 0,
-        float ViewportWidth = 0
+        float ViewportWidth = 0,
+        bool FactionColoursEnabled = true
         );
 
 }

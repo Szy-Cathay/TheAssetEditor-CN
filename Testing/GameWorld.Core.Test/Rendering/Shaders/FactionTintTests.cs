@@ -103,6 +103,44 @@ public class FactionTintTests
     }
 
     [Test]
+    public void MaterialApply_ForwardsGlobalFactionPreviewStateToEffect()
+    {
+        var game = new WpfGameMock();
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\Pbr\\SpecGloss\\SpecGloss_main");
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library => library.GetStaticEffect(
+                ShaderTypes.Pbr_SpecGloss))
+            .Returns(effect);
+        var material = new FactionTintMaterial(resources.Object);
+        var parameters = new CommonShaderParameters(
+            Matrix.Identity,
+            Matrix.Identity,
+            Vector3.Zero,
+            Vector3.Zero,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            [Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ],
+            FactionColoursEnabled: false);
+
+        material.Apply(parameters, Matrix.Identity);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(material.Tint.UseFactionColours, Is.False);
+            Assert.That(
+                effect.Parameters["Tint_UseFactionColours"]
+                    .GetValueBoolean(),
+                Is.False);
+            Assert.That(material.Tint.ApplyCapability, Is.True);
+        });
+    }
+
+    [Test]
     public void SpecGlossShader_AppliesFactionColourFromMaskChannel()
     {
         var game = new WpfGameMock();
@@ -126,6 +164,42 @@ public class FactionTintTests
         {
             Assert.That(redPixel.R, Is.GreaterThan(redPixel.B + 20));
             Assert.That(bluePixel.B, Is.GreaterThan(bluePixel.R + 20));
+        });
+    }
+
+    [Test]
+    public void SpecGlossShader_DisabledFactionPreviewLeavesDiffuseUntinted()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\Pbr\\SpecGloss\\SpecGloss_main");
+        using var diffuse = CreateTexture(device, Color.White);
+        using var mask = CreateTexture(device, Color.Red);
+        ConfigureSpecGlossEffect(effect, diffuse, mask);
+
+        var tintedPixel = RenderFactionColour(
+            device,
+            effect,
+            new Vector3(1, 0, 0));
+        effect.Parameters["Tint_UseFactionColours"]
+            .SetValue(false);
+        var untintedPixel = RenderFactionColour(
+            device,
+            effect,
+            new Vector3(1, 0, 0));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                tintedPixel.R,
+                Is.GreaterThan(tintedPixel.G + 20));
+            Assert.That(
+                Math.Abs(untintedPixel.R - untintedPixel.G),
+                Is.LessThanOrEqualTo(2));
+            Assert.That(
+                Math.Abs(untintedPixel.G - untintedPixel.B),
+                Is.LessThanOrEqualTo(2));
         });
     }
 
@@ -252,5 +326,26 @@ public class FactionTintTests
             BlendWeights = Vector4.Zero,
             BlendIndices = Vector4.Zero
         };
+    }
+
+    private sealed class FactionTintMaterial : CapabilityMaterial
+    {
+        public TintCapability Tint { get; } = new();
+
+        public FactionTintMaterial(IScopedResourceLibrary resources)
+            : base(
+                CapabilityMaterialsEnum.SpecGlossPbr_Default,
+                ShaderTypes.Pbr_SpecGloss,
+                resources)
+        {
+            Capabilities =
+            [
+                new CommonShaderParametersCapability(),
+                Tint
+            ];
+        }
+
+        protected override CapabilityMaterial CreateCloneInstance() =>
+            new FactionTintMaterial(_resourceLibrary);
     }
 }

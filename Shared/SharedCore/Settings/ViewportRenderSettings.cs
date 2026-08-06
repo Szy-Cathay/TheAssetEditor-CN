@@ -9,7 +9,11 @@ namespace Shared.Core.Settings
         float LightIntensity,
         float EnvironmentLightRotationY,
         float DirectLightRotationX,
-        float DirectLightRotationY)
+        float DirectLightRotationY,
+        bool FactionColoursEnabled = true,
+        string FactionColour0 = ApplicationSettings.DefaultFactionColour0,
+        string FactionColour1 = ApplicationSettings.DefaultFactionColour1,
+        string FactionColour2 = ApplicationSettings.DefaultFactionColour2)
     {
         public static ViewportRenderSettings From(
             ApplicationSettings settings)
@@ -23,7 +27,11 @@ namespace Shared.Core.Settings
                 settings.ViewportLightIntensity,
                 settings.ViewportEnvironmentLightRotationY,
                 settings.ViewportDirectLightRotationX,
-                settings.ViewportDirectLightRotationY);
+                settings.ViewportDirectLightRotationY,
+                settings.ViewportFactionColoursEnabled,
+                settings.ViewportFactionColour0,
+                settings.ViewportFactionColour1,
+                settings.ViewportFactionColour2);
         }
     }
 }

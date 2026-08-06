@@ -30,7 +30,10 @@ namespace Shared.Ui.BaseDialogs.ColourPickerButton
         [RelayCommand]
         public void OnHandleColourChanged()
         {
-            SelectedColour = new Vector3(PickedColor.R / 256f, PickedColor.G / 256f, PickedColor.B / 256f);
+            SelectedColour = new Vector3(
+                PickedColor.R / 255f,
+                PickedColor.G / 255f,
+                PickedColor.B / 255f);
             _onColourChangedCallback?.Invoke(SelectedColour);
         }
     }

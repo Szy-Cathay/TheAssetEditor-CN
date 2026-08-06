@@ -25,6 +25,7 @@ using GameWorld.Core.Services.SceneSaving.Material;
 using GameWorld.Core.Services.SceneSaving.Material.Strategies;
 using GameWorld.Core.Utility;
 using GameWorld.Core.WpfWindow;
+using GameWorld.Core.WpfWindow.FactionColourSettings;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.DependencyInjection;
 using Shared.Core.Services;
@@ -45,6 +46,10 @@ namespace GameWorld.Core
             // Settings
             serviceCollection.AddScoped<GeometrySaveSettings>();
             serviceCollection.AddScoped<SceneRenderParametersStore>();
+            serviceCollection.AddSingleton<FactionColourSettingsService>();
+            serviceCollection.AddTransient<
+                IFactionColourSettingsDialogService,
+                FactionColourSettingsDialogService>();
 
             // Services
             serviceCollection.AddSingleton<ISkeletonAnimationLookUpHelper, SkeletonAnimationLookUpHelper>();

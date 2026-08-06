@@ -29,7 +29,8 @@ namespace GameWorld.Core.Components.Rendering
 
                 _cachedFactionColours,
                 viewportHeight,
-                viewportWidth);
+                viewportWidth,
+                sceneLightParameters.FactionColoursEnabled);
 
             return commonShaderParameters;
         }

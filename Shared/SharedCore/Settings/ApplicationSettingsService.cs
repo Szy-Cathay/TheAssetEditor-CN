@@ -7,6 +7,10 @@ namespace Shared.Core.Settings
 {
     public class ApplicationSettings
     {
+        public const string DefaultFactionColour0 = "255,0,0";
+        public const string DefaultFactionColour1 = "100,169,226";
+        public const string DefaultFactionColour2 = "255,255,255";
+
         public class GamePathPair
         {
             public GameTypeEnum Game { get; set; }
@@ -24,6 +28,13 @@ namespace Shared.Core.Settings
         public float ViewportEnvironmentLightRotationY { get; set; } = 20.0f;
         public float ViewportDirectLightRotationX { get; set; } = 0.0f;
         public float ViewportDirectLightRotationY { get; set; } = 0.0f;
+        public bool ViewportFactionColoursEnabled { get; set; } = true;
+        public string ViewportFactionColour0 { get; set; } =
+            DefaultFactionColour0;
+        public string ViewportFactionColour1 { get; set; } =
+            DefaultFactionColour1;
+        public string ViewportFactionColour2 { get; set; } =
+            DefaultFactionColour2;
         public bool StartMaximised { get; set; } = false;
         public List<GamePathPair> GameDirectories { get; set; } = [];
         public GameTypeEnum CurrentGame { get; set; } = GameTypeEnum.Warhammer3;

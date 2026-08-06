@@ -15,6 +15,7 @@ using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using GameWorld.Core.WpfWindow;
+using GameWorld.Core.WpfWindow.FactionColourSettings;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
@@ -187,6 +188,7 @@ namespace Editors.CscEditor.ViewModels
         public ICommand AddCompositeSceneCommand { get; }
         public ICommand AddPrefabCommand { get; }
         public ICommand AddAnimationCommand { get; }
+        public ICommand OpenFactionColourSettingsCommand { get; }
 
         public CscEditorViewModel(
             IPackFileService packFileService,
@@ -201,7 +203,8 @@ namespace Editors.CscEditor.ViewModels
             CscPlaybackContext playbackContext,
             ArcBallCamera camera,
             SelectionManager selectionManager,
-            LocalizationManager localization)
+            LocalizationManager localization,
+            IFactionColourSettingsDialogService factionColourSettingsDialog)
         {
             _packFileService = packFileService;
             _fileSaveService = fileSaveService;
@@ -277,6 +280,8 @@ namespace Editors.CscEditor.ViewModels
             AddCompositeSceneCommand = new RelayCommand(AddCompositeScene);
             AddPrefabCommand = new RelayCommand(AddPrefab);
             AddAnimationCommand = new RelayCommand(AddAnimation);
+            OpenFactionColourSettingsCommand = new RelayCommand(
+                factionColourSettingsDialog.ShowDialog);
         }
 
         void OnPortholeFrameUpdated() => NotifyPropertyChanged(nameof(PortholeLiveFrame));

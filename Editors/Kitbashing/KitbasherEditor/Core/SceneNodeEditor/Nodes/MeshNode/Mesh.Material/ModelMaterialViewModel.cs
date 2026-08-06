@@ -30,6 +30,8 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
         private readonly IStandardDialogs _packFileUiProvider;
         private readonly SceneNodePropertyEditor _propertyEditor;
         private readonly SceneRenderParametersStore _sceneRenderParameters;
+        private readonly FactionColourSettingsService
+            _factionColourSettingsService;
         Rmv2MeshNode? _currentNode;
 
         [ObservableProperty] List<CapabilityMaterialsEnum> _possibleMaterialTypes;
@@ -52,7 +54,8 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
             CapabilityMaterialFactory abstractMaterialFactory,
             IStandardDialogs packFileUiProvider,
             SceneNodePropertyEditor propertyEditor,
-            SceneRenderParametersStore sceneRenderParameters)
+            SceneRenderParametersStore sceneRenderParameters,
+            FactionColourSettingsService factionColourSettingsService)
         {
             _uiCommandFactory = uiCommandFactory;
             _selectionManager = selectionManager;
@@ -63,6 +66,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
             _packFileUiProvider = packFileUiProvider;
             _propertyEditor = propertyEditor;
             _sceneRenderParameters = sceneRenderParameters;
+            _factionColourSettingsService = factionColourSettingsService;
             _possibleMaterialTypes = _materialFactory.GetPossibleMaterials();
         }
 
@@ -156,7 +160,8 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews
                 material,
                 capability => new TintViewModel(
                     capability,
-                    _sceneRenderParameters));
+                    _sceneRenderParameters,
+                    _factionColourSettingsService));
         }
 
         TViewModel? CreateCapabilityView<T, TViewModel>(

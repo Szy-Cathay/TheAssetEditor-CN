@@ -8,7 +8,8 @@ using Shared.Core.Settings;
 namespace CommonControls
 {
     /// <summary>
-    /// Enables dark mode title bar on Windows 11+ via DWM API.
+    /// Enables the optional dark title bar via DWM when the Windows build
+    /// supports it.
     /// Automatically follows the current theme - dark themes get dark title bar, light themes get light title bar.
     /// Call DarkTitleBarHelper.Enable(this) in a Window constructor.
     /// </summary>
@@ -16,8 +17,21 @@ namespace CommonControls
     {
         private static readonly ConditionalWeakTable<Window, Registration> Registrations = new();
 
-        [DllImport("dwmapi.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
-        static extern void DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+        internal delegate int DwmSetWindowAttributeDelegate(
+            IntPtr hwnd,
+            int attribute,
+            ref int attributeValue,
+            int attributeSize);
+
+        [DllImport(
+            "dwmapi.dll",
+            EntryPoint = "DwmSetWindowAttribute",
+            PreserveSig = true)]
+        private static extern int DwmSetWindowAttributeNative(
+            IntPtr hwnd,
+            int attribute,
+            ref int attributeValue,
+            int attributeSize);
 
         const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
@@ -31,8 +45,36 @@ namespace CommonControls
             var isDark = !ThemesController.CurrentTheme.ToString().Contains("Light");
             var value = isDark ? 1 : 0;
             var handle = new WindowInteropHelper(window).Handle;
-            if (handle != IntPtr.Zero)
-                DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
+            TrySetImmersiveDarkMode(
+                handle,
+                value,
+                DwmSetWindowAttributeNative);
+        }
+
+        internal static bool TrySetImmersiveDarkMode(
+            IntPtr handle,
+            int value,
+            DwmSetWindowAttributeDelegate setter)
+        {
+            if (handle == IntPtr.Zero)
+                return false;
+
+            try
+            {
+                return setter(
+                    handle,
+                    DWMWA_USE_IMMERSIVE_DARK_MODE,
+                    ref value,
+                    sizeof(int)) >= 0;
+            }
+            catch (DllNotFoundException)
+            {
+                return false;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return false;
+            }
         }
 
         private sealed class Registration
