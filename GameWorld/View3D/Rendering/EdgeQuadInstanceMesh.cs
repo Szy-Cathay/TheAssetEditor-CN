@@ -59,8 +59,8 @@ namespace GameWorld.Core.Rendering
         int _currentInstanceCount;
         internal int CurrentInstanceCount => _currentInstanceCount;
 
-        // One-pixel half-width leaves room for analytic edge coverage.
-        public float DefaultEdgeHalfWidth { get; set; } = 1.0f;
+        public float DefaultEdgeHalfWidth { get; set; } =
+            EditOverlayStyle.WireHalfWidth;
 
         public EdgeQuadInstanceMesh(IDeviceResolver deviceResolverComponent, IScopedResourceLibrary resourceLibrary)
         {

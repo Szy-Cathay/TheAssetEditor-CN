@@ -11,6 +11,7 @@
 
 #include "../Capabilites/Emissive.hlsli"
 #include "../Capabilites/Tint.hlsli"
+#include "../Shared/ViewportSolid.hlsli"
 
 bool SelectionMaskEnabled;
 
@@ -137,6 +138,23 @@ MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : 
     return output;
 }
 
+MainPixelOutput SolidPixelShader(
+    in PixelInputType input,
+    bool bIsFrontFace : SV_IsFrontFace)
+{
+    MainPixelOutput output;
+    output.Colour = float4(
+        ShadeViewportSolid(
+            input.normal,
+            input.worldPosition,
+            CameraPos),
+        1.0f);
+    output.SelectionMask = SelectionMaskEnabled
+        ? float4(1.0f, 1.0f, 1.0f, 1.0f)
+        : float4(0.0f, 0.0f, 0.0f, 0.0f);
+    return output;
+}
+
 float4 EmissiveLayerPixelShader(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace) : SV_TARGET0
 {
     GBufferMaterial material = GetMaterial(input);
@@ -155,6 +173,15 @@ technique BasicColorDrawing
     {
         VertexShader = compile vs_5_0 MainVertexShader();
         PixelShader = compile ps_5_0 DefaultPixelShader();
+    }
+};
+
+technique SolidDrawing
+{
+    pass P0
+    {
+        VertexShader = compile vs_5_0 MainVertexShader();
+        PixelShader = compile ps_5_0 SolidPixelShader();
     }
 };
 

@@ -14,6 +14,7 @@ namespace GameWorld.Core.Components.Selection
 
         public ISelectable RenderObject { get; set; }
         public List<int> SelectedVertices { get; set; } = new List<int>();
+        public int? ActiveVertex { get; set; }
         public List<float> VertexWeights { get; set; } = new List<float>();
 
         float _selectionDistanceFallof;
@@ -27,23 +28,35 @@ namespace GameWorld.Core.Components.Selection
 
         public void ModifySelection(IEnumerable<int> newSelectionItems, bool onlyRemove)
         {
+            var requestedItems = newSelectionItems.ToList();
             var updatedSelection = new HashSet<int>(SelectedVertices);
             if (onlyRemove)
-                updatedSelection.ExceptWith(newSelectionItems);
+                updatedSelection.ExceptWith(requestedItems);
             else
-                updatedSelection.UnionWith(newSelectionItems);
+                updatedSelection.UnionWith(requestedItems);
 
             SelectedVertices = updatedSelection.OrderBy(index => index).ToList();
+            if (!onlyRemove && requestedItems.Count > 0)
+                ActiveVertex = requestedItems[^1];
+            else if (ActiveVertex.HasValue &&
+                     !updatedSelection.Contains(ActiveVertex.Value))
+                ActiveVertex = SelectedVertices.Count > 0
+                    ? SelectedVertices[^1]
+                    : null;
             UpdateWeights(_selectionDistanceFallof);
             SelectionChanged?.Invoke(this, true);
         }
 
         public void SetSelection(IEnumerable<int> newSelectionItems)
         {
-            SelectedVertices = newSelectionItems
+            var requestedItems = newSelectionItems.ToList();
+            SelectedVertices = requestedItems
                 .Distinct()
                 .OrderBy(index => index)
                 .ToList();
+            ActiveVertex = requestedItems.Count > 0
+                ? requestedItems[^1]
+                : null;
             UpdateWeights(_selectionDistanceFallof);
             SelectionChanged?.Invoke(this, true);
         }
@@ -109,6 +122,7 @@ namespace GameWorld.Core.Components.Selection
         public void Clear()
         {
             SelectedVertices.Clear();
+            ActiveVertex = null;
             UpdateWeights(_selectionDistanceFallof);
             SelectionChanged?.Invoke(this, true);
         }
@@ -118,6 +132,7 @@ namespace GameWorld.Core.Components.Selection
             return new VertexSelectionState(RenderObject, _selectionDistanceFallof)
             {
                 SelectedVertices = new List<int>(SelectedVertices),
+                ActiveVertex = ActiveVertex,
                 VertexWeights = new List<float>(VertexWeights),
             };
         }

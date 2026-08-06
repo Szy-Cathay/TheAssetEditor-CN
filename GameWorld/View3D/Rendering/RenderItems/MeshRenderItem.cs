@@ -40,7 +40,7 @@ namespace GameWorld.Core.Rendering.RenderItems
 
             _shader.SetTechnique(renderingTechnique);
             _shader.SetSelectionMask(
-                renderingTechnique == RenderingTechnique.Normal &&
+                renderingTechnique != RenderingTechnique.Emissive &&
                 _selectionMaskEnabled);
             _shader.Apply(parameters, _modelMatrix);
 

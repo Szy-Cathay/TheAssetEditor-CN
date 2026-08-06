@@ -8,8 +8,10 @@ namespace GameWorld.Core.Components.Selection;
 
 internal static class EdgeOverlayDataBuilder
 {
-    private static readonly Vector3 WireColor = new(0.15f, 0.15f, 0.15f);
-    private static readonly Vector3 SelectedColor = new(1.0f, 0.47f, 0.0f);
+    private static readonly Vector3 WireColor =
+        EditOverlayStyle.WireColour;
+    private static readonly Vector3 SelectedColor =
+        EditOverlayStyle.SelectedColour;
 
     public static void Fill(
         Span<EdgeData> destination,

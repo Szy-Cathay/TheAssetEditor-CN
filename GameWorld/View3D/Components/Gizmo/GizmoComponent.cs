@@ -221,9 +221,6 @@ namespace GameWorld.Core.Components.Gizmo
             finally
             {
                 _gizmo.IsModalCancelled = false;
-                // Gizmo should only be visible when explicitly enabled via toolbar button
-                _isEnabled = false;
-
                 ReleaseMouseOwnership();
             }
         }
@@ -317,20 +314,16 @@ namespace GameWorld.Core.Components.Gizmo
                 }
             }
 
-            // Alt+Z to toggle viewport shading mode (Textured → Solid → Wireframe)
+            // Alt+Z cycles the three viewport shading modes.
             // Only when NOT in modal transform and NOT dragging gizmo
             if (!_gizmo.IsInModalTransform && !_isEnabled)
             {
                 bool isAltHeld = _keyboard.IsKeyDown(Keys.LeftAlt) || _keyboard.IsKeyDown(Keys.RightAlt);
                 if (isAltHeld && _keyboard.IsKeyReleased(Keys.Z))
                 {
-                    var current = _resourceLibary.ShadingMode;
-                    _resourceLibary.ShadingMode = current switch
-                    {
-                        ViewportShadingMode.Textured => ViewportShadingMode.Wireframe,
-                        ViewportShadingMode.Wireframe => ViewportShadingMode.Solid,
-                        _ => ViewportShadingMode.Textured
-                    };
+                    _resourceLibary.ShadingMode =
+                        ViewportShadingPolicy.Next(
+                            _resourceLibary.ShadingMode);
                 }
             }
 

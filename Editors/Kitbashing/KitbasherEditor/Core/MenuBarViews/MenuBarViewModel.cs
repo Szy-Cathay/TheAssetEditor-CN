@@ -8,6 +8,7 @@ using Editors.KitbasherEditor.ChildEditors.ReRiggingTool;
 using Editors.KitbasherEditor.ChildEditors.VertexDebugger;
 using Editors.KitbasherEditor.Core.MenuBarViews;
 using Editors.KitbasherEditor.UiCommands;
+using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using KitbasherEditor.ViewModels.MenuBarViews.Helpers;
@@ -29,6 +30,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         public ObservableCollection<MenuBarButton> SidebarButtons { get; set; } = new ObservableCollection<MenuBarButton>();
         public TransformToolViewModel TransformTool { get; set; }
         public ProportionalEditingViewModel ProportionalEditing { get; set; }
+        public ViewportShadingViewModel ViewportShading { get; set; }
 
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly CommandExecutor _commandExecutor;
@@ -46,6 +48,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             IUiCommandFactory uiCommandFactory,
             WindowKeyboard windowKeyboard,
             SelectionManager selectionManager,
+            RenderEngineComponent renderEngine,
             IWpfGame scene)
         {
             _commandExecutor = commandExecutor;
@@ -55,6 +58,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             _scene = scene;
             TransformTool = transformToolViewModel;
             ProportionalEditing = new ProportionalEditingViewModel(selectionManager, eventHub);
+            ViewportShading = new ViewportShadingViewModel(renderEngine);
 
             RegisterActions();
             RegisterHotkeys();

@@ -40,8 +40,13 @@ namespace GameWorld.Core.Components.Selection
         private Rmv2MeshNode? _selectedEdgeWireframeMesh;
         private AnimatedWireframeRenderItem?
             _selectedEdgeWireframeRenderItem;
+        private Rmv2MeshNode? _activeEdgeWireframeMesh;
+        private AnimatedWireframeRenderItem?
+            _activeEdgeWireframeRenderItem;
         private AnimatedSelectionRenderItem?
             _faceSelectionRenderItem;
+        private AnimatedSelectionRenderItem?
+            _activeFaceSelectionRenderItem;
 
         // Cached edge topology for current mesh (avoids per-frame recomputation)
         private (int v0, int v1)[] _cachedEdgeIndices = Array.Empty<(int, int)>();
@@ -64,9 +69,9 @@ namespace GameWorld.Core.Components.Selection
         private int _sampleIdx1 = 1;
 
         const int MaxRenderEdges = 50000;
-        const float SelectedEdgeHalfWidth = 2.0f;
         private EdgeData[] _edgeDataCache = Array.Empty<EdgeData>();
         private bool _selectedEdgeDataDirty = true;
+        private bool _activeEdgeDataDirty = true;
 
         public SelectionManager(IEventHub eventHub, RenderEngineComponent renderEngine, IScopedResourceLibrary resourceLib, IDeviceResolver deviceResolverComponent)
         {
@@ -152,6 +157,7 @@ namespace GameWorld.Core.Components.Selection
         {
             _edgeDataDirty = true;
             _selectedEdgeDataDirty = true;
+            _activeEdgeDataDirty = true;
             _poseRenderCache.Clear();
             ClearObjectOutlines();
             _vertexRenderItem?.MarkDirty();
@@ -199,6 +205,15 @@ namespace GameWorld.Core.Components.Selection
                     GetFaceSelectionRenderItem(
                         pose,
                         selectionFaceState.SelectedFaces));
+                if (selectionFaceState.ActiveFace is { } activeFace &&
+                    selectionFaceState.SelectedFaces.Contains(activeFace))
+                {
+                    _renderEngine.AddRenderItem(
+                        RenderBuckedId.Selection,
+                        GetActiveFaceSelectionRenderItem(
+                            pose,
+                            activeFace));
+                }
                 _renderEngine.AddRenderItem(
                     RenderBuckedId.Wireframe,
                     GetWireframeRenderItem(meshNode, pose));
@@ -451,6 +466,16 @@ namespace GameWorld.Core.Components.Selection
                             selectionEdgeState
                                 .SelectedEdges));
                 }
+                if (selectionEdgeState.ActiveEdge is { } activeEdge &&
+                    selectionEdgeState.SelectedEdges.Contains(activeEdge))
+                {
+                    _renderEngine.AddRenderItem(
+                        RenderBuckedId.Selection,
+                        GetActiveEdgeWireframeRenderItem(
+                            edgeNode,
+                            pose,
+                            activeEdge));
+                }
             }
 
             if (selectionState is BoneSelectionState selectionBoneState && selectionBoneState.RenderObject != null)
@@ -506,6 +531,9 @@ namespace GameWorld.Core.Components.Selection
             _selectedEdgeWireframeRenderItem?.Dispose();
             _selectedEdgeWireframeRenderItem = null;
             _selectedEdgeWireframeMesh = null;
+            _activeEdgeWireframeRenderItem?.Dispose();
+            _activeEdgeWireframeRenderItem = null;
+            _activeEdgeWireframeMesh = null;
             _poseRenderCache.Clear();
             _currentState?.Clear();
             _currentState = null;
@@ -542,7 +570,15 @@ namespace GameWorld.Core.Components.Selection
                     new AnimatedWireframeRenderItem(
                         pose,
                         _resourceLib,
-                        new Vector4(0, 0, 0, 1));
+                        new Vector4(
+                            EditOverlayStyle.WireColour,
+                            1))
+                    {
+                        DepthBias =
+                            EditOverlayStyle.WireDepthBias,
+                        EdgeHalfWidth =
+                            EditOverlayStyle.WireHalfWidth
+                    };
             }
             else
             {
@@ -567,11 +603,15 @@ namespace GameWorld.Core.Components.Selection
                     new AnimatedWireframeRenderItem(
                         pose,
                         _resourceLib,
-                        new Vector4(1, 0.47f, 0, 1),
+                        new Vector4(
+                            EditOverlayStyle.SelectedColour,
+                            1),
                         0)
                     {
-                        DepthBias = 0.00004f,
-                        EdgeHalfWidth = SelectedEdgeHalfWidth
+                        DepthBias =
+                            EditOverlayStyle.SelectedEdgeDepthBias,
+                        EdgeHalfWidth =
+                            EditOverlayStyle.SelectedEdgeHalfWidth
                     };
                 _selectedEdgeDataDirty = true;
             }
@@ -591,6 +631,48 @@ namespace GameWorld.Core.Components.Selection
             return _selectedEdgeWireframeRenderItem;
         }
 
+        private AnimatedWireframeRenderItem
+            GetActiveEdgeWireframeRenderItem(
+                Rmv2MeshNode meshNode,
+                MeshPoseSnapshot pose,
+                (int v0, int v1) activeEdge)
+        {
+            if (_activeEdgeWireframeRenderItem == null ||
+                _activeEdgeWireframeMesh != meshNode)
+            {
+                _activeEdgeWireframeRenderItem?.Dispose();
+                _activeEdgeWireframeMesh = meshNode;
+                _activeEdgeWireframeRenderItem =
+                    new AnimatedWireframeRenderItem(
+                        pose,
+                        _resourceLib,
+                        new Vector4(
+                            EditOverlayStyle.ActiveColour,
+                            1),
+                        0)
+                    {
+                        DepthBias =
+                            EditOverlayStyle.ActiveEdgeDepthBias,
+                        EdgeHalfWidth =
+                            EditOverlayStyle.ActiveEdgeHalfWidth
+                    };
+                _activeEdgeDataDirty = true;
+            }
+            else
+            {
+                _activeEdgeWireframeRenderItem.UpdatePose(pose);
+            }
+
+            if (_activeEdgeDataDirty)
+            {
+                _activeEdgeWireframeRenderItem.UpdateEdges(
+                    [activeEdge]);
+                _activeEdgeDataDirty = false;
+            }
+
+            return _activeEdgeWireframeRenderItem;
+        }
+
         private AnimatedSelectionRenderItem
             GetFaceSelectionRenderItem(
                 MeshPoseSnapshot pose,
@@ -602,8 +684,14 @@ namespace GameWorld.Core.Components.Selection
                     new AnimatedSelectionRenderItem(
                         pose,
                         _resourceLib,
-                        new Vector4(1.0f, 0.47f, 0.0f, 0.3f),
-                        selectedFaces);
+                        new Vector4(
+                            EditOverlayStyle.SelectedColour,
+                            EditOverlayStyle.SelectedFaceOpacity),
+                        selectedFaces)
+                    {
+                        DepthBias =
+                            EditOverlayStyle.SelectedFaceDepthBias
+                    };
             }
             else
             {
@@ -613,6 +701,36 @@ namespace GameWorld.Core.Components.Selection
             }
 
             return _faceSelectionRenderItem;
+        }
+
+        private AnimatedSelectionRenderItem
+            GetActiveFaceSelectionRenderItem(
+                MeshPoseSnapshot pose,
+                int activeFace)
+        {
+            if (_activeFaceSelectionRenderItem == null)
+            {
+                _activeFaceSelectionRenderItem =
+                    new AnimatedSelectionRenderItem(
+                        pose,
+                        _resourceLib,
+                        new Vector4(
+                            EditOverlayStyle.ActiveColour,
+                            EditOverlayStyle.ActiveFaceOpacity),
+                        [activeFace])
+                    {
+                        DepthBias =
+                            EditOverlayStyle.ActiveFaceDepthBias
+                    };
+            }
+            else
+            {
+                _activeFaceSelectionRenderItem.UpdatePose(pose);
+                _activeFaceSelectionRenderItem
+                    .UpdateSelectedFaces([activeFace]);
+            }
+
+            return _activeFaceSelectionRenderItem;
         }
 
         private void ClearObjectOutlines()

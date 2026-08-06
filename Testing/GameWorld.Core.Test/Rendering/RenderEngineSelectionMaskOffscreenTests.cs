@@ -28,6 +28,130 @@ namespace GameWorld.Core.Test.Rendering;
 [NonParallelizable]
 public class RenderEngineSelectionMaskOffscreenTests
 {
+    [Test]
+    public void Render3DObjects_ActiveEditElementsUseThirdVisualLayer()
+    {
+        const int size = 64;
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>());
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        var eventHub = new Mock<IEventHub>();
+        using var scopedResources = new ScopedResourceLibrary(
+            resources,
+            eventHub.Object,
+            Mock.Of<IStandardDialogs>());
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            eventHub.Object,
+            new GridComponent(
+                camera,
+                resources,
+                deviceResolver.Object));
+        renderEngine.Initialize();
+        var selectionManager = new SelectionManager(
+            eventHub.Object,
+            renderEngine,
+            scopedResources,
+            deviceResolver.Object);
+        selectionManager.Initialize();
+        var mesh = CreateMesh(device, animated: false);
+        var material = new Mock<IRmvMaterial>();
+        material.SetupGet(value => value.ModelName).Returns("test");
+        material.SetupGet(value => value.PivotPoint)
+            .Returns(Vector3.Zero);
+        var node = new Rmv2MeshNode(
+            mesh,
+            material.Object,
+            null!,
+            new AnimationPlayer { IsEnabled = false });
+        var selection = new EdgeSelectionState
+        {
+            RenderObject = node
+        };
+        selection.ModifySelection(
+            [(0, 1), (2, 3)],
+            onlyRemove: false);
+        selectionManager.SetState(selection);
+        selectionManager.Draw(new GameTime());
+        using var renderTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+
+        device.SetRenderTarget(renderTarget);
+        device.Clear(
+            ClearOptions.Target | ClearOptions.DepthBuffer,
+            Color.Transparent,
+            1,
+            0);
+        device.BlendState = BlendState.Opaque;
+        device.DepthStencilState = DepthStencilState.Default;
+        InvokeRender3DObjects(renderEngine);
+        device.SetRenderTarget(null);
+
+        var pixels = new Color[size * size];
+        renderTarget.GetData(pixels);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                pixels.Count(IsOrange),
+                Is.GreaterThan(0));
+            Assert.That(
+                pixels.Count(pixel =>
+                    pixel.R > 220 &&
+                    pixel.G > 220 &&
+                    pixel.B > 220 &&
+                    pixel.A > 0),
+                Is.GreaterThan(0));
+            Assert.That(
+                GetRenderItems(
+                    renderEngine,
+                    RenderBuckedId.Selection),
+                Has.Exactly(2)
+                    .TypeOf<AnimatedWireframeRenderItem>());
+        });
+
+        renderEngine.Update(new GameTime());
+        var faceSelection = new FaceSelectionState
+        {
+            RenderObject = node
+        };
+        faceSelection.ModifySelection(
+            [0, 3],
+            onlyRemove: false);
+        selectionManager.SetState(faceSelection);
+        selectionManager.Draw(new GameTime());
+
+        Assert.That(
+            GetRenderItems(
+                renderEngine,
+                RenderBuckedId.Selection),
+            Has.Exactly(2)
+                .TypeOf<AnimatedSelectionRenderItem>());
+
+        selectionManager.Dispose();
+        mesh.Dispose();
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void Render3DObjects_SelectedEdgeRemainsOrangeOverWireframe(

@@ -93,7 +93,7 @@ public class VertexOverlayUploadTests
     }
 
     [Test]
-    public void Draw_AnimatedUnselectedVertexRemainsVisibleAndHasLargerFootprintWithSceneBackfaceCulling()
+    public void Draw_StaticAndAnimatedVerticesUseSameScreenFootprint()
     {
         var game = new WpfGameMock();
         var device = game.GraphicsDevice;
@@ -154,10 +154,91 @@ public class VertexOverlayUploadTests
             Assert.That(staticPixels, Is.GreaterThan(0));
             Assert.That(
                 animatedPixels,
-                Is.GreaterThan(staticPixels),
-                "Animated edit mode needs a larger unselected vertex footprint to remain visible over its dense wireframe.");
+                Is.EqualTo(staticPixels),
+                "Static and animated edit overlays must obey the same screen-space visual contract.");
         });
 
+        mesh.Dispose();
+    }
+
+    [Test]
+    public void Draw_ActiveVertexIsWhiteAboveOrangeSelection()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\VertexPointShader");
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver.SetupGet(x => x.Device).Returns(device);
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library =>
+                library.GetStaticEffect(
+                    ShaderTypes.VertexPoint))
+            .Returns(effect);
+        using var vertexRenderer = new VertexInstanceMesh(
+            deviceResolver.Object,
+            resources.Object);
+        var mesh = CreateMesh(device);
+        var node = new Rmv2MeshNode(
+            mesh,
+            Mock.Of<IRmvMaterial>(),
+            null!,
+            null!);
+        var selection = new VertexSelectionState(node, 0);
+        selection.SetSelection([0, 1]);
+        vertexRenderer.Update(
+            [
+                new Vector3(-0.25f, 0, 0),
+                new Vector3(0.25f, 0, 0)
+            ],
+            selection);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target | ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.DepthStencilState = DepthStencilState.Default;
+            device.RasterizerState = RasterizerState.CullNone;
+            vertexRenderer.Draw(
+                Matrix.Identity,
+                Matrix.Identity,
+                device);
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[64 * 64];
+        renderTarget.GetData(pixels);
+        var orangePixels = pixels.Count(pixel =>
+            pixel.R > 200 &&
+            pixel.G is > 70 and < 190 &&
+            pixel.B < 40 &&
+            pixel.A > 0);
+        var whitePixels = pixels.Count(pixel =>
+            pixel.R > 220 &&
+            pixel.G > 220 &&
+            pixel.B > 220 &&
+            pixel.A > 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(orangePixels, Is.GreaterThan(0));
+            Assert.That(whitePixels, Is.GreaterThan(0));
+        });
         mesh.Dispose();
     }
 
