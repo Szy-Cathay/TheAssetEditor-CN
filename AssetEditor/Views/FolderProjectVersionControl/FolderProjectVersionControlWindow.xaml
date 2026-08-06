@@ -17,9 +17,17 @@
     MinHeight="380"
     ResizeMode="CanResize"
     WindowStartupLocation="CenterOwner"
-    Style="{StaticResource CustomWindowStyle}">
+    Style="{StaticResource CustomWindowStyle}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Background="{DynamicResource AeBrush.Canvas}">
     <windowhandling:AssetEditorWindow.Resources>
-        <ResourceDictionary Source="FolderProjectGitStyles.xaml" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="FolderProjectGitStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToCollapsedConverter" />
+        </ResourceDictionary>
     </windowhandling:AssetEditorWindow.Resources>
     <Grid Margin="14">
         <Grid.RowDefinitions>
@@ -39,9 +47,10 @@
             <StackPanel>
                 <TextBlock
                     Margin="0,0,0,5"
-                    Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                    Foreground="{DynamicResource AeBrush.TextMuted}"
                     Text="{loc:Loc FolderProject.VersionControl.MergeSource}" />
                 <ComboBox
+                    Style="{StaticResource AeInput.ComboBox}"
                     Height="30"
                     VerticalContentAlignment="Center"
                     AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.MergeSource}"
@@ -49,19 +58,23 @@
                     ItemsSource="{Binding MergeSources}"
                     SelectedItem="{Binding SelectedMergeSource}" />
             </StackPanel>
-            <TextBlock
+            <Path
                 Grid.Column="1"
                 Margin="0,23,0,0"
+                Width="12"
+                Height="10"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
-                Text="→" />
+                Data="M 1,5 H 11 M 8,2 L 11,5 L 8,8"
+                Stroke="{DynamicResource AeBrush.TextMuted}"
+                StrokeThickness="1.25" />
             <StackPanel Grid.Column="2">
                 <TextBlock
                     Margin="0,0,0,5"
-                    Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                    Foreground="{DynamicResource AeBrush.TextMuted}"
                     Text="{loc:Loc FolderProject.VersionControl.MergeTarget}" />
                 <ComboBox
+                    Style="{StaticResource AeInput.ComboBox}"
                     Height="30"
                     VerticalContentAlignment="Center"
                     AutomationProperties.Name="{loc:Loc FolderProject.VersionControl.MergeTarget}"
@@ -78,16 +91,18 @@
                     Height="28"
                     Margin="0,0,6,0"
                     Command="{Binding BeginMergeCommand}"
-                    Content="{loc:Loc FolderProject.VersionControl.BeginMerge}" />
+                    Content="{loc:Loc FolderProject.VersionControl.BeginMerge}"
+                    Style="{StaticResource AeButton.Primary}" />
                 <Button
                     MinWidth="86"
                     Height="28"
                     Command="{Binding AbortMergeCommand}"
-                    Content="{loc:Loc FolderProject.VersionControl.AbortMerge}" />
+                    Content="{loc:Loc FolderProject.VersionControl.AbortMerge}"
+                    Style="{StaticResource AeButton.Danger}" />
             </StackPanel>
             <TextBlock
                 VerticalAlignment="Center"
-                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Foreground="{DynamicResource AeBrush.TextMuted}"
                 Text="{Binding MergeSummary}"
                 TextTrimming="CharacterEllipsis"
                 ToolTip="{Binding MergeSummary}" />
@@ -103,6 +118,7 @@
                 FontWeight="SemiBold"
                 Text="{loc:Loc FolderProject.VersionControl.MergeConflicts}" />
             <DataGrid
+                x:Name="MergeConflictsGrid"
                 Grid.Row="1"
                 AutoGenerateColumns="False"
                 CanUserAddRows="False"
@@ -111,10 +127,12 @@
                 SelectedItem="{Binding SelectedMergeConflict}"
                 SelectionChanged="MergeConflicts_SelectionChanged"
                 SelectionMode="Extended"
-                SelectionUnit="FullRow">
+                SelectionUnit="FullRow"
+                Style="{StaticResource AeTable.Grid}">
                 <DataGrid.Columns>
                     <DataGridTextColumn
                         Width="*"
+                        MinWidth="360"
                         Header="{loc:Loc FolderProject.VersionControl.Path}"
                         Binding="{Binding DisplayPath}" />
                 </DataGrid.Columns>
@@ -127,19 +145,22 @@
                 Height="28"
                 DockPanel.Dock="Right"
                 Command="{Binding CompleteMergeCommand}"
-                Content="{loc:Loc FolderProject.VersionControl.CompleteMerge}" />
+                Content="{loc:Loc FolderProject.VersionControl.CompleteMerge}"
+                Style="{StaticResource AeButton.Primary}" />
             <StackPanel Orientation="Horizontal">
                 <Button
                     MinWidth="110"
                     Height="28"
                     Margin="0,0,6,0"
                     Command="{Binding UseCurrentCommand}"
-                    Content="{loc:Loc FolderProject.VersionControl.UseCurrent}" />
+                    Content="{loc:Loc FolderProject.VersionControl.UseCurrent}"
+                    Style="{StaticResource AeButton.Secondary}" />
                 <Button
                     MinWidth="110"
                     Height="28"
                     Command="{Binding UseIncomingCommand}"
-                    Content="{loc:Loc FolderProject.VersionControl.UseIncoming}" />
+                    Content="{loc:Loc FolderProject.VersionControl.UseIncoming}"
+                    Style="{StaticResource AeButton.Secondary}" />
             </StackPanel>
         </DockPanel>
 
@@ -148,36 +169,24 @@
             MinHeight="28"
             Margin="0,10,0,0"
             Padding="0,7,0,0"
-            BorderBrush="{DynamicResource App.Border}"
+            BorderBrush="{DynamicResource AeBrush.Border}"
             BorderThickness="0,1,0,0">
             <TextBlock
                 VerticalAlignment="Center"
-                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Foreground="{DynamicResource AeBrush.TextMuted}"
                 Text="{Binding StatusMessage}"
                 TextTrimming="CharacterEllipsis"
                 ToolTip="{Binding StatusMessage}" />
         </Border>
 
-        <Grid
+        <progress:OperationProgressWindowHost
             Grid.RowSpan="5"
-            Panel.ZIndex="110"
-            Background="#66000000"
-            IsHitTestVisible="{Binding IsLoadingOperation}"
-            Visibility="{Binding IsLoadingOperation, Converter={StaticResource BoolToCollapsedConverter}}">
-            <Border
-                Width="500"
-                Padding="18"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Style="{StaticResource GitSurfaceBorderStyle}">
-                <progress:OperationProgressView
-                    CurrentDetailText="{Binding LoadingProgressDetailText}"
-                    IsOperationActive="{Binding IsLoadingOperation}"
-                    IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
-                    ProgressMaximum="{Binding LoadingProgressMaximum}"
-                    ProgressValue="{Binding LoadingProgressValue}"
-                    StatusText="{Binding LoadingProgressStatusText}" />
-            </Border>
-        </Grid>
+            CurrentDetailText="{Binding LoadingProgressDetailText}"
+            IsOperationActive="{Binding IsLoadingOperation}"
+            IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
+            ProgressMaximum="{Binding LoadingProgressMaximum}"
+            ProgressValue="{Binding LoadingProgressValue}"
+            StatusText="{Binding LoadingProgressStatusText}"
+            WindowTitle="{loc:Loc OperationProgress.GitOperation}" />
     </Grid>
 </windowhandling:AssetEditorWindow>

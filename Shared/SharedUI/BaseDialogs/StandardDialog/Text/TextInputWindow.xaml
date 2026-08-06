@@ -6,19 +6,43 @@
         xmlns:loc="clr-namespace:Shared.Ui.Common"
         mc:Ignorable="d"
         Title="{loc:Loc Shared.TextInput.Title}"
-        Width="310"
-        Height="80"
+        Width="440"
+        Height="160"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner" Background="#FF1C1C1C">
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}"
+        Background="{DynamicResource AeBrush.Canvas}">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="auto"/>
-            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBox x:Name="TextBoxItem" Margin="2" Grid.Row="0" Width="300" KeyDown="Key_Down"/>
+        <Border Style="{StaticResource AeWorkflow.DialogBody}">
+            <TextBox
+                x:Name="TextBoxItem"
+                VerticalAlignment="Center"
+                KeyDown="Key_Down"
+                Style="{StaticResource AeInput.TextBox}" />
+        </Border>
 
-        <Button Margin="2" Grid.Row="1" Width="100" Content="{loc:Loc General.Ok}" HorizontalAlignment="Left" Click="Ok_Click"/>
-        <Button Margin="2" Grid.Row="1" Width="100" Content="{loc:Loc General.Cancel}" HorizontalAlignment="Right" Click="Cancel_Click"/>
+        <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button
+                    MinWidth="88"
+                    Margin="0,0,8,0"
+                    Content="{loc:Loc General.Cancel}"
+                    Click="Cancel_Click"
+                    IsCancel="True"
+                    Style="{StaticResource AeButton.Secondary}" />
+                <Button
+                    MinWidth="88"
+                    Content="{loc:Loc General.Ok}"
+                    Click="Ok_Click"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

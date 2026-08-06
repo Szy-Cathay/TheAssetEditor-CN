@@ -6,6 +6,10 @@
              xmlns:local="clr-namespace:AssetEditor.Views"
              xmlns:packfiletree="clr-namespace:Shared.Ui.BaseDialogs.PackFileTree;assembly=Shared.Ui"
              mc:Ignorable="d" 
+             Background="{DynamicResource AeBrush.Canvas}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
              d:DesignHeight="450" d:DesignWidth="800">
 
     <packfiletree:PackFileBrowserView ShowTitle="False"/>

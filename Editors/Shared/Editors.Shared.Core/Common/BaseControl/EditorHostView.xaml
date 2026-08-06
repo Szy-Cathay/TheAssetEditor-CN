@@ -7,11 +7,16 @@
              xmlns:animationplayer="clr-namespace:AnimationEditor.Common.AnimationPlayer" 
              xmlns:basecontrol="clr-namespace:Editors.Shared.Core.Common.BaseControl"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             mc:Ignorable="d" >
+             mc:Ignorable="d"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <basecontrol:HostTemplateSelector x:Key="EditorSelector" />
@@ -88,7 +93,7 @@
             </ListView>
             </Expander>
 
-            <Rectangle Grid.Row="3" Fill="LightGray" Height="3" Margin="2,2,2,2"/>
+            <Rectangle Grid.Row="3" Fill="{DynamicResource AeBrush.Border}" Height="1" Margin="2"/>
 
             <ScrollViewer  Grid.Row="4" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto">
                 <DockPanel  DockPanel.Dock="Top">

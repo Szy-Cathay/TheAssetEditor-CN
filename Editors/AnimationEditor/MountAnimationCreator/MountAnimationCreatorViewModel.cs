@@ -13,7 +13,6 @@ using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.GameFormats.AnimationPack;
 using Shared.Ui.Common;
-using MessageBox = System.Windows.Forms.MessageBox;
 using Clipboard = System.Windows.Clipboard;
 using Shared.Core.Events;
 using GameWorld.Core.Components.Selection;

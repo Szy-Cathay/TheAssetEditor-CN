@@ -18,13 +18,13 @@
     <DockPanel  LastChildFill="False">
 
         <DockPanel DockPanel.Dock="Top">
-            <TextBlock  FontSize="20" FontWeight="Bold" Text="{loc:Loc MainNode.Header}"/>
+            <TextBlock Text="{loc:Loc MainNode.Header}"
+                       Style="{DynamicResource Kitbash.PropertyTitle}"/>
         </DockPanel>
         <Expander IsExpanded="True" Header="{loc:Loc MainNode.General}" DockPanel.Dock="Top">
             <DockPanel DockPanel.Dock="Top">
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" Content="{loc:Loc MainNode.Skeleton}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" Content="{loc:Loc MainNode.Skeleton}"/>
                     <filterdialog:CollapsableFilterControl  VerticalContentAlignment="Center"
                                 SelectedItem="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                                 SearchItems="{Binding SkeletonNameList, UpdateSourceTrigger=PropertyChanged}"     
@@ -38,16 +38,14 @@
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" Content="{loc:Loc MainNode.CopyTexturesToPack}" />
-                    <Label>:</Label>
-                    <Button Content="{loc:Loc General.Copy}" Click="{s:MethodBinding CopyTexturesToOutputPack}" Margin="0,2,2,2" Width="50"/>
-                    <Label Content="{loc:Loc MainNode.Conversion}" Visibility="Collapsed"/>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" Content="{loc:Loc MainNode.CopyTexturesToPack}" />
+                    <Button HorizontalAlignment="Right" Content="{loc:Loc General.Copy}" Click="{s:MethodBinding CopyTexturesToOutputPack}" Margin="0,2,2,2" Width="50"/>
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc MainNode.Conversion}" Visibility="Collapsed"/>
                     <ComboBox SelectedValue="None" VerticalAlignment="Center" Visibility="Collapsed"/>
                 </DockPanel>
 
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MainNode.AttachmentPoints}"/>
-                    <Label>:</Label>
+                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MainNode.AttachmentPoints}"/>
 
                     <Expander>
                         <Expander.Header>
@@ -72,7 +70,7 @@
                         </StackPanel>
 
                     </Expander>
-                </StackPanel>
+                </DockPanel>
             </DockPanel>
         </Expander>
 

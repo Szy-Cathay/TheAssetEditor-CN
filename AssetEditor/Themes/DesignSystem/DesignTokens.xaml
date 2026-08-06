@@ -1,0 +1,72 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=netstandard">
+    <sys:Double x:Key="AeSpace.1">4</sys:Double>
+    <sys:Double x:Key="AeSpace.2">8</sys:Double>
+    <sys:Double x:Key="AeSpace.3">12</sys:Double>
+    <sys:Double x:Key="AeSpace.4">16</sys:Double>
+    <sys:Double x:Key="AeSpace.6">24</sys:Double>
+    <sys:Double x:Key="AeSpace.8">32</sys:Double>
+
+    <sys:Double x:Key="AeSize.ActivityRailWidth">30</sys:Double>
+    <sys:Double x:Key="AeSize.TabHeight">24</sys:Double>
+    <GridLength x:Key="AeSize.TabGridLength">24</GridLength>
+    <sys:Double x:Key="AeSize.CompactRowHeight">24</sys:Double>
+    <sys:Double x:Key="AeSize.ControlHeight">26</sys:Double>
+    <sys:Double x:Key="AeSize.ProminentControlHeight">30</sys:Double>
+
+    <CornerRadius x:Key="AeRadius.Compact">3</CornerRadius>
+    <CornerRadius x:Key="AeRadius.Control">4</CornerRadius>
+    <CornerRadius x:Key="AeRadius.Surface">6</CornerRadius>
+    <CornerRadius x:Key="AeRadius.Overlay">7</CornerRadius>
+
+    <Duration x:Key="AeMotion.Pressed">0:0:0.090</Duration>
+    <Duration x:Key="AeMotion.Release">0:0:0.160</Duration>
+    <Duration x:Key="AeMotion.Hover">0:0:0.120</Duration>
+    <Duration x:Key="AeMotion.Selection">0:0:0.140</Duration>
+    <Duration x:Key="AeMotion.Overlay">0:0:0.160</Duration>
+    <sys:Double x:Key="AeMotion.OverlayOffset">2</sys:Double>
+
+    <Storyboard x:Key="AeMotion.ButtonPressStoryboard" x:Shared="False">
+        <DoubleAnimation
+            Storyboard.TargetName="InteractionScale"
+            Storyboard.TargetProperty="ScaleX"
+            To="0.985"
+            Duration="0:0:0.070">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+        <DoubleAnimation
+            Storyboard.TargetName="InteractionScale"
+            Storyboard.TargetProperty="ScaleY"
+            To="0.985"
+            Duration="0:0:0.070">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+    </Storyboard>
+
+    <Storyboard x:Key="AeMotion.ButtonReleaseStoryboard" x:Shared="False">
+        <DoubleAnimation
+            Storyboard.TargetName="InteractionScale"
+            Storyboard.TargetProperty="ScaleX"
+            To="1"
+            Duration="0:0:0.120">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+        <DoubleAnimation
+            Storyboard.TargetName="InteractionScale"
+            Storyboard.TargetProperty="ScaleY"
+            To="1"
+            Duration="0:0:0.120">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut" />
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+    </Storyboard>
+</ResourceDictionary>

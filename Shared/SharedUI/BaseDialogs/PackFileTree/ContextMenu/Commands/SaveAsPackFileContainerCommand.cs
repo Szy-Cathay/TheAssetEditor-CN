@@ -46,7 +46,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 }
                 catch (Exception exception)
                 {
-                    System.Windows.MessageBox.Show(
+                    MessageBox.Show(
                         LocalizationManager.Instance.GetFormat(
                             "Msg.ErrorSavingPack",
                             exception.Message),

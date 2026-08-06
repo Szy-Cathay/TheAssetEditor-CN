@@ -19,6 +19,8 @@ public partial class OperationProgressView : UserControl
     private readonly ReadOnlyObservableCollection<string> _readOnlyHistory;
     private readonly Stopwatch _stopwatch = new();
     private readonly DispatcherTimer _elapsedTimer;
+    private readonly OperationProgressVisibilityController
+        _visibilityController;
     private bool _isBatchApplying;
     private int _flushScheduled;
 
@@ -80,11 +82,23 @@ public partial class OperationProgressView : UserControl
             typeof(OperationProgressView),
             new PropertyMetadata(string.Empty));
 
+    public static readonly DependencyProperty UseDeferredVisibilityProperty =
+        DependencyProperty.Register(
+            nameof(UseDeferredVisibility),
+            typeof(bool),
+            typeof(OperationProgressView),
+            new PropertyMetadata(true, OnUseDeferredVisibilityChanged));
+
     public OperationProgressView()
     {
         _readOnlyHistory = new ReadOnlyObservableCollection<string>(
             _detailHistory);
         InitializeComponent();
+        _visibilityController = new OperationProgressVisibilityController(
+            Dispatcher,
+            isVisible => SetCurrentValue(
+                VisibilityProperty,
+                isVisible ? Visibility.Visible : Visibility.Collapsed));
         _elapsedTimer = new DispatcherTimer(
             TimeSpan.FromSeconds(1),
             DispatcherPriority.Background,
@@ -93,7 +107,8 @@ public partial class OperationProgressView : UserControl
         DetailsHeaderText = GetText(
             "OperationProgress.ShowDetails",
             "查看详情");
-        Unloaded += (_, _) => _elapsedTimer.Stop();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     public string StatusText
@@ -142,6 +157,12 @@ public partial class OperationProgressView : UserControl
     {
         get => (string)GetValue(DetailsHeaderTextProperty);
         set => SetValue(DetailsHeaderTextProperty, value);
+    }
+
+    public bool UseDeferredVisibility
+    {
+        get => (bool)GetValue(UseDeferredVisibilityProperty);
+        set => SetValue(UseDeferredVisibilityProperty, value);
     }
 
     public ReadOnlyObservableCollection<string> DetailHistory =>
@@ -249,6 +270,20 @@ public partial class OperationProgressView : UserControl
             DetailsList.ScrollIntoView(_detailHistory[^1]);
     }
 
+    private void OnLoaded(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!UseDeferredVisibility)
+            _visibilityController.RevealImmediately();
+        else if (IsOperationActive)
+            _visibilityController.Begin();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs eventArgs)
+    {
+        _elapsedTimer.Stop();
+        _visibilityController.ForceHide();
+    }
+
     private static string GetText(string key, string fallback)
     {
         return LocalizationManager.Instance?.Get(key) ?? fallback;
@@ -301,11 +336,36 @@ public partial class OperationProgressView : UserControl
             view._stopwatch.Restart();
             view._elapsedTimer.Start();
             view.UpdateProgressSummary(0, 0);
+            if (view.UseDeferredVisibility)
+                view._visibilityController.Begin();
+            else
+                view._visibilityController.RevealImmediately();
         }
         else
         {
             view._elapsedTimer.Stop();
             view._stopwatch.Stop();
+            if (view.UseDeferredVisibility)
+                _ = view._visibilityController.EndAsync();
+        }
+    }
+
+    private static void OnUseDeferredVisibilityChanged(
+        DependencyObject dependencyObject,
+        DependencyPropertyChangedEventArgs eventArgs)
+    {
+        var view = (OperationProgressView)dependencyObject;
+        if (eventArgs.NewValue is false)
+        {
+            view._visibilityController.RevealImmediately();
+        }
+        else if (view.IsOperationActive)
+        {
+            view._visibilityController.Begin();
+        }
+        else
+        {
+            view._visibilityController.ForceHide();
         }
     }
 }

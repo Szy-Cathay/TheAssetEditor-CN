@@ -23,6 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\..\AssetEditor\AssetEditor.csproj" />
         <ProjectReference Include="..\Editors.CscEditor\Editors.CscEditor.csproj" />
     </ItemGroup>
 

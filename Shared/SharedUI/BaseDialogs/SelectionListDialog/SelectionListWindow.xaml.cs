@@ -5,7 +5,6 @@ using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using Shared.Ui.BaseDialogs.SelectionListDialog;
 using Shared.Ui.Common;
 
@@ -16,8 +15,6 @@ namespace CommonControls.SelectionListDialog
         public bool Result { get; set; } = false;
         public delegate bool OnSeachDelegate(object item, Regex regex);
 
-        readonly SolidColorBrush _noErrorBackground = new(Colors.White);
-        readonly SolidColorBrush _errorBackground = new(Colors.Red);
         public SelectionListWindow()
         {
             InitializeComponent();
@@ -51,7 +48,9 @@ namespace CommonControls.SelectionListDialog
                         typedDataContext.ItemList.Add(item);
                     }
                     toolTip.IsOpen = false;
-                    SearchTextBox.Background = _noErrorBackground;
+                    SearchTextBox.SetResourceReference(
+                        Control.BorderBrushProperty,
+                        "AeBrush.BorderStrong");
                     return;
                 }
 
@@ -68,12 +67,16 @@ namespace CommonControls.SelectionListDialog
 
                     }
                     toolTip.IsOpen = false;
-                    SearchTextBox.Background = _noErrorBackground;
+                    SearchTextBox.SetResourceReference(
+                        Control.BorderBrushProperty,
+                        "AeBrush.BorderStrong");
                     DataContext = typedDataContext;
                 }
                 catch (Exception e)
                 {
-                    SearchTextBox.Background = _errorBackground;
+                    SearchTextBox.SetResourceReference(
+                        Control.BorderBrushProperty,
+                        "AeBrush.Danger");
                     toolTip.IsOpen = true;
                     toolTip.Content = e.Message;
                     toolTip.Content += "\n\nCommon usage:\n";

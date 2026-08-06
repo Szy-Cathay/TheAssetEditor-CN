@@ -67,6 +67,18 @@ public class FolderProjectTreeStateTests
             NUnitAssert.That(
                 harness.ViewModel.IsRefreshingCaWemFiles,
                 Is.False);
+            NUnitAssert.That(
+                harness.ViewModel.CaWemRefreshValue,
+                Is.EqualTo(1));
+            NUnitAssert.That(
+                harness.ViewModel.CaWemRefreshMaximum,
+                Is.EqualTo(1));
+            NUnitAssert.That(
+                harness.ViewModel.CaWemRefreshDetail,
+                Is.EqualTo(caPack.Name));
+            NUnitAssert.That(
+                harness.ViewModel.CaWemRefreshIsIndeterminate,
+                Is.False);
         });
     }
 

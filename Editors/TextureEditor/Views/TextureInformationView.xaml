@@ -5,7 +5,19 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:TextureEditor.Views"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <Grid>
         <TextBox Text="{Binding .,Mode=OneTime}" TextWrapping="Wrap"/>
     </Grid>

@@ -9,7 +9,19 @@
         Title="{loc:Loc ImportWindow.Title}"  Width="800"                
          SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize" Background="#FF1C1C1C">
+        ResizeMode="NoResize"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
     <Grid Margin="4">
         <Grid.ColumnDefinitions>
@@ -28,31 +40,28 @@
             <RowDefinition Height="25"/>            
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc ImportWindow.SelectedFile}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="0" Grid.Column="1" Text=": "/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="0" Grid.Column="0" Text="{loc:Loc ImportWindow.SelectedFile}"/>
         <TextBox Grid.Row="0" Grid.Column="2" Text="{Binding SystemPath}" HorizontalContentAlignment="Left" IsReadOnly="True"/>
         <!--<Button Grid.Row="0" Grid.Column="2" Content="Browse" Command="{Binding BrowsePathCommandCommand}" Grid.ColumnSpan="2" Margin="517,0,0,0"/>-->
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc ImportWindow.CreateImportProject}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="1" Grid.Column="1" Text=": "/>
-        <CheckBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Left" IsChecked="{Binding CreateImportProject, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="1" Grid.Column="0" Text="{loc:Loc ImportWindow.CreateImportProject}"/>
+        <CheckBox Grid.Row="1" Grid.Column="2" IsChecked="{Binding CreateImportProject, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-        <TextBlock Grid.Row="2" Grid.Column="0" HorizontalAlignment="Left" Text="{loc:Loc ImportWindow.AvailableImporters}"/>
-        <TextBlock Grid.Row="2" Grid.Column="1" Text=": "/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="0" Text="{loc:Loc ImportWindow.AvailableImporters}"/>
         <ComboBox Grid.Row="2" Grid.Column="2"  HorizontalContentAlignment="Left"
             ItemsSource="{Binding PossibleImporters, UpdateSourceTrigger=PropertyChanged}"
             SelectedValue="{Binding SelectedImporter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
             DisplayMemberPath = "DisplayName"/>
 
         <Expander Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Header="{loc:Loc ImportWindow.ImporterSettings}" IsExpanded="True"  HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-            <Border BorderBrush="Gray" BorderThickness="2" Margin="2">
+            <Border BorderBrush="{DynamicResource AeBrush.BorderStrong}" BorderThickness="1" Margin="2">
                 <ContentControl BorderThickness="2"
                           Content="{Binding SelectedImporter, UpdateSourceTrigger=PropertyChanged}"       
                           ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
             </Border>
         </Expander>
 
-        <Button Grid.Row="5" Grid.ColumnSpan="4" Content="{loc:Loc General.Import}" Click="ImportButton_Click"/>
+        <Button Grid.Row="5" Grid.ColumnSpan="4" Content="{loc:Loc General.Import}" Click="ImportButton_Click" Style="{StaticResource AeButton.Primary}"/>
 
 
     </Grid>

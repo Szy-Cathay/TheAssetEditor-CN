@@ -21,45 +21,38 @@
         </Expander.Header>
 
         <DockPanel LastChildFill="False" >
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.Filter}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.Filter}"/>
                 <TextBlock  Text="{Binding Material.Filters.Value}"  VerticalAlignment="Center"/>
-            </StackPanel>
+            </DockPanel>
 
             <DockPanel DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.MatrixIndex}"/>
-                <Label>:</Label>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.MatrixIndex}"/>
                 <TextBlock  Text="{Binding Material.MatrixIndex.Value}"  VerticalAlignment="Center"/>
             </DockPanel>
 
             <DockPanel DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.ParentMatrixIndex}"/>
-                <Label>:</Label>
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.ParentMatrixIndex}"/>
                 <TextBlock  Text="{Binding Material.ParentMatrixIndex.Value}"  VerticalAlignment="Center"/>
             </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.RmvVertexFormat}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.RmvVertexFormat}"/>
                 <TextBlock  Text="{Binding Material.BinaryVertexFormat.Value}"  VerticalAlignment="Center"/>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.RmvMaterialId}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.RmvMaterialId}"/>
                 <TextBlock  Text="{Binding Material.MaterialId.Value}"  VerticalAlignment="Center"/>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.TransformInfo}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.TransformInfo}"/>
                 <TextBlock  Text="{Binding Material.TransformInfo.Value}"  VerticalAlignment="Center"/>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.StringParams}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.StringParams}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -73,12 +66,11 @@
 
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.FloatParams}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.FloatParams}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -98,13 +90,12 @@
 
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
 
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.IntParams}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.IntParams}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -125,11 +116,10 @@
 
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.TextureParams}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.TextureParams}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -148,12 +138,11 @@
 
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.AttachmentParams}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.AttachmentParams}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -171,11 +160,10 @@
 
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.Vec4Params}"/>
-                <Label>:</Label>
+            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc WeightedMaterial.Vec4Params}"/>
                 <StackPanel>
                     <Expander>
                         <Expander.Header>
@@ -193,7 +181,7 @@
 
                     </Expander>
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
 
         </DockPanel>
     </Expander>

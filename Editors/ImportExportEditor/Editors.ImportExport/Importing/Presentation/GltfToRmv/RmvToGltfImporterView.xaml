@@ -7,8 +7,18 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
              VerticalAlignment="Stretch"
-                
-             >
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
 
     <Grid VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
@@ -34,25 +44,21 @@
         <CheckBox Grid.Column="2" Content="" HorizontalAlignment="Left" VerticalAlignment="Center" x:Name="ImportMeshes_CheckBox"
                   IsChecked="{Binding ImportMeshes, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                   ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMeshes}"/>
-        <TextBlock Grid.Column="1" Text=" : " VerticalAlignment="Center" Height="15"/>
 
-        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMaterials}" Height="15" Width="88"/>
-        <TextBlock Grid.Row="1" Grid.Column="1" Text=" : " VerticalAlignment="Center" Height="15"/>
-        <CheckBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Left" x:Name = "ImportMaterialCheckBox"                  
-                  IsChecked="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMaterials}" Height="15" Width="88"/>
+        <CheckBox Grid.Row="1" Grid.Column="2" x:Name = "ImportMaterialCheckBox"
+                  IsChecked="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                     ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMaterials}" >
         </CheckBox>
 
-        <TextBlock Grid.Row="2" Grid.Column="1" Text="{loc:Loc RmvToGltfImporter.ConvertMaterialMap}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="15" Width="265" Grid.ColumnSpan="2" Margin="9,0,0,0"/>
-        <TextBlock Grid.Row="2" Grid.Column="3" Text=" : " VerticalAlignment="Center" Height="15" Margin="0,0,1,0"/>
-        <CheckBox Grid.Row="2" Grid.Column="5" HorizontalAlignment="Left" 
-                  IsEnabled="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged}" 
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="1" Text="{loc:Loc RmvToGltfImporter.ConvertMaterialMap}" VerticalAlignment="Center" Height="15" Width="265" Grid.ColumnSpan="2"/>
+        <CheckBox Grid.Row="2" Grid.Column="5"
+                  IsEnabled="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged}"
                   IsChecked="{Binding ConvertFromBlenderMaterialMap, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                   ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMeshes}"/>
 
-        <TextBlock Grid.Row="3" Grid.Column="2" Text="{loc:Loc RmvToGltfImporter.ConvertNormalMap}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="15" Margin="4,0,0,0" Width="255"/>
-        <TextBlock Grid.Row="3" Grid.Column="3" Text=" : " VerticalAlignment="Top" Height="15" HorizontalAlignment="Center" Width="9"/>
-        <CheckBox Grid.Row="3" Grid.Column="5" HorizontalAlignment="Left" x:Name="ConvertNormalMapCheckbox"
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="3" Grid.Column="2" Text="{loc:Loc RmvToGltfImporter.ConvertNormalMap}" VerticalAlignment="Center" Height="15" Width="255"/>
+        <CheckBox Grid.Row="3" Grid.Column="5" x:Name="ConvertNormalMapCheckbox"
                   IsEnabled="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged}" 
                   IsChecked="{Binding ConvertNormalTextureToOrange, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
             <CheckBox.ToolTip>
@@ -61,15 +67,13 @@
                 - Orange type is a specialal "compressed" 2 channel type, used by TW, and some other games.
             </CheckBox.ToolTip>
         </CheckBox>
-        <TextBlock Grid.Row="4" Text="{loc:Loc RmvToGltfImporter.ImportAnimations}" HorizontalAlignment="Center" VerticalAlignment="Center" Height="15" Width="109"/>
-        <TextBlock Grid.Row="4" Grid.Column="1" Text=" : " VerticalAlignment="Center" Height="15"/>
-        <CheckBox Grid.Row="4" Grid.Column="2" HorizontalAlignment="Left" IsChecked="{Binding ImportAnimations, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="4" Text="{loc:Loc RmvToGltfImporter.ImportAnimations}" VerticalAlignment="Center" Height="15" Width="109"/>
+        <CheckBox Grid.Row="4" Grid.Column="2" IsChecked="{Binding ImportAnimations, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
             <CheckBox.ToolTip>
                 Import Animations From GLTF File, convert to TW ANIM;
             </CheckBox.ToolTip>
         </CheckBox>
-        <TextBlock Grid.Row="5" Grid.Column="2" Text="{loc:Loc RmvToGltfImporter.KeySamplesPerSecond}"  HorizontalAlignment="Left" VerticalAlignment="Center" Height="15" Margin="4,0,0,0" Width="193"/>
-        <TextBlock Grid.Row="5" Grid.Column="3" Text=" : " HorizontalAlignment="Center" VerticalAlignment="Top" Height="16" Width="9" RenderTransformOrigin="8.147,0.333"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="5" Grid.Column="2" Text="{loc:Loc RmvToGltfImporter.KeySamplesPerSecond}" VerticalAlignment="Center" Height="15" Width="193"/>
         <TextBox Grid.Row="5" Grid.Column="5" HorizontalAlignment="Left" VerticalAlignment="Top" Width="28"
                  Text="{Binding AnimationKeysPerSecond, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 

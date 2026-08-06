@@ -26,7 +26,9 @@ public sealed class ImportPackAsFolderProjectCommand(
     private readonly IFolderProjectImportDialogs _importDialogs =
         importDialogs ?? new FolderProjectImportDialogs();
     private readonly IFolderProjectSetupDialogs _setupDialogs =
-        setupDialogs ?? new FolderProjectSetupDialogs(localizationManager);
+        setupDialogs ?? new FolderProjectSetupDialogs(
+            localizationManager,
+            dialogs);
     private readonly Func<string, bool> _isEmptyTarget =
         isEmptyTarget ?? FolderProjectImportTargetValidator.IsEmptyTarget;
     private readonly IFolderProjectVersionControlService

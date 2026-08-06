@@ -6,7 +6,19 @@
         xmlns:local="clr-namespace:Editors.ImportExport.Exporting.Presentation"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc ExportWindow.Title}" Height="350" Width="600" Background="#FF1C1C1C">
+        Title="{loc:Loc ExportWindow.Title}" Height="350" Width="600"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
     <Grid Margin="4">
         <Grid.ColumnDefinitions>
@@ -24,17 +36,14 @@
             <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc ExportWindow.SystemPath}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="0" Grid.Column="1" Text=": "/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="0" Grid.Column="0" Text="{loc:Loc ExportWindow.SystemPath}"/>
         <TextBox Grid.Row="0" Grid.Column="2" Text="{Binding SystemPath}" HorizontalContentAlignment="Right" IsReadOnly="True"/>
         <Button Grid.Row="0" Grid.Column="3" Content="{loc:Loc General.Browse}" Command="{Binding BrowsePathCommandCommand}"/>
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc ExportWindow.CreateImportProject}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="1" Grid.Column="1" Text=": "/>
-        <CheckBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Left" IsChecked="{Binding CreateImportProject, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="1" Grid.Column="0" Text="{loc:Loc ExportWindow.CreateImportProject}"/>
+        <CheckBox Grid.Row="1" Grid.Column="2" IsChecked="{Binding CreateImportProject, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc ExportWindow.AvailableExporters}" HorizontalAlignment="Left"/>
-        <TextBlock Grid.Row="2" Grid.Column="1" Text=": "/>
+        <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="0" Text="{loc:Loc ExportWindow.AvailableExporters}"/>
         <ComboBox Grid.Row="2" Grid.Column="2"  HorizontalContentAlignment="Right"
                 ItemsSource="{Binding PossibleExporters, UpdateSourceTrigger=PropertyChanged}"
                 SelectedValue="{Binding SelectedExporter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
@@ -45,7 +54,7 @@
                       Content="{Binding SelectedExporter, UpdateSourceTrigger=PropertyChanged}"       
                       ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
 
-        <Button Grid.Row="4" Grid.ColumnSpan="4" Content="{loc:Loc General.Export}" Click="ExportButton_Click"/>
+        <Button Grid.Row="4" Grid.ColumnSpan="4" Content="{loc:Loc General.Export}" Click="ExportButton_Click" Style="{StaticResource AeButton.Primary}"/>
 
     </Grid>
 </Window>

@@ -6,18 +6,36 @@
         xmlns:errorlistdialog="clr-namespace:CommonControls.BaseDialogs.ErrorListDialog"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
         mc:Ignorable="d"
-        Title="{Binding WindowTitle}" Height="450" Width="800" WindowStartupLocation="CenterOwner" Background="#FF1C1C1C">
+        Title="{Binding WindowTitle}" Height="520" Width="860"
+        MinHeight="420" MinWidth="720"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}"
+        Background="{DynamicResource AeBrush.Canvas}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="auto"/>
-            <RowDefinition Height="auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <errorlistdialog:ErrorListView Grid.Row="0" />
-        <StackPanel Orientation="Horizontal" Grid.Row="1">
-            <Button Content="{loc:Loc Shared.ErrorList.Close}" Margin="5" Click="Button_Click"/>
-            <Button Content="{loc:Loc Shared.ErrorList.SaveReport}" Margin="5" Click="SaveReport_Click"/>
-        </StackPanel>
+        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
+            <errorlistdialog:ErrorListView />
+        </Border>
+        <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button
+                    MinWidth="104"
+                    Margin="0,0,8,0"
+                    Content="{loc:Loc Shared.ErrorList.SaveReport}"
+                    Click="SaveReport_Click"
+                    Style="{StaticResource AeButton.Secondary}" />
+                <Button
+                    MinWidth="88"
+                    Content="{loc:Loc Shared.ErrorList.Close}"
+                    Click="Button_Click"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

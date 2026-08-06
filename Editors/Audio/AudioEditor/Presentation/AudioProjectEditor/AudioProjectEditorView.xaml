@@ -9,10 +9,19 @@
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=AudioProjectEditor:AudioProjectEditorViewModel}"
     mc:Ignorable="d"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="450" d:DesignWidth="800">
     
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        </ResourceDictionary>
     </UserControl.Resources>
     
     <Grid
@@ -49,6 +58,7 @@
             <Button 
                 Grid.Column="0"
                 Content="{Binding CommitButtonLabel}"
+                Style="{StaticResource AeButton.Primary}"
                 ToolTipService.ShowOnDisabled="True"
                 Command="{Binding AddRowsToViewerCommand}" 
                 Margin="5, 0, 0, 0" 
@@ -69,6 +79,7 @@
                 Margin="5, 0, 0, 0"
                 Width="80"
                 Content="{loc:Loc General.Cancel}"
+                Style="{StaticResource AeButton.Secondary}"
                 Command="{Binding CancelEditCommand}"
                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"/>
 

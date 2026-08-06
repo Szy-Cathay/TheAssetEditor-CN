@@ -17,10 +17,19 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=Local:AudioEditorViewModel}"
     mc:Ignorable="d" 
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignWidth="1200" d:DesignHeight="700">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -107,13 +116,26 @@
                 Grid.Column="1"
                 Margin="10, 5, 10, 0"
                 VerticalAlignment="Center">
-                <progress:OperationProgressView
-                    Width="460"
-                    CurrentDetailText="{Binding CompileStatus}"
-                    IsOperationActive="{Binding IsBusy}"
-                    IsProgressIndeterminate="True"
-                    StatusText="{loc:Loc OperationProgress.AudioCompile}"
-                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <progress:OperationProgressWindowHost
+                    CancelCommand="{Binding LoadAudioProjectCancelCommand}"
+                    CancelText="{loc:Loc General.Cancel}"
+                    CurrentDetailText="{Binding OperationDetail}"
+                    IsOperationActive="{Binding IsLoading}"
+                    IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding OperationProgressMaximum}"
+                    ProgressValue="{Binding OperationProgressValue}"
+                    StatusText="{Binding OperationStatus}"
+                    WindowTitle="{loc:Loc OperationProgress.AudioLoad}" />
+                <progress:OperationProgressWindowHost
+                    CancelCommand="{Binding CompileAudioProjectCancelCommand}"
+                    CancelText="{loc:Loc General.Cancel}"
+                    CurrentDetailText="{Binding OperationDetail}"
+                    IsOperationActive="{Binding IsCompiling}"
+                    IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding OperationProgressMaximum}"
+                    ProgressValue="{Binding OperationProgressValue}"
+                    StatusText="{Binding OperationStatus}"
+                    WindowTitle="{loc:Loc OperationProgress.AudioCompile}" />
                 <TextBlock
                     MinWidth="72"
                     MaxWidth="360"
@@ -124,7 +146,9 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                <DataTrigger
+                                    Binding="{Binding IsBusy}"
+                                    Value="True">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                             </Style.Triggers>
@@ -137,7 +161,7 @@
         <Border 
             Grid.Row="1" 
             Height="1" 
-            Background="{DynamicResource App.Border}" 
+            Background="{DynamicResource AeBrush.Border}"
             Margin="0, 5, 0, 0"/>
 
         <Grid 
@@ -185,7 +209,7 @@
                     <GridSplitter
                         Grid.Row="1"
                         Height="5"
-                        Background="{DynamicResource App.Border}"
+                        Background="{DynamicResource AeBrush.Border}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"
@@ -199,7 +223,7 @@
                     <GridSplitter
                         Grid.Row="3"
                         Height="5"
-                        Background="{DynamicResource App.Border}"
+                        Background="{DynamicResource AeBrush.Border}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"
@@ -217,7 +241,7 @@
             <GridSplitter 
                 Grid.Column="1" 
                 Width="5" 
-                Background="{DynamicResource App.Border}" 
+                Background="{DynamicResource AeBrush.Border}"
                 VerticalAlignment="Stretch" 
                 HorizontalAlignment="Center"
                 ResizeBehavior="PreviousAndNext" 
@@ -245,7 +269,7 @@
                 <Border 
                     Grid.Row="1"
                     Height="5" 
-                    Background="{DynamicResource App.Border}"
+                    Background="{DynamicResource AeBrush.Border}"
                     Visibility="{Binding IsSettingsBorderVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                 <Settings:SettingsView 
@@ -263,7 +287,7 @@
         <Border
             Grid.Row="2"
             Panel.ZIndex="2"
-            Background="{DynamicResource TreeView.Static.Background}">
+            Background="{DynamicResource AeBrush.Surface1}">
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -280,7 +304,7 @@
                 Margin="20"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Foreground="{DynamicResource ABrush.Foreground.Disabled}"
+                Foreground="{DynamicResource AeBrush.TextMuted}"
                 Text="{Binding EmptyStateText}"
                 TextAlignment="Center"
                 TextWrapping="Wrap"/>

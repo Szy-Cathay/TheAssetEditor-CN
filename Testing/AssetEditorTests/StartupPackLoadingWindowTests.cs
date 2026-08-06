@@ -43,6 +43,7 @@ public class StartupPackLoadingWindowTests
             };
             var registered = false;
             var ownerWasEnabledDuringLoad = true;
+            var loadingFeedbackWasVisible = true;
             var renderedProgressWasExpandable = false;
             StartupPackLoadingWindow? loadingWindow = null;
             try
@@ -62,6 +63,7 @@ public class StartupPackLoadingWindowTests
                         {
                             ownerWasEnabledDuringLoad = IsWindowEnabled(
                                 new WindowInteropHelper(owner).Handle);
+                            loadingFeedbackWasVisible = window.Opacity > 0;
                             window.StartupOperationProgress
                                 .IsDetailsExpanded = true;
                             window.UpdateLayout();
@@ -93,6 +95,10 @@ public class StartupPackLoadingWindowTests
                         Is.False,
                         "The main window remained interactive while CA packs loaded.");
                     Assert.That(registered, Is.True);
+                    Assert.That(
+                        loadingFeedbackWasVisible,
+                        Is.False,
+                        "A short startup operation displayed loading feedback.");
                     Assert.That(
                         renderedProgressWasExpandable,
                         Is.True,

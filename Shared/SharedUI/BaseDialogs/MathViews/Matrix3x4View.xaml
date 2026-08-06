@@ -4,7 +4,19 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d"
-             x:Name="self">
+             x:Name="self"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <Grid>
         <GroupBox Header="{Binding MatrixData.Name, ElementName=self, UpdateSourceTrigger=PropertyChanged}">
             <StackPanel>

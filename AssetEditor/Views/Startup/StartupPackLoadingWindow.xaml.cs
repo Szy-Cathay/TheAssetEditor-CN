@@ -22,7 +22,10 @@ public partial class StartupPackLoadingWindow : Window
     private readonly Action _openSettings;
     private bool _canClose;
     private bool _isLoading;
+    private bool _isShowingDialog;
     private bool _succeeded;
+    private readonly OperationProgressVisibilityController
+        _visibilityController;
 
     public StartupPackLoadingWindow(
         Func<Action<CaPackLoadProgress>, PackFileContainer?> loadPacks,
@@ -34,8 +37,11 @@ public partial class StartupPackLoadingWindow : Window
         _openSettings = openSettings;
 
         InitializeComponent();
+        _visibilityController = new OperationProgressVisibilityController(
+            Dispatcher,
+            SetWindowFeedbackVisibility);
         DarkTitleBarHelper.Enable(this);
-        if (Application.Current?.MainWindow is { } owner &&
+        if (Application.Current?.MainWindow is { IsLoaded: true } owner &&
             !ReferenceEquals(owner, this))
         {
             Owner = owner;
@@ -47,7 +53,16 @@ public partial class StartupPackLoadingWindow : Window
 
     public bool Run()
     {
-        ShowDialog();
+        _isShowingDialog = true;
+        try
+        {
+            ShowDialog();
+        }
+        finally
+        {
+            _isShowingDialog = false;
+        }
+
         return _succeeded;
     }
 
@@ -62,6 +77,7 @@ public partial class StartupPackLoadingWindow : Window
         _isLoading = true;
         FailurePanel.Visibility = Visibility.Collapsed;
         StartupOperationProgress.IsOperationActive = true;
+        _visibilityController.Begin();
         StartupOperationProgress.Report(new OperationProgressUpdate(
             GetText("StartupPackLoading.Preparing")));
 
@@ -90,6 +106,7 @@ public partial class StartupPackLoadingWindow : Window
 
             _succeeded = true;
             _canClose = true;
+            await _visibilityController.EndAsync();
             DialogResult = true;
         }
         catch
@@ -136,6 +153,7 @@ public partial class StartupPackLoadingWindow : Window
             GetText("StartupPackLoading.FailureDetail")));
         StartupOperationProgress.IsOperationActive = false;
         FailurePanel.Visibility = Visibility.Visible;
+        _visibilityController.RevealImmediately();
     }
 
     private void OnRetryClick(object sender, RoutedEventArgs e) =>
@@ -148,7 +166,11 @@ public partial class StartupPackLoadingWindow : Window
     private void OnExitClick(object sender, RoutedEventArgs e)
     {
         _canClose = true;
-        DialogResult = false;
+        _visibilityController.ForceHide();
+        if (_isShowingDialog)
+            DialogResult = false;
+        else if (IsLoaded)
+            Close();
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)
@@ -159,4 +181,10 @@ public partial class StartupPackLoadingWindow : Window
 
     private static string GetText(string key) =>
         LocalizationManager.Instance.Get(key);
+
+    private void SetWindowFeedbackVisibility(bool isVisible)
+    {
+        Opacity = isVisible ? 1 : 0;
+        IsHitTestVisible = isVisible;
+    }
 }

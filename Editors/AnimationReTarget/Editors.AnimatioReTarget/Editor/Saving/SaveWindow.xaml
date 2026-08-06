@@ -6,27 +6,36 @@
         xmlns:System="clr-namespace:System;assembly=System.Runtime"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc AnimReTarget.SaveWindowTitle}" Height="450" Width="800" Background="#FF1C1C1C">
+        Title="{loc:Loc AnimReTarget.SaveWindowTitle}"
+        Height="450"
+        Width="800"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
     
     <Window.Resources>
-        <System:Double x:Key="labelWidth">140</System:Double>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <System:Double x:Key="labelWidth">140</System:Double>
+        </ResourceDictionary>
     </Window.Resources>
 
 
     <StackPanel>
         <DockPanel >
-            <Label Content="{loc:Loc AnimReTarget.SavePrefix}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
-            <Label Content=":" DockPanel.Dock="Left"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.SavePrefix}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
             <ComboBox Margin="2" DockPanel.Dock="Right" Width="60" 
                       ItemsSource="{Binding PossibleAnimationFormats, UpdateSourceTrigger=PropertyChanged}" 
                       SelectedItem="{Binding AnimationFormat, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-            <Label Content="{loc:Loc AnimReTarget.Format}" DockPanel.Dock="Right"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.Format}" DockPanel.Dock="Right"/>
             <TextBox Text="{Binding SavePrefix, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalAlignment="Center" DockPanel.Dock="Left"/>
         </DockPanel>
 
         <DockPanel IsEnabled="False">
-            <Label Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}" Width ="{StaticResource labelWidth}"/>
-            <Label Content=":"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}" Width ="{StaticResource labelWidth}"/>
             <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding UseScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             <Button Content="{loc:Loc AnimReTarget.ExportMeshSkeletonAtScale}" Command="{Binding ExportScaledMesh}"  DockPanel.Dock="Right" Margin="2"/>
             <TextBox Text="{Binding ScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalAlignment="Center"/>

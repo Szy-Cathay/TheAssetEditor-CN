@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Emissive" 
-             xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui" xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui" xmlns:b="http://schemas.microsoft.com/xaml/behaviors" xmlns:userinterface="clr-namespace:GameWorld.Core.Utility.UserInterface;assembly=GameWorld.Core" xmlns:colourpickerbutton="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui" xmlns:mathviews1="clr-namespace:Shared.Ui.BaseDialogs.MathViews;assembly=Shared.Ui" xmlns:basedialogs="clr-namespace:Shared.Ui.BaseDialogs;assembly=Shared.Ui"
+             xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui" xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui" xmlns:b="http://schemas.microsoft.com/xaml/behaviors" xmlns:userinterface="clr-namespace:GameWorld.Core.Utility.UserInterface;assembly=GameWorld.Core" xmlns:colourpickerbutton="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui" xmlns:mathviews1="clr-namespace:Shared.Ui.BaseDialogs.MathViews;assembly=Shared.Ui"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
@@ -18,93 +18,105 @@
 
     <ContentControl DockPanel.Dock="Top">
 
-        <Expander DockPanel.Dock="Top" IsExpanded="True">
+        <Expander DockPanel.Dock="Top" IsExpanded="True" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
             <Expander.Header>
-                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}" ToolTip="{loc:Loc Emissive.ToolTip}">
-                    <Label Content="{loc:Loc Emissive.Header}" FontSize="{StaticResource HeaderFontSize}"/>
-                    <Separator/>
+                <DockPanel DockPanel.Dock="Top" ToolTip="{loc:Loc Emissive.ToolTip}">
+                    <TextBlock Text="{loc:Loc Emissive.Header}" FontWeight="Normal" Margin="3"/>
                 </DockPanel>
             </Expander.Header>
 
             <DockPanel LastChildFill="False">
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Texture}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveTexture}"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Texture}" Style="{StaticResource AeForm.Label}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveTexture}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Distortion}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveDistortionTexture}"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Distortion}" Style="{StaticResource AeForm.Label}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveDistortionTexture}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Direction}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Direction}" Style="{StaticResource AeForm.Label}" />
                     <mathviews1:Vector2View DataContext="{Binding EmissiveDirection}" />
-                </basedialogs:AeAttribute>
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.DistortStrength}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <TextBox Margin="2" Text="{Binding EmissiveDistortStrength, UpdateSourceTrigger=LostFocus}" MaxLength="8"  VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.DistortStrength}" Style="{StaticResource AeForm.Label}" />
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" MaxLength="8" Text="{Binding EmissiveDistortStrength, UpdateSourceTrigger=LostFocus}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.FresnelStrength}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <TextBox Margin="2" Text="{Binding EmissiveFresnelStrength, UpdateSourceTrigger=LostFocus}" MaxLength="8"  VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.FresnelStrength}" Style="{StaticResource AeForm.Label}" />
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" MaxLength="8" Text="{Binding EmissiveFresnelStrength, UpdateSourceTrigger=LostFocus}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Tint}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <colourpickerbutton:ColourPickerButtonView DataContext="{Binding EmissiveTint}" Margin="5,0,5,0" HorizontalAlignment="Left" Width="20" Height="20"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Tint}" Style="{StaticResource AeForm.Label}" />
+                    <colourpickerbutton:ColourPickerButtonView Width="20" Height="20" HorizontalAlignment="Left" DataContext="{Binding EmissiveTint}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Gradient1}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <DockPanel DockPanel.Dock="Top">
-                        <colourpickerbutton:ColourPickerButtonView DataContext="{Binding Gradient0}" Margin="5,0,5,0" HorizontalAlignment="Left" Width="20" Height="20"/>
-                        <Label Content="{loc:Loc Emissive.Time}"/>
-                        <TextBox Margin="2"  Text="{Binding GradientTime0, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient1}" Style="{StaticResource AeForm.Label}" />
+                    <DockPanel LastChildFill="False">
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient0}" />
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
+                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime0, UpdateSourceTrigger=LostFocus}" />
                     </DockPanel>
-                </basedialogs:AeAttribute>
+                </DockPanel>
 
-
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Gradient2}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <DockPanel DockPanel.Dock="Top">
-    
-                        <colourpickerbutton:ColourPickerButtonView DataContext="{Binding Gradient1}" Margin="5,0,5,0" HorizontalAlignment="Left" Width="20" Height="20"/>
-                        <Label Content="{loc:Loc Emissive.Time}"/>
-                        <TextBox Margin="2"  Text="{Binding GradientTime1, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient2}" Style="{StaticResource AeForm.Label}" />
+                    <DockPanel LastChildFill="False">
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient1}" />
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
+                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime1, UpdateSourceTrigger=LostFocus}" />
                     </DockPanel>
-                </basedialogs:AeAttribute>
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Gradient3}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <DockPanel DockPanel.Dock="Top">
-                        <colourpickerbutton:ColourPickerButtonView DataContext="{Binding Gradient2}" Margin="5,0,5,0" HorizontalAlignment="Left" Width="20" Height="20"/>
-                        <Label Content="{loc:Loc Emissive.Time}"/>
-                        <TextBox Margin="2"  Text="{Binding GradientTime2, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient3}" Style="{StaticResource AeForm.Label}" />
+                    <DockPanel LastChildFill="False">
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient2}" />
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
+                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime2, UpdateSourceTrigger=LostFocus}" />
                     </DockPanel>
-                </basedialogs:AeAttribute>
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Gradient4}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <DockPanel DockPanel.Dock="Top">
-                        <colourpickerbutton:ColourPickerButtonView DataContext="{Binding Gradient3}" Margin="5,0,5,0" HorizontalAlignment="Left" Width="20" Height="20"/>
-                        <Label Content="{loc:Loc Emissive.Time}"/>
-                        <TextBox Margin="2"  Text="{Binding GradientTime3, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="50" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient4}" Style="{StaticResource AeForm.Label}" />
+                    <DockPanel LastChildFill="False">
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient3}" />
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
+                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime3, UpdateSourceTrigger=LostFocus}" />
                     </DockPanel>
-                </basedialogs:AeAttribute>
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Speed}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <TextBox Margin="2"  Text="{Binding EmissiveSpeed, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Speed}" Style="{StaticResource AeForm.Label}" />
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveSpeed, UpdateSourceTrigger=LostFocus}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.PulseSpeed}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <TextBox Margin="2"  Text="{Binding EmissivePulseSpeed, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.PulseSpeed}" Style="{StaticResource AeForm.Label}" />
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissivePulseSpeed, UpdateSourceTrigger=LostFocus}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.PulseStrength}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <TextBox Margin="2"  Text="{Binding EmissivePulseStrength, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.PulseStrength}" Style="{StaticResource AeForm.Label}" />
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissivePulseStrength, UpdateSourceTrigger=LostFocus}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Strength}" LabelWidth="{StaticResource labelWidth}" ToolTipEnumValue="None">
-                    <TextBox Margin="2" Text="{Binding EmissiveStrength, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Strength}" Style="{StaticResource AeForm.Label}" />
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveStrength, UpdateSourceTrigger=LostFocus}" />
+                </DockPanel>
 
-                <basedialogs:AeAttribute DockPanel.Dock="Top" LabelText="{loc:Loc Emissive.Tiling}" LabelWidth="{StaticResource labelWidth}"  ToolTipEnumValue="None">
-                    <mathviews1:Vector2View DataContext="{Binding EmissiveTiling}"/>
-                </basedialogs:AeAttribute>
+                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Tiling}" Style="{StaticResource AeForm.Label}" />
+                    <mathviews1:Vector2View DataContext="{Binding EmissiveTiling}" />
+                </DockPanel>
 
             </DockPanel>
         </Expander>

@@ -57,13 +57,13 @@ namespace Shared.Ui.BaseDialogs.StandardDialog.PackFile
         {
             if (string.IsNullOrWhiteSpace(CurrentFileName))
             {
-                System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.NoNameProvided"));
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.NoNameProvided"));
                 return;
             }
 
             if (SelectedFile != null)
             {
-                if (System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.ReplaceFile"), "", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.No)
+                if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.ReplaceFile"), "", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.No)
                     return;
             }
 

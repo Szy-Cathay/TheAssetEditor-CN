@@ -4,20 +4,30 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:basedialogs="clr-namespace:Shared.Ui.BaseDialogs;assembly=Shared.Ui" xmlns:System="clr-namespace:System;assembly=mscorlib" xmlns:mathviews="clr-namespace:Shared.Ui.BaseDialogs.MathViews;assembly=Shared.Ui" xmlns:componenteditor="clr-namespace:Editors.Twui.Editor.ComponentEditor"
+             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
     <UserControl.Resources>
-        <System:Double x:Key="labelWidth">50</System:Double>
-        <Thickness x:Key="LabelMargin">20,0,0,0</Thickness>
-        <System:Double x:Key="HeaderFontSize">10</System:Double>
-        <System:Double x:Key="HeaderLabelLength">100</System:Double>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <System:Double x:Key="labelWidth">72</System:Double>
+            <Thickness x:Key="LabelMargin">20,0,0,0</Thickness>
+            <System:Double x:Key="HeaderFontSize">10</System:Double>
+            <System:Double x:Key="HeaderLabelLength">100</System:Double>
+        </ResourceDictionary>
     </UserControl.Resources>
 
 
     <DockPanel LastChildFill="False">
-        <basedialogs:AutoAeAttribute InnerContent="{Binding SelectedComponentViewModel.TestString, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  LabelText="String" DockPanel.Dock="Top"  LabelWidth="{StaticResource labelWidth}"/>
-        <basedialogs:AutoAeAttribute  InnerContent="{Binding SelectedComponentViewModel.TestFloat, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  LabelText="Float" DockPanel.Dock="Top"  LabelWidth="{StaticResource labelWidth}"/>
-        <basedialogs:AutoAeAttribute  InnerContent="{Binding SelectedComponentViewModel.TextVector2, UpdateSourceTrigger=PropertyChanged}"  LabelText="Vector2" DockPanel.Dock="Top"  LabelWidth="{StaticResource labelWidth}"/>
-        <basedialogs:AutoAeAttribute  InnerContent="{Binding SelectedComponentViewModel.TestBool, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  LabelText="Bool" DockPanel.Dock="Top"  LabelWidth="{StaticResource labelWidth}"/>
+        <basedialogs:AutoAeAttribute InnerContent="{Binding SelectedComponentViewModel.TestString, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" LabelText="{loc:Loc Twui.Component.String}" DockPanel.Dock="Top" LabelWidth="{StaticResource labelWidth}"/>
+        <basedialogs:AutoAeAttribute InnerContent="{Binding SelectedComponentViewModel.TestFloat, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" LabelText="{loc:Loc Twui.Component.Float}" DockPanel.Dock="Top" LabelWidth="{StaticResource labelWidth}"/>
+        <basedialogs:AutoAeAttribute InnerContent="{Binding SelectedComponentViewModel.TextVector2, UpdateSourceTrigger=PropertyChanged}" LabelText="{loc:Loc Twui.Component.Vector2}" DockPanel.Dock="Top" LabelWidth="{StaticResource labelWidth}"/>
+        <basedialogs:AutoAeAttribute InnerContent="{Binding SelectedComponentViewModel.TestBool, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" LabelText="{loc:Loc Twui.Component.Bool}" DockPanel.Dock="Top" LabelWidth="{StaticResource labelWidth}"/>
     </DockPanel>
 </UserControl>

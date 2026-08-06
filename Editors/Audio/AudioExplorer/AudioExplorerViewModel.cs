@@ -84,6 +84,9 @@ namespace Editors.Audio.AudioExplorer
         [ObservableProperty] private bool _isStopAudioButtonEnabled = false;
         [ObservableProperty] private bool _isAudioPlaybackVisible = false;
         [ObservableProperty] private bool _isAudioPreviewLoading = false;
+        [ObservableProperty] private int _audioPreviewProgressValue = 0;
+        [ObservableProperty] private int _audioPreviewProgressMaximum = 2;
+        [ObservableProperty] private string _audioPreviewProgressDetail = string.Empty;
         [ObservableProperty] private ImageSource _audioWaveformBaseImageSource;
         [ObservableProperty] private ImageSource _audioWaveformOverlayImageSource;
         [ObservableProperty] private Rect _audioWaveformOverlayClip = Rect.Empty;
@@ -93,9 +96,16 @@ namespace Editors.Audio.AudioExplorer
         [ObservableProperty] private double _totalPlaybackSeconds = 0;
         [ObservableProperty] private bool _isLoading = false;
         [ObservableProperty] private int _loadProgress = 0;
+        [ObservableProperty] private int _loadProgressValue = 0;
+        [ObservableProperty] private int _loadProgressMaximum = 0;
+        [ObservableProperty] private string _loadProgressDetail = string.Empty;
+        [ObservableProperty] private bool _loadProgressIsIndeterminate = true;
         [ObservableProperty] private string _loadStatus = string.Empty;
         [ObservableProperty] private bool _isExporting = false;
         [ObservableProperty] private int _exportProgress = 0;
+        [ObservableProperty] private int _exportProgressValue = 0;
+        [ObservableProperty] private int _exportProgressMaximum = 0;
+        [ObservableProperty] private string _exportProgressDetail = string.Empty;
         [ObservableProperty] private bool _isExportSelectedAudioEnabled = false;
         [ObservableProperty] private bool _isExportSelectedBranchEnabled = false;
         [ObservableProperty] private bool _isExportCurrentResultsEnabled = false;
@@ -303,6 +313,12 @@ namespace Editors.Audio.AudioExplorer
             }
 
             IsAudioPlaybackVisible = true;
+            AudioPreviewProgressValue = 0;
+            AudioPreviewProgressMaximum = 2;
+            AudioPreviewProgressDetail = string.Format(
+                LocalizationManager.Instance.Get(
+                    "OperationProgress.AudioPreview.Decode"),
+                source.SourceId);
             IsAudioPreviewLoading = true;
             var cancellationTokenSource = new CancellationTokenSource();
             _playbackPreparationCancellationTokenSource =
@@ -329,6 +345,11 @@ namespace Editors.Audio.AudioExplorer
                     throw new InvalidOperationException(
                         $"Unable to prepare audio '{source.SourceId}'.");
 
+                AudioPreviewProgressValue = 1;
+                AudioPreviewProgressDetail = string.Format(
+                    LocalizationManager.Instance.Get(
+                        "OperationProgress.AudioPreview.Waveform"),
+                    source.SourceId);
                 var waveform = await _waveformRendererService.RenderAsync(
                     playbackData.WavData,
                     1000,
@@ -346,6 +367,7 @@ namespace Editors.Audio.AudioExplorer
                 TotalPlaybackTime = waveform.TotalTime;
                 TotalPlaybackSeconds = waveform.TotalTime.TotalSeconds;
                 SetPlaybackPosition(TimeSpan.Zero);
+                AudioPreviewProgressValue = 2;
             }
             catch (OperationCanceledException)
             {
@@ -461,6 +483,10 @@ namespace Editors.Audio.AudioExplorer
 
             IsLoading = true;
             LoadProgress = 0;
+            LoadProgressValue = 0;
+            LoadProgressMaximum = 0;
+            LoadProgressDetail = string.Empty;
+            LoadProgressIsIndeterminate = true;
             LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.Loading");
             CancelTreeBuild();
 
@@ -469,6 +495,10 @@ namespace Editors.Audio.AudioExplorer
                 LoadProgress = value.Total == 0
                     ? 0
                     : (int)Math.Round(value.Completed * 100d / value.Total);
+                LoadProgressValue = value.Completed;
+                LoadProgressMaximum = value.Total;
+                LoadProgressDetail = Path.GetFileName(value.CurrentFile);
+                LoadProgressIsIndeterminate = value.Total <= 0;
                 LoadStatus = LocalizationManager.Instance.GetFormat(
                     "AudioExplorer.LoadingProgress",
                     value.Completed,
@@ -842,6 +872,9 @@ namespace Editors.Audio.AudioExplorer
 
             IsExporting = true;
             ExportProgress = 0;
+            ExportProgressValue = 0;
+            ExportProgressMaximum = plan.Sources.Count;
+            ExportProgressDetail = string.Empty;
             var exportedCount = 0;
             var failedCount = 0;
             var skippedCount = plan.SkippedCount;
@@ -854,6 +887,9 @@ namespace Editors.Audio.AudioExplorer
                         ? 0
                         : (int)Math.Round(
                             completed * 100d / total);
+                    ExportProgressValue = completed;
+                    ExportProgressMaximum = total;
+                    ExportProgressDetail = sourceId.ToString();
                     LoadStatus = LocalizationManager.Instance.GetFormat(
                         "AudioExplorer.ExportingProgress",
                         completed,

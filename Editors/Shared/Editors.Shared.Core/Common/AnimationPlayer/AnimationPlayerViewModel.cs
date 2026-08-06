@@ -14,6 +14,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         public NotifyAttr<int> SelectedAnimationCurrentFrame { get; private set; } = new();
         public NotifyAttr<int> SelectedAnimationFrameCount { get; private set; } = new();
         public NotifyAttr<bool> IsEnabled { get; set; } = new();
+        public NotifyAttr<bool> IsPlaying { get; private set; } = new();
         public NotifyAttr<bool> LoopAnimation { get; set; } = new(true);
 
         public NotifyAttr<Visibility> PlayerControlsVisibility { get; private set; } = new(Visibility.Collapsed);
@@ -61,24 +62,43 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
 
         public void ToggleAnimationPausePlay()
         {
+            var shouldPlay = !_assetList.Any(item =>
+                item.Player.IsPlaying && item.Player.IsEnabled);
             foreach (var item in _assetList)
             {
-                if (item.Player.IsPlaying)
-                    Pause(item);
-                else
+                if (shouldPlay)
                     Play(item);
+                else
+                    Pause(item);
             }
+
+            UpdatePlayingState();
         }
 
-        public void SetAnimationNextFrame() => _assetList.ForEach(x => NextFrame(x));
-        public void SetAnimationPrivFrame() => _assetList.ForEach(x => PrivFrame(x));
-        public void SetAnimationFirstFrame() => _assetList.ForEach(x => SetFrame(x, 0));
+        public void SetAnimationNextFrame()
+        {
+            _assetList.ForEach(NextFrame);
+            UpdatePlayingState();
+        }
+
+        public void SetAnimationPrivFrame()
+        {
+            _assetList.ForEach(PrivFrame);
+            UpdatePlayingState();
+        }
+
+        public void SetAnimationFirstFrame()
+        {
+            _assetList.ForEach(x => SetFrame(x, 0));
+            UpdatePlayingState();
+        }
 
         public void SetAnimationLastFrame()
         {
             LoopAnimation.Value = false;
             foreach (var item in _assetList)
                 SetFrame(item, SelectedMainAnimation.Asset.Player.FrameCount());
+            UpdatePlayingState();
         }
 
         private void OnAnimationFrameChanged(int currentFrame)
@@ -97,6 +117,8 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
                     ToggleAnimationPausePlay();
                 }
             }
+
+            UpdatePlayingState();
         }
 
         private void OnAnimationPlayerEnabled(bool isEnabled)
@@ -116,7 +138,12 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
                 PlayerControlsVisibility.Value = Visibility.Collapsed;
                 _assetList.ForEach(x => Stop(x));
             }
+
+            UpdatePlayingState();
         }
+
+        private void UpdatePlayingState() => IsPlaying.Value = _assetList.Any(
+            item => item.Player.IsPlaying && item.Player.IsEnabled);
 
         void Play(SceneObject asset)
         {

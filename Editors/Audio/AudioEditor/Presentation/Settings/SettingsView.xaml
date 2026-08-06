@@ -11,23 +11,36 @@
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=Settings:SettingsViewModel}"
     mc:Ignorable="d"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="550"
     d:DesignWidth="960">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter 
-            x:Key="BoolToVisibilityConverter"/>
-        <ValueConverters:EnumConverter 
-            x:Key="EnumConverter"/>
-        <DataTemplate 
-            x:Key="EnumToStringTemplate">
-            <TextBlock 
-                Text="{Binding Converter={StaticResource EnumConverter}}"/>
-        </DataTemplate>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter
+                x:Key="BoolToVisibilityConverter"/>
+            <ValueConverters:EnumConverter
+                x:Key="EnumConverter"/>
+            <DataTemplate
+                x:Key="EnumToStringTemplate">
+                <TextBlock
+                    Text="{Binding Converter={StaticResource EnumConverter}}"/>
+            </DataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid 
+    <ScrollViewer
+        MaxHeight="460"
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto"
         Visibility="{Binding IsSettingsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+    <Grid>
 
         <Grid.RowDefinitions>
             <RowDefinition 
@@ -64,6 +77,7 @@
                 VerticalAlignment="Center" 
                 HorizontalAlignment="Left"
                 Content="{loc:Loc AudioSettings.ResetSettings}"
+                Style="{StaticResource AeButton.Quiet}"
                 ToolTip="{loc:Loc AudioSettings.ResetSettings.ToolTip}"
                 Command="{Binding ResetSettingsCommand}"/>
 
@@ -73,6 +87,7 @@
                 Margin="5, 0, 0, 5" 
                 VerticalAlignment="Center"
                 Content="{loc:Loc AudioSettings.SetRecommendedVO}"
+                Style="{StaticResource AeButton.Primary}"
                 ToolTipService.ShowOnDisabled="True"
                 ToolTip="{loc:Loc AudioSettings.SetRecommendedVO.ToolTip}"
                 Command="{Binding SetRecommendedVOSettingsCommand}"
@@ -84,6 +99,7 @@
                 Margin="5, 0, 0, 5" 
                 VerticalAlignment="Center"
                 Content="{loc:Loc AudioSettings.RemoveAudioFiles}"
+                Style="{StaticResource AeButton.Danger}"
                 ToolTip="{loc:Loc AudioSettings.RemoveAudioFiles.ToolTip}"
                 ToolTipService.ShowOnDisabled="True"
                 Command="{Binding RemoveSelectedAudioFilesCommand}"
@@ -115,7 +131,7 @@
             <Border 
                 Grid.Row="0"
                 Grid.Column="1"
-                BorderBrush="{DynamicResource Button.Static.Border}"
+                BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="0, 0, 0, 0">
 
                 <Expander 
@@ -123,7 +139,7 @@
                     Style="{StaticResource ExpanderWithBorderBackground}"
                     IsExpanded="True"
                     Padding="0,0,0,0"
-                    BorderBrush="{DynamicResource Button.Static.Border}">
+                    BorderBrush="{DynamicResource AeBrush.Border}">
 
                     <Expander.Header>
                         <DockPanel 
@@ -167,13 +183,13 @@
             <Border 
                 Grid.Row="1"
                 Grid.Column="0"
-                BorderBrush="{DynamicResource Button.Static.Border}">
+                BorderBrush="{DynamicResource AeBrush.Border}">
 
                 <Expander 
                     Style="{StaticResource ExpanderWithBorderBackground}"
                     IsExpanded="True"
                     Padding="5,0,0,0"
-                    BorderBrush="{DynamicResource Button.Static.Border}">
+                    BorderBrush="{DynamicResource AeBrush.Border}">
 
                     <Expander.Header>
                         <DockPanel 
@@ -413,6 +429,7 @@
             Grid.Row="3"
             Grid.ColumnSpan="2"
             Height="5" 
-            Background="{DynamicResource App.Border}"/>
+            Background="{DynamicResource AeBrush.Border}"/>
     </Grid>
+    </ScrollViewer>
 </UserControl>

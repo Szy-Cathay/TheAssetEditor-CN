@@ -4,12 +4,16 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     Title=""
-    Width="680"
-    Height="350"
+    Width="700"
+    Height="390"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     ResizeMode="NoResize"
     Style="{StaticResource CustomWindowStyle}"
     WindowStartupLocation="CenterOwner">
-    <Grid Margin="10">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -26,16 +30,23 @@
             <ColumnDefinition Width="120" />
         </Grid.ColumnDefinitions>
 
+        <Border
+            Grid.RowSpan="7"
+            Grid.ColumnSpan="3"
+            Margin="18,16,18,10"
+            Padding="16"
+            Style="{StaticResource AeSurface.Panel}" />
+
         <TextBlock
             x:Name="DescriptionTextBlock"
             Grid.ColumnSpan="3"
-            Margin="0,0,0,12"
-            FontWeight="SemiBold"
+            Margin="34,30,34,18"
+            Style="{StaticResource AeText.SectionTitle}"
             TextWrapping="Wrap" />
 
         <TextBlock
             Grid.Row="1"
-            Margin="0,0,8,8"
+            Margin="34,0,8,8"
             VerticalAlignment="Center"
             Text="{loc:Loc FolderProject.Setup.ProjectFolder}" />
         <TextBox
@@ -47,18 +58,20 @@
             VerticalAlignment="Center"
             HorizontalScrollBarVisibility="Hidden"
             IsReadOnly="True"
+            Style="{StaticResource AeInput.TextBox}"
             TextWrapping="NoWrap" />
         <Button
             Grid.Row="1"
             Grid.Column="2"
             Height="24"
-            Margin="0,0,0,8"
+            Margin="0,0,34,8"
             Click="BrowseProjectFolder_Click"
-            Content="{loc:Loc FolderProject.Setup.Browse}" />
+            Content="{loc:Loc FolderProject.Setup.Browse}"
+            Style="{StaticResource AeButton.Secondary}" />
 
         <TextBlock
             Grid.Row="2"
-            Margin="0,0,8,8"
+            Margin="34,0,8,8"
             VerticalAlignment="Center"
             Text="{loc:Loc FolderProject.Setup.OutputFolder}" />
         <TextBox
@@ -70,18 +83,20 @@
             VerticalAlignment="Center"
             HorizontalScrollBarVisibility="Hidden"
             IsReadOnly="True"
+            Style="{StaticResource AeInput.TextBox}"
             TextWrapping="NoWrap" />
         <Button
             Grid.Row="2"
             Grid.Column="2"
             Height="24"
-            Margin="0,0,0,8"
+            Margin="0,0,34,8"
             Click="BrowseOutputFolder_Click"
-            Content="{loc:Loc FolderProject.Setup.Browse}" />
+            Content="{loc:Loc FolderProject.Setup.Browse}"
+            Style="{StaticResource AeButton.Secondary}" />
 
         <TextBlock
             Grid.Row="3"
-            Margin="0,0,8,8"
+            Margin="34,0,8,8"
             VerticalAlignment="Center"
             Text="{loc:Loc FolderProject.Setup.CorruptionDetection}" />
         <CheckBox
@@ -92,11 +107,12 @@
             Margin="0,0,0,8"
             VerticalAlignment="Center"
             Content="{loc:Loc FolderProject.Setup.CorruptionDetectionCheckbox}"
-            IsChecked="False" />
+            IsChecked="False"
+            Style="{StaticResource AeInput.CheckBox}" />
 
         <TextBlock
             Grid.Row="4"
-            Margin="0,0,8,8"
+            Margin="34,0,8,8"
             VerticalAlignment="Center"
             Text="{loc:Loc FolderProject.Setup.PrimaryBranch}" />
         <TextBox
@@ -105,33 +121,40 @@
             Grid.Column="1"
             Grid.ColumnSpan="2"
             Height="24"
-            Margin="0,0,0,8"
-            VerticalContentAlignment="Center" />
+            Margin="0,0,34,8"
+            VerticalContentAlignment="Center"
+            Style="{StaticResource AeInput.TextBox}" />
 
         <TextBlock
             Grid.Row="5"
             Grid.ColumnSpan="3"
-            Margin="0,2,0,10"
-            Foreground="{DynamicResource ABrush.ColourfulGlyph.Static}"
+            Margin="34,2,34,10"
+            Foreground="{DynamicResource AeBrush.Accent}"
+            Style="{StaticResource AeText.Caption}"
             Text="{loc:Loc FolderProject.Setup.VersionControlRequired}"
             TextWrapping="Wrap" />
 
-        <StackPanel
+        <Border
             Grid.Row="7"
             Grid.ColumnSpan="3"
-            HorizontalAlignment="Right"
-            Orientation="Horizontal">
-            <Button
-                Width="80"
-                Margin="0,0,8,0"
-                Click="Ok_Click"
-                Content="{loc:Loc General.Ok}"
-                IsDefault="True" />
-            <Button
-                Width="80"
-                Click="Cancel_Click"
-                Content="{loc:Loc General.Cancel}"
-                IsCancel="True" />
-        </StackPanel>
+            Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel
+                HorizontalAlignment="Right"
+                Orientation="Horizontal">
+                <Button
+                    Width="88"
+                    Margin="0,0,8,0"
+                    Click="Ok_Click"
+                    Content="{loc:Loc General.Ok}"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+                <Button
+                    Width="88"
+                    Click="Cancel_Click"
+                    Content="{loc:Loc General.Cancel}"
+                    IsCancel="True"
+                    Style="{StaticResource AeButton.Secondary}" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

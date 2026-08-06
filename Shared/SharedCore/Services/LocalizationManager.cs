@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Windows;
 using Shared.Core.ErrorHandling;
 
 namespace Shared.Core.Services
@@ -23,7 +22,7 @@ namespace Shared.Core.Services
         {
             if (File.Exists(LanguageFilePath) == false)
             {
-                MessageBox.Show($"找不到中文语言文件“{LanguageFile}”。");
+                UiMessageBoxBridge.Show($"找不到中文语言文件“{LanguageFile}”。");
                 _logger.Here().Error($"Chinese language file was not found at {LanguageFilePath}");
                 return;
             }
@@ -34,7 +33,7 @@ namespace Shared.Core.Services
                 var strings = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
                 if (strings == null || strings.Count == 0)
                 {
-                    MessageBox.Show($"中文语言文件解析失败：{LanguageFile}");
+                    UiMessageBoxBridge.Show($"中文语言文件解析失败：{LanguageFile}");
                     _logger.Here().Error($"Failed to parse Chinese language file {LanguageFilePath}");
 
                     _strings = [];
@@ -45,7 +44,7 @@ namespace Shared.Core.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"中文语言文件加载失败：{ex.Message}");
+                UiMessageBoxBridge.Show($"中文语言文件加载失败：{ex.Message}");
                 _logger.Here().Error($"Failed to load Chinese language file {LanguageFilePath}: {ex.Message}");
             }
         }

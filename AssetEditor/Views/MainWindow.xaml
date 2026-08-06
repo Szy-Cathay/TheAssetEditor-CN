@@ -1,4 +1,4 @@
-﻿<Window x:Class="AssetEditor.Views.MainWindow"
+<Window x:Class="AssetEditor.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -11,7 +11,6 @@
         xmlns:common="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
-        xmlns:local="clr-namespace:AssetEditor"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
@@ -19,356 +18,279 @@
         x:Name="window"
         Width="1440"
         Height="900"
+        MinWidth="960"
+        MinHeight="600"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Title="{Binding ApplicationTitle, UpdateSourceTrigger=PropertyChanged}"
         FontFamily="{DynamicResource AppFontFamily}"
-        Background="{DynamicResource WindowBackground}">
+        Background="{DynamicResource AeBrush.Canvas}">
 
     <Window.Resources>
         <datatemplates:EditorTemplateSelector x:Key="EditorSelector" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-
-        <Style
-            x:Key="SidebarWorkspaceTabItemStyle"
-            TargetType="{x:Type TabItem}">
-            <Setter Property="Height" Value="22" />
-            <Setter Property="MinWidth" Value="72" />
-            <Setter Property="Margin" Value="0,1,2,1" />
-            <Setter Property="Padding" Value="12,0,10,0" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-            <Setter Property="Background" Value="{DynamicResource ABrush.Tone3.Background.Static}" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type TabItem}">
-                        <Grid SnapsToDevicePixels="True">
-                            <Border
-                                x:Name="SegmentSurface"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="3" />
-                            <Border
-                                x:Name="SelectionIndicator"
-                                Width="2"
-                                Height="12"
-                                Margin="4,0,0,0"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Center"
-                                Background="{DynamicResource ABrush.AccentTone2.Background.Static}"
-                                CornerRadius="1"
-                                Visibility="Collapsed" />
-                            <ContentPresenter
-                                x:Name="HeaderContent"
-                                Margin="{TemplateBinding Padding}"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                ContentSource="Header"
-                                Focusable="False"
-                                RecognizesAccessKey="True"
-                                SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource ABrush.Tone3.Background.MouseOver}" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource ABrush.Tone4.Background.Static}" />
-                                <Setter
-                                    TargetName="SelectionIndicator"
-                                    Property="Visibility"
-                                    Value="Visible" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
-                            </Trigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsKeyboardFocusWithin" Value="True" />
-                                    <Condition Property="IsSelected" Value="False" />
-                                </MultiTrigger.Conditions>
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource ABrush.Tone3.Background.MouseOver}" />
-                            </MultiTrigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsKeyboardFocusWithin" Value="True" />
-                                    <Condition Property="IsSelected" Value="True" />
-                                </MultiTrigger.Conditions>
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource ABrush.Tone4.Background.MouseOver}" />
-                            </MultiTrigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsMouseOver" Value="True" />
-                                    <Condition Property="IsSelected" Value="True" />
-                                </MultiTrigger.Conditions>
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource ABrush.Tone4.Background.MouseOver}" />
-                            </MultiTrigger>
-                            <Trigger Property="IsMouseCaptured" Value="True">
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource ABrush.Tone4.Background.MouseDown}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter
-                                    TargetName="HeaderContent"
-                                    Property="Opacity"
-                                    Value="0.56" />
-                                <Setter
-                                    TargetName="SegmentSurface"
-                                    Property="Background"
-                                    Value="{DynamicResource TabItem.Disabled.Background}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style
-            x:Key="SidebarWorkspaceTabControlStyle"
-            TargetType="{x:Type TabControl}">
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="{DynamicResource TabItem.Static.Background}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource App.Border}" />
-            <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-            <Setter Property="ItemContainerStyle" Value="{StaticResource SidebarWorkspaceTabItemStyle}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type TabControl}">
-                        <Grid
-                            Background="{TemplateBinding Background}"
-                            ClipToBounds="True"
-                            KeyboardNavigation.TabNavigation="Local"
-                            SnapsToDevicePixels="True">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="24" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <TabPanel
-                                x:Name="SidebarHeaderPanel"
-                                Height="24"
-                                Background="{DynamicResource ABrush.Tone2.Background.Static}"
-                                IsItemsHost="True"
-                                KeyboardNavigation.TabIndex="1"
-                                Panel.ZIndex="1" />
-                            <Border
-                                x:Name="SidebarContentBorder"
-                                Grid.Row="1"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                KeyboardNavigation.DirectionalNavigation="Contained"
-                                KeyboardNavigation.TabIndex="2"
-                                KeyboardNavigation.TabNavigation="Local">
-                                <ContentPresenter
-                                    x:Name="PART_SelectedContentHost"
-                                    Margin="{TemplateBinding Padding}"
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Stretch"
-                                    ContentSource="SelectedContent"
-                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                            </Border>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid x:Name="rootGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- MenuBar -->
-            <RowDefinition Height="*"/>     <!-- Content -->
-            <RowDefinition Height="Auto" /> <!-- StatusBar -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- MenuBar -->
-        <DockPanel Grid.Row="0">
-            <views:MenuBarView/>
-        </DockPanel>
+        <views:MenuBarView x:Name="MainMenuBar" Grid.Row="0" />
 
-        <Border Grid.Row="1">
-            <Grid>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding FileTreeColumnWidth}" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Grid
+                x:Name="WorkspaceShell"
+                Grid.Column="0"
+                Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="{Binding FileTreeColumnWidth}"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <TabControl
-                    Grid.Row="1"
+                <ListBox
+                    x:Name="ActivityBar"
                     Grid.Column="0"
-                    Style="{StaticResource SidebarWorkspaceTabControlStyle}"
-                    TabStripPlacement="Top"
-                    SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}"
-                    Visibility="{Binding DataContext.IsPackFileExplorerVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TabItem Header="{loc:Loc FolderProject.Git.WorkTree}">
-                        <views:FileTreeView
-                            DataContext="{Binding DataContext.FileTree, RelativeSource={RelativeSource AncestorType=Window}}"
-                            Padding="10,0,10,5" />
+                    Style="{StaticResource AeShell.ActivityBar}"
+                    SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}">
+                    <ListBoxItem
+                        AutomationProperties.Name="{loc:Loc MainWindow.Activity.Resources}"
+                        ToolTip="{loc:Loc MainWindow.Activity.Resources}">
+                        <materialIcons:MaterialIcon
+                            Width="17"
+                            Height="17"
+                            Kind="FolderOutline" />
+                    </ListBoxItem>
+                    <ListBoxItem
+                        AutomationProperties.Name="{loc:Loc MainWindow.Activity.Git}"
+                        IsEnabled="{Binding DataContext.GitWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}"
+                        ToolTip="{loc:Loc MainWindow.Activity.Git}">
+                        <materialIcons:MaterialIcon
+                            Width="17"
+                            Height="17"
+                            Kind="SourceBranch" />
+                    </ListBoxItem>
+                </ListBox>
+
+                <TabControl
+                    x:Name="WorkspaceSidebar"
+                    Grid.Column="1"
+                    Style="{StaticResource AeShell.WorkspaceSidebar}"
+                    SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}">
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="{StaticResource AeSize.TabGridLength}" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Border
+                                Background="{DynamicResource AeBrush.Surface1}"
+                                BorderBrush="{DynamicResource AeBrush.Border}"
+                                BorderThickness="0,0,0,1">
+                                <TextBlock
+                                    Style="{StaticResource AeShell.SidebarHeader}"
+                                    Text="{loc:Loc MainWindow.Activity.Resources}" />
+                            </Border>
+                            <views:FileTreeView
+                                x:Name="ResourceTreeView"
+                                Grid.Row="1"
+                                Padding="8,4,8,6"
+                                DataContext="{Binding DataContext.FileTree, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        </Grid>
                     </TabItem>
                     <TabItem
-                        Header="{loc:Loc FolderProject.Git.Management}"
                         IsEnabled="{Binding DataContext.GitWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}">
-                        <gitViews:FolderProjectGitPanelView
-                            DataContext="{Binding DataContext.GitWorkspace, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="{StaticResource AeSize.TabGridLength}" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Border
+                                Background="{DynamicResource AeBrush.Surface1}"
+                                BorderBrush="{DynamicResource AeBrush.Border}"
+                                BorderThickness="0,0,0,1">
+                                <TextBlock
+                                    Style="{StaticResource AeShell.SidebarHeader}"
+                                    Text="{loc:Loc MainWindow.Activity.Git}" />
+                            </Border>
+                            <gitViews:FolderProjectGitPanelView
+                                Grid.Row="1"
+                                DataContext="{Binding DataContext.GitWorkspace, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        </Grid>
                     </TabItem>
                 </TabControl>
-
-                <GridSplitter Grid.Row="1" Grid.RowSpan="1" Grid.Column="1" Width="3" HorizontalAlignment="Stretch" Background="Transparent" SnapsToDevicePixels="True"
-                              Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-
-                <views:CachedTabControl Grid.Row="1" Grid.Column="2" ItemsSource="{Binding EditorManager.CurrentEditorsList, UpdateSourceTrigger=PropertyChanged}" 
-                        SelectedIndex="{Binding EditorManager.SelectedEditorIndex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
-                        ContentTemplateSelector="{StaticResource EditorSelector}" viewFactory:ToolFactoryParameter.ViewFactory="{Binding ToolsFactory}"
-                        x:Name="EditorsTabControl" Margin="0" BorderThickness="0,1,0,0" >
-
-                    <views:CachedTabControl.Template>
-                        <!-- [Crucial Fix]: TargetType must be strictly set to views:CachedTabControl to prevent rendering crashes or white screens -->
-                        <ControlTemplate TargetType="{x:Type views:CachedTabControl}">
-                            <Grid KeyboardNavigation.TabNavigation="Local">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- This line controls the display of the tab headers -->
-                                <TabPanel x:Name="HeaderPanel" Panel.ZIndex="1" Height="24" Margin="0" IsItemsHost="True" KeyboardNavigation.TabIndex="1" Background="{DynamicResource ABrush.Tone2.Background.Static}" />
-
-                                <!-- [Crucial Fix]: This binds to the AssetEditor exclusive dark theme color TabItem.Static.Background -->
-                                <Border x:Name="Border" Grid.Row="1" 
-                                        BorderThickness="{TemplateBinding BorderThickness}" 
-                                        BorderBrush="{DynamicResource App.Border}" 
-                                        Background="{DynamicResource TabItem.Static.Background}" 
-                                        KeyboardNavigation.DirectionalNavigation="Contained" 
-                                        KeyboardNavigation.TabIndex="2">
-                                    <Grid x:Name="PART_ItemsHolder" />
-                                </Border>
-                            </Grid>
-                        </ControlTemplate>
-                    </views:CachedTabControl.Template>
-
-                    <views:CachedTabControl.Resources>
-                        <common:BindingProxy x:Key="Proxy" Data="{Binding}" />
-                    </views:CachedTabControl.Resources>
-
-                    <views:CachedTabControl.ItemContainerStyle>
-                        <!-- Ensure each child tab item inherits the workspace tab theme and events -->
-                        <Style TargetType="TabItem" BasedOn="{StaticResource SidebarWorkspaceTabItemStyle}">
-                            <EventSetter Event="Drop" Handler="TabItem_Drop"/>
-                            <EventSetter Event="PreviewMouseMove" Handler="TabItem_MouseMove"/>
-                            <EventSetter Event="PreviewMouseDown" Handler="TabItem_MouseDown"/>
-                            <Setter Property="AllowDrop" Value="True"/>
-                            <Setter Property="Focusable" Value="False"/>
-                            <Setter Property="behaviors:MouseMiddleClick.Command" Value="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolCommand}"/>
-                            <Setter Property="behaviors:MouseMiddleClick.CommandParameter" Value="{Binding}"/>
-                        </Style>
-                    </views:CachedTabControl.ItemContainerStyle>
-
-                    <views:CachedTabControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.Resources>
-                                    <common:BindingProxy x:Key="GridProxy" Data="{Binding}" />
-                                </Grid.Resources>
-
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Grid.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.Close}" Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolCommand}" CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}" />
-                                        <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.CloseMultiple}">
-                                            <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.CloseOtherTabs}" Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseOtherToolsCommand}" CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}"/>
-                                            <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.CloseAllTabs}" Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseAllToolsCommand}" CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}"/>
-                                            <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.CloseTabsToLeft}" Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolsToLeftCommand}" CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}"/>
-                                            <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.CloseTabsToRight}" Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolsToRightCommand}" CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}"/>
-                                        </MenuItem>
-                                    </ContextMenu>
-                                </Grid.ContextMenu>
-
-                                <TextBlock Grid.Column="0" Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="{x:Type TextBlock}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasUnsavedChanges, FallbackValue=False}" Value="True">
-                                                    <Setter Property="Foreground" Value="Red"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <Button Margin="4,0,-4,0" Grid.Column="1" Command="{Binding DataContext.CloseToolCommand, RelativeSource={RelativeSource FindAncestor, AncestorType=TabControl}}" CommandParameter="{Binding}" HorizontalContentAlignment="Right" Content="{materialIcons:MaterialIconExt Kind=CloseThick, Size=13 }">
-                                </Button>
-                            </Grid>
-                        </DataTemplate>
-                    </views:CachedTabControl.ItemTemplate>
-                </views:CachedTabControl>
             </Grid>
-        </Border>
 
-        <StatusBar Grid.Row="2" BorderThickness="0, 1, 0, 0">
-            <StatusBar.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                    </Grid>
-                </ItemsPanelTemplate>
-            </StatusBar.ItemsPanel>
+            <GridSplitter
+                Grid.Column="1"
+                Margin="0,24,0,0"
+                Style="{StaticResource AeShell.Splitter}"
+                Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-            <StatusBarItem Grid.Column="0">
-                <TextBlock Text="{Binding ApplicationTitle}" Margin="8, 0, 5, 5"/>
-            </StatusBarItem>
+            <views:CachedTabControl
+                x:Name="EditorsTabControl"
+                Grid.Column="2"
+                Style="{StaticResource AeShell.EditorTabs}"
+                ItemsSource="{Binding EditorManager.CurrentEditorsList, UpdateSourceTrigger=PropertyChanged}"
+                SelectedIndex="{Binding EditorManager.SelectedEditorIndex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                ContentTemplateSelector="{StaticResource EditorSelector}"
+                viewFactory:ToolFactoryParameter.ViewFactory="{Binding ToolsFactory}">
 
-            <StatusBarItem Grid.Column="1">
-                <TextBlock Text="{Binding CurrentGame}" Margin="5, 0, 5, 5"/>
-            </StatusBarItem>
+                <views:CachedTabControl.Resources>
+                    <common:BindingProxy x:Key="Proxy" Data="{Binding}" />
+                </views:CachedTabControl.Resources>
 
-            <StatusBarItem Grid.Column="2">
-                <TextBlock Text="{Binding EditablePackFile}" Margin="5, 0, 5, 5"/>
-            </StatusBarItem>
+                <views:CachedTabControl.ItemContainerStyle>
+                    <Style
+                        TargetType="{x:Type TabItem}"
+                        BasedOn="{StaticResource AeShell.EditorTabItem}">
+                        <EventSetter Event="Drop" Handler="TabItem_Drop" />
+                        <EventSetter Event="PreviewMouseMove" Handler="TabItem_MouseMove" />
+                        <EventSetter Event="PreviewMouseDown" Handler="TabItem_MouseDown" />
+                        <Setter Property="AllowDrop" Value="True" />
+                        <Setter Property="Focusable" Value="False" />
+                        <Setter Property="behaviors:MouseMiddleClick.Command" Value="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolCommand}" />
+                        <Setter Property="behaviors:MouseMiddleClick.CommandParameter" Value="{Binding}" />
+                    </Style>
+                </views:CachedTabControl.ItemContainerStyle>
 
-            <StatusBarItem
-                Grid.Column="3"
-                HorizontalContentAlignment="Right"
-                Visibility="{Binding IsLoadingPacks, Converter={StaticResource BoolToVisibilityConverter}}">
-                <progress:OperationProgressView
+                <views:CachedTabControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.Resources>
+                                <common:BindingProxy x:Key="GridProxy" Data="{Binding}" />
+                            </Grid.Resources>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid.ContextMenu>
+                                <ContextMenu Style="{StaticResource AeMenu.Context}">
+                                    <ContextMenu.Resources>
+                                        <Style
+                                            TargetType="{x:Type MenuItem}"
+                                            BasedOn="{StaticResource AeMenu.Item}" />
+                                    </ContextMenu.Resources>
+                                    <MenuItem
+                                        Header="{loc:Loc MainWindow.TabContextMenu.Close}"
+                                        Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolCommand}"
+                                        CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}" />
+                                    <MenuItem Header="{loc:Loc MainWindow.TabContextMenu.CloseMultiple}">
+                                        <MenuItem
+                                            Header="{loc:Loc MainWindow.TabContextMenu.CloseOtherTabs}"
+                                            Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseOtherToolsCommand}"
+                                            CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}" />
+                                        <MenuItem
+                                            Header="{loc:Loc MainWindow.TabContextMenu.CloseAllTabs}"
+                                            Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseAllToolsCommand}"
+                                            CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}" />
+                                        <MenuItem
+                                            Header="{loc:Loc MainWindow.TabContextMenu.CloseTabsToLeft}"
+                                            Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolsToLeftCommand}"
+                                            CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}" />
+                                        <MenuItem
+                                            Header="{loc:Loc MainWindow.TabContextMenu.CloseTabsToRight}"
+                                            Command="{Binding Source={StaticResource Proxy}, Path=Data.CloseToolsToRightCommand}"
+                                            CommandParameter="{Binding Source={StaticResource GridProxy}, Path=Data}" />
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Grid.ContextMenu>
+
+                            <Ellipse
+                                Grid.Column="0"
+                                Width="6"
+                                Height="6"
+                                Margin="0,0,6,0"
+                                VerticalAlignment="Center"
+                                Fill="{DynamicResource AeBrush.Danger}"
+                                IsHitTestVisible="False"
+                                Visibility="{Binding HasUnsavedChanges, FallbackValue=False, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Body}"
+                                Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                                TextTrimming="CharacterEllipsis" />
+                            <Button
+                                Grid.Column="2"
+                                Margin="4,0,0,0"
+                                AutomationProperties.Name="{loc:Loc MainWindow.TabContextMenu.Close}"
+                                Command="{Binding DataContext.CloseToolCommand, RelativeSource={RelativeSource FindAncestor, AncestorType=TabControl}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource AeShell.TabCloseButton}">
+                                <materialIcons:MaterialIcon
+                                    Width="11"
+                                    Height="11"
+                                    Kind="CloseThick" />
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </views:CachedTabControl.ItemTemplate>
+            </views:CachedTabControl>
+        </Grid>
+
+        <Border
+            x:Name="ApplicationStatusBar"
+            Grid.Row="2"
+            Style="{StaticResource AeShell.StatusBar}">
+            <Grid Margin="8,0">
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="{x:Type StackPanel}">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLoadingPacks}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock
+                        MaxWidth="260"
+                        Style="{StaticResource AeShell.StatusText}"
+                        Text="{Binding ApplicationTitle}" />
+                    <Border
+                        Width="1"
+                        Height="12"
+                        Margin="8,0"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource AeBrush.Border}" />
+                    <TextBlock
+                        MaxWidth="260"
+                        Style="{StaticResource AeShell.StatusText}"
+                        Text="{Binding CurrentGame}" />
+                    <Border
+                        Width="1"
+                        Height="12"
+                        Margin="8,0"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource AeBrush.Border}" />
+                    <TextBlock
+                        MaxWidth="360"
+                        Style="{StaticResource AeShell.StatusText}"
+                        Text="{Binding EditablePackFile}" />
+                </StackPanel>
+
+                <progress:OperationProgressWindowHost
                     x:Name="ApplicationLoadingProgress"
-                    Width="520"
-                    Margin="12,4,8,4"
                     CurrentDetailText="{Binding LoadingProgressDetailText}"
                     IsOperationActive="{Binding IsLoadingPacks}"
                     IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
                     ProgressMaximum="{Binding LoadingProgressMaximum}"
                     ProgressValue="{Binding LoadingProgressValue}"
-                    StatusText="{Binding LoadingStatusText}" />
-            </StatusBarItem>
-        </StatusBar>
+                    StatusText="{Binding LoadingStatusText}"
+                    WindowTitle="{Binding LoadingStatusText}" />
+            </Grid>
+        </Border>
     </Grid>
 </Window>

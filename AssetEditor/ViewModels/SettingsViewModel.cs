@@ -495,7 +495,7 @@ namespace AssetEditor.ViewModels
                 var manifest = files.Count(x => x.Contains("manifest.txt"));
 
                 if (packFiles == 0 && manifest == 0)
-                    System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.NotGameDirectory", packFiles, manifest));
+                    MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.NotGameDirectory", packFiles, manifest));
             }
         }
     }

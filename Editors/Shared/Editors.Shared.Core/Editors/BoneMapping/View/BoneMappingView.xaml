@@ -9,96 +9,26 @@
              xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui" xmlns:view="clr-namespace:Editors.Shared.Core.Editors.BoneMapping.View"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}">
     <UserControl.Resources>
-        <PathGeometry x:Key="TreeArrow" Figures="M0,0 L0,6 L6,0 z"/>
-
-        <Style x:Key="ExpandCollapseToggleStyle" TargetType="{x:Type ToggleButton}">
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="Width" Value="16"/>
-            <Setter Property="Height" Value="16"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ToggleButton}">
-                        <Border Width="16" Height="16" Background="Transparent" Padding="5,5,5,5">
-                            <Path x:Name="ExpandPath" Fill="Transparent" Stroke="#FF989898" Data="{StaticResource TreeArrow}">
-                                <Path.RenderTransform>
-                                    <RotateTransform Angle="135" CenterX="3" CenterY="3"/>
-                                </Path.RenderTransform>
-                            </Path>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Stroke" TargetName="ExpandPath" Value="#FF1BBBFA"/>
-                                <Setter Property="Fill" TargetName="ExpandPath" Value="Transparent"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="RenderTransform" TargetName="ExpandPath">
-                                    <Setter.Value>
-                                        <RotateTransform Angle="180" CenterX="3" CenterY="3"/>
-                                    </Setter.Value>
-                                </Setter>
-                                <Setter Property="Fill" TargetName="ExpandPath" Value="#FF595959"/>
-                                <Setter Property="Stroke" TargetName="ExpandPath" Value="#FF262626"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="BoneTreeViewStyle" TargetType="{x:Type TreeViewItem}"  BasedOn="{StaticResource {x:Type TreeViewItem}}">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="HorizontalContentAlignment" Value="{Binding Path=HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"/>
-            <Setter Property="VerticalContentAlignment" Value="{Binding Path=VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"/>
-            <Setter Property="Padding" Value="1,0,0,0"/>
-            <Setter Property="IsExpanded" Value="True"/>
-            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
-            <Setter Property="Visibility" Value="Visible" />
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type TreeViewItem}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition MinWidth="19" Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition/>
-                            </Grid.RowDefinitions>
-                            <ToggleButton x:Name="Expander" Style="{StaticResource ExpandCollapseToggleStyle}" ClickMode="Press" IsChecked="{Binding Path=IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"/>
-                            <Border x:Name="Bd" SnapsToDevicePixels="true" Grid.Column="1" Grid.ColumnSpan="2" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter x:Name="PART_Header" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" ContentSource="Header"/>
-                            </Border>
-                            <ItemsPresenter x:Name="ItemsHost" Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsExpanded" Value="false">
-                                <Setter Property="Visibility" TargetName="ItemsHost" Value="Collapsed"/>
-                            </Trigger>
-
-                            <Trigger Property="HasItems" Value="false">
-                                <Setter Property="Visibility" TargetName="Expander" Value="Hidden"/>
-                            </Trigger>
-                            <DataTrigger Binding="{Binding IsVisible.Value}" Value="False">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                            <Trigger Property="IsSelected" Value="true">
-                                <Setter Property="Background" TargetName="Bd" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
-                            </Trigger>
-                            
-                            <Trigger Property="IsEnabled" Value="false">
-                                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="BoneTreeViewStyle" TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
+                <Setter Property="IsExpanded" Value="True"/>
+                <Setter Property="Visibility" Value="Visible" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsVisible.Value}" Value="False">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -134,7 +64,7 @@
             </StackPanel>
 
 
-            <TextBox Grid.Row="1" BorderBrush="Black" Text="{Binding MeshBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <TextBox Grid.Row="1" Text="{Binding MeshBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             <Button Grid.Row="1" Grid.Column ="1"  Content="{loc:Loc AnimReTarget.Clear}" IsEnabled="False" />
 
 
@@ -155,7 +85,16 @@
 
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                        <Grid HorizontalAlignment="Stretch" >
+                        <Grid HorizontalAlignment="Stretch">
+                            <Grid.Style>
+                                <Style TargetType="{x:Type Grid}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsUsedByCurrentModel.Value}" Value="False">
+                                            <Setter Property="Opacity" Value="0.55" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="auto"/>
@@ -163,37 +102,17 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <TextBlock  
-                                            Text="{Binding Name.Value}"
-                                            Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
-                                <TextBlock  
-                                        Text="["
-                                        Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
-
-                                <TextBlock  
-                                        Text="{Binding BoneIndex.Value}"
-                                        Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
-
-                                <TextBlock  
-                                        Text="]"
-                                        Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
+                                <TextBlock Text="{Binding Name.Value}"/>
+                                <TextBlock Text="["/>
+                                <TextBlock Text="{Binding BoneIndex.Value}"/>
+                                <TextBlock Text="]"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <TextBlock  
-                                            Text="{Binding MappedBoneName.Value}"
-                                            Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
-                                <TextBlock  
-                                        Text="["
-                                        Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
-
-                                <TextBlock  
-                                        Text="{Binding MappedBoneIndex.Value}"
-                                        Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
-
-                                <TextBlock  
-                                        Text="]"
-                                        Foreground="{Binding IsUsedByCurrentModel.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_gray}}"/>
+                                <TextBlock Text="{Binding MappedBoneName.Value}"/>
+                                <TextBlock Text="["/>
+                                <TextBlock Text="{Binding MappedBoneIndex.Value}"/>
+                                <TextBlock Text="]"/>
                             </StackPanel>
                         </Grid>
                     </HierarchicalDataTemplate>
@@ -205,7 +124,7 @@
                         <ColumnDefinition Width=".5*"/>
                         <ColumnDefinition Width=".5*"/>
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0"  Click="{s:MethodBinding AutoMapSelfAndChildrenByName}" Content="{loc:Loc BoneMapping.AutoMapByName}" Margin="0,0,2,0"/>
+                    <Button Grid.Column="0" Click="{s:MethodBinding AutoMapSelfAndChildrenByName}" Content="{loc:Loc BoneMapping.AutoMapByName}" Margin="0,0,2,0"/>
                     <Button Grid.Column="1" Click="{s:MethodBinding AutoMapSelfAndChildrenByHierarchy}" Content="{loc:Loc BoneMapping.AutoMapByHierarchy}"/>
                 </Grid>
                 <Grid Margin="0,2,0,0">
@@ -238,7 +157,7 @@
                 <TextBlock  Text="{Binding ParentSkeletonName.Value, UpdateSourceTrigger=PropertyChanged}" FontWeight="Bold" FontSize="16" TextDecorations="Underline"/>
             </StackPanel>
 
-            <TextBox Grid.Row="1" BorderBrush="Black" Text="{Binding ParentModelBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <TextBox Grid.Row="1" Text="{Binding ParentModelBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             <Button Grid.Row="1" Grid.Column ="1"  Content="{loc:Loc AnimReTarget.Clear}" IsEnabled="False"/>
             <TreeView 
                 Grid.Row="2"

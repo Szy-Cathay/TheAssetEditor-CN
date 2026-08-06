@@ -144,7 +144,7 @@
                 var content = JsonConvert.SerializeObject(_gameAnimMetaDefinitions[CurrentGame], Formatting.Indented);
                 File.WriteAllText(path, content);
 
-                MessageBox.Show("Be kind and send the updated scehema to the developers so it can be shared");
+                Shared.Core.Services.UiMessageBoxBridge.Show("Be kind and send the updated scehema to the developers so it can be shared");
 
                 return true;
             }

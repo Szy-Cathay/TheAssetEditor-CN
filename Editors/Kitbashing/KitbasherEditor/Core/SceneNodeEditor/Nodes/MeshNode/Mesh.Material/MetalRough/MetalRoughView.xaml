@@ -16,43 +16,37 @@
     </UserControl.Resources>
 
     <ContentControl x:Name="Shared" DockPanel.Dock="Top">
-        <Expander DockPanel.Dock="Top" IsExpanded="True">
+        <Expander DockPanel.Dock="Top" IsExpanded="True" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
             <Expander.Header>
-                <DockPanel  DockPanel.Dock="Top"  Background="{DynamicResource GroupBox.Header.Static.Background}" ToolTip="{loc:Loc MetalRough.ToolTip}">
-                    <Label Content="{loc:Loc MetalRough.Header}" FontSize="{StaticResource HeaderFontSize}" HorizontalAlignment="Left"/>
-                    <Separator/>
+                <DockPanel DockPanel.Dock="Top" ToolTip="{loc:Loc MetalRough.ToolTip}">
+                    <TextBlock Text="{loc:Loc MetalRough.Header}" FontWeight="Normal" Margin="3"/>
                 </DockPanel>
             </Expander.Header>
 
             <DockPanel LastChildFill="False">
 
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.UseAlpha}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
-                    <CheckBox Margin="2,0,2,0"  IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
-                </StackPanel>
+                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.UseAlpha}"/>
+                    <CheckBox Margin="2,0,2,0" IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
+                </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.BaseColour}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.BaseColour}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding BaseColour}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.MaterialMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.MaterialMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding MaterialMap}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.NormalMap}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.NormalMap}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding NormalMap}"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.Mask}" Margin="{StaticResource LabelMargin}"/>
-                    <Label>:</Label>
+                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.Mask}"/>
                     <userinterface:ShaderTextureView DataContext="{Binding Mask}"/>
                 </DockPanel>
             </DockPanel>

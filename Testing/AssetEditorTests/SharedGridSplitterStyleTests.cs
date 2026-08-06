@@ -1,6 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Shapes;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -10,9 +9,11 @@ namespace AssetEditorTests
 
     public class SharedGridSplitterStyleTests
     {
-        [TestCase("AeVerticalGridSplitterStyle", "⁞")]
-        [TestCase("AeHorizontalGridSplitterStyle", "⋯")]
-        public void GripStyle_LoadsExpectedTemplate(string resourceKey, string grip)
+        [TestCase("AeVerticalGridSplitterStyle", Orientation.Vertical)]
+        [TestCase("AeHorizontalGridSplitterStyle", Orientation.Horizontal)]
+        public void GripStyle_LoadsCenteredVectorTemplate(
+            string resourceKey,
+            Orientation orientation)
         {
             WpfTestApplicationHost.Invoke(_ =>
             {
@@ -42,17 +43,17 @@ namespace AssetEditorTests
                     .Single(setter => setter.Property == Control.TemplateProperty)
                     .Value as ControlTemplate;
                 NUnitAssert.That(template, Is.Not.Null);
-                var root = template!.LoadContent() as Grid;
+                var root = template!.LoadContent() as Border;
                 NUnitAssert.That(root, Is.Not.Null);
-                var button = root!.Children.OfType<Button>().Single();
-                var overlay = root.Children.OfType<Rectangle>().Single();
+                var grip = root!.Child as StackPanel;
 
                 NUnitAssert.Multiple(() =>
                 {
-                    NUnitAssert.That(button.Content, Is.EqualTo(grip));
-                    NUnitAssert.That(
-                        (overlay.Fill as SolidColorBrush)?.Color.A,
-                        Is.Zero);
+                    NUnitAssert.That(grip, Is.Not.Null);
+                    NUnitAssert.That(grip!.Orientation, Is.EqualTo(orientation));
+                    NUnitAssert.That(grip.Children.OfType<Ellipse>().Count(), Is.EqualTo(3));
+                    NUnitAssert.That(root.HorizontalAlignment, Is.EqualTo(HorizontalAlignment.Stretch));
+                    NUnitAssert.That(root.VerticalAlignment, Is.EqualTo(VerticalAlignment.Stretch));
                 });
             });
         }

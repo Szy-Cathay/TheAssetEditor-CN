@@ -46,10 +46,20 @@
                     <TreeView.ItemTemplate >
                         <HierarchicalDataTemplate ItemsSource="{Binding Path=Children, UpdateSourceTrigger=PropertyChanged}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding BoneName, UpdateSourceTrigger=PropertyChanged}"   Foreground="{Binding HasMapping, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_red}}"/>
-                                <TextBlock Text=" [" Foreground="{Binding HasMapping, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_red}}"/>
-                                <TextBlock Text="{Binding BoneIndex, UpdateSourceTrigger=PropertyChanged}" Foreground="{Binding HasMapping, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_red}}"/>
-                                <TextBlock Text="]" Foreground="{Binding HasMapping, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToColour_white_red}}"/>
+                                <StackPanel.Style>
+                                    <Style TargetType="{x:Type StackPanel}">
+                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasMapping}" Value="False">
+                                                <Setter Property="TextElement.Foreground" Value="{DynamicResource AeBrush.Danger}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding BoneName, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text=" ["/>
+                                <TextBlock Text="{Binding BoneIndex, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="]"/>
                             </StackPanel>
                         </HierarchicalDataTemplate>
                     </TreeView.ItemTemplate>

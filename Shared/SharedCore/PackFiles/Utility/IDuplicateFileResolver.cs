@@ -1,4 +1,3 @@
-﻿using System.Windows;
 using Shared.Core.Services;
 
 namespace Shared.Core.PackFiles.Utility
@@ -20,8 +19,13 @@ namespace Shared.Core.PackFiles.Utility
         public bool CheckForDuplicates => true;
         public bool KeepDuplicateFile(string fileName)
         {
-            var res = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.DuplicateFile", fileName), "DuplicateFile", MessageBoxButton.YesNo);
-            return res == MessageBoxResult.Yes;
+            var res = UiMessageBoxBridge.Show(
+                LocalizationManager.Instance.GetFormat(
+                    "Msg.DuplicateFile",
+                    fileName),
+                "DuplicateFile",
+                UiMessageBoxButtonSet.YesNo);
+            return res == UiMessageBoxResult.Yes;
         }
     }
 }

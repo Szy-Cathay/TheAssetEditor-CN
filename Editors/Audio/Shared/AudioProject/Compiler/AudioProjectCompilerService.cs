@@ -9,6 +9,7 @@ using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Models;
 using Editors.Audio.Shared.Dat;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
+using Editors.Audio.Shared.Storage;
 using Editors.Audio.Shared.Wwise;
 using Editors.Audio.Shared.Wwise.Generators;
 using Serilog;
@@ -26,12 +27,23 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             CancellationToken cancellationToken = default);
     }
 
+    public interface IAudioProjectCompilerProgressService
+    {
+        Task<bool> CompileAsync(
+            AudioProjectFile audioProject,
+            string audioProjectFileName,
+            string audioProjectFilePath,
+            IProgress<AudioOperationProgress> progress,
+            CancellationToken cancellationToken = default);
+    }
+
     public class AudioProjectCompilerService(
         ISoundBankGeneratorService soundBankGeneratorService,
         IWemGeneratorService wemGeneratorService,
         IDatGeneratorService datGeneratorService,
         IAudioPackOutputService audioPackOutputService) :
-        IAudioProjectCompilerService
+        IAudioProjectCompilerService,
+        IAudioProjectCompilerProgressService
     {
         private readonly ISoundBankGeneratorService _soundBankGeneratorService = soundBankGeneratorService;
         private readonly IWemGeneratorService _wemGeneratorService = wemGeneratorService;
@@ -42,10 +54,23 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
         private readonly ILogger _logger = Logging.Create<AudioProjectCompilerService>();
         private static readonly SemaphoreSlim CompilationGate = new(1, 1);
 
+        public Task<bool> CompileAsync(
+            AudioProjectFile audioProject,
+            string audioProjectFileName,
+            string audioProjectFilePath,
+            CancellationToken cancellationToken = default) =>
+            CompileAsync(
+                audioProject,
+                audioProjectFileName,
+                audioProjectFilePath,
+                null,
+                cancellationToken);
+
         public async Task<bool> CompileAsync(
             AudioProjectFile audioProject,
             string audioProjectFileName,
             string audioProjectFilePath,
+            IProgress<AudioOperationProgress> progress,
             CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -84,6 +109,11 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
 
                     try
                     {
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.Preparing",
+                            audioProjectFileName,
+                            0,
+                            audioProject.SoundBanks.Count));
                         SetSoundBankData(
                             audioProject,
                             audioProjectNameWithoutExtension,
@@ -91,6 +121,19 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                             audioFiles,
                             sounds,
                             cancellationToken);
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.Preparing",
+                            audioProjectFileName,
+                            audioProject.SoundBanks.Count,
+                            audioProject.SoundBanks.Count));
+                        var wemCount = audioFiles
+                            .DistinctBy(audioFile => audioFile.Id)
+                            .Count();
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.Wems",
+                            $"{wemCount} WEM",
+                            0,
+                            wemCount));
                         generatedOutputs.AddRange(
                             await GenerateWemsAsync(
                                 audioProject,
@@ -98,6 +141,11 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                                 sounds,
                                 workspacePath,
                                 cancellationToken));
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.Wems",
+                            $"{wemCount} WEM",
+                            wemCount,
+                            wemCount));
                         if (cancellationToken.IsCancellationRequested)
                         {
                             return (
@@ -105,13 +153,37 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                                 WasCancelled: true);
                         }
 
+                        var soundBankCount = audioProject.SoundBanks.Count(
+                            soundBank =>
+                                soundBank.ActionEvents.Count != 0 ||
+                                soundBank.DialogueEvents.Count != 0);
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.SoundBanks",
+                            audioProjectFileName,
+                            0,
+                            soundBankCount));
                         generatedOutputs.AddRange(GenerateSoundBanks(
                             audioProject,
                             cancellationToken));
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.SoundBanks",
+                            audioProjectFileName,
+                            soundBankCount,
+                            soundBankCount));
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.EventData",
+                            audioProjectFileName,
+                            0,
+                            1));
                         generatedOutputs.AddRange(GenerateDatFiles(
                             audioProject,
                             audioProjectNameWithoutExtension,
                             cancellationToken));
+                        progress?.Report(new AudioOperationProgress(
+                            "AudioOperation.Compile.EventData",
+                            audioProjectFileName,
+                            1,
+                            1));
                         return (
                             Outputs: generatedOutputs,
                             WasCancelled: false);
@@ -131,10 +203,28 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                     return false;
                 }
 
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Saving",
+                    audioProjectFilePath,
+                    0,
+                    compilationResult.Outputs.Count));
                 await Task.Run(() =>
                     _audioPackOutputService.SaveBatch(
                         compilationResult.Outputs));
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Saving",
+                    audioProjectFilePath,
+                    compilationResult.Outputs.Count,
+                    compilationResult.Outputs.Count));
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Optimizing",
+                    audioProjectFileName));
                 await Task.Run(MemoryOptimiser.Optimise);
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Completed",
+                    audioProjectFileName,
+                    1,
+                    1));
                 return true;
             }
             finally

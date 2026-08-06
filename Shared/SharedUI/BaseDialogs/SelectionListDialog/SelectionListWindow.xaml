@@ -8,7 +8,19 @@
         xmlns:s="http://schemas.singulink.com/xaml"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
         mc:Ignorable="d"
-    Title="{Binding WindowTitle}" Height="450" Width="800" Background="#FF1C1C1C">
+    Title="{Binding WindowTitle}" Height="450" Width="800"
+    Background="{DynamicResource AeBrush.Canvas}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -18,13 +30,17 @@
         <local:SelectionListView/>
         
         <DockPanel Grid.Row="1">
-            <Button DockPanel.Dock="Left" Content="{loc:Loc Shared.SelectionList.SelectAll}" Margin="2,2,2,2" Width="80" Click="{s:MethodBinding SelectAll}" />
-            <Button DockPanel.Dock="Left"  Content="{loc:Loc Shared.SelectionList.DeselectAll}" Margin="2,2,2,2" Width="80" Click="{s:MethodBinding DeselectAll}" />
-            <Button DockPanel.Dock="Right" Content="{loc:Loc General.Ok}" Margin="2,2,2,2" Width="80" Click="OkButton_Click"/>
-            <StackPanel>
-                <Label  DockPanel.Dock="Left" Content="{loc:Loc General.Filter}" VerticalContentAlignment="Center"/>
-                <TextBox x:Name="SearchTextBox" Height="20" behaviors:TextBoxExtensions.Watermark="{loc:Loc Shared.SelectionList.SearchHint}"/>
-            </StackPanel>
+            <Button DockPanel.Dock="Left" Content="{loc:Loc Shared.SelectionList.SelectAll}" Margin="2" Width="80" Click="{s:MethodBinding SelectAll}" Style="{StaticResource AeButton.Quiet}" />
+            <Button DockPanel.Dock="Left" Content="{loc:Loc Shared.SelectionList.DeselectAll}" Margin="2" Width="80" Click="{s:MethodBinding DeselectAll}" Style="{StaticResource AeButton.Quiet}" />
+            <Button DockPanel.Dock="Right" Content="{loc:Loc General.Ok}" Margin="2" Width="80" Click="OkButton_Click" Style="{StaticResource AeButton.Primary}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc General.Filter}" VerticalContentAlignment="Center"/>
+                <TextBox Grid.Column="1" x:Name="SearchTextBox" Height="20" behaviors:TextBoxExtensions.Watermark="{loc:Loc Shared.SelectionList.SearchHint}"/>
+            </Grid>
         </DockPanel>
 
     </Grid>

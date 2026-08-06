@@ -6,12 +6,15 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     Title="{loc:Loc StartupPackLoading.Title}"
     Width="700"
-    MinHeight="230"
+    MinHeight="170"
     MaxHeight="700"
     ResizeMode="CanResizeWithGrip"
     ShowInTaskbar="False"
     SizeToContent="Height"
     Style="{StaticResource CustomWindowStyle}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Background="{DynamicResource AeBrush.Canvas}"
     WindowStartupLocation="CenterOwner">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -21,17 +24,14 @@
 
         <progress:OperationProgressView
             x:Name="StartupOperationProgress"
-            IsOperationActive="True" />
+            IsOperationActive="True"
+            UseDeferredVisibility="False" />
 
         <Border
             x:Name="FailurePanel"
             Grid.Row="1"
             Margin="0,16,0,0"
-            Padding="12"
-            Background="{DynamicResource ABrush.Tone3.Background.Static}"
-            BorderBrush="{DynamicResource TextBox.Static.Border}"
-            BorderThickness="1"
-            CornerRadius="3"
+            Style="{StaticResource AeWorkflow.FailurePanel}"
             Visibility="Collapsed">
             <Grid>
                 <Grid.RowDefinitions>
@@ -53,18 +53,21 @@
                         MinWidth="88"
                         Margin="0,0,8,0"
                         Click="OnRetryClick"
-                        Content="{loc:Loc StartupPackLoading.Retry}" />
+                        Content="{loc:Loc StartupPackLoading.Retry}"
+                        Style="{StaticResource AeButton.Primary}" />
                     <Button
                         x:Name="CheckGamePathButton"
                         MinWidth="120"
                         Margin="0,0,8,0"
                         Click="OnCheckGamePathClick"
-                        Content="{loc:Loc StartupPackLoading.CheckGamePath}" />
+                        Content="{loc:Loc StartupPackLoading.CheckGamePath}"
+                        Style="{StaticResource AeButton.Secondary}" />
                     <Button
                         x:Name="ExitButton"
                         MinWidth="88"
                         Click="OnExitClick"
-                        Content="{loc:Loc StartupPackLoading.Exit}" />
+                        Content="{loc:Loc StartupPackLoading.Exit}"
+                        Style="{StaticResource AeButton.Secondary}" />
                 </StackPanel>
             </Grid>
         </Border>

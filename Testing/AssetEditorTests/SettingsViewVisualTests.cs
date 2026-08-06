@@ -18,7 +18,7 @@ public class SettingsViewVisualTests
     public void SetUp() => new LocalizationManager().LoadLanguage();
 
     [Test]
-    public void CustomLayoutStyles_PreserveApplicationThemeColours()
+    public void CustomLayoutStyles_UseSemanticApplicationThemeColours()
     {
         using var services = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
@@ -29,9 +29,9 @@ public class SettingsViewVisualTests
             () =>
             {
                 var view = new SettingsView();
-                var foreground = GetThemeBrush("ABrush.Foreground.Static");
-                var textBoxBackground = GetThemeBrush("TextBox.Static.Background");
-                var comboBoxBackground = GetThemeBrush("ComboBox.Static.Background");
+                var primary = GetThemeBrush("AeBrush.TextPrimary");
+                var secondary = GetThemeBrush("AeBrush.TextSecondary");
+                var inputBackground = GetThemeBrush("AeBrush.Surface2");
                 var layoutTextBlocks = GetDescendants<TextBlock>(view)
                     .Where(textBlock =>
                         ReferenceEquals(
@@ -56,19 +56,28 @@ public class SettingsViewVisualTests
                     NUnitAssert.That(layoutTextBlocks, Is.Not.Empty);
                     NUnitAssert.That(
                         layoutTextBlocks.Select(value => GetBrushSignature(value.Foreground)),
-                        Has.All.EqualTo(foreground));
+                        Has.All.Matches<string>(value =>
+                            value == primary || value == secondary));
+                    NUnitAssert.That(
+                        layoutTextBlocks.Select(value =>
+                            GetBrushSignature(value.Foreground)),
+                        Does.Contain(primary));
+                    NUnitAssert.That(
+                        layoutTextBlocks.Select(value =>
+                            GetBrushSignature(value.Foreground)),
+                        Does.Contain(secondary));
                     NUnitAssert.That(textBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         textBoxes.Select(value => GetBrushSignature(value.Background)),
-                        Has.All.EqualTo(textBoxBackground));
+                        Has.All.EqualTo(inputBackground));
                     NUnitAssert.That(comboBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         comboBoxes.Select(value => GetBrushSignature(value.Background)),
-                        Has.All.EqualTo(comboBoxBackground));
+                        Has.All.EqualTo(inputBackground));
                     NUnitAssert.That(checkBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         checkBoxes.Select(value => GetBrushSignature(value.Foreground)),
-                        Has.All.EqualTo(foreground));
+                        Has.All.EqualTo(secondary));
                 });
             });
     }
@@ -184,6 +193,149 @@ public class SettingsViewVisualTests
                         }));
                     NUnitAssert.That(colourPickers, Has.Count.EqualTo(2));
                     NUnitAssert.That(lighting.IsExpanded, Is.False);
+                });
+            });
+    }
+
+    [Test]
+    public void CategoryPages_AreAnchoredToTheUpperLeft()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var view = new SettingsView();
+                var pageStyle = (Style)view.Resources["SettingsPageStyle"];
+                var pages = GetDescendants<StackPanel>(view)
+                    .Where(panel => ReferenceEquals(panel.Style, pageStyle))
+                    .ToList();
+                var pageScrollViewerStyle =
+                    (Style)view.Resources["SettingsPageScrollViewerStyle"];
+                var pageScrollViewers = GetDescendants<ScrollViewer>(view)
+                    .Where(scrollViewer => ReferenceEquals(
+                        scrollViewer.Style,
+                        pageScrollViewerStyle))
+                    .ToList();
+                var tabs = (TabControl)view.FindName(
+                    "SettingsCategories");
+                var availableSize = new Size(780, 500);
+                view.Measure(availableSize);
+                view.Arrange(new Rect(availableSize));
+                tabs.ApplyTemplate();
+                view.UpdateLayout();
+                var selectedContentHost = (ContentPresenter)tabs.Template
+                    .FindName("PART_SelectedContentHost", tabs);
+                var selectedTab = (TabItem)tabs.SelectedItem;
+                var selectedScrollViewer =
+                    (ScrollViewer)selectedTab.Content;
+                var selectedPage =
+                    (StackPanel)selectedScrollViewer.Content;
+                var selectedPageOrigin = selectedPage.TranslatePoint(
+                    new Point(),
+                    selectedContentHost);
+                var selectedPageViewOrigin = selectedPage.TranslatePoint(
+                    new Point(),
+                    view);
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(pages, Has.Count.EqualTo(5));
+                    NUnitAssert.That(
+                        pages.Select(page => page.HorizontalAlignment),
+                        Has.All.EqualTo(HorizontalAlignment.Left));
+                    NUnitAssert.That(
+                        pages.Select(page => page.VerticalAlignment),
+                        Has.All.EqualTo(VerticalAlignment.Top));
+                    NUnitAssert.That(
+                        pages.Select(page => page.Margin),
+                        Has.All.EqualTo(new Thickness(12, 10, 12, 10)));
+                    NUnitAssert.That(pageScrollViewers, Has.Count.EqualTo(5));
+                    NUnitAssert.That(
+                        pageScrollViewers.Select(item =>
+                            item.HorizontalContentAlignment),
+                        Has.All.EqualTo(HorizontalAlignment.Left));
+                    NUnitAssert.That(
+                        pageScrollViewers.Select(item =>
+                            item.VerticalContentAlignment),
+                        Has.All.EqualTo(VerticalAlignment.Top));
+                    NUnitAssert.That(
+                        selectedPageOrigin,
+                        Is.EqualTo(new Point(12, 10)));
+                    NUnitAssert.That(
+                        selectedPageViewOrigin,
+                        Is.EqualTo(new Point(156, 10)));
+                    NUnitAssert.That(tabs.ActualHeight, Is.EqualTo(500));
+                    NUnitAssert.That(
+                        tabs.VerticalContentAlignment,
+                        Is.EqualTo(VerticalAlignment.Stretch),
+                        "Settings TabControl content alignment");
+                    NUnitAssert.That(
+                        selectedContentHost.VerticalAlignment,
+                        Is.EqualTo(VerticalAlignment.Stretch),
+                        "Selected content host alignment");
+                    NUnitAssert.That(
+                        selectedContentHost.ActualHeight,
+                        Is.EqualTo(500));
+                });
+            });
+    }
+
+    [Test]
+    public void CategoryNavigationAndFields_UseCompactOperationalSpacing()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var view = new SettingsView();
+                var tabs = (TabControl)view.FindName(
+                    "SettingsCategories");
+                var items = tabs.Items.OfType<TabItem>().ToList();
+                var labels = GetDescendants<TextBlock>(view)
+                    .Where(textBlock => ReferenceEquals(
+                        textBlock.Style,
+                        view.Resources["SettingsLabelStyle"]))
+                    .ToList();
+                var fieldControls = GetDescendants<Control>(view)
+                    .Where(control =>
+                        ReferenceEquals(
+                            control.Style,
+                            view.Resources["ComboBoxFieldStyle"]) ||
+                        ReferenceEquals(
+                            control.Style,
+                            view.Resources["CheckBoxFieldStyle"]) ||
+                        ReferenceEquals(
+                            control.Style,
+                            view.Resources["TextBoxFieldStyle"]))
+                    .ToList();
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        items.Select(item => item.Width),
+                        Has.All.EqualTo(144));
+                    NUnitAssert.That(
+                        items.Select(item => item.MinHeight),
+                        Has.All.EqualTo(32));
+                    NUnitAssert.That(
+                        items.Select(item => item.Padding),
+                        Has.All.EqualTo(new Thickness(12, 0, 12, 0)));
+                    NUnitAssert.That(labels, Is.Not.Empty);
+                    NUnitAssert.That(
+                        labels.Select(label => label.Margin.Bottom),
+                        Has.All.EqualTo(6));
+                    NUnitAssert.That(fieldControls, Is.Not.Empty);
+                    NUnitAssert.That(
+                        fieldControls.Select(control => control.Margin.Bottom),
+                        Has.All.EqualTo(6));
                 });
             });
     }

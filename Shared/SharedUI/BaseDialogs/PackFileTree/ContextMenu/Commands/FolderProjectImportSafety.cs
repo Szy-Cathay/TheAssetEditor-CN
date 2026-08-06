@@ -34,7 +34,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
             if (existingCount == 0)
                 return true;
 
-            return System.Windows.MessageBox.Show(
+            return MessageBox.Show(
                        LocalizationManager.Instance.GetFormat(
                            "FolderProject.Import.ConfirmOverwrite",
                            existingCount),

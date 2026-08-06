@@ -13,6 +13,7 @@ namespace AssetEditor.Views.FolderProject;
 public partial class FolderProjectSetupWindow : Window
 {
     private readonly LocalizationManager _localizationManager;
+    private readonly IStandardDialogs _dialogs;
 
     public string ProjectFolder { get; private set; } = "";
     public string OutputFolder { get; private set; } = "";
@@ -23,16 +24,18 @@ public partial class FolderProjectSetupWindow : Window
 
     public FolderProjectSetupWindow(
         LocalizationManager localizationManager,
+        IStandardDialogs dialogs,
         string title,
         string description)
     {
         _localizationManager = localizationManager;
+        _dialogs = dialogs;
         InitializeComponent();
         DarkTitleBarHelper.Enable(this);
         Title = title;
         DescriptionTextBlock.Text = description;
         PrimaryBranchNameTextBox.Text = "master";
-        if (Application.Current?.MainWindow is { } owner &&
+        if (Application.Current?.MainWindow is { IsVisible: true } owner &&
             !ReferenceEquals(owner, this))
         {
             Owner = owner;
@@ -55,7 +58,7 @@ public partial class FolderProjectSetupWindow : Window
 
         if (HasProjectSettings(dialog.SelectedPath))
         {
-            MessageBox.Show(
+            _dialogs.ShowDialogBox(
                 GetText("FolderProject.Create.AlreadyExists"),
                 GetText("FolderProject.ErrorTitle"));
             return;
@@ -88,11 +91,9 @@ public partial class FolderProjectSetupWindow : Window
         OutputFolderTextBox.Text = OutputFolder;
         if (IsSameFolder(ProjectFolder, OutputFolder))
         {
-            MessageBox.Show(
+            _dialogs.ShowDialogBox(
                 GetText("FolderProject.Setup.OutputSameAsProject"),
-                GetText("FolderProject.Setup.WarningTitle"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                GetText("FolderProject.Setup.WarningTitle"));
         }
     }
 
@@ -100,7 +101,7 @@ public partial class FolderProjectSetupWindow : Window
     {
         if (string.IsNullOrWhiteSpace(ProjectFolder))
         {
-            MessageBox.Show(
+            _dialogs.ShowDialogBox(
                 GetText("FolderProject.Setup.NoProjectFolder"),
                 GetText("FolderProject.ErrorTitle"));
             return;
@@ -108,7 +109,7 @@ public partial class FolderProjectSetupWindow : Window
 
         if (string.IsNullOrWhiteSpace(OutputFolder))
         {
-            MessageBox.Show(
+            _dialogs.ShowDialogBox(
                 GetText("FolderProject.Setup.NoOutputFolder"),
                 GetText("FolderProject.ErrorTitle"));
             return;
@@ -117,7 +118,7 @@ public partial class FolderProjectSetupWindow : Window
         if (!FolderProjectGitRepository.IsValidBranchName(
                 PrimaryBranchName))
         {
-            MessageBox.Show(
+            _dialogs.ShowDialogBox(
                 GetText("FolderProject.Setup.InvalidPrimaryBranch"),
                 GetText("FolderProject.ErrorTitle"));
             return;

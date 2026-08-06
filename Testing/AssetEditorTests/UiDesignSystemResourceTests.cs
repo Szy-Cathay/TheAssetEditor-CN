@@ -1,0 +1,467 @@
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using NUnit.Framework;
+using Shared.Core.Settings;
+using NUnitAssert = NUnit.Framework.Assert;
+
+namespace AssetEditorTests;
+
+[NonParallelizable]
+public class UiDesignSystemResourceTests
+{
+    [Test]
+    public void ApplicationResources_LoadDesignSystemInRequiredOrder()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var sources = Application.Current.Resources.MergedDictionaries
+                    .Select(dictionary => dictionary.Source?.OriginalString)
+                    .Where(source => source != null)
+                    .ToList();
+                var expected = new[]
+                {
+                    "Themes/ColourDictionaries/DarkTheme.xaml",
+                    "Themes/ControlColours.xaml",
+                    "Themes/DesignSystem/DesignTokens.xaml",
+                    "Themes/DesignSystem/Typography.xaml",
+                    "Themes/DesignSystem/SurfaceStyles.xaml",
+                    "Themes/Controls.xaml",
+                    "Themes/DesignSystem/Controls/Buttons.xaml",
+                    "Themes/DesignSystem/Controls/Inputs.xaml",
+                    "Themes/DesignSystem/Controls/Collections.xaml",
+                    "Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
+                    "Themes/DesignSystem/Shell.xaml",
+                    "Themes/DesignSystem/Workflows.xaml",
+                };
+
+                NUnitAssert.Multiple(() =>
+                {
+                    for (var index = 0; index < expected.Length; index++)
+                    {
+                        NUnitAssert.That(
+                            sources[index],
+                            Does.EndWith(expected[index]),
+                            $"Merged dictionary position {index}.");
+                    }
+                });
+            });
+    }
+
+    [Test]
+    public void ThemeSwitch_UpdatesSemanticBrushConsumers()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var previousTheme = ThemesController.CurrentTheme;
+                Window? window = null;
+
+                try
+                {
+                    ThemesController.SetTheme(ThemeType.DarkTheme);
+                    var border = new Border
+                    {
+                        Style = (Style)Application.Current.FindResource(
+                            "AeSurface.Panel"),
+                    };
+                    border.SetResourceReference(
+                        Border.BackgroundProperty,
+                        "AeBrush.Surface1");
+                    window = new Window
+                    {
+                        Content = border,
+                        ShowActivated = false,
+                        ShowInTaskbar = false,
+                    };
+                    window.Show();
+                    var dark = ((SolidColorBrush)border.Background).Color;
+
+                    ThemesController.SetTheme(ThemeType.LightTheme);
+                    var light = ((SolidColorBrush)border.Background).Color;
+
+                    NUnitAssert.That(light, Is.Not.EqualTo(dark));
+                }
+                finally
+                {
+                    window?.Close();
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
+    public void Typography_ExposesApprovedTextRoles()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var dictionary = Load(
+                "Themes/DesignSystem/Typography.xaml");
+            var expected = new Dictionary<string, double>
+            {
+                ["AeText.PageTitle"] = 20,
+                ["AeText.SectionTitle"] = 13,
+                ["AeText.Body"] = 12,
+                ["AeText.Label"] = 11,
+                ["AeText.Caption"] = 11,
+                ["AeText.Technical"] = 11,
+            };
+
+            NUnitAssert.Multiple(() =>
+            {
+                foreach (var pair in expected)
+                {
+                    var style = (Style)dictionary[pair.Key];
+                    NUnitAssert.That(
+                        style.TargetType,
+                        Is.EqualTo(typeof(TextBlock)),
+                        pair.Key);
+                    NUnitAssert.That(
+                        style.Setters.OfType<Setter>()
+                            .Single(setter =>
+                                setter.Property == TextBlock.FontSizeProperty)
+                            .Value,
+                        Is.EqualTo(pair.Value),
+                        pair.Key);
+                }
+            });
+        });
+    }
+
+    [Test]
+    public void SurfaceStyles_AreKeyedAndDoNotReplaceImplicitBorderStyle()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var tokens = Load("Themes/DesignSystem/DesignTokens.xaml");
+            Application.Current.Resources.MergedDictionaries.Add(tokens);
+
+            try
+            {
+                var dictionary = Load(
+                    "Themes/DesignSystem/SurfaceStyles.xaml");
+                var keys = new[]
+                {
+                    "AeSurface.Canvas",
+                    "AeSurface.Panel",
+                    "AeSurface.Control",
+                    "AeSurface.Overlay",
+                };
+
+                NUnitAssert.Multiple(() =>
+                {
+                    foreach (var key in keys)
+                    {
+                        var style = (Style)dictionary[key];
+                        NUnitAssert.That(
+                            style.TargetType,
+                            Is.EqualTo(typeof(Border)));
+                    }
+
+                    NUnitAssert.That(
+                        dictionary.Contains(typeof(Border)),
+                        Is.False,
+                        "Foundation styles must not replace the implicit Border style.");
+                });
+            }
+            finally
+            {
+                Application.Current.Resources.MergedDictionaries.Remove(tokens);
+            }
+        });
+    }
+
+    private static readonly string[] SemanticBrushKeys =
+    [
+        "AeBrush.Canvas",
+        "AeBrush.Surface1",
+        "AeBrush.Surface2",
+        "AeBrush.Surface3",
+        "AeBrush.SurfaceHover",
+        "AeBrush.Border",
+        "AeBrush.BorderStrong",
+        "AeBrush.TextPrimary",
+        "AeBrush.TextSecondary",
+        "AeBrush.TextMuted",
+        "AeBrush.Accent",
+        "AeBrush.AccentHover",
+        "AeBrush.AccentSoft",
+        "AeBrush.Success",
+        "AeBrush.Warning",
+        "AeBrush.Danger",
+    ];
+
+    [TestCaseSource(nameof(ThemeNames))]
+    public void EveryTheme_ExposesSemanticBrushContract(string themeName)
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var dictionary = Load(
+                $"Themes/ColourDictionaries/{themeName}.xaml");
+
+            NUnitAssert.Multiple(() =>
+            {
+                foreach (var key in SemanticBrushKeys)
+                {
+                    NUnitAssert.That(
+                        dictionary.Contains(key),
+                        Is.True,
+                        $"{themeName} is missing {key}.");
+                    NUnitAssert.That(
+                        dictionary[key],
+                        Is.InstanceOf<SolidColorBrush>(),
+                        $"{themeName} {key} is not a SolidColorBrush.");
+                }
+            });
+        });
+    }
+
+    [Test]
+    public void DarkTheme_UsesApprovedGraphitePalette()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var dictionary = Load(
+                "Themes/ColourDictionaries/DarkTheme.xaml");
+            var expected = new Dictionary<string, string>
+            {
+                ["AeBrush.Canvas"] = "#FF151719",
+                ["AeBrush.Surface1"] = "#FF1B1E21",
+                ["AeBrush.Surface2"] = "#FF212529",
+                ["AeBrush.Surface3"] = "#FF282D32",
+                ["AeBrush.SurfaceHover"] = "#FF30363C",
+                ["AeBrush.Border"] = "#FF343A40",
+                ["AeBrush.BorderStrong"] = "#FF464E56",
+                ["AeBrush.TextPrimary"] = "#FFE4E7E9",
+                ["AeBrush.TextSecondary"] = "#FFB0B6BC",
+                ["AeBrush.TextMuted"] = "#FF858D95",
+                ["AeBrush.Accent"] = "#FF64A9E2",
+                ["AeBrush.AccentHover"] = "#FF75B5E8",
+                ["AeBrush.AccentSoft"] = "#FF263A4B",
+                ["AeBrush.Success"] = "#FF72BC91",
+                ["AeBrush.Warning"] = "#FFE2B45F",
+                ["AeBrush.Danger"] = "#FFE17979",
+            };
+
+            NUnitAssert.Multiple(() =>
+            {
+                foreach (var pair in expected)
+                {
+                    var brush = (SolidColorBrush)dictionary[pair.Key];
+                    NUnitAssert.That(
+                        brush.Color.ToString(),
+                        Is.EqualTo(pair.Value),
+                        pair.Key);
+                }
+            });
+        });
+    }
+
+    [Test]
+    public void DesignTokens_ExposeApprovedMetricsAndDurations()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var dictionary = Load(
+                "Themes/DesignSystem/DesignTokens.xaml");
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(dictionary["AeSpace.1"], Is.EqualTo(4d));
+                NUnitAssert.That(dictionary["AeSpace.2"], Is.EqualTo(8d));
+                NUnitAssert.That(dictionary["AeSpace.3"], Is.EqualTo(12d));
+                NUnitAssert.That(dictionary["AeSpace.4"], Is.EqualTo(16d));
+                NUnitAssert.That(dictionary["AeSpace.6"], Is.EqualTo(24d));
+                NUnitAssert.That(dictionary["AeSpace.8"], Is.EqualTo(32d));
+                NUnitAssert.That(
+                    dictionary["AeSize.ActivityRailWidth"],
+                    Is.EqualTo(30d));
+                NUnitAssert.That(dictionary["AeSize.TabHeight"], Is.EqualTo(24d));
+                NUnitAssert.That(
+                    dictionary["AeSize.TabGridLength"],
+                    Is.EqualTo(new GridLength(24)));
+                NUnitAssert.That(
+                    dictionary["AeSize.CompactRowHeight"],
+                    Is.EqualTo(24d));
+                NUnitAssert.That(
+                    dictionary["AeSize.ControlHeight"],
+                    Is.EqualTo(26d));
+                NUnitAssert.That(
+                    dictionary["AeSize.ProminentControlHeight"],
+                    Is.EqualTo(30d));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Compact"],
+                    Is.EqualTo(new CornerRadius(3)));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Control"],
+                    Is.EqualTo(new CornerRadius(4)));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Surface"],
+                    Is.EqualTo(new CornerRadius(6)));
+                NUnitAssert.That(
+                    dictionary["AeRadius.Overlay"],
+                    Is.EqualTo(new CornerRadius(7)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Pressed"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(90)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Release"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(160)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Hover"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(120)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Selection"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(140)));
+                NUnitAssert.That(
+                    ((Duration)dictionary["AeMotion.Overlay"]).TimeSpan,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(160)));
+                NUnitAssert.That(
+                    dictionary["AeMotion.OverlayOffset"],
+                    Is.EqualTo(2d));
+            });
+        });
+    }
+
+    private static IEnumerable<string> ThemeNames() =>
+        Enum.GetNames<ThemeType>();
+
+    [Test]
+    public void CanonicalUiStandard_CoversRequiredContract()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var standard = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "docs",
+            "ui-design-system.md"));
+        string[] requiredContracts =
+        {
+            "## 3. 资源与主题",
+            "AeSize.ControlHeight",
+            "AeMotion.ButtonPressStoryboard",
+            "## 4. 公共控件契约",
+            "## 5. 布局规则",
+            "## 6. 窗口、对话框与消息",
+            "## 7. 加载与真实进度",
+            "OperationProgressWindowHost",
+            "## 9. 架构边界",
+            "## 10. Agent 公共组件复用协议",
+            "### 10.1 公共资源目录",
+            "### 10.2 强制搜索",
+            "### 10.3 复用决策",
+            "### 10.4 新公共组件准入",
+            "### 10.5 交付证据",
+            "UiCommonControlResourceTests",
+            "SharedUiArchitectureTests",
+            "未新增公共组件",
+            "## 11. 新功能实施清单",
+            "## 12. 禁止项",
+        };
+
+        foreach (var contract in requiredContracts)
+        {
+            NUnitAssert.That(
+                standard,
+                Does.Contain(contract),
+                contract);
+        }
+    }
+
+    [Test]
+    public void CanonicalUiStandard_CatalogsEveryPublicControlStyle()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var standard = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "docs",
+            "ui-design-system.md"));
+        string[] dictionaryPaths =
+        {
+            "Buttons.xaml",
+            "Inputs.xaml",
+            "Collections.xaml",
+            "MenusAndFeedback.xaml",
+        };
+        var internalKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "AeButton.KeyboardFocusVisual",
+            "AeButton.Base",
+            "AeMenu.TopLevelItemTemplate",
+            "AeMenu.SubmenuItemTemplate",
+        };
+        var publicKeys = dictionaryPaths
+            .SelectMany(path => Regex.Matches(
+                    File.ReadAllText(Path.Combine(
+                        solutionRoot,
+                        "AssetEditor",
+                        "Themes",
+                        "DesignSystem",
+                        "Controls",
+                        path)),
+                    "x:Key=\"(?<key>Ae[^\"]+)\"")
+                .Cast<Match>()
+                .Select(match => match.Groups["key"].Value))
+            .Where(key => !internalKeys.Contains(key))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(key => key)
+            .ToArray();
+
+        foreach (var key in publicKeys)
+        {
+            NUnitAssert.That(
+                standard,
+                Does.Contain($"`{key}`"),
+                key);
+        }
+    }
+
+    [Test]
+    public void RepositoryInstructions_RequireCanonicalUiReuseProtocol()
+    {
+        var instructions = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "AGENTS.md"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                instructions,
+                Does.Contain("docs/ui-design-system.md"));
+            NUnitAssert.That(
+                instructions,
+                Does.Contain("Agent 公共组件复用协议"));
+            NUnitAssert.That(
+                instructions,
+                Does.Contain("先搜索、再复用"));
+        });
+    }
+
+    private static string FindSolutionRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(
+                    directory.FullName,
+                    "AssetEditor.CN.sln")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "Could not locate AssetEditor.CN.sln.");
+    }
+
+    private static ResourceDictionary Load(string path) => new()
+    {
+        Source = new Uri(
+            $"pack://application:,,,/AssetEditor.CN;component/{path}"),
+    };
+}

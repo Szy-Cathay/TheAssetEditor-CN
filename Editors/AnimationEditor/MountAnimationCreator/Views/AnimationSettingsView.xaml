@@ -9,7 +9,7 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d" d:Width="500">
     <Expander Header="{loc:Loc MountAnim.AnimationSettings}" IsExpanded="true">
-        <Border BorderBrush="Gray" BorderThickness="0">
+        <Border BorderThickness="0">
             <Grid  Margin="10,5,10,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="auto"/>
@@ -28,41 +28,34 @@
                     <RowDefinition Height="auto"/>
                 </Grid.RowDefinitions>
 
-                <Label Grid.Column="0" Grid.Row="0" Content="{loc:Loc MountAnim.FitAnimation}"/>
-                <Label Grid.Column="1" Grid.Row="0" Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="0" Content="{loc:Loc MountAnim.FitAnimation}"/>
                 <CheckBox Grid.Column="2" Grid.Row="0" VerticalContentAlignment="Center" IsChecked="{Binding FitAnimation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-                <Label Grid.Column="0" Grid.Row="1" Content="{loc:Loc MountAnim.LoopCounter}"/>
-                <Label Grid.Column="1" Grid.Row="1" Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="1" Content="{loc:Loc MountAnim.LoopCounter}"/>
                 <TextBox Grid.Column="2" Grid.Row="1" VerticalContentAlignment="Center" Text="{Binding LoopCounter.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" >
                     <b:Interaction.Behaviors>
                         <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
                     </b:Interaction.Behaviors>
                 </TextBox>
 
-                <Label Grid.Column="0" Grid.Row="3" Content="{loc:Loc MountAnim.TransOffset}"/>
-                <Label Grid.Column="1" Grid.Row="3" Content=":"/>
-                <mathviews:Vector3View Grid.Column="3" Grid.Row="3" VerticalContentAlignment="Center" Vector3="{Binding Translation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="3" Content="{loc:Loc MountAnim.TransOffset}"/>
+                <mathviews:Vector3View Grid.Column="2" Grid.Row="3" VerticalContentAlignment="Center" Vector3="{Binding Translation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-                <Label Grid.Column="0" Grid.Row="4" Content="{loc:Loc MountAnim.RotOffset}"/>
-                <Label Grid.Column="1" Grid.Row="4" Content=":"/>
-                <mathviews:Vector3View Grid.Column="3" Grid.Row="4" VerticalContentAlignment="Center" Vector3="{Binding Rotation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="4" Content="{loc:Loc MountAnim.RotOffset}"/>
+                <mathviews:Vector3View Grid.Column="2" Grid.Row="4" VerticalContentAlignment="Center" Vector3="{Binding Rotation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-                <Label Grid.Column="0" Grid.Row="5" Content="{loc:Loc MountAnim.Scale}"/>
-                <Label Grid.Column="1" Grid.Row="5" Content=":"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="5" Content="{loc:Loc MountAnim.Scale}"/>
                 <TextBox Grid.Column="2" Grid.Row="5"  Text="{Binding Scale.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" >
                     <b:Interaction.Behaviors>
                         <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
                     </b:Interaction.Behaviors>
                 </TextBox>
 
-                <Label Grid.Column="0" Grid.Row="6" Content="{loc:Loc MountAnim.KeepRiderRot}"/>
-                <Label Grid.Column="1" Grid.Row="6" Content=":"/>
-                <CheckBox Grid.Column="3" Grid.Row="6" VerticalContentAlignment="Center" IsChecked="{Binding KeepRiderRotation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="6" Content="{loc:Loc MountAnim.KeepRiderRot}"/>
+                <CheckBox Grid.Column="2" Grid.Row="6" VerticalContentAlignment="Center" IsChecked="{Binding KeepRiderRotation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                
-                <Label Grid.Column="0"      Grid.Row="7" Content="{loc:Loc MountAnim.IsRootNodeAnim}"/>
-                <Label Grid.Column="1"      Grid.Row="7" Content=":"/>
-                <CheckBox Grid.Column="3"   Grid.Row="7" VerticalContentAlignment="Center" IsChecked="{Binding IsRootNodeAnimation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <Label Style="{StaticResource AeForm.Label}" Grid.Column="0"      Grid.Row="7" Content="{loc:Loc MountAnim.IsRootNodeAnim}"/>
+                <CheckBox Grid.Column="2" Grid.Row="7" VerticalContentAlignment="Center" IsChecked="{Binding IsRootNodeAnimation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             </Grid>
         </Border>
     </Expander>

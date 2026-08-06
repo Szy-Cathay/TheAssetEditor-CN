@@ -9,8 +9,16 @@
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
                                 
-        Title="{loc:Loc PinTool.Title}" Height="600" Width="400">
-    <DockPanel LastChildFill="False">
+        Title="{loc:Loc PinTool.Title}" Height="600" Width="440"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <windowhandling:AssetEditorWindow.Resources>
+        <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+    </windowhandling:AssetEditorWindow.Resources>
+    <DockPanel Margin="12" LastChildFill="False">
 
         <Expander Header="{loc:Loc PinTool.Instructions}" DockPanel.Dock="Top">
             <TextBlock Margin="10,0,0,10">
@@ -34,7 +42,7 @@
         </Expander>
 
         <DockPanel DockPanel.Dock="Top">
-            <Label Content="{loc:Loc PinTool.AnimationTransferMode}"/>
+            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc PinTool.AnimationTransferMode}"/>
             <ComboBox Margin="10,0,0,0"
                       SelectedValue="{Binding SelectedRiggingMode, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                       SelectedValuePath="Tag">
@@ -64,7 +72,7 @@
                 </ListView>
 
                 <Button Content="{loc:Loc PinTool.AddSelectedMeshes}" Grid.Row="1" Grid.Column="0" Margin="2,2,2,0" Command="{Binding AddSelectionToAffectMeshCollectionCommand}" />
-                <Button Content="{loc:Loc PinTool.RemoveAll}" Grid.Row="1" Grid.Column="1" Margin="2,2,2,0" Command="{Binding ClearAffectedMeshCollectionCommand}" />
+                <Button Content="{loc:Loc PinTool.RemoveAll}" Grid.Row="1" Grid.Column="1" Margin="2,2,2,0" Command="{Binding ClearAffectedMeshCollectionCommand}" Style="{StaticResource AeButton.Danger}" />
             </Grid>
         </GroupBox>
 
@@ -88,7 +96,7 @@
                                                 <RowDefinition Height="auto"/>
                                             </Grid.RowDefinitions>
 
-                                            <Label Grid.Column="0" Grid.Row="0" Content="{loc:Loc PinTool.Source}"/>
+                                            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="0" Content="{loc:Loc PinTool.Source}"/>
                                             <TextBox Grid.Column="1" Grid.Row="0" IsReadOnly="true" VerticalContentAlignment="Center" Margin="2" Text="{Binding PinMode.Description, UpdateSourceTrigger=PropertyChanged}"/>
 
                                             <Button Grid.Column="1" Grid.Row="1" Content="{loc:Loc PinTool.SetFromSelectedVertex}" Margin="2" Command="{Binding PinMode.SetSelectionCommand}" />
@@ -114,7 +122,7 @@
                                                 <RowDefinition Height="auto"/>
                                             </Grid.RowDefinitions>
 
-                                            <Label Grid.Column="0" Grid.Row="0" Content="{loc:Loc PinTool.Mesh}"/>
+                                            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="0" Content="{loc:Loc PinTool.Mesh}"/>
                                             <TextBox Grid.Column="1" Grid.Row="0" IsReadOnly="true" VerticalContentAlignment="Center" Margin="2" Text="{Binding SkinWrapMode.Description, UpdateSourceTrigger=PropertyChanged}"/>
                                             <Button Grid.Column="1" Grid.Row="1" Content="{loc:Loc PinTool.SetFromSelection}" Margin="2" Command="{Binding SkinWrapMode.SetSelectionCommand}" />
 
@@ -134,7 +142,7 @@
 
 
 
-        <Button Content="{loc:Loc General.Apply}" Margin="2,5,2,2" Click="OnApplyClick" DockPanel.Dock="Top"/>
+        <Button Content="{loc:Loc General.Apply}" Margin="2,8,2,2" Click="OnApplyClick" DockPanel.Dock="Top" Style="{StaticResource AeButton.Primary}"/>
 
     </DockPanel>
 </windowhandling:AssetEditorWindow>

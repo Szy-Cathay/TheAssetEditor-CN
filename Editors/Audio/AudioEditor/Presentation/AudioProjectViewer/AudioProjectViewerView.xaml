@@ -10,13 +10,22 @@
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     d:DataContext="{d:DesignInstance Type=AudioProjectViewer:AudioProjectViewerViewModel}"
     mc:Ignorable="d" 
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter 
-            x:Key="BoolToVisibilityConverter"/>
-        <ValueConverters:ActionEventRowEnablementConverter
-            x:Key="ActionEventRowEnablementConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter
+                x:Key="BoolToVisibilityConverter"/>
+            <ValueConverters:ActionEventRowEnablementConverter
+                x:Key="ActionEventRowEnablementConverter"/>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid
@@ -55,6 +64,7 @@
                 VerticalAlignment="Center" 
                 HorizontalAlignment="Left"
                 Content="{loc:Loc AudioProjectViewer.EditRow}"
+                Style="{StaticResource AeButton.Primary}"
                 ToolTipService.ShowOnDisabled="True"
                 ToolTip="{loc:Loc AudioProjectViewer.EditRow.ToolTip}"
                 Command="{Binding EditRowCommand}" 
@@ -67,6 +77,7 @@
                 VerticalAlignment="Center"
                 HorizontalAlignment="Left"
                 Content="{loc:Loc AudioProjectViewer.RemoveRow}"
+                Style="{StaticResource AeButton.Danger}"
                 ToolTipService.ShowOnDisabled="True"
                 ToolTip="{loc:Loc AudioProjectViewer.RemoveRow.ToolTip}"
                 Command="{Binding RemoveRowCommand}" 

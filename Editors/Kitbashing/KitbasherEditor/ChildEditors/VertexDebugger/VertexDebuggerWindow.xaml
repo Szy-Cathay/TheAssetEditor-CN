@@ -11,35 +11,47 @@
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
         Closing="Window_Closing"
-        Title="{loc:Loc VertexDebugger.Title}" Height="1200" Width="1100">
-    <Grid>
+        Title="{loc:Loc VertexDebugger.Title}" Height="720" Width="1040"
+        MinHeight="520" MinWidth="760"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <windowhandling:AssetEditorWindow.Resources>
+        <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+    </windowhandling:AssetEditorWindow.Resources>
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
             <RowDefinition/>
         </Grid.RowDefinitions>
 
-        <StackPanel Orientation="Horizontal">
-            <Label Content="{loc:Loc VertexDebugger.NormalDebugScale}"/>
-            <TextBox Width="100" Text="{Binding DebugScale.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="100" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc VertexDebugger.NormalDebugScale}"/>
+            <TextBox Grid.Column="1" Text="{Binding DebugScale.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
                 <b:Interaction.Behaviors>
                     <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
                 </b:Interaction.Behaviors>
             </TextBox>
 
-            <Button Content="{loc:Loc VertexDebugger.ShowStatistics}" Margin="2" Click="Button_Click"/>
-        </StackPanel>
+            <Button Grid.Column="2" Content="{loc:Loc VertexDebugger.ShowStatistics}" Margin="8,0,0,0" Click="Button_Click" Style="{StaticResource AeButton.Secondary}"/>
+        </Grid>
 
         <DataGrid Grid.Row="1" 
                  ItemsSource="{Binding VertexList, UpdateSourceTrigger=PropertyChanged}" 
                  SelectedItem="{Binding SelectedVertex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                  IsReadOnly="True" 
+                 AutoGenerateColumns="True"
                  AlternationCount="2"
-               
-                 AlternatingRowBackground="Gray" Foreground="White">
+                 Style="{StaticResource AeTable.Grid}">
             <DataGrid.CellStyle>
-                <Style TargetType="DataGridCell">
-                   
-                </Style>
+                <Style TargetType="DataGridCell" BasedOn="{StaticResource AeTable.Cell}" />
             </DataGrid.CellStyle>
         </DataGrid>
     </Grid>

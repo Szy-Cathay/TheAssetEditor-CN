@@ -1,5 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+	<ItemGroup>
+		<Using Include="Shared.Ui.BaseDialogs.StandardDialog.UnifiedMessageBox" Alias="MessageBox" />
+	</ItemGroup>
 	<PropertyGroup>
 		<TargetFramework>net10.0-windows</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>

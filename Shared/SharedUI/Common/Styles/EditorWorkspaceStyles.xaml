@@ -1,0 +1,187 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Secondary}" />
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}" />
+    <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource AeInput.ComboBox}" />
+    <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource AeInput.CheckBox}" />
+    <Style TargetType="{x:Type RadioButton}" BasedOn="{StaticResource AeInput.RadioButton}" />
+    <Style TargetType="{x:Type TreeView}" BasedOn="{StaticResource AeTree.View}" />
+    <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}" />
+    <Style TargetType="{x:Type ListBox}" BasedOn="{StaticResource AeList.View}" />
+    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource AeList.Item}" />
+    <Style TargetType="{x:Type ListView}" BasedOn="{StaticResource {x:Type ListView}}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+    </Style>
+    <Style TargetType="{x:Type DataGrid}" BasedOn="{StaticResource AeTable.Grid}" />
+    <Style TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource AeTable.Row}" />
+    <Style TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource AeTable.Cell}" />
+    <Style TargetType="{x:Type DataGridColumnHeader}" BasedOn="{StaticResource AeTable.Header}" />
+    <Style TargetType="{x:Type Menu}" BasedOn="{StaticResource AeMenu.Bar}" />
+    <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource AeMenu.Item}" />
+    <Style TargetType="{x:Type ContextMenu}" BasedOn="{StaticResource AeMenu.Context}" />
+    <Style TargetType="{x:Type ToolTip}" BasedOn="{StaticResource AeToolTip}" />
+    <Style TargetType="{x:Type TabItem}" BasedOn="{StaticResource AeTab.Item}" />
+    <Style TargetType="{x:Type ProgressBar}" BasedOn="{StaticResource AeProgress.Bar}" />
+    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource AeScrollBar.Compact}" />
+
+    <Style TargetType="{x:Type Label}">
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="Padding" Value="6,2" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style TargetType="{x:Type GroupBox}">
+        <Setter Property="Margin" Value="0,4,0,0" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
+    </Style>
+
+    <Style TargetType="{x:Type Expander}" BasedOn="{StaticResource {x:Type Expander}}">
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+    </Style>
+
+    <Style TargetType="{x:Type Separator}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Border}" />
+    </Style>
+
+    <Style TargetType="{x:Type ToolBarTray}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+    </Style>
+
+    <Style TargetType="{x:Type ToolBar}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+
+    <Style x:Key="AeEditor.ToggleIcon" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="7" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface3}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Border
+                        x:Name="Chrome"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{StaticResource AeRadius.Control}"
+                        RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1" />
+                        </Border.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="MouseOver" />
+                                <VisualState x:Name="Pressed" />
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}" />
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}" />
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.48" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style
+        x:Key="AeEditor.PlaybackToggle"
+        BasedOn="{StaticResource AeEditor.ToggleIcon}"
+        TargetType="{x:Type ToggleButton}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Border
+                        x:Name="Chrome"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{StaticResource AeRadius.Control}"
+                        RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="InteractionScale" ScaleX="1" ScaleY="1" />
+                        </Border.RenderTransform>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="MouseOver" />
+                                <VisualState x:Name="Pressed" />
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonPressStoryboard}" />
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Storyboard="{StaticResource AeMotion.ButtonReleaseStoryboard}" />
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.48" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

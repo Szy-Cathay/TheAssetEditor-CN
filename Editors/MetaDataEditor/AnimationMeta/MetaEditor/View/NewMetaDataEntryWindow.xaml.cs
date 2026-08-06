@@ -23,7 +23,7 @@ namespace Editors.AnimationMeta.Presentation.View
 
             if (model.SelectedItem == null)
             {
-                System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.NothingSelected"));
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.NothingSelected"));
                 return;
             }
 

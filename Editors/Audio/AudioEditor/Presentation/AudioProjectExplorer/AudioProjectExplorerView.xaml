@@ -10,22 +10,32 @@
     xmlns:Models="clr-namespace:Editors.Audio.AudioEditor.Presentation.Shared.Models" 
     xmlns:AudioProjectExplorer="clr-namespace:Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
     d:DataContext="{d:DesignInstance Type=AudioProjectExplorer:AudioProjectExplorerViewModel}"
     mc:Ignorable="d" 
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
     d:DesignHeight="550" d:DesignWidth="800">
 
     <UserControl.Resources>
-        <sys:Double 
-            x:Key="DefaultHeight">23</sys:Double>
-        <ValueConverters:EnumConverter 
-            x:Key="EnumConverter"/>
-        <DataTemplate 
-            x:Key="EnumToStringTemplate">
-            <TextBlock 
-                Text="{Binding Converter={StaticResource EnumConverter}}"/>
-        </DataTemplate>
-        <BooleanToVisibilityConverter 
-            x:Key="BoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <sys:Double
+                x:Key="DefaultHeight">23</sys:Double>
+            <ValueConverters:EnumConverter
+                x:Key="EnumConverter"/>
+            <DataTemplate
+                x:Key="EnumToStringTemplate">
+                <TextBlock
+                    Text="{Binding Converter={StaticResource EnumConverter}}"/>
+            </DataTemplate>
+            <BooleanToVisibilityConverter
+                x:Key="BoolToVisibilityConverter"/>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid>
@@ -199,6 +209,7 @@
                         VerticalAlignment="Center" 
                         HorizontalAlignment="Left"
                         Content="{loc:Loc AudioProjectExplorer.ToggleCollapseExpand}"
+                        Style="{StaticResource AeButton.Quiet}"
                         ToolTip="{loc:Loc AudioProjectExplorer.ToggleCollapseExpand.ToolTip}" 
                         Command="{Binding CollapseOrExpandTreeCommand}"/>
                     
@@ -209,6 +220,7 @@
                         VerticalAlignment="Center" 
                         HorizontalAlignment="Left"
                         Content="{loc:Loc AudioProjectExplorer.ResetFilters}"
+                        Style="{StaticResource AeButton.Quiet}"
                         ToolTip="{loc:Loc AudioProjectExplorer.ToggleCollapseExpand.ToolTip}" 
                         Command="{Binding ResetFiltersCommand}"/>
                 </Grid>
@@ -217,7 +229,7 @@
                     Grid.Row="3"
                     Margin="0, 5, 5, 0"
                     SnapsToDevicePixels="True" 
-                    BorderBrush="{DynamicResource TextBox.Static.Border}" 
+                    BorderBrush="{DynamicResource AeBrush.Border}"
                     BorderThickness="1">
 
                     <Grid>
@@ -241,50 +253,10 @@
                             VerticalContentAlignment="Center"
                             HorizontalContentAlignment="Center"
                             VerticalAlignment="Center"
+                            Style="{StaticResource AeButton.Icon}"
                             Click="ClearButtonClick" 
                             Command="{Binding ResetSearchQueryCommand}">
-
-                            <Button.Template>
-                                <ControlTemplate 
-                                    TargetType="Button">
-
-                                    <Grid 
-                                        SnapsToDevicePixels="true" 
-                                        Background="{DynamicResource TextBox.Static.Background}">
-
-                                        <Path 
-                                            Data="M0,0 L8,8 M8,0 L0,8" 
-                                            StrokeThickness="1.5" 
-                                            VerticalAlignment="Center" 
-                                            HorizontalAlignment="Center">
-
-                                            <Path.Style>
-                                                <Style 
-                                                    TargetType="{x:Type Path}">
-
-                                                    <Style.Triggers>
-                                                        <Trigger 
-                                                            Property="IsMouseOver" 
-                                                            Value="False">
-                                                            <Setter
-                                                                Property="Stroke" 
-                                                                Value="{DynamicResource Button.Disabled.Foreground}" />
-                                                        </Trigger>
-
-                                                        <Trigger 
-                                                            Property="IsMouseOver" 
-                                                            Value="True">
-                                                            <Setter 
-                                                                Property="Stroke" 
-                                                                Value="{DynamicResource Button.Static.Foreground}" />
-                                                        </Trigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Path.Style>
-                                        </Path>
-                                    </Grid>
-                                </ControlTemplate>
-                            </Button.Template>
+                            <materialIcons:MaterialIcon Width="14" Height="14" Kind="Close" />
                         </Button>
                     </Grid>
                 </Border>
@@ -311,7 +283,7 @@
                                     Text="{Binding Name}" />
                                 <Run 
                                     Text="{Binding DialogueEventFilterDisplayText}" 
-                                    Foreground="{DynamicResource ABrush.Foreground.Disabled}"/>
+                                    Foreground="{DynamicResource AeBrush.TextMuted}"/>
                             </TextBlock.Inlines>
                         </TextBlock>
                     </HierarchicalDataTemplate>

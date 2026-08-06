@@ -38,6 +38,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
         {
             using var browser = new SavePackFileWindow(_pfs, _packFileBrowserBuilder);
             browser.ViewModel.Filter.SetExtensions(extensions);
+            ApplyOwner(browser);
 
             if (browser.ShowDialog() == true)
                 return new SaveDialogResult(true, browser.SelectedFile, browser.FilePath);
@@ -48,6 +49,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
         public BrowseDialogResultFile DisplayBrowseDialog(List<string> extensions)
         {
             using var browser = new PackFileBrowserWindow(_packFileBrowserBuilder, extensions, showCaFiles: true, showFoldersOnly: false);
+            ApplyOwner(browser);
 
             var saveResult = browser.ShowDialog();
             var output = new BrowseDialogResultFile(saveResult, browser.SelectedFile);
@@ -57,6 +59,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
         public BrowseDialogResultFolder DisplayBrowseFolderDialog()
         {
             using var browser = new PackFileBrowserWindow(_packFileBrowserBuilder, null, showCaFiles: false, showFoldersOnly: true);
+            ApplyOwner(browser);
 
             var saveResult = browser.ShowDialog();
             var output = new BrowseDialogResultFolder(saveResult, browser.SelectedFolder);
@@ -68,14 +71,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
             var extendedException =
                 _exceptionService.Create(e, userInfo);
             var errorWindow = new CustomExceptionWindow(extendedException, this, _eventHub, _scopeToken, _scopeRepository);
-            if (Application.Current.MainWindow != null)
-            {
-                if (errorWindow != Application.Current.MainWindow)
-                {
-                    errorWindow.Owner = Application.Current.MainWindow;
-                }
-            }
-            errorWindow.ShowDialog();
+            ShowOwnedDialog(errorWindow);
         }
 
         public void ShowErrorViewDialog(string title, ErrorList errorItems, bool modal = true)
@@ -86,7 +82,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
         public TextInputDialogResult ShowTextInputDialog(string title, string initialText = "")
         {
             var window = new TextInputWindow(title, initialText);
-            var result = window.ShowDialog();
+            var result = ShowOwnedDialog(window);
 
             return new TextInputDialogResult(result!.Value, window.TextValue);
         }
@@ -104,7 +100,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
                 descriptionLabel,
                 initialTitle,
                 initialDescription);
-            var result = window.ShowDialog() == true;
+            var result = ShowOwnedDialog(window) == true;
             return new TitleDescriptionInputDialogResult(
                 result,
                 window.TitleValue,
@@ -113,15 +109,40 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
 
         public void ShowDialogBox(string message, string title)
         {
-            MessageBox.Show(message, title);
+            var dialog = new MessageDialogWindow(
+                title,
+                message,
+                MessageDialogButtonSet.Ok);
+            ShowOwnedDialog(dialog);
         }
 
         public ShowMessageBoxResult ShowYesNoBox(string message, string title)
         {
-            var result = MessageBox.Show(message, title, MessageBoxButton.YesNo);
-            if (result == MessageBoxResult.Yes)
+            var dialog = new MessageDialogWindow(
+                title,
+                message,
+                MessageDialogButtonSet.YesNo);
+            if (ShowOwnedDialog(dialog) == true)
                 return ShowMessageBoxResult.OK;
             return ShowMessageBoxResult.Cancel;
+        }
+
+        private static void ApplyOwner(Window window)
+        {
+            var owner = Application.Current?.MainWindow;
+            if (owner != null &&
+                owner.IsLoaded &&
+                !ReferenceEquals(owner, window) &&
+                window.Owner == null)
+            {
+                window.Owner = owner;
+            }
+        }
+
+        private static bool? ShowOwnedDialog(Window window)
+        {
+            ApplyOwner(window);
+            return window.ShowDialog();
         }
 
 

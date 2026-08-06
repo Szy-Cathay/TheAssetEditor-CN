@@ -7,7 +7,19 @@
         mc:Ignorable="d"
         Title="{loc:Loc Shared.ControllerHost.Title}"
         SizeToContent="WidthAndHeight"
-        ResizeMode="NoResize" FontFamily="{DynamicResource AppFontFamily}" Background="{DynamicResource WindowBackground}">
+        ResizeMode="NoResize"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
     <Grid>
         
     </Grid>

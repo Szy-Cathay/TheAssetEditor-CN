@@ -13,10 +13,11 @@
         <controls:BooleanToVisibilityConverter x:Key="boolConv"/>
     </UserControl.Resources>
 
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <DockPanel LastChildFill="False">
         <Label  DockPanel.Dock="Top" Content="{loc:Loc AnimKeyframe.Title}" FontSize="18" FontWeight="Bold"/>
         <Label  DockPanel.Dock="Top" FontSize="10" Content="{loc:Loc AnimKeyframe.DragBorderHint}"/>
-        <Label  DockPanel.Dock="Top" FontSize="20" Foreground="Red" Visibility="{Binding IsDirty.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource boolConv}}" Content="{loc:Loc AnimKeyframe.WarningDirty}"/>
+        <Label DockPanel.Dock="Top" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource AeBrush.Warning}" Visibility="{Binding IsDirty.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource boolConv}}" Content="{loc:Loc AnimKeyframe.WarningDirty}"/>
         <Grid  DockPanel.Dock="Top">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="20*"/>
@@ -39,7 +40,7 @@
                 <CheckBox DockPanel.Dock="Top" Content="{loc:Loc AnimKeyframe.IncrementFrameAfterCopy}" IsChecked="{Binding IncrementFrameAfterCopyOperation.Value, UpdateSourceTrigger=PropertyChanged}"  />
                 <CheckBox DockPanel.Dock="Top" Content="{loc:Loc AnimKeyframe.SelectPreviousBonesOnFrameChange}" IsChecked="{Binding AutoSelectPreviousBonesOnFrameChange.Value, UpdateSourceTrigger=PropertyChanged}"  />
                 <CheckBox DockPanel.Dock="Top" Content="{loc:Loc AnimKeyframe.EnableIK}" IsChecked="{Binding EnableInverseKinematics.Value, UpdateSourceTrigger=PropertyChanged}"  IsEnabled="false"  />
-                <Label Content="{loc:Loc AnimKeyframe.LastEndBonesChain}"/>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimKeyframe.LastEndBonesChain}"/>
                 <ComboBox  
                           IsEditable="True"
                           IsTextSearchEnabled="false"
@@ -151,7 +152,7 @@
 
                     </Grid.ColumnDefinitions>
 
-                    <Label Grid.Column="0" Content="{loc:Loc AnimKeyframe.AnimationDuration}"/>
+                    <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc AnimKeyframe.AnimationDuration}"/>
                     <TextBox Grid.Column="1" PreviewTextInput="AnimationTextInputPreview" Text="{Binding FramesDurationInSeconds, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"></TextBox>
                     <Label Grid.Column="2" Content="{loc:Loc AnimKeyframe.Seconds}"/>
                     <Button Grid.Column="3"  Click="{s:MethodBinding ResetDuration}" Content="{loc:Loc General.Reset}"/>
@@ -192,7 +193,7 @@
                 <ColumnDefinition Width="70"/>
                 <ColumnDefinition Width="120"/>
             </Grid.ColumnDefinitions>
-            <Label Grid.Column="0" Content="{loc:Loc AnimKeyframe.PasteLength}"/>
+            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Content="{loc:Loc AnimKeyframe.PasteLength}"/>
             <TextBox Grid.Column="1" PreviewTextInput="FrameNrPreviewTextInput" TextChanged="FrameNrCantBeEmpty" IsEnabled="{Binding CopyMoreThanSingleFrame}" Text="{Binding FrameNrLength}"></TextBox>
             <Button Grid.Column="2" Content="{loc:Loc AnimKeyframe.SetMax}"  Click="{s:MethodBinding SetFrameLengthMax}" Margin="2,0,0,0"/>
             <Button Grid.Column="3" Content="{loc:Loc AnimKeyframe.FromClipboard}"  Click="{s:MethodBinding SetFrameLengthFromClipboard}" Margin="2,0,0,0"/>
@@ -217,12 +218,12 @@
         <Grid DockPanel.Dock="Top" Margin="5,5,5,0">
             <StackPanel>
                 <Label Content="{loc:Loc AnimKeyframe.InterpolateBetweenFrame}"/>
-                <StackPanel Orientation="Horizontal">
-                    <Label Content="{loc:Loc AnimKeyframe.SelectedFrameA}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimKeyframe.SelectedFrameA}"/>
                     <Label Content="{Binding SelectedFrameAInterpolation.Value, UpdateSourceTrigger=PropertyChanged, Mode=OneWay}"></Label>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Label Content="{loc:Loc AnimKeyframe.SelectedFrameB}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimKeyframe.SelectedFrameB}"/>
                     <Label Content="{Binding SelectedFrameBInterpolation.Value, UpdateSourceTrigger=PropertyChanged, Mode=OneWay}"></Label>
                 </StackPanel>
                 <StackPanel>
@@ -289,8 +290,9 @@
             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" />
         </Grid>
 
-        <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc General.Save}" Click="{s:MethodBinding Save}"/>
+        <Button DockPanel.Dock="Top" Margin="5" Style="{StaticResource AeButton.Primary}" Content="{loc:Loc General.Save}" Click="{s:MethodBinding Save}"/>
         <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc AnimKeyframe.SaveAs}" Click="{s:MethodBinding SaveAs}"/>
 
     </DockPanel>
+    </ScrollViewer>
 </UserControl>

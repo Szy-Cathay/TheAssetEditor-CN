@@ -51,6 +51,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         [ObservableProperty] TreeNode _selectedItem;
         [ObservableProperty] ObservableCollection<ContextMenuItem2> _contextMenu = [];
         [ObservableProperty] bool _isRefreshingCaWemFiles;
+        [ObservableProperty] string _caWemRefreshDetail = string.Empty;
+        [ObservableProperty] int _caWemRefreshValue;
+        [ObservableProperty] int _caWemRefreshMaximum;
+        [ObservableProperty] bool _caWemRefreshIsIndeterminate = true;
 
         public bool ShowFoldersOnly { get; }
 
@@ -112,11 +116,20 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             await Task.Yield();
             try
             {
-                foreach (var container in _packFileService
+                var containers = _packFileService
                     .GetAllPackfileContainers()
-                    .Where(value => value.IsCaPackFile))
+                    .Where(value => value.IsCaPackFile)
+                    .ToArray();
+                CaWemRefreshValue = 0;
+                CaWemRefreshMaximum = containers.Length;
+                CaWemRefreshIsIndeterminate = containers.Length == 0;
+                for (var index = 0; index < containers.Length; index++)
                 {
+                    var container = containers[index];
+                    CaWemRefreshDetail = container.Name;
                     ReloadTree(container);
+                    CaWemRefreshValue = index + 1;
+                    await Task.Yield();
                 }
             }
             finally

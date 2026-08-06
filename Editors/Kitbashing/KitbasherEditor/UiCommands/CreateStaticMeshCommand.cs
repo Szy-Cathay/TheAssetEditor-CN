@@ -6,7 +6,6 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
 using Shared.Core.Services;
 using Shared.Ui.Common.MenuSystem;
-using MessageBox = System.Windows.MessageBox;
 
 namespace Editors.KitbasherEditor.UiCommands
 {

@@ -1,0 +1,41 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style x:Key="AeText.PageTitle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style x:Key="AeText.SectionTitle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+    </Style>
+    <Style x:Key="AeText.Body" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+    </Style>
+    <Style x:Key="AeText.Label" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+    </Style>
+    <Style x:Key="AeText.Caption" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
+    </Style>
+    <Style x:Key="AeText.Technical" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+    </Style>
+</ResourceDictionary>

@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Markup;
-using System.Windows.Media;
 using Shared.Ui.Common;
 
 namespace CommonControls.FilterDialog
@@ -17,9 +16,6 @@ namespace CommonControls.FilterDialog
     [ContentProperty("InnerContent")]
     public partial class FilterUserControl : UserControl
     {
-        SolidColorBrush _noErrorBackground = new SolidColorBrush(Colors.White);
-        SolidColorBrush _errorBackground = new SolidColorBrush(Colors.Red);
-
         public delegate bool OnSeachDelegate(object item, Regex regex);
 
         public EventHandler OnItemDoubleClicked;
@@ -104,7 +100,9 @@ namespace CommonControls.FilterDialog
                 {
                     ResultList.ItemsSource = SearchItems;
                     toolTip.IsOpen = false;
-                    SearchTextBox.Background = _noErrorBackground;
+                    SearchTextBox.SetResourceReference(
+                        Control.BorderBrushProperty,
+                        "AeBrush.BorderStrong");
                     return;
                 }
 
@@ -122,11 +120,15 @@ namespace CommonControls.FilterDialog
                     }
                     ResultList.ItemsSource = displayList;
                     toolTip.IsOpen = false;
-                    SearchTextBox.Background = _noErrorBackground;
+                    SearchTextBox.SetResourceReference(
+                        Control.BorderBrushProperty,
+                        "AeBrush.BorderStrong");
                 }
                 catch (Exception e)
                 {
-                    SearchTextBox.Background = _errorBackground;
+                    SearchTextBox.SetResourceReference(
+                        Control.BorderBrushProperty,
+                        "AeBrush.Danger");
                     toolTip.IsOpen = true;
                     toolTip.Content = e.Message;
                     toolTip.Content += "\n\nCommon usage:\n";

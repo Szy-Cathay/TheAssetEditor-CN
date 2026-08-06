@@ -6,7 +6,19 @@
         xmlns:local="clr-namespace:AnimationEditor.MountAnimationCreator"
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
-        Title="{loc:Loc MountAnim.BatchProcessTitle}" SizeToContent="WidthAndHeight" Background="#FF1C1C1C">
+        Title="{loc:Loc MountAnim.BatchProcessTitle}"
+        SizeToContent="WidthAndHeight"
+        Background="{DynamicResource AeBrush.Canvas}"
+        Foreground="{DynamicResource AeBrush.TextPrimary}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="{DynamicResource AppFontWeight}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
@@ -23,18 +35,15 @@
             <ColumnDefinition Width="auto"/>
         </Grid.ColumnDefinitions>
 
-        <Label Grid.Row="0" Grid.Column="0" Content="{loc:Loc MountAnim.AnimPack}"/>
-        <Label Grid.Row="0" Grid.Column="1" Content=":"/>
+        <Label Style="{StaticResource AeForm.Label}" Grid.Row="0" Grid.Column="0" Content="{loc:Loc MountAnim.AnimPack}"/>
         <CheckBox Grid.Row="0" Grid.Column="2" VerticalContentAlignment="Center" IsChecked="{Binding CreateAnimPack, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
         <TextBox Grid.Row="0" Grid.Column="3" Width="300" VerticalContentAlignment="Center" Margin="2,2,0,2" Text="{Binding AnimPackName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="{Binding CreateAnimPack, UpdateSourceTrigger=PropertyChanged}" />
 
-        <Label Grid.Row="2" Grid.Column="0" Content="{loc:Loc MountAnim.Fragment}"/>
-        <Label Grid.Row="2" Grid.Column="1" Content=":"/>
+        <Label Style="{StaticResource AeForm.Label}" Grid.Row="2" Grid.Column="0" Content="{loc:Loc MountAnim.Fragment}"/>
         <CheckBox Grid.Row="2" Grid.Column="2" VerticalContentAlignment="Center" IsChecked="{Binding CreateFragment, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
         <TextBox Grid.Row="2" Grid.Column="3" Width="300" VerticalContentAlignment="Center" Margin="2,2,0,2" Text="{Binding FragmentName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="{Binding CreateFragment, UpdateSourceTrigger=PropertyChanged}" />
 
-        <Label Grid.Row="3" Grid.Column="0" Content="{loc:Loc MountAnim.Animations}"/>
-        <Label Grid.Row="3" Grid.Column="1" Content=":"/>
+        <Label Style="{StaticResource AeForm.Label}" Grid.Row="3" Grid.Column="0" Content="{loc:Loc MountAnim.Animations}"/>
         <CheckBox Grid.Row="3" Grid.Column="2" VerticalContentAlignment="Center" IsChecked="{Binding CreateAnimations, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
 
         <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="4" Content="{loc:Loc MountAnim.Create}" Margin="10,2,10,2" Click="Button_Click"/>

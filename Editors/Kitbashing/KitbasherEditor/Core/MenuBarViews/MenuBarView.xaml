@@ -5,9 +5,14 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
+             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:viewmodel="clr-namespace:KitbasherEditor.ViewModels.MenuBarViews"
              xmlns:menusystem="clr-namespace:Shared.Ui.Common.MenuSystem;assembly=Shared.Ui"
              mc:Ignorable="d"
+             Background="{DynamicResource AeBrush.Surface1}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
              Loaded="UserControl_Loaded"
              Unloaded="UserControl_Unloaded">
     <UserControl.Resources>
@@ -30,7 +35,8 @@
         </Style>
 
         <Style x:Key="ImageStyle" TargetType="Image">
-            <Setter Property="Height" Value="28"/>
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.05"></Setter>
@@ -39,13 +45,13 @@
         </Style>
 
         <DataTemplate x:Key="defaultButtonTemplate">
-            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" BorderThickness="0" Background="Transparent" Margin="1" 
+            <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1"
                     AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
                     Focusable="False"
                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                     Command="{Binding Path=Action.Command}" 
                     ToolTipService.ShowOnDisabled="True"
-                    Style="{StaticResource NoBackgroundOnDisabledButton}"
+                    Style="{StaticResource AeButton.Icon}"
                     Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToCollapsedConverter}}">
                 <Image Style="{StaticResource ImageStyle}" Source="{Binding Image}"/>
             </Button>
@@ -58,7 +64,7 @@
                             IsChecked="{Binding IsChecked.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                             Command="{Binding Path=Action.Command}"
                             GroupName="{Binding GroupName}" 
-                            Style="{StaticResource {x:Type ToggleButton}}"
+                            Style="{DynamicResource Kitbash.ToolRadioButton}"
                             IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                             ToolTipService.ShowOnDisabled="True"
                             Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToCollapsedConverter}}">
@@ -109,32 +115,34 @@
             <!-- Proportional editing toggle + dropdown -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="4,0"
                         Visibility="{Binding ProportionalEditing.IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                <Border Background="{DynamicResource ToolBarTrayBackground}" CornerRadius="3" Margin="0,0,2,0">
-                    <StackPanel Orientation="Horizontal">
-                        <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
-                        <ToggleButton x:Name="PropToggleBtn"
-                                      ToolTip="衰减编辑 (Proportional Editing)"
-                                      AutomationProperties.Name="衰减编辑"
-                                      IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Focusable="False"
-                                      BorderThickness="0" Background="Transparent" Padding="4,2">
-                            <Image Width="24" Height="24" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
-                        </ToggleButton>
-                        <!-- Dropdown arrow - Focusable=False for same reason -->
-                        <ToggleButton x:Name="PropArrowBtn" Content="▾" FontSize="10" FontWeight="Bold"
-                                      BorderThickness="0" Background="Transparent" Padding="2,0,4,0"
-                                      Focusable="False"
-                                      AutomationProperties.Name="调整衰减距离"
-                                      ToolTip="调整衰减距离"/>
-                    </StackPanel>
-                </Border>
+                <StackPanel Orientation="Horizontal" Margin="0,0,2,0">
+                    <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
+                    <ToggleButton x:Name="PropToggleBtn"
+                                  Width="28"
+                                  Height="28"
+                                  Margin="0,0,2,0"
+                                  Padding="4"
+                                  ToolTip="{loc:Loc BlenderHelp.ProportionalEditing}"
+                                  AutomationProperties.Name="{loc:Loc BlenderHelp.ProportionalEditing}"
+                                  IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  Focusable="False">
+                        <Image Width="20" Height="20" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
+                    </ToggleButton>
+                    <!-- Dropdown arrow - Focusable=False for same reason -->
+                    <ToggleButton x:Name="PropArrowBtn"
+                                  Height="28"
+                                  Style="{StaticResource AeButton.DropdownArrow}"
+                                  Focusable="False"
+                                  AutomationProperties.Name="{loc:Loc Kitbasher.VertexFalloff.ToolTip}"
+                                  ToolTip="{loc:Loc Kitbasher.VertexFalloff.ToolTip}"/>
+                </StackPanel>
                 <!-- Popup for falloff value -->
                 <Popup x:Name="FalloffPopup" PlacementTarget="{Binding ElementName=PropArrowBtn}"
                        IsOpen="{Binding IsChecked, ElementName=PropArrowBtn, Mode=TwoWay}"
                        StaysOpen="False" AllowsTransparency="True">
-                    <Border Background="{DynamicResource ToolBarTrayBackground}" BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                    <Border Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Surface}" Padding="10,8">
                         <StackPanel>
-                            <TextBlock Text="衰减距离 (Falloff)" Margin="0,0,0,6" Foreground="White"/>
+                            <TextBlock Text="{loc:Loc Kitbasher.VertexFalloff}" Margin="0,0,0,6" Foreground="{DynamicResource AeBrush.TextPrimary}"/>
                             <TextBox x:Name="FalloffTextBox"
                                      Text="{Binding ProportionalEditing.FalloffDistance, UpdateSourceTrigger=LostFocus, Mode=TwoWay, StringFormat='{}{0:0.###}'}"
                                      Width="100" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"

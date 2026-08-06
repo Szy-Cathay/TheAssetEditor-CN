@@ -37,7 +37,7 @@ namespace Editors.Shared.Core.Common
         public SceneObjectViewModel CreateAsset(string uniqeId, bool createByDefault, string header, Color skeletonColour, AnimationToolInput input)
         {
             var mainAsset = _sceneObjectEditor.CreateAsset(uniqeId, header, skeletonColour);
-            var returnObj = new SceneObjectViewModel(_uiCommandFactory, _pfs, _packFileUiProvider, mainAsset, header + ":", _sceneObjectEditor, _skeletonHelper);
+            var returnObj = new SceneObjectViewModel(_uiCommandFactory, _pfs, _packFileUiProvider, mainAsset, header, _sceneObjectEditor, _skeletonHelper);
 
             if (createByDefault)
             {

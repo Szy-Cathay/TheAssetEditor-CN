@@ -221,4 +221,21 @@
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Selected"                  Color="{StaticResource AColour.Tone9.Border.Selected}"/>
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Selected.Inactive"         Color="{StaticResource AColour.Tone9.Border.Selected.Inactive}"/>
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Disabled"                  Color="{StaticResource AColour.Tone9.Border.Disabled}"/>
+    <!-- AE UI design-system semantic brushes -->
+    <SolidColorBrush x:Key="AeBrush.Canvas" Color="{StaticResource AColour.Tone1.Background.Static}" />
+    <SolidColorBrush x:Key="AeBrush.Surface1" Color="{StaticResource AColour.Tone2.Background.Static}" />
+    <SolidColorBrush x:Key="AeBrush.Surface2" Color="{StaticResource AColour.Tone3.Background.Static}" />
+    <SolidColorBrush x:Key="AeBrush.Surface3" Color="{StaticResource AColour.Tone4.Background.Static}" />
+    <SolidColorBrush x:Key="AeBrush.SurfaceHover" Color="{StaticResource AColour.Tone4.Background.MouseOver}" />
+    <SolidColorBrush x:Key="AeBrush.Border" Color="{StaticResource AColour.Tone3.Border.Static}" />
+    <SolidColorBrush x:Key="AeBrush.BorderStrong" Color="{StaticResource AColour.Tone5.Border.Static}" />
+    <SolidColorBrush x:Key="AeBrush.TextPrimary" Color="{StaticResource AColour.Foreground.Static}" />
+    <SolidColorBrush x:Key="AeBrush.TextSecondary" Color="{StaticResource AColour.Foreground.Deeper}" />
+    <SolidColorBrush x:Key="AeBrush.TextMuted" Color="{StaticResource AColour.Foreground.Disabled}" />
+    <SolidColorBrush x:Key="AeBrush.Accent" Color="{StaticResource AColour.ColourfulGlyph.Static}" />
+    <SolidColorBrush x:Key="AeBrush.AccentHover" Color="{StaticResource AColour.ColourfulGlyph.MouseOver}" />
+    <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="{StaticResource AColour.Tone4.Background.Selected}" />
+    <SolidColorBrush x:Key="AeBrush.Success" Color="#72BC91" />
+    <SolidColorBrush x:Key="AeBrush.Warning" Color="#E2B45F" />
+    <SolidColorBrush x:Key="AeBrush.Danger" Color="#E17979" />
 </ResourceDictionary>

@@ -18,6 +18,8 @@ namespace Shared.Ui
 
         public override void Register(IServiceCollection services)
         {
+            UiMessageBoxBridge.Configure(UnifiedMessageBox.Show);
+
             // Implement required interfaces
             services.AddScoped<IStandardDialogs, StandardDialogs>();
             services.AddTransient<IToolSelectorUiProvider, ToolSelectorUiProvider>();

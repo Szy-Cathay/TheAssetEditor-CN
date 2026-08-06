@@ -1,5 +1,6 @@
 ﻿using System.Windows.Input;
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -46,6 +47,11 @@ namespace Editors.Audio.AudioEditor.Presentation
         [ObservableProperty] private bool _isEditorIdle = true;
         [ObservableProperty] private bool _canEditAudioProject = false;
         [ObservableProperty] private string _compileStatus = string.Empty;
+        [ObservableProperty] private string _operationStatus = string.Empty;
+        [ObservableProperty] private string _operationDetail = string.Empty;
+        [ObservableProperty] private int _operationProgressValue;
+        [ObservableProperty] private int _operationProgressMaximum;
+        [ObservableProperty] private bool _operationProgressIsIndeterminate = true;
         [ObservableProperty] private string _emptyStateText =
             LocalizationManager.Instance.Get("AudioEditor.Empty");
         [ObservableProperty] private bool _hasUnsavedChanges;
@@ -185,6 +191,12 @@ namespace Editors.Audio.AudioEditor.Presentation
             IsLoading = true;
             CompileStatus = LocalizationManager.Instance.Get(
                 "AudioEditor.Load.InProgress");
+            OperationStatus = LocalizationManager.Instance.Get(
+                "OperationProgress.AudioLoad");
+            OperationDetail = CompileStatus;
+            OperationProgressValue = 0;
+            OperationProgressMaximum = 0;
+            OperationProgressIsIndeterminate = true;
             EmptyStateText = CompileStatus;
             var progress = new Progress<AudioLoadProgress>(
                 loadProgress =>
@@ -196,6 +208,12 @@ namespace Editors.Audio.AudioEditor.Presentation
                         loadProgress.CurrentFile);
                     CompileStatus = status;
                     EmptyStateText = status;
+                    OperationDetail = Path.GetFileName(
+                        loadProgress.CurrentFile);
+                    OperationProgressValue = loadProgress.Completed;
+                    OperationProgressMaximum = loadProgress.Total;
+                    OperationProgressIsIndeterminate =
+                        loadProgress.Total <= 0;
                 });
             try
             {
@@ -246,6 +264,12 @@ namespace Editors.Audio.AudioEditor.Presentation
             IsCompiling = true;
             CompileStatus = LocalizationManager.Instance.Get(
                 "AudioEditor.Compile.InProgress");
+            OperationStatus = LocalizationManager.Instance.Get(
+                "OperationProgress.AudioCompile");
+            OperationDetail = CompileStatus;
+            OperationProgressValue = 0;
+            OperationProgressMaximum = 0;
+            OperationProgressIsIndeterminate = true;
             try
             {
                 if (!Save())
@@ -258,8 +282,18 @@ namespace Editors.Audio.AudioEditor.Presentation
                 var cleanAudioProject = _audioEditorStateService.AudioProject.Clean();
                 var fileName = _audioEditorStateService.AudioProjectFileName;
                 var filePath = _audioEditorStateService.AudioProjectFilePath;
+                var progress = new Progress<AudioOperationProgress>(
+                    UpdateOperationProgress);
                 var compileCompleted =
-                    await _audioProjectCompilerService.CompileAsync(
+                    _audioProjectCompilerService is
+                        IAudioProjectCompilerProgressService progressService
+                    ? await progressService.CompileAsync(
+                        cleanAudioProject,
+                        fileName,
+                        filePath,
+                        progress,
+                        cancellationToken)
+                    : await _audioProjectCompilerService.CompileAsync(
                         cleanAudioProject,
                         fileName,
                         filePath,
@@ -288,6 +322,16 @@ namespace Editors.Audio.AudioEditor.Presentation
             {
                 IsCompiling = false;
             }
+        }
+
+        private void UpdateOperationProgress(AudioOperationProgress progress)
+        {
+            OperationStatus = LocalizationManager.Instance.Get(
+                progress.StageResourceKey);
+            OperationDetail = progress.Detail;
+            OperationProgressValue = progress.Completed;
+            OperationProgressMaximum = progress.Total;
+            OperationProgressIsIndeterminate = progress.Total <= 0;
         }
 
         [RelayCommand]

@@ -15,7 +15,16 @@
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
     Closed="OnClosed"
-    Title="{loc:Loc AudioProjectConverter.Title}" Background="#FF1C1C1C">
+    Style="{StaticResource CustomWindowStyle}"
+    Title="{loc:Loc AudioProjectConverter.Title}"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}">
+
+    <Window.Resources>
+        <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -262,12 +271,14 @@
         <Grid
             Grid.Row="2"
             Margin="10,0,10,8">
-            <progress:OperationProgressView
-                CurrentDetailText="{Binding Status}"
+            <progress:OperationProgressWindowHost
+                CurrentDetailText="{Binding ProgressDetail}"
                 IsOperationActive="{Binding IsBusy}"
-                IsProgressIndeterminate="True"
+                IsProgressIndeterminate="{Binding ProgressIsIndeterminate}"
+                ProgressMaximum="{Binding ProgressMaximum}"
+                ProgressValue="{Binding ProgressValue}"
                 StatusText="{loc:Loc OperationProgress.AudioConvert}"
-                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
+                WindowTitle="{loc:Loc OperationProgress.AudioConvert}" />
             <TextBlock
                 Margin="0,4,0,0"
                 Text="{Binding Status}"
@@ -292,6 +303,7 @@
 
             <Button 
                 Content="{loc:Loc General.Ok}"
+                Style="{StaticResource AeButton.Primary}"
                 Width="75"
                 Margin="0, 0, 5, 0"
                 Command="{Binding ProcessAudioProjectConversionCommand}" 
@@ -300,6 +312,7 @@
 
             <Button 
                 Content="{loc:Loc General.Cancel}"
+                Style="{StaticResource AeButton.Secondary}"
                 Width="75"
                 Margin="5, 0, 0, 0"
                 IsCancel="True"

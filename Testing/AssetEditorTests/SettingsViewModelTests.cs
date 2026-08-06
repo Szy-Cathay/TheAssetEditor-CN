@@ -256,7 +256,10 @@ public class SettingsViewModelTests
                 NUnitAssert.That(
                     defaultTypeface.TryGetGlyphTypeface(out _),
                     Is.True,
-                    "The default embedded application font did not resolve.");
+                    "The default Windows UI application font did not resolve.");
+                NUnitAssert.That(
+                    defaultFamily.Source,
+                    Does.Contain("Segoe UI"));
 
                 foreach (var font in new[]
                          {

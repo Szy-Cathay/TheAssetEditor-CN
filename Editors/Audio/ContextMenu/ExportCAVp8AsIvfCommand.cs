@@ -135,7 +135,7 @@ namespace Editors.Audio.ContextMenu
         }
 
         private static bool ConfirmOverwrite(string outputPath) =>
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 LocalizationManager.Instance.GetFormat(
                     "CAVp8.ConfirmOverwrite",
                     outputPath),
@@ -146,13 +146,13 @@ namespace Editors.Audio.ContextMenu
             System.Windows.MessageBoxResult.Yes;
 
         private static void ShowSuccess(string message) =>
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 message,
                 LocalizationManager.Instance.Get(
                     "CAVp8.ExportTitle"));
 
         private static void ShowError(string message) =>
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 message,
                 LocalizationManager.Instance.Get(
                     "CAVp8.ExportTitle"),

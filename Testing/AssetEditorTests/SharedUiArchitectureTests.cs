@@ -52,6 +52,24 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void SharedCoreMessageBridge_DoesNotReferenceWpf()
+        {
+            var source = File.ReadAllText(Path.Combine(
+                FindSolutionRoot(),
+                "Shared",
+                "SharedCore",
+                "Services",
+                "UiMessageBoxBridge.cs"));
+
+            Assert.IsFalse(source.Contains(
+                "System.Windows",
+                StringComparison.Ordinal));
+            Assert.IsFalse(source.Contains(
+                "MessageBox.Show",
+                StringComparison.Ordinal));
+        }
+
+        [TestMethod]
         public void RepositoryXamlFiles_AreWellFormedXml()
         {
             var solutionRoot = FindSolutionRoot();

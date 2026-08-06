@@ -17,8 +17,18 @@
                 <!-- AE Semantic Colors (ControlColours.xaml - for AE custom controls) -->
                 <ResourceDictionary Source="Themes/ControlColours.xaml"/>
 
+                <ResourceDictionary Source="Themes/DesignSystem/DesignTokens.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Typography.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/SurfaceStyles.xaml"/>
+
                 <!-- AE Control Templates (custom styles only) -->
                 <ResourceDictionary Source="Themes/Controls.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/Buttons.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/Inputs.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/Collections.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Controls/MenusAndFeedback.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Shell.xaml"/>
+                <ResourceDictionary Source="Themes/DesignSystem/Workflows.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!--Value converters-->

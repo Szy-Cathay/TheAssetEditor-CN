@@ -149,14 +149,6 @@
     <SolidColorBrush x:Key="TabItem.Disabled.Background"            Color="{DynamicResource AColour.Tone5.Background.Disabled}"/>
     <SolidColorBrush x:Key="TabItem.Disabled.Border"                Color="{DynamicResource AColour.Tone5.Border.Disabled}"/>
 
-    <SolidColorBrush x:Key="Expander.MouseOver.Circle.Fill"         Color="{DynamicResource AColour.Tone5.Background.MouseOver}"/>
-    <SolidColorBrush x:Key="Expander.MouseOver.Circle.Stroke"       Color="{DynamicResource AColour.Tone5.Border.MouseOver}"/>
-    <SolidColorBrush x:Key="Expander.Pressed.Circle.Fill"           Color="{DynamicResource AColour.Tone5.Background.MouseDown}"/>
-    <SolidColorBrush x:Key="Expander.Pressed.Circle.Stroke"         Color="{DynamicResource AColour.Tone5.Border.MouseDown}"/>
-    <SolidColorBrush x:Key="Expander.Disabled.Circle.Fill"          Color="{DynamicResource AColour.Tone5.Background.Disabled}"/>
-    <SolidColorBrush x:Key="Expander.Disabled.Circle.Stroke"        Color="{DynamicResource AColour.Tone5.Border.Disabled}"/>
-    <SolidColorBrush x:Key="Expander.Static.Circle.Fill"            Color="{DynamicResource AColour.Tone5.Background.Static}"/>
-    <SolidColorBrush x:Key="Expander.Static.Circle.Stroke"          Color="{DynamicResource AColour.Tone5.Border.Static}"/>
     <SolidColorBrush x:Key="Expander.Static.Arrow.Stroke"           Color="{DynamicResource AColour.Glyph.Static}"/>
     <SolidColorBrush x:Key="Expander.MouseOver.Arrow.Stroke"        Color="{DynamicResource AColour.Glyph.MouseOver}"/>
     <SolidColorBrush x:Key="Expander.Pressed.Arrow.Stroke"          Color="{DynamicResource AColour.Glyph.MouseDown}"/>
@@ -292,6 +284,6 @@
 
     <SolidColorBrush x:Key="WindowBackground"                         Color="{DynamicResource AColour.Tone2.Background.Static}"/>
 
-    <FontFamily x:Key="AppFontFamily">/AssetEditor.CN;component/Fonts/#Alibaba PuHuiTi 3.0</FontFamily>
+    <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI</FontFamily>
     <FontWeight x:Key="AppFontWeight">Normal</FontWeight>
 </ResourceDictionary>
