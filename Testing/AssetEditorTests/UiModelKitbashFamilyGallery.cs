@@ -410,6 +410,12 @@ public class UiModelKitbashFamilyGallery
             IsEnabled = false,
             FalloffDistance = 1.25,
         },
+        ViewportShading = new GalleryModel
+        {
+            IsWireframe = false,
+            IsSolid = false,
+            IsMaterialPreview = true,
+        },
     };
 
     private static VertexDebuggerWindow CreateVertexDebuggerWindow()
@@ -779,9 +785,12 @@ public class UiModelKitbashFamilyGallery
         public object? HandlePreviewTextureCommand { get; set; } = GalleryCommand.Instance;
         public object? IsChecked { get; set; }
         public object? IsEnabled { get; set; }
+        public object? IsMaterialPreview { get; set; }
+        public object? IsSolid { get; set; }
         public object? IsTechSkeleton { get; set; }
         public object? IsUsedByCurrentModel { get; set; }
         public object? IsVisible { get; set; }
+        public object? IsWireframe { get; set; }
         public object? LeftColumnWidth { get; set; }
         public object? LightIntensity { get; set; }
         public object? LodIndex { get; set; }
@@ -831,6 +840,7 @@ public class UiModelKitbashFamilyGallery
         public object? TextureCount { get; set; }
         public object? TransformTool { get; set; }
         public object? Value { get; set; }
+        public object? ViewportShading { get; set; }
         public object? WsStrategies { get; set; }
         public object? Metalness { get; set; }
         public object? Alpha { get; set; }

@@ -11,12 +11,14 @@ namespace GameWorld.Core.Components.Selection
 
         public ISelectable RenderObject { get; set; }
         public List<int> SelectedFaces { get; set; } = new List<int>();
+        public int? ActiveFace { get; set; }
 
         public void ModifySelection(IEnumerable<int> newSelectionItems, bool onlyRemove)
         {
+            var requestedItems = newSelectionItems.ToList();
             if (onlyRemove)
             {
-                foreach (var newSelectionItem in newSelectionItems)
+                foreach (var newSelectionItem in requestedItems)
                 {
                     if (SelectedFaces.Contains(newSelectionItem))
                         SelectedFaces.Remove(newSelectionItem);
@@ -24,12 +26,19 @@ namespace GameWorld.Core.Components.Selection
             }
             else
             {
-                foreach (var newSelectionItem in newSelectionItems)
+                foreach (var newSelectionItem in requestedItems)
                 {
                     if (!SelectedFaces.Contains(newSelectionItem))
                         SelectedFaces.Add(newSelectionItem);
                 }
             }
+            if (!onlyRemove && requestedItems.Count > 0)
+                ActiveFace = requestedItems[^1];
+            else if (ActiveFace.HasValue &&
+                     !SelectedFaces.Contains(ActiveFace.Value))
+                ActiveFace = SelectedFaces.Count > 0
+                    ? SelectedFaces[^1]
+                    : null;
             SelectionChanged?.Invoke(this, true);
         }
 
@@ -42,6 +51,7 @@ namespace GameWorld.Core.Components.Selection
         public void Clear()
         {
             SelectedFaces.Clear();
+            ActiveFace = null;
             SelectionChanged?.Invoke(this, true);
         }
 
@@ -49,6 +59,11 @@ namespace GameWorld.Core.Components.Selection
         public void EnsureSorted()
         {
             SelectedFaces = SelectedFaces.Distinct().OrderBy(x => x).ToList();
+            if (ActiveFace.HasValue &&
+                !SelectedFaces.Contains(ActiveFace.Value))
+                ActiveFace = SelectedFaces.Count > 0
+                    ? SelectedFaces[^1]
+                    : null;
         }
 
 
@@ -57,7 +72,8 @@ namespace GameWorld.Core.Components.Selection
             return new FaceSelectionState()
             {
                 RenderObject = RenderObject,
-                SelectedFaces = new List<int>(SelectedFaces)
+                SelectedFaces = new List<int>(SelectedFaces),
+                ActiveFace = ActiveFace
             };
         }
 

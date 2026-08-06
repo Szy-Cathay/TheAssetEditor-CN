@@ -15,6 +15,7 @@ namespace GameWorld.Core.Components.Rendering
     public enum RenderingTechnique
     {
         Normal,
+        Solid,
         Emissive,
     }
 

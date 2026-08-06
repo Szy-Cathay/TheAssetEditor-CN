@@ -19,6 +19,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders.SpecGloss
             ];
 
             _renderingTechniqueMap[RenderingTechnique.Normal] = "BasicColorDrawing";
+            _renderingTechniqueMap[RenderingTechnique.Solid] = "SolidDrawing";
         }
 
         protected override CapabilityMaterial CreateCloneInstance() => new AdvancedRmvMaterial(_resourceLibrary);

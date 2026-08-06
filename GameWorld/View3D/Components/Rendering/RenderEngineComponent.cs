@@ -60,10 +60,26 @@ namespace GameWorld.Core.Components.Rendering
         public SpriteFont DefaultFont { get; private set; }
         public SpriteFont ViewportOverlayFont { get; private set; }
 
+        private ViewportShadingMode _shadingMode =
+            ViewportShadingMode.Solid;
+
+        public event Action<ViewportShadingMode>? ShadingModeChanged;
+
         /// <summary>
         /// Viewport shading mode - controls how 3D objects are rendered
         /// </summary>
-        public ViewportShadingMode ShadingMode { get; set; } = ViewportShadingMode.Textured;
+        public ViewportShadingMode ShadingMode
+        {
+            get => _shadingMode;
+            set
+            {
+                if (_shadingMode == value)
+                    return;
+
+                _shadingMode = value;
+                ShadingModeChanged?.Invoke(value);
+            }
+        }
         public bool SquareViewport { get; set; }
         public RenderTarget2D? LastFrame =>
             SquareViewport ? _transparentCaptureTarget : null;
@@ -277,15 +293,22 @@ namespace GameWorld.Core.Components.Rendering
             device.DepthStencilState = DepthStencilState.Default;
             _gridComponent.RenderGrid(device, commonShaderParameters);
 
-            // 3D drawing - Normal scene
+            var shadingPipeline =
+                ViewportShadingPolicy.Resolve(ShadingMode);
+
+            // 3D drawing - selected viewport surface pipeline
             device.DepthStencilState = DepthStencilState.Default;
             device.BlendState = BlendState.Opaque;
-            Render3DObjects(commonShaderParameters, RenderingTechnique.Normal);
+            Render3DObjects(
+                commonShaderParameters,
+                shadingPipeline.SurfaceTechnique);
 
-            // 3D drawing - Emissive (only if scene contains emissive-capable objects)
-            var hasEmissiveItems = _renderItems[RenderBuckedId.Normal]
-                .Any(item => item.SupportsTechnique(
-                    RenderingTechnique.Emissive));
+            // Editing modes deliberately skip texture-driven emissive bloom.
+            var hasEmissiveItems =
+                shadingPipeline.EnableBloom &&
+                _renderItems[RenderBuckedId.Normal]
+                    .Any(item => item.SupportsTechnique(
+                        RenderingTechnique.Emissive));
             Texture2D? bloomRenderTarget = null;
 
             if (hasEmissiveItems)
@@ -639,8 +662,9 @@ namespace GameWorld.Core.Components.Rendering
                         size);
                 }
 
-                // Apply shading mode to the normal render bucket
-                if (ShadingMode == ViewportShadingMode.Wireframe)
+                var shadingPipeline =
+                    ViewportShadingPolicy.Resolve(ShadingMode);
+                if (shadingPipeline.FillMode == FillMode.WireFrame)
                     device.RasterizerState = _rasterStates[RasterizerStateEnum.Wireframe];
                 else
                     device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
@@ -650,7 +674,9 @@ namespace GameWorld.Core.Components.Rendering
 
                 // Draw depth-tested helpers after meshes so they cannot punch
                 // holes into the selection mask before selected geometry renders.
-                if (renderingTechnique == RenderingTechnique.Normal &&
+                var isSurfacePass =
+                    renderingTechnique != RenderingTechnique.Emissive;
+                if (isSurfacePass &&
                     _renderLines.Count != 0)
                 {
                     var shader =
@@ -682,9 +708,14 @@ namespace GameWorld.Core.Components.Rendering
                 device.RasterizerState =
                     _rasterStates[RasterizerStateEnum.Wireframe];
                 foreach (var item in _renderItems[RenderBuckedId.Wireframe])
-                    item.Draw(device, commonShaderParameters, renderingTechnique);
+                    item.Draw(
+                        device,
+                        commonShaderParameters,
+                        isSurfacePass
+                            ? RenderingTechnique.Normal
+                            : renderingTechnique);
 
-                if (renderingTechnique == RenderingTechnique.Normal &&
+                if (isSurfacePass &&
                     _overlayLines.Count != 0)
                 {
                     var shader =
@@ -718,7 +749,12 @@ namespace GameWorld.Core.Components.Rendering
                 device.RasterizerState =
                     _rasterStates[RasterizerStateEnum.SelectedFaces];
                 foreach (var item in _renderItems[RenderBuckedId.Selection])
-                    item.Draw(device, commonShaderParameters, renderingTechnique);
+                    item.Draw(
+                        device,
+                        commonShaderParameters,
+                        isSurfacePass
+                            ? RenderingTechnique.Normal
+                            : renderingTechnique);
             }
             finally
             {
@@ -836,8 +872,8 @@ namespace GameWorld.Core.Components.Rendering
     /// </summary>
     public enum ViewportShadingMode
     {
-        Textured,   // Default: PBR materials with textures
-        Solid,      // Solid fill without textures (same as Textured for now)
-        Wireframe   // Wireframe only
+        MaterialPreview,
+        Solid,
+        Wireframe
     }
 }

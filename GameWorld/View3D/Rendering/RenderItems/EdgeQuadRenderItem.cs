@@ -18,7 +18,9 @@ namespace GameWorld.Core.Rendering.RenderItems
 
         public void Draw(GraphicsDevice device, CommonShaderParameters parameters, RenderingTechnique renderingTechnique)
         {
-            if (renderingTechnique != RenderingTechnique.Normal)
+            if (renderingTechnique is not (
+                    RenderingTechnique.Normal or
+                    RenderingTechnique.Solid))
                 return;
 
             if (EdgeQuadRenderer == null)

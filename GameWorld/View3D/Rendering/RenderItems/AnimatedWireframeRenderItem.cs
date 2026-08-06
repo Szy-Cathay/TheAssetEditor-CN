@@ -76,8 +76,10 @@ namespace GameWorld.Core.Rendering.RenderItems
         int _vertexDataVersion = -1;
         bool _instanceDataDirty = true;
 
-        public float DepthBias { get; set; } = 0.00002f;
-        public float EdgeHalfWidth { get; set; } = 1.0f;
+        public float DepthBias { get; set; } =
+            EditOverlayStyle.WireDepthBias;
+        public float EdgeHalfWidth { get; set; } =
+            EditOverlayStyle.WireHalfWidth;
         internal int IndexBufferBuildCount { get; private set; }
         internal int EdgePrimitiveCount =>
             _lineIndices.Length / 2;

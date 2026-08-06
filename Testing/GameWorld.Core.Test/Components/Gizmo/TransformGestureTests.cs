@@ -112,6 +112,76 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             });
         }
 
+        [Test]
+        public void ToolbarGizmo_AfterCompletingDrag_AllowsSecondDragWithoutReselecting()
+        {
+            using var context = CreateComponentContext();
+            var wrapper = (TransformGizmoWrapper)context.Component.Gizmo.Selection.Single();
+            context.Component.SetGizmoMode(GizmoMode.Translate);
+            context.Component.Gizmo.ActiveAxis = GizmoAxis.X;
+
+            context.Component.Update(new GameTime());
+            Assert.That(wrapper.HasBackup, Is.True);
+
+            context.Mouse
+                .Setup(component => component.IsMouseButtonDown(MouseButton.Left))
+                .Returns(false);
+            context.Mouse.Setup(component => component.LastState()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Pressed,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Mouse.Setup(component => component.State()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Component.Update(new GameTime());
+            Assert.That(wrapper.HasBackup, Is.False);
+
+            context.Mouse
+                .Setup(component => component.IsMouseButtonDown(MouseButton.Left))
+                .Returns(true);
+            context.Mouse.Setup(component => component.LastState()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Mouse.Setup(component => component.State()).Returns(
+                new MouseState(
+                    10,
+                    10,
+                    0,
+                    ButtonState.Pressed,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released,
+                    ButtonState.Released));
+            context.Component.Gizmo.ActiveAxis = GizmoAxis.X;
+            context.Component.Update(new GameTime());
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(wrapper.HasBackup, Is.True);
+                Assert.That(context.Mouse.Object.MouseOwner, Is.SameAs(context.Component));
+            });
+        }
+
         [TestCase(Keys.LeftAlt)]
         [TestCase(Keys.RightAlt)]
         public void AltTabRelease_DoesNotToggleEditMode(Keys altKey)

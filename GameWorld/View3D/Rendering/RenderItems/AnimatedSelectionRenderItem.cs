@@ -13,6 +13,8 @@ namespace GameWorld.Core.Rendering.RenderItems
         readonly IScopedResourceLibrary _resourceLibrary;
         readonly Vector4 _colour;
         IReadOnlyList<int>? _selectedFaces;
+        public float DepthBias { get; set; } =
+            EditOverlayStyle.SelectedFaceDepthBias;
 
         public AnimatedSelectionRenderItem(
             MeshPoseSnapshot pose,
@@ -82,7 +84,7 @@ namespace GameWorld.Core.Rendering.RenderItems
                     _colour.Z * alpha,
                     alpha));
             effect.Parameters["SelectionDepthBias"].SetValue(
-                0.00001f);
+                DepthBias);
             effect.Parameters["CapabilityFlag_ApplyAnimation"]
                 .SetValue(_pose.ApplyAnimation);
             effect.Parameters["Animation_WeightCount"]

@@ -112,9 +112,77 @@
                 <ToolBar ItemsSource="{Binding Path=CustomButtons}" ItemTemplateSelector="{StaticResource buttonStyleSelector}" />
             </ToolBarTray>
 
-            <!-- Proportional editing toggle + dropdown -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="4,0"
-                        Visibility="{Binding ProportionalEditing.IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="4,0">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Width="28"
+                                 Height="28"
+                                 Padding="4"
+                                 GroupName="ViewportShading"
+                                 Style="{DynamicResource Kitbash.ToolRadioButton}"
+                                 IsChecked="{Binding ViewportShading.IsWireframe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="{loc:Loc Kitbash.ViewportShading.Wireframe}"
+                                 AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Wireframe}"
+                                 Focusable="False">
+                        <Viewbox Width="18" Height="18">
+                            <Grid Width="20" Height="20">
+                                <Ellipse Stroke="{DynamicResource AeBrush.TextSecondary}"
+                                         StrokeThickness="1.5"/>
+                                <Path Data="M 3,7 L 17,7 M 2,13 L 18,13 M 7,2 L 7,18 M 13,2 L 13,18"
+                                      Stroke="{DynamicResource AeBrush.TextSecondary}"
+                                      StrokeThickness="1"/>
+                            </Grid>
+                        </Viewbox>
+                    </RadioButton>
+
+                    <RadioButton Width="28"
+                                 Height="28"
+                                 Padding="4"
+                                 GroupName="ViewportShading"
+                                 Style="{DynamicResource Kitbash.ToolRadioButton}"
+                                 IsChecked="{Binding ViewportShading.IsSolid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="{loc:Loc Kitbash.ViewportShading.Solid}"
+                                 AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Solid}"
+                                 Focusable="False">
+                        <Viewbox Width="18" Height="18">
+                            <Grid Width="20" Height="20">
+                                <Ellipse Fill="{DynamicResource AeBrush.TextSecondary}"/>
+                                <Ellipse Margin="4,3,8,9"
+                                         Fill="{DynamicResource AeBrush.TextPrimary}"
+                                         Opacity="0.7"/>
+                            </Grid>
+                        </Viewbox>
+                    </RadioButton>
+
+                    <RadioButton Width="28"
+                                 Height="28"
+                                 Padding="4"
+                                 GroupName="ViewportShading"
+                                 Style="{DynamicResource Kitbash.ToolRadioButton}"
+                                 IsChecked="{Binding ViewportShading.IsMaterialPreview, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="{loc:Loc Kitbash.ViewportShading.MaterialPreview}"
+                                 AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.MaterialPreview}"
+                                 Focusable="False">
+                        <Viewbox Width="18" Height="18">
+                            <Grid Width="20" Height="20">
+                                <Ellipse Fill="{DynamicResource AeBrush.Accent}"/>
+                                <Path Data="M 10,0 A 10,10 0 0 0 10,20 Z"
+                                      Fill="{DynamicResource AeBrush.TextSecondary}"/>
+                                <Ellipse Margin="4,3,8,9"
+                                         Fill="{DynamicResource AeBrush.TextPrimary}"
+                                         Opacity="0.8"/>
+                            </Grid>
+                        </Viewbox>
+                    </RadioButton>
+                </StackPanel>
+
+                <Separator Style="{DynamicResource VerticalSeparatorStyle}"/>
+
+                <!-- Proportional editing toggle + dropdown -->
+                <StackPanel Orientation="Horizontal"
+                            Visibility="{Binding ProportionalEditing.IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
                 <StackPanel Orientation="Horizontal" Margin="0,0,2,0">
                     <!-- Toggle button - Focusable=False prevents stealing keyboard focus from 3D viewport -->
                     <ToggleButton x:Name="PropToggleBtn"
@@ -156,6 +224,7 @@
                         </StackPanel>
                     </Border>
                 </Popup>
+                </StackPanel>
             </StackPanel>
         </Grid>
     </DockPanel>

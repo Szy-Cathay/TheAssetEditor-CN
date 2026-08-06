@@ -15,18 +15,33 @@ namespace GameWorld.Core.Components.Selection
         /// Selected edges stored as ordered pairs (v0, v1) where v0 &lt; v1
         /// </summary>
         public HashSet<(int v0, int v1)> SelectedEdges { get; set; } = new HashSet<(int, int)>();
+        public (int v0, int v1)? ActiveEdge { get; set; }
 
         public void ModifySelection(IEnumerable<(int v0, int v1)> newEdges, bool onlyRemove)
         {
+            var requestedEdges = newEdges.ToList();
             if (onlyRemove)
             {
-                foreach (var edge in newEdges)
+                foreach (var edge in requestedEdges)
                     SelectedEdges.Remove(edge);
             }
             else
             {
-                foreach (var edge in newEdges)
+                foreach (var edge in requestedEdges)
                     SelectedEdges.Add(edge);
+            }
+            if (!onlyRemove && requestedEdges.Count > 0)
+                ActiveEdge = requestedEdges[^1];
+            else if (ActiveEdge.HasValue &&
+                     !SelectedEdges.Contains(ActiveEdge.Value))
+            {
+                var remainingEdges = SelectedEdges
+                    .OrderBy(edge => edge.v0)
+                    .ThenBy(edge => edge.v1)
+                    .ToList();
+                ActiveEdge = remainingEdges.Count > 0
+                    ? remainingEdges[^1]
+                    : null;
             }
             SelectionChanged?.Invoke(this, true);
         }
@@ -60,6 +75,7 @@ namespace GameWorld.Core.Components.Selection
         public void Clear()
         {
             SelectedEdges.Clear();
+            ActiveEdge = null;
             SelectionChanged?.Invoke(this, true);
         }
 
@@ -68,7 +84,8 @@ namespace GameWorld.Core.Components.Selection
             return new EdgeSelectionState()
             {
                 RenderObject = RenderObject,
-                SelectedEdges = new HashSet<(int, int)>(SelectedEdges)
+                SelectedEdges = new HashSet<(int, int)>(SelectedEdges),
+                ActiveEdge = ActiveEdge
             };
         }
 

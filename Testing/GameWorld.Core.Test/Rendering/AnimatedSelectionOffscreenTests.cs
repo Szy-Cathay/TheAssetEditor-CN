@@ -16,6 +16,92 @@ namespace GameWorld.Core.Test.Rendering;
 public class AnimatedSelectionOffscreenTests
 {
     [Test]
+    public void Draw_ActiveFaceLayerIsLighterThanOrangeSelection()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>(
+            "Shaders\\AnimatedSelection");
+        var resources = new Mock<IScopedResourceLibrary>();
+        resources
+            .Setup(library => library.GetStaticEffect(
+                ShaderTypes.AnimatedSelection))
+            .Returns(effect);
+        var mesh = CreateMesh(new GraphicsCardGeometry(device));
+        mesh.RebuildIndexBuffer();
+        mesh.RebuildVertexBuffer();
+        var pose = MeshPoseSnapshot.Create(
+            mesh,
+            Matrix.Identity,
+            [],
+            false);
+        var selected = new AnimatedSelectionRenderItem(
+            pose,
+            resources.Object,
+            new Vector4(
+                EditOverlayStyle.SelectedColour,
+                EditOverlayStyle.SelectedFaceOpacity),
+            [0]);
+        var active = new AnimatedSelectionRenderItem(
+            pose,
+            resources.Object,
+            new Vector4(
+                EditOverlayStyle.ActiveColour,
+                EditOverlayStyle.ActiveFaceOpacity),
+            [0])
+        {
+            DepthBias = EditOverlayStyle.ActiveFaceDepthBias
+        };
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        var parameters = new CommonShaderParameters(
+            Matrix.Identity,
+            Matrix.Identity,
+            Vector3.Zero,
+            Vector3.Forward,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            [],
+            64,
+            64);
+
+        var selectedColour = DrawAndAverage(
+            device,
+            renderTarget,
+            parameters,
+            selected);
+        var activeColour = DrawAndAverage(
+            device,
+            renderTarget,
+            parameters,
+            selected,
+            active);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                activeColour.Z,
+                Is.GreaterThan(selectedColour.Z));
+            Assert.That(
+                activeColour.X - activeColour.Z,
+                Is.LessThan(
+                    selectedColour.X - selectedColour.Z));
+            Assert.That(
+                activeColour.W,
+                Is.GreaterThan(selectedColour.W));
+        });
+        mesh.Dispose();
+    }
+
+    [Test]
     public void Draw_SelectedFaceUsesTranslucentPremultipliedOrange()
     {
         var game = new WpfGameMock();
@@ -267,5 +353,48 @@ public class AnimatedSelectionOffscreenTests
         }
 
         return count;
+    }
+
+    private static Vector4 DrawAndAverage(
+        GraphicsDevice device,
+        RenderTarget2D renderTarget,
+        CommonShaderParameters parameters,
+        params AnimatedSelectionRenderItem[] layers)
+    {
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target | ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.BlendState = BlendState.Opaque;
+            device.DepthStencilState = DepthStencilState.Default;
+            device.RasterizerState = RasterizerState.CullNone;
+            foreach (var layer in layers)
+            {
+                layer.Draw(
+                    device,
+                    parameters,
+                    RenderingTechnique.Normal);
+            }
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[
+            renderTarget.Width * renderTarget.Height];
+        renderTarget.GetData(pixels);
+        var visible = pixels
+            .Where(pixel => pixel.A > 0)
+            .ToArray();
+        Assert.That(visible, Is.Not.Empty);
+        return visible.Aggregate(
+            Vector4.Zero,
+            (sum, pixel) => sum + pixel.ToVector4()) /
+            visible.Length;
     }
 }

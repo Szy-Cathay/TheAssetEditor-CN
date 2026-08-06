@@ -103,6 +103,51 @@ namespace Test.KitbashEditor
         }
 
         [Test]
+        public void MenuBar_ViewportShadingButtonsAreGroupedAndAccessible()
+        {
+            var document = XDocument.Load(GetRepositoryFilePath(
+                "Editors",
+                "Kitbashing",
+                "KitbasherEditor",
+                "Core",
+                "MenuBarViews",
+                "MenuBarView.xaml"));
+            XNamespace presentation =
+                "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+            var buttons = document
+                .Descendants(presentation + "RadioButton")
+                .Where(element =>
+                    (string?)element.Attribute("GroupName") ==
+                    "ViewportShading")
+                .ToList();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(buttons, Has.Count.EqualTo(3));
+                Assert.That(
+                    buttons.All(element =>
+                        (string?)element.Attribute("Focusable") ==
+                        "False"),
+                    Is.True);
+                Assert.That(
+                    buttons.All(element =>
+                        (string?)element.Attribute("ToolTip") ==
+                        (string?)element.Attribute(
+                            "AutomationProperties.Name")),
+                    Is.True);
+                Assert.That(
+                    buttons.Select(element =>
+                        (string?)element.Attribute("IsChecked")),
+                    Is.EquivalentTo(new[]
+                    {
+                        "{Binding ViewportShading.IsWireframe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}",
+                        "{Binding ViewportShading.IsSolid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}",
+                        "{Binding ViewportShading.IsMaterialPreview, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}",
+                    }));
+            });
+        }
+
+        [Test]
         public void MenuBar_FalloffInputAcceptsOnlyPositiveDecimals()
         {
             var document = XDocument.Load(GetRepositoryFilePath(

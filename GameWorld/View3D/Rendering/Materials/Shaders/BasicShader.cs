@@ -64,7 +64,11 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
 
         public bool SupportsTechnique(RenderingTechnique technique)
         {
-            var supported = new[] { RenderingTechnique.Normal };
+            var supported = new[]
+            {
+                RenderingTechnique.Normal,
+                RenderingTechnique.Solid
+            };
             if (supported.Contains(technique))
                 return true;
             return false;

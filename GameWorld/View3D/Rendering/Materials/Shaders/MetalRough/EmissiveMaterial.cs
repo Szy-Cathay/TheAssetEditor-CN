@@ -21,6 +21,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders.MetalRough
                 ];
 
             _renderingTechniqueMap[RenderingTechnique.Normal] = "BasicColorDrawing";
+            _renderingTechniqueMap[RenderingTechnique.Solid] = "SolidDrawing";
             _renderingTechniqueMap[RenderingTechnique.Emissive] = "GlowDrawing";
         }
 

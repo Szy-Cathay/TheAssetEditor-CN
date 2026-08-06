@@ -20,6 +20,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders.MetalRough
                 ];
 
             _renderingTechniqueMap[RenderingTechnique.Normal] = "BasicColorDrawing";
+            _renderingTechniqueMap[RenderingTechnique.Solid] = "SolidDrawing";
         }
 
         protected override void OnApply(Effect effect)

@@ -64,21 +64,18 @@ namespace GameWorld.Core.Rendering
         Matrix _overlayBoundsWorld = Matrix.Identity;
         internal int InstanceUploadCount { get; private set; }
 
-        // Colors - EXACT Blender match: unselected = black (visible via z-bias), selected = orange
-        // Blender theme: TH_VERTEX = 0x000000ff (black), TH_VERTEX_SELECT = 0xff7a00ff (orange)
-        Vector3 _selectedColour = new(1.0f, 0.47f, 0.0f);           // Orange (255, 122, 0)
-        Vector3 _deselectedColour = new(0.0f, 0.0f, 0.0f);          // Black (0, 0, 0)
+        readonly Vector3 _selectedColour =
+            EditOverlayStyle.SelectedColour;
+        readonly Vector3 _deselectedColour =
+            EditOverlayStyle.VertexColour;
 
-        // Screen-space vertex size in pixels (diameter) - EXACT Blender match
-        // Blender: sizes.vert = max(1.0, TH_VERTEX_SIZE * sqrt2 / 2) = ~2.12, then * 2.0 = 4.24 pixels
-        public float VertexPixelSize { get; set; } = 4.5f;
+        // Screen-space vertex diameter remains stable across mesh types.
+        public float VertexPixelSize { get; set; } =
+            EditOverlayStyle.VertexDiameter;
 
-        // Additional size boost for selected vertices (pixels added to diameter)
-        // Blender uses same base size, but we add slight boost for visibility
-        public float SelectedSizeBoost { get; set; } = 1.0f;
-
-        // Animated edit mode also shows a dense skinned wireframe, so its points need more separation.
-        const float AnimatedVertexSizeBoost = 1.5f;
+        // Selected vertices use colour, not size, for emphasis.
+        public float SelectedSizeBoost { get; set; } =
+            EditOverlayStyle.VertexSelectionDiameterBoost;
 
         // Selection threshold multiplier (selection radius = render radius * this)
         public float SelectionThresholdMultiplier { get; set; } = 2.0f;
@@ -179,7 +176,10 @@ namespace GameWorld.Core.Rendering
 
                 // Color based on selection weight
                 var weight = selectedVertexes.VertexWeights[i];
-                var color = Vector3.Lerp(_deselectedColour, _selectedColour, weight);
+                var color = GetVertexColour(
+                    i,
+                    weight,
+                    selectedVertexes);
 
                 _instanceData[i].InstancePosition = vertPos;
                 _instanceData[i].InstanceScale =
@@ -214,10 +214,10 @@ namespace GameWorld.Core.Rendering
                 min = Vector3.Min(min, vertPos);
                 max = Vector3.Max(max, vertPos);
                 var weight = selectedVertexes.VertexWeights[i];
-                var color = Vector3.Lerp(
-                    _deselectedColour,
-                    _selectedColour,
-                    weight);
+                var color = GetVertexColour(
+                    i,
+                    weight,
+                    selectedVertexes);
 
                 _instanceData[i].InstancePosition = vertPos;
                 _instanceData[i].InstanceScale =
@@ -249,17 +249,30 @@ namespace GameWorld.Core.Rendering
                     selectedVertexes.VertexWeights[i];
                 _instanceData[i].InstanceScale =
                     VertexPixelSize +
-                    AnimatedVertexSizeBoost +
                     weight * SelectedSizeBoost;
                 _instanceData[i].InstanceColor =
-                    Vector3.Lerp(
-                        _deselectedColour,
-                        _selectedColour,
-                        weight);
+                    GetVertexColour(
+                        i,
+                        weight,
+                        selectedVertexes);
                 _instanceData[i].InstanceWeight = weight;
             }
 
             UploadInstances();
+        }
+
+        Vector3 GetVertexColour(
+            int vertexIndex,
+            float selectionWeight,
+            VertexSelectionState selectionState)
+        {
+            if (selectionState.ActiveVertex == vertexIndex)
+                return EditOverlayStyle.ActiveColour;
+
+            return Vector3.Lerp(
+                _deselectedColour,
+                _selectedColour,
+                selectionWeight);
         }
 
         /// <summary>
