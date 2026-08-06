@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -348,8 +349,17 @@ public class UiDesignSystemResourceTests
             "## 7. 加载与真实进度",
             "OperationProgressWindowHost",
             "## 9. 架构边界",
-            "## 10. 新功能实施清单",
-            "## 11. 禁止项",
+            "## 10. Agent 公共组件复用协议",
+            "### 10.1 公共资源目录",
+            "### 10.2 强制搜索",
+            "### 10.3 复用决策",
+            "### 10.4 新公共组件准入",
+            "### 10.5 交付证据",
+            "UiCommonControlResourceTests",
+            "SharedUiArchitectureTests",
+            "未新增公共组件",
+            "## 11. 新功能实施清单",
+            "## 12. 禁止项",
         };
 
         foreach (var contract in requiredContracts)
@@ -359,6 +369,75 @@ public class UiDesignSystemResourceTests
                 Does.Contain(contract),
                 contract);
         }
+    }
+
+    [Test]
+    public void CanonicalUiStandard_CatalogsEveryPublicControlStyle()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var standard = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "docs",
+            "ui-design-system.md"));
+        string[] dictionaryPaths =
+        {
+            "Buttons.xaml",
+            "Inputs.xaml",
+            "Collections.xaml",
+            "MenusAndFeedback.xaml",
+        };
+        var internalKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "AeButton.KeyboardFocusVisual",
+            "AeButton.Base",
+            "AeMenu.TopLevelItemTemplate",
+            "AeMenu.SubmenuItemTemplate",
+        };
+        var publicKeys = dictionaryPaths
+            .SelectMany(path => Regex.Matches(
+                    File.ReadAllText(Path.Combine(
+                        solutionRoot,
+                        "AssetEditor",
+                        "Themes",
+                        "DesignSystem",
+                        "Controls",
+                        path)),
+                    "x:Key=\"(?<key>Ae[^\"]+)\"")
+                .Cast<Match>()
+                .Select(match => match.Groups["key"].Value))
+            .Where(key => !internalKeys.Contains(key))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(key => key)
+            .ToArray();
+
+        foreach (var key in publicKeys)
+        {
+            NUnitAssert.That(
+                standard,
+                Does.Contain($"`{key}`"),
+                key);
+        }
+    }
+
+    [Test]
+    public void RepositoryInstructions_RequireCanonicalUiReuseProtocol()
+    {
+        var instructions = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "AGENTS.md"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                instructions,
+                Does.Contain("docs/ui-design-system.md"));
+            NUnitAssert.That(
+                instructions,
+                Does.Contain("Agent 公共组件复用协议"));
+            NUnitAssert.That(
+                instructions,
+                Does.Contain("先搜索、再复用"));
+        });
     }
 
     private static string FindSolutionRoot()

@@ -217,7 +217,78 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - 公共控件消费应用提供的 `AeBrush.*`、字体和设计变量；WPF 测试统一使用 `WpfTestApplicationHost`。
 - 不全局启用会替换所有 WPF 模板的第三方 StyleDictionary；第三方库只用于明确、局部、可验证的能力。
 
-## 10. 新功能实施清单
+## 10. Agent 公共组件复用协议
+
+本章是所有新增功能、修改控件和 UI 调整任务的强制入口。Agent 不得仅凭记忆判断“项目里没有现成控件”，必须先完成搜索、复用判断和证据记录。
+
+### 10.1 公共资源目录
+
+| 能力 | 文件 | 公开入口 |
+| --- | --- | --- |
+| 按钮 | `AssetEditor/Themes/DesignSystem/Controls/Buttons.xaml` | `AeButton.Primary`、`AeButton.Secondary`、`AeButton.Quiet`、`AeButton.Danger`、`AeButton.Icon`、`AeButton.DropdownArrow`、`AeButton.VisibilityToggle` |
+| 输入与表单 | `AssetEditor/Themes/DesignSystem/Controls/Inputs.xaml` | `AeInput.TextBox`、`AeInput.ComboBox`、`AeInput.CheckBox`、`AeInput.RadioButton`、`AeInput.Switch`、`AeInput.ExpandableField`、`AeForm.Label`、`AeForm.TextLabel`、`AeValidation.Message` |
+| 集合控件 | `AssetEditor/Themes/DesignSystem/Controls/Collections.xaml` | `AeTab.Item`、`AeTag.Container`、`AeTag.Text`、`AeTree.View`、`AeTree.Item`、`AeList.View`、`AeList.Item`、`AeTable.Grid`、`AeTable.Header`、`AeTable.Row`、`AeTable.Cell` |
+| 菜单与反馈 | `AssetEditor/Themes/DesignSystem/Controls/MenusAndFeedback.xaml` | `AeMenu.Bar`、`AeMenu.Item`、`AeMenu.Context`、`AeToolTip`、`AeFeedback.Notice`、`AeFeedback.Icon`、`AeFeedback.SuccessIcon`、`AeFeedback.WarningIcon`、`AeFeedback.DangerIcon`、`AeEmptyState.Panel`、`AeEmptyState.Title`、`AeEmptyState.Description`、`AeProgress.Bar`、`AeScrollBar.Compact` |
+| 变量、文字与表面 | `AssetEditor/Themes/DesignSystem/DesignTokens.xaml`、`Typography.xaml`、`SurfaceStyles.xaml` | `AeSpace.*`、`AeSize.*`、`AeRadius.*`、`AeMotion.*`、`AeText.*`、`AeSurface.*` |
+| 主窗口工作区 | `AssetEditor/Themes/DesignSystem/Shell.xaml` | `AeShell.*` |
+| 设置与标准工作流 | `AssetEditor/Themes/DesignSystem/Workflows.xaml` | `AeWorkflow.*` |
+| 编辑器按钮与播放器 | `Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml` | `AeEditor.ToggleIcon`、`AeEditor.PlaybackToggle` |
+| 分隔条 | `Shared/SharedUI/Common/Styles/GridSplitterStyles.xaml` | `AeVerticalGridSplitterStyle`、`AeHorizontalGridSplitterStyle` |
+| 统一窗口 | `Shared/SharedUI/Common/AssetEditorWindow.cs` | `AssetEditorWindow` 与 `CustomWindowStyle` |
+| 标准消息 | `Shared/SharedCore/Services/IStandardDialogs.cs`、`Shared/SharedUI/BaseDialogs/StandardDialog/` | `IStandardDialogs`、`UnifiedMessageBox`、`MessageDialogWindow` |
+| 长操作进度 | `Shared/SharedUI/Common/OperationProgress/` | `OperationProgressWindowHost`、`OperationProgressWindow` |
+
+`AssetEditor/Themes/Controls.xaml` 是旧模板和第三方控件的兼容层，不是新增公共 UI 的首选入口。只有目录中没有对应能力且现有兼容模板确实无法组合时，才考虑扩展设计系统。
+
+### 10.2 强制搜索
+
+开始编辑前，Agent 至少执行以下搜索，并查看两个最接近当前需求的真实用例：
+
+```powershell
+rg -n 'x:Key="Ae|AssetEditorWindow|OperationProgressWindowHost|IStandardDialogs' AssetEditor Shared Editors GameWorld
+rg -n 'AeButton\.|AeInput\.|AeForm\.|AeTree\.|AeList\.|AeTable\.|AeWorkflow\.|AeEditor\.' AssetEditor Shared Editors GameWorld
+rg -n '<(Button|ToggleButton|TextBox|ComboBox|TreeView|DataGrid|ProgressBar)\b' AssetEditor Shared Editors GameWorld --glob '*.xaml'
+```
+
+搜索目标不是找到相同名称，而是确认：已有语义样式、相同状态组合、相同窗口类型、相同业务交互以及相邻模块的成熟实现。未执行搜索不能声称“需要新控件”。
+
+### 10.3 复用决策
+
+严格按以下顺序决策，命中后停止，不继续扩大实现：
+
+1. **直接复用**：已有公开样式或公共组件能够表达需求，直接引用并保留原 Binding、Command 和状态。
+2. **组合复用**：单个样式不够时，使用现有布局容器、语义样式和公共行为组合，不复制 ControlTemplate。
+3. **业务局部样式**：只有单个编辑器需要特殊排列时，在编辑器目录新增基于公开 `Ae*` 样式的局部样式；不得反向放入 `Shared.Ui`。
+4. **扩展公共样式**：至少两个独立模块存在同一无业务含义需求，且组合现有能力仍会造成实质重复时，才允许扩展设计系统或 `Shared.Ui`。
+
+不得为了改一个 Margin、宽度、文案、图标或业务状态创建新的公共控件。不得给现有公开样式换一个近义名称后复制模板。
+
+### 10.4 新公共组件准入
+
+新增或扩展公共组件必须同时满足并完成以下事项：
+
+- 提供搜索证据，说明现有组件为什么无法直接复用或组合。
+- 无业务名称、无具体编辑器依赖，并确认至少两个真实调用方。
+- 使用现有 `AeBrush.*`、`AeText.*`、`AeSize.*`、`AeRadius.*` 和 `AeMotion.*`，不另建平行变量体系。
+- 在对应设计系统资源文件中实现，并把公开键加入本章目录。
+- 更新 `UiCommonControlResourceTests` 的公开样式契约，并覆盖默认、悬停、按下、禁用、选中等实际状态。
+- 在 Dark、Light、HighContrastDark、HighContrastLight 中实例化或渲染验证。
+- 保持 `Shared.Ui` 依赖边界，通过 `SharedUiArchitectureTests`。
+
+只增加业务页面、不增加公共能力时，不得修改公共组件目录或创建新的全局资源字典。
+
+### 10.5 交付证据
+
+每个 UI 任务的最终回复必须简短说明：
+
+- 复用了哪些现有资源、组件和参考用例；
+- 是否新增公共组件；如果新增，列出两个真实调用方和无法组合复用的原因；
+- 修改了哪些业务 UI，哪些 Binding、Command 和业务语义保持不变；
+- 实际执行的主题、架构、构建、测试和人工验收范围。
+
+没有新增公共组件时，也必须明确写出“未新增公共组件”，防止复制模板或局部控件被误报为复用。
+
+## 11. 新功能实施清单
 
 新增或修改 UI 时按以下顺序执行：
 
@@ -230,7 +301,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 7. 运行受影响项目 Release 构建、相关测试和 `git diff --check`；跨模块 UI 变更执行完整 Release 构建与完整测试。
 8. 交给用户在真实应用中完成主题、DPI、字体、窗口尺寸和交互验收。
 
-## 11. 禁止项
+## 12. 禁止项
 
 - 禁止新增固定主题色、固定字体族、任意字号、任意行高和未登记的间距尺度。
 - 禁止用字体字符或 Emoji 代替图标。
