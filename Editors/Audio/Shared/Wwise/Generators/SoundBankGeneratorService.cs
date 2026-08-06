@@ -219,6 +219,17 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 return false;
             }
 
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Merge.Analysing",
+                soundBankSuffix,
+                moddedSoundBanks.Count,
+                moddedSoundBanks.Count));
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Merge.Creating",
+                soundBankSuffix,
+                0,
+                0));
+
             var outputs = await Task.Run(
                 () => CreateMergedDialogueEventSoundBankOutputs(
                     moddedSoundBanks,
@@ -227,11 +238,6 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
-            progress?.Report(new AudioOperationProgress(
-                "AudioOperation.Merge.Analysing",
-                soundBankSuffix,
-                moddedSoundBanks.Count,
-                moddedSoundBanks.Count));
             progress?.Report(new AudioOperationProgress(
                 "AudioOperation.Merge.Creating",
                 soundBankSuffix,

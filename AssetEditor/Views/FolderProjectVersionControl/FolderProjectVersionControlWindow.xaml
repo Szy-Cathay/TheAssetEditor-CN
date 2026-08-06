@@ -58,13 +58,16 @@
                     ItemsSource="{Binding MergeSources}"
                     SelectedItem="{Binding SelectedMergeSource}" />
             </StackPanel>
-            <TextBlock
+            <Path
                 Grid.Column="1"
                 Margin="0,23,0,0"
+                Width="12"
+                Height="10"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Foreground="{DynamicResource AeBrush.TextMuted}"
-                Text="→" />
+                Data="M 1,5 H 11 M 8,2 L 11,5 L 8,8"
+                Stroke="{DynamicResource AeBrush.TextMuted}"
+                StrokeThickness="1.25" />
             <StackPanel Grid.Column="2">
                 <TextBlock
                     Margin="0,0,0,5"

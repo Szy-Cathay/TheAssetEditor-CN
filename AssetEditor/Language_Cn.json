@@ -284,6 +284,7 @@
   "FolderProject.VersionControl.SwitchChoice.Carry": "保留更改并切换",
   "FolderProject.VersionControl.SwitchChoice.Stash": "储藏更改并切换",
   "FolderProject.VersionControl.SwitchChoice.Discard": "放弃更改并切换",
+  "FolderProject.VersionControl.BranchSwitch.PendingPrefix": "切换到 ",
   "FolderProject.VersionControl.PrepareMerge": "合并所选分支",
   "FolderProject.VersionControl.BranchHint.Select": "请选择一个分支。",
   "FolderProject.VersionControl.BranchHint.Current": "这是当前分支。合并时默认把它的更改合并到“{0}”，也可以在合并页更改目标分支。",
@@ -1838,6 +1839,7 @@
 
   "Chrome.Minimise": "最小化",
   "Chrome.Maximise": "最大化",
+  "Chrome.MaximiseRestore": "最大化或还原",
   "Chrome.Close": "关闭",
 
   "ContextMenu.Save": "保存",
@@ -1877,6 +1879,11 @@
 
   "TextureEditor.ImageDetails": "贴图详情",
   "TextureEditor.ImagePath": "贴图路径",
+  "TextureEditor.UvChannels": "UV 通道",
+  "TextureEditor.Format": "格式",
+  "TextureEditor.Width": "宽度",
+  "TextureEditor.Height": "高度",
+  "TextureEditor.MipMapCount": "Mipmap 数量",
 
   "ShaderTexture.ApplyTexture": "渲染时应用贴图",
   "ShaderTexture.RemoveTexture": "移除贴图并替换为默认遮罩",

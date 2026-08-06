@@ -10,6 +10,7 @@
     xmlns:Models="clr-namespace:Editors.Audio.AudioEditor.Presentation.Shared.Models" 
     xmlns:AudioProjectExplorer="clr-namespace:Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
     d:DataContext="{d:DesignInstance Type=AudioProjectExplorer:AudioProjectExplorerViewModel}"
     mc:Ignorable="d" 
     Background="{DynamicResource AeBrush.Canvas}"
@@ -254,8 +255,9 @@
                             VerticalAlignment="Center"
                             Style="{StaticResource AeButton.Icon}"
                             Click="ClearButtonClick" 
-                            Command="{Binding ResetSearchQueryCommand}"
-                            Content="×" />
+                            Command="{Binding ResetSearchQueryCommand}">
+                            <materialIcons:MaterialIcon Width="14" Height="14" Kind="Close" />
+                        </Button>
                     </Grid>
                 </Border>
             </Grid>

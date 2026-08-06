@@ -1,4 +1,3 @@
-﻿using System.Windows;
 using Shared.Core.Services;
 
 namespace Shared.Core.PackFiles.Utility
@@ -25,8 +24,8 @@ namespace Shared.Core.PackFiles.Utility
                     "Msg.DuplicateFile",
                     fileName),
                 "DuplicateFile",
-                MessageBoxButton.YesNo);
-            return res == MessageBoxResult.Yes;
+                UiMessageBoxButtonSet.YesNo);
+            return res == UiMessageBoxResult.Yes;
         }
     }
 }

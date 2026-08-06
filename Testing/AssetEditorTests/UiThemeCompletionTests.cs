@@ -297,16 +297,45 @@ public class UiThemeCompletionTests
     }
 
     [Test]
-    public void MigrationLedger_HasNoUnreviewedRows()
+    public void CanonicalUiStandard_ReplacesTemporaryMigrationDocuments()
     {
-        var ledger = File.ReadAllText(IOPath.Combine(
-            FindSolutionRoot(),
+        var solutionRoot = FindSolutionRoot();
+        var standard = IOPath.Combine(
+            solutionRoot,
             "docs",
-            "superpowers",
-            "plans",
-            "ae-ui-migration-ledger.md"));
+            "ui-design-system.md");
+        string[] temporaryDocuments =
+        {
+            "docs/superpowers/specs/2026-08-05-ae-ui-design-system-design.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-common-controls.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-common-workflows.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-editor-animation-metadata.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-editor-audio.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-editor-model-kitbash.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-editor-remaining.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-foundation.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-main-shell.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-pack-git-workspace.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-redesign-roadmap.md",
+            "docs/superpowers/plans/2026-08-05-ae-ui-theme-legacy-cleanup.md",
+            "docs/superpowers/plans/ae-ui-migration-ledger.md",
+        };
 
-        NUnitAssert.That(ledger, Does.Not.Contain("| Unreviewed |"));
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(File.Exists(standard), Is.True);
+            foreach (var relativePath in temporaryDocuments)
+            {
+                NUnitAssert.That(
+                    File.Exists(IOPath.Combine(
+                        solutionRoot,
+                        relativePath.Replace(
+                            '/',
+                            IOPath.DirectorySeparatorChar))),
+                    Is.False,
+                    relativePath);
+            }
+        });
     }
 
     private static ResourceDictionary LoadTheme(ThemeType theme) => new()

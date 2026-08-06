@@ -626,7 +626,7 @@
                         FontSize="16"
                         FontWeight="SemiBold"
                         TextWrapping="Wrap">
-                        <Run Text="切换到 " /><Run Text="{Binding VersionControl.PendingBranchName}" />
+                        <Run Text="{loc:Loc FolderProject.VersionControl.BranchSwitch.PendingPrefix}" /><Run Text="{Binding VersionControl.PendingBranchName}" />
                     </TextBlock>
                     <Button
                         Height="34"
@@ -652,7 +652,7 @@
                     <Button
                         HorizontalAlignment="Right"
                         Command="{Binding VersionControl.CancelBranchSwitchCommand}"
-                        Content="取消"
+                        Content="{loc:Loc General.Cancel}"
                         Style="{StaticResource AeButton.Quiet}" />
                 </StackPanel>
             </Border>

@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:CommonControls.Editors.TextEditor"
              xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit" 
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:texteditor="clr-namespace:Shared.Ui.Editors.TextEditor"
             xmlns:resources="clr-namespace:Shared.EmbeddedResources;assembly=Shared.EmbeddedResources"
              mc:Ignorable="d"
@@ -32,7 +33,7 @@
                     </Style.Triggers>
                 </Style>
             </ToolBar.Resources>
-            <Button Style="{StaticResource AeButton.Icon}" ToolTip="保存" Command="{Binding SaveCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+            <Button Style="{StaticResource AeButton.Icon}" ToolTip="{loc:Loc General.Save}" Command="{Binding SaveCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                 <Image Height="16"  Source="{Binding Source={x:Static resources:IconLibrary.SaveFileIcon}}"/>
             </Button>
             <Separator/>

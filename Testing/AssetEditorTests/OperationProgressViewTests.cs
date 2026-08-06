@@ -103,6 +103,31 @@ public class OperationProgressViewTests
     }
 
     [Test]
+    public void SoundBankGeneration_ReportsCreatingBeforeExpensiveWork()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "Editors",
+            "Audio",
+            "Shared",
+            "Wwise",
+            "Generators",
+            "SoundBankGeneratorService.cs"));
+        var methodStart = source.IndexOf(
+            "public async Task<bool> GenerateMergedDialogueEventSoundBanksAsync",
+            StringComparison.Ordinal);
+        var methodSource = source[methodStart..];
+
+        Assert.That(
+            methodSource.IndexOf(
+                "\"AudioOperation.Merge.Creating\"",
+                StringComparison.Ordinal),
+            Is.LessThan(methodSource.IndexOf(
+                "CreateMergedDialogueEventSoundBankOutputs(",
+                StringComparison.Ordinal)));
+    }
+
+    [Test]
     public void BoundProgressValues_UpdateSummaryImmediately()
     {
         InvokeWithWpfApplication(() =>

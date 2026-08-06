@@ -99,6 +99,41 @@ public class UiFoundationWindowTests
             });
     }
 
+    [TestCase(MessageBoxImage.None, false)]
+    [TestCase(MessageBoxImage.Error, true)]
+    [TestCase(MessageBoxImage.Warning, true)]
+    [TestCase(MessageBoxImage.Question, true)]
+    [TestCase(MessageBoxImage.Information, true)]
+    public void MessageDialog_PreservesSemanticImage(
+        MessageBoxImage image,
+        bool expectedIconVisibility)
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var dialog = new MessageDialogWindow(
+                    "测试标题",
+                    "测试内容",
+                    MessageDialogButtonSet.Ok,
+                    image);
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(dialog.MessageImage, Is.EqualTo(image));
+                    NUnitAssert.That(
+                        dialog.IsMessageIconVisible,
+                        Is.EqualTo(expectedIconVisibility));
+                });
+
+                dialog.Close();
+            });
+    }
+
     [Test]
     public void StandardDialogs_DoNotFallBackToWindowsMessageBox()
     {

@@ -118,6 +118,7 @@
                 VerticalAlignment="Center">
                 <progress:OperationProgressWindowHost
                     CancelCommand="{Binding LoadAudioProjectCancelCommand}"
+                    CancelText="{loc:Loc General.Cancel}"
                     CurrentDetailText="{Binding OperationDetail}"
                     IsOperationActive="{Binding IsLoading}"
                     IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
@@ -127,6 +128,7 @@
                     WindowTitle="{loc:Loc OperationProgress.AudioLoad}" />
                 <progress:OperationProgressWindowHost
                     CancelCommand="{Binding CompileAudioProjectCancelCommand}"
+                    CancelText="{loc:Loc General.Cancel}"
                     CurrentDetailText="{Binding OperationDetail}"
                     IsOperationActive="{Binding IsCompiling}"
                     IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"

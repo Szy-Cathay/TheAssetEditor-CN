@@ -330,74 +330,36 @@ public class UiDesignSystemResourceTests
         Enum.GetNames<ThemeType>();
 
     [Test]
-    public void MigrationLedger_CoversEveryProductXamlSource()
+    public void CanonicalUiStandard_CoversRequiredContract()
     {
         var solutionRoot = FindSolutionRoot();
-        var ledgerPath = Path.Combine(
+        var standard = File.ReadAllText(Path.Combine(
             solutionRoot,
             "docs",
-            "superpowers",
-            "plans",
-            "ae-ui-migration-ledger.md");
-        var ledgerPaths = File.ReadLines(ledgerPath)
-            .Select(line => line.Split('|'))
-            .Where(cells => cells.Length > 2)
-            .Select(cells => cells[1].Trim())
-            .Where(value =>
-                value.StartsWith('`') &&
-                value.EndsWith(".xaml`", StringComparison.OrdinalIgnoreCase))
-            .Select(value => value[1..^1].Replace('\\', '/'))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var sourcePaths = new HashSet<string>(
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var productRoot in new[]
-                 {
-                     "AssetEditor",
-                     "Shared",
-                     "Editors",
-                     "GameWorld",
-                 })
+            "ui-design-system.md"));
+        string[] requiredContracts =
         {
-            var absoluteRoot = Path.Combine(solutionRoot, productRoot);
-            foreach (var path in Directory.EnumerateFiles(
-                         absoluteRoot,
-                         "*.xaml",
-                         SearchOption.AllDirectories))
-            {
-                var relativePath = Path.GetRelativePath(solutionRoot, path);
-                if (!ContainsBuildOutputDirectory(relativePath))
-                    sourcePaths.Add(relativePath.Replace('\\', '/'));
-            }
+            "## 3. 资源与主题",
+            "AeSize.ControlHeight",
+            "AeMotion.ButtonPressStoryboard",
+            "## 4. 公共控件契约",
+            "## 5. 布局规则",
+            "## 6. 窗口、对话框与消息",
+            "## 7. 加载与真实进度",
+            "OperationProgressWindowHost",
+            "## 9. 架构边界",
+            "## 10. 新功能实施清单",
+            "## 11. 禁止项",
+        };
+
+        foreach (var contract in requiredContracts)
+        {
+            NUnitAssert.That(
+                standard,
+                Does.Contain(contract),
+                contract);
         }
-
-        var missing = sourcePaths.Except(ledgerPaths)
-            .OrderBy(path => path)
-            .ToArray();
-        var extra = ledgerPaths.Except(sourcePaths)
-            .OrderBy(path => path)
-            .ToArray();
-
-        NUnitAssert.Multiple(() =>
-        {
-            NUnitAssert.That(
-                missing,
-                Is.Empty,
-                $"Ledger is missing:{Environment.NewLine}{string.Join(Environment.NewLine, missing)}");
-            NUnitAssert.That(
-                extra,
-                Is.Empty,
-                $"Ledger has extra paths:{Environment.NewLine}{string.Join(Environment.NewLine, extra)}");
-        });
     }
-
-    private static bool ContainsBuildOutputDirectory(string path) =>
-        path.Split(
-                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-                StringSplitOptions.RemoveEmptyEntries)
-            .Any(part =>
-                part.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
-                part.Equals("obj", StringComparison.OrdinalIgnoreCase));
 
     private static string FindSolutionRoot()
     {

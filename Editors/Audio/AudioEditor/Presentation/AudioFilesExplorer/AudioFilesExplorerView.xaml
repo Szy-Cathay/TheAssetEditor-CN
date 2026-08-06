@@ -9,6 +9,7 @@
     xmlns:Controls="clr-namespace:Editors.Audio.AudioEditor.Presentation.Shared.Controls"
     xmlns:AudioFilesExplorer="clr-namespace:Editors.Audio.AudioEditor.Presentation.AudioFilesExplorer"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
     d:DataContext="{d:DesignInstance Type=AudioFilesExplorer:AudioFilesExplorerViewModel}"
     mc:Ignorable="d"
     Background="{DynamicResource AeBrush.Canvas}"
@@ -135,8 +136,9 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource AeButton.Icon}"
                         Click="OnClearButtonClick" 
-                        Command="{Binding ClearTextCommand}"
-                        Content="×" />
+                        Command="{Binding ClearTextCommand}">
+                        <materialIcons:MaterialIcon Width="14" Height="14" Kind="Close" />
+                    </Button>
                 </Grid>
             </Border>
         </Grid>

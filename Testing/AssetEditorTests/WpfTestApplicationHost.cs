@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
+using Shared.Core.Services;
 using Shared.Ui.Common;
 using Shared.Ui.Common.ValueConverters;
 
@@ -30,7 +31,8 @@ internal static class WpfTestApplicationHost
         EnsureStarted();
         _dispatcher!.Invoke(() =>
         {
-            _application!.ServiceProvider = serviceProvider;
+            _application!.ServiceProvider =
+                new TestServiceProvider(serviceProvider);
             _application.EnsureThemeResources();
             action();
         });
@@ -143,5 +145,30 @@ internal static class WpfTestApplicationHost
         public static EmptyServiceProvider Instance { get; } = new();
 
         public object? GetService(Type serviceType) => null;
+    }
+
+    private sealed class TestServiceProvider : IServiceProvider
+    {
+        private static readonly LocalizationManager Localization =
+            CreateLocalizationManager();
+        private readonly IServiceProvider _inner;
+
+        public TestServiceProvider(IServiceProvider inner)
+        {
+            _inner = inner;
+        }
+
+        public object? GetService(Type serviceType) =>
+            _inner.GetService(serviceType) ??
+            (serviceType == typeof(LocalizationManager)
+                ? Localization
+                : null);
+
+        private static LocalizationManager CreateLocalizationManager()
+        {
+            var localization = new LocalizationManager();
+            localization.LoadLanguage();
+            return localization;
+        }
     }
 }

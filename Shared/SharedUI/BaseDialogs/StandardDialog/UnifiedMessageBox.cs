@@ -10,6 +10,27 @@ namespace Shared.Ui.BaseDialogs.StandardDialog;
 
 public static class UnifiedMessageBox
 {
+    public static UiMessageBoxResult Show(
+        string message,
+        string title,
+        UiMessageBoxButtonSet buttons,
+        UiMessageBoxIcon image)
+    {
+        var result = Show(
+            message,
+            title,
+            ToWpfButton(buttons),
+            ToWpfImage(image));
+        return result switch
+        {
+            MessageBoxResult.OK => UiMessageBoxResult.Ok,
+            MessageBoxResult.Cancel => UiMessageBoxResult.Cancel,
+            MessageBoxResult.Yes => UiMessageBoxResult.Yes,
+            MessageBoxResult.No => UiMessageBoxResult.No,
+            _ => UiMessageBoxResult.None,
+        };
+    }
+
     public static MessageBoxResult Show(string message) =>
         Show(message, string.Empty);
 
@@ -48,7 +69,8 @@ public static class UnifiedMessageBox
         var dialog = new MessageDialogWindow(
             title,
             message,
-            ToButtonSet(buttons));
+            ToButtonSet(buttons),
+            image);
         var owner = application.Windows
             .OfType<Window>()
             .FirstOrDefault(window => window.IsActive) ??
@@ -89,6 +111,25 @@ public static class UnifiedMessageBox
             MessageBoxButton.YesNoCancel =>
                 MessageDialogButtonSet.YesNoCancel,
             _ => MessageDialogButtonSet.Ok,
+        };
+
+    private static MessageBoxButton ToWpfButton(
+        UiMessageBoxButtonSet buttons) => buttons switch
+        {
+            UiMessageBoxButtonSet.OkCancel => MessageBoxButton.OKCancel,
+            UiMessageBoxButtonSet.YesNo => MessageBoxButton.YesNo,
+            UiMessageBoxButtonSet.YesNoCancel => MessageBoxButton.YesNoCancel,
+            _ => MessageBoxButton.OK,
+        };
+
+    private static MessageBoxImage ToWpfImage(
+        UiMessageBoxIcon icon) => icon switch
+        {
+            UiMessageBoxIcon.Error => MessageBoxImage.Error,
+            UiMessageBoxIcon.Warning => MessageBoxImage.Warning,
+            UiMessageBoxIcon.Question => MessageBoxImage.Question,
+            UiMessageBoxIcon.Information => MessageBoxImage.Information,
+            _ => MessageBoxImage.None,
         };
 
     private static MessageBoxImage ToImage(MessageBoxIcon icon) =>

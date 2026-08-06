@@ -66,7 +66,7 @@ public sealed class OperationProgressWindowHost : FrameworkElement
             nameof(CancelText),
             typeof(string),
             typeof(OperationProgressWindowHost),
-            new PropertyMetadata("取消"));
+            new PropertyMetadata(string.Empty));
 
     private OperationProgressWindow? _window;
     private readonly OperationProgressVisibilityController

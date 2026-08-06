@@ -1,46 +1,78 @@
-using System.Windows;
-
 namespace Shared.Core.Services;
+
+public enum UiMessageBoxButtonSet
+{
+    Ok,
+    OkCancel,
+    YesNo,
+    YesNoCancel,
+}
+
+public enum UiMessageBoxIcon
+{
+    None,
+    Error,
+    Warning,
+    Question,
+    Information,
+}
+
+public enum UiMessageBoxResult
+{
+    None,
+    Ok,
+    Cancel,
+    Yes,
+    No,
+}
 
 public static class UiMessageBoxBridge
 {
     private static Func<
         string,
         string,
-        MessageBoxButton,
-        MessageBoxImage,
-        MessageBoxResult>? _show;
+        UiMessageBoxButtonSet,
+        UiMessageBoxIcon,
+        UiMessageBoxResult>? _show;
 
     public static void Configure(
         Func<
             string,
             string,
-            MessageBoxButton,
-            MessageBoxImage,
-            MessageBoxResult> show)
+            UiMessageBoxButtonSet,
+            UiMessageBoxIcon,
+            UiMessageBoxResult> show)
     {
         _show = show;
     }
 
-    public static MessageBoxResult Show(string message) =>
+    public static UiMessageBoxResult Show(string message) =>
         Show(message, string.Empty);
 
-    public static MessageBoxResult Show(string message, string title) =>
-        Show(message, title, MessageBoxButton.OK);
+    public static UiMessageBoxResult Show(string message, string title) =>
+        Show(message, title, UiMessageBoxButtonSet.Ok);
 
-    public static MessageBoxResult Show(
+    public static UiMessageBoxResult Show(
         string message,
         string title,
-        MessageBoxButton buttons) =>
-        Show(message, title, buttons, MessageBoxImage.None);
+        UiMessageBoxButtonSet buttons) =>
+        Show(message, title, buttons, UiMessageBoxIcon.None);
 
-    public static MessageBoxResult Show(
+    public static UiMessageBoxResult Show(
         string message,
         string title,
-        MessageBoxButton buttons,
-        MessageBoxImage image)
+        UiMessageBoxButtonSet buttons,
+        UiMessageBoxIcon image)
     {
         return _show?.Invoke(message, title, buttons, image) ??
-               MessageBox.Show(message, title, buttons, image);
+               GetFallbackResult(buttons);
     }
+
+    private static UiMessageBoxResult GetFallbackResult(
+        UiMessageBoxButtonSet buttons) => buttons switch
+        {
+            UiMessageBoxButtonSet.Ok => UiMessageBoxResult.Ok,
+            UiMessageBoxButtonSet.YesNo => UiMessageBoxResult.No,
+            _ => UiMessageBoxResult.Cancel,
+        };
 }
