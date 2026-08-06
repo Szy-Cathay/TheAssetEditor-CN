@@ -45,6 +45,9 @@
                 <MenuItem Header="{loc:Loc EditorHost.Menu.FocusSelection}" Command="{Binding FocusCameraCommand}"/>
                 <MenuItem Header="{loc:Loc EditorHost.Menu.Reset}" Command="{Binding ResetCameraCommand}"/>
             </MenuItem>
+            <MenuItem
+                Header="{loc:Loc FactionTint.Menu}"
+                Command="{Binding OpenFactionColourSettingsCommand}" />
         </Menu>
 
         <ContentControl Grid.Row="2" Grid.Column="0" Content="{Binding GameWorld, Mode=OneTime}"/>

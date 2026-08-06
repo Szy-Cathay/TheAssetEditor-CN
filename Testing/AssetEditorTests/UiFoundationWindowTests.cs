@@ -43,11 +43,19 @@ public class UiFoundationWindowTests
                     DarkTitleBarHelper.Enable(window);
                     window.Show();
 
-                    NUnitAssert.That(ReadDarkTitleBar(window), Is.EqualTo(1));
+                    if (!TryReadDarkTitleBar(window, out var darkValue))
+                    {
+                        NUnitAssert.Ignore(
+                            "This Windows build does not support the optional immersive dark title-bar attribute.");
+                    }
+                    NUnitAssert.That(darkValue, Is.EqualTo(1));
 
                     ThemesController.SetTheme(ThemeType.LightTheme);
 
-                    NUnitAssert.That(ReadDarkTitleBar(window), Is.EqualTo(0));
+                    NUnitAssert.That(
+                        TryReadDarkTitleBar(window, out var lightValue),
+                        Is.True);
+                    NUnitAssert.That(lightValue, Is.EqualTo(0));
                 }
                 finally
                 {
@@ -97,6 +105,30 @@ public class UiFoundationWindowTests
 
                 dialog.Close();
             });
+    }
+
+    [Test]
+    public void UnsupportedDarkTitleBarAttribute_DoesNotThrow()
+    {
+        var invoked = false;
+
+        var result = DarkTitleBarHelper.TrySetImmersiveDarkMode(
+            new IntPtr(1),
+            1,
+            (IntPtr handle,
+                int attribute,
+                ref int value,
+                int size) =>
+            {
+                invoked = true;
+                return unchecked((int)0x80070057);
+            });
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(invoked, Is.True);
+            NUnitAssert.That(result, Is.False);
+        });
     }
 
     [TestCase(MessageBoxImage.None, false)]
@@ -228,16 +260,17 @@ public class UiFoundationWindowTests
             "Native Windows MessageBox calls bypass the unified dialog.");
     }
 
-    private static int ReadDarkTitleBar(Window window)
+    private static bool TryReadDarkTitleBar(
+        Window window,
+        out int value)
     {
-        var value = 0;
+        value = 0;
         var result = DwmGetWindowAttribute(
             new WindowInteropHelper(window).Handle,
             DwmwaUseImmersiveDarkMode,
             ref value,
             sizeof(int));
-        NUnitAssert.That(result, Is.EqualTo(0));
-        return value;
+        return result >= 0;
     }
 
     private static string FindSolutionRoot()

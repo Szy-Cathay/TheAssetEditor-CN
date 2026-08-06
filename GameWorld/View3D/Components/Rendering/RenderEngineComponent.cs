@@ -61,7 +61,7 @@ namespace GameWorld.Core.Components.Rendering
         public SpriteFont ViewportOverlayFont { get; private set; }
 
         private ViewportShadingMode _shadingMode =
-            ViewportShadingMode.Solid;
+            ViewportShadingMode.MaterialPreview;
 
         public event Action<ViewportShadingMode>? ShadingModeChanged;
 

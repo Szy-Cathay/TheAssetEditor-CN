@@ -1,12 +1,15 @@
 ﻿using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Editors.Twui.Editor.ComponentEditor;
 using Editors.Twui.Editor.Rendering;
+using GameWorld.Core.WpfWindow.FactionColourSettings;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
+using System.Windows.Input;
 
 namespace Editors.Twui.Editor
 {
@@ -24,14 +27,23 @@ namespace Editors.Twui.Editor
         [ObservableProperty] ComponentManger _componentManager;
         [ObservableProperty] IWpfGame _scene;
         private readonly IPackFileService _packFileService;
+        public ICommand OpenFactionColourSettingsCommand { get; }
 
-        public TwuiEditor(IEventHub eventHub, ComponentManger componentEditor, TwuiRenderComponent renderComponent, IWpfGame wpfGame, IPackFileService packFileService)
+        public TwuiEditor(
+            IEventHub eventHub,
+            ComponentManger componentEditor,
+            TwuiRenderComponent renderComponent,
+            IWpfGame wpfGame,
+            IPackFileService packFileService,
+            IFactionColourSettingsDialogService factionColourSettingsDialog)
         {
             _eventHub = eventHub;
             _componentManager = componentEditor;
             _renderComponent = renderComponent;
             _scene = wpfGame;
             _packFileService = packFileService;
+            OpenFactionColourSettingsCommand = new RelayCommand(
+                factionColourSettingsDialog.ShowDialog);
             wpfGame.ForceEnsureCreated();
             renderComponent.Initialize();
 

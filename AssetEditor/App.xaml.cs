@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -47,6 +48,7 @@ namespace AssetEditor
 
             var forceValidateServiceScopes = Debugger.IsAttached;
             _serviceProvider = new DependencyInjectionConfig().Build(forceValidateServiceScopes);
+            LogRuntimeEnvironment();
 
             _ = _serviceProvider.GetRequiredService<RecentFilesTracker>(); // Force instance of the RecentFilesTracker
             _ = _serviceProvider.GetRequiredService<IScopeRepository>();  // Force instance of the IScopeRepository
@@ -173,6 +175,16 @@ namespace AssetEditor
             var newerReleases = await VersionChecker.GetNewerReleases();
             if (newerReleases != null)
                 uiCommandFactory.Create<OpenUpdaterWindowCommand>().Execute(newerReleases);
+        }
+
+        private static void LogRuntimeEnvironment()
+        {
+            Logging.Create<App>().Here().Information(
+                "Runtime environment: OS={OSDescription}; OSVersion={OSVersion}; Architecture={Architecture}; Framework={Framework}",
+                RuntimeInformation.OSDescription,
+                Environment.OSVersion.VersionString,
+                RuntimeInformation.ProcessArchitecture,
+                RuntimeInformation.FrameworkDescription);
         }
 
         void DispatcherUnhandledExceptionHandler(object sender, DispatcherUnhandledExceptionEventArgs args)

@@ -35,15 +35,40 @@ public class ViewportRenderSettingsTests
                 Is.EqualTo(0.0f));
             Assert.That(viewportSettings.DirectLightRotationY,
                 Is.EqualTo(0.0f));
+            Assert.That(viewportSettings.FactionColoursEnabled, Is.True);
+            Assert.That(viewportSettings.FactionColour0,
+                Is.EqualTo("255,0,0"));
+            Assert.That(viewportSettings.FactionColour1,
+                Is.EqualTo("100,169,226"));
+            Assert.That(viewportSettings.FactionColour2,
+                Is.EqualTo("255,255,255"));
         });
     }
 
     [Test]
-    public void ViewportSettingsSerialization_DoesNotContainFactionPreviewColours()
+    public void ViewportSettingsSerialization_PreservesFactionPreview()
     {
-        var json = JsonSerializer.Serialize(
-            ViewportRenderSettings.From(new ApplicationSettings()));
+        var settings = new ApplicationSettings
+        {
+            ViewportFactionColoursEnabled = false,
+            ViewportFactionColour0 = "1,2,3",
+            ViewportFactionColour1 = "4,5,6",
+            ViewportFactionColour2 = "7,8,9"
+        };
 
-        Assert.That(json, Does.Not.Contain("Faction"));
+        var json = JsonSerializer.Serialize(settings);
+        var loaded = JsonSerializer.Deserialize<ApplicationSettings>(json)!;
+        var viewportSettings = ViewportRenderSettings.From(loaded);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewportSettings.FactionColoursEnabled, Is.False);
+            Assert.That(viewportSettings.FactionColour0,
+                Is.EqualTo("1,2,3"));
+            Assert.That(viewportSettings.FactionColour1,
+                Is.EqualTo("4,5,6"));
+            Assert.That(viewportSettings.FactionColour2,
+                Is.EqualTo("7,8,9"));
+        });
     }
 }

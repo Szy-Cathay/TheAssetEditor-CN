@@ -74,6 +74,10 @@
                     <MenuItem Header="{loc:Loc Csc.Add.Prefab}" Command="{Binding AddPrefabCommand}"/>
                     <MenuItem Header="{loc:Loc Csc.Add.Group}" Command="{Binding AddLocatorCommand}"/>
                 </MenuItem>
+                <MenuItem
+                    Header="{loc:Loc FactionTint.Menu}"
+                    Padding="8,3"
+                    Command="{Binding OpenFactionColourSettingsCommand}" />
             </Menu>
             <Button Content="{loc:Loc General.Delete}" Command="{Binding DeleteSelectedCommand}" IsEnabled="{Binding HasSelection}" Style="{StaticResource AeButton.Danger}"/>
             <Separator/>

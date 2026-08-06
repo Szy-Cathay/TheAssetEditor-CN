@@ -45,6 +45,14 @@
                     <colourpickerbutton:ColourPickerButtonView DataContext="{Binding FactionColour2}" HorizontalAlignment="Left" Width="20" Height="20" Background="Transparent"/>
                 </DockPanel>
 
+                <Button
+                    DockPanel.Dock="Top"
+                    Margin="0,8,0,0"
+                    HorizontalAlignment="Left"
+                    Command="{Binding SaveFactionColourSettingsCommand}"
+                    Content="{loc:Loc FactionTint.SaveGlobal}"
+                    Style="{StaticResource AeButton.Secondary}" />
+
             </DockPanel>
         </Expander>
     </ContentControl>

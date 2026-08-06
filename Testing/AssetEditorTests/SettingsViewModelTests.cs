@@ -347,6 +347,10 @@ public class SettingsViewModelTests
     public void ColourPickers_PreviewExactBackgroundAndGridColours()
     {
         var settings = new ApplicationSettingsService();
+        settings.CurrentSettings.ViewportFactionColoursEnabled = false;
+        settings.CurrentSettings.ViewportFactionColour0 = "1,2,3";
+        settings.CurrentSettings.ViewportFactionColour1 = "4,5,6";
+        settings.CurrentSettings.ViewportFactionColour2 = "7,8,9";
         var eventHub = new TestEventHub();
         var previews = new List<ViewportRenderSettings>();
         eventHub.Register<ViewportRenderSettingsChangedEvent>(
@@ -393,6 +397,12 @@ public class SettingsViewModelTests
                     NUnitAssert.That(
                         previews.Last().GridColour,
                         Is.EqualTo("70,80,90"));
+                    NUnitAssert.That(
+                        previews.Last().FactionColoursEnabled,
+                        Is.False);
+                    NUnitAssert.That(
+                        previews.Last().FactionColour0,
+                        Is.EqualTo("1,2,3"));
                 });
             });
         autoSave.Stop();

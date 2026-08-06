@@ -1387,7 +1387,7 @@
   "SpecGloss.Mask": "遮罩",
 
   "Tint.Header": "阵营颜色预览",
-  "Tint.ToolTip": "遮罩贴图的红、绿、蓝通道分别使用下方三种预览颜色。修改颜色后视图会立即更新；这些颜色只属于编辑器预览，不会写入模型，游戏中仍由实际阵营数据决定最终颜色。",
+  "Tint.ToolTip": "遮罩贴图的红、绿、蓝通道分别使用下方三种预览颜色。修改颜色后视图会立即更新；保存后会成为所有 3D 编辑器共用的预览设置，但不会写入模型，游戏中仍由实际阵营数据决定最终颜色。",
   "Tint.PreviewCapability": "启用阵营色预览",
   "Tint.FactionColour0": "红通道（阵营色 1）",
   "Tint.FactionColour1": "绿通道（阵营色 2）",
@@ -1397,6 +1397,10 @@
   "Tint.Variation": "变体",
   "Tint.UseFactionColours": "使用阵营颜色",
   "Tint.FactionColour3Mask": "阵营颜色 3 遮罩",
+  "FactionTint.Menu": "阵营着色",
+  "FactionTint.Window.Title": "阵营着色",
+  "FactionTint.Enabled": "启用阵营着色",
+  "FactionTint.SaveGlobal": "保存阵营着色",
 
   "WeightedMaterial.Header": "RMV2 原始材质数据（诊断，只读）",
   "WeightedMaterial.ToolTip": "这是载入模型时的原始数据快照，通常无需查看，也不会随上方编辑实时更新。仅在动画附着、材质类型或贴图异常时，与同游戏、同材质的正常模型对比：顶点格式和材质类型应相符，贴图及参数列表可用于查找缺项。不要只凭数值猜测修改模型。",

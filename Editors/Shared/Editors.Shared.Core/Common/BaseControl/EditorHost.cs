@@ -7,6 +7,7 @@ using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Components;
 using GameWorld.Core.Services;
 using GameWorld.Core.WpfWindow.Events;
+using GameWorld.Core.WpfWindow.FactionColourSettings;
 using Shared.Core.Events;
 using Shared.Core.Misc;
 using Shared.Core.Services;
@@ -36,6 +37,7 @@ namespace Editors.Shared.Core.Common.BaseControl
 
         public ICommand ResetCameraCommand { get; set; }
         public ICommand FocusCamerasCommand { get; set; }
+        public ICommand OpenFactionColourSettingsCommand { get; set; }
 
         public EditorHost(IEditorDatabase toolFactory,
             IComponentInserter componentInserter,
@@ -43,7 +45,8 @@ namespace Editors.Shared.Core.Common.BaseControl
             IWpfGame gameWorld,
             FocusSelectableObjectService focusSelectableObjectService,
             TEditor editor,
-            IEventHub eventHub)
+            IEventHub eventHub,
+            IFactionColourSettingsDialogService factionColourSettingsDialog)
         {
             ToolsFactory = toolFactory;
             Editor = editor;
@@ -54,6 +57,8 @@ namespace Editors.Shared.Core.Common.BaseControl
 
             ResetCameraCommand = new RelayCommand(ResetCameraAction);
             FocusCamerasCommand = new RelayCommand(FocusCameraAction);
+            OpenFactionColourSettingsCommand = new RelayCommand(
+                factionColourSettingsDialog.ShowDialog);
 
             componentInserter.Execute();
 

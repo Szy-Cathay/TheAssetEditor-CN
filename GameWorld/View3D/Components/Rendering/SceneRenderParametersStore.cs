@@ -21,12 +21,18 @@ namespace GameWorld.Core.Components.Rendering
         public float DirLightRotationRadians_Y => MathHelper.ToRadians(DirLightRotationDegrees_Y);
 
         public Vector3 FactionColour0 { get; set; } = Color.Red.ToVector3();
-        public Vector3 FactionColour1 { get; set; } = Color.Blue.ToVector3();
+        public Vector3 FactionColour1 { get; set; } =
+            new Color(100, 169, 226).ToVector3();
         public Vector3 FactionColour2 { get; set; } = Color.White.ToVector3();
+        public bool FactionColoursEnabled { get; set; } = true;
 
         public void ApplyGlobalLighting(ViewportRenderSettings settings)
         {
             _globalLighting = settings;
+            FactionColoursEnabled = settings.FactionColoursEnabled;
+            FactionColour0 = ParseFactionColour(settings.FactionColour0);
+            FactionColour1 = ParseFactionColour(settings.FactionColour1);
+            FactionColour2 = ParseFactionColour(settings.FactionColour2);
             if (_lightingOverrideCount == 0)
                 ApplyLighting(settings);
         }
@@ -54,6 +60,10 @@ namespace GameWorld.Core.Components.Rendering
             DirLightRotationDegrees_X = settings.DirectLightRotationX;
             DirLightRotationDegrees_Y = settings.DirectLightRotationY;
         }
+
+        private static Vector3 ParseFactionColour(string rgb) =>
+            ApplicationSettingsHelper.ParseCustomBackgroundColour(rgb)
+                .ToVector3();
 
         private sealed class LightingOverride(
             SceneRenderParametersStore owner) : IDisposable

@@ -20,6 +20,24 @@ namespace GameWorld.Core.Test.Rendering;
 public class ViewportRenderSettingsRuntimeTests
 {
     [Test]
+    public void Constructor_DefaultsSharedViewportsToMaterialPreview()
+    {
+        var renderEngine = new RenderEngineComponent(
+            null!,
+            null!,
+            null!,
+            null!,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            Mock.Of<IEventHub>(),
+            new GridComponent(null!, null!, null!));
+
+        Assert.That(
+            renderEngine.ShadingMode,
+            Is.EqualTo(ViewportShadingMode.MaterialPreview));
+    }
+
+    [Test]
     public void GridVisibilityOverride_PreservesCscCameraModeAcrossGlobalChanges()
     {
         var grid = new GridComponent(null!, null!, null!);
@@ -36,7 +54,7 @@ public class ViewportRenderSettingsRuntimeTests
     }
 
     [Test]
-    public void GlobalViewportChange_UpdatesVisualDefaultsWithoutTouchingFactionPreview()
+    public void GlobalViewportChange_UpdatesVisualAndFactionDefaults()
     {
         var game = new WpfGameMock();
         var deviceResolver = new Mock<IDeviceResolver>();
@@ -56,6 +74,7 @@ public class ViewportRenderSettingsRuntimeTests
             deviceResolver.Object);
         var scene = new SceneRenderParametersStore
         {
+            FactionColoursEnabled = true,
             FactionColour0 = new Vector3(0.1f, 0.2f, 0.3f),
             FactionColour1 = new Vector3(0.4f, 0.5f, 0.6f),
             FactionColour2 = new Vector3(0.7f, 0.8f, 0.9f)
@@ -81,7 +100,11 @@ public class ViewportRenderSettingsRuntimeTests
                 1.75f,
                 45.0f,
                 -15.0f,
-                120.0f)));
+                120.0f,
+                false,
+                "10,20,30",
+                "40,50,60",
+                "70,80,90")));
 
         var background = (Color)typeof(RenderEngineComponent)
             .GetField(
@@ -99,12 +122,13 @@ public class ViewportRenderSettingsRuntimeTests
             Assert.That(scene.EnvLightRotationDegrees_Y, Is.EqualTo(45.0f));
             Assert.That(scene.DirLightRotationDegrees_X, Is.EqualTo(-15.0f));
             Assert.That(scene.DirLightRotationDegrees_Y, Is.EqualTo(120.0f));
+            Assert.That(scene.FactionColoursEnabled, Is.False);
             Assert.That(scene.FactionColour0,
-                Is.EqualTo(new Vector3(0.1f, 0.2f, 0.3f)));
+                Is.EqualTo(new Color(10, 20, 30).ToVector3()));
             Assert.That(scene.FactionColour1,
-                Is.EqualTo(new Vector3(0.4f, 0.5f, 0.6f)));
+                Is.EqualTo(new Color(40, 50, 60).ToVector3()));
             Assert.That(scene.FactionColour2,
-                Is.EqualTo(new Vector3(0.7f, 0.8f, 0.9f)));
+                Is.EqualTo(new Color(70, 80, 90).ToVector3()));
         });
     }
 
