@@ -166,16 +166,26 @@ namespace GameWorld.Core.Rendering
                     _currentInstanceCount));
 
             // Alpha blending for anti-aliased edges
+            var previousRasterizerState =
+                device.RasterizerState;
             device.BlendState = BlendState.AlphaBlend;
+            device.RasterizerState =
+                RasterizerState.CullNone;
+            try
+            {
+                device.Indices = _indexBuffer;
+                _effect.CurrentTechnique.Passes[0].Apply();
 
-            device.Indices = _indexBuffer;
-            _effect.CurrentTechnique.Passes[0].Apply();
-
-            device.SetVertexBuffers(_bindings);
-            // Draw 2 triangles (one quad) per instance
-            device.DrawInstancedPrimitives(PrimitiveType.TriangleList, 0, 0, 4, 0, 2, _currentInstanceCount);
-
-            device.BlendState = BlendState.Opaque;
+                device.SetVertexBuffers(_bindings);
+                // Draw 2 triangles (one quad) per instance
+                device.DrawInstancedPrimitives(PrimitiveType.TriangleList, 0, 0, 4, 0, 2, _currentInstanceCount);
+            }
+            finally
+            {
+                device.RasterizerState =
+                    previousRasterizerState;
+                device.BlendState = BlendState.Opaque;
+            }
         }
 
         public void Dispose()
