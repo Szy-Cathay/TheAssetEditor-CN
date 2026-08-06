@@ -12,7 +12,7 @@ namespace GameWorld.Core.Test.Rendering;
 public class EdgeQuadOffscreenTests
 {
     [Test]
-    public void Draw_SelectedEdge_ProducesVisibleOrangePixels()
+    public void Draw_SelectedEdge_RemainsVisibleWithSceneBackfaceCulling()
     {
         var game = new WpfGameMock();
         var device = game.GraphicsDevice;
@@ -52,7 +52,8 @@ public class EdgeQuadOffscreenTests
             device.SetRenderTarget(renderTarget);
             device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, Color.Transparent, 1.0f, 0);
             device.DepthStencilState = DepthStencilState.Default;
-            device.RasterizerState = RasterizerState.CullNone;
+            device.RasterizerState =
+                RasterizerState.CullCounterClockwise;
             renderer.Draw(Matrix.Identity, Matrix.Identity, 64.0f, 64.0f, device);
         }
         finally

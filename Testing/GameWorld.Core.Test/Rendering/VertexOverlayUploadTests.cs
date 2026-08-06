@@ -93,7 +93,7 @@ public class VertexOverlayUploadTests
     }
 
     [Test]
-    public void Draw_AnimatedUnselectedVertexHasLargerVisibleFootprint()
+    public void Draw_AnimatedUnselectedVertexRemainsVisibleAndHasLargerFootprintWithSceneBackfaceCulling()
     {
         var game = new WpfGameMock();
         var device = game.GraphicsDevice;
@@ -535,7 +535,7 @@ public class VertexOverlayUploadTests
             device.DepthStencilState =
                 DepthStencilState.Default;
             device.RasterizerState =
-                RasterizerState.CullNone;
+                RasterizerState.CullCounterClockwise;
             draw();
         }
         finally

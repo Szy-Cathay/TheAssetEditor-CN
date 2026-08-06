@@ -375,18 +375,30 @@ namespace GameWorld.Core.Rendering
             GraphicsDevice device,
             VertexBufferBinding[] bindings)
         {
+            var previousRasterizerState =
+                device.RasterizerState;
             device.BlendState = BlendState.AlphaBlend;
-            device.Indices = _indexBuffer;
-            _effect.CurrentTechnique.Passes[0].Apply();
-            device.SetVertexBuffers(bindings);
-            device.DrawInstancedPrimitives(
-                PrimitiveType.TriangleList,
-                0,
-                0,
-                4,
-                0,
-                2,
-                _currentInstanceCount);
+            device.RasterizerState =
+                RasterizerState.CullNone;
+            try
+            {
+                device.Indices = _indexBuffer;
+                _effect.CurrentTechnique.Passes[0].Apply();
+                device.SetVertexBuffers(bindings);
+                device.DrawInstancedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    4,
+                    0,
+                    2,
+                    _currentInstanceCount);
+            }
+            finally
+            {
+                device.RasterizerState =
+                    previousRasterizerState;
+            }
         }
 
         void EnsureInstanceCapacity(int requiredCount)
