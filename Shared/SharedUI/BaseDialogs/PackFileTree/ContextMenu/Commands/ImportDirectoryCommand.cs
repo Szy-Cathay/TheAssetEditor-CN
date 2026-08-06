@@ -17,7 +17,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
         {
             if (_selectedNode.FileOwner.IsCaPackFile)
             {
-                System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.UnableToEditPackfile"));
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.UnableToEditPackfile"));
                 return;
             }
 

@@ -199,22 +199,14 @@
             </TreeView.ItemTemplate>
         </TreeView>
 
-        <Grid
+        <progress:OperationProgressWindowHost
             Grid.RowSpan="3"
-            Panel.ZIndex="10"
-            Background="Transparent"
-            Visibility="{Binding IsRefreshingCaWemFiles, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
-            <progress:OperationProgressView
-                Width="280"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                CurrentDetailText="{Binding CaWemRefreshDetail}"
-                IsOperationActive="{Binding IsRefreshingCaWemFiles}"
-                IsProgressIndeterminate="{Binding CaWemRefreshIsIndeterminate}"
-                ProgressMaximum="{Binding CaWemRefreshMaximum}"
-                ProgressValue="{Binding CaWemRefreshValue}"
-                StatusText="{loc:Loc Shared.PackFileBrowser.RefreshingCaWem}" />
-        </Grid>
+            CurrentDetailText="{Binding CaWemRefreshDetail}"
+            IsOperationActive="{Binding IsRefreshingCaWemFiles}"
+            IsProgressIndeterminate="{Binding CaWemRefreshIsIndeterminate}"
+            ProgressMaximum="{Binding CaWemRefreshMaximum}"
+            ProgressValue="{Binding CaWemRefreshValue}"
+            StatusText="{loc:Loc Shared.PackFileBrowser.RefreshingCaWem}"
+            WindowTitle="{loc:Loc Shared.PackFileBrowser.RefreshingCaWem}" />
     </Grid>
 </UserControl>

@@ -33,6 +33,7 @@ public class UiAudioEditorFamilyGallery
         "audio-explorer-ready",
         "audio-explorer-busy",
         "audio-editor-workspace",
+        "audio-editor-busy",
         "audio-settings",
         "new-project",
         "converter",
@@ -121,7 +122,14 @@ public class UiAudioEditorFamilyGallery
         "audio-editor-workspace" => Host(
             new AudioEditorView
             {
-                DataContext = CreateAudioEditor(),
+                DataContext = CreateAudioEditor(false),
+            },
+            1280,
+            760),
+        "audio-editor-busy" => Host(
+            new AudioEditorView
+            {
+                DataContext = CreateAudioEditor(true),
             },
             1280,
             760),
@@ -240,6 +248,10 @@ public class UiAudioEditorFamilyGallery
             IsExportSelectedAudioEnabled = !busy,
             IsExportSelectedBranchEnabled = !busy,
             IsExportCurrentResultsEnabled = !busy,
+            LoadProgressDetail = "battle_group_vocalisation_empire_core.bnk",
+            LoadProgressIsIndeterminate = false,
+            LoadProgressMaximum = 806d,
+            LoadProgressValue = busy ? 30d : 806d,
             LoadProgress = busy ? 42d : 100d,
             LoadStatus = busy
                 ? "正在读取英语与简体中文声音库……"
@@ -252,7 +264,7 @@ public class UiAudioEditorFamilyGallery
         };
     }
 
-    private static SampleModel CreateAudioEditor()
+    private static SampleModel CreateAudioEditor(bool busy)
     {
         var files = new SampleModel
         {
@@ -308,11 +320,19 @@ public class UiAudioEditorFamilyGallery
             },
             HasSelectedAudio = true,
             IsAudioProjectLoaded = true,
-            IsEditorIdle = true,
+            IsBusy = busy,
+            IsLoading = busy,
+            IsCompiling = false,
+            IsEditorIdle = !busy,
             CanEditAudioProject = true,
             IsSettingsBorderVisible = true,
             EmptyStateText = "打开或新建音频工程以开始编辑",
             CompileStatus = "工程已保存",
+            OperationDetail = @"D:\AudioProjects\empire_general_voice.aeaudio",
+            OperationProgressIsIndeterminate = false,
+            OperationProgressMaximum = 428d,
+            OperationProgressValue = 176d,
+            OperationStatus = "正在读取音频工程 176 / 428",
         };
     }
 
@@ -735,6 +755,10 @@ public class UiAudioEditorFamilyGallery
         public object? LoadAudioRepositoryForSelectedLanguagesCancelCommand { get; set; } = SampleCommand.Instance;
         public object? LoadAudioRepositoryForSelectedLanguagesCommand { get; set; } = SampleCommand.Instance;
         public object? LoadProgress { get; set; }
+        public object? LoadProgressDetail { get; set; }
+        public object? LoadProgressIsIndeterminate { get; set; }
+        public object? LoadProgressMaximum { get; set; }
+        public object? LoadProgressValue { get; set; }
         public object? LoadStatus { get; set; }
         public object? LoopingType { get; set; }
         public object? LoopingTypes { get; set; }
@@ -748,6 +772,11 @@ public class UiAudioEditorFamilyGallery
         public object? OpenAudioProjectConverterCommand { get; set; } = SampleCommand.Instance;
         public object? OpenAudioProjectMergerCommand { get; set; } = SampleCommand.Instance;
         public object? OpenDialogueEventMergerCommand { get; set; } = SampleCommand.Instance;
+        public object? OperationDetail { get; set; }
+        public object? OperationProgressIsIndeterminate { get; set; }
+        public object? OperationProgressMaximum { get; set; }
+        public object? OperationProgressValue { get; set; }
+        public object? OperationStatus { get; set; }
         public object? OutputDirectoryPath { get; set; }
         public object? PasteRowsCommand { get; set; } = SampleCommand.Instance;
         public object? PlaybackPositionSeconds { get; set; }

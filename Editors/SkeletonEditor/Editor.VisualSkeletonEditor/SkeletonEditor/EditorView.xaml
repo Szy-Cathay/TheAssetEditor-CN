@@ -25,150 +25,160 @@
             <Setter Property="Padding" Value="6,2" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
-        <Style TargetType="{x:Type GroupBox}">
-            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
-            <Setter Property="Padding" Value="8" />
-        </Style>
     </UserControl.Resources>
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <DockPanel Margin="12" LastChildFill="False">
-        <Label DockPanel.Dock="Top" Content="{loc:Loc SkeletonEditor.Header}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AeBrush.TextPrimary}"/>
+    <StackPanel Margin="12">
+        <TextBlock
+            Margin="0,0,0,8"
+            Style="{StaticResource AeText.SectionTitle}"
+            Text="{loc:Loc SkeletonEditor.Header}" />
 
-        <Grid DockPanel.Dock="Top" Margin="5,0,5,5">
+        <Grid Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="auto" />
-                <ColumnDefinition Width="auto" />
-                <ColumnDefinition Width="auto" />
+                <ColumnDefinition Width="120" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="50" />
+                <ColumnDefinition Width="72" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition/>
-                <RowDefinition/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <CheckBox  Grid.Row="0" Grid.Column="0" IsChecked="{Binding ShowSkeleton, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
-            <Label Style="{StaticResource AeForm.Label}"     Grid.Row="0" Grid.Column="1" Content="{loc:Loc SkeletonEditor.Skeleton}"/>
-            <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
-            <Button    Grid.Row="0" Grid.Column="4" Content="{loc:Loc General.Load}" Click="{s:MethodBinding LoadSkeletonAction}" Margin="1"/>
+            <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.Skeleton}"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,2,8,2" IsReadOnly="True" Text="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged}"/>
+            <Button Grid.Row="0" Grid.Column="2" Width="72" Margin="0,2,0,2" Content="{loc:Loc General.Load}" Click="{s:MethodBinding LoadSkeletonAction}"/>
+            <ToggleButton
+                Grid.Row="0"
+                Grid.Column="3"
+                Margin="2,2,0,2"
+                AutomationProperties.Name="{loc:Loc General.ToggleVisibility}"
+                IsChecked="{Binding ShowSkeleton, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                Style="{StaticResource AeButton.VisibilityToggle}"
+                ToolTip="{loc:Loc General.ToggleVisibility}" />
 
-            <CheckBox  Grid.Row="1" Grid.Column="0" IsChecked="{Binding ShowRefMesh, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
-            <Label Style="{StaticResource AeForm.Label}"     Grid.Row="1" Grid.Column="1" Content="{loc:Loc SkeletonEditor.RefMesh}"/>
-            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding RefMeshName, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
-            <Button    Grid.Row="1" Grid.Column="4" Content="{loc:Loc General.Load}" Click="{s:MethodBinding LoadRefMeshAction}" Margin="1"/>
-
+            <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.RefMesh}"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,2,8,2" IsReadOnly="True" Text="{Binding RefMeshName, UpdateSourceTrigger=PropertyChanged}"/>
+            <Button Grid.Row="1" Grid.Column="2" Width="72" Margin="0,2,0,2" Content="{loc:Loc General.Load}" Click="{s:MethodBinding LoadRefMeshAction}"/>
+            <ToggleButton
+                Grid.Row="1"
+                Grid.Column="3"
+                Margin="2,2,0,2"
+                AutomationProperties.Name="{loc:Loc General.ToggleVisibility}"
+                IsChecked="{Binding ShowRefMesh, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                Style="{StaticResource AeButton.VisibilityToggle}"
+                ToolTip="{loc:Loc General.ToggleVisibility}" />
         </Grid>
 
-        <TreeView DockPanel.Dock="Top" ItemsSource="{Binding Bones, UpdateSourceTrigger=PropertyChanged}" MaxHeight="400" Height="400" Margin="5,5,5,1">
-            <b:Interaction.Behaviors>
-                <behaviors:BindableSelectedItemBehavior SelectedItem="{Binding SelectedBone, Mode=TwoWay}" />
-            </b:Interaction.Behaviors>
+        <Border Height="360" Padding="4" Style="{StaticResource AeSurface.Panel}">
+            <TreeView ItemsSource="{Binding Bones, UpdateSourceTrigger=PropertyChanged}">
+                <b:Interaction.Behaviors>
+                    <behaviors:BindableSelectedItemBehavior SelectedItem="{Binding SelectedBone, Mode=TwoWay}" />
+                </b:Interaction.Behaviors>
 
-            <TreeView.ItemContainerStyle>
-                <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
-                    <Setter Property="IsExpanded" Value="True" />
-                </Style>
-            </TreeView.ItemContainerStyle>
-            <TreeView.ItemTemplate >
-                <HierarchicalDataTemplate ItemsSource="{Binding Path=Children, UpdateSourceTrigger=PropertyChanged}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding BoneName, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Text=" - "></TextBlock>
-                        <TextBlock Text="{Binding BoneIndex, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
-                </HierarchicalDataTemplate>
-            </TreeView.ItemTemplate>
-        </TreeView>
+                <TreeView.ItemContainerStyle>
+                    <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
+                        <Setter Property="IsExpanded" Value="True" />
+                    </Style>
+                </TreeView.ItemContainerStyle>
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate ItemsSource="{Binding Path=Children, UpdateSourceTrigger=PropertyChanged}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding BoneName, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text=" - "/>
+                            <TextBlock Text="{Binding BoneIndex, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Border>
 
-        <Grid DockPanel.Dock="Top" Margin="5,0,5,0">
+        <Grid Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="0.33*"/>
-                <ColumnDefinition Width="0.33*"/>
-                <ColumnDefinition Width="0.33*"/>
-                <ColumnDefinition Width="0.33*"/>
-                <ColumnDefinition Width="0.33*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0" Content="{loc:Loc General.New}"  Click="{s:MethodBinding CreateBoneAction}" Margin="0,0,2,0"/>
             <Button Grid.Column="1" Content="{loc:Loc General.Duplicate}"  Click="{s:MethodBinding DuplicateBoneAction}"  Margin="2,0,2,0"/>
-            <Button Grid.Column="2" Content="{loc:Loc General.Delete}" Click="{s:MethodBinding DeleteBoneAction}" Margin="2,0,0,0" Style="{StaticResource AeButton.Danger}"/>
-            <Button Grid.Column="3" Content="{loc:Loc General.Copy}"  Click="{s:MethodBinding CopyBoneAction}" Margin="2,0,0,0"/>
-            <Button Grid.Column="4" Content="{loc:Loc General.Paste}"  Click="{s:MethodBinding PasteBoneAction}" Margin="2,0,0,0"/>
+            <Button Grid.Column="2" Content="{loc:Loc General.Copy}"  Click="{s:MethodBinding CopyBoneAction}" Margin="2,0,2,0"/>
+            <Button Grid.Column="3" Content="{loc:Loc General.Paste}"  Click="{s:MethodBinding PasteBoneAction}" Margin="2,0,2,0"/>
+            <Button Grid.Column="4" Content="{loc:Loc General.Delete}" Click="{s:MethodBinding DeleteBoneAction}" Margin="2,0,0,0" Style="{StaticResource AeButton.Danger}"/>
         </Grid>
 
-        <GroupBox DockPanel.Dock="Top" Margin="5" Header="{loc:Loc AnimReTarget.Settings}">
-            <Grid>
+        <Border Height="1" Margin="0,12,0,8" Background="{DynamicResource AeBrush.Border}"/>
+        <TextBlock Margin="0,0,0,6" Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimReTarget.Settings}"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.SourceSkeleton}"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,2,0,2" Text="{Binding SourceSkeletonName, UpdateSourceTrigger=LostFocus, Mode=TwoWay}"/>
+
+            <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.SelectedBoneScale}"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Margin="0,2,0,2" Text="{Binding BoneVisualScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}">
+                <b:Interaction.Behaviors>
+                    <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
+                </b:Interaction.Behaviors>
+            </TextBox>
+
+            <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.Focus}"/>
+            <Button Grid.Row="2" Grid.Column="1" Width="140" Margin="0,2,0,2" HorizontalAlignment="Left" Content="{loc:Loc SkeletonEditor.FocusSelectedBone}" Click="{s:MethodBinding FocusSelectedBoneAction}"/>
+
+            <Label Grid.Row="3" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.WorldTransforms}"/>
+            <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding ShowBonesAsWorldTransform, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+
+            <Label Grid.Row="4" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.IsTechSkeleton}"/>
+            <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding IsTechSkeleton, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+        </Grid>
+
+        <Border Height="1" Margin="0,12,0,8" Background="{DynamicResource AeBrush.Border}"/>
+        <TextBlock Margin="0,0,0,6" Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc SkeletonEditor.SelectedBone}"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.Name}"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,2,0,2" Text="{Binding SelectedBoneName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+
+            <Label Grid.Row="1" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.Translation}"/>
+            <mathviews:Vector3View Grid.Row="1" Grid.Column="1" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneTranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+
+            <Label Grid.Row="2" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.Rotation}"/>
+            <mathviews:Vector3View Grid.Row="2" Grid.Column="1" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneRotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+
+            <Label Grid.Row="3" Grid.Column="0" Style="{StaticResource AeForm.Label}" Content="{loc:Loc SkeletonEditor.LengthScale}"/>
+            <Grid Grid.Row="3" Grid.Column="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="auto"/>
-                    <ColumnDefinition Width="auto"/>
-                    <ColumnDefinition />
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="72"/>
                 </Grid.ColumnDefinitions>
-
-                <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                </Grid.RowDefinitions>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="0" Grid.Column="0" Content="{loc:Loc SkeletonEditor.SourceSkeleton}"/>
-                <TextBox    Grid.Row="0" Grid.Column="2" Text="{Binding SourceSkeletonName, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2"/>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="1" Grid.Column="0" Content="{loc:Loc SkeletonEditor.SelectedBoneScale}"/>
-                <TextBox    Grid.Row="1" Grid.Column="2" Text="{Binding BoneVisualScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
-                    <b:Interaction.Behaviors>
-                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
-                    </b:Interaction.Behaviors>
-                </TextBox>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="2" Grid.Column="0" Content="{loc:Loc SkeletonEditor.Focus}"/>
-                <Button HorizontalAlignment="Right"     Grid.Row="2" Grid.Column="2" Content="{loc:Loc SkeletonEditor.FocusSelectedBone}" VerticalContentAlignment="Center"  Click="{s:MethodBinding FocusSelectedBoneAction}" Margin="2"/>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="3" Grid.Column="0" Content="{loc:Loc SkeletonEditor.WorldTransforms}"/>
-                <CheckBox HorizontalAlignment="Right"   Grid.Row="3" Grid.Column="2" IsChecked="{Binding ShowBonesAsWorldTransform, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="4" Grid.Column="0" Content="{loc:Loc SkeletonEditor.IsTechSkeleton}"/>
-                <CheckBox HorizontalAlignment="Right"   Grid.Row="4" Grid.Column="2" IsChecked="{Binding IsTechSkeleton, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+                <TextBox Grid.Column="0" Margin="0,2,8,2" Text="{Binding BoneScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}"/>
+                <Button Grid.Column="1" Width="72" Margin="0,2,0,2" Content="{loc:Loc SkeletonEditor.Bake}" Click="{s:MethodBinding BakeSkeletonAction}"/>
             </Grid>
-        </GroupBox>
+        </Grid>
 
-        <GroupBox DockPanel.Dock="Top" Margin="5" Header="{loc:Loc SkeletonEditor.SelectedBone}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="auto"/>
-                    <ColumnDefinition Width="auto"/>
-                    <ColumnDefinition />
-                </Grid.ColumnDefinitions>
-
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="auto"/>
-                    <RowDefinition Height="auto"/>
-                    <RowDefinition Height="auto"/>
-                    <RowDefinition Height="auto"/>
-                </Grid.RowDefinitions>
-
-                <Label Style="{StaticResource AeForm.Label}" Grid.Row="0"   Grid.Column="0" Content="{loc:Loc SkeletonEditor.Name}"/>
-                <TextBox Grid.Row="0"  Grid.Column="2" Text="{Binding SelectedBoneName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2"/>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="1" Grid.Column="0" Content="{loc:Loc SkeletonEditor.Translation}"/>
-                <mathviews:Vector3View Grid.Row="1" Grid.Column="2" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneTranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-
-                <Label Style="{StaticResource AeForm.Label}"      Grid.Row="2" Grid.Column="0" Content="{loc:Loc SkeletonEditor.Rotation}"/>
-                <mathviews:Vector3View Grid.Row="2" Grid.Column="2" VerticalContentAlignment="Center" Vector3="{Binding SelectedBoneRotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-
-
-                <Label Style="{StaticResource AeForm.Label}" Grid.Row="3" Grid.Column="0" Content="{loc:Loc SkeletonEditor.LengthScale}"/>
-                <DockPanel Grid.Row="3" Grid.Column="2">
-                    <Button Content="{loc:Loc SkeletonEditor.Bake}" DockPanel.Dock="Right" Width="60"  Click="{s:MethodBinding BakeSkeletonAction}" Margin="2"/>
-                    <TextBox Text="{Binding BoneScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2" DockPanel.Dock="Left"/>
-                </DockPanel>
-           
-            </Grid>
-        </GroupBox>
-
-        <Button DockPanel.Dock="Top" Margin="5" Content="{loc:Loc General.Save}" Click="{s:MethodBinding SaveSkeletonAction}" Style="{StaticResource AeButton.Primary}"/>
-    </DockPanel>
+        <Button Width="120" Margin="0,12,0,0" HorizontalAlignment="Right" Content="{loc:Loc General.Save}" Click="{s:MethodBinding SaveSkeletonAction}" Style="{StaticResource AeButton.Primary}"/>
+    </StackPanel>
     </ScrollViewer>
 </UserControl>

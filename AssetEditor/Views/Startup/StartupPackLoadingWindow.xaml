@@ -6,7 +6,7 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     Title="{loc:Loc StartupPackLoading.Title}"
     Width="700"
-    MinHeight="230"
+    MinHeight="170"
     MaxHeight="700"
     ResizeMode="CanResizeWithGrip"
     ShowInTaskbar="False"
@@ -24,7 +24,8 @@
 
         <progress:OperationProgressView
             x:Name="StartupOperationProgress"
-            IsOperationActive="True" />
+            IsOperationActive="True"
+            UseDeferredVisibility="False" />
 
         <Border
             x:Name="FailurePanel"

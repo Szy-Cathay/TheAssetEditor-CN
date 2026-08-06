@@ -36,7 +36,7 @@
 
         <DockPanel IsEnabled="False">
             <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}" Width ="{StaticResource labelWidth}"/>
-            <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding UseScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding UseScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
             <Button Content="{loc:Loc AnimReTarget.ExportMeshSkeletonAtScale}" Command="{Binding ExportScaledMesh}"  DockPanel.Dock="Right" Margin="2"/>
             <TextBox Text="{Binding ScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalAlignment="Center"/>
         </DockPanel>

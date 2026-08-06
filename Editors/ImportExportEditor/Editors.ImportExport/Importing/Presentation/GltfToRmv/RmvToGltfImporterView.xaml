@@ -46,19 +46,19 @@
                   ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMeshes}"/>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMaterials}" Height="15" Width="88"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="1" Grid.Column="2" x:Name = "ImportMaterialCheckBox"
+        <CheckBox Grid.Row="1" Grid.Column="2" x:Name = "ImportMaterialCheckBox"
                   IsChecked="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                     ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMaterials}" >
         </CheckBox>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="1" Text="{loc:Loc RmvToGltfImporter.ConvertMaterialMap}" VerticalAlignment="Center" Height="15" Width="265" Grid.ColumnSpan="2"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="2" Grid.Column="5"
+        <CheckBox Grid.Row="2" Grid.Column="5"
                   IsEnabled="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged}"
                   IsChecked="{Binding ConvertFromBlenderMaterialMap, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                   ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMeshes}"/>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="3" Grid.Column="2" Text="{loc:Loc RmvToGltfImporter.ConvertNormalMap}" VerticalAlignment="Center" Height="15" Width="255"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="3" Grid.Column="5" x:Name="ConvertNormalMapCheckbox"
+        <CheckBox Grid.Row="3" Grid.Column="5" x:Name="ConvertNormalMapCheckbox"
                   IsEnabled="{Binding ImportMaterials, UpdateSourceTrigger=PropertyChanged}" 
                   IsChecked="{Binding ConvertNormalTextureToOrange, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
             <CheckBox.ToolTip>
@@ -68,7 +68,7 @@
             </CheckBox.ToolTip>
         </CheckBox>
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="4" Text="{loc:Loc RmvToGltfImporter.ImportAnimations}" VerticalAlignment="Center" Height="15" Width="109"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="4" Grid.Column="2" IsChecked="{Binding ImportAnimations, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
+        <CheckBox Grid.Row="4" Grid.Column="2" IsChecked="{Binding ImportAnimations, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
             <CheckBox.ToolTip>
                 Import Animations From GLTF File, convert to TW ANIM;
             </CheckBox.ToolTip>

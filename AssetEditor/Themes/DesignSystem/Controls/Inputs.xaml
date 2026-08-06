@@ -81,8 +81,118 @@
         </Setter>
     </Style>
 
+    <Style x:Key="AeInput.ExpandableField" TargetType="{x:Type Expander}">
+        <Setter Property="MinHeight" Value="{StaticResource AeSize.ControlHeight}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Expander}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ToggleButton
+                            x:Name="HeaderSite"
+                            Grid.Row="0"
+                            MinHeight="{StaticResource AeSize.ControlHeight}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Content="{TemplateBinding Header}"
+                            ContentTemplate="{TemplateBinding HeaderTemplate}"
+                            ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"
+                            FocusVisualStyle="{x:Null}"
+                            HorizontalContentAlignment="Stretch"
+                            IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                    <Border
+                                        x:Name="Field"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="{StaticResource AeRadius.Control}">
+                                        <Grid>
+                                            <ContentPresenter
+                                                Margin="6,0,24,0"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Center" />
+                                            <Path
+                                                x:Name="Chevron"
+                                                Width="8"
+                                                Height="5"
+                                                Margin="0,0,8,0"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Data="M 1,1 L 4,4 L 7,1"
+                                                Fill="Transparent"
+                                                RenderTransformOrigin="0.5,0.5"
+                                                Stroke="{DynamicResource AeBrush.TextMuted}"
+                                                StrokeEndLineCap="Round"
+                                                StrokeLineJoin="Round"
+                                                StrokeStartLineCap="Round"
+                                                StrokeThickness="1.4">
+                                                <Path.RenderTransform>
+                                                    <RotateTransform />
+                                                </Path.RenderTransform>
+                                            </Path>
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter
+                                                TargetName="Chevron"
+                                                Property="Stroke"
+                                                Value="{DynamicResource AeBrush.AccentHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Chevron" Property="RenderTransform">
+                                                <Setter.Value>
+                                                    <RotateTransform Angle="180" />
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter TargetName="Field" Property="Opacity" Value="0.48" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <Border
+                            x:Name="ExpandSite"
+                            Grid.Row="1"
+                            Margin="0,2,0,0"
+                            Background="{DynamicResource AeBrush.Surface1}"
+                            BorderBrush="{DynamicResource AeBrush.BorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource AeRadius.Control}"
+                            Visibility="Collapsed">
+                            <ContentPresenter
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="AeInput.CheckBox" TargetType="{x:Type CheckBox}">
         <Setter Property="MinHeight" Value="24" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">

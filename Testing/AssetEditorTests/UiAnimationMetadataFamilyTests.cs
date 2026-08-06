@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
 
@@ -171,6 +172,54 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 styles,
                 Does.Contain("AeMotion.ButtonReleaseStoryboard"));
+        });
+    }
+
+    [Test]
+    public void CampaignAnimationActions_AlignWithSceneObjectFieldColumn()
+    {
+        var path = Path.Combine(
+            FindSolutionRoot(),
+            "Editors",
+            "AnimationEditor",
+            "CampaignAnimationCreator",
+            "EditorView.xaml");
+        var document = XDocument.Load(path);
+        var layout = document.Root!.Elements().Single(element =>
+            element.Name.LocalName == "Grid");
+        var columns = layout.Elements()
+            .Single(element =>
+                element.Name.LocalName == "Grid.ColumnDefinitions")
+            .Elements()
+            .Select(element => element.Attribute("Width")?.Value)
+            .ToArray();
+        var rootBoneInput = layout.Elements().Single(element =>
+            element.Name.LocalName == "ComboBox");
+        var actions = layout.Elements()
+            .Where(element => element.Name.LocalName == "Button")
+            .ToArray();
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                layout.Attribute("Margin")?.Value,
+                Is.EqualTo("32,0,8,0"));
+            NUnitAssert.That(columns, Is.EqualTo(new[] { "140", "*" }));
+            NUnitAssert.That(
+                rootBoneInput.Attributes().Single(attribute =>
+                    attribute.Name.LocalName == "Grid.Column").Value,
+                Is.EqualTo("1"));
+            NUnitAssert.That(actions, Has.Length.EqualTo(2));
+            NUnitAssert.That(
+                actions.All(action =>
+                    action.Attributes().Any(attribute =>
+                        attribute.Name.LocalName == "Grid.Column" &&
+                        attribute.Value == "1")),
+                Is.True);
+            NUnitAssert.That(
+                actions.Any(action => action.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Grid.ColumnSpan")),
+                Is.False);
         });
     }
 

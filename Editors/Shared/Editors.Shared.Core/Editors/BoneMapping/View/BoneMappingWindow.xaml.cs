@@ -41,7 +41,7 @@ namespace CommonControls.Editors.BoneMapping.View
             var res = viewModel.Validate(out string errorText);
             if (res == false)
             {
-                var messageBoxResult = System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.BoneMappingError", errorText), "Error", System.Windows.MessageBoxButton.OKCancel);
+                var messageBoxResult = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.BoneMappingError", errorText), "Error", System.Windows.MessageBoxButton.OKCancel);
                 if (messageBoxResult == System.Windows.MessageBoxResult.Cancel)
                     return;
             }

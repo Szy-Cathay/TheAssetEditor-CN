@@ -557,24 +557,15 @@
             </Grid>
         </Grid>
 
-        <Grid
-            x:Name="RepositoryBusyOverlay"
+        <progress:OperationProgressWindowHost
+            x:Name="RepositoryProgressWindow"
             Grid.ColumnSpan="3"
-            Panel.ZIndex="100"
-            Background="Transparent"
-            IsHitTestVisible="{Binding VersionControl.IsLoadingOperation}"
-            Visibility="{Binding VersionControl.IsLoadingOperation, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
-            <progress:OperationProgressView
-                Width="500"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                CurrentDetailText="{Binding VersionControl.LoadingProgressDetailText}"
-                IsOperationActive="{Binding VersionControl.IsLoadingOperation}"
-                IsProgressIndeterminate="{Binding VersionControl.LoadingProgressIsIndeterminate}"
-                ProgressMaximum="{Binding VersionControl.LoadingProgressMaximum}"
-                ProgressValue="{Binding VersionControl.LoadingProgressValue}"
-                StatusText="{Binding VersionControl.LoadingProgressStatusText}" />
-        </Grid>
+            CurrentDetailText="{Binding VersionControl.LoadingProgressDetailText}"
+            IsOperationActive="{Binding VersionControl.IsLoadingOperation}"
+            IsProgressIndeterminate="{Binding VersionControl.LoadingProgressIsIndeterminate}"
+            ProgressMaximum="{Binding VersionControl.LoadingProgressMaximum}"
+            ProgressValue="{Binding VersionControl.LoadingProgressValue}"
+            StatusText="{Binding VersionControl.LoadingProgressStatusText}"
+            WindowTitle="{loc:Loc OperationProgress.GitOperation}" />
     </Grid>
 </UserControl>

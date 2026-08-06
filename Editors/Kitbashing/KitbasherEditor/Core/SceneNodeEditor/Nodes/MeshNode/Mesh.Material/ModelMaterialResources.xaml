@@ -4,8 +4,8 @@
     
     <System:Double x:Key="labelWidth">140</System:Double>
     <Thickness x:Key="LabelMargin">20,0,0,0</Thickness>
+    <Thickness x:Key="MaterialSubsectionMargin">16,0,0,0</Thickness>
 
 
-    <System:Double x:Key="HeaderFontSize">10</System:Double>
     <System:Double x:Key="HeaderLabelLength">100</System:Double>
 </ResourceDictionary>

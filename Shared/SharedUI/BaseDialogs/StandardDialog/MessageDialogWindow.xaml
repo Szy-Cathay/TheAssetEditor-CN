@@ -59,6 +59,15 @@
                     Margin="8,0,0,0"
                     Click="NoButton_Click"
                     Content="{loc:Loc General.No}"
+                IsCancel="False"
+                    Style="{StaticResource AeButton.Secondary}"
+                    Visibility="Collapsed" />
+                <Button
+                    x:Name="CancelButton"
+                    MinWidth="88"
+                    Margin="8,0,0,0"
+                    Click="CancelButton_Click"
+                    Content="{loc:Loc General.Cancel}"
                     IsCancel="True"
                     Style="{StaticResource AeButton.Secondary}"
                     Visibility="Collapsed" />

@@ -5,86 +5,80 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowhandling="clr-namespace:WindowHandling;assembly=Shared.Ui"
-    xmlns:basedialogs="clr-namespace:Shared.Ui.BaseDialogs;assembly=Shared.Ui"
     xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
     xmlns:colourpicker="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     mc:Ignorable="d"
     ResizeMode="NoResize"
-    SizeToContent="WidthAndHeight"
-    Style="{StaticResource CustomWindowStyle}"
+    SizeToContent="Height"
     Title="{loc:Loc KitbashTool.PhotoStudio.Title}"
-    WindowStartupLocation="CenterOwner"
-    Background="{DynamicResource AeBrush.Canvas}"
-    Foreground="{DynamicResource AeBrush.TextPrimary}"
-    FontFamily="{DynamicResource AppFontFamily}"
-    FontWeight="{DynamicResource AppFontWeight}">
+    Width="474"
+    WindowStartupLocation="CenterOwner">
     <windowhandling:AssetEditorWindow.Resources>
         <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
     </windowhandling:AssetEditorWindow.Resources>
-    <DockPanel Width="450" Margin="12" LastChildFill="False">
-        <DockPanel
+    <DockPanel Margin="12" LastChildFill="False">
+        <TextBlock
             DockPanel.Dock="Top"
-            Background="{DynamicResource AeBrush.Surface2}">
-            <Label
-                Content="{loc:Loc KitbashTool.PhotoStudio.CameraInformation}"
-                FontSize="10" />
-            <Separator />
-        </DockPanel>
+            Style="{StaticResource Kitbash.PropertyTitle}"
+            Text="{loc:Loc KitbashTool.PhotoStudio.CameraInformation}" />
 
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.CameraPosition}"
-            LabelWidth="200">
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.CameraPosition}"
+                Style="{StaticResource AeForm.Label}" />
             <mathviews:Vector3View
                 VerticalContentAlignment="Center"
                 Vector3="{Binding CameraPosition, Mode=TwoWay}" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.CameraYaw}"
-            LabelWidth="200">
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.CameraYaw}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding CameraYaw, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.CameraPitch}"
-            LabelWidth="200">
+                Text="{Binding CameraYaw, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.CameraPitch}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding CameraPitch, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.CameraZoom}"
-            LabelWidth="200">
+                Text="{Binding CameraPitch, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.CameraZoom}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding CameraZoom, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.CameraTarget}"
-            LabelWidth="200">
+                Text="{Binding CameraZoom, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.CameraTarget}"
+                Style="{StaticResource AeForm.Label}" />
             <mathviews:Vector3View
-                Margin="2,0"
                 VerticalContentAlignment="Center"
                 Vector3="{Binding CameraLookAt, Mode=TwoWay}" />
-        </basedialogs:AeAttribute>
+        </DockPanel>
         <Button
             Margin="3"
             Command="{Binding RefreshCameraValuesCommand}"
@@ -92,82 +86,80 @@
             Style="{StaticResource AeButton.Secondary}"
             DockPanel.Dock="Top" />
 
-        <DockPanel
+        <TextBlock
             DockPanel.Dock="Top"
-            Background="{DynamicResource AeBrush.Surface2}">
+            Style="{StaticResource Kitbash.PropertyTitle}"
+            Text="{loc:Loc KitbashTool.PhotoStudio.LightInformation}" />
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
             <Label
-                Content="{loc:Loc KitbashTool.PhotoStudio.LightInformation}"
-                FontSize="10" />
-            <Separator />
-        </DockPanel>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.LightColour}"
-            LabelWidth="200">
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.LightColour}"
+                Style="{StaticResource AeForm.Label}" />
             <colourpicker:ColourPickerButtonView
                 Width="25"
                 Height="25"
-                Margin="2"
                 HorizontalAlignment="Left"
                 DataContext="{Binding LightColour}" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.LightIntensity}"
-            LabelWidth="200">
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.LightIntensity}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding LightIntensity, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.EnvLightRotation}"
-            LabelWidth="200">
+                Text="{Binding LightIntensity, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.EnvLightRotation}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding EnvLightRotationY, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationX}"
-            LabelWidth="200">
+                Text="{Binding EnvLightRotationY, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationX}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding DirectLightRotationX, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationY}"
-            LabelWidth="200">
+                Text="{Binding DirectLightRotationX, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationY}"
+                Style="{StaticResource AeForm.Label}" />
             <TextBox
                 Width="100"
-                Margin="2"
                 HorizontalAlignment="Left"
                 HorizontalContentAlignment="Right"
-                Text="{Binding DirectLightRotationY, UpdateSourceTrigger=LostFocus}"
-                VerticalContentAlignment="Center" />
-        </basedialogs:AeAttribute>
-        <basedialogs:AeAttribute
-            DockPanel.Dock="Top"
-            LabelText="{loc:Loc KitbashTool.PhotoStudio.DoubleImageResolution}"
-            LabelWidth="200">
+                Text="{Binding DirectLightRotationY, UpdateSourceTrigger=LostFocus}" />
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Top" LastChildFill="True">
+            <Label
+                DockPanel.Dock="Left"
+                Width="200"
+                Content="{loc:Loc KitbashTool.PhotoStudio.DoubleImageResolution}"
+                Style="{StaticResource AeForm.Label}" />
             <CheckBox
-                Margin="2"
                 HorizontalAlignment="Left"
                 IsChecked="{Binding DoubleImageResolution}" />
-        </basedialogs:AeAttribute>
+        </DockPanel>
 
         <Button
             Margin="3"

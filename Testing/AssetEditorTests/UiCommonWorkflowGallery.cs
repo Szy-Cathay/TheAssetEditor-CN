@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -246,6 +248,10 @@ public class UiCommonWorkflowGallery
                         "data.pack",
                         2,
                         3));
+                    Thread.Sleep(
+                        OperationProgressVisibilityController
+                            .ShowDelay +
+                        TimeSpan.FromMilliseconds(100));
                     window!.Dispatcher.Invoke(() =>
                     {
                         window.UpdateLayout();

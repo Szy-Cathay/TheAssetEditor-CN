@@ -176,23 +176,14 @@
                 ToolTip="{Binding StatusMessage}" />
         </Border>
 
-        <Grid
+        <progress:OperationProgressWindowHost
             Grid.RowSpan="5"
-            Panel.ZIndex="110"
-            Background="Transparent"
-            IsHitTestVisible="{Binding IsLoadingOperation}"
-            Visibility="{Binding IsLoadingOperation, Converter={StaticResource BoolToCollapsedConverter}}">
-            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
-            <progress:OperationProgressView
-                Width="500"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                CurrentDetailText="{Binding LoadingProgressDetailText}"
-                IsOperationActive="{Binding IsLoadingOperation}"
-                IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
-                ProgressMaximum="{Binding LoadingProgressMaximum}"
-                ProgressValue="{Binding LoadingProgressValue}"
-                StatusText="{Binding LoadingProgressStatusText}" />
-        </Grid>
+            CurrentDetailText="{Binding LoadingProgressDetailText}"
+            IsOperationActive="{Binding IsLoadingOperation}"
+            IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
+            ProgressMaximum="{Binding LoadingProgressMaximum}"
+            ProgressValue="{Binding LoadingProgressValue}"
+            StatusText="{Binding LoadingProgressStatusText}"
+            WindowTitle="{loc:Loc OperationProgress.GitOperation}" />
     </Grid>
 </windowhandling:AssetEditorWindow>

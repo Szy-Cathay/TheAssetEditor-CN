@@ -32,6 +32,6 @@
         </Grid.RowDefinitions>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="0" Grid.Column="0" Text="{loc:Loc DdsToMaterialPng.SwapMaterialRoughness}"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="0" Grid.Column="2" IsChecked="{Binding SwapBlender, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+        <CheckBox Grid.Row="0" Grid.Column="2" IsChecked="{Binding SwapBlender, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
     </Grid>
 </UserControl>

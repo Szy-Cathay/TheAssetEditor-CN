@@ -150,11 +150,4 @@
         <Setter Property="CornerRadius" Value="{StaticResource AeRadius.Control}" />
     </Style>
 
-    <Style x:Key="AeWorkflow.OperationProgressSurface" TargetType="{x:Type Border}">
-        <Setter Property="Padding" Value="12" />
-        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource AeRadius.Surface}" />
-    </Style>
 </ResourceDictionary>

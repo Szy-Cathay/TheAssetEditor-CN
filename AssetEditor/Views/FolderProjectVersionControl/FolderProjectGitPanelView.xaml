@@ -658,26 +658,15 @@
             </Border>
         </Grid>
 
-        <Grid
-            x:Name="GitPanelBusyOverlay"
+        <progress:OperationProgressWindowHost
+            x:Name="GitPanelProgressWindow"
             Grid.RowSpan="2"
-            Panel.ZIndex="110"
-            Background="Transparent"
-            IsHitTestVisible="{Binding IsLoadingOperationVisibleInPanel}"
-            Visibility="{Binding IsLoadingOperationVisibleInPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Border Background="{DynamicResource AeBrush.Canvas}" Opacity="0.86" />
-            <progress:OperationProgressView
-                Width="500"
-                MaxWidth="500"
-                Margin="18"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Center"
-                CurrentDetailText="{Binding VersionControl.LoadingProgressDetailText}"
-                IsOperationActive="{Binding IsLoadingOperationVisibleInPanel}"
-                IsProgressIndeterminate="{Binding VersionControl.LoadingProgressIsIndeterminate}"
-                ProgressMaximum="{Binding VersionControl.LoadingProgressMaximum}"
-                ProgressValue="{Binding VersionControl.LoadingProgressValue}"
-                StatusText="{Binding VersionControl.LoadingProgressStatusText}" />
-        </Grid>
+            CurrentDetailText="{Binding VersionControl.LoadingProgressDetailText}"
+            IsOperationActive="{Binding IsLoadingOperationVisibleInPanel}"
+            IsProgressIndeterminate="{Binding VersionControl.LoadingProgressIsIndeterminate}"
+            ProgressMaximum="{Binding VersionControl.LoadingProgressMaximum}"
+            ProgressValue="{Binding VersionControl.LoadingProgressValue}"
+            StatusText="{Binding VersionControl.LoadingProgressStatusText}"
+            WindowTitle="{loc:Loc OperationProgress.GitOperation}" />
     </Grid>
 </UserControl>

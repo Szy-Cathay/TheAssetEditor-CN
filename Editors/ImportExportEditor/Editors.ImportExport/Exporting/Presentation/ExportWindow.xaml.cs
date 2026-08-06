@@ -31,7 +31,7 @@ namespace Editors.ImportExport.Exporting.Presentation
         {
             if (!PathValidator.IsValid(_viewModel.SystemPath))
             {
-                System.Windows.MessageBox.Show(LocalizationManager.Instance.Get("Msg.InvalidOrEmptyPath"), LocalizationManager.Instance.Get("Msg.GeneralError"));
+                MessageBox.Show(LocalizationManager.Instance.Get("Msg.InvalidOrEmptyPath"), LocalizationManager.Instance.Get("Msg.GeneralError"));
                 return;
             }
 

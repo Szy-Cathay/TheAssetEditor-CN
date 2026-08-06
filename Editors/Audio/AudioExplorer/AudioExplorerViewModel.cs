@@ -84,6 +84,9 @@ namespace Editors.Audio.AudioExplorer
         [ObservableProperty] private bool _isStopAudioButtonEnabled = false;
         [ObservableProperty] private bool _isAudioPlaybackVisible = false;
         [ObservableProperty] private bool _isAudioPreviewLoading = false;
+        [ObservableProperty] private int _audioPreviewProgressValue = 0;
+        [ObservableProperty] private int _audioPreviewProgressMaximum = 2;
+        [ObservableProperty] private string _audioPreviewProgressDetail = string.Empty;
         [ObservableProperty] private ImageSource _audioWaveformBaseImageSource;
         [ObservableProperty] private ImageSource _audioWaveformOverlayImageSource;
         [ObservableProperty] private Rect _audioWaveformOverlayClip = Rect.Empty;
@@ -310,6 +313,12 @@ namespace Editors.Audio.AudioExplorer
             }
 
             IsAudioPlaybackVisible = true;
+            AudioPreviewProgressValue = 0;
+            AudioPreviewProgressMaximum = 2;
+            AudioPreviewProgressDetail = string.Format(
+                LocalizationManager.Instance.Get(
+                    "OperationProgress.AudioPreview.Decode"),
+                source.SourceId);
             IsAudioPreviewLoading = true;
             var cancellationTokenSource = new CancellationTokenSource();
             _playbackPreparationCancellationTokenSource =
@@ -336,6 +345,11 @@ namespace Editors.Audio.AudioExplorer
                     throw new InvalidOperationException(
                         $"Unable to prepare audio '{source.SourceId}'.");
 
+                AudioPreviewProgressValue = 1;
+                AudioPreviewProgressDetail = string.Format(
+                    LocalizationManager.Instance.Get(
+                        "OperationProgress.AudioPreview.Waveform"),
+                    source.SourceId);
                 var waveform = await _waveformRendererService.RenderAsync(
                     playbackData.WavData,
                     1000,
@@ -353,6 +367,7 @@ namespace Editors.Audio.AudioExplorer
                 TotalPlaybackTime = waveform.TotalTime;
                 TotalPlaybackSeconds = waveform.TotalTime.TotalSeconds;
                 SetPlaybackPosition(TimeSpan.Zero);
+                AudioPreviewProgressValue = 2;
             }
             catch (OperationCanceledException)
             {

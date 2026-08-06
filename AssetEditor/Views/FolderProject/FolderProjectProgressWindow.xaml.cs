@@ -19,6 +19,8 @@ public partial class FolderProjectProgressWindow : Window
     private FolderProjectContainer? _result;
     private ExceptionDispatchInfo? _failure;
     private bool _operationCompleted;
+    private readonly OperationProgressVisibilityController
+        _visibilityController;
 
     public FolderProjectProgressWindow(
         string title,
@@ -28,6 +30,9 @@ public partial class FolderProjectProgressWindow : Window
     {
         _operation = operation;
         InitializeComponent();
+        _visibilityController = new OperationProgressVisibilityController(
+            Dispatcher,
+            SetWindowFeedbackVisibility);
         DarkTitleBarHelper.Enable(this);
         Title = title;
         FolderProjectOperationProgress.Report(
@@ -51,6 +56,7 @@ public partial class FolderProjectProgressWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _visibilityController.Begin();
         try
         {
             _result = await Task.Run(
@@ -63,6 +69,7 @@ public partial class FolderProjectProgressWindow : Window
         }
         finally
         {
+            await _visibilityController.EndAsync();
             _operationCompleted = true;
             DialogResult = _failure == null;
         }
@@ -72,5 +79,11 @@ public partial class FolderProjectProgressWindow : Window
     {
         if (!_operationCompleted)
             e.Cancel = true;
+    }
+
+    private void SetWindowFeedbackVisibility(bool isVisible)
+    {
+        Opacity = isVisible ? 1 : 0;
+        IsHitTestVisible = isVisible;
     }
 }

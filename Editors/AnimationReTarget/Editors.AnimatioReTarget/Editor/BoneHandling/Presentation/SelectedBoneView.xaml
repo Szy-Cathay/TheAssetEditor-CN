@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Editors.AnimatioReTarget.Editor.BoneHandling.Presentation.SelectedBoneView"
+<UserControl x:Class="Editors.AnimatioReTarget.Editor.BoneHandling.Presentation.SelectedBoneView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -6,88 +6,179 @@
              xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
              xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
-             xmlns:System="clr-namespace:System;assembly=System.Runtime"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450"
+             d:DesignWidth="800">
+    <Grid Margin="8,2,8,6">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="110" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-
-    <UserControl.Resources>
-        <System:Double x:Key="labelWidth">110</System:Double>
-    </UserControl.Resources>
-
-
-    <Grid  >
-        <StackPanel>
-            <DockPanel>
-                <Label>
-                    <Label.Content>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{loc:Loc AnimReTarget.SettingsForSelectedBone}" FontSize="16" VerticalAlignment="Center"/>
-                            <TextBlock Text="&quot;"  VerticalAlignment="Center" FontSize="16" FontWeight="Bold"/>
-                            <TextBlock Text="{Binding BoneManager.SelectedBone.BoneName, UpdateSourceTrigger=PropertyChanged}"  VerticalAlignment="Center" FontSize="16" FontWeight="Bold"/>
-                            <TextBlock Text="&quot;"  VerticalAlignment="Center" FontSize="16" FontWeight="Bold"/>
-                        </StackPanel>
-                    </Label.Content>
-                </Label>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}"      Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.TranslationOffset}"/>
-                <mathviews:Vector3View  VerticalContentAlignment="Center" Vector3="{Binding BoneManager.SelectedBone.TranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}"     Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.RotationOffset}"/>
-                <mathviews:Vector3View  VerticalContentAlignment="Center" Vector3="{Binding BoneManager.SelectedBone.RotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-            </DockPanel>
-
-            <DockPanel >
-                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.BoneLengthMult}" Width ="{StaticResource labelWidth}"/>
-                <TextBox Text="{Binding BoneManager.SelectedBone.BoneLengthMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
-                    <b:Interaction.Behaviors>
-                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
-                    </b:Interaction.Behaviors>
-                </TextBox>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeTranslation}" Content="{loc:Loc AnimReTarget.FreezePosition}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezePosition.ToolTip}"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeRotation}" Content="{loc:Loc AnimReTarget.FreezeRotation}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezeRotation.ToolTip}"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.FreezeRotationZ}" Content="{loc:Loc AnimReTarget.FreezeRotationZ}" Margin="0,0,5,0" ToolTip="{loc:Loc AnimReTarget.FreezeRotationZ.ToolTip}"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ForceSnapToWorld}" Content="{loc:Loc AnimReTarget.SnapWorldspace}" ToolTip="{loc:Loc AnimReTarget.SnapWorldspace.ToolTip}"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ApplyTranslation}" Content="{loc:Loc AnimReTarget.ApplyTranslation}" Margin="0,0,5,0"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding BoneManager.SelectedBone.ApplyRotation}" Content="{loc:Loc AnimReTarget.ApplyRotation}"/>
-            </DockPanel>
-
-            <DockPanel>
-                <Label Style="{StaticResource AeForm.Label}"     Width ="{StaticResource labelWidth}" Content="{loc:Loc AnimReTarget.IsRelativeTo}"/>
-                <Button HorizontalAlignment="Right" DockPanel.Dock="Right" Content="{loc:Loc AnimReTarget.Clear}" Width="60" Command="{Binding BoneManager.ClearRelativeSelectedBoneCommand}" Margin="3,0,0,0"/>
-                <ComboBox ItemsSource="{Binding BoneManager.FlatBoneList}" SelectedItem="{Binding BoneManager.SelectedBone.SelectedRelativeBone, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" DisplayMemberPath="BoneName.Value"/>
-            </DockPanel>
-
-            <Button Grid.Row="4"  Content="{loc:Loc AnimReTarget.ClearSelectedBoneSettings}" Command="{Binding BoneManager.ResetSelectedBoneCommand}" Margin="2" />
+        <StackPanel
+            Grid.Row="0"
+            Grid.ColumnSpan="2"
+            Margin="0,0,0,4"
+            Orientation="Horizontal">
+            <TextBlock
+                Style="{StaticResource AeText.SectionTitle}"
+                Text="{loc:Loc AnimReTarget.SettingsForSelectedBone}" />
+            <TextBlock
+                Margin="4,0,0,0"
+                FontWeight="SemiBold"
+                Text="&quot;" />
+            <TextBlock
+                FontWeight="SemiBold"
+                Text="{Binding BoneManager.SelectedBone.BoneName, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock
+                FontWeight="SemiBold"
+                Text="&quot;" />
         </StackPanel>
+
+        <Label
+            Grid.Row="1"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.TranslationOffset}"
+            Style="{StaticResource AeForm.Label}" />
+        <mathviews:Vector3View
+            Grid.Row="1"
+            Grid.Column="1"
+            Vector3="{Binding BoneManager.SelectedBone.TranslationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+
+        <Label
+            Grid.Row="2"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.RotationOffset}"
+            Style="{StaticResource AeForm.Label}" />
+        <mathviews:Vector3View
+            Grid.Row="2"
+            Grid.Column="1"
+            Vector3="{Binding BoneManager.SelectedBone.RotationOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+
+        <Label
+            Grid.Row="3"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.BoneLengthMult}"
+            Style="{StaticResource AeForm.Label}" />
+        <TextBox
+            Grid.Row="3"
+            Grid.Column="1"
+            Margin="0,2"
+            Text="{Binding BoneManager.SelectedBone.BoneLengthMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}">
+            <b:Interaction.Behaviors>
+                <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+            </b:Interaction.Behaviors>
+        </TextBox>
+
+        <Label
+            Grid.Row="4"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.FreezePosition}"
+            Style="{StaticResource AeForm.Label}" />
+        <CheckBox
+            Grid.Row="4"
+            Grid.Column="1"
+            IsChecked="{Binding BoneManager.SelectedBone.FreezeTranslation}"
+            ToolTip="{loc:Loc AnimReTarget.FreezePosition.ToolTip}" />
+
+        <Label
+            Grid.Row="5"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.FreezeRotation}"
+            Style="{StaticResource AeForm.Label}" />
+        <CheckBox
+            Grid.Row="5"
+            Grid.Column="1"
+            IsChecked="{Binding BoneManager.SelectedBone.FreezeRotation}"
+            ToolTip="{loc:Loc AnimReTarget.FreezeRotation.ToolTip}" />
+
+        <Label
+            Grid.Row="6"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.FreezeRotationZ}"
+            Style="{StaticResource AeForm.Label}" />
+        <CheckBox
+            Grid.Row="6"
+            Grid.Column="1"
+            IsChecked="{Binding BoneManager.SelectedBone.FreezeRotationZ}"
+            ToolTip="{loc:Loc AnimReTarget.FreezeRotationZ.ToolTip}" />
+
+        <Label
+            Grid.Row="7"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.SnapWorldspace}"
+            Style="{StaticResource AeForm.Label}" />
+        <CheckBox
+            Grid.Row="7"
+            Grid.Column="1"
+            IsChecked="{Binding BoneManager.SelectedBone.ForceSnapToWorld}"
+            ToolTip="{loc:Loc AnimReTarget.SnapWorldspace.ToolTip}" />
+
+        <Label
+            Grid.Row="8"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.ApplyTranslation}"
+            Style="{StaticResource AeForm.Label}" />
+        <CheckBox
+            Grid.Row="8"
+            Grid.Column="1"
+            IsChecked="{Binding BoneManager.SelectedBone.ApplyTranslation}" />
+
+        <Label
+            Grid.Row="9"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.ApplyRotation}"
+            Style="{StaticResource AeForm.Label}" />
+        <CheckBox
+            Grid.Row="9"
+            Grid.Column="1"
+            IsChecked="{Binding BoneManager.SelectedBone.ApplyRotation}" />
+
+        <Label
+            Grid.Row="10"
+            Grid.Column="0"
+            Content="{loc:Loc AnimReTarget.IsRelativeTo}"
+            Style="{StaticResource AeForm.Label}" />
+        <Grid
+            Grid.Row="10"
+            Grid.Column="1"
+            Margin="0,2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox
+                Grid.Column="0"
+                DisplayMemberPath="BoneName.Value"
+                ItemsSource="{Binding BoneManager.FlatBoneList}"
+                SelectedItem="{Binding BoneManager.SelectedBone.SelectedRelativeBone, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+            <Button
+                Grid.Column="1"
+                Margin="4,0,0,0"
+                Content="{loc:Loc AnimReTarget.Clear}"
+                Command="{Binding BoneManager.ClearRelativeSelectedBoneCommand}" />
+        </Grid>
+
+        <Button
+            Grid.Row="11"
+            Grid.Column="1"
+            Margin="0,4,0,0"
+            Content="{loc:Loc AnimReTarget.ClearSelectedBoneSettings}"
+            Command="{Binding BoneManager.ResetSelectedBoneCommand}" />
     </Grid>
 </UserControl>

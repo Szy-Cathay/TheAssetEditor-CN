@@ -5,7 +5,7 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     Title=""
     Width="700"
-    MinHeight="190"
+    MinHeight="170"
     MaxHeight="620"
     ResizeMode="CanResizeWithGrip"
     ShowInTaskbar="False"
@@ -17,5 +17,6 @@
     WindowStartupLocation="CenterOwner">
     <progress:OperationProgressView
         x:Name="FolderProjectOperationProgress"
-        Margin="20" />
+        Margin="20"
+        UseDeferredVisibility="False" />
 </Window>

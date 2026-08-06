@@ -58,17 +58,17 @@
 
                     <DockPanel LastChildFill="True" DockPanel.Dock="Top">
                         <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.ReduceLods}"/>
-                        <CheckBox HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding Mesh.ReduceMeshOnLodGeneration, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        <CheckBox VerticalAlignment="Center" IsChecked="{Binding Mesh.ReduceMeshOnLodGeneration, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     </DockPanel>
 
                     <DockPanel LastChildFill="True" DockPanel.Dock="Top">
                         <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.RenderBbox}"/>
-                        <CheckBox HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawBoundingBox, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        <CheckBox VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawBoundingBox, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     </DockPanel>
 
                     <DockPanel LastChildFill="True" DockPanel.Dock="Top">
                         <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Mesh.ShowPivot}"/>
-                        <CheckBox HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawPivotPoint, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        <CheckBox VerticalAlignment="Center" IsChecked="{Binding Mesh.DrawPivotPoint, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     </DockPanel>
 
                     <DockPanel DockPanel.Dock="Top">

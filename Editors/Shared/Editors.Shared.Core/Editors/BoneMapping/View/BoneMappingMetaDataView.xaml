@@ -43,10 +43,10 @@
         </TextBox>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="2" Grid.Column="0" Text="{loc:Loc BoneMapping.OnlyMoveSelectedBone}"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="2" Grid.Column="2" IsChecked="{Binding OnlyMOveSelectedBone.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
+        <CheckBox Grid.Row="2" Grid.Column="2" IsChecked="{Binding OnlyMOveSelectedBone.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" IsEnabled="False"/>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="3" Grid.Column="0" Text="{loc:Loc BoneMapping.RelativeScale}"/>
-        <CheckBox HorizontalAlignment="Right" Grid.Row="3" Grid.Column="2" IsChecked="{Binding RelativeScale.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+        <CheckBox Grid.Row="3" Grid.Column="2" IsChecked="{Binding RelativeScale.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
         <TextBlock Style="{StaticResource AeForm.TextLabel}" Grid.Row="4" Grid.Column="0" Text="{loc:Loc BoneMapping.DisplayOffset}"/>
         <mathviews:Vector3View Grid.Row="4" Grid.Column="2" Width="350" VerticalContentAlignment="Center" Vector3="{Binding SkeletonDisplayOffset, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2" HorizontalAlignment="Left"/>

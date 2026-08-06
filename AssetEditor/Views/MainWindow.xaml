@@ -281,18 +281,15 @@
                         Text="{Binding EditablePackFile}" />
                 </StackPanel>
 
-                <progress:OperationProgressView
+                <progress:OperationProgressWindowHost
                     x:Name="ApplicationLoadingProgress"
-                    Width="520"
-                    Margin="8,4"
-                    HorizontalAlignment="Right"
                     CurrentDetailText="{Binding LoadingProgressDetailText}"
                     IsOperationActive="{Binding IsLoadingPacks}"
                     IsProgressIndeterminate="{Binding LoadingProgressIsIndeterminate}"
                     ProgressMaximum="{Binding LoadingProgressMaximum}"
                     ProgressValue="{Binding LoadingProgressValue}"
                     StatusText="{Binding LoadingStatusText}"
-                    Visibility="{Binding IsLoadingPacks, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    WindowTitle="{Binding LoadingStatusText}" />
             </Grid>
         </Border>
     </Grid>

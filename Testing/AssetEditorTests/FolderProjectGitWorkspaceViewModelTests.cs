@@ -1727,49 +1727,44 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
-    public void GitManagementLoadingStates_BlockTheUnderlyingInterface()
+    public void GitManagementLoadingStates_UseIndependentProgressWindows()
     {
-        var overlays = new[]
+        var hosts = new[]
         {
             (Document: LoadView("FolderProjectGitPanelView.xaml"),
-                Name: "GitPanelBusyOverlay"),
+                Name: "GitPanelProgressWindow"),
             (Document: LoadView("FolderProjectGitRepositoryView.xaml"),
-                Name: "RepositoryBusyOverlay"),
+                Name: "RepositoryProgressWindow"),
         };
-        XNamespace presentation =
-            "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml =
             "http://schemas.microsoft.com/winfx/2006/xaml";
 
         NUnitAssert.Multiple(() =>
         {
-            foreach (var overlay in overlays)
+            foreach (var host in hosts)
             {
-                var element = overlay.Document
-                    .Descendants(presentation + "Grid")
+                var element = host.Document
+                    .Descendants()
                     .Single(candidate =>
+                        candidate.Name.LocalName ==
+                            nameof(OperationProgressWindowHost) &&
                         candidate.Attribute(xaml + "Name")?.Value ==
-                        overlay.Name);
+                        host.Name);
                 NUnitAssert.That(
-                    element.Attribute("Background")?.Value,
-                    Is.EqualTo("Transparent"));
-                var backdrop = element.Elements(presentation + "Border")
-                    .First();
+                    element.Attribute("IsOperationActive")?.Value,
+                    Does.Contain("LoadingOperation"));
                 NUnitAssert.That(
-                    backdrop.Attribute("Background")?.Value,
-                    Is.EqualTo("{DynamicResource AeBrush.Canvas}"));
-                NUnitAssert.That(
-                    backdrop.Attribute("Opacity")?.Value,
-                    Is.EqualTo("0.86"));
-                NUnitAssert.That(
-                    element.Attribute("IsHitTestVisible")?.Value,
-                    Does.Contain("IsLoadingOperation"));
+                    host.Document.Descendants().Any(candidate =>
+                        candidate.Attribute(xaml + "Name")?.Value.EndsWith(
+                            "BusyOverlay",
+                            StringComparison.Ordinal) == true),
+                    Is.False);
             }
         });
     }
 
     [Test]
-    public void GitBackgroundLoads_ShowBlockingProgressOverlays()
+    public void GitBackgroundLoads_UpdateIndependentProgressWindows()
     {
         var workspace = CreateWorkspace(out var versionControl);
         var serviceProvider = new Mock<IServiceProvider>();
@@ -1791,24 +1786,16 @@ public class FolderProjectGitWorkspaceViewModelTests
                 panel.Arrange(new Rect(0, 0, 500, 700));
                 panel.UpdateLayout();
 
-                var panelOverlay = (Grid)panel.FindName(
-                    "GitPanelBusyOverlay");
-                var panelProgress = FindVisualDescendant<
-                    OperationProgressView>(panelOverlay);
+                var panelProgress = (OperationProgressWindowHost)
+                    panel.FindName("GitPanelProgressWindow");
 
                 NUnitAssert.Multiple(() =>
                 {
                     NUnitAssert.That(
-                        panelOverlay.Visibility,
-                        Is.EqualTo(Visibility.Visible));
-                    NUnitAssert.That(
-                        panelOverlay.IsHitTestVisible,
+                        panelProgress.IsOperationActive,
                         Is.True);
                     NUnitAssert.That(
-                        panelProgress?.IsOperationActive,
-                        Is.True);
-                    NUnitAssert.That(
-                        panelProgress?.StatusText,
+                        panelProgress.StatusText,
                         Is.EqualTo(LocalizationManager.Instance.Get(
                             "FolderProject.VersionControl.Busy.Refreshing")));
                 });
@@ -1823,24 +1810,16 @@ public class FolderProjectGitWorkspaceViewModelTests
                 repository.Arrange(new Rect(0, 0, 900, 650));
                 repository.UpdateLayout();
 
-                var repositoryOverlay = (Grid)repository.FindName(
-                    "RepositoryBusyOverlay");
-                var repositoryProgress = FindVisualDescendant<
-                    OperationProgressView>(repositoryOverlay);
+                var repositoryProgress = (OperationProgressWindowHost)
+                    repository.FindName("RepositoryProgressWindow");
 
                 NUnitAssert.Multiple(() =>
                 {
                     NUnitAssert.That(
-                        repositoryOverlay.Visibility,
-                        Is.EqualTo(Visibility.Visible));
-                    NUnitAssert.That(
-                        repositoryOverlay.IsHitTestVisible,
+                        repositoryProgress.IsOperationActive,
                         Is.True);
                     NUnitAssert.That(
-                        repositoryProgress?.IsOperationActive,
-                        Is.True);
-                    NUnitAssert.That(
-                        repositoryProgress?.StatusText,
+                        repositoryProgress.StatusText,
                         Is.EqualTo(LocalizationManager.Instance.Get(
                             "FolderProject.VersionControl.Busy.LoadingCommit")));
                 });
@@ -1848,7 +1827,7 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
-    public async Task RepositoryLoad_ShowsOnlyRepositoryProgressOverlay()
+    public async Task RepositoryLoad_ShowsOnlyRepositoryProgressWindow()
     {
         var workspace = CreateWorkspace(out var versionControl);
         var repositoryEditor = new FolderProjectGitRepositoryViewModel();
@@ -1881,23 +1860,17 @@ public class FolderProjectGitWorkspaceViewModelTests
                 panel.UpdateLayout();
                 repository.UpdateLayout();
 
-                var panelOverlay = (Grid)panel.FindName(
-                    "GitPanelBusyOverlay");
-                var repositoryOverlay = (Grid)repository.FindName(
-                    "RepositoryBusyOverlay");
+                var panelProgress = (OperationProgressWindowHost)
+                    panel.FindName("GitPanelProgressWindow");
+                var repositoryProgress = (OperationProgressWindowHost)
+                    repository.FindName("RepositoryProgressWindow");
                 NUnitAssert.Multiple(() =>
                 {
                     NUnitAssert.That(
-                        panelOverlay.Visibility,
-                        Is.EqualTo(Visibility.Collapsed));
-                    NUnitAssert.That(
-                        panelOverlay.IsHitTestVisible,
+                        panelProgress.IsOperationActive,
                         Is.False);
                     NUnitAssert.That(
-                        repositoryOverlay.Visibility,
-                        Is.EqualTo(Visibility.Visible));
-                    NUnitAssert.That(
-                        repositoryOverlay.IsHitTestVisible,
+                        repositoryProgress.IsOperationActive,
                         Is.True);
                 });
 
@@ -1907,10 +1880,7 @@ public class FolderProjectGitWorkspaceViewModelTests
                 NUnitAssert.Multiple(() =>
                 {
                     NUnitAssert.That(
-                        panelOverlay.Visibility,
-                        Is.EqualTo(Visibility.Visible));
-                    NUnitAssert.That(
-                        panelOverlay.IsHitTestVisible,
+                        panelProgress.IsOperationActive,
                         Is.True);
                 });
             });
@@ -2519,25 +2489,6 @@ public class FolderProjectGitWorkspaceViewModelTests
             "Views",
             "FolderProjectVersionControl",
             fileName));
-    }
-
-    private static T? FindVisualDescendant<T>(DependencyObject parent)
-        where T : DependencyObject
-    {
-        for (var index = 0;
-             index < VisualTreeHelper.GetChildrenCount(parent);
-             index++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, index);
-            if (child is T match)
-                return match;
-
-            var descendant = FindVisualDescendant<T>(child);
-            if (descendant != null)
-                return descendant;
-        }
-
-        return null;
     }
 
     private static FolderProjectCommitSummary Commit(

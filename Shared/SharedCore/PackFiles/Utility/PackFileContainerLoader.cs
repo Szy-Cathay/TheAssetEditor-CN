@@ -84,7 +84,9 @@ namespace Shared.Core.PackFiles.Utility
                 if (!File.Exists(packFileSystemPath))
                 {
                     _logger.Here().Error($"Trying to load file {packFileSystemPath}, which can not be located.", "Error");
-                    System.Windows.MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.PackFileNotFound", packFileSystemPath));
+                    UiMessageBoxBridge.Show(LocalizationManager.Instance.GetFormat(
+                        "Msg.PackFileNotFound",
+                        packFileSystemPath));
                     return null;
                 }
 

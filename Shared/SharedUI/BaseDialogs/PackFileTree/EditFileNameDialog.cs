@@ -2,7 +2,6 @@
 using System.IO;
 using CommonControls.BaseDialogs;
 using Shared.Core.Services;
-using MessageBox = System.Windows.MessageBox;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree
 {

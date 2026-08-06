@@ -14,6 +14,7 @@ using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels.PinTool;
 using Editors.KitbasherEditor.ViewModels.SaveDialog;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.SpecGloss;
+using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Utility.UserInterface;
 using KitbasherEditor.Views;
 using KitbasherEditor.Views.EditorViews;
@@ -146,7 +147,7 @@ public class UiModelKitbashFamilyGallery
             1100,
             180),
         "scene-explorer" => Host(
-            new SceneExplorerView { DataContext = new GalleryModel() },
+            CreateSceneExplorer(),
             520,
             680),
         "scene-item-editor" => Host(
@@ -350,6 +351,55 @@ public class UiModelKitbashFamilyGallery
         return new MeshFitterWindow(viewModel);
     }
 
+    private static SceneExplorerView CreateSceneExplorer()
+    {
+        var view = new SceneExplorerView { DataContext = new GalleryModel() };
+        var tree = (MultiSelectTreeView)view.FindName("TheTreeView");
+        var nodes = (ObservableCollection<SceneExplorerNode>)typeof(
+                MultiSelectTreeView)
+            .GetField("_nodes", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(tree)!;
+
+        var root = CreateNode(new GroupNode("Root"));
+        var character = CreateNode(new VariantMeshNode("advisor01"));
+        var model = CreateNode(new Rmv2ModelNode("Editable Model"));
+        var lod = CreateNode(new Rmv2LodNode("Lod 0", 0));
+        var mesh = (Rmv2MeshNode)System.Runtime.CompilerServices.RuntimeHelpers
+            .GetUninitializedObject(typeof(Rmv2MeshNode));
+        mesh.Name = "misc_advisor_body_01";
+        mesh.IsVisible = true;
+        var meshNode = CreateNode(mesh, selected: true);
+        var references = CreateNode(
+            new GroupNode("Reference meshes"),
+            isReference: true);
+
+        character.Content.Parent = root.Content;
+        model.Content.Parent = root.Content;
+        lod.Content.Parent = model.Content;
+        meshNode.Content.Parent = lod.Content;
+        references.Content.Parent = model.Content;
+        root.Children.Add(character);
+        root.Children.Add(model);
+        model.Children.Add(lod);
+        model.Children.Add(references);
+        lod.Children.Add(meshNode);
+        nodes.Add(root);
+        return view;
+
+        static SceneExplorerNode CreateNode(
+            ISceneNode content,
+            bool isReference = false,
+            bool selected = false)
+        {
+            content.IsExpanded = true;
+            content.IsVisible = true;
+            return new SceneExplorerNode(content, isReference)
+            {
+                IsSelected = selected,
+            };
+        }
+    }
+
     private static GalleryModel CreateMenuBarModel() => new()
     {
         MenuItems = Array.Empty<object>(),
@@ -397,21 +447,21 @@ public class UiModelKitbashFamilyGallery
     private static void ConfigureWindow(Window window, string variant)
     {
         window.Title = variant;
+        window.ShowActivated = false;
+        window.ShowInTaskbar = false;
+
+        if (variant == "photo-studio")
+            return;
+
         window.WindowStyle = WindowStyle.None;
         window.ResizeMode = ResizeMode.NoResize;
         window.SizeToContent = SizeToContent.Manual;
-        window.ShowActivated = false;
-        window.ShowInTaskbar = false;
 
         switch (variant)
         {
             case "mesh-fitter":
                 window.Width = 1000;
                 window.Height = 620;
-                break;
-            case "photo-studio":
-                window.Width = 520;
-                window.Height = 720;
                 break;
             case "pin-tool":
                 window.Width = 500;

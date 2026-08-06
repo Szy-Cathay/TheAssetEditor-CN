@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Xml.Linq;
 using NUnit.Framework;
 using Shared.Core.Settings;
 using Shared.Ui.BaseDialogs;
@@ -117,9 +118,19 @@ public class UiThemeCompletionTests
                 {
                     ThemesController.SetTheme(ThemeType.DarkTheme);
                     window = new AssetEditorWindow();
-                    NUnitAssert.That(
-                        window.Background,
-                        Is.EqualTo(Application.Current.FindResource("WindowBackground")));
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            window.Background,
+                            Is.EqualTo(Application.Current.FindResource("AeBrush.Canvas")));
+                        NUnitAssert.That(
+                            window.Foreground,
+                            Is.EqualTo(Application.Current.FindResource("AeBrush.TextPrimary")));
+                        NUnitAssert.That(
+                            window.Style?.TargetType,
+                            Is.EqualTo(typeof(Window)));
+                        NUnitAssert.That(window.Template, Is.Not.Null);
+                    });
 
                     ThemesController.ApplyCustomFont(customFont, FontWeights.SemiBold);
                     NUnitAssert.Multiple(() =>
@@ -133,6 +144,76 @@ public class UiThemeCompletionTests
                     window?.Close();
                     ThemesController.ApplyCustomFont(previousFont, previousWeight);
                     ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
+    public void ProductWindows_DoNotOverrideTheUnifiedChromeOrCanvas()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var offenders = ProductXamlFiles(solutionRoot)
+            .Select(path => (Path: path, Root: XDocument.Load(path).Root))
+            .Where(item => item.Root is not null &&
+                item.Root.Name.LocalName is "Window" or "AssetEditorWindow")
+            .Where(item =>
+            {
+                var attributes = item.Root!.Attributes().ToDictionary(
+                    attribute => attribute.Name.LocalName,
+                    attribute => attribute.Value);
+                var hasConflictingStyle =
+                    attributes.TryGetValue("Style", out var style) &&
+                    !style.Contains("CustomWindowStyle", StringComparison.Ordinal);
+                var hasConflictingBackground =
+                    attributes.TryGetValue("Background", out var background) &&
+                    !background.Contains("AeBrush.Canvas", StringComparison.Ordinal);
+                return hasConflictingStyle || hasConflictingBackground;
+            })
+            .Select(item => IOPath.GetRelativePath(solutionRoot, item.Path))
+            .OrderBy(path => path)
+            .ToArray();
+
+        NUnitAssert.That(offenders, Is.Empty);
+    }
+
+    [Test]
+    public void PlainWindow_InheritsTheUnifiedChromeAndCanvas()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var window = new Window
+                {
+                    Width = 320,
+                    Height = 180,
+                    Left = -10000,
+                    Top = -10000,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+                try
+                {
+                    window.Show();
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            window.Style?.TargetType,
+                            Is.EqualTo(typeof(Window)));
+                        NUnitAssert.That(window.Template, Is.Not.Null);
+                        NUnitAssert.That(
+                            window.Background,
+                            Is.EqualTo(Application.Current.FindResource(
+                                "AeBrush.Canvas")));
+                        NUnitAssert.That(
+                            window.Foreground,
+                            Is.EqualTo(Application.Current.FindResource(
+                                "AeBrush.TextPrimary")));
+                    });
+                }
+                finally
+                {
+                    window.Close();
                 }
             });
     }

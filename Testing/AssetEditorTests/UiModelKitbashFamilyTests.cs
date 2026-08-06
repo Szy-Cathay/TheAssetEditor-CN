@@ -1,5 +1,13 @@
 using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Xml.Linq;
+using CommonControls.Editors.BoneMapping.View;
+using Editors.KitbasherEditor.ChildEditors.PhotoStudio;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using Shared.Core.Services;
 using NUnitAssert = NUnit.Framework.Assert;
 
 namespace AssetEditorTests;
@@ -106,6 +114,238 @@ public class UiModelKitbashFamilyTests
     }
 
     [Test]
+    public void SkeletonEditor_UsesFlatAlignedPropertySections()
+    {
+        var path = Path.Combine(
+            FindSolutionRoot(),
+            "Editors",
+            "SkeletonEditor",
+            "Editor.VisualSkeletonEditor",
+            "SkeletonEditor",
+            "EditorView.xaml");
+        var document = XDocument.Load(path);
+        var skeletonPath = document.Descendants().Single(element =>
+            element.Name.LocalName == "TextBox" &&
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Text" &&
+                attribute.Value.Contains(
+                    "SkeletonName",
+                    StringComparison.Ordinal) &&
+                !attribute.Value.Contains(
+                    "SourceSkeletonName",
+                    StringComparison.Ordinal)));
+        var referenceMeshPath = document.Descendants().Single(element =>
+            element.Name.LocalName == "TextBox" &&
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Text" &&
+                attribute.Value.Contains(
+                    "RefMeshName",
+                    StringComparison.Ordinal)));
+        var sectionTitles = document.Descendants()
+            .Where(element =>
+                element.Name.LocalName == "TextBlock" &&
+                element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Style" &&
+                    attribute.Value.Contains(
+                        "AeText.SectionTitle",
+                        StringComparison.Ordinal)))
+            .ToArray();
+        var treePanel = document.Descendants().Single(element =>
+            element.Name.LocalName == "Border" &&
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Style" &&
+                attribute.Value.Contains(
+                    "AeSurface.Panel",
+                    StringComparison.Ordinal)) &&
+            element.Descendants().Any(descendant =>
+                descendant.Name.LocalName == "TreeView"));
+        var loadButtons = document.Descendants()
+            .Where(element =>
+                element.Name.LocalName == "Button" &&
+                element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Content" &&
+                    attribute.Value.Contains(
+                        "General.Load",
+                        StringComparison.Ordinal)))
+            .ToArray();
+        var resourceGrid = skeletonPath.Parent!;
+        var visibilityToggles = resourceGrid.Elements()
+            .Where(element =>
+                element.Name.LocalName == "ToggleButton" &&
+                element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Style" &&
+                    attribute.Value.Contains(
+                        "AeButton.VisibilityToggle",
+                        StringComparison.Ordinal)))
+            .ToArray();
+        var visibilityBindings = visibilityToggles
+            .SelectMany(element => element.Attributes())
+            .Where(attribute => attribute.Name.LocalName == "IsChecked")
+            .Select(attribute => attribute.Value)
+            .ToArray();
+        var resourceColumnWidths = resourceGrid.Elements()
+            .Single(element => element.Name.LocalName == "Grid.ColumnDefinitions")
+            .Elements()
+            .Select(element => element.Attribute("Width")?.Value)
+            .ToArray();
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                document.Descendants().Any(element =>
+                    element.Name.LocalName == "GroupBox"),
+                Is.False);
+            NUnitAssert.That(sectionTitles, Has.Length.EqualTo(3));
+            NUnitAssert.That(
+                new[] { skeletonPath, referenceMeshPath }.All(element =>
+                    element.Attributes().Any(attribute =>
+                        attribute.Name.LocalName == "IsReadOnly" &&
+                        attribute.Value.Equals(
+                            "True",
+                            StringComparison.OrdinalIgnoreCase))),
+                Is.True);
+            NUnitAssert.That(treePanel, Is.Not.Null);
+            NUnitAssert.That(loadButtons, Has.Length.EqualTo(2));
+            NUnitAssert.That(
+                loadButtons.All(button =>
+                    button.Attributes().Any(attribute =>
+                        attribute.Name.LocalName == "Width" &&
+                        attribute.Value == "72")),
+                Is.True);
+            NUnitAssert.That(
+                resourceGrid.Elements().Any(element =>
+                    element.Name.LocalName == "CheckBox"),
+                Is.False);
+            NUnitAssert.That(visibilityToggles, Has.Length.EqualTo(2));
+            NUnitAssert.That(
+                visibilityBindings.Any(binding => binding.Contains(
+                    "ShowSkeleton",
+                    StringComparison.Ordinal)),
+                Is.True);
+            NUnitAssert.That(
+                visibilityBindings.Any(binding => binding.Contains(
+                    "ShowRefMesh",
+                    StringComparison.Ordinal)),
+                Is.True);
+            NUnitAssert.That(
+                resourceColumnWidths,
+                Is.EqualTo(new[] { "120", "*", "72", "Auto" }));
+        });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void PhotoStudio_UsesTheSharedWindowShellWithoutPrivateChrome()
+    {
+        var localizationManager = new LocalizationManager();
+        localizationManager.LoadLanguage();
+        using var services = new ServiceCollection()
+            .AddSingleton(localizationManager)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                using var window = new PhotoStudioWindow(null!)
+                {
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var source = File.ReadAllText(Path.Combine(
+                        FindSolutionRoot(),
+                        "Editors",
+                        "Kitbashing",
+                        "KitbasherEditor",
+                        "ChildEditors",
+                        "PhotoStudio",
+                        "PhotoStudioWindow.xaml.cs"));
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            window.SizeToContent,
+                            Is.EqualTo(SizeToContent.Height));
+                        NUnitAssert.That(window.Width, Is.EqualTo(474));
+                        NUnitAssert.That(source, Does.Not.Contain("DllImport"));
+                        NUnitAssert.That(
+                            source,
+                            Does.Not.Contain("OnSourceInitialized"));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void BoneMappingActions_UseTwoReadableRows()
+    {
+        var localizationManager = new LocalizationManager();
+        localizationManager.LoadLanguage();
+        using var services = new ServiceCollection()
+            .AddSingleton(localizationManager)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                var view = new BoneMappingView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 1000,
+                    Height = 900,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var expectedLabels = new[]
+                    {
+                        "BoneMapping.AutoMapByName",
+                        "BoneMapping.AutoMapByHierarchy",
+                        "BoneMapping.DeleteSelf",
+                        "BoneMapping.DeleteSelfAndChildren",
+                        "BoneMapping.CopyToAllChildren",
+                    }.Select(localizationManager.Get).ToHashSet();
+                    var actions = FindVisualDescendants<Button>(view)
+                        .Where(button =>
+                            button.Content is string label &&
+                            expectedLabels.Contains(label))
+                        .ToArray();
+                    var rowOffsets = actions
+                        .Select(button => Math.Round(
+                            button.TranslatePoint(new Point(), view).Y,
+                            2))
+                        .Distinct()
+                        .ToArray();
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(actions, Has.Length.EqualTo(5));
+                        NUnitAssert.That(rowOffsets, Has.Length.EqualTo(2));
+                        NUnitAssert.That(
+                            actions.Select(button => button.ActualWidth),
+                            Has.All.GreaterThanOrEqualTo(150));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
     public void ModelKitbashFamily_UsesCompactThemeNativeChrome()
     {
         var styles = ReadKitbashStyleSource();
@@ -186,6 +426,15 @@ public class UiModelKitbashFamilyTests
             "Core",
             "SceneExplorer",
             "SceneExplorerView.xaml"));
+        var iconConverter = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Kitbashing",
+            "KitbasherEditor",
+            "Core",
+            "SceneNodeEditor",
+            "ValueConverters",
+            "SceneNodeToIconKindConverter.cs"));
         var sceneNodeEditor = File.ReadAllText(Path.Combine(
             root,
             "Editors",
@@ -214,12 +463,53 @@ public class UiModelKitbashFamilyTests
             NUnitAssert.That(
                 styles,
                 Does.Contain("x:Key=\"Kitbash.VisibilityToggle\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("x:Key=\"Kitbash.SceneTreeItem\""));
+            NUnitAssert.That(styles, Does.Contain("Margin=\"16,0,0,0\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("Property=\"IsKeyboardFocused\" Value=\"True\""));
+            NUnitAssert.That(styles, Does.Not.Contain("IsKeyboardFocusWithin"));
             NUnitAssert.That(styles, Does.Contain("x:Name=\"CheckMark\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain(
+                    "Setter TargetName=\"CheckMark\" Property=\"Opacity\" Value=\"1\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain(
+                    "Stroke=\"{DynamicResource AeBrush.Accent}\""));
             NUnitAssert.That(styles, Does.Contain("x:Key=\"Kitbash.PropertyTitle\""));
             NUnitAssert.That(styles, Does.Not.Contain("<Ellipse"));
             NUnitAssert.That(
                 sceneExplorer,
                 Does.Contain("Style=\"{StaticResource Kitbash.VisibilityToggle}\""));
+            NUnitAssert.That(
+                sceneExplorer,
+                Does.Contain(
+                    "BasedOn=\"{StaticResource Kitbash.SceneTreeItem}\""));
+            NUnitAssert.That(styles, Does.Contain("x:Key=\"Kitbash.SceneIcon\""));
+            NUnitAssert.That(styles, Does.Contain("x:Key=\"Kitbash.SceneLockIcon\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("<Trigger Property=\"Content\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("Stroke=\"{DynamicResource AeBrush.TextSecondary}\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("Fill=\"{DynamicResource AeBrush.Accent}\""));
+            NUnitAssert.That(sceneExplorer, Does.Contain("x:Name=\"NodeStatus\""));
+            NUnitAssert.That(sceneExplorer, Does.Contain("x:Name=\"LockState\""));
+            NUnitAssert.That(
+                sceneExplorer,
+                Does.Match("x:Name=\"NodeStatus\"[\\s\\S]*?Orientation=\"Horizontal\""));
+            NUnitAssert.That(sceneExplorer, Does.Not.Contain("Grid.Column=\"3\""));
+            NUnitAssert.That(sceneExplorer, Does.Not.Contain("ImageBrush"));
+            NUnitAssert.That(iconConverter, Does.Contain("SceneNodeIconKind.Lod"));
+            NUnitAssert.That(iconConverter, Does.Contain("SceneNodeIconKind.Mesh"));
+            NUnitAssert.That(iconConverter, Does.Not.Contain("IconLibrary"));
             NUnitAssert.That(sceneExplorer, Does.Contain("Content.IsVisible"));
             NUnitAssert.That(propertySource, Does.Not.Contain("FontSize=\"20\""));
             NUnitAssert.That(
@@ -311,22 +601,48 @@ public class UiModelKitbashFamilyTests
             "KitbasherEditor",
             "KitbashUiStyles.xaml"));
 
+    private static IEnumerable<T> FindVisualDescendants<T>(
+        DependencyObject parent)
+        where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match)
+                yield return match;
+
+            foreach (var descendant in FindVisualDescendants<T>(child))
+                yield return descendant;
+        }
+    }
+
     private static string FindSolutionRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
+        var configuredRoot = Environment.GetEnvironmentVariable(
+            "AE_SOLUTION_ROOT");
+        foreach (var startingPath in new[]
+                 {
+                     configuredRoot,
+                     AppContext.BaseDirectory,
+                     Directory.GetCurrentDirectory(),
+                 }.Where(path => !string.IsNullOrWhiteSpace(path)))
         {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "AssetEditor.CN.sln")))
+            DirectoryInfo? directory = new(startingPath!);
+            while (directory is not null)
             {
-                return directory.FullName;
-            }
+                if (File.Exists(Path.Combine(
+                        directory.FullName,
+                        "AssetEditor.CN.sln")))
+                {
+                    return directory.FullName;
+                }
 
-            directory = directory.Parent;
+                directory = directory.Parent;
+            }
         }
 
         throw new DirectoryNotFoundException(
             "Could not locate the solution root.");
     }
+
 }

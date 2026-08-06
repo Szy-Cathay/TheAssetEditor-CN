@@ -162,16 +162,15 @@
             </Grid>
         </Grid>
 
-        <progress:OperationProgressView
+        <progress:OperationProgressWindowHost
             Grid.Row="2"
-            Margin="10,0,10,6"
             CurrentDetailText="{Binding CreationProgressDetail}"
             IsOperationActive="{Binding IsCreating}"
             IsProgressIndeterminate="{Binding CreationProgressIsIndeterminate}"
             ProgressMaximum="{Binding CreationProgressMaximum}"
             ProgressValue="{Binding CreationProgressValue}"
             StatusText="{loc:Loc OperationProgress.AudioCreate}"
-            Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibilityConverter}}" />
+            WindowTitle="{loc:Loc OperationProgress.AudioCreate}" />
 
         <StackPanel
             Grid.Row="3"

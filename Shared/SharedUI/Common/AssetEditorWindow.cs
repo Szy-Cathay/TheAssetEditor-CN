@@ -19,7 +19,9 @@ namespace WindowHandling
             if (mainWindow != null && mainWindow != this && mainWindow.IsLoaded)
                 Owner = mainWindow;
             Deactivated += AssetEdWindow_Deactivated;
-            SetResourceReference(BackgroundProperty, "WindowBackground");
+            SetResourceReference(StyleProperty, "CustomWindowStyle");
+            SetResourceReference(BackgroundProperty, "AeBrush.Canvas");
+            SetResourceReference(ForegroundProperty, "AeBrush.TextPrimary");
             SetResourceReference(FontFamilyProperty, "AppFontFamily");
             SetResourceReference(FontWeightProperty, "AppFontWeight");
             DarkTitleBarHelper.Enable(this);

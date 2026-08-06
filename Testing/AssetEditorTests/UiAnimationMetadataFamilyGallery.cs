@@ -176,9 +176,9 @@ public class UiAnimationMetadataFamilyGallery
             760,
             780),
         "campaign-animation" => Host(
-            new CampaignAnimationView { DataContext = CreateGeneralModel() },
-            760,
-            300),
+            CreateCampaignAnimationWorkspace(),
+            920,
+            620),
         "mount-animation" => Host(
             new MountAnimationView { DataContext = CreateGeneralModel() },
             820,
@@ -445,6 +445,32 @@ public class UiAnimationMetadataFamilyGallery
             FragmentName = "empire_general.fragment",
             SavePrefix = "empire_general_",
         };
+    }
+
+    private static FrameworkElement CreateCampaignAnimationWorkspace()
+    {
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition
+        {
+            Height = GridLength.Auto,
+        });
+        layout.RowDefinitions.Add(new RowDefinition
+        {
+            Height = GridLength.Auto,
+        });
+
+        var sceneObject = new SceneObjectView
+        {
+            DataContext = CreateSceneObjectModel(),
+        };
+        var campaignEditor = new CampaignAnimationView
+        {
+            DataContext = CreateGeneralModel(),
+        };
+        Grid.SetRow(campaignEditor, 1);
+        layout.Children.Add(sceneObject);
+        layout.Children.Add(campaignEditor);
+        return layout;
     }
 
     private static GalleryModel CreateBatchExportModel() => new()

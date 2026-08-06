@@ -116,15 +116,24 @@
                 Grid.Column="1"
                 Margin="10, 5, 10, 0"
                 VerticalAlignment="Center">
-                <progress:OperationProgressView
-                    Width="460"
+                <progress:OperationProgressWindowHost
+                    CancelCommand="{Binding LoadAudioProjectCancelCommand}"
                     CurrentDetailText="{Binding OperationDetail}"
-                    IsOperationActive="{Binding IsBusy}"
+                    IsOperationActive="{Binding IsLoading}"
                     IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
                     ProgressMaximum="{Binding OperationProgressMaximum}"
                     ProgressValue="{Binding OperationProgressValue}"
                     StatusText="{Binding OperationStatus}"
-                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    WindowTitle="{loc:Loc OperationProgress.AudioLoad}" />
+                <progress:OperationProgressWindowHost
+                    CancelCommand="{Binding CompileAudioProjectCancelCommand}"
+                    CurrentDetailText="{Binding OperationDetail}"
+                    IsOperationActive="{Binding IsCompiling}"
+                    IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
+                    ProgressMaximum="{Binding OperationProgressMaximum}"
+                    ProgressValue="{Binding OperationProgressValue}"
+                    StatusText="{Binding OperationStatus}"
+                    WindowTitle="{loc:Loc OperationProgress.AudioCompile}" />
                 <TextBlock
                     MinWidth="72"
                     MaxWidth="360"
@@ -135,7 +144,9 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                <DataTrigger
+                                    Binding="{Binding IsBusy}"
+                                    Value="True">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                             </Style.Triggers>

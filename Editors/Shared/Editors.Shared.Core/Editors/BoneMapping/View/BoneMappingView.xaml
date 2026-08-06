@@ -124,7 +124,7 @@
                         <ColumnDefinition Width=".5*"/>
                         <ColumnDefinition Width=".5*"/>
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0"  Click="{s:MethodBinding AutoMapSelfAndChildrenByName}" Content="{loc:Loc BoneMapping.AutoMapByName}" Margin="0,0,2,0"/>
+                    <Button Grid.Column="0" Click="{s:MethodBinding AutoMapSelfAndChildrenByName}" Content="{loc:Loc BoneMapping.AutoMapByName}" Margin="0,0,2,0"/>
                     <Button Grid.Column="1" Click="{s:MethodBinding AutoMapSelfAndChildrenByHierarchy}" Content="{loc:Loc BoneMapping.AutoMapByHierarchy}"/>
                 </Grid>
                 <Grid Margin="0,2,0,0">

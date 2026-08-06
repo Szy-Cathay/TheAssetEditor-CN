@@ -88,7 +88,7 @@
                     <Label Style="{StaticResource AeForm.Label}" Grid.Column="2" Content="{loc:Loc MountAnim.AnimVersion}"/>
                     <ComboBox Grid.Column="3" HorizontalAlignment="Right" ItemsSource="{Binding AnimationOutputFormats}" SelectedItem="{Binding SelectedAnimationOutputFormat.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     <Label Style="{StaticResource AeForm.Label}" Grid.Column="4" Content="{loc:Loc MountAnim.EnsureUnique}"/>
-                    <CheckBox Grid.Column="5" HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding EnsureUniqeFileName.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                    <CheckBox Grid.Column="5" VerticalContentAlignment="Center" IsChecked="{Binding EnsureUniqeFileName.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                 </Grid>
             </StackPanel>
         </Border>

@@ -1093,6 +1093,7 @@ namespace Shared.Core.PackFiles
 
     public class SimpleMessageBox : ISimpleMessageBox
     {
-        public void ShowDialogBox(string message, string title) => MessageBox.Show(message, title);
+        public void ShowDialogBox(string message, string title) =>
+            UiMessageBoxBridge.Show(message, title);
     }
 }

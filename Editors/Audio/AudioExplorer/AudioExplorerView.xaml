@@ -179,53 +179,50 @@
                     Grid.ColumnSpan="2"
                     Margin="0, 0, 0, 3"
                     Text="{Binding LoadStatus}"
-                    TextWrapping="Wrap"/>
+                    TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding IsLoading}"
+                                    Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger
+                                    Binding="{Binding IsExporting}"
+                                    Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
 
-                <progress:OperationProgressView
+                <progress:OperationProgressWindowHost
                     Grid.Row="1"
                     Grid.Column="0"
-                    Margin="0,3,0,0"
+                    CancelCommand="{Binding LoadAudioRepositoryForSelectedLanguagesCancelCommand}"
+                    CancelText="{loc:Loc AudioExplorer.CancelLoading}"
                     CurrentDetailText="{Binding LoadProgressDetail}"
                     IsOperationActive="{Binding IsLoading}"
                     IsProgressIndeterminate="{Binding LoadProgressIsIndeterminate}"
                     ProgressMaximum="{Binding LoadProgressMaximum}"
                     ProgressValue="{Binding LoadProgressValue}"
-                    StatusText="{loc:Loc OperationProgress.AudioLoad}"
-                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    StatusText="{Binding LoadStatus}"
+                    WindowTitle="{loc:Loc OperationProgress.AudioLoad}" />
 
-                <Button
-                    Grid.Row="1"
-                    Grid.Column="1"
-                    Style="{StaticResource AeButton.Secondary}"
-                    MinWidth="60"
-                    Height="25"
-                    Margin="5, 0, 0, 0"
-                    Content="{loc:Loc AudioExplorer.CancelLoading}"
-                    Command="{Binding LoadAudioRepositoryForSelectedLanguagesCancelCommand}"
-                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                <progress:OperationProgressView
+                <progress:OperationProgressWindowHost
                     Grid.Row="2"
                     Grid.Column="0"
-                    Margin="0, 3, 0, 0"
+                    CancelCommand="{Binding ExportAudioCancelCommand}"
+                    CancelText="{loc:Loc AudioExplorer.CancelExport}"
                     CurrentDetailText="{Binding ExportProgressDetail}"
                     IsOperationActive="{Binding IsExporting}"
                     IsProgressIndeterminate="False"
                     ProgressMaximum="{Binding ExportProgressMaximum}"
                     ProgressValue="{Binding ExportProgressValue}"
-                    StatusText="{loc:Loc OperationProgress.AudioExport}"
-                    Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                <Button
-                    Grid.Row="2"
-                    Grid.Column="1"
-                    Style="{StaticResource AeButton.Secondary}"
-                    MinWidth="60"
-                    Height="25"
-                    Margin="5, 3, 0, 0"
-                    Content="{loc:Loc AudioExplorer.CancelExport}"
-                    Command="{Binding ExportAudioCancelCommand}"
-                    Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    StatusText="{Binding LoadStatus}"
+                    WindowTitle="{loc:Loc OperationProgress.AudioExport}" />
             </Grid>
 
             <Expander
@@ -517,14 +514,15 @@
                         </Image>
                     </Grid>
 
-                    <progress:OperationProgressView
+                    <progress:OperationProgressWindowHost
                         Grid.Row="1"
-                        Margin="0,6,0,0"
-                        CurrentDetailText="{Binding SelectedNode.DisplayName}"
+                        CurrentDetailText="{Binding AudioPreviewProgressDetail}"
                         IsOperationActive="{Binding IsAudioPreviewLoading}"
-                        IsProgressIndeterminate="True"
+                        IsProgressIndeterminate="False"
+                        ProgressMaximum="{Binding AudioPreviewProgressMaximum}"
+                        ProgressValue="{Binding AudioPreviewProgressValue}"
                         StatusText="{loc:Loc OperationProgress.AudioPreview}"
-                        Visibility="{Binding IsAudioPreviewLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        WindowTitle="{loc:Loc OperationProgress.AudioPreview}" />
 
                     <Grid
                         Grid.Row="2"

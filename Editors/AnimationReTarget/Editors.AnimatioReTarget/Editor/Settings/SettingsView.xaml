@@ -1,82 +1,134 @@
-﻿<UserControl x:Class="Editors.AnimatioReTarget.Editor.Settings.SettingsView"
+<UserControl x:Class="Editors.AnimatioReTarget.Editor.Settings.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:System="clr-namespace:System;assembly=System.Runtime" 
-             xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
-             xmlns:b="http://schemas.microsoft.com/xaml/behaviors" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
-    <UserControl.Resources>
-        <System:Double x:Key="labelWidth">140</System:Double>
-    </UserControl.Resources>
-   
-    <DockPanel LastChildFill="False">
-        <Expander IsExpanded="True" Header="{loc:Loc AnimReTarget.RenderSettings}" DockPanel.Dock="Top" >
-            <StackPanel Margin="10,0,2,0">
+             mc:Ignorable="d"
+             d:DesignHeight="450"
+             d:DesignWidth="800">
+    <StackPanel>
+        <Expander
+            Header="{loc:Loc AnimReTarget.RenderSettings}"
+            IsExpanded="True">
+            <Grid Margin="10,2,8,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <DockPanel>
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.GeneratedMesh}" Width ="{StaticResource labelWidth}"  />
-                    <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Rendering.ShowGeneratedMesh, UpdateSourceTrigger=PropertyChanged}"/>
-                </DockPanel>
+                <Label
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.GeneratedMesh}"
+                    Style="{StaticResource AeForm.Label}" />
+                <CheckBox
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    IsChecked="{Binding Rendering.ShowGeneratedMesh, UpdateSourceTrigger=PropertyChanged}" />
 
-                <DockPanel>
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.GeneratedSkeleton}" Width ="{StaticResource labelWidth}" />
-                    <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Rendering.ShowGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged}"/>
-                </DockPanel>
+                <Label
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.GeneratedSkeleton}"
+                    Style="{StaticResource AeForm.Label}" />
+                <CheckBox
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    IsChecked="{Binding Rendering.ShowGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged}" />
 
-                <DockPanel>
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.OffsetSpacing}" Width ="{StaticResource labelWidth}"  />
-
-                    <TextBox Text="{Binding Rendering.VisualOffset, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
-                        <b:Interaction.Behaviors>
-                            <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
-                        </b:Interaction.Behaviors>
-                    </TextBox>
-                </DockPanel>
-            </StackPanel>
+                <Label
+                    Grid.Row="2"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.OffsetSpacing}"
+                    Style="{StaticResource AeForm.Label}" />
+                <TextBox
+                    Grid.Row="2"
+                    Grid.Column="1"
+                    Margin="0,2"
+                    Text="{Binding Rendering.VisualOffset, UpdateSourceTrigger=LostFocus, Mode=TwoWay}">
+                    <b:Interaction.Behaviors>
+                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                    </b:Interaction.Behaviors>
+                </TextBox>
+            </Grid>
         </Expander>
 
-        <Expander IsExpanded="True" Header="{loc:Loc AnimReTarget.AnimationSettings}" DockPanel.Dock="Bottom">
-            <StackPanel Margin="10,0,2,0">
-                <DockPanel>
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.SkeletonScale}" Width ="{StaticResource labelWidth}"  DockPanel.Dock="Left"/>
+        <Expander
+            Header="{loc:Loc AnimReTarget.AnimationSettings}"
+            IsExpanded="True">
+            <Grid Margin="10,2,8,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                    <TextBox Text="{Binding Settings.SkeletonScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
-                        <TextBox.ToolTip>
-                            <ToolTip Content="{loc:Loc AnimReTarget.SkeletonScale.ToolTip}"/>
-                        </TextBox.ToolTip>
+                <Label
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.SkeletonScale}"
+                    Style="{StaticResource AeForm.Label}" />
+                <TextBox
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Margin="0,2"
+                    Text="{Binding Settings.SkeletonScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}"
+                    ToolTip="{loc:Loc AnimReTarget.SkeletonScale.ToolTip}">
+                    <b:Interaction.Behaviors>
+                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                    </b:Interaction.Behaviors>
+                </TextBox>
 
-                        <b:Interaction.Behaviors>
-                            <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
-                        </b:Interaction.Behaviors>
-                    </TextBox>
-                </DockPanel>
+                <Label
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.AnimationSpeedMult}"
+                    Style="{StaticResource AeForm.Label}" />
+                <TextBox
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Margin="0,2"
+                    Text="{Binding Settings.AnimationSpeedMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}">
+                    <b:Interaction.Behaviors>
+                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                    </b:Interaction.Behaviors>
+                </TextBox>
 
-                <DockPanel>
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.AnimationSpeedMult}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left"/>
-                    <TextBox Text="{Binding Settings.AnimationSpeedMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center" Margin="2">
-                        <b:Interaction.Behaviors>
-                            <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
-                        </b:Interaction.Behaviors>
-                    </TextBox>
-                </DockPanel>
+                <Label
+                    Grid.Row="2"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.ZeroUnmappedBones}"
+                    Style="{StaticResource AeForm.Label}" />
+                <CheckBox
+                    Grid.Row="2"
+                    Grid.Column="1"
+                    IsChecked="{Binding Settings.ZeroUnmappedBones, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                    ToolTip="{loc:Loc AnimReTarget.ZeroUnmappedBones.ToolTip}" />
 
-                <DockPanel >
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.ZeroUnmappedBones}" Width ="{StaticResource labelWidth}"/>
-
-                    <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Settings.ZeroUnmappedBones, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  ToolTip="{loc:Loc AnimReTarget.ZeroUnmappedBones.ToolTip}"/>
-                </DockPanel>
-
-                <DockPanel >
-                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc AnimReTarget.ApplyRelativeScale}" Width ="{StaticResource labelWidth}"/>
-                <CheckBox HorizontalAlignment="Right" VerticalContentAlignment="Center" IsChecked="{Binding Settings.ApplyRelativeScale, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"  ToolTip="{loc:Loc AnimReTarget.ApplyRelativeScale.ToolTip}" Margin="0,0,5,0"/>
-            </DockPanel>
-
-        </StackPanel>
-    </Expander>
-    </DockPanel>
+                <Label
+                    Grid.Row="3"
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.ApplyRelativeScale}"
+                    Style="{StaticResource AeForm.Label}" />
+                <CheckBox
+                    Grid.Row="3"
+                    Grid.Column="1"
+                    IsChecked="{Binding Settings.ApplyRelativeScale, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                    ToolTip="{loc:Loc AnimReTarget.ApplyRelativeScale.ToolTip}" />
+            </Grid>
+        </Expander>
+    </StackPanel>
 </UserControl>

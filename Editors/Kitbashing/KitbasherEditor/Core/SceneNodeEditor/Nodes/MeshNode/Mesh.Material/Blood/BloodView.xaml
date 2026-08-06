@@ -19,18 +19,17 @@
 
     <ContentControl DockPanel.Dock="Top">
 
-        <Expander DockPanel.Dock="Top" IsExpanded="True">
+        <Expander DockPanel.Dock="Top" IsExpanded="True" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
             <Expander.Header>
-                <DockPanel DockPanel.Dock="Top" Background="{DynamicResource AeBrush.Surface2}">
-                    <Label Content="{loc:Loc Blood.Header}" FontSize="{StaticResource HeaderFontSize}"/>
-                    <Separator/>
+                <DockPanel DockPanel.Dock="Top">
+                    <TextBlock Text="{loc:Loc Blood.Header}" FontWeight="Normal" Margin="3"/>
                 </DockPanel>
             </Expander.Header>
 
             <DockPanel LastChildFill="False">
                 <DockPanel LastChildFill="True" DockPanel.Dock="Top">
                     <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.ReceivesBlood}"/>
-                    <CheckBox HorizontalAlignment="Right" Margin="2,0,2,0"  IsChecked="{Binding UseBlood, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
+                    <CheckBox Margin="2,0,2,0" IsChecked="{Binding UseBlood, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top">

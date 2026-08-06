@@ -58,7 +58,9 @@ public class UiFoundationWindowTests
     }
 
     [TestCase(MessageDialogButtonSet.Ok, 1)]
+    [TestCase(MessageDialogButtonSet.OkCancel, 2)]
     [TestCase(MessageDialogButtonSet.YesNo, 2)]
+    [TestCase(MessageDialogButtonSet.YesNoCancel, 3)]
     public void MessageDialog_UsesThemeResourcesAndExpectedButtons(
         MessageDialogButtonSet buttonSet,
         int expectedButtonCount)
@@ -110,6 +112,85 @@ public class UiFoundationWindowTests
             "StandardDialogs.cs"));
 
         NUnitAssert.That(source, Does.Not.Contain("MessageBox.Show"));
+    }
+
+    [Test]
+    public void ProductUiProjects_RouteMessageBoxesThroughUnifiedDialog()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var sharedUiProject = Path.Combine(
+            solutionRoot,
+            "Shared",
+            "SharedUI",
+            "Shared.Ui.csproj");
+        var projectFiles = Directory
+            .EnumerateFiles(solutionRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path =>
+                path.Equals(sharedUiProject, StringComparison.OrdinalIgnoreCase) ||
+                File.ReadAllText(path).Contains(
+                    "Shared.Ui.csproj",
+                    StringComparison.Ordinal))
+            .ToArray();
+
+        NUnitAssert.Multiple(() =>
+        {
+            foreach (var projectFile in projectFiles)
+            {
+                var project = File.ReadAllText(projectFile);
+                NUnitAssert.That(
+                    project,
+                    Does.Contain(
+                        "Shared.Ui.BaseDialogs.StandardDialog.UnifiedMessageBox")
+                        .And.Contain("Alias=\"MessageBox\""),
+                    $"Missing unified MessageBox alias: {projectFile}");
+            }
+        });
+    }
+
+    [Test]
+    public void ProductSources_DoNotCallNativeWindowsMessageBoxDirectly()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var productRoots = new[]
+        {
+            "AssetEditor",
+            "Editors",
+            "GameWorld",
+            "Shared",
+        };
+        var allowedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.Combine(
+                solutionRoot,
+                "Shared",
+                "SharedCore",
+                "Services",
+                "UiMessageBoxBridge.cs"),
+            Path.Combine(
+                solutionRoot,
+                "Shared",
+                "SharedUI",
+                "BaseDialogs",
+                "StandardDialog",
+                "UnifiedMessageBox.cs"),
+        };
+
+        var violations = productRoots
+            .Select(root => Path.Combine(solutionRoot, root))
+            .SelectMany(root => Directory.EnumerateFiles(
+                root,
+                "*.cs",
+                SearchOption.AllDirectories))
+            .Where(path => !allowedFiles.Contains(path))
+            .Where(path => File.ReadAllText(path).Contains(
+                "System.Windows.MessageBox.Show",
+                StringComparison.Ordinal))
+            .ToArray();
+
+        NUnitAssert.That(
+            violations,
+            Is.Empty,
+            "Native Windows MessageBox calls bypass the unified dialog.");
     }
 
     private static int ReadDarkTitleBar(Window window)

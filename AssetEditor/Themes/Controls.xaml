@@ -20,10 +20,10 @@
 
     <ap:WatermarkComboBoxDropDownVisibilityConverter x:Key="watermarkComboBoxDropDownVisibilityConverter" />
 
-    <Style x:Key="TitleBarButtonStyle" TargetType="Button">
+    <Style x:Key="TitleBarButtonStyle" x:Shared="False" TargetType="Button">
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="Background" Value="{StaticResource TitleBar.Button.Background}"/>
-        <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.Foreground}"/>
+        <Setter Property="Background" Value="{DynamicResource TitleBar.Button.Background}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TitleBar.Button.Foreground}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0"/>
         <Setter Property="VerticalAlignment" Value="Top"/>
@@ -61,12 +61,12 @@
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.MouseOver.Background}" />
-                            <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.MouseOver.Foreground}" />
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TitleBar.Button.MouseOver.Background}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TitleBar.Button.MouseOver.Foreground}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.Pressed.Background}" />
-                            <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.Pressed.Foreground}" />
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TitleBar.Button.Pressed.Background}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TitleBar.Button.Pressed.Foreground}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -76,10 +76,11 @@
 
     <Style
         x:Key="TitleBarCloseButtonStyle"
+        x:Shared="False"
         BasedOn="{StaticResource TitleBarButtonStyle}"
         TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource TitleBar.Button.Background}"/>
-        <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.Foreground}"/>
+        <Setter Property="Background" Value="{DynamicResource TitleBar.Button.Background}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TitleBar.Button.Foreground}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -110,12 +111,12 @@
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.MouseOver.Background}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.MouseOver.Foreground}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TitleBar.Button.MouseOver.Background}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TitleBar.Button.MouseOver.Foreground}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="true">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource TitleBar.Button.Pressed.Background}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TitleBar.Button.Pressed.Foreground}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TitleBar.Button.Pressed.Background}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TitleBar.Button.Pressed.Foreground}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -5630,17 +5631,16 @@
         </ControlTemplate.Triggers>
     </ControlTemplate>
     
-    <Style TargetType="{x:Type Window}">
+    <Style x:Key="AeWindowBaseStyle" TargetType="{x:Type Window}">
         <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="FontWeight" Value="{DynamicResource AppFontWeight}"/>
     </Style>
 
-    <Style x:Key="CustomWindowStyle" TargetType="{x:Type Window}"
-           BasedOn="{StaticResource {x:Type Window}}">
-        <Setter Property="Icon" Value="pack://application:,,,/AssetEditor.CN;component/AssetEditor.CN.ico"/>
-        <Setter Property="Background" Value="{DynamicResource Window.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Window.Static.Border}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Window.Static.Foreground}"/>
+    <Style x:Key="CustomWindowStyle" x:Shared="False" TargetType="{x:Type Window}"
+           BasedOn="{StaticResource AeWindowBaseStyle}">
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Canvas}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="WindowStyle" Value="SingleBorderWindow"/>
         <Setter Property="WindowChrome.WindowChrome">
@@ -5668,7 +5668,7 @@
                             <Grid 
                                 MinHeight="35" 
                                 x:Name="titlebar" 
-                                Background="{TemplateBinding BorderBrush}" 
+                                Background="{DynamicResource AeBrush.Surface1}"
                                 VerticalAlignment="Top" 
                                 Margin="0" 
                                 DockPanel.Dock="Top">
@@ -5679,7 +5679,8 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Image 
+                                <Image
+                                    x:Name="titleIcon"
                                     Grid.Column="0"
                                     Width="24" 
                                     Height="24" 
@@ -5702,8 +5703,8 @@
                                     x:Name="btnMinimise" 
                                     Grid.Column="2"
                                     Width="46"
-                                    Style="{StaticResource TitleBarButtonStyle}" 
-                                    ToolTip="{loc:Loc Chrome.Minimise}"
+                                    Style="{DynamicResource AeButton.Icon}"
+                                    ToolTip="最小化"
                                     VerticalAlignment="Stretch"
                                     Height="Auto"
                                     WindowChrome.IsHitTestVisibleInChrome="True" 
@@ -5719,8 +5720,8 @@
                                     x:Name="btnMaximiseRestore" 
                                     Grid.Column="3"
                                     Width="46"
-                                    Style="{StaticResource TitleBarButtonStyle}" 
-                                    ToolTip="{loc:Loc Chrome.Maximise}"
+                                    Style="{DynamicResource AeButton.Icon}"
+                                    ToolTip="最大化或还原"
                                     VerticalAlignment="Stretch"
                                     Height="Auto"
                                     WindowChrome.IsHitTestVisibleInChrome="True" 
@@ -5736,8 +5737,8 @@
                                     x:Name="btnClose" 
                                     Grid.Column="4"
                                     Width="46"
-                                    Style="{StaticResource TitleBarCloseButtonStyle}" 
-                                    ToolTip="{loc:Loc Chrome.Close}"
+                                    Style="{DynamicResource AeButton.Icon}"
+                                    ToolTip="关闭"
                                     VerticalAlignment="Stretch"
                                     Height="Auto"
                                     WindowChrome.IsHitTestVisibleInChrome="True" 
@@ -5801,6 +5802,9 @@
                                 </Setter.Value>
                             </Setter>
                         </Trigger>
+                        <Trigger Property="Icon" Value="{x:Null}">
+                            <Setter TargetName="titleIcon" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -5814,4 +5818,9 @@
             </Trigger>
         </Style.Triggers>
     </Style>
+
+    <Style
+        x:Shared="False"
+        TargetType="{x:Type Window}"
+        BasedOn="{StaticResource CustomWindowStyle}" />
 </ResourceDictionary>
