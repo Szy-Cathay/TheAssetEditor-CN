@@ -76,6 +76,17 @@ public sealed class CombatMetaDataEditSession
     public CombatMetaDataPoint? CurrentPoint => _target?.Point;
     public ParsedMetadataAttribute? CurrentSource => _target?.Source;
 
+    public static bool CanEdit(ParsedMetadataAttribute source) =>
+        PointAccessor.TryCreate(
+            source,
+            CombatMetaDataPoint.Position) != null ||
+        PointAccessor.TryCreate(
+            source,
+            CombatMetaDataPoint.SplashStart) != null ||
+        PointAccessor.TryCreate(
+            source,
+            CombatMetaDataPoint.SplashEnd) != null;
+
     public bool SetTarget(
         object owner,
         ParsedMetadataAttribute source,

@@ -42,10 +42,12 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private static Color s_color = Color.Black;
         private static Color s_selectedColor = Color.Red;
 
-        private static readonly Color s_impactColor = new(255, 99, 71);
-        private static readonly Color s_targetColor = new(0, 191, 255);
-        private static readonly Color s_fireColor = new(255, 193, 7);
-        private static readonly Color s_splashColor = new(186, 85, 211);
+        private static readonly Color s_impactColor = new(226, 180, 95);
+        private static readonly Color s_targetColor = new(100, 169, 226);
+        private static readonly Color s_fireColor = new(225, 121, 121);
+        private static readonly Color s_splashColor = new(220, 141, 85);
+        private static readonly Color s_effectColor = new(180, 135, 232);
+        private static readonly Color s_crewLocationColor = new(114, 188, 145);
 
         private sealed record PropPreviewData(
             ParsedMetadataAttribute Source,
@@ -692,6 +694,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                             data.Source),
                         selected =>
                         {
+                            SetPreviewOutline(loadedNode, selected);
                             if (propSkeletonNode != null)
                             {
                                 propSkeletonNode.NodeColour = selected
@@ -720,6 +723,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         data.Source),
                     selected =>
                     {
+                        SetPreviewOutline(loadedNode, selected);
                         if (propSkeletonNode != null)
                         {
                             propSkeletonNode.NodeColour = selected
@@ -744,6 +748,15 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                     selectedMetaDataAttribute);
             }
         }
+
+        private static void SetPreviewOutline(
+            SceneNode root,
+            bool enabled) =>
+            root.ForeachNodeRecursive(node =>
+            {
+                if (node is Rmv2MeshNode meshNode)
+                    meshNode.SetPreviewOutline(enabled);
+            });
 
         private static bool TryGetOrdinaryPropData(
             ParsedMetadataAttribute attribute,
@@ -943,7 +956,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             bool isSelected)
         {
             var color = GetCombatPreviewColor(category, isSelected);
-            var markerScale = isSelected ? scale * 1.5f : scale;
+            var markerScale = scale;
+            var edgeWidth = isSelected ? 1.6f : 0.65f;
             node.ClearItems();
             node.AddItem(new WorldTextRenderItem(
                 _resourceLibrary,
@@ -952,23 +966,36 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 color));
             if (category == CombatMetaDataPreviewCategory.Impact)
             {
-                node.AddItem(LineHelper.AddCircle(
+                node.AddItem(PreviewShapeGeometry.CreateCircleMarker(
                     Vector3.Zero,
                     markerScale,
-                    color));
+                    PreviewShapeGeometry.WithPremultipliedAlpha(
+                        s_impactColor,
+                        48),
+                    color,
+                    edgeWidth));
             }
             else if (category == CombatMetaDataPreviewCategory.Target)
             {
-                node.AddItem(LineHelper.CreateCube(
-                    Matrix.CreateScale(markerScale),
-                    color));
+                node.AddItem(PreviewShapeGeometry.CreateBoxMarker(
+                    Vector3.Zero,
+                    markerScale,
+                    PreviewShapeGeometry.WithPremultipliedAlpha(
+                        s_targetColor,
+                        48),
+                    color,
+                    edgeWidth));
             }
             else
             {
-                node.AddItem(LineHelper.AddLocator(
+                node.AddItem(PreviewShapeGeometry.CreateLocatorMarker(
                     Vector3.Zero,
                     markerScale,
-                    color));
+                    PreviewShapeGeometry.WithPremultipliedAlpha(
+                        s_fireColor,
+                        48),
+                    color,
+                    edgeWidth));
             }
 
         }
@@ -1089,44 +1116,21 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             float scale,
             bool isSelected)
         {
-            var color = GetCombatPreviewColor(
+            var edgeColor = GetCombatPreviewColor(
                 CombatMetaDataPreviewCategory.Splash,
                 isSelected);
-            var markerScale = isSelected ? scale * 1.5f : scale;
+            var edgeWidth = isSelected ? 1.6f : 0.65f;
+            var fillColor = PreviewShapeGeometry.WithPremultipliedAlpha(
+                s_splashColor,
+                48);
             node.ClearItems();
             var textPos = (splashAttack.EndPosition + splashAttack.StartPosition) / 2;
 
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, color));
-            node.AddItem(LineHelper.AddLocator(splashAttack.StartPosition, markerScale, color));
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, color));
-            node.AddItem(LineHelper.AddLocator(splashAttack.EndPosition, markerScale, color));
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, textPos, color));
-            node.AddItem(LineHelper.AddLine(splashAttack.StartPosition, splashAttack.EndPosition, color));
-
-            var normal = splashAttack.EndPosition - splashAttack.StartPosition;
-            normal.Normalize();
-            var random = new Random(1);
-            Func<Random, float> randomFloat = r =>
-                (float)(2 * r.NextDouble() - 1);
-            var vectorP = new Vector3(
-                randomFloat(random),
-                randomFloat(random),
-                randomFloat(random));
-            vectorP.Normalize();
-
-            var planeVectorP = Vector3.Cross(
-                normal,
-                Vector3.Cross(vectorP, normal));
-            var planeVectorPN = Vector3.Cross(vectorP, normal);
-            planeVectorP.Normalize();
-            planeVectorPN.Normalize();
-
-            var rotationM = MathUtil.CreateRotation(
-            [
-                planeVectorP,
-                planeVectorPN,
-                normal
-            ]);
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, edgeColor));
+            node.AddItem(LineHelper.AddLocator(splashAttack.StartPosition, scale, edgeColor));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, edgeColor));
+            node.AddItem(LineHelper.AddLocator(splashAttack.EndPosition, scale, edgeColor));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, textPos, edgeColor));
 
             if (splashAttack.AoeShape == 0)
             {
@@ -1138,17 +1142,13 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         $"{displayName}: the half-angle {splashAttack.AngleForCone / 2} of the cone is close to 0");
                 }
 
-                var transformationM = rotationM *
-                    Matrix.CreateScale(Vector3.Distance(
-                        splashAttack.StartPosition,
-                        splashAttack.EndPosition)) *
-                    Matrix.CreateTranslation(splashAttack.StartPosition);
-                node.AddItem(LineHelper.AddConeSplash(
+                node.AddItem(PreviewShapeGeometry.CreateSplashCone(
                     splashAttack.StartPosition,
                     splashAttack.EndPosition,
-                    transformationM,
                     splashAttack.AngleForCone,
-                    color));
+                    fillColor,
+                    edgeColor,
+                    edgeWidth));
             }
             if (splashAttack.AoeShape == 1)
             {
@@ -1160,14 +1160,13 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         $"{displayName}: the WidthForCorridor {splashAttack.WidthForCorridor} of the corridor is close to 0");
                 }
 
-                var transformationM = rotationM *
-                    Matrix.CreateScale(splashAttack.WidthForCorridor / 2) *
-                    Matrix.CreateTranslation(splashAttack.StartPosition);
-                node.AddItem(LineHelper.AddCorridorSplash(
+                node.AddItem(PreviewShapeGeometry.CreateSplashCorridor(
                     splashAttack.StartPosition,
                     splashAttack.EndPosition,
-                    transformationM,
-                    color));
+                    splashAttack.WidthForCorridor / 2,
+                    fillColor,
+                    edgeColor,
+                    edgeWidth));
             }
 
         }
@@ -1201,7 +1200,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 selected => PopulateEffectNode(
                     node,
                     effect.VfxName,
-                    selected ? Color.White : s_color),
+                    selected),
                 () => effect.Position,
                 () => new Quaternion(effect.Orientation));
             root.AddObject(node);
@@ -1339,19 +1338,23 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             SpatialMetaDataBinding binding,
             bool isSelected)
         {
-            var color = isSelected
-                ? Color.White
-                : binding.Kind switch
-                {
-                    SpatialMetaDataKind.Blood => Color.Crimson,
-                    SpatialMetaDataKind.CameraShake => Color.Gold,
-                    SpatialMetaDataKind.CrewLocation => Color.CornflowerBlue,
-                    SpatialMetaDataKind.SoundTrigger or
-                    SpatialMetaDataKind.SoundBuilding => Color.LimeGreen,
-                    SpatialMetaDataKind.Transform => Color.Orange,
-                    _ => Color.Gray
-                };
-            var scale = isSelected ? 0.45f : 0.3f;
+            var baseColor = binding.Kind switch
+            {
+                SpatialMetaDataKind.Blood => Color.Crimson,
+                SpatialMetaDataKind.CameraShake => Color.Gold,
+                SpatialMetaDataKind.CrewLocation => s_crewLocationColor,
+                SpatialMetaDataKind.SoundTrigger => Color.LimeGreen,
+                SpatialMetaDataKind.SoundBuilding =>
+                    new Color(76, 175, 125),
+                SpatialMetaDataKind.Transform => Color.Orange,
+                _ => Color.Gray
+            };
+            var color = isSelected ? Color.White : baseColor;
+            var fill = PreviewShapeGeometry.WithPremultipliedAlpha(
+                baseColor,
+                48);
+            var edgeWidth = isSelected ? 1.6f : 0.65f;
+            const float scale = 0.3f;
             var origin = Vector3.Zero;
 
             node.ClearItems();
@@ -1366,7 +1369,12 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 SpatialMetaDataKind.SoundBuilding or
                 SpatialMetaDataKind.CameraShake)
             {
-                node.AddItem(LineHelper.AddCircle(origin, scale, color));
+                node.AddItem(PreviewShapeGeometry.CreateCircleMarker(
+                    origin,
+                    scale,
+                    fill,
+                    color,
+                    edgeWidth));
                 node.AddItem(LineHelper.AddCircle(
                     origin,
                     scale * 0.55f,
@@ -1374,9 +1382,12 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             }
             else if (binding.Kind == SpatialMetaDataKind.CrewLocation)
             {
-                node.AddItem(LineHelper.CreateCube(
-                    Matrix.CreateScale(scale * 0.45f),
-                    color));
+                node.AddItem(PreviewShapeGeometry.CreateBoxMarker(
+                    origin,
+                    scale * 0.9f,
+                    fill,
+                    color,
+                    edgeWidth));
                 node.AddItem(LineHelper.AddLine(
                     origin,
                     Vector3.Forward * scale,
@@ -1384,7 +1395,12 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             }
             else if (binding.Kind == SpatialMetaDataKind.Blood)
             {
-                node.AddItem(LineHelper.AddCircle(origin, scale * 0.45f, color));
+                node.AddItem(PreviewShapeGeometry.CreateCircleMarker(
+                    origin,
+                    scale * 0.45f,
+                    fill,
+                    color,
+                    edgeWidth));
                 node.AddItem(LineHelper.AddLine(
                     origin,
                     Vector3.Down * scale,
@@ -1392,7 +1408,12 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             }
             else
             {
-                node.AddItem(LineHelper.AddLocator(origin, scale, color));
+                node.AddItem(PreviewShapeGeometry.CreateLocatorMarker(
+                    origin,
+                    scale,
+                    fill,
+                    color,
+                    edgeWidth));
             }
 
             if (binding.CanRotate)
@@ -1415,7 +1436,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private void PopulateEffectNode(
             SimpleDrawableNode node,
             string effectName,
-            Color color)
+            bool isSelected)
         {
             var locatorScale = 0.3f;
             var textOffset = locatorScale * 1.5f + 0.01f;
@@ -1426,21 +1447,24 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             var localZ = Vector3.UnitZ;
 
             node.ClearItems();
+            var edgeColor = isSelected ? Color.White : s_effectColor;
+            node.AddItem(PreviewShapeGeometry.CreateBoxMarker(
+                position,
+                locatorScale * 0.3f,
+                PreviewShapeGeometry.WithPremultipliedAlpha(
+                    s_effectColor,
+                    48),
+                edgeColor,
+                isSelected ? 1.6f : 0.65f));
             node.AddItem(LineHelper.AddLine(position, position + localX * locatorScale, Color.Red));
             node.AddItem(LineHelper.AddLine(position, position + localY * locatorScale, Color.Green));
             node.AddItem(LineHelper.AddLine(position, position + localZ * locatorScale, Color.Blue));
-            if (color == Color.White)
-            {
-                node.AddItem(LineHelper.CreateCube(
-                    Matrix.CreateScale(locatorScale * 0.15f),
-                    color));
-            }
 
             node.AddItem(new WorldTextRenderItem(
                 _resourceLibrary,
                 effectName,
                 position,
-                color));
+                edgeColor));
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, "X", position + localX * textOffset, Color.Red));
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, "Y", position + localY * textOffset, Color.Green));
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, "Z", position + localZ * textOffset, Color.Blue));

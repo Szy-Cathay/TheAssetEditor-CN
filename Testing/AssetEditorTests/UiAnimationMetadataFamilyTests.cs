@@ -152,10 +152,50 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 kitbashPlayer,
                 Does.Contain("IsChecked=\"{Binding IsPlaying"));
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Contain("AeEditor.PlaybackSlider"));
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Contain("Value=\"{Binding PlaybackPositionSeconds, Mode=TwoWay"));
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Contain("x:Name=\"PlaybackCommandRow\""));
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Contain("x:Name=\"PlaybackTimelineRow\""));
+            NUnitAssert.That(sharedPlayer, Does.Contain("<ItemsControl"));
+            NUnitAssert.That(sharedPlayer, Does.Not.Contain("<ListBox"));
+            NUnitAssert.That(sharedPlayer, Does.Not.Contain("Width=\".1*\""));
+            NUnitAssert.That(sharedPlayer, Does.Not.Contain("Width=\".3*\""));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("AeEditor.PlaybackSlider"));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("Value=\"{Binding PlaybackPositionSeconds, Mode=TwoWay"));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("Maximum=\"{Binding MaxTimeSeconds, Mode=OneWay}\""));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("Text=\"{Binding MaxTimeSeconds, Mode=OneWay"));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("{loc:Loc SharedAnimPlayer.Seconds}"));
+            NUnitAssert.That(
+                kitbashPlayer,
+                Does.Contain("{loc:Loc SharedAnimPlayer.Time}"));
+            NUnitAssert.That(kitbashPlayer, Does.Not.Contain("Width=\"240\""));
+            NUnitAssert.That(kitbashPlayer, Does.Contain("SelectedSkeleton"));
+            NUnitAssert.That(kitbashPlayer, Does.Contain("SelectedAnimation"));
             NUnitAssert.That(cscPlayer, Does.Contain("AeBrush.Danger"));
             NUnitAssert.That(
                 styles,
                 Does.Contain("x:Key=\"AeEditor.PlaybackToggle\""));
+            NUnitAssert.That(
+                styles,
+                Does.Contain("x:Key=\"AeEditor.PlaybackSlider\""));
             NUnitAssert.That(
                 styles,
                 Does.Not.Contain("Property=\"IsKeyboardFocused\""));
@@ -404,6 +444,42 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 attributeView,
                 Does.Contain("EditEffectOrientation"));
+        });
+    }
+
+    [Test]
+    public void MetadataPreviewControls_AreExplicitlyScopedToSuperViewHost()
+    {
+        var root = FindSolutionRoot();
+        var attributeView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "MetaEditor",
+            "View",
+            "MetaDataAttributeView.xaml"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("x:Name=\"SuperViewBatchControls\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("x:Name=\"SuperViewSelectedMetaDataControls\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("<Setter Property=\"Visibility\" Value=\"Collapsed\" />"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Not.Contain("Visibility=\"{Binding DataContext.IsAnimationMetaTabSelected"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Not.Contain("Visibility=\"{Binding DataContext.HasSelectedSceneMarkerSettings"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("EnableAllAnimationMeta3D"));
         });
     }
 

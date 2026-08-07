@@ -40,6 +40,23 @@ namespace Test.KitbashEditor.Animation
             return new GameSkeleton(animFile, player);
         }
 
+        static AnimationClip CreateTestClip(int frameCount, float seconds)
+        {
+            var clip = new AnimationClip();
+            for (var index = 0; index < frameCount; index++)
+            {
+                clip.DynamicFrames.Add(new AnimationClip.KeyFrame
+                {
+                    Position = [Microsoft.Xna.Framework.Vector3.Zero],
+                    Rotation = [Microsoft.Xna.Framework.Quaternion.Identity],
+                    Scale = [Microsoft.Xna.Framework.Vector3.One],
+                });
+            }
+
+            clip.PlayTimeInSec = seconds;
+            return clip;
+        }
+
         (AnimationControllerViewModel ViewModel, KitbasherRootScene Scene) CreateViewModel()
         {
             var mockPfs = new Mock<IPackFileService>();
@@ -191,6 +208,45 @@ namespace Test.KitbashEditor.Animation
             // Verify panel is visible and player is enabled
             Assert.That(vm.AnimationControllerVisability.Value, Is.EqualTo(Visibility.Visible));
             Assert.That(player.IsEnabled, Is.True);
+        }
+
+        [Test]
+        public void PlaybackPositionSeconds_SeeksAndKeepsPausedState()
+        {
+            var (vm, scene) = CreateViewModel();
+            var skeleton = CreateTestSkeleton(scene.Player);
+            typeof(KitbasherRootScene).GetProperty("Skeleton")!
+                .SetValue(scene, skeleton);
+            scene.Player.SetAnimation(
+                CreateTestClip(10, 1),
+                skeleton,
+                true);
+            vm.IsEnabled = true;
+            scene.Player.Play();
+            vm.PausePlayCommand.Execute(null);
+
+            vm.PlaybackPositionSeconds = 0.4f;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(scene.Player.GetTimeUs(), Is.EqualTo(400_000));
+                Assert.That(scene.Player.IsPlaying, Is.False);
+                Assert.That(vm.MaxTimeSeconds, Is.EqualTo(1));
+            });
+
+            vm.PausePlayCommand.Execute(null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(scene.Player.GetTimeUs(), Is.EqualTo(400_000));
+                Assert.That(scene.Player.IsPlaying, Is.True);
+            });
+
+            vm.PlaybackPositionSeconds = 0.6f;
+            Assert.Multiple(() =>
+            {
+                Assert.That(scene.Player.GetTimeUs(), Is.EqualTo(600_000));
+                Assert.That(scene.Player.IsPlaying, Is.True);
+            });
         }
 
         #endregion

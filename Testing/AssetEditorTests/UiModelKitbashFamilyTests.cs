@@ -3,11 +3,14 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Xml.Linq;
+using CommonControls.FilterDialog;
 using CommonControls.Editors.BoneMapping.View;
 using Editors.KitbasherEditor.ChildEditors.PhotoStudio;
+using KitbasherEditor.Views.EditorViews;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Shared.Core.Services;
+using Shared.Ui.Common.ValueConverters;
 using NUnitAssert = NUnit.Framework.Assert;
 
 namespace AssetEditorTests;
@@ -555,6 +558,210 @@ public class UiModelKitbashFamilyTests
     }
 
     [Test]
+    [NonParallelizable]
+    public void KitbashAnimationBar_LoadsWithReadOnlyDurationAndKeepsSelectors()
+    {
+        var localizationManager = new LocalizationManager();
+        localizationManager.LoadLanguage();
+        using var services = new ServiceCollection()
+            .AddSingleton(localizationManager)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                const string converterKey = "BoolToCollapsedConverter";
+                var resources = Application.Current.Resources;
+                var hadConverter = resources.Contains(converterKey);
+                var previousConverter = hadConverter
+                    ? resources[converterKey]
+                    : null;
+                resources[converterKey] = new BoolToVisibilityConverter
+                {
+                    TrueValue = Visibility.Visible,
+                    FalseValue = Visibility.Collapsed,
+                };
+                try
+                {
+                    var view = new AnimationPlayerView
+                    {
+                        DataContext = new KitbashAnimationPlayerProbe(),
+                    };
+                    var window = new Window
+                    {
+                        Content = view,
+                        Width = 1000,
+                        Height = 500,
+                        ShowActivated = false,
+                        ShowInTaskbar = false,
+                    };
+                    try
+                    {
+                        window.Show();
+                        window.UpdateLayout();
+
+                        var timeline = FindVisualDescendants<Slider>(view)
+                            .Single();
+                        var timeText = FindVisualDescendants<TextBlock>(view)
+                            .Select(textBlock => textBlock.Text)
+                            .First(text => text.Contains(
+                                localizationManager.Get(
+                                    "SharedAnimPlayer.Seconds"),
+                                StringComparison.Ordinal));
+                        NUnitAssert.Multiple(() =>
+                        {
+                            NUnitAssert.That(timeline.Maximum, Is.EqualTo(2.3));
+                            NUnitAssert.That(timeText, Does.Contain("2.30"));
+                            NUnitAssert.That(
+                                FindLogicalDescendants<CollapsableFilterControl>(
+                                    view).Count(),
+                                Is.EqualTo(2));
+                        });
+                    }
+                    finally
+                    {
+                        window.Close();
+                    }
+                }
+                finally
+                {
+                    if (hadConverter)
+                    {
+                        resources[converterKey] = previousConverter!;
+                    }
+                    else
+                    {
+                        resources.Remove(converterKey);
+                    }
+                }
+            });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void KitbashAnimationSelectors_ShowAvailableItemsWhenExpandedAndBrowsed()
+    {
+        var localizationManager = new LocalizationManager();
+        localizationManager.LoadLanguage();
+        using var services = new ServiceCollection()
+            .AddSingleton(localizationManager)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                const string converterKey = "BoolToCollapsedConverter";
+                var resources = Application.Current.Resources;
+                var hadConverter = resources.Contains(converterKey);
+                var previousConverter = hadConverter
+                    ? resources[converterKey]
+                    : null;
+                resources[converterKey] = new BoolToVisibilityConverter
+                {
+                    TrueValue = Visibility.Visible,
+                    FalseValue = Visibility.Collapsed,
+                };
+                try
+                {
+                    var view = new AnimationPlayerView
+                    {
+                        DataContext = new KitbashAnimationPlayerProbe
+                        {
+                            SkeletonList = ["animations\\skeletons\\humanoid17.anim"],
+                            AnimationsForCurrentSkeleton = ["animations\\battle\\test.anim"],
+                        },
+                    };
+                    var window = new Window
+                    {
+                        Content = view,
+                        Width = 1000,
+                        Height = 700,
+                        ShowActivated = false,
+                        ShowInTaskbar = false,
+                    };
+                    try
+                    {
+                        window.Show();
+                        window.UpdateLayout();
+
+                        var selectorArea = FindVisualDescendants<Expander>(view)
+                            .Single();
+                        selectorArea.IsExpanded = true;
+                        window.UpdateLayout();
+
+                        var selectors = FindVisualDescendants<CollapsableFilterControl>(
+                                view)
+                            .ToArray();
+                        NUnitAssert.That(selectors, Has.Length.EqualTo(2));
+
+                        var aeListItemStyle = (Style)Application.Current
+                            .FindResource("AeList.Item");
+                        var expectedItems = new[]
+                        {
+                            "animations\\skeletons\\humanoid17.anim",
+                            "animations\\battle\\test.anim",
+                        };
+                        for (var index = 0; index < selectors.Length; index++)
+                        {
+                            var selector = selectors[index];
+                            var browseButton = FindVisualDescendants<Button>(selector)
+                                .First(button => Equals(
+                                    button.Content,
+                                    localizationManager.Get("General.Browse")));
+                            browseButton.RaiseEvent(new RoutedEventArgs(
+                                Button.ClickEvent));
+                            window.UpdateLayout();
+
+                            var filter = FindVisualDescendants<FilterUserControl>(
+                                    selector)
+                                .Single();
+                            var results = FindVisualDescendants<ListView>(filter)
+                                .Single();
+                            var itemContainer = (ListViewItem?)results
+                                .ItemContainerGenerator.ContainerFromIndex(0);
+                            var itemStyleBasedOn = itemContainer?.Style.BasedOn;
+                            var visibleItemText = itemContainer is null
+                                ? Array.Empty<string>()
+                                : FindVisualDescendants<TextBlock>(itemContainer)
+                                    .Select(textBlock => textBlock.Text)
+                                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                                    .ToArray();
+                            NUnitAssert.Multiple(() =>
+                            {
+                                NUnitAssert.That(filter.Visibility, Is.EqualTo(
+                                    Visibility.Visible));
+                                NUnitAssert.That(results.Items.Count, Is.EqualTo(1));
+                                NUnitAssert.That(results.ActualHeight, Is.GreaterThan(0));
+                                NUnitAssert.That(itemContainer, Is.Not.Null);
+                                NUnitAssert.That(
+                                    itemStyleBasedOn,
+                                    Is.SameAs(aeListItemStyle));
+                                NUnitAssert.That(
+                                    visibleItemText,
+                                    Does.Contain(expectedItems[index]));
+                            });
+                        }
+                    }
+                    finally
+                    {
+                        window.Close();
+                    }
+                }
+                finally
+                {
+                    if (hadConverter)
+                    {
+                        resources[converterKey] = previousConverter!;
+                    }
+                    else
+                    {
+                        resources.Remove(converterKey);
+                    }
+                }
+            });
+    }
+
+    [Test]
     public void DynamicContextMenuSeparators_UseCompactRows()
     {
         var root = FindSolutionRoot();
@@ -614,6 +821,42 @@ public class UiModelKitbashFamilyTests
             foreach (var descendant in FindVisualDescendants<T>(child))
                 yield return descendant;
         }
+    }
+
+    private static IEnumerable<T> FindLogicalDescendants<T>(
+        DependencyObject parent)
+        where T : DependencyObject
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(parent)
+                     .OfType<DependencyObject>())
+        {
+            if (child is T match)
+                yield return match;
+
+            foreach (var descendant in FindLogicalDescendants<T>(child))
+                yield return descendant;
+        }
+    }
+
+    private sealed class KitbashAnimationPlayerProbe
+    {
+        public bool IsEnabled { get; set; } = true;
+        public VisibilityValue AnimationControllerVisability { get; } = new();
+        public int CurrentFrame { get; set; } = 19;
+        public int MaxFrames { get; set; } = 47;
+        public bool IsPlaying { get; } = true;
+        public double PlaybackPositionSeconds { get; set; } = 0.89;
+        public double MaxTimeSeconds { get; } = 2.3;
+        public string HeaderText { get; set; } = "测试动画";
+        public object? SelectedAnimation { get; set; }
+        public object? SelectedSkeleton { get; set; }
+        public object[] SkeletonList { get; set; } = [];
+        public object[] AnimationsForCurrentSkeleton { get; set; } = [];
+    }
+
+    private sealed class VisibilityValue
+    {
+        public Visibility Value { get; set; } = Visibility.Visible;
     }
 
     private static string FindSolutionRoot()

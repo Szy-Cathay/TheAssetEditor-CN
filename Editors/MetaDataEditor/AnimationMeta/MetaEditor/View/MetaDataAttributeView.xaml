@@ -22,24 +22,76 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Margin="0,0,0,8">
+            <Grid Grid.Row="0" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <TextBlock
-                    Style="{StaticResource AeText.Label}"
-                    Text="{loc:Loc MetaData.DescriptionHeader}" />
-                <TextBlock
-                    Margin="0,2,0,0"
+                    VerticalAlignment="Center"
                     Style="{StaticResource AeText.Body}"
                     Text="{Binding SelectedTag.Description, UpdateSourceTrigger=PropertyChanged}"
-                    TextWrapping="Wrap" />
-            </StackPanel>
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="NoWrap"
+                    ToolTip="{Binding SelectedTag.Description}" />
+                <StackPanel x:Name="SuperViewBatchControls"
+                    Grid.Column="1"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding DataContext.IsAnimationMetaTabSelected, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}}"
+                                    Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <CheckBox
+                        Margin="0,0,12,0"
+                        Content="{loc:Loc SuperView.Batch.ShowAll}"
+                        IsChecked="{Binding DataContext.ShowAllAnimationMetaPreviews, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        IsEnabled="{Binding DataContext.CanToggleAnimationMetaPreviewVisibility, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}}"
+                        Style="{StaticResource AeInput.CheckBox}"
+                        ToolTip="{loc:Loc SuperView.Batch.ShowAllTip}" />
+                    <CheckBox
+                        Margin="0,0,12,0"
+                        Content="{loc:Loc SuperView.Batch.FullTime}"
+                        IsChecked="{Binding DataContext.ShowAllAnimationMetaForEntireAnimation, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        IsEnabled="{Binding DataContext.CanToggleAnimationMetaDisplayTime, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}}"
+                        Style="{StaticResource AeInput.CheckBox}"
+                        ToolTip="{loc:Loc SuperView.Batch.FullTimeTip}" />
+                    <CheckBox
+                        Content="{loc:Loc SuperView.Batch.Edit3D}"
+                        IsChecked="{Binding DataContext.EnableAllAnimationMeta3D, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        IsEnabled="{Binding DataContext.CanToggleAnimationMeta3D, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}}"
+                        Style="{StaticResource AeInput.CheckBox}"
+                        ToolTip="{loc:Loc SuperView.Batch.Edit3DTip}" />
+                </StackPanel>
+            </Grid>
 
-            <Border
+            <Border x:Name="SuperViewSelectedMetaDataControls"
                 Grid.Row="1"
                 Margin="0,0,0,8"
                 Padding="0,8"
                 BorderBrush="{DynamicResource AeBrush.Border}"
-                BorderThickness="0,1,0,1"
-                Visibility="{Binding DataContext.HasSelectedSceneMarkerSettings, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}, Converter={StaticResource BoolToCollapsedConverter}}">
+                BorderThickness="0,1,0,1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger
+                                Binding="{Binding DataContext.HasSelectedSceneMarkerSettings, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}}"
+                                Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <StackPanel>
                     <TextBlock
                         Style="{StaticResource AeText.Label}"
@@ -475,6 +527,7 @@
                                     MinWidth="300"
                                     Margin="0,3"
                                     HorizontalAlignment="Left"
+                                    ToolTip="{Binding Description}"
                                     VerticalContentAlignment="Center"
                                     Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
                                 <Border
@@ -513,6 +566,7 @@
                                 MinWidth="300"
                                 Margin="0,3"
                                 HorizontalAlignment="Left"
+                                ToolTip="{Binding Description}"
                                 VerticalContentAlignment="Center"
                                 Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
                             <Border

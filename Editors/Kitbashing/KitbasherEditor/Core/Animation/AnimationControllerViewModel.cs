@@ -52,6 +52,30 @@ namespace Editors.KitbasherEditor.ViewModels
         int _maxFrames = 0;
         public int MaxFrames { get { return _maxFrames; } set { SetAndNotify(ref _maxFrames, value); } }
 
+        float _playbackPositionSeconds;
+        bool _isUpdatingPlaybackPosition;
+        public float PlaybackPositionSeconds
+        {
+            get => _playbackPositionSeconds;
+            set
+            {
+                SetAndNotifyWhenChanged(
+                    ref _playbackPositionSeconds,
+                    value);
+                if (!_isUpdatingPlaybackPosition)
+                    _player.SeekToTimeSeconds(value);
+            }
+        }
+
+        float _maxTimeSeconds;
+        public float MaxTimeSeconds
+        {
+            get => _maxTimeSeconds;
+            private set => SetAndNotifyWhenChanged(
+                ref _maxTimeSeconds,
+                value);
+        }
+
         public NotifyAttr<Visibility> AnimationControllerVisability { get; set; } = new NotifyAttr<Visibility>(Visibility.Collapsed);
 
 
@@ -82,6 +106,7 @@ namespace Editors.KitbasherEditor.ViewModels
             _player.OnFrameChanged += currentFrame =>
             {
                 CurrentFrame = currentFrame + 1;
+                RefreshPlaybackPosition();
                 UpdatePlayingState();
             };
 
@@ -196,6 +221,7 @@ namespace Editors.KitbasherEditor.ViewModels
 
                 MaxFrames = _player.FrameCount();
                 CurrentFrame = 0;
+                RefreshPlaybackPosition();
                 UpdatePlayingState();
             }
         }
@@ -216,19 +242,38 @@ namespace Editors.KitbasherEditor.ViewModels
                     CurrentFrame = 0;
 
                     _player.SetAnimation(animClip, skeleton, true);
+                    RefreshPlaybackPosition();
                 }
             }
             else
             {
                 AnimationControllerVisability.Value = Visibility.Collapsed;
                 _player.SetAnimation(null, skeleton, true);
+                RefreshPlaybackPosition();
             }
 
             _player.IsEnabled = isEnabled;
+            RefreshPlaybackPosition();
             UpdatePlayingState();
         }
 
         private void UpdatePlayingState() =>
             IsPlaying = _player.IsPlaying && _player.IsEnabled;
+
+        private void RefreshPlaybackPosition()
+        {
+            _isUpdatingPlaybackPosition = true;
+            try
+            {
+                PlaybackPositionSeconds =
+                    (float)_player.GetTimeUs() / 1_000_000;
+                MaxTimeSeconds =
+                    (float)_player.GetAnimationLengthUs() / 1_000_000;
+            }
+            finally
+            {
+                _isUpdatingPlaybackPosition = false;
+            }
+        }
     }
 }

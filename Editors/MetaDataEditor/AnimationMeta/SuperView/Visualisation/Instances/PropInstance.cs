@@ -19,12 +19,22 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         private readonly ILogger _logger = Logging.Create<PropInstance>();
         private readonly Action<bool>? _selectionChanged;
         private bool _canFollowBone = true;
+        private bool _isEnabled = true;
         private bool _isSelected;
         private bool _showForEntireAnimation;
         private float _currentTimeSeconds;
 
         public AnimationPlayer Player { get; }
         public ParsedMetadataAttribute Source { get; private set; } = null!;
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                _isEnabled = value;
+                ApplyVisibility();
+            }
+        }
         public Matrix ReferenceWorldTransform
         {
             get
@@ -176,8 +186,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         }
 
         private void ApplyVisibility() =>
-            _node.IsVisible = _showForEntireAnimation ||
-                _activeTimeRange.Contains(_currentTimeSeconds);
+            _node.IsVisible = _isEnabled &&
+                (_showForEntireAnimation ||
+                    _activeTimeRange.Contains(_currentTimeSeconds));
 
         private Matrix GetParentWorldTransform()
         {

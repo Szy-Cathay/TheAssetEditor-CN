@@ -38,8 +38,12 @@ namespace Editors.AnimationMeta.SuperView
             CombatMetaDataTransformMode.Translate;
         private ParsedMetadataAttribute? _appliedSelectedPreviewAttribute;
         private bool? _reportedSelectedMetaDataIsActive;
+        private bool? _animationMetaPreviewVisibilityOverride;
         private readonly HashSet<ParsedMetadataAttribute>
             _entireAnimationPreviewSources = new(
+                ReferenceEqualityComparer.Instance);
+        private readonly HashSet<ParsedMetadataAttribute>
+            _threeDimensionalEditingSources = new(
                 ReferenceEqualityComparer.Instance);
 
         [ObservableProperty] MetaDataEditorViewModel _persistentMetaEditor = null!;
@@ -49,7 +53,125 @@ namespace Editors.AnimationMeta.SuperView
         [ObservableProperty] bool _showTargetPositions = true;
         [ObservableProperty] bool _showFirePositions = true;
         [ObservableProperty] bool _showSplashAttacks = true;
-        [ObservableProperty] bool _isCombatMetaData3dEditingEnabled;
+        public bool IsCombatMetaData3dEditingEnabled
+        {
+            get => SelectedPreviewAttribute is ParsedMetadataAttribute source &&
+                _threeDimensionalEditingSources.Contains(source);
+            set
+            {
+                if (SelectedPreviewAttribute is not ParsedMetadataAttribute source ||
+                    value && !CombatMetaDataEditSession.CanEdit(source))
+                {
+                    return;
+                }
+
+                var changed = value
+                    ? _threeDimensionalEditingSources.Add(source)
+                    : _threeDimensionalEditingSources.Remove(source);
+                if (!changed)
+                    return;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(EnableAllAnimationMeta3D));
+                UpdateCombatGizmoEnabled();
+                OnPropertyChanged(nameof(CanUndoCombatMetaData));
+                OnPropertyChanged(nameof(CanRedoCombatMetaData));
+            }
+        }
+        public bool IsAnimationMetaTabSelected =>
+            SelectedTabControllerIndex == 1;
+        public bool CanToggleAnimationMetaPreviewVisibility =>
+            GetAnimationMetaPreviews().Any();
+        public bool ShowAllAnimationMetaPreviews
+        {
+            get
+            {
+                var previews = GetAnimationMetaPreviews().ToList();
+                return previews.Count != 0 && previews.All(preview =>
+                    preview.IsEnabled);
+            }
+            set
+            {
+                if (!CanToggleAnimationMetaPreviewVisibility)
+                {
+                    return;
+                }
+
+                _animationMetaPreviewVisibilityOverride = value;
+                ApplyCombatPreviewVisibility();
+            }
+        }
+        public bool CanToggleAnimationMetaDisplayTime =>
+            GetAnimationTimedMetaPreviews().Any();
+        public bool ShowAllAnimationMetaForEntireAnimation
+        {
+            get
+            {
+                var previews = GetAnimationTimedMetaPreviews().ToList();
+                return previews.Count != 0 && previews.All(preview =>
+                    preview.ShowForEntireAnimation);
+            }
+            set
+            {
+                var previews = GetAnimationTimedMetaPreviews().ToList();
+                if (previews.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (var preview in previews)
+                {
+                    if (value)
+                        _entireAnimationPreviewSources.Add(preview.Source);
+                    else
+                        _entireAnimationPreviewSources.Remove(preview.Source);
+                    preview.ShowForEntireAnimation = value;
+                }
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(ShowCombatMetaDataForEntireAnimation));
+                OnPropertyChanged(
+                    nameof(ShowCombatMetaDataDuringActiveTime));
+            }
+        }
+        public bool CanToggleAnimationMeta3D =>
+            GetAnimationMetaSources().Any(
+                CombatMetaDataEditSession.CanEdit);
+        public bool EnableAllAnimationMeta3D
+        {
+            get
+            {
+                var sources = GetAnimationMetaSources()
+                    .Where(CombatMetaDataEditSession.CanEdit)
+                    .ToList();
+                return sources.Count != 0 && sources.All(source =>
+                    _threeDimensionalEditingSources.Contains(source));
+            }
+            set
+            {
+                var sources = GetAnimationMetaSources()
+                    .Where(CombatMetaDataEditSession.CanEdit)
+                    .ToList();
+                if (sources.Count == 0)
+                    return;
+
+                foreach (var source in sources)
+                {
+                    if (value)
+                        _threeDimensionalEditingSources.Add(source);
+                    else
+                        _threeDimensionalEditingSources.Remove(source);
+                }
+
+                OnPropertyChanged();
+                OnPropertyChanged(
+                    nameof(IsCombatMetaData3dEditingEnabled));
+                UpdateCombatGizmoEnabled();
+                OnPropertyChanged(nameof(CanUndoCombatMetaData));
+                OnPropertyChanged(nameof(CanRedoCombatMetaData));
+            }
+        }
         public bool ShowCombatMetaDataForEntireAnimation
         {
             get => SelectedPreviewAttribute is ParsedMetadataAttribute source &&
@@ -72,6 +194,8 @@ namespace Editors.AnimationMeta.SuperView
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ShowCombatMetaDataDuringActiveTime));
+                OnPropertyChanged(
+                    nameof(ShowAllAnimationMetaForEntireAnimation));
             }
         }
         public override Type EditorViewModelType => typeof(EditorView);
@@ -274,7 +398,6 @@ namespace Editors.AnimationMeta.SuperView
 
         private void OnSelectedMetaDataAttributeChanged(SelecteMetaDataAttributeChangedEvent @event)
         {
-            IsCombatMetaData3dEditingEnabled = false;
             Set3DTransformMode(CombatMetaDataTransformMode.Translate);
             ApplySelectedMetaDataPreview();
             UpdateCombatEditTarget();
@@ -282,26 +405,20 @@ namespace Editors.AnimationMeta.SuperView
         }
         partial void OnSelectedTabControllerIndexChanged(int value)
         {
-            IsCombatMetaData3dEditingEnabled = false;
             Set3DTransformMode(CombatMetaDataTransformMode.Translate);
             ApplySelectedMetaDataPreview();
             UpdateCombatEditTarget();
             NotifySelectedMetaDataContextChanged();
-        }
-        partial void OnIsCombatMetaData3dEditingEnabledChanged(bool value)
-        {
-            _combatGizmo.IsEnabled = value;
-            OnPropertyChanged(nameof(CanUndoCombatMetaData));
-            OnPropertyChanged(nameof(CanRedoCombatMetaData));
+            OnPropertyChanged(nameof(IsAnimationMetaTabSelected));
         }
         partial void OnShowImpactPositionsChanged(bool value) =>
-            ApplyCombatPreviewVisibility();
+            OnCombatCategoryVisibilityChanged();
         partial void OnShowTargetPositionsChanged(bool value) =>
-            ApplyCombatPreviewVisibility();
+            OnCombatCategoryVisibilityChanged();
         partial void OnShowFirePositionsChanged(bool value) =>
-            ApplyCombatPreviewVisibility();
+            OnCombatCategoryVisibilityChanged();
         partial void OnShowSplashAttacksChanged(bool value) =>
-            ApplyCombatPreviewVisibility();
+            OnCombatCategoryVisibilityChanged();
         void OnMetaDataAttributeChanged(MetaDataAttributeChangedEvent @event)
         {
             if (@event.Source is not ParsedMetadataAttribute attribute ||
@@ -398,12 +515,15 @@ namespace Editors.AnimationMeta.SuperView
                 .ToHashSet(ReferenceEqualityComparer.Instance);
             _entireAnimationPreviewSources.RemoveWhere(source =>
                 !currentSources.Contains(source));
+            _threeDimensionalEditingSources.RemoveWhere(source =>
+                !currentSources.Contains(source));
 
             _asset.Data.MetaDataItems = _metaDataFactory.Create(persist, meta, SelectedPreviewAttribute, _asset.Data.MainNode, _asset.Data, _asset.Data.Player, _asset.FragAndSlotSelection.FragmentList.SelectedItem);
             _appliedSelectedPreviewAttribute = SelectedPreviewAttribute;
             ApplyCombatPreviewVisibility();
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
             OnPropertyChanged(nameof(CanConfigureSelectedMetaDataDisplayTime));
+            NotifyAnimationMetaBatchControlsChanged();
             _asset.Data.Player.Refresh();
 
             // Re-disable selection after metadata creates new nodes
@@ -483,22 +603,75 @@ namespace Editors.AnimationMeta.SuperView
                     _entireAnimationPreviewSources.Contains(preview.Source);
             }
 
+            var animationSources = GetAnimationMetaSources().ToHashSet(
+                ReferenceEqualityComparer.Instance);
             foreach (var preview in _asset.Data.MetaDataItems
-                .OfType<ICombatMetaDataPreview>())
+                .OfType<IMetaDataPreview>())
             {
-                preview.IsEnabled = preview.Category switch
+                var enabled = preview is ICombatMetaDataPreview combatPreview
+                    ? combatPreview.Category switch
+                    {
+                        CombatMetaDataPreviewCategory.Impact =>
+                            ShowImpactPositions,
+                        CombatMetaDataPreviewCategory.Target =>
+                            ShowTargetPositions,
+                        CombatMetaDataPreviewCategory.Fire =>
+                            ShowFirePositions,
+                        CombatMetaDataPreviewCategory.Splash =>
+                            ShowSplashAttacks,
+                        _ => true
+                    }
+                    : true;
+                if (animationSources.Contains(preview.Source) &&
+                    _animationMetaPreviewVisibilityOverride.HasValue)
                 {
-                    CombatMetaDataPreviewCategory.Impact =>
-                        ShowImpactPositions,
-                    CombatMetaDataPreviewCategory.Target =>
-                        ShowTargetPositions,
-                    CombatMetaDataPreviewCategory.Fire =>
-                        ShowFirePositions,
-                    CombatMetaDataPreviewCategory.Splash =>
-                        ShowSplashAttacks,
-                    _ => true
-                };
+                    enabled = _animationMetaPreviewVisibilityOverride.Value;
+                }
+
+                preview.IsEnabled = enabled;
             }
+
+            NotifyAnimationMetaBatchControlsChanged();
+        }
+
+        private void OnCombatCategoryVisibilityChanged()
+        {
+            _animationMetaPreviewVisibilityOverride = null;
+            ApplyCombatPreviewVisibility();
+        }
+
+        private IEnumerable<ParsedMetadataAttribute>
+            GetAnimationMetaSources() =>
+            MetaEditor.ParsedFile?.Attributes
+                .OfType<ParsedMetadataAttribute>() ?? [];
+
+        private IEnumerable<IMetaDataPreview> GetAnimationMetaPreviews()
+        {
+            var sources = GetAnimationMetaSources().ToHashSet(
+                ReferenceEqualityComparer.Instance);
+            return _asset.Data.MetaDataItems
+                .OfType<IMetaDataPreview>()
+                .Where(preview => sources.Contains(preview.Source));
+        }
+
+        private IEnumerable<ITimedMetaDataPreview>
+            GetAnimationTimedMetaPreviews() =>
+            GetAnimationMetaPreviews()
+                .OfType<ITimedMetaDataPreview>()
+                .Where(preview => MetaDataTimeRange.TryCreate(
+                    preview.Source,
+                    out _));
+
+        private void NotifyAnimationMetaBatchControlsChanged()
+        {
+            OnPropertyChanged(
+                nameof(CanToggleAnimationMetaPreviewVisibility));
+            OnPropertyChanged(nameof(ShowAllAnimationMetaPreviews));
+            OnPropertyChanged(nameof(CanToggleAnimationMetaDisplayTime));
+            OnPropertyChanged(
+                nameof(ShowAllAnimationMetaForEntireAnimation));
+            OnPropertyChanged(nameof(CanToggleAnimationMeta3D));
+            OnPropertyChanged(nameof(EnableAllAnimationMeta3D));
         }
 
         private ISpatialMetaDataPreview? GetSelectedSpatialPreview()
@@ -579,6 +752,9 @@ namespace Editors.AnimationMeta.SuperView
             OnPropertyChanged(nameof(IsEffectMetaDataSelected));
             OnPropertyChanged(nameof(CanEditSelectedMetaData3D));
             OnPropertyChanged(nameof(CanRotateSelectedMetaData3D));
+            OnPropertyChanged(
+                nameof(IsCombatMetaData3dEditingEnabled));
+            OnPropertyChanged(nameof(EnableAllAnimationMeta3D));
             OnPropertyChanged(nameof(CanConfigureSelectedMetaDataDisplayTime));
             OnPropertyChanged(nameof(EditEffectPosition));
             OnPropertyChanged(nameof(EditEffectOrientation));
@@ -661,8 +837,14 @@ namespace Editors.AnimationMeta.SuperView
             }
 
             _combatGizmo.RefreshTarget();
+            UpdateCombatGizmoEnabled();
             NotifyCombatEditStateChanged();
         }
+
+        private void UpdateCombatGizmoEnabled() =>
+            _combatGizmo.IsEnabled =
+                IsCombatMetaData3dEditingEnabled &&
+                CanEditSelectedMetaData3D;
 
         private void OnCombatMetaDataValueChanged(
             CombatMetaDataEditChange change)
@@ -704,6 +886,7 @@ namespace Editors.AnimationMeta.SuperView
 
         private void OnSceneObjectUpdated(SceneObjectUpdateEvent e)
         {
+            _animationMetaPreviewVisibilityOverride = null;
             _combatEditSession.ResetDocument(PersistentMetaEditor);
             _combatEditSession.ResetDocument(MetaEditor);
             PersistentMetaEditor.LoadFile(e.Owner.PersistMetaData);
@@ -712,6 +895,7 @@ namespace Editors.AnimationMeta.SuperView
             RecreateMetaDataInformation();
             UpdateCombatEditTarget();
             NotifyMetaFileStateChanged();
+            NotifyAnimationMetaBatchControlsChanged();
         }
 
         public void Load(AnimationToolInput debugDataToLoad)

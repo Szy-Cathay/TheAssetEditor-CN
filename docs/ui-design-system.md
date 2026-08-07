@@ -128,7 +128,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - 所有按钮 `FocusVisualStyle` 为 `null`，不得显示聚焦框、蓝色描边或按下后残留边框；键盘命令、访问键和自动化名称仍必须保留。
 - 禁用状态降低层级但保持文字可读；危险按钮使用 `Danger`，不能只靠红色表达风险。
 
-播放器播放期间，播放按钮背景持续保持选中高亮，播放图标使用 `AeBrush.Danger`；停止或暂停后恢复普通状态。播放器复用 `AeEditor.PlaybackToggle` 等现有实现，不单独制造另一套按钮。
+播放器播放期间，播放按钮背景持续保持选中高亮，播放图标使用 `AeBrush.Danger`；停止或暂停后恢复普通状态。播放器复用 `AeEditor.PlaybackToggle` 和可拖动的 `AeEditor.PlaybackSlider`，不单独制造另一套按钮或时间轴。
 
 ### 4.3 输入、选择和下拉箭头
 
@@ -232,7 +232,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 | 变量、文字与表面 | `AssetEditor/Themes/DesignSystem/DesignTokens.xaml`、`Typography.xaml`、`SurfaceStyles.xaml` | `AeSpace.*`、`AeSize.*`、`AeRadius.*`、`AeMotion.*`、`AeText.*`、`AeSurface.*` |
 | 主窗口工作区 | `AssetEditor/Themes/DesignSystem/Shell.xaml` | `AeShell.*` |
 | 设置与标准工作流 | `AssetEditor/Themes/DesignSystem/Workflows.xaml` | `AeWorkflow.*` |
-| 编辑器按钮与播放器 | `Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml` | `AeEditor.ToggleIcon`、`AeEditor.PlaybackToggle` |
+| 编辑器按钮与播放器 | `Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml` | `AeEditor.ToggleIcon`、`AeEditor.PlaybackToggle`、`AeEditor.PlaybackSlider` |
 | 分隔条 | `Shared/SharedUI/Common/Styles/GridSplitterStyles.xaml` | `AeVerticalGridSplitterStyle`、`AeHorizontalGridSplitterStyle` |
 | 统一窗口 | `Shared/SharedUI/Common/AssetEditorWindow.cs` | `AssetEditorWindow` 与 `CustomWindowStyle` |
 | 标准消息 | `Shared/SharedCore/Services/IStandardDialogs.cs`、`Shared/SharedUI/BaseDialogs/StandardDialog/` | `IStandardDialogs`、`UnifiedMessageBox`、`MessageDialogWindow` |

@@ -288,6 +288,123 @@ namespace Test.AnimationMeta
                 Is.True);
         }
 
+        [Test]
+        public void TagEditor_UsesCompactPurposeAndHoverOnlyPropertyHelp()
+        {
+            var solutionRoot = FindSolutionRoot();
+            var view = XDocument.Load(Path.Combine(
+                solutionRoot,
+                "Editors",
+                "MetaDataEditor",
+                "AnimationMeta",
+                "MetaEditor",
+                "View",
+                "MetaDataAttributeView.xaml"));
+            var purpose = view.Descendants().Single(element =>
+                element.Name.LocalName == "TextBlock" &&
+                element.Attribute("Text")?.Value.Contains(
+                    "SelectedTag.Description",
+                    StringComparison.Ordinal) == true);
+            var templates = view.Descendants()
+                .Where(element => element.Name.LocalName == "DataTemplate")
+                .ToList();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    purpose.Attribute("TextWrapping")?.Value,
+                    Is.EqualTo("NoWrap"));
+                Assert.That(
+                    purpose.Attribute("TextTrimming")?.Value,
+                    Is.EqualTo("CharacterEllipsis"));
+                Assert.That(
+                    purpose.Attribute("ToolTip")?.Value,
+                    Is.EqualTo("{Binding SelectedTag.Description}"));
+                Assert.That(
+                    view.Descendants().Any(element =>
+                        element.Attribute("Text")?.Value.Contains(
+                            "MetaData.DescriptionHeader",
+                            StringComparison.Ordinal) == true),
+                    Is.False);
+                Assert.That(
+                    templates.All(template => template.Descendants().Any(
+                        element => element.Attribute("ToolTip")?.Value ==
+                            "{Binding Description}")),
+                    Is.True);
+            });
+
+            using var language = JsonDocument.Parse(File.ReadAllText(
+                Path.Combine(solutionRoot, "AssetEditor", "Language_Cn.json")));
+            var root = language.RootElement;
+            var unconfirmedKeys = new[]
+            {
+                "MetaData.PropTip.UnknownMeaning",
+                "MetaData.PropTip.PrimaryPersistent",
+                "MetaData.PropTip.PathToAnotherAnim",
+                "MetaData.PropTip.Unknownbool_v15",
+                "MetaData.PropTip.Unknownbool",
+                "MetaData.PropTip.Unk0",
+                "MetaData.PropTip.Unk1",
+                "MetaData.PropTip.UnknownInt_v11"
+            };
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    root.GetProperty("MetaData.TagDesc.Unknown").GetString(),
+                    Is.EqualTo("用途尚未确认"));
+                Assert.That(
+                    unconfirmedKeys.All(key =>
+                        root.GetProperty(key).GetString() == "含义未确认"),
+                    Is.True);
+                Assert.That(
+                    root.EnumerateObject()
+                        .Where(property => property.Name.StartsWith(
+                            "MetaData.TagDesc.",
+                            StringComparison.Ordinal))
+                        .All(property =>
+                            property.Value.GetString()?.Contains('。') != true &&
+                            property.Value.GetString()?.Contains('；') != true),
+                    Is.True);
+            });
+        }
+
+        [Test]
+        public void TagEditor_UsesCompactAnimationMetaBatchControls()
+        {
+            var solutionRoot = FindSolutionRoot();
+            var view = XDocument.Load(Path.Combine(
+                solutionRoot,
+                "Editors",
+                "MetaDataEditor",
+                "AnimationMeta",
+                "MetaEditor",
+                "View",
+                "MetaDataAttributeView.xaml"));
+            var bindings = view.Descendants()
+                .SelectMany(element => element.Attributes())
+                .Select(attribute => attribute.Value)
+                .ToList();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(bindings.Any(value => value.Contains(
+                    "ShowAllAnimationMetaPreviews",
+                    StringComparison.Ordinal)), Is.True);
+                Assert.That(bindings.Any(value => value.Contains(
+                    "ShowAllAnimationMetaForEntireAnimation",
+                    StringComparison.Ordinal)), Is.True);
+                Assert.That(bindings.Any(value => value.Contains(
+                    "CanToggleAnimationMeta3D",
+                    StringComparison.Ordinal)), Is.True);
+                Assert.That(view.Descendants().Count(element =>
+                    element.Name.LocalName == "CheckBox" &&
+                    element.Attribute("Style")?.Value ==
+                        "{StaticResource AeInput.CheckBox}"),
+                    Is.GreaterThanOrEqualTo(3));
+            });
+        }
+
         private static string FindSolutionRoot()
         {
             DirectoryInfo? directory = new(AppContext.BaseDirectory);

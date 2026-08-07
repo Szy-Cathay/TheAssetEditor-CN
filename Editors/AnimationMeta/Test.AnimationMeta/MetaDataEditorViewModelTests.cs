@@ -925,8 +925,8 @@ namespace Test.AnimationMeta
                         superView.ShowCombatMetaDataForEntireAnimation,
                         Is.False);
                 });
-
                 superView.IsCombatMetaData3dEditingEnabled = true;
+
                 superView.MetaEditor.SelectedTag = superView.MetaEditor.Tags
                     .Single(tag => tag._input.Name == "FIRE_POS");
                 Assert.Multiple(() =>
@@ -943,7 +943,6 @@ namespace Test.AnimationMeta
                         Is.True);
                 });
 
-                superView.IsCombatMetaData3dEditingEnabled = true;
                 superView.MetaEditor.SelectedTag = superView.MetaEditor.Tags
                     .Single(tag => tag._input.Name == "SPLASH_ATTACK");
                 Assert.Multiple(() =>
@@ -959,6 +958,166 @@ namespace Test.AnimationMeta
                     Assert.That(superView.EditSplashEnd, Is.False);
                     Assert.That(
                         superView.CanEditSelectedCombatMetaData,
+                        Is.True);
+                });
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        superView.CanToggleAnimationMetaPreviewVisibility,
+                        Is.True);
+                    Assert.That(
+                        superView.CanToggleAnimationMetaDisplayTime,
+                        Is.True);
+                    Assert.That(
+                        superView.CanToggleAnimationMeta3D,
+                        Is.True);
+                });
+
+                superView.EnableAllAnimationMeta3D = true;
+                foreach (var tag in superView.MetaEditor.Tags)
+                {
+                    superView.MetaEditor.SelectedTag = tag;
+                    Assert.That(
+                        superView.IsCombatMetaData3dEditingEnabled,
+                        Is.True);
+                }
+
+                superView.EnableAllAnimationMeta3D = false;
+                foreach (var tag in superView.MetaEditor.Tags)
+                {
+                    superView.MetaEditor.SelectedTag = tag;
+                    Assert.That(
+                        superView.IsCombatMetaData3dEditingEnabled,
+                        Is.False);
+                }
+
+                superView.ShowAllAnimationMetaPreviews = false;
+                Assert.That(previews, Has.All.Property("IsEnabled").False);
+                superView.ShowAllAnimationMetaPreviews = true;
+                Assert.That(previews, Has.All.Property("IsEnabled").True);
+
+                superView.ShowAllAnimationMetaForEntireAnimation = true;
+                Assert.That(
+                    previews,
+                    Has.All.Property("ShowForEntireAnimation").True);
+                superView.ShowAllAnimationMetaForEntireAnimation = false;
+                Assert.That(
+                    previews,
+                    Has.All.Property("ShowForEntireAnimation").False);
+            }
+            finally
+            {
+                superView.Close();
+            }
+        }
+
+        [Test]
+        public void SuperView_AnimationMetaBatchControls_DoNotChangePersistentMetaPreviews()
+        {
+            const string animationPath =
+                @"animations\battle\codex\batch_animation.anm.meta";
+            const string persistentPath =
+                @"animations\battle\codex\batch_persistent.anm.meta";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateOutputPack();
+            var editorCreator =
+                runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)editorCreator.Create(
+                EditorEnums.SuperView_Editor);
+
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<
+                    MetaDataFileParser>();
+                var fileSaveService =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        IFileSaveService>();
+                var sceneObjectEditor =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        SceneObjectEditor>();
+                var animationMetadata = new ParsedMetadataFile
+                {
+                    Version = 2,
+                    Attributes =
+                    [
+                        new ImpactPosition_v10
+                        {
+                            Name = "IMPACT_POS",
+                            Version = 10,
+                            Position = new Vector3(1, 2, 3),
+                        },
+                    ]
+                };
+                var persistentMetadata = new ParsedMetadataFile
+                {
+                    Version = 2,
+                    Attributes =
+                    [
+                        new TargetPos_10
+                        {
+                            Name = "TARGET_POS",
+                            Version = 10,
+                            Position = new Vector3(4, 5, 6),
+                        },
+                    ]
+                };
+                var animationFile = fileSaveService.Save(
+                    animationPath,
+                    parser.GenerateBytes(
+                        animationMetadata.Version,
+                        animationMetadata),
+                    false);
+                var persistentFile = fileSaveService.Save(
+                    persistentPath,
+                    parser.GenerateBytes(
+                        persistentMetadata.Version,
+                        persistentMetadata),
+                    false);
+                var sceneObject = superView.SceneObjects.Single();
+                sceneObject.FragAndSlotSelection.MetaDataName = animationPath;
+                sceneObject.FragAndSlotSelection.MetaDataPersistName =
+                    persistentPath;
+                sceneObjectEditor.SetMetaFile(
+                    sceneObject.Data,
+                    animationFile,
+                    persistentFile);
+
+                var animationSource = superView.MetaEditor.Tags.Single()._input;
+                var persistentSource =
+                    superView.PersistentMetaEditor.Tags.Single()._input;
+                var animationPreview = sceneObject.Data.MetaDataItems
+                    .OfType<ICombatMetaDataPreview>()
+                    .Single(preview =>
+                        ReferenceEquals(preview.Source, animationSource));
+                var persistentPreview = sceneObject.Data.MetaDataItems
+                    .OfType<ICombatMetaDataPreview>()
+                    .Single(preview =>
+                        ReferenceEquals(preview.Source, persistentSource));
+
+                superView.ShowAllAnimationMetaPreviews = false;
+                superView.ShowAllAnimationMetaForEntireAnimation = true;
+                superView.SelectedTabControllerIndex = 0;
+                superView.PersistentMetaEditor.SelectedTag =
+                    superView.PersistentMetaEditor.Tags.Single();
+                superView.IsCombatMetaData3dEditingEnabled = true;
+                superView.SelectedTabControllerIndex = 1;
+                superView.EnableAllAnimationMeta3D = true;
+                superView.EnableAllAnimationMeta3D = false;
+                superView.SelectedTabControllerIndex = 0;
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(animationPreview.IsEnabled, Is.False);
+                    Assert.That(persistentPreview.IsEnabled, Is.True);
+                    Assert.That(
+                        animationPreview.ShowForEntireAnimation,
+                        Is.True);
+                    Assert.That(
+                        persistentPreview.ShowForEntireAnimation,
+                        Is.False);
+                    Assert.That(
+                        superView.IsCombatMetaData3dEditingEnabled,
                         Is.True);
                 });
             }

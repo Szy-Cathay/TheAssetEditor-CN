@@ -64,12 +64,19 @@ namespace GameWorld.Core.Rendering
 
         public EdgeQuadInstanceMesh(IDeviceResolver deviceResolverComponent, IScopedResourceLibrary resourceLibrary)
         {
-            Initialize(deviceResolverComponent.Device, resourceLibrary);
+            Initialize(
+                deviceResolverComponent.Device,
+                resourceLibrary.GetStaticEffect(ShaderTypes.EdgeQuad));
         }
 
-        void Initialize(GraphicsDevice device, IScopedResourceLibrary resourceLib)
+        public EdgeQuadInstanceMesh(GraphicsDevice device, Effect effect)
         {
-            _effect = resourceLib.GetStaticEffect(ShaderTypes.EdgeQuad);
+            Initialize(device, effect);
+        }
+
+        void Initialize(GraphicsDevice device, Effect effect)
+        {
+            _effect = effect;
 
             _instanceVertexDeclaration = EdgeQuadInstanceData.VertexDeclaration;
             GenerateGeometry(device);
@@ -190,7 +197,6 @@ namespace GameWorld.Core.Rendering
 
         public void Dispose()
         {
-            _instanceVertexDeclaration?.Dispose();
             _instanceBuffer?.Dispose();
             _geometryBuffer?.Dispose();
             _indexBuffer?.Dispose();

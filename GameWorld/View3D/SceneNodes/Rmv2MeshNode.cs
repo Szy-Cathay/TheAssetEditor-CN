@@ -66,6 +66,7 @@ namespace GameWorld.Core.SceneNodes
         private readonly Matrix[] _animationBuffer = new Matrix[256];
         private GeometryRenderItem? _pooledRenderItem;
         private bool _selectionOutlineEnabled;
+        private bool _previewOutlineEnabled;
 
         public Rmv2MeshNode(MeshObject meshObject, IRmvMaterial material, CapabilityMaterial shader, AnimationPlayer animationPlayer)
         {
@@ -121,8 +122,11 @@ namespace GameWorld.Core.SceneNodes
                 _pooledRenderItem = new GeometryRenderItem(Geometry, Material, worldMatrix);
             else
                 _pooledRenderItem.UpdateWorldMatrix(worldMatrix);
-            _pooledRenderItem.SetSelectionMask(
-                _selectionOutlineEnabled);
+            var outlineEnabled = _selectionOutlineEnabled ||
+                _previewOutlineEnabled;
+            _pooledRenderItem.SetSelectionMask(outlineEnabled);
+            if (outlineEnabled)
+                renderEngine.RequestSelectionOutline();
 
             renderEngine.AddRenderItem(RenderBuckedId.Normal, _pooledRenderItem);
 
@@ -136,7 +140,15 @@ namespace GameWorld.Core.SceneNodes
         internal void SetSelectionOutline(bool enabled)
         {
             _selectionOutlineEnabled = enabled;
-            _pooledRenderItem?.SetSelectionMask(enabled);
+            _pooledRenderItem?.SetSelectionMask(
+                enabled || _previewOutlineEnabled);
+        }
+
+        public void SetPreviewOutline(bool enabled)
+        {
+            _previewOutlineEnabled = enabled;
+            _pooledRenderItem?.SetSelectionMask(
+                enabled || _selectionOutlineEnabled);
         }
 
         public Matrix GetRenderWorldMatrix()

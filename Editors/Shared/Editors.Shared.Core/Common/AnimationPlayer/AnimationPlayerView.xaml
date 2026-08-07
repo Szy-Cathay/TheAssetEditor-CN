@@ -18,119 +18,179 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <Border
+        Margin="8,4,8,8"
+        Padding="6"
+        Background="{DynamicResource AeBrush.Surface2}"
+        BorderBrush="{DynamicResource AeBrush.Border}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource AeRadius.Control}">
+        <Grid Grid.IsSharedSizeScope="True">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="8,6,8,4">
-            <TextBlock Text="{loc:Loc AnimationView.Animation}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-            <ToggleButton Style="{StaticResource AeInput.Switch}" IsChecked="{Binding IsEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-        </StackPanel>
-        <Grid Grid.Row="1" Margin="0,4,0,10" Visibility="{Binding PlayerControlsVisibility.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width=".1*"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width=".3*"/>
-            </Grid.ColumnDefinitions>
-
-            <Grid Grid.Column="0" VerticalAlignment="Top">
-                <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                </Grid.RowDefinitions>
-
-                <DockPanel Grid.Row="0"  >
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc SharedAnimPlayer.MainAnimation}" DockPanel.Dock="Left"/>
-                    <ComboBox DisplayMemberPath="SlotName.Value" ItemsSource="{Binding PlayerItems, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" SelectedItem="{Binding SelectedMainAnimation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"   DockPanel.Dock="Right"/>
-                </DockPanel>
-                 
-                <StackPanel Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{loc:Loc SharedAnimPlayer.Frame}"/>
-                        <TextBlock Text="{Binding SelectedAnimationCurrentFrame.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Text=" / "/>
-                        <TextBlock Text="{Binding SelectedAnimationFrameCount.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{loc:Loc SharedAnimPlayer.Time}"/>
-                        <TextBlock Text="{Binding SelectedAnimationFps.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Text="{loc:Loc SharedAnimPlayer.Fps}"/>
-                        <TextBlock Text="{Binding SelectedAnimationCurrentTime.Value, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Text=" / "/>
-                        <TextBlock Text="{Binding SelectedAnimationMaxTime.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
-                </StackPanel>
-
-      
-
-                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="2">
-                    <Button Style="{StaticResource AeButton.Icon}" Click="{s:MethodBinding SetAnimationFirstFrame}">
-                        <Canvas Width="16" Height="16">
-                            <Path Data="M 3,3 L 3,13 M 13,3 L 5,8 L 13,13 Z" Stroke="{DynamicResource AeBrush.TextPrimary}" Fill="{DynamicResource AeBrush.TextPrimary}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                        </Canvas>
-                    </Button>
-                    <Button Style="{StaticResource AeButton.Icon}" Click="{s:MethodBinding SetAnimationPrivFrame}">
-                        <Canvas Width="16" Height="16">
-                            <Path Data="M 13,3 L 6,8 L 13,13 Z M 8,3 L 1,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}"/>
-                        </Canvas>
-                    </Button>
+            <Grid x:Name="PlaybackCommandRow">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Text="{loc:Loc AnimationView.Animation}" />
                     <ToggleButton
-                        IsChecked="{Binding IsPlaying.Value, Mode=OneWay}"
-                        Style="{StaticResource AeEditor.PlaybackToggle}"
-                        Click="{s:MethodBinding ToggleAnimationPausePlay}">
-                        <Canvas Width="16" Height="16">
-                            <Path
-                                Data="M 4,2 L 14,8 L 4,14 Z"
-                                Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
-                        </Canvas>
-                    </ToggleButton>
-                    <Button Style="{StaticResource AeButton.Icon}" Click="{s:MethodBinding SetAnimationNextFrame}">
-                        <Canvas Width="16" Height="16">
-                            <Path Data="M 3,3 L 10,8 L 3,13 Z M 8,3 L 15,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}"/>
-                        </Canvas>
-                    </Button>
-                    <Button Style="{StaticResource AeButton.Icon}" Click="{s:MethodBinding SetAnimationLastFrame}">
-                        <Canvas Width="16" Height="16">
-                            <Path Data="M 3,3 L 11,8 L 3,13 Z M 13,3 L 13,13" Stroke="{DynamicResource AeBrush.TextPrimary}" Fill="{DynamicResource AeBrush.TextPrimary}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                        </Canvas>
-                    </Button>
+                        IsChecked="{Binding IsEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                        Style="{StaticResource AeInput.Switch}" />
                 </StackPanel>
 
-                <CheckBox IsChecked="{Binding LoopAnimation.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Grid.Row="4" Content="{loc:Loc SharedAnimPlayer.Loop}" HorizontalAlignment="Center"/>
+                <Grid
+                    Grid.Column="1"
+                    Margin="12,0,0,0"
+                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.Label}"
+                            Text="{loc:Loc SharedAnimPlayer.MainAnimation}" />
+                        <ComboBox
+                            MinWidth="140"
+                            MaxWidth="220"
+                            DisplayMemberPath="SlotName.Value"
+                            ItemsSource="{Binding PlayerItems, UpdateSourceTrigger=PropertyChanged}"
+                            SelectedItem="{Binding SelectedMainAnimation, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                            VerticalContentAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Column="1"
+                        Margin="10,0,12,0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                        <Button
+                            Click="{s:MethodBinding SetAnimationFirstFrame}"
+                            Style="{StaticResource AeButton.Icon}">
+                            <Canvas Width="16" Height="16">
+                                <Path Data="M 3,3 L 3,13 M 13,3 L 5,8 L 13,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeEndLineCap="Round" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeThickness="1.5" />
+                            </Canvas>
+                        </Button>
+                        <Button
+                            Click="{s:MethodBinding SetAnimationPrivFrame}"
+                            Style="{StaticResource AeButton.Icon}">
+                            <Canvas Width="16" Height="16">
+                                <Path Data="M 13,3 L 6,8 L 13,13 Z M 8,3 L 1,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" />
+                            </Canvas>
+                        </Button>
+                        <ToggleButton
+                            Click="{s:MethodBinding ToggleAnimationPausePlay}"
+                            IsChecked="{Binding IsPlaying.Value, Mode=OneWay}"
+                            Style="{StaticResource AeEditor.PlaybackToggle}">
+                            <Canvas Width="16" Height="16">
+                                <Path Data="M 4,2 L 14,8 L 4,14 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
+                            </Canvas>
+                        </ToggleButton>
+                        <Button
+                            Click="{s:MethodBinding SetAnimationNextFrame}"
+                            Style="{StaticResource AeButton.Icon}">
+                            <Canvas Width="16" Height="16">
+                                <Path Data="M 3,3 L 10,8 L 3,13 Z M 8,3 L 15,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" />
+                            </Canvas>
+                        </Button>
+                        <Button
+                            Click="{s:MethodBinding SetAnimationLastFrame}"
+                            Style="{StaticResource AeButton.Icon}">
+                            <Canvas Width="16" Height="16">
+                                <Path Data="M 3,3 L 11,8 L 3,13 Z M 13,3 L 13,13" Fill="{DynamicResource AeBrush.TextPrimary}" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeEndLineCap="Round" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeThickness="1.5" />
+                            </Canvas>
+                        </Button>
+                    </StackPanel>
+
+                    <ItemsControl
+                        Grid.Column="2"
+                        MaxHeight="52"
+                        HorizontalContentAlignment="Stretch"
+                        ItemsSource="{Binding PlayerItems, UpdateSourceTrigger=PropertyChanged}"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerName" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="PlayerFrames" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Margin="4,1"
+                                        Style="{StaticResource AeText.Label}"
+                                        Text="{Binding SlotName.Value}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Margin="10,1,4,1">
+                                        <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
+                                        <Run Text="{Binding MaxFrames.Value}" />
+                                    </TextBlock>
+                                    <TextBlock
+                                        Grid.Column="2"
+                                        Margin="10,1,4,1"
+                                        Text="{Binding AnimationName.Value}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTip="{Binding AnimationName.Value}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </Grid>
 
-            <ListView  Grid.Column="2" ItemsSource="{Binding PlayerItems, UpdateSourceTrigger=PropertyChanged}">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Header="{loc:Loc SharedAnimPlayer.Player}" Width="auto">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Label Content="{Binding SlotName.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                        <GridViewColumn Header="{loc:Loc SharedAnimPlayer.Frames}" Width="auto">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Label Content="{Binding MaxFrames.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                        <GridViewColumn Header="{loc:Loc AnimationView.Animation}" Width="auto">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Label Content="{Binding AnimationName.Value, UpdateSourceTrigger=PropertyChanged}"/>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                    </GridView>
-                </ListView.View>
-            </ListView>
+            <Grid
+                x:Name="PlaybackTimelineRow"
+                Grid.Row="1"
+                Margin="0,6,0,0"
+                Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
+                    <Run Text="{Binding SelectedAnimationCurrentTime.Value, StringFormat=N2}" />
+                    <Run Text=" / " />
+                    <Run Text="{Binding SelectedAnimationMaxTime.Value, StringFormat=N2}" />
+                    <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
+                </TextBlock>
+                <Slider
+                    Grid.Column="1"
+                    Maximum="{Binding SelectedAnimationMaxTime.Value, Mode=OneWay}"
+                    Style="{StaticResource AeEditor.PlaybackSlider}"
+                    Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
+                    <Run Text="{Binding SelectedAnimationCurrentFrame.Value}" />
+                    <Run Text=" / " />
+                    <Run Text="{Binding SelectedAnimationFrameCount.Value}" />
+                </TextBlock>
+                <TextBlock Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Run Text="{Binding SelectedAnimationFps.Value}" />
+                    <Run Text="{loc:Loc SharedAnimPlayer.Fps}" />
+                </TextBlock>
+                <CheckBox
+                    Grid.Column="4"
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center"
+                    Content="{loc:Loc SharedAnimPlayer.Loop}"
+                    IsChecked="{Binding LoopAnimation.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+            </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </UserControl>

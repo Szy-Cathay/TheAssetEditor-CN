@@ -127,12 +127,13 @@ namespace Editors.AnimationMeta.Presentation
             {
                 if (metadataEntry is ParsedUnknownMetadataAttribute uknMeta)
                 {
-                    var desc = LocalizeTagDescription(uknMeta.Name, _metaDataFileParser.GetDatabase().GetDescriptionSafe(uknMeta.Name));
+                    var desc = LocalizeTagDescription(uknMeta.Name);
                     Tags.Add(new MetaDataEntry(uknMeta, desc, _eventHub, false));
                 }
                 else if (metadataEntry is ParsedMetadataAttribute parsedKnownAttribute)
                 {
-                    var desc = LocalizeTagDescription(parsedKnownAttribute.Name, _metaDataFileParser.GetDatabase().GetDescriptionSafe(parsedKnownAttribute.Name));
+                    var desc = LocalizeTagDescription(
+                        parsedKnownAttribute.Name);
                     Tags.Add(new MetaDataEntry(parsedKnownAttribute, desc, _eventHub, true));
                 }
                 else
@@ -172,7 +173,7 @@ namespace Editors.AnimationMeta.Presentation
         [RelayCommand] void CopyAction() => _uiCommandFactory.Create<CopyPastCommand>().ExecuteCopy(this);
         [RelayCommand] void SaveAction() => _uiCommandFactory.Create<SaveCommand>().Execute(this);
 
-        static string LocalizeTagDescription(string tagName, string fallbackDescription)
+        internal static string LocalizeTagDescription(string tagName)
         {
             try
             {
@@ -185,7 +186,19 @@ namespace Editors.AnimationMeta.Presentation
             }
             catch { }
 
-            return fallbackDescription;
+            try
+            {
+                const string unknownKey = "MetaData.TagDesc.Unknown";
+                if (LocalizationManager.Instance != null)
+                {
+                    var unknown = LocalizationManager.Instance.Get(unknownKey);
+                    if (unknown != unknownKey)
+                        return unknown;
+                }
+            }
+            catch { }
+
+            return "用途尚未确认";
         }
     }
 }

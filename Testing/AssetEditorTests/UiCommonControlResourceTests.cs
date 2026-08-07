@@ -890,6 +890,34 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
+    public void EditorWorkspace_PlaybackSliderSupportsClickAndDragSeeking()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var editorStyles = Load(
+                    "Shared.Ui",
+                    "Common/Styles/EditorWorkspaceStyles.xaml");
+                var slider = new Slider
+                {
+                    Style = (Style)editorStyles[
+                        "AeEditor.PlaybackSlider"],
+                };
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(slider.MinWidth, Is.EqualTo(120));
+                    NUnitAssert.That(slider.Height, Is.EqualTo(28));
+                    NUnitAssert.That(slider.IsMoveToPointEnabled, Is.True);
+                    NUnitAssert.That(
+                        slider.AutoToolTipPlacement,
+                        Is.EqualTo(AutoToolTipPlacement.TopLeft));
+                });
+            });
+    }
+
+    [Test]
     public void EditorToggleButtons_UsePressReleaseMotionWithoutFocusFrames()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(

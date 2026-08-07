@@ -14,13 +14,13 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
     public interface IMetaDataPreview
     {
         ParsedMetadataAttribute Source { get; }
+        bool IsEnabled { get; set; }
         bool IsSelected { get; set; }
     }
 
     public interface ICombatMetaDataPreview : ISpatialMetaDataPreview
     {
         CombatMetaDataPreviewCategory Category { get; }
-        bool IsEnabled { get; set; }
     }
 
     public interface ITimedMetaDataPreview : IMetaDataPreview

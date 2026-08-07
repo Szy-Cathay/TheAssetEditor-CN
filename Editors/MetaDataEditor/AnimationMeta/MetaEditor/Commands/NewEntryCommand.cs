@@ -46,14 +46,8 @@ namespace Editors.AnimationMeta.MetaEditor.Commands
                 var tagName = separatorIndex > 0
                     ? definitionName[..separatorIndex]
                     : definitionName;
-                var descriptionKey = $"MetaData.TagDesc.{tagName}";
-                var description = LocalizationManager.Instance.Get(
-                    descriptionKey);
-                if (description == descriptionKey)
-                {
-                    description = _metaDataDatabase.GetDescriptionSafe(
-                        tagName);
-                }
+                var description = MetaDataEditorViewModel
+                    .LocalizeTagDescription(tagName);
 
                 var categoryKey = AnimationMetaTagCatalog.GetCategoryKey(
                     definitionName);

@@ -44,7 +44,8 @@ namespace Editors.AnimationMeta.Presentation
                 var value = prop.GetValue(typedMetaItem);
 
                 var fieldName = GetLocalizedPropertyName(prop.Name);
-                var itemDescription = GetLocalizedPropertyDescription(prop.Name, attributeInfo.Description, prop.PropertyType.Name);
+                var itemDescription = GetLocalizedPropertyDescription(
+                    prop.Name);
 
                 AttributeViewModel? editableItem = null;
                 if (value is bool boolean)
@@ -136,7 +137,10 @@ namespace Editors.AnimationMeta.Presentation
             }
             catch { }
 
-            return FormatFieldName(propertyName);
+            var formattedName = FormatFieldName(propertyName);
+            return IsUnconfirmedPropertyName(propertyName)
+                ? $"未确认字段（{formattedName}）"
+                : formattedName;
         }
 
         static string GetLocalizedChoiceName(string propertyName, string value)
@@ -168,7 +172,12 @@ namespace Editors.AnimationMeta.Presentation
             return fallback;
         }
 
-        static string GetLocalizedPropertyDescription(string propertyName, string attributeDescription, string typeName)
+        static bool IsUnconfirmedPropertyName(string propertyName) =>
+            propertyName.Contains("Unknown", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.StartsWith("Unk", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.StartsWith("Probably", StringComparison.OrdinalIgnoreCase);
+
+        static string GetLocalizedPropertyDescription(string propertyName)
         {
             try
             {
@@ -177,15 +186,14 @@ namespace Editors.AnimationMeta.Presentation
                     var key = $"MetaData.PropTip.{propertyName}";
                     var localized = LocalizationManager.Instance.Get(key);
                     if (localized != key)
-                        return localized + "\n" + $"Value type is {typeName}";
+                        return localized;
                 }
             }
             catch { }
 
-            var itemDescription = $"Value type is {typeName}";
-            if (string.IsNullOrWhiteSpace(attributeDescription) == false)
-                itemDescription = attributeDescription + "\n" + itemDescription;
-            return itemDescription;
+            return GetLocalizedText(
+                "MetaData.PropTip.UnknownMeaning",
+                "含义未确认");
         }
     }
 }

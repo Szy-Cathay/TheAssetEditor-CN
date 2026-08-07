@@ -19,6 +19,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         private readonly SceneNode _node;
         private readonly MetaDataTimeRange? _activeTimeRange;
         private readonly Action<bool>? _selectionChanged;
+        private bool _isEnabled = true;
         private bool _isSelected;
         private bool _showForEntireAnimation;
         private float _currentTimeSeconds;
@@ -27,6 +28,15 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         private int? _highlightedBoneIndex;
         public AnimationPlayer Player => null!;
         public ParsedMetadataAttribute Source { get; private set; } = null!;
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                _isEnabled = value;
+                ApplyVisibility();
+            }
+        }
         public bool IsSelected
         {
             get => _isSelected;
@@ -144,9 +154,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         private void ApplyVisibility()
         {
-            _node.IsVisible = _showForEntireAnimation ||
-                _activeTimeRange is not MetaDataTimeRange activeTimeRange ||
-                activeTimeRange.Contains(_currentTimeSeconds);
+            _node.IsVisible = _isEnabled &&
+                (_showForEntireAnimation ||
+                    _activeTimeRange is not MetaDataTimeRange activeTimeRange ||
+                    activeTimeRange.Contains(_currentTimeSeconds));
         }
 
         public void CleanUp()
