@@ -1,4 +1,5 @@
-﻿<UserControl x:Class="Editors.AnimationMeta.SuperView.EditorView"
+<UserControl x:Class="Editors.AnimationMeta.SuperView.EditorView"
+             x:Name="SuperViewRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -7,23 +8,103 @@
              xmlns:view="clr-namespace:Editors.AnimationMeta.Presentation.View"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
-    <DockPanel>
-        <Button Margin="5" Content="{loc:Loc General.Reset}" Click="{s:MethodBinding RefreshAction}" DockPanel.Dock="Top"/>
-
-        <TabControl DockPanel.Dock="Top" SelectedIndex="{Binding SelectedTabControllerIndex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
+             d:DesignHeight="450"
+             d:DesignWidth="800">
+    <Grid>
+        <TabControl
+            SelectedIndex="{Binding SelectedTabControllerIndex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
             <TabItem Header="{loc:Loc MetaData.Persistent}">
-                <DockPanel>
-                    <view:MainEditorView DataContext="{Binding PersistentMetaEditor}" DockPanel.Dock="Top"/>
-                </DockPanel>
+                <Grid>
+                    <view:MainEditorView
+                        DataContext="{Binding PersistentMetaEditor}"
+                        Visibility="{Binding DataContext.HasPersistentMetaFile, ElementName=SuperViewRoot, Converter={StaticResource BoolToCollapsedConverter}}" />
+                    <Border
+                        Margin="12"
+                        VerticalAlignment="Top"
+                        Style="{StaticResource AeFeedback.Notice}"
+                        Visibility="{Binding CanCreatePersistentMetaFile, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <StackPanel>
+                            <TextBlock
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc SuperView.MissingFile.PersistentTitle}" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                Style="{StaticResource AeText.Body}"
+                                Text="{loc:Loc SuperView.MissingFile.Description}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,4,0,10"
+                                Foreground="{DynamicResource AeBrush.TextSecondary}"
+                                Style="{StaticResource AeText.Caption}"
+                                TextWrapping="Wrap">
+                                <Run Text="{loc:Loc SuperView.ReferencePath}" />
+                                <Run Text="{Binding PersistentMetaFilePath, Mode=OneWay}" />
+                            </TextBlock>
+                            <Button
+                                HorizontalAlignment="Left"
+                                Click="{s:MethodBinding CreatePersistentMetaFile}"
+                                Content="{loc:Loc SuperView.CreateEmptyMeta}"
+                                Style="{StaticResource AeButton.Secondary}" />
+                        </StackPanel>
+                    </Border>
+                    <Border
+                        Margin="12"
+                        VerticalAlignment="Top"
+                        Style="{StaticResource AeFeedback.Notice}"
+                        Visibility="{Binding IsPersistentMetaReferenceMissing, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <TextBlock
+                            Style="{StaticResource AeText.Body}"
+                            Text="{loc:Loc SuperView.NoReference.Persistent}"
+                            TextWrapping="Wrap" />
+                    </Border>
+                </Grid>
             </TabItem>
             <TabItem Header="{loc:Loc MetaData.Animation}">
-                <DockPanel>
-                    <view:MainEditorView DataContext="{Binding MetaEditor}" DockPanel.Dock="Top"/>
-                </DockPanel>
+                <Grid>
+                    <view:MainEditorView
+                        DataContext="{Binding MetaEditor}"
+                        Visibility="{Binding DataContext.HasAnimationMetaFile, ElementName=SuperViewRoot, Converter={StaticResource BoolToCollapsedConverter}}" />
+                    <Border
+                        Margin="12"
+                        VerticalAlignment="Top"
+                        Style="{StaticResource AeFeedback.Notice}"
+                        Visibility="{Binding CanCreateAnimationMetaFile, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <StackPanel>
+                            <TextBlock
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc SuperView.MissingFile.AnimationTitle}" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                Style="{StaticResource AeText.Body}"
+                                Text="{loc:Loc SuperView.MissingFile.Description}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,4,0,10"
+                                Foreground="{DynamicResource AeBrush.TextSecondary}"
+                                Style="{StaticResource AeText.Caption}"
+                                TextWrapping="Wrap">
+                                <Run Text="{loc:Loc SuperView.ReferencePath}" />
+                                <Run Text="{Binding AnimationMetaFilePath, Mode=OneWay}" />
+                            </TextBlock>
+                            <Button
+                                HorizontalAlignment="Left"
+                                Click="{s:MethodBinding CreateAnimationMetaFile}"
+                                Content="{loc:Loc SuperView.CreateEmptyMeta}"
+                                Style="{StaticResource AeButton.Secondary}" />
+                        </StackPanel>
+                    </Border>
+                    <Border
+                        Margin="12"
+                        VerticalAlignment="Top"
+                        Style="{StaticResource AeFeedback.Notice}"
+                        Visibility="{Binding IsAnimationMetaReferenceMissing, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <TextBlock
+                            Style="{StaticResource AeText.Body}"
+                            Text="{loc:Loc SuperView.NoReference.Animation}"
+                            TextWrapping="Wrap" />
+                    </Border>
+                </Grid>
             </TabItem>
         </TabControl>
-        
-        
-    </DockPanel>
+    </Grid>
 </UserControl>

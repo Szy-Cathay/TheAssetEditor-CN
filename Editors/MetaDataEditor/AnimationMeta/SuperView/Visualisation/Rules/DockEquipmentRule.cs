@@ -16,8 +16,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
         int _equipmentSlotToDock;
         AnimationClip _dockAnimation;
         ISkeletonProvider _skeletonProvider;
-        float _startTime;
-        float _endTime;
+        MetaDataTimeRange _activeTimeRange;
         int _dockTargetkBoneId;
         Matrix _offset;
 
@@ -26,14 +25,17 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
             _dockTargetkBoneId = dockTargetkBoneId;
             _dockAnimation = dockAnimation;
             _skeletonProvider = skeletonProvider;
-            _startTime = startTime;
-            _endTime = endTime;
+            _activeTimeRange = new MetaDataTimeRange(
+                startTime,
+                endTime,
+                MetaDataZeroRangeBehavior.WholeAnimation);
 
             try
             {
-                _equipmentSlotToDock = skeletonProvider.Skeleton.GetBoneIndexByName("be_prop_" + (equipmentSlotToDock - 1));
-                var offsetFrame = AnimationSampler.Sample(0, _skeletonProvider.Skeleton, _dockAnimation);
-                _offset = offsetFrame.GetSkeletonAnimatedWorldDiff(_skeletonProvider.Skeleton, _equipmentSlotToDock, _dockTargetkBoneId);
+                _equipmentSlotToDock = skeletonProvider.Skeleton
+                    .GetBoneIndexByName(GetEquipmentBoneName(
+                        equipmentSlotToDock));
+                _offset = Matrix.Identity;
             }
             catch (Exception e)
             {
@@ -42,6 +44,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
             }
         }
 
+        public static string GetEquipmentBoneName(int propBoneId) =>
+            "be_prop_" + propBoneId;
+
         public void TransformFrameWorldSpace(AnimationFrame frame, float time)
         {
             if (_hasError)
@@ -49,7 +54,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
 
             try
             {
-                if (time >= _startTime)
+                if (_activeTimeRange.Contains(time))
                 {
                     var offsetFrame = AnimationSampler.Sample(0, _skeletonProvider.Skeleton, _dockAnimation);
                     _offset = offsetFrame.GetSkeletonAnimatedWorldDiff(_skeletonProvider.Skeleton, _dockTargetkBoneId, _equipmentSlotToDock);

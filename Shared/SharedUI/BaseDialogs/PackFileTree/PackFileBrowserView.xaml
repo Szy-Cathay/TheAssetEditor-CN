@@ -60,33 +60,34 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border
-                Background="{DynamicResource AeBrush.Control}"
-                BorderBrush="{DynamicResource AeBrush.BorderStrong}"
-                BorderThickness="1"
-                CornerRadius="4"
-                SnapsToDevicePixels="true">
-                <Grid>
-                    <TextBox x:Name="FilterTextBoxItem" Style="{StaticResource HintedTextBox}" KeyboardNavigation.TabIndex="0" FontSize="12" BorderThickness="0"
-                             KeyboardNavigation.IsTabStop="True" HorizontalAlignment="Stretch" Padding="8, 0, 30, 0"  Height="30" VerticalContentAlignment="Center"
-                             Background="Transparent" Foreground="{DynamicResource AeBrush.TextPrimary}"
-                             Text="{Binding Filter.FilterText, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Delay=350, ValidatesOnDataErrors=True}"
-                             Tag="{loc:Loc Shared.PackFileBrowser.SearchHint}">
-                    </TextBox>
+            <Grid>
+                <TextBox
+                    x:Name="FilterTextBoxItem"
+                    Height="30"
+                    Padding="8,0,30,0"
+                    behaviors:TextBoxExtensions.Watermark="{loc:Loc Shared.PackFileBrowser.SearchHint}"
+                    KeyboardNavigation.IsTabStop="True"
+                    KeyboardNavigation.TabIndex="0"
+                    Style="{StaticResource AeInput.TextBox}"
+                    Text="{Binding Filter.FilterText, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Delay=350, ValidatesOnDataErrors=True}" />
 
-                    <Button Click="ClearButtonClick" Command="{Binding ClearTextCommand}" Width="28" Height="28" HorizontalAlignment="Right"
-                            Style="{StaticResource AeButton.Icon}"
-                            VerticalContentAlignment="Center" HorizontalContentAlignment="Center" VerticalAlignment="Center">
-                        <Path
-                            Width="9"
-                            Height="9"
-                            Data="M0,0 L8,8 M8,0 L0,8"
-                            Stretch="Uniform"
-                            Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                            StrokeThickness="1.5" />
-                    </Button>
-                </Grid>
-            </Border>
+                <Button
+                    Width="28"
+                    Height="28"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Click="ClearButtonClick"
+                    Command="{Binding ClearTextCommand}"
+                    Style="{StaticResource AeButton.Icon}">
+                    <Path
+                        Width="9"
+                        Height="9"
+                        Data="M0,0 L8,8 M8,0 L0,8"
+                        Stretch="Uniform"
+                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                        StrokeThickness="1.5" />
+                </Button>
+            </Grid>
         </Grid>
 
         <!-- TreeView -->

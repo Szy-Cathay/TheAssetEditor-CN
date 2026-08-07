@@ -13,17 +13,22 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
         ILogger _logger = Logging.Create<CopyRootTransform>();
         bool _hasError = false;
         Transform_v10 _metadata;
+        MetaDataTimeRange _activeTimeRange;
 
         public TransformBoneRule(Transform_v10 metadata)
         {
             _metadata = metadata;
+            _activeTimeRange = new MetaDataTimeRange(
+                metadata.StartTime,
+                metadata.EndTime,
+                MetaDataZeroRangeBehavior.WholeAnimation);
         }
 
         public void TransformFrameWorldSpace(AnimationFrame frame, float time) { }
 
         public void TransformFrameLocalSpace(AnimationFrame frame, int boneId, float time)
         {
-            if (boneId != _metadata.TargetNode || _hasError)
+            if (boneId != _metadata.TargetNode || _hasError || _activeTimeRange.Contains(time) == false)
                 return;
 
             try

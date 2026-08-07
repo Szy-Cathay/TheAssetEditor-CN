@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -76,6 +77,8 @@ public class UiAnimationMetadataFamilyGallery
         "metadata-entry",
         "metadata-new-entry-window",
         "metadata-super-editor",
+        "metadata-super-editor-loaded",
+        "metadata-super-editor-loaded-narrow",
         "shared-animation-player",
         "shared-editor-host",
         "shared-scene-object",
@@ -288,14 +291,32 @@ public class UiAnimationMetadataFamilyGallery
         "metadata-super-editor" => Host(
             new MetadataSuperView
             {
-                DataContext = new GalleryModel
-                {
-                    SelectedTabControllerIndex = 0,
-                    PersistentMetaEditor = CreateMetadataModel(),
-                    MetaEditor = CreateMetadataModel(),
-                },
+                DataContext = new MetadataSuperViewGalleryModel(
+                    hasPersistentMetaFile: false,
+                    hasAnimationMetaFile: false,
+                    selectedTabControllerIndex: 0),
             },
             1080,
+            720),
+        "metadata-super-editor-loaded" => Host(
+            new MetadataSuperView
+            {
+                DataContext = new MetadataSuperViewGalleryModel(
+                    hasPersistentMetaFile: false,
+                    hasAnimationMetaFile: true,
+                    selectedTabControllerIndex: 1),
+            },
+            1080,
+            720),
+        "metadata-super-editor-loaded-narrow" => Host(
+            new MetadataSuperView
+            {
+                DataContext = new MetadataSuperViewGalleryModel(
+                    hasPersistentMetaFile: false,
+                    hasAnimationMetaFile: true,
+                    selectedTabControllerIndex: 1),
+            },
+            480,
             720),
         "shared-animation-player" => Host(
             new SharedAnimationPlayerView
@@ -629,38 +650,26 @@ public class UiAnimationMetadataFamilyGallery
 
     private static GalleryModel CreateMetadataModel()
     {
-        var variables = new[]
-        {
-            new GalleryModel
+        var tag = new Editors.AnimationMeta.Presentation.MetaDataEntry(
+            new Shared.GameFormats.AnimationMeta.Definitions.SplashAttack_v10
             {
-                FieldName = "animation_speed",
-                Description = "控制动画的播放速度倍率。",
-                ValueAsString = "1.000",
-                IsValid = true,
-                IsReadOnly = false,
+                Name = "SPLASH_ATTACK",
+                Version = 10,
+                StartTime = 0.35f,
+                EndTime = 0.8f,
+                StartPosition = new Microsoft.Xna.Framework.Vector3(0, 0, 2),
+                EndPosition = new Microsoft.Xna.Framework.Vector3(0, 0, 0.5f),
             },
-        };
-        var tag = new GalleryModel
+            "触发溅射攻击并标记影响范围。",
+            Moq.Mock.Of<Shared.Core.Events.IEventHub>(),
+            true)
         {
-            DisplayName = "locomotion",
-            Description = "帝国将军的移动动画元数据。",
-            Variables = variables,
             IsSelected = true,
-            IsDecodedCorrectly = true,
         };
         return new GalleryModel
         {
-            MetaDataFileVersion = "v4",
-            Tags = new[]
-            {
-                tag,
-                new GalleryModel
-                {
-                    DisplayName = "weapon_action",
-                    IsSelected = false,
-                    IsDecodedCorrectly = true,
-                },
-            },
+            MetaDataFileVersion = 2,
+            Tags = new[] { tag },
             SelectedTag = tag,
             NewActionCommand = GalleryCommand.Instance,
             DeleteActionCommand = GalleryCommand.Instance,
@@ -810,6 +819,110 @@ public class UiAnimationMetadataFamilyGallery
                     .Count(),
                 Is.GreaterThanOrEqualTo(5));
         }
+
+        if (variant.StartsWith(
+            "metadata-super-editor-loaded",
+            StringComparison.Ordinal))
+        {
+            var editor = FindVisualDescendants<MetadataMainView>(window)
+                .Single();
+            NUnitAssert.That(editor.Visibility, Is.EqualTo(Visibility.Visible));
+            NUnitAssert.That(editor.ActualHeight, Is.GreaterThan(100));
+        }
+
+        if (variant.StartsWith("metadata-super-editor", StringComparison.Ordinal))
+        {
+            var isLoadedMetadataEditor = variant.StartsWith(
+                "metadata-super-editor-loaded",
+                StringComparison.Ordinal);
+            var previewToggles = FindVisualDescendants<CheckBox>(window)
+                .Where(checkBox => checkBox.Content is string text &&
+                    checkBox.IsVisible &&
+                    (text == "撞击点" || text == "目标点" ||
+                     text == "发射点" || text == "溅射范围"))
+                .ToArray();
+            var displayModeSelectors =
+                FindVisualDescendants<RadioButton>(window)
+                    .Where(radioButton =>
+                        radioButton.IsVisible &&
+                        (Equals(radioButton.Content, "生效期间") ||
+                         Equals(radioButton.Content, "全程")))
+                    .ToArray();
+            var focusButtons = buttons.Where(button =>
+                button.IsVisible &&
+                Equals(button.Content, "定位所选 META")).ToArray();
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    previewToggles,
+                    Has.Length.EqualTo(isLoadedMetadataEditor ? 1 : 0));
+                NUnitAssert.That(
+                    previewToggles,
+                    Has.All.Matches<CheckBox>(toggle =>
+                        toggle.IsChecked == true));
+                if (isLoadedMetadataEditor)
+                {
+                    NUnitAssert.That(
+                        displayModeSelectors,
+                        Has.Length.EqualTo(2));
+                    NUnitAssert.That(
+                        displayModeSelectors.Single(radioButton =>
+                            Equals(radioButton.Content, "生效期间")).IsChecked,
+                        Is.True);
+                    NUnitAssert.That(
+                        displayModeSelectors.Single(radioButton =>
+                            Equals(radioButton.Content, "全程")).IsChecked,
+                        Is.False);
+                }
+                NUnitAssert.That(
+                    focusButtons,
+                    Has.Length.EqualTo(isLoadedMetadataEditor ? 1 : 0));
+                NUnitAssert.That(
+                    focusButtons,
+                    Has.All.Matches<Button>(button => button.IsEnabled));
+            });
+
+            if (isLoadedMetadataEditor)
+            {
+                var splashPointSelectors =
+                    FindVisualDescendants<RadioButton>(window)
+                        .Where(radioButton =>
+                            radioButton.IsVisible &&
+                            (Equals(radioButton.Content, "起点") ||
+                             Equals(radioButton.Content, "终点")))
+                        .ToArray();
+                var undoButton = buttons.Single(button =>
+                    button.IsVisible && Equals(button.Content, "撤销"));
+                var redoButton = buttons.Single(button =>
+                    button.IsVisible && Equals(button.Content, "重做"));
+                var edit3dSwitch =
+                    FindVisualDescendants<ToggleButton>(window)
+                        .Single(toggle =>
+                            toggle.IsVisible &&
+                            ReferenceEquals(
+                                toggle.Style,
+                                Application.Current.FindResource(
+                                    "AeInput.Switch")));
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        splashPointSelectors,
+                        Has.Length.EqualTo(2));
+                    NUnitAssert.That(
+                        splashPointSelectors.Single(radioButton =>
+                            Equals(radioButton.Content, "起点")).IsChecked,
+                        Is.True);
+                    NUnitAssert.That(edit3dSwitch.IsChecked, Is.False);
+                    NUnitAssert.That(
+                        splashPointSelectors,
+                        Has.All.Matches<RadioButton>(selector =>
+                            selector.IsEnabled == false));
+                    NUnitAssert.That(undoButton.IsEnabled, Is.False);
+                    NUnitAssert.That(redoButton.IsEnabled, Is.False);
+                });
+            }
+        }
     }
 
     private static void Capture(
@@ -878,6 +991,105 @@ public class UiAnimationMetadataFamilyGallery
         {
             add { }
             remove { }
+        }
+    }
+
+    private sealed class MetadataSuperViewGalleryModel
+    {
+        public int SelectedTabControllerIndex { get; set; }
+        public GalleryModel PersistentMetaEditor { get; } =
+            CreateMetadataModel();
+        public GalleryModel MetaEditor { get; } = CreateMetadataModel();
+        public bool HasPersistentMetaFile { get; }
+        public bool HasAnimationMetaFile { get; }
+        public bool CanCreatePersistentMetaFile =>
+            HasPersistentMetaFile == false;
+        public bool CanCreateAnimationMetaFile =>
+            HasAnimationMetaFile == false;
+        public bool IsPersistentMetaReferenceMissing => false;
+        public bool IsAnimationMetaReferenceMissing => false;
+        public bool ShowImpactPositions { get; set; } = true;
+        public bool ShowTargetPositions { get; set; } = true;
+        public bool ShowFirePositions { get; set; } = true;
+        public bool ShowSplashAttacks { get; set; } = true;
+        public bool ShowCombatMetaDataDuringActiveTime { get; set; } = true;
+        public bool ShowCombatMetaDataForEntireAnimation { get; set; }
+        public bool CanFocusSelectedMetaData => HasAnimationMetaFile;
+        public bool HasSelectedSceneMarkerSettings => HasAnimationMetaFile;
+        public bool CanEditSelectedCombatMetaData => HasAnimationMetaFile;
+        public bool CanEditSelectedMetaData3D =>
+            CanEditSelectedCombatMetaData;
+        public bool IsCombatMetaData3dEditingEnabled { get; set; }
+        public bool IsImpactMetaDataSelected => false;
+        public bool IsTargetMetaDataSelected => false;
+        public bool IsFireMetaDataSelected => false;
+        public bool IsSplashMetaDataSelected => HasAnimationMetaFile;
+        public bool CanUndoCombatMetaData =>
+            HasAnimationMetaFile && IsCombatMetaData3dEditingEnabled;
+        public bool CanRedoCombatMetaData => false;
+        public bool EditSplashStart { get; set; } = true;
+        public bool EditSplashEnd { get; set; }
+        public bool HasSelectedMetaDataTimeRange => HasAnimationMetaFile;
+        public float SelectedMetaDataStartTimeSeconds => 0.35f;
+        public float SelectedMetaDataEndTimeSeconds => 0.8f;
+        public bool SelectedMetaDataUsesZeroRangeConvention => false;
+        public string SelectedMetaDataZeroRangeHint =>
+            "0/0：格式没有额外开关，预览按整段持续显示";
+        public string SelectedMetaDataStartToolTip =>
+            "暂停动画并跳到所选 META 的开始时间";
+        public string SelectedMetaDataTimeState => "当前正在生效";
+        public bool IsEffectMetaDataSelected => false;
+        public string PersistentMetaFilePath =>
+            @"animations\battle\example\persistent.meta";
+        public string AnimationMetaFilePath =>
+            @"animations\battle\example\attack.anm.meta";
+        public ICommand FocusSelectedMetaDataActionCommand =>
+            GalleryCommand.Instance;
+        public ICommand JumpToSelectedMetaDataStartActionCommand =>
+            GalleryCommand.Instance;
+        public ICommand JumpToSelectedMetaDataEndActionCommand =>
+            GalleryCommand.Instance;
+        public ICommand UndoCombatMetaDataActionCommand =>
+            GalleryCommand.Instance;
+        public ICommand RedoCombatMetaDataActionCommand =>
+            GalleryCommand.Instance;
+
+        public MetadataSuperViewGalleryModel(
+            bool hasPersistentMetaFile,
+            bool hasAnimationMetaFile,
+            int selectedTabControllerIndex)
+        {
+            HasPersistentMetaFile = hasPersistentMetaFile;
+            HasAnimationMetaFile = hasAnimationMetaFile;
+            SelectedTabControllerIndex = selectedTabControllerIndex;
+        }
+
+        public void CreatePersistentMetaFile()
+        {
+        }
+
+        public void CreateAnimationMetaFile()
+        {
+        }
+
+        public void UndoCombatMetaDataAction()
+        {
+        }
+
+        public void RedoCombatMetaDataAction()
+        {
+        }
+
+        public void FocusSelectedMetaDataAction()
+        {
+        }
+
+        public void JumpToSelectedMetaDataStartAction()
+        {
+        }
+
+        public void JumpToSelectedMetaDataEndAction()
+        {
         }
     }
 
@@ -967,6 +1179,14 @@ public class UiAnimationMetadataFamilyGallery
         public object? ParentSkeletonName { get; set; }
         public object? PasteActionCommand { get; set; }
         public object? PersistentMetaEditor { get; set; }
+        public object? PersistentMetaFilePath { get; set; }
+        public object? HasPersistentMetaFile { get; set; }
+        public object? HasAnimationMetaFile { get; set; }
+        public object? CanCreatePersistentMetaFile { get; set; }
+        public object? CanCreateAnimationMetaFile { get; set; }
+        public object? IsPersistentMetaReferenceMissing { get; set; }
+        public object? IsAnimationMetaReferenceMissing { get; set; }
+        public object? AnimationMetaFilePath { get; set; }
         public object? Player { get; set; }
         public object? PlayerControlsVisibility { get; set; }
         public object? PlayerItems { get; set; }

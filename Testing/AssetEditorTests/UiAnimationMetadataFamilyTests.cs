@@ -223,6 +223,190 @@ public class UiAnimationMetadataFamilyTests
         });
     }
 
+    [Test]
+    public void MetadataSuperView_ExplainsMissingFilesAndRemovesDeadResetAction()
+    {
+        var path = Path.Combine(
+            FindSolutionRoot(),
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "SuperView",
+            "EditorView.xaml");
+        var source = File.ReadAllText(path) + Environment.NewLine +
+            File.ReadAllText(Path.Combine(
+                FindSolutionRoot(),
+                "Editors",
+                "MetaDataEditor",
+                "AnimationMeta",
+                "MetaEditor",
+                "View",
+                "MetaDataAttributeView.xaml"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(source, Does.Contain("AeFeedback.Notice"));
+            NUnitAssert.That(source, Does.Contain("AeButton.Secondary"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("CanCreateAnimationMetaFile"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("CanCreatePersistentMetaFile"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("IsAnimationMetaReferenceMissing"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("IsPersistentMetaReferenceMissing"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("DataContext.HasPersistentMetaFile"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("DataContext.HasAnimationMetaFile"));
+            NUnitAssert.That(source, Does.Contain("AeInput.CheckBox"));
+            NUnitAssert.That(source, Does.Contain("ShowImpactPositions"));
+            NUnitAssert.That(source, Does.Contain("ShowTargetPositions"));
+            NUnitAssert.That(source, Does.Contain("ShowFirePositions"));
+            NUnitAssert.That(source, Does.Contain("ShowSplashAttacks"));
+            NUnitAssert.That(source, Does.Contain("CanFocusSelectedMetaData"));
+            NUnitAssert.That(source, Does.Contain("FocusSelectedMetaDataAction"));
+            NUnitAssert.That(source, Does.Contain("SuperView.ShowImpactPos"));
+            NUnitAssert.That(source, Does.Contain("SuperView.ShowTargetPos"));
+            NUnitAssert.That(source, Does.Contain("SuperView.ShowFirePos"));
+            NUnitAssert.That(source, Does.Contain("SuperView.ShowSplashAttack"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("ShowCombatMetaDataDuringActiveTime"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("ShowCombatMetaDataForEntireAnimation"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("SuperView.CombatDisplayMode.ActiveTime"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("SuperView.CombatDisplayMode.EntireAnimation"));
+            NUnitAssert.That(source, Does.Contain("SuperView.FocusSelectedMeta"));
+            NUnitAssert.That(source, Does.Contain("AeInput.RadioButton"));
+            NUnitAssert.That(source, Does.Contain("CanEditSelectedMetaData3D"));
+            NUnitAssert.That(source, Does.Contain("IsSplashMetaDataSelected"));
+            NUnitAssert.That(source, Does.Contain("UndoCombatMetaDataAction"));
+            NUnitAssert.That(source, Does.Contain("RedoCombatMetaDataAction"));
+            NUnitAssert.That(source, Does.Contain("SuperView.Edit3D.SplashStart"));
+            NUnitAssert.That(source, Does.Contain("SuperView.Edit3D.SplashEnd"));
+            NUnitAssert.That(source, Does.Contain("HasSelectedMetaDataTimeRange"));
+            NUnitAssert.That(source, Does.Contain("JumpToSelectedMetaDataStartAction"));
+            NUnitAssert.That(source, Does.Contain("JumpToSelectedMetaDataEndAction"));
+            NUnitAssert.That(source, Does.Contain("SelectedMetaDataStartToolTip"));
+            NUnitAssert.That(source, Does.Not.Contain("SelectedMetaDataZeroRangeHint, RelativeSource"));
+            NUnitAssert.That(source, Does.Not.Contain("SuperView.EffectPreview.LocatorMode"));
+            NUnitAssert.That(source, Does.Not.Contain("General.Reset"));
+            NUnitAssert.That(source, Does.Not.Contain("RefreshAction"));
+        });
+    }
+
+    [Test]
+    public void MetadataSuperView_UsesContextualPropertyLayoutAndIndependentScrollers()
+    {
+        var root = FindSolutionRoot();
+        var superView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "SuperView",
+            "EditorView.xaml"));
+        var entryView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "MetaEditor",
+            "View",
+            "MetaDataEntryView.xaml"));
+        var attributeView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "MetaEditor",
+            "View",
+            "MetaDataAttributeView.xaml"));
+        var editorHostView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Shared",
+            "Editors.Shared.Core",
+            "Common",
+            "BaseControl",
+            "EditorHostView.xaml"));
+        var superViewViewModel = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "SuperView",
+            "SuperViewViewModel.cs"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                superView,
+                Does.Not.Contain("SuperView.PreviewVisibility"));
+            NUnitAssert.That(
+                superView,
+                Does.Not.Contain("SuperView.Edit3D.Title"));
+            NUnitAssert.That(
+                superView,
+                Does.Not.Contain("SuperView.Time.Title"));
+            NUnitAssert.That(
+                entryView,
+                Does.Not.Contain("MetaData.HeaderLeft"));
+            NUnitAssert.That(
+                entryView,
+                Does.Contain("ScrollViewer.VerticalScrollBarVisibility=\"Auto\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("ScrollViewer.VerticalScrollBarVisibility=\"Auto\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("SuperView.PreviewVisibility"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("IsCombatMetaData3dEditingEnabled"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("IsCombatPositionAnchor"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("JumpToSelectedMetaDataStartActionCommand"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("JumpToSelectedMetaDataEndActionCommand"));
+            NUnitAssert.That(
+                editorHostView,
+                Does.Contain(
+                    "VerticalScrollBarVisibility=\"{Binding EditorContentVerticalScrollBarVisibility}\""));
+            NUnitAssert.That(
+                superViewViewModel,
+                Does.Contain("ScrollBarVisibility.Disabled"));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("HorizontalAlignment=\"Left\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("MinWidth=\"300\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("Style=\"{StaticResource AeForm.Label}\""));
+            NUnitAssert.That(
+                attributeView,
+                Does.Contain("EditEffectOrientation"));
+        });
+    }
+
     private static IReadOnlyList<string> ReadProductSources()
     {
         var root = FindSolutionRoot();

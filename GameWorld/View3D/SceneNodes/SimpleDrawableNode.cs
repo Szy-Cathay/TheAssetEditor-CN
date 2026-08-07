@@ -27,6 +27,12 @@ namespace GameWorld.Core.SceneNodes
             _lineVertexList.AddRange(lineArray);
         }
 
+        public void ClearItems()
+        {
+            _renderList.Clear();
+            _lineVertexList.Clear();
+        }
+
         public void Render(RenderEngineComponent renderEngine, Matrix parentWorld)
         {
             var m = ModelMatrix * parentWorld;

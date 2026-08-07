@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -10,9 +10,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
     public class SearchFilter : NotifyPropertyChangedImpl, IDataErrorInfo
     {
         public string Error { get; set; } = string.Empty;
-        public string this[string columnName] => Filter(FilterText);
+        public string this[string columnName] => _filterError;
 
         private readonly ObservableCollection<TreeNode> _nodeCollection;
+        private Dictionary<TreeNode, bool>? _searchExpansionState;
+        private string _filterError = string.Empty;
 
         string _filterText = "";
         public string FilterText
@@ -21,7 +23,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             set
             {
                 SetAndNotify(ref _filterText, value);
-                Filter(_filterText);
+                _filterError = Filter(_filterText);
             }
         }
 
@@ -32,11 +34,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             set
             {
                 SetAndNotify(ref _showFoldersOnly, value);
-                Filter(FilterText);
+                _filterError = Filter(FilterText);
             }
         }
 
-        List<string> _extensionFilter;
+        List<string>? _extensionFilter;
         public int AutoExapandResultsAfterLimitedCount { get; set; } = 25;
 
         public SearchFilter(ObservableCollection<TreeNode> nodes)
@@ -46,116 +48,157 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         string Filter(string text)
         {
-            Regex expression = null;
+            Regex expression;
             try
             {
-                expression = new Regex(text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                expression = new Regex(
+                    text,
+                    RegexOptions.Compiled |
+                    RegexOptions.IgnoreCase |
+                    RegexOptions.CultureInvariant);
             }
             catch (Exception e)
             {
                 return e.Message;
             }
 
-            foreach (var item in _nodeCollection)
-                HasChildWithFilterMatch(item, expression);
-
-            if (ShowFoldersOnly)
+            var hasSearchText = string.IsNullOrEmpty(text) == false;
+            if (hasSearchText)
             {
-                foreach (var node in _nodeCollection)
-                    ApplyFoldersOnlyFilter(node);
+                if (_searchExpansionState == null)
+                    _searchExpansionState = CaptureExpansionState();
+                else
+                    RestoreExpansionState(_searchExpansionState);
+            }
+            else if (_searchExpansionState != null)
+            {
+                RestoreExpansionState(_searchExpansionState);
+                _searchExpansionState = null;
             }
 
-            if (AutoExapandResultsAfterLimitedCount != -1)
-            {
-                var visibleNodes = 0;
-                foreach (var item in _nodeCollection)
-                    visibleNodes += CountVisibleNodes(item);
+            var matches = new List<TreeNode>();
+            foreach (var item in _nodeCollection)
+                ApplyVisibility(item, expression, hasSearchText, matches);
 
-                if (visibleNodes <= AutoExapandResultsAfterLimitedCount)
-                {
-                    foreach (var item in _nodeCollection)
-                        item.ExpandIfVisible();
-                }
+            if (hasSearchText &&
+                AutoExapandResultsAfterLimitedCount != -1 &&
+                matches.Count <= AutoExapandResultsAfterLimitedCount)
+            {
+                ExpandMatchPaths(matches);
             }
 
             return "";
         }
 
-        private static void ApplyFoldersOnlyFilter(TreeNode node)
+        private bool ApplyVisibility(
+            TreeNode node,
+            Regex expression,
+            bool hasSearchText,
+            List<TreeNode> matches)
         {
             if (node.NodeType == NodeType.File)
-                node.IsVisible = false;
-            else
             {
-                node.IsVisible = true;
-                foreach (var child in node.Children)
-                    ApplyFoldersOnlyFilter(child);
+                var isMatch =
+                    HasValidExtension(node.Name) &&
+                    expression.IsMatch(node.Name);
+                node.IsVisible = ShowFoldersOnly == false && isMatch;
+                if (isMatch)
+                    matches.Add(node);
+                return isMatch;
             }
+
+            var hasChildMatch = false;
+            foreach (var child in node.Children)
+            {
+                if (ApplyVisibility(
+                    child,
+                    expression,
+                    hasSearchText,
+                    matches))
+                {
+                    hasChildMatch = true;
+                }
+            }
+
+            var isFolderMatch =
+                ShowFoldersOnly &&
+                hasSearchText &&
+                expression.IsMatch(node.Name);
+            if (isFolderMatch)
+                matches.Add(node);
+
+            var isVisible = node.Children.Count == 0 &&
+                node.NodeType == NodeType.Root
+                ? true
+                : ShowFoldersOnly
+                    ? hasSearchText == false ||
+                        isFolderMatch ||
+                        hasChildMatch
+                    : hasChildMatch;
+            node.IsVisible = isVisible;
+            return isVisible;
         }
 
-        private static int CountVisibleNodes(TreeNode file)
+        private bool HasValidExtension(string fileName)
         {
-            if (file.NodeType == NodeType.File && file.IsVisible)
-                return 1;
+            if (_extensionFilter == null)
+                return true;
 
-            var count = 0;
-            foreach (var child in file.Children)
-                count += CountVisibleNodes(child);
+            foreach (var extension in _extensionFilter)
+            {
+                if (fileName.Contains(
+                    extension,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
 
-            return count;
+            return false;
+        }
+
+        private Dictionary<TreeNode, bool> CaptureExpansionState()
+        {
+            var state = new Dictionary<TreeNode, bool>();
+            foreach (var root in _nodeCollection)
+            {
+                root.ForeachNode(node =>
+                    state[node] = node.IsNodeExpanded);
+            }
+
+            return state;
+        }
+
+        private static void RestoreExpansionState(
+            IReadOnlyDictionary<TreeNode, bool> state)
+        {
+            foreach (var (node, isExpanded) in state)
+                node.IsNodeExpanded = isExpanded;
+        }
+
+        private static void ExpandMatchPaths(
+            IReadOnlyCollection<TreeNode> matches)
+        {
+            foreach (var match in matches)
+            {
+                var current = match.NodeType == NodeType.File
+                    ? match.Parent
+                    : match;
+                while (current != null)
+                {
+                    if (current.IsVisible)
+                        current.IsNodeExpanded = true;
+                    current = current.Parent;
+                }
+            }
         }
 
         public void SetExtensions(List<string> extentions)
         {
             _extensionFilter = extentions;
-            Filter(FilterText);
+            _filterError = Filter(FilterText);
         }
 
-        public void Refresh() => Filter(FilterText);
-
-        private bool HasChildWithFilterMatch(TreeNode file, Regex expression)
-        {
-            if (file.NodeType == NodeType.Root && file.Children.Count == 0)
-            {
-                file.IsVisible = true;
-                return true;
-            }
-
-            if (file.NodeType == NodeType.File)
-            {
-                var hasValidExtention = true;
-                if (_extensionFilter != null)
-                {
-                    hasValidExtention = false;
-                    foreach (var extention in _extensionFilter)
-                    {
-                        if (file.Name.Contains(extention))
-                        {
-                            hasValidExtention = true;
-                            continue;
-                        }
-                    }
-                }
-
-                if (hasValidExtention)
-                {
-                    if (expression.IsMatch(file.Name))
-                    {
-                        file.IsVisible = true;
-                        return true;
-                    }
-                }
-            }
-
-            var hasChildMatch = false;
-            foreach (var child in file.Children)
-            {
-                if (HasChildWithFilterMatch(child, expression))
-                    hasChildMatch = true;
-            }
-
-            file.IsVisible = hasChildMatch;
-            return hasChildMatch;
-        }
+        public void Refresh() => _filterError = Filter(FilterText);
     }
 }

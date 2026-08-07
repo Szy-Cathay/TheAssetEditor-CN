@@ -17,9 +17,9 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid ClipToBounds="True">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition Width="170" MinWidth="150"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>

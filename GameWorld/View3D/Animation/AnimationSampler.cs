@@ -7,7 +7,7 @@ namespace GameWorld.Core.Animation
 {
     public class AnimationSampler
     {
-        public static AnimationFrame Sample(int frameIndex, float frameIterpolation, GameSkeleton skeleton, AnimationClip animationClip, List<IAnimationChangeRule> animationChangeRules = null, bool freezeFrame = false)
+        public static AnimationFrame Sample(int frameIndex, float frameIterpolation, GameSkeleton skeleton, AnimationClip animationClip, List<IAnimationChangeRule> animationChangeRules = null, bool freezeFrame = false, float? ruleTimeSeconds = null)
         {
             try
             {
@@ -15,6 +15,7 @@ namespace GameWorld.Core.Animation
                     return null;
 
                 var currentFrame = skeleton.ConvertToAnimationFrame();
+                var currentTimeSeconds = ruleTimeSeconds ?? GetFrameTimeSeconds(frameIndex + frameIterpolation, animationClip);
 
                 // Apply the animation to the skeleton frame
                 if (animationClip != null)
@@ -40,7 +41,7 @@ namespace GameWorld.Core.Animation
                                 localRule.TransformFrameLocalSpace(
                                     currentFrame,
                                     boneIndex,
-                                    animationClip.PlayTimeInSec);
+                                    currentTimeSeconds);
                             }
                         }
                     }
@@ -56,7 +57,7 @@ namespace GameWorld.Core.Animation
                 if (animationChangeRules != null && animationClip != null)
                 {
                     foreach (var rule in animationChangeRules.OfType<IWorldSpaceAnimationRule>())
-                        rule.TransformFrameWorldSpace(currentFrame, animationClip.PlayTimeInSec);
+                        rule.TransformFrameWorldSpace(currentFrame, currentTimeSeconds);
                 }
 
                 // Remove the skeleten info from the world transform.
@@ -87,6 +88,9 @@ namespace GameWorld.Core.Animation
                     return null;
 
                 var currentFrame = skeleton.ConvertToAnimationFrame();
+                var currentTimeSeconds = GetFrameTimeSeconds(
+                    frameIndexA + ((frameIndexB - frameIndexA) * frameIterpolation),
+                    animationClip);
 
                 // Apply the animation to the skeleton frame
                 if (animationClip != null)
@@ -112,7 +116,7 @@ namespace GameWorld.Core.Animation
                                 localRule.TransformFrameLocalSpace(
                                     currentFrame,
                                     boneIndex,
-                                    animationClip.PlayTimeInSec);
+                                    currentTimeSeconds);
                             }
                         }
                     }
@@ -128,7 +132,7 @@ namespace GameWorld.Core.Animation
                 if (animationChangeRules != null)
                 {
                     foreach (var rule in animationChangeRules.OfType<IWorldSpaceAnimationRule>())
-                        rule.TransformFrameWorldSpace(currentFrame, animationClip.PlayTimeInSec);
+                        rule.TransformFrameWorldSpace(currentFrame, currentTimeSeconds);
                 }
 
                 // Remove the skeleten info from the world transform.
@@ -170,7 +174,8 @@ namespace GameWorld.Core.Animation
                     frameIndex = (int)clampedFrame;
                     frameIterpolation = frameWithLeftover - clampedFrame;
                 }
-                return Sample(frameIndex, frameIterpolation, skeleton, animationClip, animationChangeRules, freezeFrame);
+                var currentTimeSeconds = animationClip == null ? 0 : clampedT * animationClip.PlayTimeInSec;
+                return Sample(frameIndex, frameIterpolation, skeleton, animationClip, animationChangeRules, freezeFrame, currentTimeSeconds);
             }
             catch (Exception e)
             {
@@ -178,6 +183,16 @@ namespace GameWorld.Core.Animation
                 logger.Error(e.Message);
                 throw;
             }
+        }
+
+        private static float GetFrameTimeSeconds(float frame, AnimationClip animationClip)
+        {
+            if (animationClip == null || animationClip.DynamicFrames.Count <= 1)
+                return 0;
+
+            var lastFrame = animationClip.DynamicFrames.Count - 1;
+            var clampedFrame = MathUtil.EnsureRange(frame, 0, lastFrame);
+            return clampedFrame / lastFrame * animationClip.PlayTimeInSec;
         }
 
         static AnimationClip.KeyFrame GetKeyFrameFromIndex(List<AnimationClip.KeyFrame> keyframes, int frameIndex)

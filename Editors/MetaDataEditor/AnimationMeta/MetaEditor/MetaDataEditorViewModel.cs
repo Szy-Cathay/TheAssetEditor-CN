@@ -16,6 +16,7 @@ namespace Editors.AnimationMeta.Presentation
         private readonly MetaDataFileParser _metaDataFileParser;
         private readonly IEventHub _eventHub;
         private bool _hasStructuralChanges;
+        public event Action<MetaDataEditorViewModel>? StructureChanged;
         public ParsedMetadataFile? ParsedFile { get; private set; }
         public ParsedMetadataAttribute? SelectedAttribute { get; private set; }
 
@@ -59,7 +60,7 @@ namespace Editors.AnimationMeta.Presentation
             }
 
         }
-        public PackFile CurrentFile { get; set; }
+        public PackFile CurrentFile { get; set; } = null!;
 
         public MetaDataEditorViewModel(IUiCommandFactory uiCommandFactory, MetaDataFileParser metaDataFileParser, IEventHub eventHub)
         {
@@ -80,6 +81,9 @@ namespace Editors.AnimationMeta.Presentation
         }
 
         public bool Save() => _uiCommandFactory.Create<SaveCommand>().Execute(this);
+        public bool CreateNewFile(string path) =>
+            _uiCommandFactory.Create<CreateEmptyMetaDataFileCommand>()
+                .Execute(this, path);
         public void Close() { }
 
         public void LoadFile(PackFile? file)
@@ -87,7 +91,7 @@ namespace Editors.AnimationMeta.Presentation
             if (file == CurrentFile)
                 return;
 
-            CurrentFile = file;
+            CurrentFile = file!;
             DisplayName = file == null ? "Metadata Editor" : file.Name;
 
             if (file == null)
@@ -104,13 +108,14 @@ namespace Editors.AnimationMeta.Presentation
                 MetaDataFileVersion = ParsedFile.Version;
             }
 
-            UpdateView();
+            UpdateView(false);
             HasUnsavedChanges = false;
         }
 
-        public void UpdateView()
+        public void UpdateView(bool trackStructureChange = true)
         {
-            var structureChanged = ParsedFile != null &&
+            var structureChanged = trackStructureChange &&
+                ParsedFile != null &&
                 Tags.Select(tag => tag._input)
                     .SequenceEqual(ParsedFile.Attributes) == false;
 
@@ -138,8 +143,20 @@ namespace Editors.AnimationMeta.Presentation
                 MarkStructureChanged();
         }
 
+        public void RefreshAttributeValues(ParsedMetadataAttribute attribute)
+        {
+            var entry = Tags.FirstOrDefault(tag =>
+                ReferenceEquals(tag._input, attribute));
+            if (entry == null)
+                return;
+
+            foreach (var variable in entry.Variables)
+                variable.RefreshFromTarget();
+        }
+
         internal void MarkStructureChanged()
         {
+            StructureChanged?.Invoke(this);
             if (_hasStructuralChanges)
                 return;
 

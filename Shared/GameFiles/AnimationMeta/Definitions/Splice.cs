@@ -25,7 +25,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         // [MetaDataTag(9)]
         // public float ProbablyLegsWeight { get; set; }
 
-        [MetaDataTag(7, "true or false as text")]
+        [MetaDataTag(7, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ProbablyAdditive { get; set; } = "false";
     }
 
@@ -46,7 +46,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         // [MetaDataTag(9)]
         // public float ProbablyLegsWeight { get; set; }
 
-        [MetaDataTag(9, "true or false as text")]
+        [MetaDataTag(9, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ProbablyAdditive { get; set; } = "false";
     }
 
@@ -74,18 +74,18 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(11)]
         public float ProbablyLegsWeight { get; set; }
 
-        [MetaDataTag(12, "true or false as text")]
+        [MetaDataTag(12, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ProbablyAdditive { get; set; } = "false";
 
         //new field
-        [MetaDataTag(13, "true or false as text")]
+        [MetaDataTag(13, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ProbablyWeaponPose { get; set; } = "false";
     }
 
     [MetaData("SPLICE", 4)]
     public class Splice_v4 : Splice_v3
     {
-        [MetaDataTag(14, "true or false as text")]
+        [MetaDataTag(14, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ProbablyStretch { get; set; } = "false";
     }
 
@@ -119,15 +119,15 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(13)]
         public float LegsWeight { get; set; }
 
-        [MetaDataTag(14, "true or false as text")]
+        [MetaDataTag(14, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Additive { get; set; } = "false";
-        [MetaDataTag(15, "true or false as text")]
+        [MetaDataTag(15, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string WeaponPose { get; set; } = "false";
-        [MetaDataTag(16, "true or false as text")]
+        [MetaDataTag(16, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Stretch { get; set; } = "false";
 
         // new field
-        [MetaDataTag(17, "true or false as text")]
+        [MetaDataTag(17, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ExcludeStripped { get; set; } = "false";
     }
 
@@ -168,13 +168,13 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         public float BlendInTime { get; set; }
 
         // override MetaDataTag order
-        [MetaDataTag(15, "true or false as text")]
+        [MetaDataTag(15, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Additive { get; set; } = "false";
-        [MetaDataTag(16, "true or false as text")]
+        [MetaDataTag(16, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string WeaponPose { get; set; } = "false";
-        [MetaDataTag(17, "true or false as text")]
+        [MetaDataTag(17, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Stretch { get; set; } = "false";
-        [MetaDataTag(18, "true or false as text")]
+        [MetaDataTag(18, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ExcludeStripped { get; set; } = "false";
     }
 
@@ -209,13 +209,13 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(15)]
         public float BlendInTime { get; set; }
 
-        [MetaDataTag(16, "true or false as text")]
+        [MetaDataTag(16, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Additive { get; set; } = "false";
-        [MetaDataTag(17, "true or false as text")]
+        [MetaDataTag(17, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string WeaponPose { get; set; } = "false";
-        [MetaDataTag(18, "true or false as text")]
+        [MetaDataTag(18, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Stretch { get; set; } = "false";
-        [MetaDataTag(19, "true or false as text")]
+        [MetaDataTag(19, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ExcludeStripped { get; set; } = "false";
     }
 
@@ -253,13 +253,13 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(16)]
         public float BlendOutTime { get; set; }
 
-        [MetaDataTag(17, "true or false as text")]
+        [MetaDataTag(17, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Additive { get; set; } = "false";
-        [MetaDataTag(18, "true or false as text")]
+        [MetaDataTag(18, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string WeaponPose { get; set; } = "false";
-        [MetaDataTag(19, "true or false as text")]
+        [MetaDataTag(19, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string Stretch { get; set; } = "false";
-        [MetaDataTag(20, "true or false as text")]
+        [MetaDataTag(20, "true or false as text", ChoiceValues = new[] { "false", "true" })]
         public string ExcludeStripped { get; set; } = "false";
     }
 

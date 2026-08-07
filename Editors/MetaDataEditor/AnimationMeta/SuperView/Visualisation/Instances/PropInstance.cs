@@ -1,36 +1,44 @@
-﻿using Editors.Shared.Core.Common;
+using Editors.Shared.Core.Common;
 using GameWorld.Core.Animation;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
+using Serilog;
+using Shared.Core.ErrorHandling;
 using Shared.GameFormats.AnimationMeta.Parsing;
 
 namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 {
-    public class AnimatedPropInstance : IMetaDataInstance, ISpatialMetaDataPreview
+    public class PropInstance : IMetaDataInstance, ISpatialMetaDataPreview
     {
         private readonly SceneNode _node;
-        private readonly MetaDataTimeRange _activeTimeRange;
         private readonly ISkeletonProvider? _skeleton;
-        private readonly int _boneId = -1;
-        private readonly Func<Vector3> _positionProvider = () => Vector3.Zero;
-        private readonly Func<Quaternion> _orientationProvider =
-            () => Quaternion.Identity;
+        private readonly int _boneId;
+        private readonly Func<Vector3> _positionProvider;
+        private readonly Func<Quaternion> _orientationProvider;
+        private readonly MetaDataTimeRange _activeTimeRange;
+        private readonly ILogger _logger = Logging.Create<PropInstance>();
         private readonly Action<bool>? _selectionChanged;
+        private bool _canFollowBone = true;
         private bool _isSelected;
         private bool _showForEntireAnimation;
         private float _currentTimeSeconds;
 
-        public AnimationPlayer Player { get; private set; }
+        public AnimationPlayer Player { get; }
         public ParsedMetadataAttribute Source { get; private set; } = null!;
         public Matrix ReferenceWorldTransform
         {
             get
             {
-                var attachment = _skeleton != null &&
+                var attachment = Matrix.Identity;
+                if (_skeleton != null &&
                     _boneId >= 0 &&
-                    _boneId < _skeleton.Skeleton.BoneCount
-                        ? _skeleton.Skeleton.GetAnimatedWorldTranform(_boneId)
-                        : Matrix.Identity;
+                    _boneId < _skeleton.Skeleton.BoneCount &&
+                    _canFollowBone)
+                {
+                    attachment = _skeleton.Skeleton
+                        .GetAnimatedWorldTranform(_boneId);
+                }
+
                 return attachment * GetParentWorldTransform();
             }
         }
@@ -62,36 +70,32 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             }
         }
 
-        public AnimatedPropInstance(SceneNode node, AnimationPlayer player, float startTime, float endTime)
+        public PropInstance(
+            SceneNode node,
+            AnimationPlayer player,
+            ISkeletonProvider? skeleton,
+            int boneId,
+            Vector3 position,
+            Quaternion orientation,
+            float startTime,
+            float endTime)
         {
             _node = node;
             Player = player;
+            _skeleton = skeleton;
+            _boneId = boneId;
+            _positionProvider = () => position;
+            _orientationProvider = () => orientation;
             _activeTimeRange = new MetaDataTimeRange(
                 startTime,
                 endTime,
                 MetaDataZeroRangeBehavior.WholeAnimation);
         }
 
-        public AnimatedPropInstance(
+        public PropInstance(
             SceneNode node,
             AnimationPlayer player,
-            float startTime,
-            float endTime,
-            ParsedMetadataAttribute source,
-            bool isSelected,
-            Action<bool> selectionChanged)
-            : this(node, player, startTime, endTime)
-        {
-            Source = source;
-            _selectionChanged = selectionChanged;
-            _isSelected = isSelected;
-            _selectionChanged(isSelected);
-        }
-
-        public AnimatedPropInstance(
-            SceneNode node,
-            AnimationPlayer player,
-            ISkeletonProvider skeleton,
+            ISkeletonProvider? skeleton,
             int boneId,
             Func<Vector3> positionProvider,
             Func<Quaternion> orientationProvider,
@@ -100,12 +104,45 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             ParsedMetadataAttribute source,
             bool isSelected,
             Action<bool> selectionChanged)
-            : this(node, player, startTime, endTime)
         {
+            _node = node;
+            Player = player;
             _skeleton = skeleton;
             _boneId = boneId;
             _positionProvider = positionProvider;
             _orientationProvider = orientationProvider;
+            _activeTimeRange = new MetaDataTimeRange(
+                startTime,
+                endTime,
+                MetaDataZeroRangeBehavior.WholeAnimation);
+            Source = source;
+            _selectionChanged = selectionChanged;
+            _isSelected = isSelected;
+            _selectionChanged(isSelected);
+        }
+
+        public PropInstance(
+            SceneNode node,
+            AnimationPlayer player,
+            ISkeletonProvider? skeleton,
+            int boneId,
+            Vector3 position,
+            Quaternion orientation,
+            float startTime,
+            float endTime,
+            ParsedMetadataAttribute source,
+            bool isSelected,
+            Action<bool> selectionChanged)
+            : this(
+                node,
+                player,
+                skeleton,
+                boneId,
+                position,
+                orientation,
+                startTime,
+                endTime)
+        {
             Source = source;
             _selectionChanged = selectionChanged;
             _isSelected = isSelected;
@@ -115,19 +152,27 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         public void Update(float currentTime)
         {
             _currentTimeSeconds = currentTime;
-            if (Player.IsEnabled && Player.IsPlaying == false)
-                Player.SeekToTimeSeconds(GetPlayerTime(currentTime));
             ApplyVisibility();
-        }
 
-        private float GetPlayerTime(float mainAnimationTime)
-        {
-            var animationLengthUs = Player.GetAnimationLengthUs();
-            if (!Player.LoopAnimation || animationLengthUs <= 0)
-                return mainAnimationTime;
+            var transform = Matrix.CreateFromQuaternion(
+                    _orientationProvider()) *
+                Matrix.CreateTranslation(_positionProvider());
+            if (_skeleton != null && _boneId != -1 && _canFollowBone)
+            {
+                try
+                {
+                    transform *= _skeleton.Skeleton
+                        .GetAnimatedWorldTranform(_boneId);
+                }
+                catch (Exception e)
+                {
+                    _canFollowBone = false;
+                    _logger.Here().Warning(
+                        $"Unable to attach prop preview to bone {_boneId}: {e.Message}");
+                }
+            }
 
-            var animationLengthSeconds = animationLengthUs / 1_000_000f;
-            return mainAnimationTime % animationLengthSeconds;
+            _node.ModelMatrix = transform;
         }
 
         private void ApplyVisibility() =>
@@ -144,7 +189,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         public void CleanUp()
         {
-            _node.Parent.RemoveObject(_node);
+            if (_node.Parent != null)
+                _node.Parent.RemoveObject(_node);
             Player.MarkedForRemoval = true;
         }
     }

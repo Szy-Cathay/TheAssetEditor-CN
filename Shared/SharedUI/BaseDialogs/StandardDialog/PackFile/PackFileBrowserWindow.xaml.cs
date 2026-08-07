@@ -27,7 +27,6 @@ namespace Shared.Ui.BaseDialogs.StandardDialog.PackFile
         {
             ViewModel = packFileBrowserBuilder.Create(ContextMenuType.None, showCaFiles, showFoldersOnly);
             ViewModel.FileOpen += ViewModel_FileOpen;
-            ViewModel.Filter.AutoExapandResultsAfterLimitedCount = 50;
 
             InitializeComponent();
             DarkTitleBarHelper.Enable(this);

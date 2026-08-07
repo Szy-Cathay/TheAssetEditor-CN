@@ -2,6 +2,7 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Windows.Controls;
 using Editors.Shared.Core.Common.AnimationPlayer;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Services;
@@ -30,6 +31,9 @@ namespace Editors.Shared.Core.Common.BaseControl
         [ObservableProperty] AnimationPlayerViewModel _player;
         [ObservableProperty] GridLength _leftColumnWidth = new(0.75, GridUnitType.Star);
         [ObservableProperty] GridLength _rightColumnWidth = new(0.25, GridUnitType.Star);
+        [ObservableProperty]
+        ScrollBarVisibility _editorContentVerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
 
         public EditorHostBase(IEditorHostParameters inputParams)
         {

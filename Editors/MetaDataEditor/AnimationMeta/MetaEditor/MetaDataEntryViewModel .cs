@@ -47,7 +47,37 @@ namespace Editors.AnimationMeta.Presentation
                 var itemDescription = GetLocalizedPropertyDescription(prop.Name, attributeInfo.Description, prop.PropertyType.Name);
 
                 AttributeViewModel? editableItem = null;
-                if (attributeInfo.DisplayOverride == MetaDataTagAttribute.DisplayType.EulerVector || value is Vector3)
+                if (value is bool boolean)
+                {
+                    editableItem = new BooleanAttributeViewModel(
+                        fieldName,
+                        itemDescription,
+                        parser,
+                        boolean,
+                        typedMetaItem,
+                        prop,
+                        eventHub);
+                }
+                else if (attributeInfo.ChoiceValues.Length != 0)
+                {
+                    var choices = attributeInfo.ChoiceValues.Select(choice =>
+                        new AttributeChoiceValue(
+                            choice,
+                            GetLocalizedChoiceName(prop.Name, choice)));
+                    editableItem = new ChoiceAttributeViewModel(
+                        fieldName,
+                        itemDescription,
+                        parser,
+                        value,
+                        typedMetaItem,
+                        prop,
+                        eventHub,
+                        choices,
+                        GetLocalizedText(
+                            "MetaData.Option.LegacyValue",
+                            "{0}"));
+                }
+                else if (attributeInfo.DisplayOverride == MetaDataTagAttribute.DisplayType.EulerVector || value is Vector3)
                 {
                     if (value is Vector3 vector3)
                         editableItem = new VectorAttributeViewModel(fieldName, itemDescription, parser as Vector3Parser, vector3, typedMetaItem, prop, eventHub);
@@ -107,6 +137,35 @@ namespace Editors.AnimationMeta.Presentation
             catch { }
 
             return FormatFieldName(propertyName);
+        }
+
+        static string GetLocalizedChoiceName(string propertyName, string value)
+        {
+            var token = string.IsNullOrEmpty(value) ? "Empty" : value;
+            var specificKey = $"MetaData.Option.{propertyName}.{token}";
+            var specific = GetLocalizedText(specificKey, specificKey);
+            if (specific != specificKey)
+                return specific;
+
+            var commonKey = $"MetaData.Option.Common.{token}";
+            var common = GetLocalizedText(commonKey, commonKey);
+            return common != commonKey ? common : value;
+        }
+
+        static string GetLocalizedText(string key, string fallback)
+        {
+            try
+            {
+                if (LocalizationManager.Instance != null)
+                {
+                    var localized = LocalizationManager.Instance.Get(key);
+                    if (localized != key)
+                        return localized;
+                }
+            }
+            catch { }
+
+            return fallback;
         }
 
         static string GetLocalizedPropertyDescription(string propertyName, string attributeDescription, string typeName)

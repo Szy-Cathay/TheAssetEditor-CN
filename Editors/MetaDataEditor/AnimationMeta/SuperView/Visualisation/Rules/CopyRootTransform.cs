@@ -16,15 +16,28 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
         readonly int _boneId;
 
         bool _hasError = false;
-        Vector3 _offsetPos;
-        Quaternion _offsetRot;
+        readonly Func<Vector3> _offsetPosition;
+        readonly Func<Quaternion> _offsetOrientation;
 
         public CopyRootTransform(ISkeletonProvider skeleton, int boneId, Vector3 offsetPos, Quaternion offsetRot)
+            : this(
+                skeleton,
+                boneId,
+                () => offsetPos,
+                () => offsetRot)
+        {
+        }
+
+        public CopyRootTransform(
+            ISkeletonProvider skeleton,
+            int boneId,
+            Func<Vector3> offsetPosition,
+            Func<Quaternion> offsetOrientation)
         {
             _skeletonProvider = skeleton;
             _boneId = boneId;
-            _offsetPos = offsetPos;
-            _offsetRot = offsetRot;
+            _offsetPosition = offsetPosition;
+            _offsetOrientation = offsetOrientation;
         }
 
         public void TransformFrameLocalSpace(AnimationFrame frame, int boneId, float v)
@@ -35,7 +48,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
             try
             {
                 var transform = _skeletonProvider.Skeleton.GetAnimatedWorldTranform(_boneId);
-                var m = Matrix.CreateFromQuaternion(_offsetRot) * Matrix.CreateTranslation(_offsetPos) * transform;
+                var m = Matrix.CreateFromQuaternion(_offsetOrientation()) *
+                    Matrix.CreateTranslation(_offsetPosition()) *
+                    transform;
                 frame.BoneTransforms[0].WorldTransform = m;
             }
             catch (Exception e)

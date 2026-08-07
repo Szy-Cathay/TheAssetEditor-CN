@@ -3,6 +3,7 @@ using Editors.AnimationMeta.MetaEditor.Commands;
 using Editors.AnimationMeta.Presentation;
 using Editors.AnimationMeta.Presentation.View;
 using Editors.AnimationMeta.SuperView;
+using Editors.AnimationMeta.SuperView.Editing;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Editors.Shared.Core.Common.BaseControl;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,11 +22,14 @@ namespace Editors.AnimationMeta
 
             serviceCollection.AddScoped<EditorHost<SuperViewViewModel>>();
             serviceCollection.AddScoped<SuperViewViewModel>();
+            serviceCollection.AddScoped<CombatMetaDataEditSession>();
+            RegisterGameComponent<CombatMetaDataGizmoComponent>(serviceCollection);
 
             serviceCollection.AddScoped<IMetaDataBuilder, MetaDataBuilder>(); // Needs heavy refactorying!
 
             // Commands for metadata editor
             serviceCollection.AddTransient<CopyPastCommand>();
+            serviceCollection.AddTransient<CreateEmptyMetaDataFileCommand>();
             serviceCollection.AddTransient<DeleteEntryCommand>();
             serviceCollection.AddTransient<MoveEntryCommand>();
             serviceCollection.AddTransient<NewEntryCommand>();
