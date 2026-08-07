@@ -18,7 +18,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <Style x:Key="itemstyle" TargetType="{x:Type ListViewItem}" BasedOn="{StaticResource {x:Type ListViewItem}}">
+            <Style x:Key="itemstyle" TargetType="{x:Type ListViewItem}" BasedOn="{StaticResource AeList.Item}">
                 <EventSetter Event="MouseDoubleClick" Handler="ResultList_MouseDoubleClick" />
             </Style>
         </ResourceDictionary>
@@ -31,7 +31,7 @@
         </DockPanel>
 
         <ContentPresenter DockPanel.Dock="Top" Content="{Binding InnerContent, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=UserControl}}" />
-        <ListView 
+        <ListView
             ItemContainerStyle="{StaticResource itemstyle}"
             SelectedItem="{Binding SelectedItem, ElementName=self, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
             x:Name="ResultList"

@@ -98,7 +98,10 @@
 
             <Rectangle Grid.Row="3" Fill="{DynamicResource AeBrush.Border}" Height="1" Margin="2"/>
 
-            <ScrollViewer  Grid.Row="4" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer
+                Grid.Row="4"
+                Grid.RowSpan="2"
+                VerticalScrollBarVisibility="{Binding EditorContentVerticalScrollBarVisibility}">
                 <DockPanel  DockPanel.Dock="Top">
                     <ContentControl Content="{Binding ., UpdateSourceTrigger=PropertyChanged}"       
                                     ContentTemplateSelector="{StaticResource EditorSelector}"/>

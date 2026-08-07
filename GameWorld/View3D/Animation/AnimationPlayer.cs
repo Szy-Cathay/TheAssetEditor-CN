@@ -186,6 +186,24 @@ namespace GameWorld.Core.Animation
         public void Play() { IsPlaying = true; IsEnabled = true; }
 
         public void Pause() { IsPlaying = false; }
+
+        public void SeekToTimeSeconds(float timeSeconds)
+        {
+            if (float.IsFinite(timeSeconds) == false)
+                throw new ArgumentOutOfRangeException(nameof(timeSeconds));
+
+            var requestedTimeUs = (long)Math.Round(
+                Math.Max(0, timeSeconds) * 1_000_000d);
+            var animationLengthUs = GetAnimationLengthUs();
+            if (animationLengthUs > 0)
+                requestedTimeUs = Math.Min(requestedTimeUs, animationLengthUs);
+
+            _timeSinceStart = TimeSpanExtension.FromMicroseconds(
+                requestedTimeUs);
+            OnFrameChanged?.Invoke(CurrentFrame);
+            Refresh();
+        }
+
         public void Stop()
         {
             IsPlaying = false;

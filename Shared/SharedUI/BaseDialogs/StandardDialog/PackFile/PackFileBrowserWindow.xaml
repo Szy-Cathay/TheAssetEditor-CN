@@ -18,9 +18,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
-            <packfiletree:PackFileBrowserView KeyboardNavigation.TabIndex="0" KeyboardNavigation.IsTabStop="True" DataContext="{Binding ViewModel, Mode=OneTime}"/>
-        </Border>
+        <packfiletree:PackFileBrowserView
+            Margin="12"
+            DataContext="{Binding ViewModel, Mode=OneTime}"
+            KeyboardNavigation.IsTabStop="True"
+            KeyboardNavigation.TabIndex="0"
+            ShowTitle="False" />
         <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
             <Button
                 HorizontalAlignment="Right"

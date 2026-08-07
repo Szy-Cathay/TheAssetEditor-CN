@@ -287,6 +287,36 @@ public class StartupPackLoadingWindowTests
         });
     }
 
+    [Test]
+    public void DevelopmentProfile_SkipsCaPacksAndKeepsItsExistingTestPackPath()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var appSource = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "AssetEditor",
+            "App.xaml.cs"));
+        var managerSource = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "Shared",
+            "SharedCore",
+            "DevConfig",
+            "DevelopmentConfigurationManager.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                managerSource,
+                Does.Contain("HasActiveConfiguration"));
+            Assert.That(
+                appSource,
+                Does.Contain(
+                    "!devConfigManager.HasActiveConfiguration"));
+            Assert.That(
+                appSource,
+                Does.Contain("FinishStartup(devConfigManager)"));
+        });
+    }
+
     private static string FindSolutionRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

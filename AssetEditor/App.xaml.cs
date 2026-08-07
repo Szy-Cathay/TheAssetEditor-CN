@@ -74,7 +74,8 @@ namespace AssetEditor
             // Theme switching is handled by ThemesController (swaps colour dictionaries at runtime).
             ShowMainWindow();
 
-            if (!LoadCAPackFiles(settingsService, uiCommandFactory))
+            if (!devConfigManager.HasActiveConfiguration &&
+                !LoadCAPackFiles(settingsService, uiCommandFactory))
             {
                 Shutdown();
                 return;

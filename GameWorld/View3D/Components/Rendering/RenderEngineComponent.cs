@@ -30,8 +30,14 @@ namespace GameWorld.Core.Components.Rendering
         private readonly Dictionary<RenderBuckedId, List<IRenderItem>> _renderItems = [];
         private readonly List<VertexPositionColor> _renderLines = [];
         private readonly List<VertexPositionColor> _overlayLines = [];
+        private readonly List<VertexPositionColor>
+            _translucentPreviewTriangles = [];
+        private readonly List<EdgeData> _previewEdges = [];
         private VertexPositionColor[] _renderLinesArray;     // Cached array to avoid ToArray() per frame
         private VertexPositionColor[] _overlayLinesArray;    // Cached array for overlay lines
+        private VertexPositionColor[]? _previewTriangleArray;
+        private EdgeData[]? _previewEdgeArray;
+        private EdgeQuadInstanceMesh? _previewEdgeRenderer;
         private readonly IDeviceResolver _deviceResolverComponent;
         private readonly SceneRenderParametersStore _sceneLightParameters;
         private readonly IEventHub _eventHub;
@@ -194,6 +200,9 @@ namespace GameWorld.Core.Components.Rendering
             DefaultFont = _wpfGame.Content.Load<SpriteFont>("Fonts//DefaultFont");
             ViewportOverlayFont = _wpfGame.Content.Load<SpriteFont>(
                 "Fonts//ViewportOverlayFont");
+            _previewEdgeRenderer = new EdgeQuadInstanceMesh(
+                device,
+                _resourceLibrary.GetStaticEffect(ShaderTypes.EdgeQuad));
         }
 
         void RebuildRasterStates(bool cullingEnabled, bool bigSceneDepthBias)
@@ -231,6 +240,18 @@ namespace GameWorld.Core.Components.Rendering
             _overlayLines.AddRange(lineVertices);
         }
 
+        public void AddTranslucentPreviewTriangles(
+            VertexPositionColor[] triangleVertices)
+        {
+            Guard.IsTrue(triangleVertices.Length % 3 == 0);
+            _translucentPreviewTriangles.AddRange(triangleVertices);
+        }
+
+        public void AddPreviewEdges(EdgeData[] edges)
+        {
+            _previewEdges.AddRange(edges);
+        }
+
         public override void Update(GameTime gameTime)
         {
             foreach (var value in _renderItems.Keys)
@@ -238,6 +259,8 @@ namespace GameWorld.Core.Components.Rendering
 
             _renderLines.Clear();
             _overlayLines.Clear();
+            _translucentPreviewTriangles.Clear();
+            _previewEdges.Clear();
             _selectionOutlineRequested = false;
         }
 
@@ -676,6 +699,15 @@ namespace GameWorld.Core.Components.Rendering
                 // holes into the selection mask before selected geometry renders.
                 var isSurfacePass =
                     renderingTechnique != RenderingTechnique.Emissive;
+                if (isSurfacePass)
+                {
+                    DrawTranslucentPreviewSurfaces(
+                        device,
+                        commonShaderParameters);
+                    DrawPreviewEdges(
+                        device,
+                        commonShaderParameters);
+                }
                 if (isSurfacePass &&
                     _renderLines.Count != 0)
                 {
@@ -760,6 +792,79 @@ namespace GameWorld.Core.Components.Rendering
             {
                 device.Viewport = previousViewport;
             }
+        }
+
+        private void DrawTranslucentPreviewSurfaces(
+            GraphicsDevice device,
+            CommonShaderParameters parameters)
+        {
+            if (_translucentPreviewTriangles.Count == 0)
+                return;
+
+            if (_previewTriangleArray == null ||
+                _previewTriangleArray.Length <
+                    _translucentPreviewTriangles.Count)
+            {
+                _previewTriangleArray = new VertexPositionColor[
+                    _translucentPreviewTriangles.Count];
+            }
+            _translucentPreviewTriangles.CopyTo(
+                _previewTriangleArray,
+                0);
+
+            var effect = _resourceLibrary.GetStaticEffect(
+                ShaderTypes.Line);
+            effect.Parameters["World"].SetValue(Matrix.Identity);
+            effect.Parameters["View"].SetValue(parameters.View);
+            effect.Parameters["Projection"].SetValue(
+                parameters.Projection);
+
+            var previousBlendState = device.BlendState;
+            var previousDepthState = device.DepthStencilState;
+            var previousRasterizerState = device.RasterizerState;
+            device.BlendState = BlendState.AlphaBlend;
+            device.DepthStencilState = DepthStencilState.DepthRead;
+            device.RasterizerState = RasterizerState.CullNone;
+            try
+            {
+                effect.CurrentTechnique.Passes[0].Apply();
+                device.DrawUserPrimitives(
+                    PrimitiveType.TriangleList,
+                    _previewTriangleArray,
+                    0,
+                    _translucentPreviewTriangles.Count / 3);
+            }
+            finally
+            {
+                device.BlendState = previousBlendState;
+                device.DepthStencilState = previousDepthState;
+                device.RasterizerState = previousRasterizerState;
+            }
+        }
+
+        private void DrawPreviewEdges(
+            GraphicsDevice device,
+            CommonShaderParameters parameters)
+        {
+            if (_previewEdges.Count == 0 ||
+                _previewEdgeRenderer == null)
+            {
+                return;
+            }
+
+            if (_previewEdgeArray == null ||
+                _previewEdgeArray.Length != _previewEdges.Count)
+            {
+                _previewEdgeArray = new EdgeData[_previewEdges.Count];
+            }
+            _previewEdges.CopyTo(_previewEdgeArray, 0);
+            _previewEdgeRenderer.Update(_previewEdgeArray);
+            _previewEdgeRenderer.Draw(
+                parameters.View,
+                parameters.Projection,
+                device.Viewport.Height,
+                device.Viewport.Width,
+                device);
         }
 
         private void CaptureTransparentFrame(
@@ -857,6 +962,7 @@ namespace GameWorld.Core.Components.Rendering
             _transparentCaptureTarget?.Dispose();
             _transparentCaptureTarget = null;
             _whiteTexture.Dispose();
+            _previewEdgeRenderer?.Dispose();
 
             _renderLines.Clear();
             _renderItems.Clear();

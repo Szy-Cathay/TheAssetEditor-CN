@@ -99,6 +99,7 @@ namespace Shared.GameFormats.AnimationMeta.Parsing
         public string Description { get; private set; }
         public DisplayType DisplayOverride { get; private set; }
         public bool IsEditable { get; set; } = true;
+        public string[] ChoiceValues { get; set; } = [];
 
         public enum DisplayType
         {

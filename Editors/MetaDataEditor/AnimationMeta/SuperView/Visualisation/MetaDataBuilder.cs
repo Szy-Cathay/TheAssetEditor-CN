@@ -23,7 +23,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 {
     public interface IMetaDataBuilder
     {
-        List<IMetaDataInstance> Create(ParsedMetadataFile? persistent, ParsedMetadataFile? metaData, ParsedMetadataAttribute? selectedMetaDataAttribute, SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat fragment);
+        List<IMetaDataInstance> Create(ParsedMetadataFile? persistent, ParsedMetadataFile? metaData, ParsedMetadataAttribute? selectedMetaDataAttribute, SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat? fragment);
+        bool TryCreateMetaDataPreview(ParsedMetadataAttribute attribute,
+            bool isSelected, SceneNode root, ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer,
+            out IMetaDataInstance? preview);
     }
 
     public class MetaDataBuilder : IMetaDataBuilder
@@ -37,6 +41,32 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 
         private static Color s_color = Color.Black;
         private static Color s_selectedColor = Color.Red;
+
+        private static readonly Color s_impactColor = new(226, 180, 95);
+        private static readonly Color s_targetColor = new(100, 169, 226);
+        private static readonly Color s_fireColor = new(225, 121, 121);
+        private static readonly Color s_splashColor = new(220, 141, 85);
+        private static readonly Color s_effectColor = new(180, 135, 232);
+        private static readonly Color s_crewLocationColor = new(114, 188, 145);
+
+        private sealed record PropPreviewData(
+            ParsedMetadataAttribute Source,
+            string ModelName,
+            string AnimationName,
+            float StartTime,
+            float EndTime,
+            int BoneId,
+            Vector3 Position,
+            Vector4 Orientation,
+            float Scale);
+
+        private sealed record SplashPreviewData(
+            ParsedMetadataAttribute Source,
+            Vector3 StartPosition,
+            Vector3 EndPosition,
+            int AoeShape,
+            float WidthForCorridor,
+            float AngleForCone);
 
         public MetaDataBuilder(ComplexMeshLoader complexMeshLoader,
             RenderEngineComponent resourceLibrary,
@@ -53,7 +83,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 
         public List<IMetaDataInstance> Create(ParsedMetadataFile? persistent,
             ParsedMetadataFile? metaData, ParsedMetadataAttribute? selectedMetaDataAttribute,
-            SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat fragment)
+            SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat? fragment)
         {
             // Clear all
             var output = new List<IMetaDataInstance>();
@@ -70,41 +100,385 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             return output;
         }
 
-        private IEnumerable<IMetaDataInstance> ApplyMetaData(ParsedMetadataFile? file, ParsedMetadataAttribute? selectedAttribute, SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat fragment)
+        private IEnumerable<IMetaDataInstance> ApplyMetaData(ParsedMetadataFile? file, ParsedMetadataAttribute? selectedAttribute, SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat? fragment)
         {
             var output = new List<IMetaDataInstance>();
             if (file == null)
                 return output;
 
             foreach (var animatedProp in file.GetItemsOfType<IAnimatedPropMeta>())
+                TryAddPreview(
+                    output,
+                    animatedProp.GetType().Name,
+                    () => CreateAnimatedProp(
+                        animatedProp,
+                        root,
+                        skeleton,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var attribute in file.Attributes
+                .OfType<ParsedMetadataAttribute>())
             {
-                var instance = CreateAnimatedProp(
+                if (TryGetOrdinaryPropData(attribute, out var propData))
+                {
+                    TryAddPreview(
+                        output,
+                        attribute.Name,
+                        () => CreateOrdinaryProp(
+                            propData,
+                            root,
+                            skeleton,
+                            selectedAttribute,
+                            rootPlayer));
+                }
+            }
+
+            foreach (var item in file.GetItemsOfType<ImpactPosition_v2>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "ImpactPos",
+                        CombatMetaDataPreviewCategory.Impact,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<ImpactPosition_v10>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "ImpactPos",
+                        CombatMetaDataPreviewCategory.Impact,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<TargetPos_0>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "TargetPos",
+                        CombatMetaDataPreviewCategory.Target,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<TargetPos_10>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "TargetPos",
+                        CombatMetaDataPreviewCategory.Target,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<FirePos_v0>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateFireLocator(
+                        item,
+                        root,
+                        item.Position,
+                        skeleton,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<FirePos_v2>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateFireLocator(
+                        item,
+                        root,
+                        item.Position,
+                        skeleton,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<FirePos_v10>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateFireLocator(
+                        item,
+                        root,
+                        item.Position,
+                        skeleton,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<SplashAttack_v3>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateSplashAttack(
+                        CreateSplashPreviewData(item),
+                        root,
+                        $"SplashAttack_{Math.Round(item.EndTime, 2)}",
+                        0.1f,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<SplashAttack_v10>())
+                TryAddPreview(
+                    output,
+                    item.Name,
+                    () => CreateSplashAttack(
+                        CreateSplashPreviewData(item),
+                        root,
+                        $"SplashAttack_{Math.Round(item.EndTime, 2)}",
+                        0.1f,
+                        selectedAttribute,
+                        rootPlayer));
+
+            foreach (var item in file.GetItemsOfType<IEffectMeta>())
+                TryAddPreview(
+                    output,
+                    item.GetType().Name,
+                    () => CreateEffect(item, root, skeleton, selectedAttribute));
+
+            foreach (var attribute in file.Attributes
+                .OfType<ParsedMetadataAttribute>())
+            {
+                if (SpatialMetaDataCatalog.TryCreate(
+                        attribute,
+                        out var spatialBinding) &&
+                    spatialBinding.UsesGenericMarker)
+                {
+                    TryAddPreview(
+                        output,
+                        attribute.Name,
+                        () => CreateSpatialMarker(
+                            spatialBinding,
+                            root,
+                            skeleton,
+                            selectedAttribute));
+                }
+
+                if (TryCreateBoneOnlyPreview(
+                        attribute,
+                        root,
+                        skeleton,
+                        selectedAttribute,
+                        out var bonePreview) &&
+                    bonePreview != null)
+                {
+                    output.Add(bonePreview);
+                }
+            }
+
+            foreach (var meteDataItem in file.GetItemsOfType<DockEquipment>())
+                TryAddRule(
+                    meteDataItem.Name,
+                    () => CreateEquipmentDock(
+                        meteDataItem,
+                        fragment,
+                        skeleton,
+                        rootPlayer));
+
+            foreach (var meteDataItem in file.GetItemsOfType<Transform_v10>())
+                TryAddRule(
+                    meteDataItem.Name,
+                    () => CreateTransform(meteDataItem, rootPlayer));
+
+            return output;
+        }
+
+        public bool TryCreateMetaDataPreview(
+            ParsedMetadataAttribute attribute,
+            bool isSelected,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer,
+            out IMetaDataInstance? preview)
+        {
+            Func<IMetaDataInstance?>? create;
+            if (attribute is IAnimatedPropMeta animatedProp)
+            {
+                create = () => CreateAnimatedProp(
                     animatedProp,
                     root,
                     skeleton,
-                    selectedAttribute,
+                    isSelected ? attribute : null,
                     rootPlayer);
+            }
+            else if (TryGetOrdinaryPropData(attribute, out var propData))
+            {
+                create = () => CreateOrdinaryProp(
+                    propData,
+                    root,
+                    skeleton,
+                    isSelected ? attribute : null,
+                    rootPlayer);
+            }
+            else
+            {
+                create = attribute switch
+                {
+                    ImpactPosition_v2 item => () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "ImpactPos",
+                        CombatMetaDataPreviewCategory.Impact,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    ImpactPosition_v10 item => () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "ImpactPos",
+                        CombatMetaDataPreviewCategory.Impact,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    TargetPos_0 item => () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "TargetPos",
+                        CombatMetaDataPreviewCategory.Target,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    TargetPos_10 item => () => CreateStaticLocator(
+                        item,
+                        root,
+                        item.Position,
+                        "TargetPos",
+                        CombatMetaDataPreviewCategory.Target,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    FirePos_v0 item => () => CreateFireLocator(
+                        item,
+                        root,
+                        item.Position,
+                        skeleton,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    FirePos_v2 item => () => CreateFireLocator(
+                        item,
+                        root,
+                        item.Position,
+                        skeleton,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    FirePos_v10 item => () => CreateFireLocator(
+                        item,
+                        root,
+                        item.Position,
+                        skeleton,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    SplashAttack_v3 item => () => CreateSplashAttack(
+                        CreateSplashPreviewData(item),
+                        root,
+                        $"SplashAttack_{Math.Round(item.EndTime, 2)}",
+                        0.1f,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    SplashAttack_v10 item => () => CreateSplashAttack(
+                        CreateSplashPreviewData(item),
+                        root,
+                        $"SplashAttack_{Math.Round(item.EndTime, 2)}",
+                        0.1f,
+                        isSelected ? item : null,
+                        rootPlayer),
+                    IEffectMeta item => () => CreateEffect(
+                        item,
+                        root,
+                        skeleton,
+                        isSelected ? attribute : null),
+                    _ => null
+                };
+            }
+            if (create == null &&
+                SpatialMetaDataCatalog.TryCreate(
+                    attribute,
+                    out var spatialBinding) &&
+                spatialBinding.UsesGenericMarker)
+            {
+                create = () => CreateSpatialMarker(
+                    spatialBinding,
+                    root,
+                    skeleton,
+                    isSelected ? attribute : null);
+            }
+            if (create == null && IsBoneOnlyMetaData(attribute))
+            {
+                create = () =>
+                {
+                    TryCreateBoneOnlyPreview(
+                        attribute,
+                        root,
+                        skeleton,
+                        isSelected ? attribute : null,
+                        out var bonePreview);
+                    return bonePreview;
+                };
+            }
+            if (create == null)
+            {
+                preview = null;
+                return false;
+            }
+
+            try
+            {
+                preview = create();
+            }
+            catch (Exception e)
+            {
+                _logger.Here().Warning(
+                    $"Skipping metadata preview for '{attribute.Name}': {e.Message}");
+                preview = null;
+            }
+
+            return true;
+        }
+
+        private void TryAddPreview(
+            ICollection<IMetaDataInstance> output,
+            string tagName,
+            Func<IMetaDataInstance?> create)
+        {
+            try
+            {
+                var instance = create();
                 if (instance != null)
                     output.Add(instance);
             }
+            catch (Exception e)
+            {
+                _logger.Here().Warning(
+                    $"Skipping metadata preview for '{tagName}': {e.Message}");
+            }
+        }
 
-            output.AddRange(file.GetItemsOfType<ImpactPosition_v10>().Select(meteDataItem => CreateStaticLocator(meteDataItem, root, meteDataItem.Position, "ImpactPos", selectedAttribute)));
-
-            output.AddRange(file.GetItemsOfType<TargetPos_10>().Select(meteDataItem => CreateStaticLocator(meteDataItem, root, meteDataItem.Position, "TargetPos", selectedAttribute)));
-
-            output.AddRange(file.GetItemsOfType<FirePos_v10>().Select(meteDataItem => CreateStaticLocator(meteDataItem, root, meteDataItem.Position, "FirePos", selectedAttribute)));
-
-            output.AddRange(file.GetItemsOfType<SplashAttack_v10>().Select(meteDataItem => CreateSplashAttack(meteDataItem, root, $"SplashAttack_{Math.Round(meteDataItem.EndTime, 2)}", 0.1f, selectedAttribute)));
-
-            output.AddRange(file.GetItemsOfType<IEffectMeta>().Select(x => CreateEffect(x, root, skeleton, selectedAttribute)));
-
-            foreach (var meteDataItem in file.GetItemsOfType<DockEquipment>())
-                CreateEquipmentDock(meteDataItem, fragment, skeleton, rootPlayer);
-
-            foreach (var meteDataItem in file.GetItemsOfType<Transform_v10>())
-                CreateTransform(meteDataItem, rootPlayer);
-
-            return output;
+        private void TryAddRule(string tagName, Action create)
+        {
+            try
+            {
+                create();
+            }
+            catch (Exception e)
+            {
+                _logger.Here().Warning(
+                    $"Skipping metadata preview rule for '{tagName}': {e.Message}");
+            }
         }
 
         private void CreateTransform(Transform_v10 transform, AnimationPlayer rootPlayer)
@@ -113,7 +487,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             rootPlayer.AnimationRules.Add(rule);
         }
 
-        private void CreateEquipmentDock(DockEquipment metaData, IAnimationBinGenericFormat fragment, ISkeletonProvider skeleton, AnimationPlayer rootPlayer)
+        private void CreateEquipmentDock(DockEquipment metaData, IAnimationBinGenericFormat? fragment, ISkeletonProvider skeleton, AnimationPlayer rootPlayer)
         {
             if (fragment == null)
             {
@@ -146,7 +520,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 
             var pf = _packFileService.FindFile(animPath);
             if (pf == null)
-                throw new Exception($"Unable to find animation for docking. Searched for {animPath} and failed to find it in the pack file service. This is required to visualise the docked equipment.");
+            {
+                _logger.Here().Warning(
+                    $"Skipping docking preview because animation '{animPath}' was not found.");
+                return;
+            }
 
             var animFile = AnimationFile.Create(pf);
             var clip = new AnimationClip(animFile, skeleton.Skeleton);
@@ -155,175 +533,941 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             rootPlayer.AnimationRules.Add(rule);
         }
 
-        private IMetaDataInstance? CreateAnimatedProp(IAnimatedPropMeta animatedPropMeta, SceneNode root, ISkeletonProvider rootSkeleton, ParsedMetadataAttribute? selectedMetaDataAttribute, AnimationPlayer rootPlayer)
+        private IMetaDataInstance? CreateAnimatedProp(
+            IAnimatedPropMeta animatedPropMeta,
+            SceneNode root,
+            ISkeletonProvider rootSkeleton,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            AnimationPlayer rootPlayer)
         {
-            var propName = "Animated_prop";
-            var color = selectedMetaDataAttribute == animatedPropMeta ? s_selectedColor : s_color;
+            var source = (ParsedMetadataAttribute)animatedPropMeta;
+            var data = new PropPreviewData(
+                source,
+                animatedPropMeta.ModelName,
+                animatedPropMeta.AnimationName,
+                animatedPropMeta.StartTime,
+                animatedPropMeta.EndTime,
+                animatedPropMeta.BoneId,
+                animatedPropMeta.Position,
+                animatedPropMeta.Orientation,
+                animatedPropMeta.Scale);
+            return CreatePropPreview(
+                data,
+                root,
+                rootSkeleton,
+                selectedMetaDataAttribute,
+                rootPlayer,
+                true);
+        }
 
-            var meshPath = _packFileService.FindFile(animatedPropMeta.ModelName);
-            if (meshPath == null)
+        private IMetaDataInstance? CreateOrdinaryProp(
+            PropPreviewData data,
+            SceneNode root,
+            ISkeletonProvider rootSkeleton,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            AnimationPlayer rootPlayer) =>
+            CreatePropPreview(
+                data,
+                root,
+                rootSkeleton,
+                selectedMetaDataAttribute,
+                rootPlayer,
+                false);
+
+        private IMetaDataInstance? CreatePropPreview(
+            PropPreviewData data,
+            SceneNode root,
+            ISkeletonProvider rootSkeleton,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            AnimationPlayer rootPlayer,
+            bool attachThroughAnimation)
+        {
+            if (!SpatialMetaDataCatalog.TryCreate(
+                    data.Source,
+                    out var spatialBinding))
             {
-                _logger.Here().Warning(
-                    $"Skipping animated prop preview because model '{animatedPropMeta.ModelName}' was not found.");
                 return null;
             }
 
-            var animationPath = _packFileService.FindFile(animatedPropMeta.AnimationName);
-            var propPlayer = _animationsContainerComponent.RegisterAnimationPlayer(new AnimationPlayer(), propName + Guid.NewGuid());
-
-            // Configure the mesh
-            var loadedNode = _complexMeshLoader.Load(meshPath, new GroupNode(propName), propPlayer, true, true);
-
-            // Configure animation
-            if (animationPath != null)
+            var propName = attachThroughAnimation
+                ? "Animated_prop"
+                : "Prop";
+            var color = selectedMetaDataAttribute == data.Source
+                ? s_selectedColor
+                : s_color;
+            var meshPath = _packFileService.FindFile(data.ModelName);
+            if (meshPath == null)
             {
-                var skeletonName = SceneNodeHelper.GetSkeletonName(loadedNode);
-                var skeletonFile = _skeletonAnimationLookUpHelper.GetSkeletonFileFromName(skeletonName);
-                if (skeletonFile == null)
-                    throw new Exception($"Unable to find skeleton for animated prop. Searched for {skeletonName} and failed to find it in the skeleton animation look up helper. This is required to play the animation of the prop.");
-
-                var skeleton = new GameSkeleton(skeletonFile, propPlayer);
-                var animFile = AnimationFile.Create(animationPath);
-                var clip = new AnimationClip(animFile, skeleton);
-                propPlayer.SetAnimation(clip, skeleton);
-
-                // Add the prop skeleton
-                var skeletonSceneNode = new SkeletonNode(skeleton)
-                {
-                    NodeColour = color,
-                    ScaleMult = animatedPropMeta.Scale
-                };
-                loadedNode.AddObject(skeletonSceneNode);
+                _logger.Here().Warning(
+                    $"Skipping prop preview because model '{data.ModelName}' was not found.");
+                return CreateSpatialMarker(
+                    spatialBinding,
+                    root,
+                    rootSkeleton,
+                    selectedMetaDataAttribute);
             }
 
-            // Configure scale
-            loadedNode.ForeachNodeRecursive((node) =>
+            AnimationPlayer? propPlayer = null;
+            SceneNode? loadedNode = null;
+            SkeletonNode? propSkeletonNode = null;
+            try
             {
-                if (node is ISelectable selectableNode)
-                    selectableNode.IsSelectable = false;
+                var animationPath = string.IsNullOrWhiteSpace(data.AnimationName)
+                    ? null
+                    : _packFileService.FindFile(data.AnimationName);
+                propPlayer = _animationsContainerComponent.RegisterAnimationPlayer(
+                    new AnimationPlayer(),
+                    propName + Guid.NewGuid());
+                loadedNode = _complexMeshLoader.Load(
+                    meshPath,
+                    new GroupNode(propName),
+                    propPlayer,
+                    true,
+                    true);
 
-                if (node is SceneNode sceneNode)
-                    sceneNode.ScaleMult = animatedPropMeta.Scale;
+                if (animationPath != null)
+                {
+                    var skeletonName = SceneNodeHelper.GetSkeletonName(loadedNode);
+                    var skeletonFile = _skeletonAnimationLookUpHelper
+                        .GetSkeletonFileFromName(skeletonName);
+                    if (skeletonFile == null)
+                    {
+                        throw new Exception(
+                            $"Unable to find skeleton '{skeletonName}' for prop.");
+                    }
+
+                    var skeleton = new GameSkeleton(skeletonFile, propPlayer);
+                    var animFile = AnimationFile.Create(animationPath);
+                    var clip = new AnimationClip(animFile, skeleton);
+                    propPlayer.SetAnimation(clip, skeleton);
+                    propSkeletonNode = new SkeletonNode(skeleton)
+                    {
+                        NodeColour = color,
+                        ScaleMult = data.Scale
+                    };
+                    loadedNode.AddObject(propSkeletonNode);
+                }
+
+                loadedNode.ForeachNodeRecursive(node =>
+                {
+                    if (node is ISelectable selectableNode)
+                        selectableNode.IsSelectable = false;
+
+                    if (node is SceneNode sceneNode)
+                        sceneNode.ScaleMult = data.Scale;
+                });
+                loadedNode.ScaleMult = data.Scale;
+
+                if (attachThroughAnimation)
+                {
+                    propPlayer.AnimationRules.Add(new CopyRootTransform(
+                        rootSkeleton,
+                        data.BoneId,
+                        () => spatialBinding.Position,
+                        () => spatialBinding.Orientation ??
+                            Quaternion.Identity));
+                }
+
+                propPlayer.IsEnabled = true;
+                if (rootPlayer.IsPlaying)
+                    propPlayer.Play();
+                else
+                    propPlayer.Pause();
+                propPlayer.Refresh();
+                root.AddObject(loadedNode);
+
+                if (attachThroughAnimation)
+                {
+                    var animatedProp = new AnimatedPropInstance(
+                        loadedNode,
+                        propPlayer,
+                        rootSkeleton,
+                        data.BoneId,
+                        () => spatialBinding.Position,
+                        () => spatialBinding.Orientation ??
+                            Quaternion.Identity,
+                        data.StartTime,
+                        data.EndTime,
+                        data.Source,
+                        ReferenceEquals(
+                            selectedMetaDataAttribute,
+                            data.Source),
+                        selected =>
+                        {
+                            SetPreviewOutline(loadedNode, selected);
+                            if (propSkeletonNode != null)
+                            {
+                                propSkeletonNode.NodeColour = selected
+                                    ? s_selectedColor
+                                    : s_color;
+                            }
+                        });
+                    animatedProp.Update(
+                        rootPlayer.GetTimeUs() / 1_000_000f);
+                    return animatedProp;
+                }
+
+                return new PropInstance(
+                    loadedNode,
+                    propPlayer,
+                    rootSkeleton,
+                    data.BoneId,
+                    () => spatialBinding.Position,
+                    () => spatialBinding.Orientation ??
+                        Quaternion.Identity,
+                    data.StartTime,
+                    data.EndTime,
+                    data.Source,
+                    ReferenceEquals(
+                        selectedMetaDataAttribute,
+                        data.Source),
+                    selected =>
+                    {
+                        SetPreviewOutline(loadedNode, selected);
+                        if (propSkeletonNode != null)
+                        {
+                            propSkeletonNode.NodeColour = selected
+                                ? s_selectedColor
+                                : s_color;
+                        }
+                    });
+            }
+            catch (Exception e)
+            {
+                if (loadedNode?.Parent != null)
+                    loadedNode.Parent.RemoveObject(loadedNode);
+                if (propPlayer != null)
+                    _animationsContainerComponent.Remove(propPlayer);
+
+                _logger.Here().Warning(
+                    $"Skipping prop preview: {e.Message}");
+                return CreateSpatialMarker(
+                    spatialBinding,
+                    root,
+                    rootSkeleton,
+                    selectedMetaDataAttribute);
+            }
+        }
+
+        private static void SetPreviewOutline(
+            SceneNode root,
+            bool enabled) =>
+            root.ForeachNodeRecursive(node =>
+            {
+                if (node is Rmv2MeshNode meshNode)
+                    meshNode.SetPreviewOutline(enabled);
             });
-            loadedNode.ScaleMult = animatedPropMeta.Scale;
 
-            // Add the animation rules
-            var animationRule = new CopyRootTransform(rootSkeleton, animatedPropMeta.BoneId, animatedPropMeta.Position, new Quaternion(animatedPropMeta.Orientation));
-            propPlayer.AnimationRules.Add(animationRule);
-            if (rootPlayer.IsPlaying)
-                propPlayer.Play();
-            propPlayer.Refresh();
-
-            // Add to scene
-            root.AddObject(loadedNode);
-
-            return new AnimatedPropInstance(loadedNode, propPlayer);
-        }
-
-        private IMetaDataInstance CreateStaticLocator(DecodedMetaEntryBase metaData, SceneNode root, Vector3 position, string displayName, ParsedMetadataAttribute? selectedMetaDataAttribute, float scale = 0.3f)
+        private static bool TryGetOrdinaryPropData(
+            ParsedMetadataAttribute attribute,
+            out PropPreviewData data)
         {
-            var color = selectedMetaDataAttribute == metaData ? s_selectedColor : s_color;
+            data = null!;
+            if (GetMetaDataName(attribute) != "PROP")
+                return false;
 
-            var node = new SimpleDrawableNode(displayName);
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, position, color));
-            node.AddItem(LineHelper.AddCircle(position, scale, color));
-            root.AddObject(node);
-
-            return new DrawableMetaInstance(metaData.StartTime, metaData.EndTime, node.Name, node);
+            data = attribute switch
+            {
+                Prop_v15 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    prop.Scale),
+                Prop_v14 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    prop.Scale),
+                Prop_v13_3K prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    prop.Scale),
+                Prop_v12_3K prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    prop.Scale),
+                Prop_v13 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    prop.Scale),
+                Prop_v12 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    1),
+                Prop_v11 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    1),
+                Prop_v10 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    1),
+                Prop_v4 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    1),
+                Prop_v3 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    1),
+                Prop_v2 prop => new(
+                    prop,
+                    prop.ModelName,
+                    prop.AnimationName,
+                    prop.StartTime,
+                    prop.EndTime,
+                    prop.BoneId,
+                    prop.Position,
+                    prop.Orientation,
+                    1),
+                _ => null!
+            };
+            return data != null;
         }
 
-        private IMetaDataInstance CreateSplashAttack(SplashAttack_v10 splashAttack, SceneNode root, string displayName, float scale, ParsedMetadataAttribute? selectedAttribute)
+        private IMetaDataInstance CreateStaticLocator(
+            ParsedMetadataAttribute metaData,
+            SceneNode root,
+            Vector3 position,
+            string displayName,
+            CombatMetaDataPreviewCategory category,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            AnimationPlayer player,
+            float scale = 0.3f,
+            Func<Matrix>? referenceLocalTransform = null,
+            int? highlightedBoneIndex = null)
+        {
+            var isSelected = selectedMetaDataAttribute == metaData;
+            var node = new SimpleDrawableNode(displayName);
+            var instance = new CombatMetaDataInstance(
+                metaData,
+                category,
+                () => GetSinglePointPosition(metaData, position),
+                node,
+                isSelected,
+                selected => PopulateStaticLocatorNode(
+                    node,
+                    metaData,
+                    category,
+                    scale,
+                    selected),
+                player,
+                GetActiveTimeRange(metaData),
+                referenceLocalTransform,
+                highlightedBoneIndex);
+            root.AddObject(node);
+            return instance;
+        }
+
+        private IMetaDataInstance CreateFireLocator(
+            ParsedMetadataAttribute metaData,
+            SceneNode root,
+            Vector3 position,
+            ISkeletonProvider skeleton,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            AnimationPlayer player)
+        {
+            var gameSkeleton = skeleton?.Skeleton;
+            var animRootIndex = gameSkeleton?.GetBoneIndexByName(
+                "animroot") ?? -1;
+            Func<Matrix> referenceLocalTransform = () => Matrix.Identity;
+            if (gameSkeleton != null && animRootIndex >= 0)
+            {
+                referenceLocalTransform = () =>
+                    gameSkeleton.GetAnimatedWorldTranform(animRootIndex);
+            }
+            return CreateStaticLocator(
+                metaData,
+                root,
+                position,
+                "FirePos",
+                CombatMetaDataPreviewCategory.Fire,
+                selectedMetaDataAttribute,
+                player,
+                referenceLocalTransform: referenceLocalTransform,
+                highlightedBoneIndex: animRootIndex >= 0
+                    ? animRootIndex
+                    : null);
+        }
+
+        private void PopulateStaticLocatorNode(
+            SimpleDrawableNode node,
+            ParsedMetadataAttribute metaData,
+            CombatMetaDataPreviewCategory category,
+            float scale,
+            bool isSelected)
+        {
+            var color = GetCombatPreviewColor(category, isSelected);
+            var markerScale = scale;
+            var edgeWidth = isSelected ? 1.6f : 0.65f;
+            node.ClearItems();
+            node.AddItem(new WorldTextRenderItem(
+                _resourceLibrary,
+                metaData.Name,
+                Vector3.Zero,
+                color));
+            if (category == CombatMetaDataPreviewCategory.Impact)
+            {
+                node.AddItem(PreviewShapeGeometry.CreateCircleMarker(
+                    Vector3.Zero,
+                    markerScale,
+                    PreviewShapeGeometry.WithPremultipliedAlpha(
+                        s_impactColor,
+                        48),
+                    color,
+                    edgeWidth));
+            }
+            else if (category == CombatMetaDataPreviewCategory.Target)
+            {
+                node.AddItem(PreviewShapeGeometry.CreateBoxMarker(
+                    Vector3.Zero,
+                    markerScale,
+                    PreviewShapeGeometry.WithPremultipliedAlpha(
+                        s_targetColor,
+                        48),
+                    color,
+                    edgeWidth));
+            }
+            else
+            {
+                node.AddItem(PreviewShapeGeometry.CreateLocatorMarker(
+                    Vector3.Zero,
+                    markerScale,
+                    PreviewShapeGeometry.WithPremultipliedAlpha(
+                        s_fireColor,
+                        48),
+                    color,
+                    edgeWidth));
+            }
+
+        }
+
+        private static Vector3 GetSinglePointPosition(
+            ParsedMetadataAttribute source,
+            Vector3 fallback) =>
+            source switch
+            {
+                ImpactPosition_v2 value => value.Position,
+                ImpactPosition_v10 value => value.Position,
+                TargetPos_0 value => value.Position,
+                TargetPos_10 value => value.Position,
+                FirePos_v0 value => value.Position,
+                FirePos_v2 value => value.Position,
+                FirePos_v10 value => value.Position,
+                _ => fallback
+            };
+
+        private static SplashPreviewData CreateSplashPreviewData(
+            SplashAttack_v3 splashAttack) =>
+            new(
+                splashAttack,
+                splashAttack.StartPosition,
+                splashAttack.EndPosition,
+                splashAttack.AoeShape,
+                splashAttack.WidthForCorridor,
+                splashAttack.AngleForCone);
+
+        private static SplashPreviewData CreateSplashPreviewData(
+            SplashAttack_v10 splashAttack) =>
+            new(
+                splashAttack,
+                splashAttack.StartPosition,
+                splashAttack.EndPosition,
+                splashAttack.AoeShape,
+                splashAttack.WidthForCorridor,
+                splashAttack.AngleForCone);
+
+        private IMetaDataInstance CreateSplashAttack(SplashPreviewData splashAttack, SceneNode root, string displayName, float scale, ParsedMetadataAttribute? selectedAttribute, AnimationPlayer player)
         {
             var distance = Vector3.Distance(splashAttack.StartPosition, splashAttack.EndPosition);
             if (MathUtil.CompareEqualFloats(distance))
                 throw new ConstraintException($"{displayName}: the distance between StartPosition {splashAttack.StartPosition} and EndPosition {splashAttack.EndPosition} is close to 0");
 
-            var color = selectedAttribute == splashAttack ? s_selectedColor : s_color;
-
+            var isSelected = selectedAttribute == splashAttack.Source;
             var node = new SimpleDrawableNode(displayName);
+            var currentSplashAttack = splashAttack;
+            void RefreshVisual()
+            {
+                var updated = CreateSplashPreviewData(
+                    currentSplashAttack.Source);
+                if (updated == currentSplashAttack)
+                    return;
+
+                currentSplashAttack = updated;
+                try
+                {
+                    PopulateSplashAttackNode(
+                        node,
+                        currentSplashAttack,
+                        displayName,
+                        scale,
+                        isSelected);
+                }
+                catch (ConstraintException)
+                {
+                    node.ClearItems();
+                }
+            }
+            var instance = new CombatMetaDataInstance(
+                splashAttack.Source,
+                CombatMetaDataPreviewCategory.Splash,
+                () => (currentSplashAttack.EndPosition +
+                    currentSplashAttack.StartPosition) / 2,
+                node,
+                isSelected,
+                selected =>
+                {
+                    isSelected = selected;
+                    PopulateSplashAttackNode(
+                        node,
+                        currentSplashAttack,
+                        displayName,
+                        scale,
+                        selected);
+                },
+                player,
+                GetActiveTimeRange(splashAttack.Source),
+                nodeLocalTransformProvider: () => Matrix.Identity,
+                refreshVisual: RefreshVisual);
+            root.AddObject(node);
+            return instance;
+        }
+
+        private static SplashPreviewData CreateSplashPreviewData(
+            ParsedMetadataAttribute source) =>
+            source switch
+            {
+                SplashAttack_v3 splashAttack =>
+                    CreateSplashPreviewData(splashAttack),
+                SplashAttack_v10 splashAttack =>
+                    CreateSplashPreviewData(splashAttack),
+                _ => throw new InvalidOperationException(
+                    $"Unsupported splash attack type {source.GetType().Name}")
+            };
+
+        private static MetaDataTimeRange? GetActiveTimeRange(
+            ParsedMetadataAttribute attribute) =>
+            MetaDataTimeRange.TryCreate(attribute, out var timeRange)
+                ? timeRange
+                : null;
+
+        private void PopulateSplashAttackNode(
+            SimpleDrawableNode node,
+            SplashPreviewData splashAttack,
+            string displayName,
+            float scale,
+            bool isSelected)
+        {
+            var edgeColor = GetCombatPreviewColor(
+                CombatMetaDataPreviewCategory.Splash,
+                isSelected);
+            var edgeWidth = isSelected ? 1.6f : 0.65f;
+            var fillColor = PreviewShapeGeometry.WithPremultipliedAlpha(
+                s_splashColor,
+                48);
+            node.ClearItems();
             var textPos = (splashAttack.EndPosition + splashAttack.StartPosition) / 2;
 
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, color));
-            node.AddItem(LineHelper.AddLocator(splashAttack.StartPosition, scale, color));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, edgeColor));
+            node.AddItem(LineHelper.AddLocator(splashAttack.StartPosition, scale, edgeColor));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, edgeColor));
+            node.AddItem(LineHelper.AddLocator(splashAttack.EndPosition, scale, edgeColor));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, textPos, edgeColor));
 
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, color));
-            node.AddItem(LineHelper.AddLocator(splashAttack.EndPosition, scale, color));
-
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, textPos, color));
-            node.AddItem(LineHelper.AddLine(splashAttack.StartPosition, splashAttack.EndPosition, color));
-
-            var normal = splashAttack.EndPosition - splashAttack.StartPosition;  // corresponds to Z
-            normal.Normalize();
-            var random = new Random(1);
-            Func<Random, float> RandomFloat = r => (float)(2 * r.NextDouble() - 1);
-            var vectorP = new Vector3(RandomFloat(random), RandomFloat(random), RandomFloat(random));
-            vectorP.Normalize();
-
-            var planeVectorP = Vector3.Cross(normal, Vector3.Cross(vectorP, normal)); // corresponds to X
-            var planeVectorPN = Vector3.Cross(vectorP, normal); // corresponds to Y
-            planeVectorP.Normalize();
-            planeVectorPN.Normalize();
-
-            var rotationM = MathUtil.CreateRotation(
-            [
-                planeVectorP,
-                planeVectorPN,
-                normal
-            ]);
-
-            if (splashAttack.AoeShape == 0) // Cone or Sphere
+            if (splashAttack.AoeShape == 0)
             {
-                if (MathUtil.CompareEqualFloats(splashAttack.AngleForCone / 2, tolerance: 0.1f))
+                if (MathUtil.CompareEqualFloats(
+                    splashAttack.AngleForCone / 2,
+                    tolerance: 0.1f))
                 {
-                    throw new ConstraintException($"{displayName}: the half-angle {splashAttack.AngleForCone / 2} of the cone is close to 0");
+                    throw new ConstraintException(
+                        $"{displayName}: the half-angle {splashAttack.AngleForCone / 2} of the cone is close to 0");
                 }
-                var transformationM = rotationM * Matrix.CreateScale(distance) * Matrix.CreateTranslation(splashAttack.StartPosition);
-                node.AddItem(LineHelper.AddConeSplash(splashAttack.StartPosition, splashAttack.EndPosition, transformationM, splashAttack.AngleForCone, color));
+
+                node.AddItem(PreviewShapeGeometry.CreateSplashCone(
+                    splashAttack.StartPosition,
+                    splashAttack.EndPosition,
+                    splashAttack.AngleForCone,
+                    fillColor,
+                    edgeColor,
+                    edgeWidth));
             }
-            if (splashAttack.AoeShape == 1) // Corridor
+            if (splashAttack.AoeShape == 1)
             {
-                if (MathUtil.CompareEqualFloats(splashAttack.WidthForCorridor, tolerance: 0.001f))
+                if (MathUtil.CompareEqualFloats(
+                    splashAttack.WidthForCorridor,
+                    tolerance: 0.001f))
                 {
-                    throw new ConstraintException($"{displayName}: the WidthForCorridor {splashAttack.WidthForCorridor} of the corridor is close to 0");
+                    throw new ConstraintException(
+                        $"{displayName}: the WidthForCorridor {splashAttack.WidthForCorridor} of the corridor is close to 0");
                 }
-                var transformationM = rotationM * Matrix.CreateScale(splashAttack.WidthForCorridor / 2) * Matrix.CreateTranslation(splashAttack.StartPosition);
-                node.AddItem(LineHelper.AddCorridorSplash(splashAttack.StartPosition, splashAttack.EndPosition, transformationM, color));
+
+                node.AddItem(PreviewShapeGeometry.CreateSplashCorridor(
+                    splashAttack.StartPosition,
+                    splashAttack.EndPosition,
+                    splashAttack.WidthForCorridor / 2,
+                    fillColor,
+                    edgeColor,
+                    edgeWidth));
             }
 
-            root.AddObject(node);
+        }
 
-            return new DrawableMetaInstance(splashAttack.StartTime, splashAttack.EndTime, node.Name, node);
+        private static Color GetCombatPreviewColor(
+            CombatMetaDataPreviewCategory category,
+            bool isSelected)
+        {
+            if (isSelected)
+                return Color.White;
+
+            return category switch
+            {
+                CombatMetaDataPreviewCategory.Impact => s_impactColor,
+                CombatMetaDataPreviewCategory.Target => s_targetColor,
+                CombatMetaDataPreviewCategory.Fire => s_fireColor,
+                CombatMetaDataPreviewCategory.Splash => s_splashColor,
+                _ => s_color
+            };
         }
 
         private IMetaDataInstance CreateEffect(IEffectMeta effect, SceneNode root, ISkeletonProvider skeleton, ParsedMetadataAttribute? selectedAttribute)
         {
-            var color = selectedAttribute == effect ? s_selectedColor : s_color;
-            var locatorScale = 0.3f;
-            var textOffset = locatorScale * 1.5f + 0.01f;
-
-            var rotationQuat = new Quaternion(effect.Orientation);
-            var rotMatrix = Matrix.CreateFromQuaternion(rotationQuat);
-
-            var localX = Vector3.Transform(Vector3.UnitX, rotMatrix);
-            var localY = Vector3.Transform(Vector3.UnitY, rotMatrix);
-            var localZ = Vector3.Transform(Vector3.UnitZ, rotMatrix);
-
+            var source = (ParsedMetadataAttribute)effect;
             var node = new SimpleDrawableNode("Effect:" + effect.VfxName);
-            node.AddItem(LineHelper.AddLine(effect.Position, effect.Position + localX * locatorScale, Color.Red));
-            node.AddItem(LineHelper.AddLine(effect.Position, effect.Position + localY * locatorScale, Color.Green));
-            node.AddItem(LineHelper.AddLine(effect.Position, effect.Position + localZ * locatorScale, Color.Blue));
-
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, effect.VfxName, effect.Position, color));
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "X", effect.Position + localX * textOffset, Color.Red));
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "Y", effect.Position + localY * textOffset, Color.Green));
-            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "Z", effect.Position + localZ * textOffset, Color.Blue));
-
+            var instance = new DrawableMetaInstance(
+                GetActiveTimeRange(source),
+                node,
+                source,
+                ReferenceEquals(selectedAttribute, source),
+                selected => PopulateEffectNode(
+                    node,
+                    effect.VfxName,
+                    selected),
+                () => effect.Position,
+                () => new Quaternion(effect.Orientation));
             root.AddObject(node);
-
-            var instance = new DrawableMetaInstance(effect.EffectStartTime, effect.EffectEndTime, node.Name, node);
             if (effect.Tracking)
                 instance.FollowBone(skeleton, effect.NodeIndex);
             return instance;
+        }
+
+        private IMetaDataInstance CreateSpatialMarker(
+            SpatialMetaDataBinding binding,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            ParsedMetadataAttribute? selectedAttribute)
+        {
+            var node = new SimpleDrawableNode(binding.Source.Name);
+            var instance = new DrawableMetaInstance(
+                GetActiveTimeRange(binding.Source),
+                node,
+                binding.Source,
+                ReferenceEquals(selectedAttribute, binding.Source),
+                selected => PopulateSpatialMarkerNode(
+                    node,
+                    binding,
+                    selected),
+                () => binding.Position,
+                () => binding.Orientation ?? Quaternion.Identity);
+            root.AddObject(node);
+
+            var boneIndex = binding.BoneIndex ?? -1;
+            if (binding.AttachToBone &&
+                boneIndex >= 0 &&
+                boneIndex < skeleton.Skeleton.BoneCount)
+            {
+                instance.FollowBone(skeleton, boneIndex);
+            }
+
+            return instance;
+        }
+
+        private bool TryCreateBoneOnlyPreview(
+            ParsedMetadataAttribute source,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            ParsedMetadataAttribute? selectedAttribute,
+            out IMetaDataInstance? preview)
+        {
+            preview = null;
+            if (!TryGetBoneOnlyTarget(source, skeleton, out var boneIndex))
+                return IsBoneOnlyMetaData(source);
+
+            var node = new SimpleDrawableNode(source.Name);
+            var instance = new DrawableMetaInstance(
+                GetActiveTimeRange(source),
+                node,
+                source,
+                ReferenceEquals(source, selectedAttribute),
+                _ => PopulateBoneOnlyMarkerNode(node),
+                () => Vector3.Zero,
+                () => Quaternion.Identity);
+            root.AddObject(node);
+            instance.FollowBone(skeleton, boneIndex);
+            preview = instance;
+            return true;
+        }
+
+        private static bool TryGetBoneOnlyTarget(
+            ParsedMetadataAttribute source,
+            ISkeletonProvider skeleton,
+            out int boneIndex)
+        {
+            boneIndex = -1;
+            if (skeleton?.Skeleton == null)
+                return false;
+
+            var metaDataName = GetMetaDataName(source);
+            if (metaDataName == "SPLICE")
+            {
+                var property = source.GetType().GetProperty(
+                    "GenericBoneIndex");
+                if (property?.PropertyType == typeof(int))
+                    boneIndex = (int)property.GetValue(source)!;
+            }
+            else if (metaDataName.StartsWith(
+                "DOCK_EQPT_",
+                StringComparison.Ordinal))
+            {
+                var property = source.GetType().GetProperty(
+                    "SkeletonNameAlternatives");
+                if (property?.GetValue(source) is string[] names)
+                {
+                    foreach (var name in names.Where(name =>
+                        !string.IsNullOrWhiteSpace(name)))
+                    {
+                        boneIndex = skeleton.Skeleton.GetBoneIndexByName(name);
+                        if (boneIndex >= 0)
+                            break;
+                    }
+                }
+            }
+
+            return boneIndex >= 0 &&
+                boneIndex < skeleton.Skeleton.BoneCount;
+        }
+
+        private static bool IsBoneOnlyMetaData(
+            ParsedMetadataAttribute source)
+        {
+            var metaDataName = GetMetaDataName(source);
+            return metaDataName == "SPLICE" ||
+                metaDataName.StartsWith(
+                "DOCK_EQPT_",
+                StringComparison.Ordinal);
+        }
+
+        private static string GetMetaDataName(
+            ParsedMetadataAttribute source)
+        {
+            if (!string.IsNullOrWhiteSpace(source.Name))
+                return source.Name;
+
+            return source.GetType()
+                .GetCustomAttributes(typeof(MetaDataAttribute), false)
+                .OfType<MetaDataAttribute>()
+                .FirstOrDefault()?.Name ?? "";
+        }
+
+        private static void PopulateBoneOnlyMarkerNode(
+            SimpleDrawableNode node)
+        {
+            node.ClearItems();
+        }
+
+        private void PopulateSpatialMarkerNode(
+            SimpleDrawableNode node,
+            SpatialMetaDataBinding binding,
+            bool isSelected)
+        {
+            var baseColor = binding.Kind switch
+            {
+                SpatialMetaDataKind.Blood => Color.Crimson,
+                SpatialMetaDataKind.CameraShake => Color.Gold,
+                SpatialMetaDataKind.CrewLocation => s_crewLocationColor,
+                SpatialMetaDataKind.SoundTrigger => Color.LimeGreen,
+                SpatialMetaDataKind.SoundBuilding =>
+                    new Color(76, 175, 125),
+                SpatialMetaDataKind.Transform => Color.Orange,
+                _ => Color.Gray
+            };
+            var color = isSelected ? Color.White : baseColor;
+            var fill = PreviewShapeGeometry.WithPremultipliedAlpha(
+                baseColor,
+                48);
+            var edgeWidth = isSelected ? 1.6f : 0.65f;
+            const float scale = 0.3f;
+            var origin = Vector3.Zero;
+
+            node.ClearItems();
+            node.AddItem(new WorldTextRenderItem(
+                _resourceLibrary,
+                binding.Source.Name,
+                origin,
+                color));
+
+            if (binding.Kind is
+                SpatialMetaDataKind.SoundTrigger or
+                SpatialMetaDataKind.SoundBuilding or
+                SpatialMetaDataKind.CameraShake)
+            {
+                node.AddItem(PreviewShapeGeometry.CreateCircleMarker(
+                    origin,
+                    scale,
+                    fill,
+                    color,
+                    edgeWidth));
+                node.AddItem(LineHelper.AddCircle(
+                    origin,
+                    scale * 0.55f,
+                    color));
+            }
+            else if (binding.Kind == SpatialMetaDataKind.CrewLocation)
+            {
+                node.AddItem(PreviewShapeGeometry.CreateBoxMarker(
+                    origin,
+                    scale * 0.9f,
+                    fill,
+                    color,
+                    edgeWidth));
+                node.AddItem(LineHelper.AddLine(
+                    origin,
+                    Vector3.Forward * scale,
+                    color));
+            }
+            else if (binding.Kind == SpatialMetaDataKind.Blood)
+            {
+                node.AddItem(PreviewShapeGeometry.CreateCircleMarker(
+                    origin,
+                    scale * 0.45f,
+                    fill,
+                    color,
+                    edgeWidth));
+                node.AddItem(LineHelper.AddLine(
+                    origin,
+                    Vector3.Down * scale,
+                    color));
+            }
+            else
+            {
+                node.AddItem(PreviewShapeGeometry.CreateLocatorMarker(
+                    origin,
+                    scale,
+                    fill,
+                    color,
+                    edgeWidth));
+            }
+
+            if (binding.CanRotate)
+            {
+                node.AddItem(LineHelper.AddLine(
+                    origin,
+                    Vector3.UnitX * scale,
+                    Color.Red));
+                node.AddItem(LineHelper.AddLine(
+                    origin,
+                    Vector3.UnitY * scale,
+                    Color.Green));
+                node.AddItem(LineHelper.AddLine(
+                    origin,
+                    Vector3.UnitZ * scale,
+                    Color.Blue));
+            }
+        }
+
+        private void PopulateEffectNode(
+            SimpleDrawableNode node,
+            string effectName,
+            bool isSelected)
+        {
+            var locatorScale = 0.3f;
+            var textOffset = locatorScale * 1.5f + 0.01f;
+
+            var position = Vector3.Zero;
+            var localX = Vector3.UnitX;
+            var localY = Vector3.UnitY;
+            var localZ = Vector3.UnitZ;
+
+            node.ClearItems();
+            var edgeColor = isSelected ? Color.White : s_effectColor;
+            node.AddItem(PreviewShapeGeometry.CreateBoxMarker(
+                position,
+                locatorScale * 0.3f,
+                PreviewShapeGeometry.WithPremultipliedAlpha(
+                    s_effectColor,
+                    48),
+                edgeColor,
+                isSelected ? 1.6f : 0.65f));
+            node.AddItem(LineHelper.AddLine(position, position + localX * locatorScale, Color.Red));
+            node.AddItem(LineHelper.AddLine(position, position + localY * locatorScale, Color.Green));
+            node.AddItem(LineHelper.AddLine(position, position + localZ * locatorScale, Color.Blue));
+
+            node.AddItem(new WorldTextRenderItem(
+                _resourceLibrary,
+                effectName,
+                position,
+                edgeColor));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "X", position + localX * textOffset, Color.Red));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "Y", position + localY * textOffset, Color.Green));
+            node.AddItem(new WorldTextRenderItem(_resourceLibrary, "Z", position + localZ * textOffset, Color.Blue));
         }
     }
 }

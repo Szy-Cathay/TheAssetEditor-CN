@@ -1,12 +1,15 @@
 ﻿using System.Collections.ObjectModel;
 using System.Windows;
 using Shared.Core.Misc;
+using GameAnimationPlayer = GameWorld.Core.Animation.AnimationPlayer;
 
 namespace Editors.Shared.Core.Common.AnimationPlayer
 {
     public class AnimationPlayerViewModel : NotifyPropertyChangedImpl
     {
         readonly List<SceneObject> _assetList = new();
+        float _playbackPositionSeconds;
+        bool _isUpdatingPlaybackPosition;
 
         public NotifyAttr<float> SelectedAnimationCurrentTime { get; private set; } = new();
         public NotifyAttr<float> SelectedAnimationMaxTime { get; private set; } = new();
@@ -16,6 +19,16 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         public NotifyAttr<bool> IsEnabled { get; set; } = new();
         public NotifyAttr<bool> IsPlaying { get; private set; } = new();
         public NotifyAttr<bool> LoopAnimation { get; set; } = new(true);
+        public float PlaybackPositionSeconds
+        {
+            get => _playbackPositionSeconds;
+            set
+            {
+                SetAndNotifyWhenChanged(ref _playbackPositionSeconds, value);
+                if (!_isUpdatingPlaybackPosition)
+                    SeekPlayers(value);
+            }
+        }
 
         public NotifyAttr<Visibility> PlayerControlsVisibility { get; private set; } = new(Visibility.Collapsed);
 
@@ -36,6 +49,13 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
                 oldAnimation.Asset.Player.OnFrameChanged -= OnAnimationFrameChanged;
 
             SelectedAnimationFrameCount.Value = mainAnimation.MaxFrames.Value;
+            SelectedAnimationCurrentTime.Value =
+                (float)mainAnimation.Asset.Player.GetTimeUs() / 1_000_000;
+            SelectedAnimationMaxTime.Value =
+                (float)mainAnimation.Asset.Player.GetAnimationLengthUs() /
+                1_000_000;
+            SetPlaybackPositionFromPlayer(
+                SelectedAnimationCurrentTime.Value);
             mainAnimation.Asset.Player.OnFrameChanged += OnAnimationFrameChanged;
         }
 
@@ -67,7 +87,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             foreach (var item in _assetList)
             {
                 if (shouldPlay)
-                    Play(item);
+                    Resume(item);
                 else
                     Pause(item);
             }
@@ -108,6 +128,8 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             SelectedAnimationCurrentTime.Value = (float)SelectedMainAnimation.Asset.Player.GetTimeUs() / 1_000_000;
             SelectedAnimationMaxTime.Value = (float)SelectedMainAnimation.Asset.Player.GetAnimationLengthUs() / 1_000_000;
             SelectedAnimationFps.Value = SelectedMainAnimation.Asset.Player.GetFps();
+            SetPlaybackPositionFromPlayer(
+                SelectedAnimationCurrentTime.Value);
 
             if (SelectedAnimationCurrentFrame.Value + 1 == SelectedMainAnimation.Asset.Player.FrameCount())
             {
@@ -131,7 +153,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
                 if (SelectedMainAnimation != null)
                     SelectedAnimationFrameCount.Value = SelectedMainAnimation.MaxFrames.Value;
 
-                _assetList.ForEach(x => Play(x));
+                _assetList.ForEach(StartFromBeginning);
             }
             else
             {
@@ -145,19 +167,63 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         private void UpdatePlayingState() => IsPlaying.Value = _assetList.Any(
             item => item.Player.IsPlaying && item.Player.IsEnabled);
 
-        void Play(SceneObject asset)
+        void SeekPlayers(float timeSeconds)
+        {
+            var players = new HashSet<GameAnimationPlayer>(
+                ReferenceEqualityComparer.Instance);
+            foreach (var asset in _assetList)
+            {
+                players.Add(asset.Player);
+                foreach (var metaItem in asset.MetaDataItems)
+                {
+                    if (metaItem.Player != null)
+                        players.Add(metaItem.Player);
+                }
+            }
+
+            _isUpdatingPlaybackPosition = true;
+            try
+            {
+                foreach (var player in players)
+                    player.SeekToTimeSeconds(timeSeconds);
+            }
+            finally
+            {
+                _isUpdatingPlaybackPosition = false;
+            }
+        }
+
+        void SetPlaybackPositionFromPlayer(float timeSeconds)
+        {
+            _isUpdatingPlaybackPosition = true;
+            try
+            {
+                PlaybackPositionSeconds = timeSeconds;
+            }
+            finally
+            {
+                _isUpdatingPlaybackPosition = false;
+            }
+        }
+
+        void StartFromBeginning(SceneObject asset)
         {
             asset.Player.CurrentFrame = 0;
-            asset.Player.Play();
-
             foreach (var metaItem in asset.MetaDataItems)
             {
                 if (metaItem.Player != null)
-                {
                     metaItem.Player.CurrentFrame = 0;
-                    metaItem.Player.Play();
-                }
             }
+
+            Resume(asset);
+        }
+
+        void Resume(SceneObject asset)
+        {
+            asset.Player.Play();
+
+            foreach (var metaItem in asset.MetaDataItems)
+                metaItem.Player?.Play();
         }
 
         void Pause(SceneObject asset)

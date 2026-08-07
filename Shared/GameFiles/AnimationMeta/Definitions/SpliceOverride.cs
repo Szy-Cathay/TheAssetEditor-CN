@@ -11,7 +11,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
     [MetaData("SPLICE_OVERRIDE", 12)]
     public class SpliceOverride_v12 : Splice_v11
     {
-        [MetaDataTag(21)]
+        [MetaDataTag(21, ChoiceValues = new[] { "false", "true" })]
         public string UnknownBool { get; set; } = "false";
     }
 }

@@ -50,37 +50,27 @@
             Grid.Row="1"
             Margin="8,2,8,8"
             Visibility="{Binding AnimationControllerVisability.Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240" />
-                <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
             <Border
-                Grid.Column="0"
+                Grid.Row="0"
                 Padding="6"
                 Background="{DynamicResource AeBrush.Surface2}"
                 BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource AeRadius.Control}">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <StackPanel
-                        Grid.Row="0"
-                        HorizontalAlignment="Center"
-                        Orientation="Horizontal">
-                        <TextBlock Text="{loc:Loc SharedAnimPlayer.Frame}" />
-                        <TextBlock Text="{Binding CurrentFrame, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Text=" / " />
-                        <TextBlock Text="{Binding MaxFrames, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                    <StackPanel
-                        Grid.Row="1"
-                        Margin="0,4,0,0"
-                        HorizontalAlignment="Center"
+                        Grid.Column="0"
                         Orientation="Horizontal">
                         <Button
                             Command="{Binding FirstFrameCommand}"
@@ -142,11 +132,36 @@
                             </Canvas>
                         </Button>
                     </StackPanel>
+                    <TextBlock
+                        Grid.Column="1"
+                        Margin="12,0"
+                        VerticalAlignment="Center">
+                        <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
+                        <Run Text="{Binding CurrentFrame}" />
+                        <Run Text=" / " />
+                        <Run Text="{Binding MaxFrames}" />
+                    </TextBlock>
+                    <Slider
+                        Grid.Column="2"
+                        Maximum="{Binding MaxTimeSeconds, Mode=OneWay}"
+                        Style="{StaticResource AeEditor.PlaybackSlider}"
+                        Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock
+                        Grid.Column="3"
+                        Margin="12,0,4,0"
+                        VerticalAlignment="Center">
+                        <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
+                        <Run Text="{Binding PlaybackPositionSeconds, Mode=OneWay, StringFormat=N2}" />
+                        <Run Text=" / " />
+                        <Run Text="{Binding MaxTimeSeconds, Mode=OneWay, StringFormat=N2}" />
+                        <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
+                    </TextBlock>
                 </Grid>
             </Border>
 
             <Border
-                Grid.Column="2"
+                Grid.Row="1"
+                Margin="0,4,0,0"
                 Background="{DynamicResource AeBrush.Surface2}"
                 BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="1"

@@ -24,7 +24,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(3, "Name of the VFX's .xml file in the vfx folder. Leave off the file extension. Note that for this you don't need to add custom vfx to the particles db table and they still require a \"movie\"-type .pack for them to be loaded.")]
         public string VfxName { get; set; } = "";
 
-        [MetaDataTag(4, "True, false or empty.")]
+        [MetaDataTag(4, "True, false or empty.", ChoiceValues = new[] { "false", "true", "" })]
         public string BoolUnknown { get; set; } = "";
 
         [MetaDataTag(5)]
@@ -49,7 +49,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(4, "Name of the VFX's .xml file in the vfx folder. Leave off the file extension. Note that for this you don't need to add custom vfx to the particles db table and they still require a \"movie\"-type .pack for them to be loaded.")]
         public string VfxName { get; set; } = "";
 
-        [MetaDataTag(5, "True, false or empty.")]
+        [MetaDataTag(5, "True, false or empty.", ChoiceValues = new[] { "false", "true", "" })]
         public string BoolUnknown { get; set; } = "";
 
         [MetaDataTag(6)]
@@ -125,7 +125,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(5, "Name of the VFX's .xml file in the vfx folder. Leave off the file extension. Note that for this you don't need to add custom vfx to the particles db table and they still require a \"movie\"-type .pack for them to be loaded.")]
         public string VfxName { get; set; } = "";
 
-        [MetaDataTag(6, "normal(0), ability_aura(1), ability_weapon(2)")]
+        [MetaDataTag(6, "normal(0), ability_aura(1), ability_weapon(2)", ChoiceValues = new[] { "0", "1", "2" })]
         public int EffectType { get; set; }
 
         [MetaDataTag(7)]
@@ -161,7 +161,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(5, "Name of the VFX's .xml file in the vfx folder. Leave off the file extension. Note that for this you don't need to add custom vfx to the particles db table and they still require a \"movie\"-type .pack for them to be loaded.")]
         public string VfxName { get; set; } = "";
 
-        [MetaDataTag(6, "normal(0), ability_aura(1), ability_weapon(2)")]
+        [MetaDataTag(6, "normal(0), ability_aura(1), ability_weapon(2)", ChoiceValues = new[] { "0", "1", "2" })]
         public int EffectType { get; set; }
 
         [MetaDataTag(7)]

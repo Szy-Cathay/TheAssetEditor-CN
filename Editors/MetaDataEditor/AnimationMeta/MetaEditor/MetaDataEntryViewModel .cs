@@ -44,10 +44,41 @@ namespace Editors.AnimationMeta.Presentation
                 var value = prop.GetValue(typedMetaItem);
 
                 var fieldName = GetLocalizedPropertyName(prop.Name);
-                var itemDescription = GetLocalizedPropertyDescription(prop.Name, attributeInfo.Description, prop.PropertyType.Name);
+                var itemDescription = GetLocalizedPropertyDescription(
+                    prop.Name);
 
                 AttributeViewModel? editableItem = null;
-                if (attributeInfo.DisplayOverride == MetaDataTagAttribute.DisplayType.EulerVector || value is Vector3)
+                if (value is bool boolean)
+                {
+                    editableItem = new BooleanAttributeViewModel(
+                        fieldName,
+                        itemDescription,
+                        parser,
+                        boolean,
+                        typedMetaItem,
+                        prop,
+                        eventHub);
+                }
+                else if (attributeInfo.ChoiceValues.Length != 0)
+                {
+                    var choices = attributeInfo.ChoiceValues.Select(choice =>
+                        new AttributeChoiceValue(
+                            choice,
+                            GetLocalizedChoiceName(prop.Name, choice)));
+                    editableItem = new ChoiceAttributeViewModel(
+                        fieldName,
+                        itemDescription,
+                        parser,
+                        value,
+                        typedMetaItem,
+                        prop,
+                        eventHub,
+                        choices,
+                        GetLocalizedText(
+                            "MetaData.Option.LegacyValue",
+                            "{0}"));
+                }
+                else if (attributeInfo.DisplayOverride == MetaDataTagAttribute.DisplayType.EulerVector || value is Vector3)
                 {
                     if (value is Vector3 vector3)
                         editableItem = new VectorAttributeViewModel(fieldName, itemDescription, parser as Vector3Parser, vector3, typedMetaItem, prop, eventHub);
@@ -106,10 +137,47 @@ namespace Editors.AnimationMeta.Presentation
             }
             catch { }
 
-            return FormatFieldName(propertyName);
+            var formattedName = FormatFieldName(propertyName);
+            return IsUnconfirmedPropertyName(propertyName)
+                ? $"未确认字段（{formattedName}）"
+                : formattedName;
         }
 
-        static string GetLocalizedPropertyDescription(string propertyName, string attributeDescription, string typeName)
+        static string GetLocalizedChoiceName(string propertyName, string value)
+        {
+            var token = string.IsNullOrEmpty(value) ? "Empty" : value;
+            var specificKey = $"MetaData.Option.{propertyName}.{token}";
+            var specific = GetLocalizedText(specificKey, specificKey);
+            if (specific != specificKey)
+                return specific;
+
+            var commonKey = $"MetaData.Option.Common.{token}";
+            var common = GetLocalizedText(commonKey, commonKey);
+            return common != commonKey ? common : value;
+        }
+
+        static string GetLocalizedText(string key, string fallback)
+        {
+            try
+            {
+                if (LocalizationManager.Instance != null)
+                {
+                    var localized = LocalizationManager.Instance.Get(key);
+                    if (localized != key)
+                        return localized;
+                }
+            }
+            catch { }
+
+            return fallback;
+        }
+
+        static bool IsUnconfirmedPropertyName(string propertyName) =>
+            propertyName.Contains("Unknown", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.StartsWith("Unk", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.StartsWith("Probably", StringComparison.OrdinalIgnoreCase);
+
+        static string GetLocalizedPropertyDescription(string propertyName)
         {
             try
             {
@@ -118,15 +186,14 @@ namespace Editors.AnimationMeta.Presentation
                     var key = $"MetaData.PropTip.{propertyName}";
                     var localized = LocalizationManager.Instance.Get(key);
                     if (localized != key)
-                        return localized + "\n" + $"Value type is {typeName}";
+                        return localized;
                 }
             }
             catch { }
 
-            var itemDescription = $"Value type is {typeName}";
-            if (string.IsNullOrWhiteSpace(attributeDescription) == false)
-                itemDescription = attributeDescription + "\n" + itemDescription;
-            return itemDescription;
+            return GetLocalizedText(
+                "MetaData.PropTip.UnknownMeaning",
+                "含义未确认");
         }
     }
 }

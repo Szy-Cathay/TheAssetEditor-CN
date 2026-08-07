@@ -6,6 +6,8 @@ using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
+using GameWorld.Core.Rendering.Materials.Capabilities;
+using GameWorld.Core.Rendering.Materials.Shaders;
 using GameWorld.Core.Rendering.RenderItems;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
@@ -28,6 +30,303 @@ namespace GameWorld.Core.Test.Rendering;
 [NonParallelizable]
 public class RenderEngineSelectionMaskOffscreenTests
 {
+    [TestCase(false, ViewportShadingMode.Wireframe)]
+    [TestCase(true, ViewportShadingMode.Wireframe)]
+    [TestCase(false, ViewportShadingMode.MaterialPreview)]
+    [TestCase(true, ViewportShadingMode.MaterialPreview)]
+    [TestCase(false, ViewportShadingMode.Solid)]
+    public void VertexMode_DoesNotUseWholeObjectOutline(
+        bool animated,
+        ViewportShadingMode shadingMode)
+    {
+        const int size = 64;
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>());
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        var eventHub = new Mock<IEventHub>();
+        using var scopedResources = new ScopedResourceLibrary(
+            resources,
+            eventHub.Object,
+            Mock.Of<IStandardDialogs>());
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            eventHub.Object,
+            new GridComponent(
+                camera,
+                resources,
+                deviceResolver.Object)
+            {
+                ShowGrid = false
+            })
+        {
+            ShadingMode = shadingMode
+        };
+        renderEngine.Initialize();
+        var selectionManager = new SelectionManager(
+            eventHub.Object,
+            renderEngine,
+            scopedResources,
+            deviceResolver.Object);
+        selectionManager.Initialize();
+        var mesh = CreateMesh(device, animated);
+        var rmvMaterial = new Mock<IRmvMaterial>();
+        rmvMaterial.SetupGet(value => value.ModelName)
+            .Returns("test");
+        rmvMaterial.SetupGet(value => value.PivotPoint)
+            .Returns(Vector3.Zero);
+        var node = new Rmv2MeshNode(
+            mesh,
+            rmvMaterial.Object,
+            new SelectionOutlineCapabilityMaterial(
+                scopedResources),
+            animated
+                ? CreateAnimationPlayer()
+                : new AnimationPlayer { IsEnabled = false });
+        using var sceneTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24,
+            4,
+            RenderTargetUsage.DiscardContents);
+        using var maskTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.None,
+            4,
+            RenderTargetUsage.DiscardContents);
+        var requestField = typeof(RenderEngineComponent).GetField(
+            "_selectionOutlineRequested",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(requestField, Is.Not.Null);
+        using var outlineFilter = new OutlineFilter();
+        outlineFilter.Load(
+            device,
+            resources,
+            new QuadRenderer(device));
+        var objectSelection =
+            selectionManager.GetState<ObjectSelectionState>();
+        objectSelection.ModifySelectionSingleObject(
+            node,
+            onlyRemove: false);
+        node.Render(renderEngine, Matrix.Identity);
+        selectionManager.Draw(new GameTime());
+        var objectRequestField = typeof(RenderEngineComponent).GetField(
+            "_selectionOutlineRequested",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(
+            objectRequestField?.GetValue(renderEngine),
+            Is.True,
+            "Object mode must retain its normal whole-object outline.");
+        device.SetRenderTargets(
+            new RenderTargetBinding(sceneTarget),
+            new RenderTargetBinding(maskTarget));
+        device.Clear(
+            ClearOptions.Target | ClearOptions.DepthBuffer,
+            Color.Transparent,
+            1,
+            0);
+        device.BlendState = BlendState.Opaque;
+        device.DepthStencilState = DepthStencilState.Default;
+        InvokeRender3DObjects(renderEngine);
+        device.SetRenderTarget(null);
+        outlineFilter.Draw(maskTarget, size, size);
+        var objectOutlinePixels = new Color[size * size];
+        outlineFilter.GetOutlineTarget().GetData(
+            objectOutlinePixels);
+        Assert.That(
+            objectOutlinePixels.Count(pixel => pixel.A > 0),
+            Is.GreaterThan(0),
+            "Object mode must retain its visible GPU outline.");
+        renderEngine.Update(new GameTime());
+        var enterVertexMode =
+            new GameWorld.Core.Commands.Object
+                .ObjectSelectionModeCommand(selectionManager);
+        enterVertexMode.Configure(
+            node,
+            GeometrySelectionMode.Vertex);
+        enterVertexMode.Execute();
+        var selectionOutlineField = typeof(Rmv2MeshNode).GetField(
+            "_selectionOutlineEnabled",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var previewOutlineField = typeof(Rmv2MeshNode).GetField(
+            "_previewOutlineEnabled",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.Multiple(() =>
+        {
+            AssertEditSelectionIsEmpty(
+                selectionManager.GetState(),
+                GeometrySelectionMode.Vertex);
+            Assert.That(selectionOutlineField?.GetValue(node), Is.False);
+            Assert.That(previewOutlineField?.GetValue(node), Is.False);
+        });
+        for (var frame = 0; frame < 2; frame++)
+        {
+            node.Render(renderEngine, Matrix.Identity);
+            selectionManager.Draw(new GameTime());
+            device.SetRenderTargets(
+                new RenderTargetBinding(sceneTarget),
+                new RenderTargetBinding(maskTarget));
+            device.Clear(
+                ClearOptions.Target | ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1,
+                0);
+            device.BlendState = BlendState.Opaque;
+            device.DepthStencilState = DepthStencilState.Default;
+            InvokeRender3DObjects(renderEngine);
+            device.SetRenderTarget(null);
+
+            var scenePixels = new Color[size * size];
+            sceneTarget.GetData(scenePixels);
+            var outlineRequested =
+                (bool)requestField!.GetValue(renderEngine)!;
+            var outlinePixels = new Color[size * size];
+            if (outlineRequested)
+            {
+                outlineFilter.Draw(maskTarget, size, size);
+                outlineFilter.GetOutlineTarget().GetData(
+                    outlinePixels);
+            }
+
+            var internalOutlinePixels = 0;
+            for (var y = 27; y <= 36; y++)
+            {
+                for (var x = 20; x <= 43; x++)
+                {
+                    if (outlinePixels[y * size + x].A > 0)
+                        internalOutlinePixels++;
+                }
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    scenePixels.Count(IsOrange),
+                    Is.EqualTo(0),
+                    $"Frame {frame}: empty edit selection must not directly colour topology orange.");
+                Assert.That(
+                    outlinePixels.Count(pixel => pixel.A > 0),
+                    Is.EqualTo(0),
+                    $"Frame {frame}: vertex mode must not use a whole-object outline in {shadingMode}.");
+                Assert.That(
+                    internalOutlinePixels,
+                    Is.EqualTo(0),
+                    $"Frame {frame}: empty edit selection must not turn internal wireframe topology into an orange selection outline.");
+                Assert.That(
+                    previewOutlineField?.GetValue(node),
+                    Is.False);
+            });
+
+            if (frame == 0)
+                renderEngine.Update(new GameTime());
+        }
+
+        selectionManager.Dispose();
+        mesh.Dispose();
+    }
+
+    [Test]
+    public void PreviewOutline_RemainsEnabledWithoutObjectSelection()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>());
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            Mock.Of<IEventHub>(),
+            new GridComponent(
+                camera,
+                resources,
+                deviceResolver.Object));
+        renderEngine.Initialize();
+        var mesh = CreateMesh(device, animated: false);
+        var material = new Mock<IRmvMaterial>();
+        material.SetupGet(value => value.ModelName).Returns("preview");
+        material.SetupGet(value => value.PivotPoint).Returns(Vector3.Zero);
+        var node = new Rmv2MeshNode(
+            mesh,
+            material.Object,
+            new PreviewOutlineCapabilityMaterial(),
+            new AnimationPlayer { IsEnabled = false });
+
+        node.SetPreviewOutline(true);
+        node.SetSelectionOutline(false);
+        node.Render(renderEngine, Matrix.Identity);
+
+        var renderItem = GetRenderItems(
+                renderEngine,
+                RenderBuckedId.Normal)
+            .Single(item => item is GeometryRenderItem);
+        var maskField = typeof(GeometryRenderItem).GetField(
+            "_selectionMaskEnabled",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var requestField = typeof(RenderEngineComponent).GetField(
+            "_selectionOutlineRequested",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(maskField?.GetValue(renderItem), Is.True);
+            Assert.That(requestField?.GetValue(renderEngine), Is.True);
+        });
+
+        renderEngine.Update(new GameTime());
+        node.Render(renderEngine, Matrix.Identity);
+        Assert.That(
+            requestField?.GetValue(renderEngine),
+            Is.True,
+            "Preview outline must request the outline pass again after each render update.");
+
+        node.SetSelectionOutline(true);
+        node.SetPreviewOutline(false);
+        Assert.That(
+            maskField?.GetValue(renderItem),
+            Is.True,
+            "Turning off the preview outline must not clear Kitbash selection.");
+        node.SetSelectionOutline(false);
+        Assert.That(maskField?.GetValue(renderItem), Is.False);
+
+        mesh.Dispose();
+    }
+
     [Test]
     public void Render3DObjects_ActiveEditElementsUseThirdVisualLayer()
     {
@@ -147,6 +446,136 @@ public class RenderEngineSelectionMaskOffscreenTests
                 RenderBuckedId.Selection),
             Has.Exactly(2)
                 .TypeOf<AnimatedSelectionRenderItem>());
+
+        selectionManager.Dispose();
+        mesh.Dispose();
+    }
+
+    [TestCase(GeometrySelectionMode.Vertex)]
+    [TestCase(GeometrySelectionMode.Edge)]
+    [TestCase(GeometrySelectionMode.Face)]
+    public void Wireframe_NonEmptyEditSelectionKeepsSelectedOverlay(
+        GeometrySelectionMode mode)
+    {
+        const int size = 64;
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>());
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        var eventHub = new Mock<IEventHub>();
+        using var scopedResources = new ScopedResourceLibrary(
+            resources,
+            eventHub.Object,
+            Mock.Of<IStandardDialogs>());
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            eventHub.Object,
+            new GridComponent(
+                camera,
+                resources,
+                deviceResolver.Object)
+            {
+                ShowGrid = false
+            })
+        {
+            ShadingMode = ViewportShadingMode.Wireframe
+        };
+        renderEngine.Initialize();
+        var selectionManager = new SelectionManager(
+            eventHub.Object,
+            renderEngine,
+            scopedResources,
+            deviceResolver.Object);
+        selectionManager.Initialize();
+        var mesh = CreateMesh(device, animated: false);
+        var node = new Rmv2MeshNode(
+            mesh,
+            Mock.Of<IRmvMaterial>(),
+            null!,
+            new AnimationPlayer { IsEnabled = false });
+        ISelectionState selectionState;
+        switch (mode)
+        {
+            case GeometrySelectionMode.Vertex:
+                var vertexSelection = new VertexSelectionState(
+                    node,
+                    0);
+                vertexSelection.ModifySelection(
+                    [0],
+                    onlyRemove: false);
+                vertexSelection.ActiveVertex = null;
+                selectionState = vertexSelection;
+                break;
+            case GeometrySelectionMode.Edge:
+                var edgeSelection = new EdgeSelectionState
+                {
+                    RenderObject = node
+                };
+                edgeSelection.ModifySelection(
+                    [(0, 1)],
+                    onlyRemove: false);
+                edgeSelection.ActiveEdge = null;
+                selectionState = edgeSelection;
+                break;
+            case GeometrySelectionMode.Face:
+                var faceSelection = new FaceSelectionState
+                {
+                    RenderObject = node
+                };
+                faceSelection.ModifySelection(
+                    [0],
+                    onlyRemove: false);
+                faceSelection.ActiveFace = null;
+                selectionState = faceSelection;
+                break;
+            default:
+                Assert.Fail($"Unexpected edit mode: {mode}");
+                return;
+        }
+
+        selectionManager.SetState(selectionState);
+        selectionManager.Update(new GameTime());
+        renderEngine.Update(new GameTime());
+        selectionManager.Draw(new GameTime());
+        using var renderTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        device.SetRenderTarget(renderTarget);
+        device.Clear(
+            ClearOptions.Target | ClearOptions.DepthBuffer,
+            Color.Transparent,
+            1,
+            0);
+        device.BlendState = BlendState.Opaque;
+        device.DepthStencilState = DepthStencilState.Default;
+        InvokeRender3DObjects(renderEngine);
+        device.SetRenderTarget(null);
+
+        var pixels = new Color[size * size];
+        renderTarget.GetData(pixels);
+        Assert.That(
+            pixels.Count(IsSelectedOrange),
+            Is.GreaterThan(0),
+            $"Wireframe {mode} mode must keep the real selected-element overlay visible.");
 
         selectionManager.Dispose();
         mesh.Dispose();
@@ -308,7 +737,7 @@ public class RenderEngineSelectionMaskOffscreenTests
     }
 
     [Test]
-    public void Render3DObjects_ForegroundLineDoesNotCutSelectionMask()
+    public void Render3DObjects_ForegroundOverlaysDoNotCutSelectionMask()
     {
         const int size = 64;
         var game = new WpfGameMock();
@@ -350,6 +779,29 @@ public class RenderEngineSelectionMaskOffscreenTests
             new VertexPositionColor(
                 new Vector3(0.8f, 0, 0.25f),
                 Color.Black)
+        ]);
+        renderEngine.AddTranslucentPreviewTriangles(
+        [
+            new VertexPositionColor(
+                new Vector3(-0.7f, -0.3f, 0.2f),
+                new Color(64, 32, 16, 64)),
+            new VertexPositionColor(
+                new Vector3(0.7f, -0.3f, 0.2f),
+                new Color(64, 32, 16, 64)),
+            new VertexPositionColor(
+                new Vector3(0, 0.3f, 0.2f),
+                new Color(64, 32, 16, 64))
+        ]);
+        renderEngine.AddPreviewEdges(
+        [
+            new EdgeData
+            {
+                P0 = new Vector3(-0.8f, 0, 0.15f),
+                P1 = new Vector3(0.8f, 0, 0.15f),
+                C0 = Vector3.One,
+                C1 = Vector3.One,
+                Width = 2
+            }
         ]);
         renderEngine.AddRenderItem(
             RenderBuckedId.Normal,
@@ -424,6 +876,33 @@ public class RenderEngineSelectionMaskOffscreenTests
                 []),
             RenderingTechnique.Normal
         ]);
+    }
+
+    private static void AssertEditSelectionIsEmpty(
+        ISelectionState state,
+        GeometrySelectionMode mode)
+    {
+        Assert.That(state.Mode, Is.EqualTo(mode));
+        switch (state)
+        {
+            case VertexSelectionState vertex:
+                Assert.That(vertex.SelectedVertices, Is.Empty);
+                Assert.That(vertex.VertexWeights, Has.All.Zero);
+                Assert.That(vertex.ActiveVertex, Is.Null);
+                break;
+            case EdgeSelectionState edge:
+                Assert.That(edge.SelectedEdges, Is.Empty);
+                Assert.That(edge.ActiveEdge, Is.Null);
+                break;
+            case FaceSelectionState face:
+                Assert.That(face.SelectedFaces, Is.Empty);
+                Assert.That(face.ActiveFace, Is.Null);
+                break;
+            default:
+                Assert.Fail(
+                    $"Unexpected edit selection state: {state.GetType().Name}");
+                break;
+        }
     }
 
     private static IReadOnlyList<IRenderItem> GetRenderItems(
@@ -528,6 +1007,49 @@ public class RenderEngineSelectionMaskOffscreenTests
                 BlendIndices = Vector4.Zero
             };
         }
+    }
+
+    private sealed class PreviewOutlineCapabilityMaterial :
+        CapabilityMaterial
+    {
+        public PreviewOutlineCapabilityMaterial()
+            : base(
+                CapabilityMaterialsEnum.SpecGlossPbr_Default,
+                ShaderTypes.Pbr_SpecGloss,
+                null!)
+        {
+        }
+
+        protected override CapabilityMaterial CreateCloneInstance() =>
+            new PreviewOutlineCapabilityMaterial();
+    }
+
+    private sealed class SelectionOutlineCapabilityMaterial :
+        CapabilityMaterial
+    {
+        public SelectionOutlineCapabilityMaterial(
+            IScopedResourceLibrary resourceLibrary)
+            : base(
+                CapabilityMaterialsEnum.SpecGlossPbr_Default,
+                ShaderTypes.Pbr_SpecGloss,
+                resourceLibrary)
+        {
+            Capabilities =
+            [
+                new CommonShaderParametersCapability(),
+                new SpecGlossCapability(),
+                new AnimationCapability(),
+                new TintCapability()
+            ];
+            _renderingTechniqueMap[RenderingTechnique.Normal] =
+                "BasicColorDrawing";
+            _renderingTechniqueMap[RenderingTechnique.Solid] =
+                "SolidDrawing";
+        }
+
+        protected override CapabilityMaterial CreateCloneInstance() =>
+            new SelectionOutlineCapabilityMaterial(
+                _resourceLibrary);
     }
 
     private sealed class SolidMeshRenderItem :
@@ -674,6 +1196,13 @@ public class RenderEngineSelectionMaskOffscreenTests
                pixel.G is > 70 and < 190 &&
                pixel.B < 40 &&
                pixel.A > 0;
+    }
+
+    private static bool IsSelectedOrange(Color pixel)
+    {
+        return pixel.A > 0 &&
+               pixel.R > pixel.G * 1.5f &&
+               pixel.G > pixel.B + 5;
     }
 
     private static double GetAverageOrangeRow(

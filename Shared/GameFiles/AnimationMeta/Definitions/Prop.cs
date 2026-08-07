@@ -30,14 +30,14 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
     [MetaData("PROP", 3)]
     public class Prop_v3 : Prop_v2
     {
-        [MetaDataTag(9, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(9, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public int AttachMethod { get; set; }
     }
 
     [MetaData("PROP", 4)]
     public class Prop_v4 : Prop_v3
     {
-        [MetaDataTag(10, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(10, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public int OverrideProp { get; set; }
     }
 
@@ -62,10 +62,10 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(10)]
         public int BoneId { get; set; }
 
-        [MetaDataTag(11, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(11, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public int AttachMethod { get; set; }
 
-        [MetaDataTag(12, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(12, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public int OverrideProp { get; set; }
     }
 
@@ -96,10 +96,10 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(11)]
         public new int BoneId { get; set; }
 
-        [MetaDataTag(12, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(12, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public new int AttachMethod { get; set; }
 
-        [MetaDataTag(13, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(13, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public new int OverrideProp { get; set; }
 
         [MetaDataTag(14)]
@@ -120,10 +120,10 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(12)]
         public new int BoneId { get; set; }
 
-        [MetaDataTag(13, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(13, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public new int AttachMethod { get; set; }
 
-        [MetaDataTag(14, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(14, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public new int OverrideProp { get; set; }
 
         [MetaDataTag(15)]
@@ -165,10 +165,10 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(13)]
         public int BoneId { get; set; }
 
-        [MetaDataTag(14, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(14, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public int AttachMethod { get; set; }
 
-        [MetaDataTag(15, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(15, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public int OverrideProp { get; set; }
 
         [MetaDataTag(16)]
@@ -213,10 +213,10 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(14)]
         public int BoneId { get; set; }
 
-        [MetaDataTag(15, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(15, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public int AttachMethod { get; set; }
 
-        [MetaDataTag(16, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(16, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public int OverrideProp { get; set; }
 
         [MetaDataTag(17)]
@@ -254,10 +254,10 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         [MetaDataTag(10)]
         public int BoneId { get; set; }
 
-        [MetaDataTag(11, "bind_pose (1), animation (2), zeroed (3), skinned (4)")]
+        [MetaDataTag(11, "bind_pose (1), animation (2), zeroed (3), skinned (4)", ChoiceValues = new[] { "1", "2", "3", "4" })]
         public int AttachMethod { get; set; }
 
-        [MetaDataTag(12, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)")]
+        [MetaDataTag(12, "projectile (1) ,weapon_1 (2) ,weapon_2 (3) ,weapon_3 (4) ,weapon_4 (5) ,weapon_5 (6),weapon_6 (7)", ChoiceValues = new[] { "0", "1", "2", "3", "4", "5", "6", "7" })]
         public int OverrideProp { get; set; }
 
         [MetaDataTag(13)]

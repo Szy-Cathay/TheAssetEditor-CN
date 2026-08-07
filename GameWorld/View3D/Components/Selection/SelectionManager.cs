@@ -164,9 +164,18 @@ namespace GameWorld.Core.Components.Selection
             _eventHub.Publish(new SelectionChangedEvent { NewState = state });
         }
 
+        public override void Update(GameTime gameTime)
+        {
+            if (_currentState != null)
+                ClearVertexModeOutline(_currentState);
+
+            base.Update(gameTime);
+        }
+
         public override void Draw(GameTime gameTime)
         {
             var selectionState = GetState();
+            ClearVertexModeOutline(selectionState);
 
             if (selectionState is ObjectSelectionState objectSelectionState)
             {
@@ -185,7 +194,6 @@ namespace GameWorld.Core.Components.Selection
                     _renderEngine.RequestSelectionOutline();
             }
             else if (selectionState.Mode is
-                         GeometrySelectionMode.Vertex or
                          GeometrySelectionMode.Edge or
                          GeometrySelectionMode.Face &&
                      selectionState.GetSingleSelectedObject() is
@@ -738,6 +746,21 @@ namespace GameWorld.Core.Components.Selection
             foreach (var mesh in _outlinedMeshes)
                 mesh.SetSelectionOutline(false);
             _outlinedMeshes.Clear();
+        }
+
+        private void ClearVertexModeOutline(
+            ISelectionState selectionState)
+        {
+            if (selectionState.Mode !=
+                    GeometrySelectionMode.Vertex ||
+                selectionState.GetSingleSelectedObject() is not
+                    Rmv2MeshNode editMesh)
+            {
+                return;
+            }
+
+            editMesh.SetSelectionOutline(false);
+            _outlinedMeshes.Remove(editMesh);
         }
 
         internal static bool ShouldRenderDenseEditOverlay(
