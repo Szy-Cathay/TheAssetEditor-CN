@@ -18,8 +18,9 @@ namespace AssetEditor.UiCommands
 
         public void Execute()
         {
+            var owner = Application.Current.MainWindow;
             var window = _serviceProvider.GetRequiredService<SettingsWindow>();
-            window.Owner = Application.Current.MainWindow;
+            window.Owner = owner;
             window.DataContext = _serviceProvider.GetRequiredService<SettingsViewModel>();
             window.ShowDialog();
         }
