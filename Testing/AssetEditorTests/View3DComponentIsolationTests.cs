@@ -62,9 +62,6 @@ public class View3DComponentIsolationTests
             game.AddedComponents);
         Assert.IsFalse(
             game.AddedComponents.Any(
-                component => component is SelectionManager));
-        Assert.IsFalse(
-            game.AddedComponents.Any(
                 component => component is KitbashSelectionInputComponent));
         Assert.IsFalse(
             game.AddedComponents.Any(
@@ -87,6 +84,15 @@ public class View3DComponentIsolationTests
                 scope.ServiceProvider
                     .GetServices<IGameComponent>()
                     .Count());
+            Assert.IsNull(
+                scope.ServiceProvider
+                    .GetService<KitbashSelectionInputComponent>());
+            Assert.IsNull(
+                scope.ServiceProvider
+                    .GetService<KitbashSelectionOverlayComponent>());
+            Assert.IsNull(
+                scope.ServiceProvider
+                    .GetService<KitbashModelGizmoComponent>());
         }
         finally
         {

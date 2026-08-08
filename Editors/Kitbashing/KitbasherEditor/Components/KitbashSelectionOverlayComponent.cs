@@ -80,6 +80,7 @@ namespace Editors.KitbasherEditor.Components
         private int _sampleIndex0;
         private int _sampleIndex1 = 1;
         private EdgeData[] _edgeDataCache = [];
+        private readonly HashSet<int> _cachedPriorityVertices = [];
         private bool _edgeDataDirty = true;
         private bool _selectedEdgeDataDirty = true;
         private bool _activeEdgeDataDirty = true;
@@ -262,6 +263,9 @@ namespace Editors.KitbasherEditor.Components
             VertexSelectionState vertexSelection)
         {
             var geometry = meshNode.Geometry;
+            var vertexCount = geometry.VertexCount();
+            vertexSelection.SelectedVertices.RemoveAll(
+                index => index < 0 || index >= vertexCount);
             var topologyChanged =
                 _cachedEdgeMesh != meshNode ||
                 _cachedEdgeGeometry != geometry ||
@@ -272,8 +276,11 @@ namespace Editors.KitbasherEditor.Components
                     geometry.IndexArray.Length ||
                 _cachedEdgeTopologyVersion !=
                     geometry.TopologyVersion;
+            var selectedVerticesChanged =
+                !_cachedPriorityVertices.SetEquals(
+                    vertexSelection.SelectedVertices);
 
-            if (topologyChanged)
+            if (topologyChanged || selectedVerticesChanged)
             {
                 _cachedEdgeMesh = meshNode;
                 _cachedEdgeGeometry = geometry;
@@ -284,13 +291,14 @@ namespace Editors.KitbasherEditor.Components
                     geometry.TopologyVersion;
                 _cachedEdgeIndices = BuildEdges(
                     geometry.IndexArray,
-                    MaxRenderEdges);
+                    MaxRenderEdges,
+                    vertexSelection.SelectedVertices);
                 _edgeDataCache =
                     new EdgeData[_cachedEdgeIndices.Length];
+                _cachedPriorityVertices.Clear();
+                _cachedPriorityVertices.UnionWith(
+                    vertexSelection.SelectedVertices);
 
-                var vertexCount = geometry.VertexCount();
-                vertexSelection.SelectedVertices.RemoveAll(
-                    index => index < 0 || index >= vertexCount);
                 if (vertexSelection.VertexWeights.Count !=
                     vertexCount)
                 {
@@ -650,6 +658,7 @@ namespace Editors.KitbasherEditor.Components
             _cachedEdgeTopologyVersion = -1;
             _cachedEdgeIndices = [];
             _edgeDataCache = [];
+            _cachedPriorityVertices.Clear();
             _edgeDataDirty = true;
 
             if (_edgeQuadRenderItem != null)
@@ -659,50 +668,101 @@ namespace Editors.KitbasherEditor.Components
             }
         }
 
-        private static (int v0, int v1)[] BuildEdges(
+        internal static (int v0, int v1)[] BuildEdges(
             ReadOnlySpan<ushort> indices,
-            int maxEdges)
+            int maxEdges,
+            IReadOnlyCollection<int>? priorityVertices = null)
         {
             var processedEdges =
                 new HashSet<(int v0, int v1)>();
             var edges = new List<(int v0, int v1)>(
                 Math.Min(maxEdges, indices.Length));
+
+            if (priorityVertices is { Count: > 0 })
+            {
+                var prioritySet = priorityVertices as ISet<int> ??
+                    new HashSet<int>(priorityVertices);
+                for (var index = 0;
+                     index + 2 < indices.Length;
+                     index += 3)
+                {
+                    AddPriorityEdge(
+                        indices[index],
+                        indices[index + 1],
+                        prioritySet,
+                        processedEdges,
+                        edges);
+                    AddPriorityEdge(
+                        indices[index + 1],
+                        indices[index + 2],
+                        prioritySet,
+                        processedEdges,
+                        edges);
+                    AddPriorityEdge(
+                        indices[index],
+                        indices[index + 2],
+                        prioritySet,
+                        processedEdges,
+                        edges);
+                }
+            }
+
+            if (edges.Count >= maxEdges)
+                return edges.ToArray();
+
             for (var index = 0;
                  index + 2 < indices.Length;
                  index += 3)
             {
-                if (AddEdge(
-                        indices[index],
-                        indices[index + 1],
-                        processedEdges,
-                        edges,
-                        maxEdges) ||
-                    AddEdge(
-                        indices[index + 1],
-                        indices[index + 2],
-                        processedEdges,
-                        edges,
-                        maxEdges) ||
-                    AddEdge(
-                        indices[index],
-                        indices[index + 2],
-                        processedEdges,
-                        edges,
-                        maxEdges))
-                {
+                AddEdge(
+                    indices[index],
+                    indices[index + 1],
+                    processedEdges,
+                    edges);
+                if (edges.Count >= maxEdges)
                     break;
-                }
+
+                AddEdge(
+                    indices[index + 1],
+                    indices[index + 2],
+                    processedEdges,
+                    edges);
+                if (edges.Count >= maxEdges)
+                    break;
+
+                AddEdge(
+                    indices[index],
+                    indices[index + 2],
+                    processedEdges,
+                    edges);
+                if (edges.Count >= maxEdges)
+                    break;
             }
 
             return edges.ToArray();
+        }
+
+        private static void AddPriorityEdge(
+            int first,
+            int second,
+            ISet<int> priorityVertices,
+            HashSet<(int v0, int v1)> processedEdges,
+            List<(int v0, int v1)> edges)
+        {
+            if (!priorityVertices.Contains(first) &&
+                !priorityVertices.Contains(second))
+            {
+                return;
+            }
+
+            AddEdge(first, second, processedEdges, edges);
         }
 
         private static bool AddEdge(
             int first,
             int second,
             HashSet<(int v0, int v1)> processedEdges,
-            List<(int v0, int v1)> edges,
-            int maxEdges)
+            List<(int v0, int v1)> edges)
         {
             if (first == second)
                 return false;
@@ -710,9 +770,11 @@ namespace Editors.KitbasherEditor.Components
             var edge = first < second
                 ? (first, second)
                 : (second, first);
-            if (processedEdges.Add(edge))
-                edges.Add(edge);
-            return edges.Count == maxEdges;
+            if (!processedEdges.Add(edge))
+                return false;
+
+            edges.Add(edge);
+            return true;
         }
 
         private static void FillEdgeData(

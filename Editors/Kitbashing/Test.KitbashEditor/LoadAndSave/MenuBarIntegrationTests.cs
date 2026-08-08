@@ -63,7 +63,8 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
             _runner.GetRequiredServiceInCurrentEditorScope<IUiCommandFactory>();
         var gizmoComponent =
             _runner.GetRequiredServiceInCurrentEditorScope<
-                KitbashModelGizmoComponent>();
+                KitbashSceneComponentSet>()
+            .ModelGizmo;
         var initialScale = gizmoComponent.Gizmo.ScaleModifier;
 
         commandFactory.Create<ScaleGizmoUpCommand>().Execute();

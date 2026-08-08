@@ -31,6 +31,32 @@ namespace GameWorld.Core.Test.Rendering;
 [NonParallelizable]
 public class RenderEngineSelectionMaskOffscreenTests
 {
+    [Test]
+    public void DenseStaticOverlay_PrioritizesSelectedVertexEdgesPastRenderLimit()
+    {
+        const int maxEdges = 50000;
+        const int selectedVertex = 50001;
+        var indices = Enumerable.Range(0, 50004)
+            .Select(index => (ushort)index)
+            .ToArray();
+
+        var edges = KitbashSelectionOverlayComponent.BuildEdges(
+            indices,
+            maxEdges,
+            [selectedVertex]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                edges,
+                Does.Contain((selectedVertex, selectedVertex + 1)));
+            Assert.That(
+                edges,
+                Does.Contain((selectedVertex, selectedVertex + 2)));
+            Assert.That(edges, Has.Length.EqualTo(maxEdges));
+        });
+    }
+
     [TestCase(false, ViewportShadingMode.Wireframe)]
     [TestCase(true, ViewportShadingMode.Wireframe)]
     [TestCase(false, ViewportShadingMode.MaterialPreview)]

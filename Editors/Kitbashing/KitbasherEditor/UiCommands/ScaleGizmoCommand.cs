@@ -11,16 +11,17 @@ namespace Editors.KitbasherEditor.UiCommands
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
         public Hotkey? HotKey { get; } = new Hotkey(Key.Add, ModifierKeys.None);
 
-        private readonly KitbashModelGizmoComponent _gizmoComponent;
+        private readonly KitbashSceneComponentSet _components;
 
 
         public ScaleGizmoUpCommand(
-            KitbashModelGizmoComponent gizmoComponent)
+            KitbashSceneComponentSet components)
         {
-            _gizmoComponent = gizmoComponent;
+            _components = components;
         }
 
-        public void Execute() => _gizmoComponent.ModifyGizmoScale(0.5f);
+        public void Execute() =>
+            _components.ModelGizmo.ModifyGizmoScale(0.5f);
     }
 
     internal class ScaleGizmoDownCommand : ITransientKitbasherUiCommand
@@ -30,15 +31,16 @@ namespace Editors.KitbasherEditor.UiCommands
         public Hotkey HotKey { get; } =
             new Hotkey(Key.Subtract, ModifierKeys.None);
 
-        private readonly KitbashModelGizmoComponent _gizmoComponent;
+        private readonly KitbashSceneComponentSet _components;
 
 
         public ScaleGizmoDownCommand(
-            KitbashModelGizmoComponent gizmoComponent)
+            KitbashSceneComponentSet components)
         {
-            _gizmoComponent = gizmoComponent;
+            _components = components;
         }
 
-        public void Execute() => _gizmoComponent.ModifyGizmoScale(-0.5f);
+        public void Execute() =>
+            _components.ModelGizmo.ModifyGizmoScale(-0.5f);
     }
 }

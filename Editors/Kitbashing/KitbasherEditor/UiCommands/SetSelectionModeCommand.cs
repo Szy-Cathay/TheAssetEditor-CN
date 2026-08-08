@@ -15,9 +15,9 @@ namespace Editors.KitbasherEditor.UiCommands
         private readonly KitbashSelectionInputComponent _selectionComponent;
 
         protected SetSelectionModeCommand(
-            KitbashSelectionInputComponent selectionComponent)
+            KitbashSceneComponentSet components)
         {
-            _selectionComponent = selectionComponent;
+            _selectionComponent = components.SelectionInput;
         }
 
         protected void UpdateSelectionMode(GeometrySelectionMode mode)
@@ -46,8 +46,8 @@ namespace Editors.KitbasherEditor.UiCommands
         public override Hotkey? HotKey { get; } = null;
 
         public ObjectSelectionModeCommand(
-            KitbashSelectionInputComponent selectionComponent)
-            : base(selectionComponent)
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 
@@ -60,8 +60,8 @@ namespace Editors.KitbasherEditor.UiCommands
         public override Hotkey? HotKey { get; } = null;
 
         public FaceSelectionModeCommand(
-            KitbashSelectionInputComponent selectionComponent)
-            : base(selectionComponent)
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 
@@ -74,8 +74,8 @@ namespace Editors.KitbasherEditor.UiCommands
         public override Hotkey? HotKey { get; } = null;
 
         public VertexSelectionModeCommand(
-            KitbashSelectionInputComponent selectionComponent)
-            : base(selectionComponent)
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 
@@ -88,8 +88,8 @@ namespace Editors.KitbasherEditor.UiCommands
         public override Hotkey? HotKey { get; } = null;
 
         public EdgeSelectionModeCommand(
-            KitbashSelectionInputComponent selectionComponent)
-            : base(selectionComponent)
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 

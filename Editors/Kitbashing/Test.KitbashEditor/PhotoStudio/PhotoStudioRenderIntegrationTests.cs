@@ -25,7 +25,8 @@ internal class PhotoStudioRenderIntegrationTests :
                 RenderEngineComponent>();
         var selectionOverlay =
             runner.GetRequiredServiceInCurrentEditorScope<
-                KitbashSelectionOverlayComponent>();
+                KitbashSceneComponentSet>()
+            .SelectionOverlay;
         var game =
             runner.GetRequiredServiceInCurrentEditorScope<
                 IWpfGame>();
@@ -126,7 +127,8 @@ internal class PhotoStudioRenderIntegrationTests :
                 RenderEngineComponent>();
         var selectionOverlay =
             runner.GetRequiredServiceInCurrentEditorScope<
-                KitbashSelectionOverlayComponent>();
+                KitbashSceneComponentSet>()
+            .SelectionOverlay;
         var game =
             runner.GetRequiredServiceInCurrentEditorScope<
                 IWpfGame>();

@@ -52,9 +52,7 @@ namespace Editors.KitbasherEditor
         {
             // Creators
             serviceCollection.AddScoped<KitbashSceneCreator>();
-            serviceCollection.AddScoped<KitbashSelectionOverlayComponent>();
-            serviceCollection.AddScoped<KitbashSelectionInputComponent>();
-            serviceCollection.AddScoped<KitbashModelGizmoComponent>();
+            serviceCollection.AddScoped<KitbashSceneComponentSet>();
             serviceCollection.AddScoped<ViewOnlySelectedService>();
             serviceCollection.AddScoped<FaceEditor>();
             serviceCollection.AddScoped<ObjectEditor>();

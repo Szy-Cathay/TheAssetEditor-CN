@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 ﻿using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -67,9 +66,7 @@ namespace Editors.KitbasherEditor.ViewModels
             CommandExecutor commandExecutor,
             IComponentInserter componentInserter,
             View3DCoreComponentSet coreComponents,
-            KitbashSelectionOverlayComponent selectionOverlay,
-            KitbashSelectionInputComponent selectionInput,
-            KitbashModelGizmoComponent modelGizmo,
+            KitbashSceneComponentSet kitbashComponents,
             SkeletonChangedHandler skeletonChangedHandler, 
             SceneNodeEditorViewModel sceneNodeEditorView)
         {
@@ -93,9 +90,7 @@ namespace Editors.KitbasherEditor.ViewModels
             // Ensure all game components are added to the editor
             componentInserter.Execute(
                 coreComponents,
-                selectionOverlay,
-                selectionInput,
-                modelGizmo);
+                kitbashComponents.Components);
         }
 
         public void LoadFile(PackFile fileToLoad)
