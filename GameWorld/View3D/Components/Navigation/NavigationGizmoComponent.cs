@@ -1,4 +1,3 @@
-using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Services;
@@ -20,7 +19,6 @@ namespace GameWorld.Core.Components.Navigation
         private readonly RenderEngineComponent _renderEngine;
         private readonly IDeviceResolver _deviceResolver;
         private readonly FocusSelectableObjectService _focusService;
-        private readonly GizmoComponent _gizmoComponent;
 
         private NavigationGizmo _navigationGizmo;
         private CameraTransition _cameraTransition;
@@ -40,8 +38,7 @@ namespace GameWorld.Core.Components.Navigation
             IMouseComponent mouse,
             RenderEngineComponent renderEngine,
             IDeviceResolver deviceResolver,
-            FocusSelectableObjectService focusService,
-            GizmoComponent gizmoComponent)
+            FocusSelectableObjectService focusService)
         {
             _camera = camera;
             _keyboard = keyboard;
@@ -49,7 +46,6 @@ namespace GameWorld.Core.Components.Navigation
             _renderEngine = renderEngine;
             _deviceResolver = deviceResolver;
             _focusService = focusService;
-            _gizmoComponent = gizmoComponent;
 
             UpdateOrder = (int)ComponentUpdateOrderEnum.NavigationGizmo;
             DrawOrder = (int)ComponentDrawOrderEnum.NavigationGizmo;
@@ -104,7 +100,8 @@ namespace GameWorld.Core.Components.Navigation
             }
 
             // Handle numpad shortcuts
-            if (_gizmoComponent.Gizmo?.IsInModalTransform != true)
+            if (_mouse.MouseOwner == null ||
+                _mouse.MouseOwner == this)
                 HandleNumpadShortcuts();
 
             // Update gizmo hover state

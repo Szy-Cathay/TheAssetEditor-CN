@@ -195,6 +195,31 @@ public class PackFileSearchFilterTests
         NUnitAssert.That(matchingFolder.IsNodeExpanded, Is.False);
     }
 
+    [Test]
+    public void EmptyFolder_RemainsVisibleWhenSearchIsClear()
+    {
+        var owner = new PackFileContainer("test.pack");
+        var root = new TreeNode("test.pack", NodeType.Root, owner, null);
+        var emptyFolder = new TreeNode(
+            "empty",
+            NodeType.Directory,
+            owner,
+            root);
+        root.Children.Add(emptyFolder);
+        var filter = new SearchFilter(new ObservableCollection<TreeNode>
+        {
+            root,
+        });
+
+        filter.Refresh();
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.IsVisible, Is.True);
+            NUnitAssert.That(emptyFolder.IsVisible, Is.True);
+        });
+    }
+
     private static TreeNode AddFile(
         TreeNode root,
         PackFileContainer owner,

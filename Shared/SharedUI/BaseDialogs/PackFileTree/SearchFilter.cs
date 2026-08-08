@@ -127,6 +127,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             if (isFolderMatch)
                 matches.Add(node);
 
+            var isEmptyDirectory =
+                hasSearchText == false &&
+                node.NodeType == NodeType.Directory &&
+                node.Children.Count == 0;
             var isVisible = node.Children.Count == 0 &&
                 node.NodeType == NodeType.Root
                 ? true
@@ -134,7 +138,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                     ? hasSearchText == false ||
                         isFolderMatch ||
                         hasChildMatch
-                    : hasChildMatch;
+                    : hasChildMatch || isEmptyDirectory;
             node.IsVisible = isVisible;
             return isVisible;
         }

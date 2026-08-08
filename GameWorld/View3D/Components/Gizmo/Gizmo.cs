@@ -111,7 +111,7 @@ namespace GameWorld.Core.Components.Gizmo
 
         /// <summary>
         /// Flag to indicate that modal transform just finished.
-        /// SelectionComponent should check this to prevent selecting other objects.
+        /// The active selection input component should check this to prevent selecting other objects.
         /// </summary>
         public bool JustFinishedModalTransform { get; private set; } = false;
 
@@ -307,7 +307,7 @@ namespace GameWorld.Core.Components.Gizmo
         }
 
         /// <summary>
-        /// Clear the JustFinishedModalTransform flag after SelectionComponent has checked it.
+        /// Clear the JustFinishedModalTransform flag after the active selection input component has checked it.
         /// </summary>
         public void ClearJustFinishedFlag()
         {
@@ -1610,7 +1610,7 @@ namespace GameWorld.Core.Components.Gizmo
         public event TransformationStartDelegate StartEvent;
         public event TransformationStopDelegate StopEvent;
 
-        internal event Action<ModalPreviewReplacement>
+        public event Action<ModalPreviewReplacement>
             ReplacePreviewFromInitialRequested;
 
         private void OnTranslateEvent(ITransformable transformable, Vector3 delta)
@@ -1649,7 +1649,7 @@ namespace GameWorld.Core.Components.Gizmo
 
     #region Gizmo EventHandlers
 
-    internal enum ModalPreviewReplacementKind
+    public enum ModalPreviewReplacementKind
     {
         RestoreOnly,
         Translate,
@@ -1657,7 +1657,7 @@ namespace GameWorld.Core.Components.Gizmo
         Scale
     }
 
-    internal readonly record struct ModalPreviewReplacement
+    public readonly record struct ModalPreviewReplacement
     {
         public ModalPreviewReplacementKind Kind { get; }
         public Vector3 VectorValue { get; }

@@ -1,8 +1,8 @@
 ﻿using System.Windows.Input;
+using Editors.KitbasherEditor.Components;
 using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels;
 using GameWorld.Core.Components;
-using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
@@ -36,12 +36,35 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
+    public void Scene_UsesKitbashExclusiveModelEditingComponents()
+    {
+        var scene = (WpfGameMock)_editor.Scene;
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                scene.Components,
+                Has.Exactly(1)
+                    .TypeOf<KitbashSelectionOverlayComponent>());
+            Assert.That(
+                scene.Components,
+                Has.Exactly(1)
+                    .TypeOf<KitbashSelectionInputComponent>());
+            Assert.That(
+                scene.Components,
+                Has.Exactly(1)
+                    .TypeOf<KitbashModelGizmoComponent>());
+        });
+    }
+
+    [Test]
     public void GizmoScaleCommands_MatchTheirNames()
     {
         var commandFactory =
             _runner.GetRequiredServiceInCurrentEditorScope<IUiCommandFactory>();
         var gizmoComponent =
-            _runner.GetRequiredServiceInCurrentEditorScope<GizmoComponent>();
+            _runner.GetRequiredServiceInCurrentEditorScope<
+                KitbashSceneComponentSet>()
+            .ModelGizmo;
         var initialScale = gizmoComponent.Gizmo.ScaleModifier;
 
         commandFactory.Create<ScaleGizmoUpCommand>().Execute();

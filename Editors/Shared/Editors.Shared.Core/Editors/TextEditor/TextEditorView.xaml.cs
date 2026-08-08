@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using ICSharpCode.AvalonEdit.Folding;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Search;
+using Shared.Core.Settings;
 using Shared.Ui.Editors.TextEditor;
 
 namespace CommonControls.Editors.TextEditor
@@ -31,6 +32,7 @@ namespace CommonControls.Editors.TextEditor
         FoldingManager _foldingManager;
         object _foldingStrategy;
         private readonly DispatcherTimer _foldingUpdateTimer;
+        private ThemeAwareHighlightingColorizer? _themeHighlightingColorizer;
 
         internal bool IsFoldingTimerEnabled => _foldingUpdateTimer.IsEnabled;
 
@@ -44,6 +46,7 @@ namespace CommonControls.Editors.TextEditor
 
             SetValue(TextOptions.TextFormattingModeProperty, TextFormattingMode.Display);
             SearchPanel.Install(textEditor);
+            UseThemeAwareSyntaxColorizer(textEditor.SyntaxHighlighting);
 
             _foldingUpdateTimer = new DispatcherTimer
             {
@@ -55,11 +58,23 @@ namespace CommonControls.Editors.TextEditor
         private void TextEditorView_Loaded(object sender, RoutedEventArgs e)
         {
             _foldingUpdateTimer.Start();
+            ThemesController.ThemeChanged -= TextEditorView_ThemeChanged;
+            ThemesController.ThemeChanged += TextEditorView_ThemeChanged;
         }
 
         private void TextEditorView_Unloaded(object sender, RoutedEventArgs e)
         {
             _foldingUpdateTimer.Stop();
+            ThemesController.ThemeChanged -= TextEditorView_ThemeChanged;
+        }
+
+        private void TextEditorView_ThemeChanged(ThemeType theme)
+        {
+            if (Dispatcher.CheckAccess())
+                textEditor.TextArea.TextView.Redraw();
+            else
+                Dispatcher.BeginInvoke(
+                    textEditor.TextArea.TextView.Redraw);
         }
 
         private void FoldingUpdateTimer_Tick(object? sender, EventArgs e)
@@ -75,7 +90,7 @@ namespace CommonControls.Editors.TextEditor
         public void SetSyntaxHighlighting(string type)
         {
             var xmlHightlight = HighlightingManager.Instance.HighlightingDefinitions.FirstOrDefault(x => x.Name == type);
-            highlightingComboBox.SelectedValue = xmlHightlight;
+            highlightingComboBox.SelectedItem = xmlHightlight;
         }
 
         public void ShowLineNumbers(bool value)
@@ -101,6 +116,7 @@ namespace CommonControls.Editors.TextEditor
         void HighlightingComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             textEditor.SyntaxHighlighting = highlightingComboBox.SelectedValue as IHighlightingDefinition;
+            UseThemeAwareSyntaxColorizer(textEditor.SyntaxHighlighting);
             if (textEditor.SyntaxHighlighting == null)
             {
                 _foldingStrategy = null;
@@ -140,6 +156,24 @@ namespace CommonControls.Editors.TextEditor
                     _foldingManager = null;
                 }
             }
+        }
+
+        private void UseThemeAwareSyntaxColorizer(
+            IHighlightingDefinition? definition)
+        {
+            var transformers = textEditor.TextArea.TextView.LineTransformers;
+            foreach (var colorizer in transformers
+                         .OfType<HighlightingColorizer>()
+                         .ToArray())
+            {
+                transformers.Remove(colorizer);
+            }
+
+            _themeHighlightingColorizer = definition == null
+                ? null
+                : new ThemeAwareHighlightingColorizer(definition);
+            if (_themeHighlightingColorizer != null)
+                transformers.Add(_themeHighlightingColorizer);
         }
 
         void UpdateFoldings()

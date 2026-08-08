@@ -12,7 +12,7 @@ using Microsoft.Xna.Framework.Input;
 namespace Editors.CscEditor.Services
 {
     /// <summary>
-    /// A CSC-specific transform gizmo. The stock <see cref="GizmoComponent"/> bakes transforms
+    /// A CSC-specific transform gizmo. The Kitbash model gizmo bakes transforms
     /// into mesh vertices (the Kitbasher model), which is wrong here - moving a CSC element means
     /// editing its position/rotation/scale channels. This component reuses the low-level
     /// <see cref="Gizmo"/> widget and routes its deltas into the selected element's channel data.

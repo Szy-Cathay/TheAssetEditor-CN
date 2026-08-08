@@ -1,9 +1,9 @@
 ﻿using System;
-using System.IO;
 ﻿using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.EventHandlers;
+using Editors.KitbasherEditor.Components;
 using Editors.KitbasherEditor.Services;
 using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer;
@@ -65,6 +65,8 @@ namespace Editors.KitbasherEditor.ViewModels
             IUiCommandFactory uiCommandFactory,
             CommandExecutor commandExecutor,
             IComponentInserter componentInserter,
+            View3DCoreComponentSet coreComponents,
+            KitbashSceneComponentSet kitbashComponents,
             SkeletonChangedHandler skeletonChangedHandler, 
             SceneNodeEditorViewModel sceneNodeEditorView)
         {
@@ -79,7 +81,6 @@ namespace Editors.KitbasherEditor.ViewModels
             SceneExplorer = sceneExplorerViewModel;
             MenuBar = menuBarViewModel;
             SceneNodeEditor = sceneNodeEditorView;
-            
             // Events
             eventHub.Register<ScopedFileSavedEvent>(this, OnFileSaved);
             eventHub.Register<CommandStackChangedEvent>(this, OnCommandStackChanged);
@@ -87,7 +88,9 @@ namespace Editors.KitbasherEditor.ViewModels
             skeletonChangedHandler.Subscribe(eventHub);
             
             // Ensure all game components are added to the editor
-            componentInserter.Execute();
+            componentInserter.Execute(
+                coreComponents,
+                kitbashComponents.Components);
         }
 
         public void LoadFile(PackFile fileToLoad)

@@ -4,6 +4,7 @@ using Editors.KitbasherEditor.ChildEditors.PinTool;
 using Editors.KitbasherEditor.ChildEditors.PinTool.Commands;
 using Editors.KitbasherEditor.ChildEditors.ReRiggingTool;
 using Editors.KitbasherEditor.ChildEditors.VertexDebugger;
+using Editors.KitbasherEditor.Components;
 using Editors.KitbasherEditor.Commands;
 using Editors.KitbasherEditor.Core;
 using Editors.KitbasherEditor.Core.MenuBarViews;
@@ -23,7 +24,21 @@ using KitbasherEditor.ViewModels.SaveDialog;
 using KitbasherEditor.ViewModels.SceneExplorerNodeViews;
 using KitbasherEditor.Views;
 using Microsoft.Extensions.DependencyInjection;
+using GameWorld.Core.Components.Selection;
+using GameWorld.Core.Commands.Edge;
+using GameWorld.Core.Commands.Face;
+using GameWorld.Core.Commands.Object;
+using GameWorld.Core.Commands.Vertex;
+using GameWorld.Core.Services;
 using GameWorld.Core.Rendering.Geometry;
+using GameWorld.Core.Rendering.Materials.Serialization;
+using GameWorld.Core.Services.SceneSaving;
+using GameWorld.Core.Services.SceneSaving.Geometry;
+using GameWorld.Core.Services.SceneSaving.Geometry.Strategies;
+using GameWorld.Core.Services.SceneSaving.Lod;
+using GameWorld.Core.Services.SceneSaving.Lod.Strategies;
+using GameWorld.Core.Services.SceneSaving.Material;
+using GameWorld.Core.Services.SceneSaving.Material.Strategies;
 using Shared.Core.DependencyInjection;
 using Shared.Core.DevConfig;
 using Shared.Core.ToolCreation;
@@ -37,6 +52,66 @@ namespace Editors.KitbasherEditor
         {
             // Creators
             serviceCollection.AddScoped<KitbashSceneCreator>();
+            serviceCollection.AddScoped<KitbashSceneComponentSet>();
+            serviceCollection.AddScoped<ViewOnlySelectedService>();
+            serviceCollection.AddScoped<FaceEditor>();
+            serviceCollection.AddScoped<ObjectEditor>();
+            serviceCollection.AddScoped<GeometrySaveSettings>();
+            serviceCollection.AddScoped<MeshBuilderService>();
+            serviceCollection.AddTransient<WsModelGeneratorService>();
+            serviceCollection.AddTransient<MaterialToWsMaterialFactory>();
+            serviceCollection.AddScoped<SaveService>();
+            serviceCollection.AddScoped<NodeToRmvSaveHelper>();
+            serviceCollection.AddScoped<GeometryStrategyProvider>();
+            serviceCollection.AddScoped<IGeometryStrategy, NoMeshStrategy>();
+            serviceCollection.AddScoped<IGeometryStrategy, Rmw6Strategy>();
+            serviceCollection.AddScoped<IGeometryStrategy, Rmw7Strategy>();
+            serviceCollection.AddScoped<IGeometryStrategy, Rmw8Strategy>();
+            serviceCollection.AddScoped<LodStrategyProvider>();
+            serviceCollection.AddScoped<
+                ILodGenerationStrategy,
+                AssetEditorLodGeneration>();
+            serviceCollection.AddScoped<
+                ILodGenerationStrategy,
+                Lod0ForAllLodGeneration>();
+            serviceCollection.AddScoped<
+                ILodGenerationStrategy,
+                NoLodGeneration>();
+            serviceCollection.AddScoped<MaterialStrategyProvider>();
+            serviceCollection.AddScoped<
+                IMaterialStrategy,
+                Warhammer3WsModelStrategy>();
+            serviceCollection.AddScoped<
+                IMaterialStrategy,
+                Warhammer2WsModelStrategy>();
+            serviceCollection.AddScoped<
+                IMaterialStrategy,
+                PharaohWsModelStrategy>();
+            serviceCollection.AddScoped<
+                IMaterialStrategy,
+                NoWsModelStrategy>();
+
+            serviceCollection.AddTransient<ConvertFacesToVertexSelectionCommand>();
+            serviceCollection.AddTransient<FaceSelectionCommand>();
+            serviceCollection.AddTransient<EdgeSelectionCommand>();
+            serviceCollection.AddTransient<DuplicateFacesCommand>();
+            serviceCollection.AddTransient<VertexSelectionCommand>();
+            serviceCollection.AddTransient<DeleteFaceCommand>();
+            serviceCollection.AddTransient<DeleteObjectsCommand>();
+            serviceCollection.AddTransient<MakeNodeEditableCommand>();
+            serviceCollection.AddTransient<SortSceneNodesCommand>();
+            serviceCollection.AddTransient<
+                GameWorld.Core.Commands.Object.ReduceMeshCommand>();
+            serviceCollection.AddTransient<TransformVertexCommand>();
+            serviceCollection.AddTransient<CombineMeshCommand>();
+            serviceCollection.AddTransient<DivideObjectIntoSubmeshesCommand>();
+            serviceCollection.AddTransient<
+                GameWorld.Core.Commands.Object.DuplicateObjectCommand>();
+            serviceCollection.AddTransient<CreateStaticMeshFromAnimationCommand>();
+            serviceCollection.AddTransient<AddObjectsToGroupCommand>();
+            serviceCollection.AddTransient<UnGroupObjectsCommand>();
+            serviceCollection.AddTransient<GroupObjectsCommand>();
+            serviceCollection.AddTransient<GrowMeshCommand>();
 
             // View models 
             serviceCollection.AddScoped<KitbasherView>();

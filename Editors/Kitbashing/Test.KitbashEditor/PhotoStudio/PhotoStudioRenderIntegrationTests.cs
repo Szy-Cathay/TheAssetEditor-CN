@@ -1,7 +1,7 @@
 using System.IO;
 using System.Reflection;
+using Editors.KitbasherEditor.Components;
 using GameWorld.Core.Components.Rendering;
-using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -23,9 +23,10 @@ internal class PhotoStudioRenderIntegrationTests :
         var renderEngine =
             runner.GetRequiredServiceInCurrentEditorScope<
                 RenderEngineComponent>();
-        var selectionManager =
+        var selectionOverlay =
             runner.GetRequiredServiceInCurrentEditorScope<
-                SelectionManager>();
+                KitbashSceneComponentSet>()
+            .SelectionOverlay;
         var game =
             runner.GetRequiredServiceInCurrentEditorScope<
                 IWpfGame>();
@@ -46,7 +47,7 @@ internal class PhotoStudioRenderIntegrationTests :
         {
             var oneTimes = Capture(
                 renderEngine,
-                selectionManager,
+                selectionOverlay,
                 editor.SceneExplorer.SceneManager,
                 device,
                 backTarget,
@@ -55,7 +56,7 @@ internal class PhotoStudioRenderIntegrationTests :
                 1.0f);
             var twoTimes = Capture(
                 renderEngine,
-                selectionManager,
+                selectionOverlay,
                 editor.SceneExplorer.SceneManager,
                 device,
                 backTarget,
@@ -124,9 +125,10 @@ internal class PhotoStudioRenderIntegrationTests :
         var renderEngine =
             runner.GetRequiredServiceInCurrentEditorScope<
                 RenderEngineComponent>();
-        var selectionManager =
+        var selectionOverlay =
             runner.GetRequiredServiceInCurrentEditorScope<
-                SelectionManager>();
+                KitbashSceneComponentSet>()
+            .SelectionOverlay;
         var game =
             runner.GetRequiredServiceInCurrentEditorScope<
                 IWpfGame>();
@@ -153,7 +155,7 @@ internal class PhotoStudioRenderIntegrationTests :
             var gameTime = new GameTime();
             renderEngine.Update(gameTime);
             editor.SceneExplorer.SceneManager.Draw(gameTime);
-            selectionManager.Draw(gameTime);
+            selectionOverlay.Draw(gameTime);
             renderEngine.SaveNextFrame(
                 new SaveRenderImageSettings(
                     "SaveFailure",
@@ -179,7 +181,7 @@ internal class PhotoStudioRenderIntegrationTests :
 
     private static string Capture(
         RenderEngineComponent renderEngine,
-        SelectionManager selectionManager,
+        KitbashSelectionOverlayComponent selectionOverlay,
         GameWorld.Core.Components.SceneManager sceneManager,
         GraphicsDevice device,
         RenderTarget2D backTarget,
@@ -190,7 +192,7 @@ internal class PhotoStudioRenderIntegrationTests :
         var gameTime = new GameTime();
         renderEngine.Update(gameTime);
         sceneManager.Draw(gameTime);
-        selectionManager.Draw(gameTime);
+        selectionOverlay.Draw(gameTime);
         renderEngine.SaveNextFrame(
             new SaveRenderImageSettings(
                 name,

@@ -405,15 +405,10 @@ public class MeshPoseSnapshotTests
         var node = CreatePausedAnimatedNode();
         var pausedPose = MeshPoseSnapshot.Capture(node);
 
-        var whilePaused =
-            SelectionManager.ShouldRenderDenseEditOverlay(
-                node,
-                pausedPose);
+        var whilePaused = !pausedPose.ApplyAnimation;
         node.AnimationPlayer!.Play();
         var whilePlaying =
-            SelectionManager.ShouldRenderDenseEditOverlay(
-                node,
-                MeshPoseSnapshot.Capture(node));
+            !MeshPoseSnapshot.Capture(node).ApplyAnimation;
 
         Assert.Multiple(() =>
         {
@@ -640,10 +635,7 @@ public class MeshPoseSnapshotTests
         var selection = CreateVertexSelection(node);
         var eventHub = new Mock<IEventHub>();
         var selectionManager = new SelectionManager(
-            eventHub.Object,
-            null!,
-            null!,
-            null!);
+            eventHub.Object);
         selectionManager.SetState(selection);
         var commandExecutor = new CommandExecutor(eventHub.Object);
         var services = new Mock<IServiceProvider>();
@@ -724,10 +716,7 @@ public class MeshPoseSnapshotTests
         var selection = CreateVertexSelection(node);
         var eventHub = new Mock<IEventHub>();
         var selectionManager = new SelectionManager(
-            eventHub.Object,
-            null!,
-            null!,
-            null!);
+            eventHub.Object);
         selectionManager.SetState(selection);
         var commandExecutor = new CommandExecutor(eventHub.Object);
         var services = new Mock<IServiceProvider>();

@@ -1,6 +1,8 @@
 using GameWorld.Core.Commands;
 using GameWorld.Core.Commands.Vertex;
 using GameWorld.Core.Components.Gizmo;
+using GizmoComponent =
+    Editors.KitbasherEditor.Components.KitbashModelGizmoComponent;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
@@ -740,11 +742,7 @@ public class TransformUploadTests
         ISelectionState selection)
     {
         var eventHub = new TestEventHub();
-        var selectionManager = new SelectionManager(
-            eventHub,
-            null,
-            null,
-            null);
+        var selectionManager = new SelectionManager(eventHub);
         var commandExecutor = new CommandExecutor(eventHub);
         var serviceProvider = new Mock<IServiceProvider>();
         serviceProvider
@@ -848,7 +846,7 @@ public class TransformUploadTests
         params MeshObject[] meshes)
     {
         var eventHub = new Mock<IEventHub>();
-        var selectionManager = new SelectionManager(eventHub.Object, null, null, null);
+        var selectionManager = new SelectionManager(eventHub.Object);
         selectionManager.SetState(selection);
         var commandExecutor = new CommandExecutor(eventHub.Object);
         var serviceProvider = new Mock<IServiceProvider>();

@@ -6,24 +6,27 @@ namespace GameWorld.Core.Components
 {
     public interface IComponentInserter
     {
-        void Execute();
+        void Execute(
+            View3DCoreComponentSet coreComponents,
+            params IGameComponent[] editorComponents);
     }
 
     public class ComponentInserter : IComponentInserter
     {
         private readonly IWpfGame _wpfGame;
-        private readonly IEnumerable<IGameComponent> _components;
-
-        public ComponentInserter(IWpfGame wpfGame, IEnumerable<IGameComponent> components)
+        public ComponentInserter(IWpfGame wpfGame)
         {
             _wpfGame = wpfGame;
-            _components = components;
         }
 
-        public void Execute()
+        public void Execute(
+            View3DCoreComponentSet coreComponents,
+            params IGameComponent[] editorComponents)
         {
             _wpfGame.ForceEnsureCreated();
-            foreach (var component in _components)
+            foreach (var component in coreComponents.Components)
+                _wpfGame.AddComponent(component);
+            foreach (var component in editorComponents)
                 _wpfGame.AddComponent(component);
         }
     }

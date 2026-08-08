@@ -2,6 +2,7 @@
 using System.Windows;
 using System.IO;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
@@ -30,7 +31,14 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 packFileService.CreateFolder(
                     _selectedNode.FileOwner,
                     folderPath);
-                _selectedNode.Children.Add(new TreeNode(folderName, NodeType.Directory, _selectedNode.FileOwner, _selectedNode));
+                if (_selectedNode.FileOwner is not FolderProjectContainer)
+                {
+                    _selectedNode.Children.Add(new TreeNode(
+                        folderName,
+                        NodeType.Directory,
+                        _selectedNode.FileOwner,
+                        _selectedNode));
+                }
             }
         }
     }

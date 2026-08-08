@@ -2,12 +2,12 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace GameWorld.Core.Components.Rendering;
 
-internal readonly record struct ViewportShadingPipeline(
+public readonly record struct ViewportShadingPipeline(
     RenderingTechnique SurfaceTechnique,
     FillMode FillMode,
     bool EnableBloom);
 
-internal static class ViewportShadingPolicy
+public static class ViewportShadingPolicy
 {
     public static ViewportShadingPipeline Resolve(
         ViewportShadingMode mode)

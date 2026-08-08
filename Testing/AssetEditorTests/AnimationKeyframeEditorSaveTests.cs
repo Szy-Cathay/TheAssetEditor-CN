@@ -78,7 +78,6 @@ namespace AssetEditorTests
         private static EditorHarness CreateHarness()
         {
             var fileSaveService = new Mock<IFileSaveService>();
-            var standardDialogs = new Mock<IStandardDialogs>();
             var editor = new AnimationKeyframeEditorViewModel(
                 new Mock<IPackFileService>().Object,
                 new Mock<ISkeletonAnimationLookUpHelper>().Object,
@@ -90,8 +89,9 @@ namespace AssetEditorTests
                 null!,
                 null!,
                 null!,
+                null!,
                 fileSaveService.Object,
-                standardDialogs.Object);
+                Mock.Of<IStandardDialogs>());
 
             var rider = new SceneObject("rider")
             {

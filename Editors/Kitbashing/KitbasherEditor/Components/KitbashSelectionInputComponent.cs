@@ -10,9 +10,10 @@ using GameWorld.Core.Commands.Edge;
 using GameWorld.Core.Commands.Face;
 using GameWorld.Core.Commands.Object;
 using GameWorld.Core.Commands.Vertex;
-using GameWorld.Core.Components.Gizmo;
+using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
+using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
@@ -22,9 +23,11 @@ using Shared.Core.Services;
 using Keys = Microsoft.Xna.Framework.Input.Keys;
 using MouseButton = GameWorld.Core.Components.Input.MouseButton;
 
-namespace GameWorld.Core.Components.Selection
+namespace Editors.KitbasherEditor.Components
 {
-    public class SelectionComponent : BaseComponent, IDisposable
+    public sealed class KitbashSelectionInputComponent :
+        BaseComponent,
+        IDisposable
     {
         //SpriteBatch _spriteBatch;
         Texture2D _textTexture;
@@ -43,14 +46,14 @@ namespace GameWorld.Core.Components.Selection
         private readonly CommandFactory _commandFactory;
         private readonly SceneManager _sceneManger;
         private readonly RenderEngineComponent _resourceLibrary;
-        private readonly GizmoComponent _gizmoComponent;
+        private readonly KitbashModelGizmoComponent _gizmoComponent;
 
-        public SelectionComponent(
+        public KitbashSelectionInputComponent(
             IMouseComponent mouseComponent, IKeyboardComponent keyboardComponent,
             ArcBallCamera camera, SelectionManager selectionManager,
             IDeviceResolver deviceResolverComponent, CommandFactory commandFactory,
             SceneManager sceneManager, RenderEngineComponent resourceLibrary,
-            GizmoComponent gizmoComponent)
+            KitbashModelGizmoComponent gizmoComponent)
         {
             _mouseComponent = mouseComponent;
             _keyboardComponent = keyboardComponent;
@@ -471,7 +474,7 @@ namespace GameWorld.Core.Components.Selection
 
         bool ChangeSelectionMode()
         {
-            // F1/F2/F3 removed - use Tab to toggle Object/Edit mode, 1/2/3 for sub-modes (handled by GizmoComponent)
+            // F1/F2/F3 removed - use Tab to toggle Object/Edit mode, 1/2/3 for sub-modes.
             if (_keyboardComponent.IsKeyReleased(Keys.F9))
             {
                 if (SetBoneSelectionMode())

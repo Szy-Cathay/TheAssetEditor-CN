@@ -1,4 +1,5 @@
 ﻿using Editors.KitbasherEditor.Core.MenuBarViews;
+using Editors.KitbasherEditor.Components;
 using GameWorld.Core.Components.Gizmo;
 using KitbasherEditor.ViewModels.MenuBarViews;
 using Shared.Ui.Common.MenuSystem;
@@ -6,7 +7,7 @@ using System.Windows.Input;
 
 namespace Editors.KitbasherEditor.UiCommands
 {
-    internal class SelectGizmoModeCommand(GizmoComponent gizmoComponent, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
+    internal class SelectGizmoModeCommand(KitbashSceneComponentSet components, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
     {
         public string ToolTip { get; set; } = "Select Gizmo";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
@@ -14,13 +15,13 @@ namespace Editors.KitbasherEditor.UiCommands
 
         public void Execute()
         {
-            gizmoComponent.ResetScale();
+            components.ModelGizmo.ResetScale();
             transformToolViewModel.SetMode(TransformToolViewModel.TransformMode.None);
-            gizmoComponent.Disable();
+            components.ModelGizmo.Disable();
         }
     }
 
-    internal class MoveGizmoModeCommand(GizmoComponent gizmoComponent, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
+    internal class MoveGizmoModeCommand(KitbashSceneComponentSet components, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
     {
         public string ToolTip { get; set; } = "Move Gizmo";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
@@ -28,13 +29,13 @@ namespace Editors.KitbasherEditor.UiCommands
 
         public void Execute()
         {
-            gizmoComponent.ResetScale();
+            components.ModelGizmo.ResetScale();
             transformToolViewModel.SetMode(TransformToolViewModel.TransformMode.Translate);
-            gizmoComponent.SetGizmoMode(GizmoMode.Translate);
+            components.ModelGizmo.SetGizmoMode(GizmoMode.Translate);
         }
     }
 
-    internal class RotateGizmoModeCommand(GizmoComponent gizmoComponent, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
+    internal class RotateGizmoModeCommand(KitbashSceneComponentSet components, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
     {
         public string ToolTip { get; set; } = "Rotate Gizmo";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
@@ -42,13 +43,13 @@ namespace Editors.KitbasherEditor.UiCommands
 
         public void Execute()
         {
-            gizmoComponent.ResetScale();
+            components.ModelGizmo.ResetScale();
             transformToolViewModel.SetMode(TransformToolViewModel.TransformMode.Rotate);
-            gizmoComponent.SetGizmoMode(GizmoMode.Rotate);
+            components.ModelGizmo.SetGizmoMode(GizmoMode.Rotate);
         }
     }
 
-    internal class ScaleGizmoModeCommand(GizmoComponent gizmoComponent, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
+    internal class ScaleGizmoModeCommand(KitbashSceneComponentSet components, TransformToolViewModel transformToolViewModel) : ITransientKitbasherUiCommand
     {
         public string ToolTip { get; set; } = "Scale Gizmo";
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
@@ -56,9 +57,9 @@ namespace Editors.KitbasherEditor.UiCommands
 
         public void Execute()
         {
-            gizmoComponent.ResetScale();
+            components.ModelGizmo.ResetScale();
             transformToolViewModel.SetMode(TransformToolViewModel.TransformMode.Scale);
-            gizmoComponent.SetGizmoMode(GizmoMode.NonUniformScale);
+            components.ModelGizmo.SetGizmoMode(GizmoMode.NonUniformScale);
         }
     }
 }

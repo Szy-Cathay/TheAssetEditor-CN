@@ -17,6 +17,8 @@ namespace GameWorld.Core.Rendering.RenderItems
         public Vector3 BindP1;
         public Vector4 Weights1;
         public Vector4 BoneIndices1;
+        public Vector3 Colour0;
+        public Vector3 Colour1;
 
         public static readonly VertexDeclaration VertexDeclaration =
             new(
@@ -49,7 +51,17 @@ namespace GameWorld.Core.Rendering.RenderItems
                     72,
                     VertexElementFormat.Vector4,
                     VertexElementUsage.BlendIndices,
-                    2));
+                    2),
+                new VertexElement(
+                    88,
+                    VertexElementFormat.Vector3,
+                    VertexElementUsage.Normal,
+                    5),
+                new VertexElement(
+                    100,
+                    VertexElementFormat.Vector3,
+                    VertexElementUsage.Normal,
+                    6));
 
         VertexDeclaration IVertexType.VertexDeclaration =>
             VertexDeclaration;
@@ -75,6 +87,8 @@ namespace GameWorld.Core.Rendering.RenderItems
         VertexBufferBinding[] _bindings = [];
         int _vertexDataVersion = -1;
         bool _instanceDataDirty = true;
+        HashSet<int>? _selectedVertices;
+        Vector3 _selectedVertexColour;
 
         public float DepthBias { get; set; } =
             EditOverlayStyle.WireDepthBias;
@@ -161,6 +175,25 @@ namespace GameWorld.Core.Rendering.RenderItems
             UpdateSelectedEdgeTopology();
         }
 
+        public void UpdateSelectedVertices(
+            IEnumerable<int> selectedVertices,
+            Vector3 selectedColour)
+        {
+            ArgumentNullException.ThrowIfNull(selectedVertices);
+            _selectedVertices = selectedVertices.ToHashSet();
+            _selectedVertexColour = selectedColour;
+            _instanceDataDirty = true;
+        }
+
+        public void ClearSelectedVertices()
+        {
+            if (_selectedVertices == null)
+                return;
+
+            _selectedVertices = null;
+            _instanceDataDirty = true;
+        }
+
         public bool SupportsTechnique(
             RenderingTechnique technique)
         {
@@ -193,11 +226,6 @@ namespace GameWorld.Core.Rendering.RenderItems
                 (float)viewportWidth);
             effect.Parameters["ViewportHeight"].SetValue(
                 (float)viewportHeight);
-            effect.Parameters["OverlayColor"].SetValue(
-                new Vector3(
-                    _colour.X,
-                    _colour.Y,
-                    _colour.Z));
             effect.Parameters["BaseOpacity"].SetValue(
                 _colour.W);
             effect.Parameters["EdgeDepthBias"].SetValue(
@@ -349,10 +377,10 @@ namespace GameWorld.Core.Rendering.RenderItems
                  edgeIndex < _instanceData.Length;
                  edgeIndex++)
             {
-                var first = _pose.Geometry.VertexArray[
-                    _lineIndices[edgeIndex * 2]];
-                var second = _pose.Geometry.VertexArray[
-                    _lineIndices[edgeIndex * 2 + 1]];
+                var firstIndex = _lineIndices[edgeIndex * 2];
+                var secondIndex = _lineIndices[edgeIndex * 2 + 1];
+                var first = _pose.Geometry.VertexArray[firstIndex];
+                var second = _pose.Geometry.VertexArray[secondIndex];
                 _instanceData[edgeIndex] =
                     new AnimatedEdgeQuadInstanceData
                     {
@@ -361,11 +389,21 @@ namespace GameWorld.Core.Rendering.RenderItems
                         BoneIndices0 = first.BlendIndices,
                         BindP1 = second.Position3(),
                         Weights1 = second.BlendWeights,
-                        BoneIndices1 = second.BlendIndices
+                        BoneIndices1 = second.BlendIndices,
+                        Colour0 = GetEndpointColour(firstIndex),
+                        Colour1 = GetEndpointColour(secondIndex)
                     };
             }
 
             return _instanceData;
+        }
+
+        private Vector3 GetEndpointColour(int vertexIndex)
+        {
+            if (_selectedVertices?.Contains(vertexIndex) == true)
+                return _selectedVertexColour;
+
+            return new Vector3(_colour.X, _colour.Y, _colour.Z);
         }
 
         void CreateQuadBuffers(GraphicsDevice device)

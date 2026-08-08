@@ -17,7 +17,7 @@ namespace Test.KitbashEditor
         [Test]
         public void Undo_RestoresOriginalGeometryAndPivot()
         {
-            var selectionManager = new SelectionManager(Mock.Of<IEventHub>(), null!, null!, null!);
+            var selectionManager = new SelectionManager(Mock.Of<IEventHub>());
             selectionManager.CreateSelectionSate(GeometrySelectionMode.Object, null!, false);
             var source = CreateMesh(UiVertexFormat.Cinematic);
             source.Geometry.VertexArray[0].BlendIndices = new Vector4(4, 3, 2, 1);

@@ -1138,7 +1138,7 @@ namespace Testing.GameWorld.Core.Commands
         static (SelectionManager SelectionManager, CommandExecutor CommandExecutor) CreateCommandContext(ISelectionState selection)
         {
             var eventHub = new Mock<IEventHub>();
-            var selectionManager = new SelectionManager(eventHub.Object, null, null, null);
+            var selectionManager = new SelectionManager(eventHub.Object);
             selectionManager.SetState(selection);
             return (selectionManager, new CommandExecutor(eventHub.Object));
         }

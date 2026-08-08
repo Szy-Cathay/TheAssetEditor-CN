@@ -1,4 +1,5 @@
 ﻿using Editors.KitbasherEditor.Core.MenuBarViews;
+using Editors.KitbasherEditor.Components;
 using GameWorld.Core.Components.Selection;
 using Shared.Ui.Common.MenuSystem;
 using System.Windows.Input;
@@ -11,11 +12,12 @@ namespace Editors.KitbasherEditor.UiCommands
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
         public abstract Hotkey? HotKey { get; }
 
-        private readonly SelectionComponent _selectionComponent;
+        private readonly KitbashSelectionInputComponent _selectionComponent;
 
-        protected SetSelectionModeCommand(SelectionComponent selectionComponent)
+        protected SetSelectionModeCommand(
+            KitbashSceneComponentSet components)
         {
-            _selectionComponent = selectionComponent;
+            _selectionComponent = components.SelectionInput;
         }
 
         protected void UpdateSelectionMode(GeometrySelectionMode mode)
@@ -43,7 +45,9 @@ namespace Editors.KitbasherEditor.UiCommands
         public override string ToolTip { get; set; } = "Object mode";
         public override Hotkey? HotKey { get; } = null;
 
-        public ObjectSelectionModeCommand(SelectionComponent selectionComponent) : base(selectionComponent)
+        public ObjectSelectionModeCommand(
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 
@@ -55,7 +59,9 @@ namespace Editors.KitbasherEditor.UiCommands
         public override string ToolTip { get; set; } = "Face mode";
         public override Hotkey? HotKey { get; } = null;
 
-        public FaceSelectionModeCommand(SelectionComponent selectionComponent) : base(selectionComponent)
+        public FaceSelectionModeCommand(
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 
@@ -67,7 +73,9 @@ namespace Editors.KitbasherEditor.UiCommands
         public override string ToolTip { get; set; } = "Vertex mode";
         public override Hotkey? HotKey { get; } = null;
 
-        public VertexSelectionModeCommand(SelectionComponent selectionComponent) : base(selectionComponent)
+        public VertexSelectionModeCommand(
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 
@@ -79,7 +87,9 @@ namespace Editors.KitbasherEditor.UiCommands
         public override string ToolTip { get; set; } = "Edge mode";
         public override Hotkey? HotKey { get; } = null;
 
-        public EdgeSelectionModeCommand(SelectionComponent selectionComponent) : base(selectionComponent)
+        public EdgeSelectionModeCommand(
+            KitbashSceneComponentSet components)
+            : base(components)
         {
         }
 

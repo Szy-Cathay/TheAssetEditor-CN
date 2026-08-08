@@ -1,5 +1,5 @@
 ﻿using Editors.KitbasherEditor.Core.MenuBarViews;
-using GameWorld.Core.Components.Gizmo;
+using Editors.KitbasherEditor.Components;
 using Shared.Ui.Common.MenuSystem;
 using System.Windows.Input;
 
@@ -11,15 +11,17 @@ namespace Editors.KitbasherEditor.UiCommands
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
         public Hotkey? HotKey { get; } = new Hotkey(Key.Add, ModifierKeys.None);
 
-        private readonly GizmoComponent _gizmoComponent;
+        private readonly KitbashSceneComponentSet _components;
 
 
-        public ScaleGizmoUpCommand(GizmoComponent gizmoComponent)
+        public ScaleGizmoUpCommand(
+            KitbashSceneComponentSet components)
         {
-            _gizmoComponent = gizmoComponent;
+            _components = components;
         }
 
-        public void Execute() => _gizmoComponent.ModifyGizmoScale(0.5f);
+        public void Execute() =>
+            _components.ModelGizmo.ModifyGizmoScale(0.5f);
     }
 
     internal class ScaleGizmoDownCommand : ITransientKitbasherUiCommand
@@ -29,14 +31,16 @@ namespace Editors.KitbasherEditor.UiCommands
         public Hotkey HotKey { get; } =
             new Hotkey(Key.Subtract, ModifierKeys.None);
 
-        private readonly GizmoComponent _gizmoComponent;
+        private readonly KitbashSceneComponentSet _components;
 
 
-        public ScaleGizmoDownCommand(GizmoComponent gizmoComponent)
+        public ScaleGizmoDownCommand(
+            KitbashSceneComponentSet components)
         {
-            _gizmoComponent = gizmoComponent;
+            _components = components;
         }
 
-        public void Execute() => _gizmoComponent.ModifyGizmoScale(-0.5f);
+        public void Execute() =>
+            _components.ModelGizmo.ModifyGizmoScale(-0.5f);
     }
 }

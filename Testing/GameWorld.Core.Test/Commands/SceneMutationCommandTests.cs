@@ -190,10 +190,7 @@ namespace Testing.GameWorld.Core.Commands
         private static SelectionManager CreateSelectionManager()
         {
             var selectionManager = new SelectionManager(
-                Mock.Of<IEventHub>(),
-                null!,
-                null!,
-                null!);
+                Mock.Of<IEventHub>());
             selectionManager.CreateSelectionSate(
                 GeometrySelectionMode.Object,
                 null!,

@@ -22,9 +22,8 @@ namespace Editors.CscEditor
             serviceCollection.AddScoped<CscPlaybackContext>();
             serviceCollection.AddScoped<CscSceneGraphBuilder>();
 
-            // Game components (picked up by IComponentInserter)
-            RegisterGameComponent<CscAnimationComponent>(serviceCollection);
-            RegisterGameComponent<CscGizmoComponent>(serviceCollection);
+            serviceCollection.AddScoped<CscAnimationComponent>();
+            serviceCollection.AddScoped<CscGizmoComponent>();
         }
 
         public override void RegisterTools(IEditorDatabase editorDatabase)

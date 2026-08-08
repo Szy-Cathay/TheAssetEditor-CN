@@ -415,7 +415,7 @@ namespace GameWorld.Core.Components.Gizmo
             }
         }
 
-        internal void ReplaceInitialPreview(
+        public void ReplaceInitialPreview(
             ModalPreviewReplacement replacement)
         {
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
@@ -1403,7 +1403,8 @@ namespace GameWorld.Core.Components.Gizmo
         /// </summary>
         public bool HasBackup => _hasBackup;
 
-        internal bool IsTransformActive => _activeCommand != null || _hasBackup;
+        public bool IsTransformActive =>
+            _activeCommand != null || _hasBackup;
 
         /// <summary>
         /// Set falloff distance for face/edge mode proportional editing
@@ -1546,7 +1547,7 @@ namespace GameWorld.Core.Components.Gizmo
             RememberAnimationDisplayState();
         }
 
-        internal void RefreshDisplayForAnimationState()
+        public void RefreshDisplayForAnimationState()
         {
             if (_effectedMeshNodes == null ||
                 _hasBackup)

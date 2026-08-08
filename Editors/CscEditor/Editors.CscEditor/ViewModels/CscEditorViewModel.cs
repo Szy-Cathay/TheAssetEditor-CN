@@ -197,12 +197,14 @@ namespace Editors.CscEditor.ViewModels
             IEventHub eventHub,
             IWpfGame gameWorld,
             IComponentInserter componentInserter,
+            View3DCoreComponentSet coreComponents,
             CscSceneGraphBuilder sceneBuilder,
             CscAnimationComponent animationComponent,
             CscGizmoComponent gizmoComponent,
             CscPlaybackContext playbackContext,
             ArcBallCamera camera,
             SelectionManager selectionManager,
+            ReferenceObjectSelectionComponent objectSelectionComponent,
             LocalizationManager localization,
             IFactionColourSettingsDialogService factionColourSettingsDialog)
         {
@@ -236,7 +238,11 @@ namespace Editors.CscEditor.ViewModels
             PortholeBackImage = LoadPackImage("ui/skins/default/porthole_back.png");
             PortholeFrameImage = LoadPackImage("ui/skins/default/porthole.png");
 
-            componentInserter.Execute();
+            componentInserter.Execute(
+                coreComponents,
+                objectSelectionComponent,
+                animationComponent,
+                gizmoComponent);
 
             _gizmo.ElementModified += OnGizmoModifiedElement;
             _gizmo.DragStarted += OnEditGestureStarted;

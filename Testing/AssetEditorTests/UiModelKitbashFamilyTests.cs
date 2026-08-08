@@ -790,6 +790,92 @@ public class UiModelKitbashFamilyTests
         });
     }
 
+    [Test]
+    public void MainEditableSkeletonSelector_KeepsLabelOnTheInputRowWhenExpanded()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                const string converterKey = "BoolToCollapsedConverter";
+                var resources = Application.Current.Resources;
+                var hadConverter = resources.Contains(converterKey);
+                var previousConverter = hadConverter
+                    ? resources[converterKey]
+                    : null;
+                resources[converterKey] = new BoolToVisibilityConverter
+                {
+                    TrueValue = Visibility.Visible,
+                    FalseValue = Visibility.Collapsed,
+                };
+                try
+                {
+                    var view = new MainEditableNodeView();
+                    var window = new Window
+                    {
+                        Content = view,
+                        Width = 640,
+                        Height = 720,
+                        ShowActivated = false,
+                        ShowInTaskbar = false,
+                    };
+                    try
+                    {
+                        window.Show();
+                        window.UpdateLayout();
+
+                        var selector = FindVisualDescendants<
+                                CollapsableFilterControl>(view)
+                            .Single();
+                        var browseButton = FindVisualDescendants<Button>(selector)
+                            .First(button => button.Name == "BrowseButton");
+                        browseButton.RaiseEvent(new RoutedEventArgs(
+                            Button.ClickEvent));
+                        window.UpdateLayout();
+
+                        var visibleLabels = FindVisualDescendants<Label>(view)
+                            .Where(label =>
+                                label.Visibility == Visibility.Visible &&
+                                Equals(label.Content, selector.LabelText))
+                            .ToArray();
+                        var selectorLabel = FindVisualDescendants<Label>(selector)
+                            .Single(label =>
+                                Equals(label.Content, selector.LabelText));
+                        var selectedFileName = FindVisualDescendants<TextBox>(selector)
+                            .Single(textBox => textBox.Name == "SelectedFileName");
+                        var labelTop = selectorLabel.TransformToAncestor(selector)
+                            .Transform(new Point()).Y;
+                        var inputTop = selectedFileName.TransformToAncestor(selector)
+                            .Transform(new Point()).Y;
+
+                        NUnitAssert.Multiple(() =>
+                        {
+                            NUnitAssert.That(selector.ShowLabel, Is.True);
+                            NUnitAssert.That(selector.LabelTotalWidth,
+                                Is.EqualTo(150));
+                            NUnitAssert.That(visibleLabels,
+                                Has.Length.EqualTo(1));
+                            NUnitAssert.That(selectorLabel.Visibility,
+                                Is.EqualTo(Visibility.Visible));
+                            NUnitAssert.That(labelTop,
+                                Is.EqualTo(inputTop).Within(1));
+                        });
+                    }
+                    finally
+                    {
+                        window.Close();
+                    }
+                }
+                finally
+                {
+                    if (hadConverter)
+                        resources[converterKey] = previousConverter!;
+                    else
+                        resources.Remove(converterKey);
+                }
+            });
+    }
+
     private static IReadOnlyList<string> ReadProductSources()
     {
         var root = FindSolutionRoot();

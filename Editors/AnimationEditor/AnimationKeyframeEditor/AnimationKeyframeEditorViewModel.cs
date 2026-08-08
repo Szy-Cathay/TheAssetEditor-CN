@@ -37,12 +37,14 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
         private CopyPastePose _copyPastePose;
         private CopyPasteFromClipboardPose _copyPasteClipboardPose;
         private InterpolateBetweenPose _interpolateBetweenPose;
+        private readonly BoneSelectionHighlightComponent
+            _boneSelectionHighlight;
 
-        public SelectionComponent SelectionComponent { get => _selectionComponent; private set { _selectionComponent = value; } }
-        private SelectionComponent _selectionComponent;
+        public AnimationBoneSelectionComponent SelectionComponent { get => _selectionComponent; private set { _selectionComponent = value; } }
+        private AnimationBoneSelectionComponent _selectionComponent;
 
-        public GizmoComponent GizmoComponent { get => _gizmoComponent; private set { _gizmoComponent = value; } }
-        private GizmoComponent _gizmoComponent;
+        public AnimationBoneGizmoComponent GizmoComponent { get => _gizmoComponent; private set { _gizmoComponent = value; } }
+        private AnimationBoneGizmoComponent _gizmoComponent;
 
         public CommandFactory CommandFactory { get => _commandFactory; private set { _commandFactory = value; } }
         private CommandFactory _commandFactory;
@@ -162,13 +164,14 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
 
         public AnimationKeyframeEditorViewModel(IPackFileService pfs,
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
-            SelectionComponent selectionComponent,
+            AnimationBoneSelectionComponent selectionComponent,
             SceneObjectViewModelBuilder sceneObjectViewModelBuilder,
             AnimationPlayerViewModel animationPlayerViewModel,
             SceneObjectEditor sceneObjectBuilder,
             CommandFactory commandFactory,
             SelectionManager selectionManager,
-            GizmoComponent gizmoComponent,
+            AnimationBoneGizmoComponent gizmoComponent,
+            BoneSelectionHighlightComponent boneSelectionHighlight,
             CommandExecutor commandExecutor,
             IFileSaveService packFileSaveService,
             IStandardDialogs standardDialogs)
@@ -185,6 +188,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             _selectionManager = selectionManager;
 
             _gizmoComponent = gizmoComponent;
+            _boneSelectionHighlight = boneSelectionHighlight;
             _commandExecutor = commandExecutor;
             _packFileSaveService = packFileSaveService;
             _standardDialogs = standardDialogs;
@@ -211,6 +215,9 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
 
         public void Initialize(EditorHost<AnimationKeyframeEditorViewModel> owner)
         {
+           owner.GameWorld.Value.AddComponent(_selectionComponent);
+           owner.GameWorld.Value.AddComponent(_gizmoComponent);
+           owner.GameWorld.Value.AddComponent(_boneSelectionHighlight);
            //var riderItem = _sceneObjectViewModelBuilder.CreateAsset(true, "Rider", Color.Black, null);
            //var mountItem = _sceneObjectViewModelBuilder.CreateAsset(true, "Mount", Color.Black, null);
            //mountItem.Data.IsSelectable = true;

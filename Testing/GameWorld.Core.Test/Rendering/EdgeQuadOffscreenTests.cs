@@ -79,6 +79,79 @@ public class EdgeQuadOffscreenTests
     }
 
     [Test]
+    public void Draw_PreviewShapeWireframeKeepsItsOwnColour()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var effect = game.Content.Load<Effect>("Shaders\\EdgeQuadShader");
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver.SetupGet(x => x.Device).Returns(device);
+        var resourceLibrary = new Mock<IScopedResourceLibrary>();
+        resourceLibrary
+            .Setup(x => x.GetStaticEffect(ShaderTypes.EdgeQuad))
+            .Returns(effect);
+        using var renderer = new EdgeQuadInstanceMesh(
+            deviceResolver.Object,
+            resourceLibrary.Object);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            64,
+            64,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        var shape = PreviewShapeGeometry.CreateBoxMarker(
+            Vector3.Zero,
+            0.65f,
+            Color.Transparent,
+            new Color(50, 190, 220),
+            0.75f);
+        renderer.Update(shape.Edges);
+
+        try
+        {
+            device.SetRenderTarget(renderTarget);
+            device.Clear(
+                ClearOptions.Target | ClearOptions.DepthBuffer,
+                Color.Transparent,
+                1.0f,
+                0);
+            device.DepthStencilState = DepthStencilState.Default;
+            device.RasterizerState = RasterizerState.CullNone;
+            renderer.Draw(
+                Matrix.Identity,
+                Matrix.Identity,
+                64.0f,
+                64.0f,
+                device);
+        }
+        finally
+        {
+            device.SetRenderTarget(null);
+        }
+
+        var pixels = new Color[64 * 64];
+        renderTarget.GetData(pixels);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                pixels.Count(pixel =>
+                    pixel.A > 0 &&
+                    pixel.B > pixel.R * 2 &&
+                    pixel.G > pixel.R * 2),
+                Is.GreaterThan(0),
+                "SuperView preview shapes must keep their own edge colour.");
+            Assert.That(
+                pixels.Count(pixel =>
+                    pixel.A > 0 &&
+                    pixel.R > pixel.G * 1.5f &&
+                    pixel.G > pixel.B + 5),
+                Is.EqualTo(0),
+                "Kitbash vertex selection colours must not leak into preview shape wireframes.");
+        });
+    }
+
+    [Test]
     public void Draw_AntialiasedEdgeUsesPremultipliedCoverage()
     {
         var pixels = RenderEdge(

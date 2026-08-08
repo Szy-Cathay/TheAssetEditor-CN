@@ -18,7 +18,6 @@ float OverlayOpacity = 1.0;
 float BaseOpacity = 1.0;
 float EdgeDepthBias = 0.0;
 float EdgeHalfWidth = 1.0;
-float3 OverlayColor;
 bool CapabilityFlag_ApplyAnimation = false;
 float4x4 Animation_Tranforms[256];
 int Animation_WeightCount = 0;
@@ -40,6 +39,8 @@ struct VSAnimatedInstanceInput
     float3 BindP1 : POSITION2;
     float4 Weights1 : COLOR2;
     float4 BoneIndices1 : BLENDINDICES2;
+    float3 Colour0 : NORMAL5;
+    float3 Colour1 : NORMAL6;
 };
 
 struct VSInput
@@ -171,8 +172,8 @@ VSOutput AnimatedEdgeQuadVS(
         input,
         mul(worldP0, ViewProjection),
         mul(worldP1, ViewProjection),
-        OverlayColor,
-        OverlayColor,
+        instance.Colour0,
+        instance.Colour1,
         EdgeHalfWidth);
 }
 

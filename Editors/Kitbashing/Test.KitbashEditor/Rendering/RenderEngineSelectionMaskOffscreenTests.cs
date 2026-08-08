@@ -1,4 +1,5 @@
 using System.Reflection;
+using Editors.KitbasherEditor.Components;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
@@ -30,6 +31,32 @@ namespace GameWorld.Core.Test.Rendering;
 [NonParallelizable]
 public class RenderEngineSelectionMaskOffscreenTests
 {
+    [Test]
+    public void DenseStaticOverlay_PrioritizesSelectedVertexEdgesPastRenderLimit()
+    {
+        const int maxEdges = 50000;
+        const int selectedVertex = 50001;
+        var indices = Enumerable.Range(0, 50004)
+            .Select(index => (ushort)index)
+            .ToArray();
+
+        var edges = KitbashSelectionOverlayComponent.BuildEdges(
+            indices,
+            maxEdges,
+            [selectedVertex]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                edges,
+                Does.Contain((selectedVertex, selectedVertex + 1)));
+            Assert.That(
+                edges,
+                Does.Contain((selectedVertex, selectedVertex + 2)));
+            Assert.That(edges, Has.Length.EqualTo(maxEdges));
+        });
+    }
+
     [TestCase(false, ViewportShadingMode.Wireframe)]
     [TestCase(true, ViewportShadingMode.Wireframe)]
     [TestCase(false, ViewportShadingMode.MaterialPreview)]
@@ -78,12 +105,14 @@ public class RenderEngineSelectionMaskOffscreenTests
             ShadingMode = shadingMode
         };
         renderEngine.Initialize();
-        var selectionManager = new SelectionManager(
-            eventHub.Object,
-            renderEngine,
-            scopedResources,
-            deviceResolver.Object);
-        selectionManager.Initialize();
+        var selectionManager = new SelectionManager(eventHub.Object);
+        using var selectionOverlay =
+            new KitbashSelectionOverlayComponent(
+                selectionManager,
+                renderEngine,
+                scopedResources,
+                deviceResolver.Object);
+        selectionOverlay.Initialize();
         var mesh = CreateMesh(device, animated);
         var rmvMaterial = new Mock<IRmvMaterial>();
         rmvMaterial.SetupGet(value => value.ModelName)
@@ -131,7 +160,7 @@ public class RenderEngineSelectionMaskOffscreenTests
             node,
             onlyRemove: false);
         node.Render(renderEngine, Matrix.Identity);
-        selectionManager.Draw(new GameTime());
+        selectionOverlay.Draw(new GameTime());
         var objectRequestField = typeof(RenderEngineComponent).GetField(
             "_selectionOutlineRequested",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -184,7 +213,7 @@ public class RenderEngineSelectionMaskOffscreenTests
         for (var frame = 0; frame < 2; frame++)
         {
             node.Render(renderEngine, Matrix.Identity);
-            selectionManager.Draw(new GameTime());
+            selectionOverlay.Draw(new GameTime());
             device.SetRenderTargets(
                 new RenderTargetBinding(sceneTarget),
                 new RenderTargetBinding(maskTarget));
@@ -363,12 +392,14 @@ public class RenderEngineSelectionMaskOffscreenTests
                 resources,
                 deviceResolver.Object));
         renderEngine.Initialize();
-        var selectionManager = new SelectionManager(
-            eventHub.Object,
-            renderEngine,
-            scopedResources,
-            deviceResolver.Object);
-        selectionManager.Initialize();
+        var selectionManager = new SelectionManager(eventHub.Object);
+        using var selectionOverlay =
+            new KitbashSelectionOverlayComponent(
+                selectionManager,
+                renderEngine,
+                scopedResources,
+                deviceResolver.Object);
+        selectionOverlay.Initialize();
         var mesh = CreateMesh(device, animated: false);
         var material = new Mock<IRmvMaterial>();
         material.SetupGet(value => value.ModelName).Returns("test");
@@ -387,7 +418,7 @@ public class RenderEngineSelectionMaskOffscreenTests
             [(0, 1), (2, 3)],
             onlyRemove: false);
         selectionManager.SetState(selection);
-        selectionManager.Draw(new GameTime());
+        selectionOverlay.Draw(new GameTime());
         using var renderTarget = new RenderTarget2D(
             device,
             size,
@@ -438,7 +469,7 @@ public class RenderEngineSelectionMaskOffscreenTests
             [0, 3],
             onlyRemove: false);
         selectionManager.SetState(faceSelection);
-        selectionManager.Draw(new GameTime());
+        selectionOverlay.Draw(new GameTime());
 
         Assert.That(
             GetRenderItems(
@@ -496,12 +527,14 @@ public class RenderEngineSelectionMaskOffscreenTests
             ShadingMode = ViewportShadingMode.Wireframe
         };
         renderEngine.Initialize();
-        var selectionManager = new SelectionManager(
-            eventHub.Object,
-            renderEngine,
-            scopedResources,
-            deviceResolver.Object);
-        selectionManager.Initialize();
+        var selectionManager = new SelectionManager(eventHub.Object);
+        using var selectionOverlay =
+            new KitbashSelectionOverlayComponent(
+                selectionManager,
+                renderEngine,
+                scopedResources,
+                deviceResolver.Object);
+        selectionOverlay.Initialize();
         var mesh = CreateMesh(device, animated: false);
         var node = new Rmv2MeshNode(
             mesh,
@@ -549,9 +582,8 @@ public class RenderEngineSelectionMaskOffscreenTests
         }
 
         selectionManager.SetState(selectionState);
-        selectionManager.Update(new GameTime());
         renderEngine.Update(new GameTime());
-        selectionManager.Draw(new GameTime());
+        selectionOverlay.Draw(new GameTime());
         using var renderTarget = new RenderTarget2D(
             device,
             size,
@@ -576,6 +608,180 @@ public class RenderEngineSelectionMaskOffscreenTests
             pixels.Count(IsSelectedOrange),
             Is.GreaterThan(0),
             $"Wireframe {mode} mode must keep the real selected-element overlay visible.");
+
+        selectionManager.Dispose();
+        mesh.Dispose();
+    }
+
+    [Test]
+    public void AnimatedVertexSelection_OnlyHighlightsConnectedEdgeEnds()
+    {
+        const int size = 128;
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>());
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        var eventHub = new Mock<IEventHub>();
+        using var scopedResources = new ScopedResourceLibrary(
+            resources,
+            eventHub.Object,
+            Mock.Of<IStandardDialogs>());
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            eventHub.Object,
+            new GridComponent(
+                camera,
+                resources,
+                deviceResolver.Object)
+            {
+                ShowGrid = false
+            });
+        renderEngine.Initialize();
+        var selectionManager = new SelectionManager(eventHub.Object);
+        using var selectionOverlay =
+            new KitbashSelectionOverlayComponent(
+                selectionManager,
+                renderEngine,
+                scopedResources,
+                deviceResolver.Object);
+        selectionOverlay.Initialize();
+        var mesh = CreateMesh(device, animated: true);
+        var node = new Rmv2MeshNode(
+            mesh,
+            Mock.Of<IRmvMaterial>(),
+            null!,
+            CreateAnimationPlayer());
+        var selection = new VertexSelectionState(node, 0);
+        selection.ActiveVertex = null;
+
+        selectionManager.SetState(selection);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        var parameters = new CommonShaderParameters(
+            Matrix.Identity,
+            Matrix.Identity,
+            Vector3.Zero,
+            Vector3.Forward,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            [],
+            size,
+            size);
+
+        Color[] DrawCurrentWireframe()
+        {
+            renderEngine.Update(new GameTime());
+            selectionOverlay.Draw(new GameTime());
+            var wireframe = GetRenderItems(
+                    renderEngine,
+                    RenderBuckedId.Wireframe)
+                .OfType<AnimatedWireframeRenderItem>()
+                .Single();
+            try
+            {
+                device.SetRenderTarget(renderTarget);
+                device.Clear(
+                    ClearOptions.Target | ClearOptions.DepthBuffer,
+                    Color.Transparent,
+                    1,
+                    0);
+                device.BlendState = BlendState.Opaque;
+                device.DepthStencilState = DepthStencilState.Default;
+                device.RasterizerState = RasterizerState.CullNone;
+                wireframe.Draw(
+                    device,
+                    parameters,
+                    RenderingTechnique.Normal);
+            }
+            finally
+            {
+                device.SetRenderTarget(null);
+            }
+
+            var framePixels = new Color[size * size];
+            renderTarget.GetData(framePixels);
+            return framePixels;
+        }
+
+        var defaultPixels = DrawCurrentWireframe();
+        selection.ModifySelection([0], onlyRemove: false);
+        var pixels = DrawCurrentWireframe();
+        selectionManager.SetState(new EdgeSelectionState
+        {
+            RenderObject = node
+        });
+        var edgeModePixels = DrawCurrentWireframe();
+        var connectedHighlight = CountPixels(
+            pixels,
+            size,
+            8,
+            46,
+            44,
+            84,
+            IsSelectedOrange);
+        var remoteTopologyHighlight = CountPixels(
+            pixels,
+            size,
+            48,
+            120,
+            46,
+            58,
+            IsSelectedOrange);
+        var farEndpointHighlight = CountPixels(
+            pixels,
+            size,
+            98,
+            120,
+            70,
+            84,
+            IsSelectedOrange);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                defaultPixels.Count(IsSelectedOrange),
+                Is.EqualTo(0),
+                "Kitbash vertex mode must keep an unselected wireframe neutral.");
+            Assert.That(
+                edgeModePixels.Count(IsSelectedOrange),
+                Is.EqualTo(0),
+                "Leaving vertex mode must clear the Kitbash vertex-edge gradient.");
+            Assert.That(
+                connectedHighlight,
+                Is.GreaterThan(0),
+                "The selected vertex must send a fading orange highlight into its connected edges.");
+            Assert.That(
+                remoteTopologyHighlight,
+                Is.EqualTo(0),
+                "Edges that are not connected to the selected vertex must keep the normal wire colour.");
+            Assert.That(
+                farEndpointHighlight,
+                Is.EqualTo(0),
+                "The highlight must fade before reaching an unselected endpoint.");
+        });
 
         selectionManager.Dispose();
         mesh.Dispose();
@@ -624,12 +830,14 @@ public class RenderEngineSelectionMaskOffscreenTests
             eventHub.Object,
             grid);
         renderEngine.Initialize();
-        var selectionManager = new SelectionManager(
-            eventHub.Object,
-            renderEngine,
-            scopedResources,
-            deviceResolver.Object);
-        selectionManager.Initialize();
+        var selectionManager = new SelectionManager(eventHub.Object);
+        using var selectionOverlay =
+            new KitbashSelectionOverlayComponent(
+                selectionManager,
+                renderEngine,
+                scopedResources,
+                deviceResolver.Object);
+        selectionOverlay.Initialize();
         var mesh = CreateMesh(device, animated);
         var material = new Mock<IRmvMaterial>();
         material.SetupGet(value => value.ModelName).Returns("test");
@@ -652,7 +860,7 @@ public class RenderEngineSelectionMaskOffscreenTests
         renderEngine.AddRenderItem(
             RenderBuckedId.Normal,
             surface);
-        selectionManager.Draw(new GameTime());
+        selectionOverlay.Draw(new GameTime());
         var selectionRenderItems = GetRenderItems(
             renderEngine,
             RenderBuckedId.Selection);
@@ -710,7 +918,7 @@ public class RenderEngineSelectionMaskOffscreenTests
         renderEngine.AddRenderItem(
             RenderBuckedId.Normal,
             surface);
-        selectionManager.Draw(new GameTime());
+        selectionOverlay.Draw(new GameTime());
 
         device.SetRenderTarget(renderTarget);
         device.Clear(
@@ -1203,6 +1411,28 @@ public class RenderEngineSelectionMaskOffscreenTests
         return pixel.A > 0 &&
                pixel.R > pixel.G * 1.5f &&
                pixel.G > pixel.B + 5;
+    }
+
+    private static int CountPixels(
+        IReadOnlyList<Color> pixels,
+        int width,
+        int startX,
+        int endX,
+        int startY,
+        int endY,
+        Func<Color, bool> predicate)
+    {
+        var count = 0;
+        for (var y = startY; y < endY; y++)
+        {
+            for (var x = startX; x < endX; x++)
+            {
+                if (predicate(pixels[y * width + x]))
+                    count++;
+            }
+        }
+
+        return count;
     }
 
     private static double GetAverageOrangeRow(
