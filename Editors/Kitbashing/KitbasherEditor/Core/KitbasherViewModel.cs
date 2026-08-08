@@ -9,6 +9,7 @@ using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.Components;
+using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using KitbasherEditor.ViewModels.MenuBarViews;
 using Serilog;
@@ -65,6 +66,7 @@ namespace Editors.KitbasherEditor.ViewModels
             IUiCommandFactory uiCommandFactory,
             CommandExecutor commandExecutor,
             IComponentInserter componentInserter,
+            SelectionManager selectionManager,
             SkeletonChangedHandler skeletonChangedHandler, 
             SceneNodeEditorViewModel sceneNodeEditorView)
         {
@@ -79,6 +81,7 @@ namespace Editors.KitbasherEditor.ViewModels
             SceneExplorer = sceneExplorerViewModel;
             MenuBar = menuBarViewModel;
             SceneNodeEditor = sceneNodeEditorView;
+            selectionManager.VertexSelectionEdgeGradientEnabled = true;
             
             // Events
             eventHub.Register<ScopedFileSavedEvent>(this, OnFileSaved);

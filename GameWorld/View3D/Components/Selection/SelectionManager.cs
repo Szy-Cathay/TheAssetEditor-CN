@@ -72,6 +72,21 @@ namespace GameWorld.Core.Components.Selection
         private EdgeData[] _edgeDataCache = Array.Empty<EdgeData>();
         private bool _selectedEdgeDataDirty = true;
         private bool _activeEdgeDataDirty = true;
+        private bool _vertexWireframeSelectionDirty = true;
+        private bool _vertexSelectionEdgeGradientEnabled;
+
+        public bool VertexSelectionEdgeGradientEnabled
+        {
+            get => _vertexSelectionEdgeGradientEnabled;
+            set
+            {
+                if (_vertexSelectionEdgeGradientEnabled == value)
+                    return;
+
+                _vertexSelectionEdgeGradientEnabled = value;
+                _vertexWireframeSelectionDirty = true;
+            }
+        }
 
         public SelectionManager(IEventHub eventHub, RenderEngineComponent renderEngine, IScopedResourceLibrary resourceLib, IDeviceResolver deviceResolverComponent)
         {
@@ -86,6 +101,9 @@ namespace GameWorld.Core.Components.Selection
             CreateSelectionSate(GeometrySelectionMode.Object, null, false);
 
             _vertexRenderer = new VertexInstanceMesh(_deviceResolverComponent, _resourceLib);
+            if (VertexSelectionEdgeGradientEnabled)
+                _vertexRenderer.SelectedColour =
+                    EditOverlayStyle.KitbashSelectedColour;
             _edgeQuadRenderer = new EdgeQuadInstanceMesh(_deviceResolverComponent, _resourceLib);
             _edgeQuadRenderItem = new EdgeQuadRenderItem { EdgeQuadRenderer = _edgeQuadRenderer };
             _vertexRenderItem = new VertexRenderItem { VertexRenderer = _vertexRenderer };
@@ -158,6 +176,7 @@ namespace GameWorld.Core.Components.Selection
             _edgeDataDirty = true;
             _selectedEdgeDataDirty = true;
             _activeEdgeDataDirty = true;
+            _vertexWireframeSelectionDirty = true;
             _poseRenderCache.Clear();
             ClearObjectOutlines();
             _vertexRenderItem?.MarkDirty();
@@ -242,7 +261,10 @@ namespace GameWorld.Core.Components.Selection
                         RenderBuckedId.Wireframe,
                         GetWireframeRenderItem(
                             vertexObject,
-                            pose));
+                            pose,
+                            VertexSelectionEdgeGradientEnabled
+                                ? selectionVertexState.SelectedVertices
+                                : null));
                     _vertexRenderItem.Node =
                         vertexObject;
                     _vertexRenderItem.Pose = pose;
@@ -567,8 +589,10 @@ namespace GameWorld.Core.Components.Selection
         private AnimatedWireframeRenderItem
             GetWireframeRenderItem(
                 Rmv2MeshNode meshNode,
-                MeshPoseSnapshot pose)
+                MeshPoseSnapshot pose,
+                IReadOnlyCollection<int>? selectedVertices = null)
         {
+            var created = false;
             if (_wireframeRenderItem == null ||
                 _wireframeMesh != meshNode)
             {
@@ -587,10 +611,22 @@ namespace GameWorld.Core.Components.Selection
                         EdgeHalfWidth =
                             EditOverlayStyle.WireHalfWidth
                     };
+                created = true;
             }
             else
             {
                 _wireframeRenderItem.UpdatePose(pose);
+            }
+
+            if (selectedVertices == null)
+            {
+                _wireframeRenderItem.ClearSelectedVertices();
+            }
+            else if (created || _vertexWireframeSelectionDirty)
+            {
+                _wireframeRenderItem.UpdateSelectedVertices(
+                    selectedVertices);
+                _vertexWireframeSelectionDirty = false;
             }
 
             return _wireframeRenderItem;

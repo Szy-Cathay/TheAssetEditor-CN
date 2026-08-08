@@ -36,6 +36,14 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
+    public void Scene_EnablesVertexSelectionEdgeGradient()
+    {
+        Assert.That(
+            SelectionManager.VertexSelectionEdgeGradientEnabled,
+            Is.True);
+    }
+
+    [Test]
     public void GizmoScaleCommands_MatchTheirNames()
     {
         var commandFactory =

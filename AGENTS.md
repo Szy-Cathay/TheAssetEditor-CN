@@ -106,6 +106,9 @@
 - `Shared/SharedCore` 放置无 WPF 业务界面的核心服务与模型，`Shared/GameFiles` 放置游戏格式，`Shared/SharedUI` 放置跨模块、无业务含义的通用 WPF 组件。
 - `Shared.Ui` 只能引用 `Shared/` 内项目，不得反向依赖 `AssetEditor`、`Editors` 或具体业务编辑器；已有 `SharedUiArchitectureTests` 是这条边界的自动门禁。
 - 只有被多个模块真实复用、无业务含义且可独立验证的 UI 才进入 `Shared.Ui`；对话框等通用依赖优先走 `IStandardDialogs` 等现有抽象。
+- `KitbashEditor` 是唯一承担模型编辑的编辑器；其他编辑器中的模型只用于参考、预览或辅助展示，不得把它们视为模型编辑入口。
+- 其他编辑器可以共用公共 View3D 场景组件；`KitbashEditor` 的模型选择、变换、编辑覆盖层及专属三维场景效果必须由 `Editors/Kitbashing/KitbasherEditor` 内的独立组件实现，并且只在 Kitbash 编辑器作用域注册。Kitbash 专属行为不得通过共享组件中的模式开关、编辑器类型判断或共享默认值实现。
+- Kitbash 独立组件可以复用无编辑器语义的底层数据结构、数学、设备和绘制原语，但不得改变其他编辑器使用的共享场景组件行为。修改 `GameWorld/View3D` 中的共享选择、Gizmo、输入或渲染组件前，必须先证明该行为对所有使用者都成立；仅服务 Kitbash 的需求应留在 Kitbash 模块。
 - 比较上游 `D:\TheAssetEditor` 时必须实时核对两边 HEAD、分支、工作区、行为、项目引用、本地化和测试；文件名相同或旧记忆不能证明功能等价。
 
 ## Pack 与文件夹工程

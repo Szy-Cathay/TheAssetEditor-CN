@@ -64,10 +64,11 @@ namespace GameWorld.Core.Rendering
         Matrix _overlayBoundsWorld = Matrix.Identity;
         internal int InstanceUploadCount { get; private set; }
 
-        readonly Vector3 _selectedColour =
-            EditOverlayStyle.SelectedColour;
         readonly Vector3 _deselectedColour =
             EditOverlayStyle.VertexColour;
+
+        public Vector3 SelectedColour { get; set; } =
+            EditOverlayStyle.SelectedColour;
 
         // Screen-space vertex diameter remains stable across mesh types.
         public float VertexPixelSize { get; set; } =
@@ -271,7 +272,7 @@ namespace GameWorld.Core.Rendering
 
             return Vector3.Lerp(
                 _deselectedColour,
-                _selectedColour,
+                SelectedColour,
                 selectionWeight);
         }
 

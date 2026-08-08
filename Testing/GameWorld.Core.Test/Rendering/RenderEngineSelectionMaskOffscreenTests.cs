@@ -581,6 +581,183 @@ public class RenderEngineSelectionMaskOffscreenTests
         mesh.Dispose();
     }
 
+    [Test]
+    public void AnimatedVertexSelection_OnlyHighlightsConnectedEdgeEnds()
+    {
+        const int size = 128;
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>());
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        var eventHub = new Mock<IEventHub>();
+        using var scopedResources = new ScopedResourceLibrary(
+            resources,
+            eventHub.Object,
+            Mock.Of<IStandardDialogs>());
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            eventHub.Object,
+            new GridComponent(
+                camera,
+                resources,
+                deviceResolver.Object)
+            {
+                ShowGrid = false
+            });
+        renderEngine.Initialize();
+        var selectionManager = new SelectionManager(
+            eventHub.Object,
+            renderEngine,
+            scopedResources,
+            deviceResolver.Object);
+        Assert.That(
+            selectionManager.VertexSelectionEdgeGradientEnabled,
+            Is.False,
+            "Other editors must retain the existing wireframe behaviour unless they opt in.");
+        selectionManager.Initialize();
+        var mesh = CreateMesh(device, animated: true);
+        var node = new Rmv2MeshNode(
+            mesh,
+            Mock.Of<IRmvMaterial>(),
+            null!,
+            CreateAnimationPlayer());
+        var selection = new VertexSelectionState(node, 0);
+        selection.ModifySelection([0], onlyRemove: false);
+        selection.ActiveVertex = null;
+
+        selectionManager.SetState(selection);
+        using var renderTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        var parameters = new CommonShaderParameters(
+            Matrix.Identity,
+            Matrix.Identity,
+            Vector3.Zero,
+            Vector3.Forward,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            [],
+            size,
+            size);
+
+        Color[] DrawCurrentWireframe()
+        {
+            renderEngine.Update(new GameTime());
+            selectionManager.Draw(new GameTime());
+            var wireframe = GetRenderItems(
+                    renderEngine,
+                    RenderBuckedId.Wireframe)
+                .OfType<AnimatedWireframeRenderItem>()
+                .Single();
+            try
+            {
+                device.SetRenderTarget(renderTarget);
+                device.Clear(
+                    ClearOptions.Target | ClearOptions.DepthBuffer,
+                    Color.Transparent,
+                    1,
+                    0);
+                device.BlendState = BlendState.Opaque;
+                device.DepthStencilState = DepthStencilState.Default;
+                device.RasterizerState = RasterizerState.CullNone;
+                wireframe.Draw(
+                    device,
+                    parameters,
+                    RenderingTechnique.Normal);
+            }
+            finally
+            {
+                device.SetRenderTarget(null);
+            }
+
+            var framePixels = new Color[size * size];
+            renderTarget.GetData(framePixels);
+            return framePixels;
+        }
+
+        var defaultPixels = DrawCurrentWireframe();
+        selectionManager.VertexSelectionEdgeGradientEnabled = true;
+        var pixels = DrawCurrentWireframe();
+        selectionManager.SetState(new EdgeSelectionState
+        {
+            RenderObject = node
+        });
+        var edgeModePixels = DrawCurrentWireframe();
+        var connectedHighlight = CountPixels(
+            pixels,
+            size,
+            8,
+            46,
+            44,
+            84,
+            IsSelectedOrange);
+        var remoteTopologyHighlight = CountPixels(
+            pixels,
+            size,
+            48,
+            120,
+            46,
+            58,
+            IsSelectedOrange);
+        var farEndpointHighlight = CountPixels(
+            pixels,
+            size,
+            98,
+            120,
+            70,
+            84,
+            IsSelectedOrange);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                defaultPixels.Count(IsSelectedOrange),
+                Is.EqualTo(0),
+                "Editors that do not opt in must keep the existing uniform wireframe colour.");
+            Assert.That(
+                edgeModePixels.Count(IsSelectedOrange),
+                Is.EqualTo(0),
+                "Leaving vertex mode must clear the vertex-edge gradient from the shared wireframe item.");
+            Assert.That(
+                connectedHighlight,
+                Is.GreaterThan(0),
+                "The selected vertex must send a fading orange highlight into its connected edges.");
+            Assert.That(
+                remoteTopologyHighlight,
+                Is.EqualTo(0),
+                "Edges that are not connected to the selected vertex must keep the normal wire colour.");
+            Assert.That(
+                farEndpointHighlight,
+                Is.EqualTo(0),
+                "The highlight must fade before reaching an unselected endpoint.");
+        });
+
+        selectionManager.Dispose();
+        mesh.Dispose();
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void Render3DObjects_SelectedEdgeRemainsOrangeOverWireframe(
@@ -1203,6 +1380,28 @@ public class RenderEngineSelectionMaskOffscreenTests
         return pixel.A > 0 &&
                pixel.R > pixel.G * 1.5f &&
                pixel.G > pixel.B + 5;
+    }
+
+    private static int CountPixels(
+        IReadOnlyList<Color> pixels,
+        int width,
+        int startX,
+        int endX,
+        int startY,
+        int endY,
+        Func<Color, bool> predicate)
+    {
+        var count = 0;
+        for (var y = startY; y < endY; y++)
+        {
+            for (var x = startX; x < endX; x++)
+            {
+                if (predicate(pixels[y * width + x]))
+                    count++;
+            }
+        }
+
+        return count;
     }
 
     private static double GetAverageOrangeRow(
