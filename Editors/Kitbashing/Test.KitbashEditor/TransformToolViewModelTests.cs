@@ -139,7 +139,7 @@ public class TransformToolViewModelTests
     {
         var eventHub = new TestEventHub();
         var commandExecutor = new CommandExecutor(eventHub);
-        var selectionManager = new SelectionManager(eventHub, null, null, null);
+        var selectionManager = new SelectionManager(eventHub);
         var serviceProvider = new Mock<IServiceProvider>();
         serviceProvider
             .Setup(provider => provider.GetService(typeof(TransformBoneCommand)))

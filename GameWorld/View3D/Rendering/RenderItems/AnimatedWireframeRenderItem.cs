@@ -88,6 +88,7 @@ namespace GameWorld.Core.Rendering.RenderItems
         int _vertexDataVersion = -1;
         bool _instanceDataDirty = true;
         HashSet<int>? _selectedVertices;
+        Vector3 _selectedVertexColour;
 
         public float DepthBias { get; set; } =
             EditOverlayStyle.WireDepthBias;
@@ -174,15 +175,17 @@ namespace GameWorld.Core.Rendering.RenderItems
             UpdateSelectedEdgeTopology();
         }
 
-        internal void UpdateSelectedVertices(
-            IEnumerable<int> selectedVertices)
+        public void UpdateSelectedVertices(
+            IEnumerable<int> selectedVertices,
+            Vector3 selectedColour)
         {
             ArgumentNullException.ThrowIfNull(selectedVertices);
             _selectedVertices = selectedVertices.ToHashSet();
+            _selectedVertexColour = selectedColour;
             _instanceDataDirty = true;
         }
 
-        internal void ClearSelectedVertices()
+        public void ClearSelectedVertices()
         {
             if (_selectedVertices == null)
                 return;
@@ -398,7 +401,7 @@ namespace GameWorld.Core.Rendering.RenderItems
         private Vector3 GetEndpointColour(int vertexIndex)
         {
             if (_selectedVertices?.Contains(vertexIndex) == true)
-                return EditOverlayStyle.KitbashSelectedColour;
+                return _selectedVertexColour;
 
             return new Vector3(_colour.X, _colour.Y, _colour.Z);
         }

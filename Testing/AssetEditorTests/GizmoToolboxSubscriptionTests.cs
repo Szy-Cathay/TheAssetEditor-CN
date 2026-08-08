@@ -110,10 +110,7 @@ namespace AssetEditorTests
         {
             var eventHub = new Mock<IEventHub>();
             var selectionManager = new SelectionManager(
-                eventHub.Object,
-                null!,
-                null!,
-                null!);
+                eventHub.Object);
             var commandExecutor = new CommandExecutor(eventHub.Object);
 
             var services = new ServiceCollection();
@@ -126,7 +123,7 @@ namespace AssetEditorTests
 
             var serviceProvider = services.BuildServiceProvider();
             var commandFactory = new CommandFactory(serviceProvider, commandExecutor);
-            var gizmoComponent = new GizmoComponent(
+            var gizmoComponent = new AnimationBoneGizmoComponent(
                 eventHub.Object,
                 null!,
                 null!,
@@ -136,16 +133,19 @@ namespace AssetEditorTests
                 null!,
                 commandFactory,
                 selectionManager);
-            var selectionComponent = new SelectionComponent(
+            var selectionComponent = new AnimationBoneSelectionComponent(
                 null!,
                 null!,
                 null!,
                 selectionManager,
-                null!,
                 commandFactory,
                 null!,
                 null!,
-                gizmoComponent);
+                null!);
+            var boneSelectionHighlight =
+                new BoneSelectionHighlightComponent(
+                    selectionManager,
+                    null!);
 
             var editor = new AnimationKeyframeEditorViewModel(
                 new Mock<IPackFileService>().Object,
@@ -157,9 +157,10 @@ namespace AssetEditorTests
                 commandFactory,
                 selectionManager,
                 gizmoComponent,
+                boneSelectionHighlight,
                 commandExecutor,
                 new Mock<IFileSaveService>().Object,
-                new Mock<IStandardDialogs>().Object);
+                Mock.Of<IStandardDialogs>());
 
             var root = new GroupNode("rider");
             root.AddObject(new GroupNode("placeholder"));

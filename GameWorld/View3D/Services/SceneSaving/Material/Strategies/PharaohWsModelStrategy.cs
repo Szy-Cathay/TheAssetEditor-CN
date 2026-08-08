@@ -4,7 +4,7 @@ using Shared.Core.Settings;
 
 namespace GameWorld.Core.Services.SceneSaving.Material.Strategies
 {
-    internal class PharaohWsModelStrategy : IMaterialStrategy
+    public class PharaohWsModelStrategy : IMaterialStrategy
     {
         private readonly WsModelGeneratorService _wsModelGeneratorService;
         private readonly MaterialToWsMaterialFactory _wsMaterialGeneratorFactory;

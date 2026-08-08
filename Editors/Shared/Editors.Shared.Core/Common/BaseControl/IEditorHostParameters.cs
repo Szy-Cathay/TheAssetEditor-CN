@@ -10,6 +10,7 @@ namespace Editors.Shared.Core.Common.BaseControl
     {
         AnimationPlayerViewModel AnimationPlayerViewModel { get; }
         IComponentInserter ComponentInserter { get; }
+        View3DCoreComponentSet CoreComponents { get; }
         FocusSelectableObjectService FocusSelectableObjectService { get; }
         IWpfGame GameWorld { get; }
         SceneObjectViewModelBuilder SceneObjectViewModelBuilder { get; }
@@ -21,6 +22,7 @@ namespace Editors.Shared.Core.Common.BaseControl
     {
         public EditorHostParameters(
             IComponentInserter componentInserter,
+            View3DCoreComponentSet coreComponents,
             AnimationPlayerViewModel animationPlayerViewModel,
             IWpfGame gameWorld,
             FocusSelectableObjectService focusSelectableObjectService,
@@ -29,6 +31,7 @@ namespace Editors.Shared.Core.Common.BaseControl
             IFactionColourSettingsDialogService factionColourSettingsDialog)
         {
             ComponentInserter = componentInserter;
+            CoreComponents = coreComponents;
             AnimationPlayerViewModel = animationPlayerViewModel;
             GameWorld = gameWorld;
             FocusSelectableObjectService = focusSelectableObjectService;
@@ -38,6 +41,7 @@ namespace Editors.Shared.Core.Common.BaseControl
         }
 
         public IComponentInserter ComponentInserter { get; }
+        public View3DCoreComponentSet CoreComponents { get; }
         public AnimationPlayerViewModel AnimationPlayerViewModel { get; }
         public IWpfGame GameWorld { get; }
         public FocusSelectableObjectService FocusSelectableObjectService { get; }

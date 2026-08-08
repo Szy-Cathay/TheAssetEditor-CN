@@ -42,7 +42,7 @@ namespace Test.KitbashEditor
 
         static SelectionManager CreateSelectionManager(ObjectSelectionState state)
         {
-            var selectionManager = new SelectionManager(Mock.Of<IEventHub>(), null!, null!, null!);
+            var selectionManager = new SelectionManager(Mock.Of<IEventHub>());
             selectionManager.SetState(state);
             return selectionManager;
         }

@@ -1,5 +1,5 @@
 ﻿using Editors.KitbasherEditor.Core.MenuBarViews;
-using GameWorld.Core.Components.Gizmo;
+using Editors.KitbasherEditor.Components;
 using Shared.Ui.Common.MenuSystem;
 using System.Windows.Input;
 
@@ -11,10 +11,11 @@ namespace Editors.KitbasherEditor.UiCommands
         public ActionEnabledRule EnabledRule => ActionEnabledRule.Always;
         public Hotkey? HotKey { get; } = new Hotkey(Key.Add, ModifierKeys.None);
 
-        private readonly GizmoComponent _gizmoComponent;
+        private readonly KitbashModelGizmoComponent _gizmoComponent;
 
 
-        public ScaleGizmoUpCommand(GizmoComponent gizmoComponent)
+        public ScaleGizmoUpCommand(
+            KitbashModelGizmoComponent gizmoComponent)
         {
             _gizmoComponent = gizmoComponent;
         }
@@ -29,10 +30,11 @@ namespace Editors.KitbasherEditor.UiCommands
         public Hotkey HotKey { get; } =
             new Hotkey(Key.Subtract, ModifierKeys.None);
 
-        private readonly GizmoComponent _gizmoComponent;
+        private readonly KitbashModelGizmoComponent _gizmoComponent;
 
 
-        public ScaleGizmoDownCommand(GizmoComponent gizmoComponent)
+        public ScaleGizmoDownCommand(
+            KitbashModelGizmoComponent gizmoComponent)
         {
             _gizmoComponent = gizmoComponent;
         }

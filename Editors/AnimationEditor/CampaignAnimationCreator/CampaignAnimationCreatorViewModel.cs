@@ -5,6 +5,7 @@ using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Animation;
+using GameWorld.Core.Components.Selection;
 using Microsoft.Xna.Framework;
 using Shared.Core.PackFiles;
 using Shared.Core.Services;
@@ -28,8 +29,13 @@ namespace AnimationEditor.CampaignAnimationCreator
             IEditorHostParameters editorHostParameters,
             IPackFileService packFileService,
             ConvertCampaignAnimationCommand convertCommand,
-            SaveCampaignAnimationCommand saveCommand) : base(editorHostParameters)
+            SaveCampaignAnimationCommand saveCommand,
+            ReferenceObjectSelectionComponent objectSelection,
+            ReferenceObjectSelectionOutlineComponent selectionOutline)
+            : base(editorHostParameters)
         {
+            GameWorld!.AddComponent(objectSelection);
+            GameWorld.AddComponent(selectionOutline);
             DisplayName = LocalizationManager.Instance.Get("DisplayName.CampaignAnimationTool");
             _packFileService = packFileService;
             _convertCommand = convertCommand;

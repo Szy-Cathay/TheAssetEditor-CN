@@ -6,6 +6,8 @@ using GameWorld.Core.Commands.Bone;
 using GameWorld.Core.Commands.Object;
 using GameWorld.Core.Commands.Vertex;
 using GameWorld.Core.Components.Gizmo;
+using GizmoComponent =
+    Editors.KitbasherEditor.Components.KitbashModelGizmoComponent;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
@@ -352,7 +354,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
         {
             var eventHub = new TestEventHub();
             var commandExecutor = new CommandExecutor(eventHub);
-            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            var selectionManager = new SelectionManager(eventHub);
             var mouse = new Mock<IMouseComponent>();
             mouse.SetupProperty(component => component.MouseOwner);
             var component = new GizmoComponent(
@@ -1518,7 +1520,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
         {
             var eventHub = new TestEventHub();
             var commandExecutor = new CommandExecutor(eventHub);
-            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            var selectionManager = new SelectionManager(eventHub);
             var serviceProvider = new Mock<IServiceProvider>();
             serviceProvider
                 .Setup(provider => provider.GetService(typeof(TransformVertexCommand)))
@@ -1593,7 +1595,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
         {
             var eventHub = new TestEventHub();
             var commandExecutor = new CommandExecutor(eventHub);
-            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            var selectionManager = new SelectionManager(eventHub);
             selectionManager.SetState(selection);
             var serviceProvider = new Mock<IServiceProvider>();
             serviceProvider
@@ -1634,7 +1636,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
 
             var eventHub = new TestEventHub();
             var commandExecutor = new CommandExecutor(eventHub);
-            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            var selectionManager = new SelectionManager(eventHub);
             selectionManager.SetState(selection);
             var serviceProvider = new Mock<IServiceProvider>();
             serviceProvider
@@ -1709,7 +1711,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             var scene = CreateBoneScene(initialFrame, [-1], [0]);
             var eventHub = new TestEventHub();
             var commandExecutor = new CommandExecutor(eventHub);
-            var selectionManager = new SelectionManager(eventHub, null, null, null);
+            var selectionManager = new SelectionManager(eventHub);
             var serviceProvider = new Mock<IServiceProvider>();
             serviceProvider
                 .Setup(provider => provider.GetService(typeof(TransformBoneCommand)))

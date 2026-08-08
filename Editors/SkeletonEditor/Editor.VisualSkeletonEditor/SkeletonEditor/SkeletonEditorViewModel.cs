@@ -6,6 +6,7 @@ using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Animation;
+using GameWorld.Core.Components.Selection;
 using Microsoft.Xna.Framework;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
@@ -48,9 +49,13 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
             CopyPasteManager copyPasteManager,
             IEditorHostParameters editorHostParameters,
             IStandardDialogs packFileUiProvider,
-            IFileSaveService packFileSaveService)
+            IFileSaveService packFileSaveService,
+            ReferenceObjectSelectionComponent objectSelection,
+            ReferenceObjectSelectionOutlineComponent selectionOutline)
             : base(editorHostParameters)
         {
+            GameWorld!.AddComponent(objectSelection);
+            GameWorld.AddComponent(selectionOutline);
             DisplayName = LocalizationManager.Instance.Get("DisplayName.SkeletonEditor");
 
             _packFileService = pfs;

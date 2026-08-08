@@ -7,6 +7,7 @@ using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.AnimationPlayer;
 using Editors.Shared.Core.Common.BaseControl;
 using GameWorld.Core.Animation;
+using GameWorld.Core.Components.Selection;
 using Microsoft.Xna.Framework;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
@@ -62,6 +63,8 @@ namespace Editors.AnimatioReTarget.Editor
             SaveManager saveManager,
             BoneManager boneManager,
             AnimationReTargetRenderingComponent renderingComponent,
+            ReferenceObjectSelectionComponent objectSelection,
+            ReferenceObjectSelectionOutlineComponent selectionOutline,
             IPackFileService pfs) : base(editorHostParameters)
         {
             DisplayName = LocalizationManager.Instance.Get("DisplayName.AnimationTransferTool");
@@ -76,6 +79,8 @@ namespace Editors.AnimatioReTarget.Editor
             _eventHub = eventHub;
             _saveManager = saveManager;
 
+            GameWorld!.AddComponent(objectSelection);
+            GameWorld.AddComponent(selectionOutline);
             GameWorld.AddComponent(renderingComponent);
 
             _eventHub.Register<SceneObjectUpdateEvent>(this, OnSceneObjectUpdated);

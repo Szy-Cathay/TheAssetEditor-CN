@@ -1,6 +1,8 @@
 ﻿using System;
 using GameWorld.Core.Commands;
 using GameWorld.Core.Commands.Object;
+using GameWorld.Core.Components;
+using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
@@ -13,13 +15,16 @@ using Shared.Core.Events;
 using Shared.Core.ErrorHandling;
 using System.Runtime.ExceptionServices;
 
-namespace GameWorld.Core.Components.Gizmo
+namespace Editors.KitbasherEditor.Components
 {
-    public class GizmoComponent : BaseComponent, IDisposable
+    public sealed class KitbashModelGizmoComponent :
+        BaseComponent,
+        IDisposable
     {
         private readonly IMouseComponent _mouse;
         private readonly IEventHub _eventHub;
-        private readonly ILogger _logger = Logging.Create<GizmoComponent>();
+        private readonly ILogger _logger =
+            Logging.Create<KitbashModelGizmoComponent>();
 
         private readonly IKeyboardComponent _keyboard;
         private readonly SelectionManager _selectionManager;
@@ -37,7 +42,7 @@ namespace GameWorld.Core.Components.Gizmo
         private GeometrySelectionMode _lastEditSubMode = GeometrySelectionMode.Vertex;
 
 
-        public GizmoComponent(IEventHub eventHub,
+        public KitbashModelGizmoComponent(IEventHub eventHub,
             IKeyboardComponent keyboardComponent, IMouseComponent mouseComponent, ArcBallCamera camera, CommandExecutor commandExecutor,
             RenderEngineComponent resourceLibary, IDeviceResolver deviceResolverComponent, CommandFactory commandFactory,
             SelectionManager selectionManager)
@@ -72,7 +77,7 @@ namespace GameWorld.Core.Components.Gizmo
         }
 
         /// <summary>
-        /// Get the Gizmo instance (for SelectionComponent to check modal transform state)
+        /// Get the Gizmo instance for KitbashSelectionInputComponent to check modal transform state.
         /// </summary>
         public Gizmo Gizmo => _gizmo;
 

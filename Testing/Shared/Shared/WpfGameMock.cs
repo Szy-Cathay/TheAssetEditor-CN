@@ -14,6 +14,7 @@ namespace Test.TestingUtility.Shared
 
         public ContentManager Content { get; set; }
         public GraphicsDevice GraphicsDevice { get; private set; }
+        public List<IGameComponent> Components { get; } = [];
 
         public WpfGameMock()
         {
@@ -40,6 +41,7 @@ namespace Test.TestingUtility.Shared
 
         public T AddComponent<T>(T comp) where T : IGameComponent
         {
+            Components.Add(comp);
             comp.Initialize();
             return comp;
         }

@@ -4,12 +4,12 @@ using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.EventHandlers;
+using Editors.KitbasherEditor.Components;
 using Editors.KitbasherEditor.Services;
 using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.Components;
-using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using KitbasherEditor.ViewModels.MenuBarViews;
 using Serilog;
@@ -66,7 +66,10 @@ namespace Editors.KitbasherEditor.ViewModels
             IUiCommandFactory uiCommandFactory,
             CommandExecutor commandExecutor,
             IComponentInserter componentInserter,
-            SelectionManager selectionManager,
+            View3DCoreComponentSet coreComponents,
+            KitbashSelectionOverlayComponent selectionOverlay,
+            KitbashSelectionInputComponent selectionInput,
+            KitbashModelGizmoComponent modelGizmo,
             SkeletonChangedHandler skeletonChangedHandler, 
             SceneNodeEditorViewModel sceneNodeEditorView)
         {
@@ -81,8 +84,6 @@ namespace Editors.KitbasherEditor.ViewModels
             SceneExplorer = sceneExplorerViewModel;
             MenuBar = menuBarViewModel;
             SceneNodeEditor = sceneNodeEditorView;
-            selectionManager.VertexSelectionEdgeGradientEnabled = true;
-            
             // Events
             eventHub.Register<ScopedFileSavedEvent>(this, OnFileSaved);
             eventHub.Register<CommandStackChangedEvent>(this, OnCommandStackChanged);
@@ -90,7 +91,11 @@ namespace Editors.KitbasherEditor.ViewModels
             skeletonChangedHandler.Subscribe(eventHub);
             
             // Ensure all game components are added to the editor
-            componentInserter.Execute();
+            componentInserter.Execute(
+                coreComponents,
+                selectionOverlay,
+                selectionInput,
+                modelGizmo);
         }
 
         public void LoadFile(PackFile fileToLoad)

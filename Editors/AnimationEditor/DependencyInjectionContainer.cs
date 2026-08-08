@@ -21,9 +21,12 @@ namespace Editors.AnimationVisualEditors
 
             serviceCollection.AddScoped<EditorHost<MountAnimationCreatorViewModel>>();
             serviceCollection.AddScoped<MountAnimationCreatorViewModel>();
+            serviceCollection.AddScoped<MountVertexSelectionComponent>();
 
             serviceCollection.AddScoped<EditorHost<AnimationKeyframeEditorViewModel>>();
             serviceCollection.AddScoped<AnimationKeyframeEditorViewModel>();
+            serviceCollection.AddScoped<AnimationBoneSelectionComponent>();
+            serviceCollection.AddScoped<AnimationBoneGizmoComponent>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
         }

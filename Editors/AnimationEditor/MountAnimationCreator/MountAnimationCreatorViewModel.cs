@@ -42,6 +42,12 @@ namespace AnimationEditor.MountAnimationCreator
         private readonly SelectionManager _selectionManager;
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
         private readonly IStandardDialogs _standardDialogs;
+        private readonly MountVertexSelectionComponent
+            _vertexSelectionComponent;
+        private readonly ReferenceObjectSelectionComponent
+            _objectSelectionComponent;
+        private readonly ReferenceObjectSelectionOutlineComponent
+            _selectionOutlineComponent;
 
         SceneObject _mount;
         SceneObject _rider;
@@ -84,6 +90,9 @@ namespace AnimationEditor.MountAnimationCreator
             SceneObjectEditor sceneObjectBuilder,
             IFileSaveService fileSaveService,
             IUiCommandFactory uiCommandFactory,
+            MountVertexSelectionComponent vertexSelectionComponent,
+            ReferenceObjectSelectionComponent objectSelectionComponent,
+            ReferenceObjectSelectionOutlineComponent selectionOutlineComponent,
             IStandardDialogs standardDialogs)
         {
             _sceneObjectViewModelBuilder = sceneObjectViewModelBuilder;
@@ -91,6 +100,9 @@ namespace AnimationEditor.MountAnimationCreator
             _sceneObjectBuilder = sceneObjectBuilder;
             _fileSaveService = fileSaveService;
             _uiCommandFactory = uiCommandFactory;
+            _vertexSelectionComponent = vertexSelectionComponent;
+            _objectSelectionComponent = objectSelectionComponent;
+            _selectionOutlineComponent = selectionOutlineComponent;
             _standardDialogs = standardDialogs;
             _pfs = pfs;
 
@@ -120,6 +132,12 @@ namespace AnimationEditor.MountAnimationCreator
 
         public void Initialize(EditorHost<MountAnimationCreatorViewModel> owner)
         {
+            owner.GameWorld.Value.AddComponent(
+                _vertexSelectionComponent);
+            owner.GameWorld.Value.AddComponent(
+                _objectSelectionComponent);
+            owner.GameWorld.Value.AddComponent(
+                _selectionOutlineComponent);
            // var riderItem = _sceneObjectViewModelBuilder.CreateAsset(true, "Rider", Color.Black, _inputRiderData);
            // var mountItem = _sceneObjectViewModelBuilder.CreateAsset(true, "Mount", Color.Black, _inputMountData);
            // mountItem.Data.IsSelectable = true;

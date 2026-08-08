@@ -13,10 +13,6 @@ internal static class EditOverlayStyle
         1.0f,
         0.47f,
         0.0f);
-    public static readonly Vector3 KitbashSelectedColour = new(
-        2.0f,
-        0.65f,
-        0.0f);
     public static readonly Vector3 ActiveColour = Vector3.One;
 
     public const float VertexDiameter = 4.5f;

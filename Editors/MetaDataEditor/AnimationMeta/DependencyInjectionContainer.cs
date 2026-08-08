@@ -23,7 +23,7 @@ namespace Editors.AnimationMeta
             serviceCollection.AddScoped<EditorHost<SuperViewViewModel>>();
             serviceCollection.AddScoped<SuperViewViewModel>();
             serviceCollection.AddScoped<CombatMetaDataEditSession>();
-            RegisterGameComponent<CombatMetaDataGizmoComponent>(serviceCollection);
+            serviceCollection.AddScoped<CombatMetaDataGizmoComponent>();
 
             serviceCollection.AddScoped<IMetaDataBuilder, MetaDataBuilder>(); // Needs heavy refactorying!
 

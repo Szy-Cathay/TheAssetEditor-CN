@@ -232,7 +232,7 @@ namespace Testing.GameWorld.Core.Commands
         private static TransformContext CreateContext()
         {
             var eventHub = new Mock<IEventHub>();
-            var selectionManager = new SelectionManager(eventHub.Object, null, null, null);
+            var selectionManager = new SelectionManager(eventHub.Object);
             var animation = CreateAnimation();
             var selection = new BoneSelectionState(null)
             {

@@ -137,7 +137,7 @@ namespace GameWorld.Core.SceneNodes
                 renderEngine.AddRenderLines(LineHelper.AddBoundingBox(Geometry.BoundingBox, Color.Red, PivotPoint));
         }
 
-        internal void SetSelectionOutline(bool enabled)
+        public void SetSelectionOutline(bool enabled)
         {
             _selectionOutlineEnabled = enabled;
             _pooledRenderItem?.SetSelectionMask(

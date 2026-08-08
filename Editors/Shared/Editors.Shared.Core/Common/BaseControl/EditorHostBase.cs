@@ -46,7 +46,8 @@ namespace Editors.Shared.Core.Common.BaseControl
             _factionColourSettingsDialog =
                 inputParams.FactionColourSettingsDialog;
 
-            inputParams.ComponentInserter.Execute();
+            inputParams.ComponentInserter.Execute(
+                inputParams.CoreComponents);
         }
 
         [RelayCommand] void ResetCamera() => _focusSelectableObjectService.ResetCamera();

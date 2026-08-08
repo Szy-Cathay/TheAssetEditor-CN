@@ -143,7 +143,7 @@ namespace Test.KitbashEditor.Commands
         {
             var eventHub = Mock.Of<IEventHub>();
             var sceneManager = new SceneManager(null!, null!, eventHub);
-            var selectionManager = new SelectionManager(eventHub, null!, null!, null!);
+            var selectionManager = new SelectionManager(eventHub);
             selectionManager.CreateSelectionSate(GeometrySelectionMode.Object, null!, false);
             var mainNode = sceneManager.RootNode.AddObject(
                 new MainEditableNode(

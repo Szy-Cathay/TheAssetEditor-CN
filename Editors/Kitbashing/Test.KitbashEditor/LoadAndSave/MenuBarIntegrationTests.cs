@@ -1,8 +1,8 @@
 ﻿using System.Windows.Input;
+using Editors.KitbasherEditor.Components;
 using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels;
 using GameWorld.Core.Components;
-using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
@@ -36,11 +36,24 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
-    public void Scene_EnablesVertexSelectionEdgeGradient()
+    public void Scene_UsesKitbashExclusiveModelEditingComponents()
     {
-        Assert.That(
-            SelectionManager.VertexSelectionEdgeGradientEnabled,
-            Is.True);
+        var scene = (WpfGameMock)_editor.Scene;
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                scene.Components,
+                Has.Exactly(1)
+                    .TypeOf<KitbashSelectionOverlayComponent>());
+            Assert.That(
+                scene.Components,
+                Has.Exactly(1)
+                    .TypeOf<KitbashSelectionInputComponent>());
+            Assert.That(
+                scene.Components,
+                Has.Exactly(1)
+                    .TypeOf<KitbashModelGizmoComponent>());
+        });
     }
 
     [Test]
@@ -49,7 +62,8 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
         var commandFactory =
             _runner.GetRequiredServiceInCurrentEditorScope<IUiCommandFactory>();
         var gizmoComponent =
-            _runner.GetRequiredServiceInCurrentEditorScope<GizmoComponent>();
+            _runner.GetRequiredServiceInCurrentEditorScope<
+                KitbashModelGizmoComponent>();
         var initialScale = gizmoComponent.Gizmo.ScaleModifier;
 
         commandFactory.Create<ScaleGizmoUpCommand>().Execute();

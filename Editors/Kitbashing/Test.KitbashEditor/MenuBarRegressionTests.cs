@@ -84,10 +84,7 @@ public class MenuBarRegressionTests
     {
         var eventHub = new Mock<IEventHub>();
         var selectionManager = new SelectionManager(
-            eventHub.Object,
-            null!,
-            null!,
-            null!);
+            eventHub.Object);
         selectionManager.SetState(new ObjectSelectionState());
         var viewModel = new ProportionalEditingViewModel(
             selectionManager,

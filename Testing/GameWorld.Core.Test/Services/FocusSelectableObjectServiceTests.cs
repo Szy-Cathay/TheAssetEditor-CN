@@ -23,11 +23,7 @@ public class FocusSelectableObjectServiceTests
     public void FocusSelection_BoneModeCentersSelectedBone()
     {
         var eventHub = Mock.Of<IEventHub>();
-        var selectionManager = new SelectionManager(
-            eventHub,
-            null!,
-            null!,
-            null!);
+        var selectionManager = new SelectionManager(eventHub);
         var camera = new ArcBallCamera(
             null!,
             Mock.Of<IKeyboardComponent>(),
@@ -57,11 +53,7 @@ public class FocusSelectableObjectServiceTests
     public void FocusSelection_BoneModeWithoutAnimationCentersObject()
     {
         var eventHub = Mock.Of<IEventHub>();
-        var selectionManager = new SelectionManager(
-            eventHub,
-            null!,
-            null!,
-            null!);
+        var selectionManager = new SelectionManager(eventHub);
         var camera = new ArcBallCamera(
             null!,
             Mock.Of<IKeyboardComponent>(),

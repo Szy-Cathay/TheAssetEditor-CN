@@ -25,7 +25,6 @@ public class NavigationGizmoComponentTests
             mouse.Object,
             null!,
             null!,
-            null!,
             null!);
         var transition = new CameraTransition(camera);
         transition.StartTransition(ViewPresetType.Front);

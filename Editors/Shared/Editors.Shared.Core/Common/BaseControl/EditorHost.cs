@@ -41,6 +41,7 @@ namespace Editors.Shared.Core.Common.BaseControl
 
         public EditorHost(IEditorDatabase toolFactory,
             IComponentInserter componentInserter,
+            View3DCoreComponentSet coreComponents,
             AnimationPlayerViewModel animationPlayerViewModel,
             IWpfGame gameWorld,
             FocusSelectableObjectService focusSelectableObjectService,
@@ -60,7 +61,7 @@ namespace Editors.Shared.Core.Common.BaseControl
             OpenFactionColourSettingsCommand = new RelayCommand(
                 factionColourSettingsDialog.ShowDialog);
 
-            componentInserter.Execute();
+            componentInserter.Execute(coreComponents);
 
             eventHub.Register<SceneInitializedEvent>(this, Initialize);
 

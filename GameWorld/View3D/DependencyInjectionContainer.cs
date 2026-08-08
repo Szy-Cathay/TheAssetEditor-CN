@@ -1,28 +1,16 @@
 ﻿using GameWorld.Core.Commands;
 using GameWorld.Core.Commands.Bone;
 using GameWorld.Core.Commands.Bone.Clipboard;
-using GameWorld.Core.Commands.Edge;
-using GameWorld.Core.Commands.Face;
 using GameWorld.Core.Commands.Object;
-using GameWorld.Core.Commands.Vertex;
 using GameWorld.Core.Components;
-using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Navigation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.Rendering.Materials;
-using GameWorld.Core.Rendering.Materials.Serialization;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
-using GameWorld.Core.Services.SceneSaving;
-using GameWorld.Core.Services.SceneSaving.Geometry;
-using GameWorld.Core.Services.SceneSaving.Geometry.Strategies;
-using GameWorld.Core.Services.SceneSaving.Lod;
-using GameWorld.Core.Services.SceneSaving.Lod.Strategies;
-using GameWorld.Core.Services.SceneSaving.Material;
-using GameWorld.Core.Services.SceneSaving.Material.Strategies;
 using GameWorld.Core.Utility;
 using GameWorld.Core.WpfWindow;
 using GameWorld.Core.WpfWindow.FactionColourSettings;
@@ -44,7 +32,6 @@ namespace GameWorld.Core
             serviceCollection.AddSingleton<ResourceLibrary>();
 
             // Settings
-            serviceCollection.AddScoped<GeometrySaveSettings>();
             serviceCollection.AddScoped<SceneRenderParametersStore>();
             serviceCollection.AddSingleton<FactionColourSettingsService>();
             serviceCollection.AddTransient<
@@ -53,38 +40,9 @@ namespace GameWorld.Core
 
             // Services
             serviceCollection.AddSingleton<ISkeletonAnimationLookUpHelper, SkeletonAnimationLookUpHelper>();
-            serviceCollection.AddScoped<MeshBuilderService>();
-            serviceCollection.AddScoped<ViewOnlySelectedService>();
             serviceCollection.AddScoped<FocusSelectableObjectService>();
             serviceCollection.AddScoped<ComplexMeshLoader>();
-            serviceCollection.AddTransient<WsModelGeneratorService>();
-            serviceCollection.AddTransient<MaterialToWsMaterialFactory>();
-            
-            serviceCollection.AddScoped<FaceEditor>();
-            serviceCollection.AddScoped<ObjectEditor>();
             serviceCollection.AddScoped<Rmv2ModelNodeLoader>();
-
-            serviceCollection.AddScoped<SaveService>();
-            serviceCollection.AddScoped<NodeToRmvSaveHelper>();
-
-            serviceCollection.AddScoped<GeometryStrategyProvider>();
-            serviceCollection.AddScoped<IGeometryStrategy, NoMeshStrategy>();
-            serviceCollection.AddScoped<IGeometryStrategy, Rmw6Strategy>();
-            serviceCollection.AddScoped<IGeometryStrategy, Rmw7Strategy>();
-            serviceCollection.AddScoped<IGeometryStrategy, Rmw8Strategy>();
-
-            serviceCollection.AddScoped<LodStrategyProvider>();
-            serviceCollection.AddScoped<ILodGenerationStrategy, AssetEditorLodGeneration>();
-            serviceCollection.AddScoped<ILodGenerationStrategy, Lod0ForAllLodGeneration>();
-            serviceCollection.AddScoped<ILodGenerationStrategy, NoLodGeneration>();
-            
-            //serviceCollection.AddScoped<ILodGenerationStrategy, SimplygonLodGeneration>();
-
-            serviceCollection.AddScoped<MaterialStrategyProvider>();
-            serviceCollection.AddScoped<IMaterialStrategy, Warhammer3WsModelStrategy>();
-            serviceCollection.AddScoped<IMaterialStrategy, Warhammer2WsModelStrategy>();
-            serviceCollection.AddScoped<IMaterialStrategy, PharaohWsModelStrategy>();
-            serviceCollection.AddScoped<IMaterialStrategy, NoWsModelStrategy>();
 
             // Shader
             serviceCollection.AddScoped<CapabilityMaterialFactory>(); 
@@ -102,21 +60,23 @@ namespace GameWorld.Core
         void RegisterComponents(IServiceCollection serviceCollection)
         {
             serviceCollection.AddScoped<IComponentInserter, ComponentInserter>();
-            RegisterGameComponent<CommandStackRenderer>(serviceCollection);
-            RegisterGameComponent<IKeyboardComponent, KeyboardComponent>(serviceCollection);
-            RegisterGameComponent<IMouseComponent, MouseComponent>(serviceCollection);
+            serviceCollection.AddScoped<View3DCoreComponentSet>();
+            serviceCollection.AddScoped<CommandStackRenderer>();
+            serviceCollection.AddScoped<IKeyboardComponent, KeyboardComponent>();
+            serviceCollection.AddScoped<IMouseComponent, MouseComponent>();
 
-            RegisterGameComponent<FpsComponent>(serviceCollection);
-            RegisterGameComponent<ArcBallCamera>(serviceCollection);
-            RegisterGameComponent<NavigationGizmoComponent>(serviceCollection);
-            RegisterGameComponent<SceneManager>(serviceCollection);
-            RegisterGameComponent<GizmoComponent>(serviceCollection);
-            RegisterGameComponent<SelectionManager>(serviceCollection);
-            RegisterGameComponent<SelectionComponent>(serviceCollection);
-            RegisterGameComponent<RenderEngineComponent>(serviceCollection);
-            RegisterGameComponent<GridComponent>(serviceCollection);
-            RegisterGameComponent<AnimationsContainerComponent>(serviceCollection);
-            RegisterGameComponent<LightControllerComponent>(serviceCollection);
+            serviceCollection.AddScoped<FpsComponent>();
+            serviceCollection.AddScoped<ArcBallCamera>();
+            serviceCollection.AddScoped<NavigationGizmoComponent>();
+            serviceCollection.AddScoped<SceneManager>();
+            serviceCollection.AddScoped<SelectionManager>();
+            serviceCollection.AddScoped<ReferenceObjectSelectionComponent>();
+            serviceCollection.AddScoped<ReferenceObjectSelectionOutlineComponent>();
+            serviceCollection.AddScoped<BoneSelectionHighlightComponent>();
+            serviceCollection.AddScoped<RenderEngineComponent>();
+            serviceCollection.AddScoped<GridComponent>();
+            serviceCollection.AddScoped<AnimationsContainerComponent>();
+            serviceCollection.AddScoped<LightControllerComponent>();
 
             //serviceCollection.AddScoped<ISceneLightParameters>(x => x.GetRequiredService<LightControllerComponent>());
         }
@@ -126,27 +86,8 @@ namespace GameWorld.Core
             serviceCollection.AddScoped<CommandExecutor>();
             serviceCollection.AddScoped<CommandFactory>();
 
-            serviceCollection.AddTransient<ConvertFacesToVertexSelectionCommand>();
-            serviceCollection.AddTransient<FaceSelectionCommand>();
-            serviceCollection.AddTransient<EdgeSelectionCommand>();
-            serviceCollection.AddTransient<DuplicateFacesCommand>();
-            serviceCollection.AddTransient<VertexSelectionCommand>();
             serviceCollection.AddTransient<ObjectSelectionCommand>();
-            serviceCollection.AddTransient<DeleteFaceCommand>();
-            serviceCollection.AddTransient<DeleteObjectsCommand>();
-            serviceCollection.AddTransient<MakeNodeEditableCommand>();
-            serviceCollection.AddTransient<SortSceneNodesCommand>();
-            serviceCollection.AddTransient<ReduceMeshCommand>();
-            serviceCollection.AddTransient<TransformVertexCommand>();
-            serviceCollection.AddTransient<CombineMeshCommand>();
             serviceCollection.AddTransient<CreateAnimatedMeshPoseCommand>();
-            serviceCollection.AddTransient<CreateStaticMeshFromAnimationCommand>();
-            serviceCollection.AddTransient<DivideObjectIntoSubmeshesCommand>();
-            serviceCollection.AddTransient<DuplicateObjectCommand>();
-            serviceCollection.AddTransient<AddObjectsToGroupCommand>();
-            serviceCollection.AddTransient<UnGroupObjectsCommand>();
-            serviceCollection.AddTransient<GroupObjectsCommand>();
-            serviceCollection.AddTransient<GrowMeshCommand>();
             serviceCollection.AddTransient<ObjectSelectionModeCommand>();
 
             serviceCollection.AddTransient<BoneSelectionCommand>();

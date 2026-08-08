@@ -387,6 +387,7 @@ namespace Editors.AnimationMeta.SuperView
             _metaDataFactory = metaDataFactory;
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
+            GameWorld!.AddComponent(combatGizmo);
             _combatEditSession.ValueChanged += OnCombatMetaDataValueChanged;
             _combatEditSession.HistoryChanged += OnCombatHistoryChanged;
             Initialize();
