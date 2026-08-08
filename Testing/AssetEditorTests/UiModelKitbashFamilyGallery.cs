@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetEditor.Services.Settings;
+using CommonControls.FilterDialog;
 using Editor.VisualSkeletonEditor.SkeletonEditor;
 using Editors.KitbasherEditor.ChildEditors.MeshFitter;
 using Editors.KitbasherEditor.ChildEditors.PhotoStudio;
@@ -121,6 +122,17 @@ public class UiModelKitbashFamilyGallery
             {
                 window.Show();
                 window.UpdateLayout();
+                if (variant == "main-editable-node")
+                {
+                    var selector = FindVisualDescendants<
+                            CollapsableFilterControl>(window)
+                        .Single();
+                    var browseButton = FindVisualDescendants<Button>(selector)
+                        .First(button => button.Name == "BrowseButton");
+                    browseButton.RaiseEvent(new RoutedEventArgs(
+                        Button.ClickEvent));
+                    window.UpdateLayout();
+                }
                 AssertVisualContracts(window, variant);
                 Capture(window, theme, variant);
             }

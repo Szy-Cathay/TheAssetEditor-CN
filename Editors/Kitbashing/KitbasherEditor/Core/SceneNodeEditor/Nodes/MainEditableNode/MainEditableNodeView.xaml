@@ -24,16 +24,15 @@
         <Expander IsExpanded="True" Header="{loc:Loc MainNode.General}" DockPanel.Dock="Top">
             <DockPanel DockPanel.Dock="Top">
                 <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" Content="{loc:Loc MainNode.Skeleton}"/>
                     <filterdialog:CollapsableFilterControl  VerticalContentAlignment="Center"
                                 SelectedItem="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                                 SearchItems="{Binding SkeletonNameList, UpdateSourceTrigger=PropertyChanged}"     
                                 OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"   
                                 IsManipulationEnabled="False"
-                                LabelTotalWidth="0"   
+                                LabelTotalWidth="150"
                                 DockPanel.Dock="top"
                                 MaxHeight="400"
-                                ShowLabel="false"
+                                ShowLabel="true"
                                 LabelText="{loc:Loc MainNode.Skeleton}"/>
                 </DockPanel>
 

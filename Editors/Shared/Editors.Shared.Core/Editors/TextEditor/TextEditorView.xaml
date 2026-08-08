@@ -39,6 +39,7 @@
             <Separator/>
             <ComboBox Name="highlightingComboBox"   
                       Width="200"
+                      Style="{StaticResource AeInput.ComboBox}"
 				SelectedItem="{Binding SyntaxHighlighting, ElementName=textEditor}"
 				ItemsSource="{Binding Source={x:Static avalonEdit:HighlightingManager.Instance}, Path=HighlightingDefinitions}"
                 SelectionChanged="HighlightingComboBox_SelectionChanged"/>
