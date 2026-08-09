@@ -82,7 +82,6 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 throw new InvalidDataException("glTF 包含动画，但未能确定对应的游戏骨架，已停止导入以避免生成损坏的 ANIM 文件。");
 
             var baseFileName = Path.GetFileNameWithoutExtension(settings.InputGltfFile);
-            var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var animationEntries = new List<NewPackFileEntry>();
             for (var animationIndex = 0; animationIndex < modelRoot.LogicalAnimations.Count; animationIndex++)
             {
@@ -98,33 +97,16 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     skeletonAnimFile,
                     animation);
 
-                var candidateFileName = modelRoot.LogicalAnimations.Count == 1
-                    ? $"{baseFileName}.anim"
-                    : $"{baseFileName}_{GetSafeAnimationName(animation, animationIndex)}.anim";
-                var importedFileName = GetUniqueFileName(candidateFileName, usedFileNames);
+                var candidateFileName =
+                    $"{baseFileName}_{GetSafeAnimationName(animation, animationIndex)}.anim";
                 var animBytes = AnimationFile.ConvertToBytes(animFile);
-                var packFileImported = new PackFile(importedFileName, new MemorySource(animBytes));
+                var packFileImported = new PackFile(candidateFileName, new MemorySource(animBytes));
                 animationEntries.Add(new NewPackFileEntry(
                     settings.DestinationPackPath,
                     packFileImported));
             }
 
             return animationEntries;
-        }
-
-        private static string GetUniqueFileName(string candidate, HashSet<string> usedFileNames)
-        {
-            if (usedFileNames.Add(candidate))
-                return candidate;
-
-            var baseName = Path.GetFileNameWithoutExtension(candidate);
-            var extension = Path.GetExtension(candidate);
-            for (var duplicateIndex = 2; ; duplicateIndex++)
-            {
-                var uniqueName = $"{baseName}_{duplicateIndex}{extension}";
-                if (usedFileNames.Add(uniqueName))
-                    return uniqueName;
-            }
         }
 
         private static string GetSafeAnimationName(Animation animation, int animationIndex)

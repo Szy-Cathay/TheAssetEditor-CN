@@ -145,7 +145,7 @@ public class GltfImporterAtomicImportTests
             .ToLowerInvariant();
         var conflictPaths = new[]
         {
-            $@"models\{baseName}.anim",
+            $@"models\{baseName}_idle.anim",
             $@"models\{baseName}.rigid_model_v2",
         };
         try
@@ -336,7 +336,7 @@ public class GltfImporterAtomicImportTests
             var conflictPaths = new[]
             {
                 @"animations\skeletons\test_skeleton.anim",
-                $@"models\{baseName}.anim",
+                $@"models\{baseName}_idle.anim",
                 @"models\tex\mesh_node_base_colour.dds",
                 $@"models\{baseName}.rigid_model_v2",
             };
