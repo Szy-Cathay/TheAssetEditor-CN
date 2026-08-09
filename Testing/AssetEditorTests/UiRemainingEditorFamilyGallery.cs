@@ -1,8 +1,10 @@
 ﻿using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetEditor.Services.Settings;
@@ -19,13 +21,18 @@ using Editors.ImportExport.Exporting.Presentation.DdsToMaterialPng;
 using Editors.ImportExport.Exporting.Presentation.DdsToNormalPng;
 using Editors.ImportExport.Exporting.Presentation.RmvToGltf;
 using Editors.ImportExport.Importing;
+using Editors.ImportExport.Importing.Importers.GltfToRmv;
+using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using Editors.ImportExport.Importing.Presentation;
+using Editors.ImportImport.Importing.Presentation.RmvToGltf;
 using Editors.ImportExport.Misc;
+using GameWorld.Core.Services;
 using Editors.Twui.Editor.ComponentEditor;
 using Editors.Twui.Editor.Presentation;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using NUnit.Framework;
+using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
@@ -33,7 +40,9 @@ using Shared.Ui.BaseDialogs;
 using Shared.Ui.BaseDialogs.ColourPickerButton;
 using Shared.Ui.BaseDialogs.MathViews;
 using Shared.Ui.BaseDialogs.SelectionListDialog;
+using Shared.Ui.BaseDialogs.StandardDialog;
 using Shared.Ui.Common.DataTemplates;
+using Shared.Ui.Common.OperationProgress;
 using Shared.Ui.Common.ValueConverters;
 using TextureEditor.Views;
 using DdsToPngView = Editors.ImportExport.Exporting.Exporters.DdsToPng.DdsToPngView;
@@ -55,6 +64,7 @@ public class UiRemainingEditorFamilyGallery
         "export-window",
         "export-rmv-gltf",
         "import-gltf-rmv",
+        "import-result",
         "import-window",
         "texture-information",
         "texture-preview",
@@ -92,6 +102,164 @@ public class UiRemainingEditorFamilyGallery
             () => Render(theme, variant));
     }
 
+    [TestCaseSource(nameof(GltfWorkflowDpiCases))]
+    public void GltfImportWorkflow_RealWindowsUseRequiredDpi(
+        ThemeType theme,
+        string variant,
+        int dpi)
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () => Render(theme, variant, dpi));
+    }
+
+    [Test]
+    public void GltfImportWindow_ClickingImportRunsRealWorkflowAndShowsProgress()
+    {
+        var glbPath = Path.Combine(
+            FindSolutionRoot(),
+            "Editors",
+            "ImportExportEditor",
+            "Test.ImportExport",
+            "TestData",
+            "Gltf",
+            "external_full_workflow.glb");
+        var importerStarted = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var importerCompleted = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseImporter = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var resultShown = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var destination = new PackFileContainer("actual-import-window");
+        var dialogs = new Mock<IStandardDialogs>();
+        var resultMessage = string.Empty;
+        dialogs
+            .Setup(service => service.ShowDialogBox(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                UiMessageBoxIcon.Information))
+            .Callback<string, string, UiMessageBoxIcon>((message, _, _) =>
+            {
+                resultMessage = message;
+                resultShown.TrySetResult(true);
+            });
+        ImportWindow? importWindow = null;
+        BlockingGltfImporterViewModel? importer = null;
+        ImporterCoreViewModel? viewModel = null;
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+
+        try
+        {
+            WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
+            {
+                RegisterApplicationResources();
+                importer = CreateBlockingGltfImporter(
+                    destination,
+                    importerStarted,
+                    importerCompleted,
+                    releaseImporter);
+                viewModel = new ImporterCoreViewModel(
+                    [importer],
+                    new ApplicationSettingsService(GameTypeEnum.Warhammer3));
+                viewModel.Initialize(destination, "models", glbPath);
+                importWindow = new ImportWindow(viewModel, dialogs.Object)
+                {
+                    Left = -10000,
+                    Top = -10000,
+                    ShowActivated = false,
+                };
+                importWindow.Show();
+                importWindow.UpdateLayout();
+                FindVisualDescendants<Button>(importWindow)
+                    .Single(button => button.IsDefault)
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            });
+
+            NUnitAssert.That(
+                importerStarted.Task.Wait(TimeSpan.FromSeconds(5)),
+                Is.True,
+                "实际导入器没有从导入按钮启动。");
+            NUnitAssert.That(
+                SpinWait.SpinUntil(
+                    () => HasOwnedProgressWindow(importWindow),
+                    TimeSpan.FromSeconds(5)),
+                Is.True,
+                "统一进度窗口没有在实际导入期间显示。");
+            WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
+            {
+                NUnitAssert.That(viewModel!.IsOperationActive, Is.True);
+                var progressWindow = Application.Current.Windows
+                    .OfType<OperationProgressWindow>()
+                    .Single(window => window.Owner == importWindow);
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(progressWindow.IsVisible, Is.True);
+                    NUnitAssert.That(
+                        progressWindow.Title,
+                        Is.EqualTo("正在导入 glTF/GLB"));
+                });
+                Capture(
+                    progressWindow,
+                    ThemesController.CurrentTheme,
+                    "import-live-progress",
+                    null);
+            });
+
+            releaseImporter.TrySetResult(true);
+            NUnitAssert.That(
+                resultShown.Task.Wait(TimeSpan.FromSeconds(20)),
+                Is.True,
+                "实际导入完成后没有显示中文结果摘要。");
+            WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
+            {
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(importer!.ExecuteCalled, Is.True);
+                    NUnitAssert.That(viewModel!.IsOperationActive, Is.False);
+                    NUnitAssert.That(importWindow!.IsVisible, Is.False);
+                    NUnitAssert.That(resultMessage, Does.Contain("已写入资源"));
+                    NUnitAssert.That(
+                        resultMessage,
+                        Does.Contain("external_full_workflow.rigid_model_v2"));
+                    NUnitAssert.That(resultMessage, Does.Contain("蒙皮权重"));
+                    NUnitAssert.That(
+                        destination.FileList.Keys,
+                        Has.Some.EndsWith(".rigid_model_v2"));
+                    NUnitAssert.That(
+                        destination.FileList.Keys.Count(path =>
+                            path.EndsWith(".anim")),
+                        Is.EqualTo(3));
+                    NUnitAssert.That(
+                        destination.FileList.Keys,
+                        Has.Some.EndsWith(".dds"));
+                });
+            });
+        }
+        finally
+        {
+            releaseImporter.TrySetResult(true);
+            if (importer?.ExecuteCalled == true)
+            {
+                importerCompleted.Task.Wait(TimeSpan.FromSeconds(20));
+                SpinWait.SpinUntil(
+                    () => viewModel?.IsOperationActive == false,
+                    TimeSpan.FromSeconds(5));
+            }
+            WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
+            {
+                if (importWindow?.IsVisible == true)
+                    importWindow.Close();
+            });
+        }
+    }
+
     private static IEnumerable<TestCaseData> Cases()
     {
         foreach (var theme in new[]
@@ -107,7 +275,33 @@ public class UiRemainingEditorFamilyGallery
         }
     }
 
-    private static void Render(ThemeType theme, string variant)
+    private static IEnumerable<TestCaseData> GltfWorkflowDpiCases()
+    {
+        foreach (var theme in new[]
+                 {
+                     ThemeType.DarkTheme,
+                     ThemeType.LightTheme,
+                     ThemeType.HighContrastDark,
+                     ThemeType.HighContrastLight,
+                 })
+        {
+            foreach (var variant in new[]
+                     {
+                         "import-window",
+                         "import-progress",
+                         "import-result",
+                     })
+            {
+                foreach (var dpi in new[] { 96, 120, 144 })
+                    yield return new TestCaseData(theme, variant, dpi);
+            }
+        }
+    }
+
+    private static void Render(
+        ThemeType theme,
+        string variant,
+        int? targetDpi = null)
     {
         var previousTheme = ThemesController.CurrentTheme;
         try
@@ -120,8 +314,19 @@ public class UiRemainingEditorFamilyGallery
             {
                 window.Show();
                 window.UpdateLayout();
+                NUnitAssert.That(
+                    PresentationSource.FromVisual(window),
+                    Is.TypeOf<HwndSource>());
+                if (targetDpi != null)
+                {
+                    ApplyWindowDpi(window, targetDpi.Value);
+                    window.UpdateLayout();
+                    NUnitAssert.That(
+                        VisualTreeHelper.GetDpi(window).PixelsPerInchX,
+                        Is.EqualTo(targetDpi.Value).Within(0.5));
+                }
                 AssertVisualContracts(window, variant);
-                Capture(window, theme, variant);
+                Capture(window, theme, variant, targetDpi);
             }
             finally
             {
@@ -206,6 +411,12 @@ public class UiRemainingEditorFamilyGallery
             },
             760,
             420),
+        "import-result" => new MessageDialogWindow(
+            "导入成功",
+            GltfWorkflowResultMessage,
+            MessageDialogButtonSet.Ok,
+            MessageBoxImage.Information),
+        "import-progress" => CreateImportProgressWindow(),
         "import-window" => CreateImportWindow(),
         "texture-information" => Host(
             new TextureInformationView
@@ -315,6 +526,15 @@ public class UiRemainingEditorFamilyGallery
         viewModel.PossibleImporters.Add(importer);
         return new ImportWindow(viewModel, Mock.Of<IStandardDialogs>());
     }
+
+    private static Window CreateImportProgressWindow() =>
+        new OperationProgressWindow(new OperationProgressWindowHost
+        {
+            WindowTitle = "正在导入 glTF/GLB",
+            StatusText = "正在转换模型、骨架、动画与贴图",
+            IsOperationActive = true,
+            IsProgressIndeterminate = true,
+        });
 
     private static Window CreateControllerHost()
     {
@@ -645,6 +865,13 @@ public class UiRemainingEditorFamilyGallery
             case "import-window":
                 window.Width = 820;
                 break;
+            case "import-progress":
+                window.Title = "正在导入 glTF/GLB";
+                window.Width = 640;
+                break;
+            case "import-result":
+                window.Width = 720;
+                break;
             case "shared-selection-window":
                 window.Width = 880;
                 window.Height = 600;
@@ -708,6 +935,30 @@ public class UiRemainingEditorFamilyGallery
             NUnitAssert.That(autoScaleCheckBox.IsChecked, Is.True);
         }
 
+        if (variant == "import-result")
+        {
+            var dialog = (MessageDialogWindow)window;
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(dialog.Message, Does.Contain("已写入资源"));
+                NUnitAssert.That(dialog.Message, Does.Contain("最终倍率：0.5"));
+                NUnitAssert.That(dialog.Message, Does.Contain("蒙皮权重"));
+                NUnitAssert.That(dialog.Message, Does.Contain("MaskMaterial"));
+                NUnitAssert.That(dialog.Message, Does.Contain("自发光（Emissive）"));
+                NUnitAssert.That(dialog.Message, Does.Contain("环境遮蔽（Occlusion）"));
+            });
+        }
+
+        if (variant == "import-progress")
+        {
+            NUnitAssert.That(window, Is.TypeOf<OperationProgressWindow>());
+            NUnitAssert.That(window.Title, Is.EqualTo("正在导入 glTF/GLB"));
+            NUnitAssert.That(
+                FindVisualDescendants<TextBlock>(window)
+                    .Select(textBlock => textBlock.Text),
+                Does.Contain("正在转换模型、骨架、动画与贴图"));
+        }
+
         if (variant == "shared-colour-picker")
         {
             var picker = FindVisualDescendants<ColourPickerButtonView>(window)
@@ -723,18 +974,27 @@ public class UiRemainingEditorFamilyGallery
     private static void Capture(
         Window window,
         ThemeType theme,
-        string variant)
+        string variant,
+        int? targetDpi)
     {
-        var dpi = VisualTreeHelper.GetDpi(window);
+        var actualDpi = VisualTreeHelper.GetDpi(window);
+        var pixelsPerInch = actualDpi.PixelsPerInchX;
+        var dpiScale = pixelsPerInch / 96.0;
         var bitmap = new RenderTargetBitmap(
             Math.Max(1, (int)Math.Ceiling(
-                window.ActualWidth * dpi.DpiScaleX)),
+                window.ActualWidth * dpiScale)),
             Math.Max(1, (int)Math.Ceiling(
-                window.ActualHeight * dpi.DpiScaleY)),
-            dpi.PixelsPerInchX,
-            dpi.PixelsPerInchY,
+                window.ActualHeight * dpiScale)),
+            pixelsPerInch,
+            pixelsPerInch,
             PixelFormats.Pbgra32);
         bitmap.Render(window);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(bitmap.PixelWidth, Is.GreaterThan(0));
+            NUnitAssert.That(bitmap.PixelHeight, Is.GreaterThan(0));
+        });
 
         var outputDirectory = Environment.GetEnvironmentVariable(
             "AE_UI_QA_OUTPUT");
@@ -744,7 +1004,9 @@ public class UiRemainingEditorFamilyGallery
         Directory.CreateDirectory(outputDirectory);
         var path = Path.Combine(
             outputDirectory,
-            $"remaining-editor-{variant}-{theme}.png");
+            targetDpi == null
+                ? $"remaining-editor-{variant}-{theme}.png"
+                : $"gltf-workflow-{variant}-{theme}-{targetDpi}dpi.png");
         using var stream = File.Create(path);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -756,6 +1018,124 @@ public class UiRemainingEditorFamilyGallery
 
     private static FontFamily FindFontFamily() =>
         (FontFamily)Application.Current.FindResource("AppFontFamily");
+
+    private static void ApplyWindowDpi(Window window, int dpi)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        NUnitAssert.That(GetWindowRect(handle, out var suggestedRectangle), Is.True);
+        var packedDpi = new IntPtr(dpi | (dpi << 16));
+        SendMessage(handle, WmDpiChanged, packedDpi, ref suggestedRectangle);
+    }
+
+    private static bool HasOwnedProgressWindow(Window? owner) =>
+        Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Windows
+                .OfType<OperationProgressWindow>()
+                .Any(window => window.Owner == owner && window.IsVisible));
+
+    private static BlockingGltfImporterViewModel CreateBlockingGltfImporter(
+        PackFileContainer destination,
+        TaskCompletionSource<bool> importerStarted,
+        TaskCompletionSource<bool> importerCompleted,
+        TaskCompletionSource<bool> releaseImporter)
+    {
+        var packFileService = new Mock<IPackFileService>();
+        packFileService
+            .Setup(service => service.GetAllPackfileContainers())
+            .Returns([]);
+        packFileService
+            .Setup(service => service.AddFilesToPack(
+                destination,
+                It.IsAny<List<NewPackFileEntry>>(),
+                It.IsAny<bool>()))
+            .Callback<PackFileContainer, List<NewPackFileEntry>, bool>(
+                (container, entries, _) =>
+                {
+                    foreach (var entry in entries)
+                    {
+                        var path = string.IsNullOrWhiteSpace(entry.DirectoyPath)
+                            ? entry.PackFile.Name
+                            : $"{entry.DirectoyPath}\\{entry.PackFile.Name}";
+                        container.FileList[path.ToLowerInvariant()] =
+                            entry.PackFile;
+                    }
+                });
+        var importer = new GltfImporter(
+            packFileService.Object,
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+        return new BlockingGltfImporterViewModel(
+            importer,
+            importerStarted,
+            importerCompleted,
+            releaseImporter)
+        {
+            AutoScaleHumanoid = false,
+        };
+    }
+
+    private static string FindSolutionRoot()
+    {
+        var directory = new DirectoryInfo(
+            NUnit.Framework.TestContext.CurrentContext.TestDirectory);
+        while (directory != null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "AssetEditor.CN.sln")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("找不到 AssetEditor.CN.sln。");
+    }
+
+    private const int WmDpiChanged = 0x02E0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRectangle
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(
+        IntPtr windowHandle,
+        out NativeRectangle rectangle);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(
+        IntPtr windowHandle,
+        int message,
+        IntPtr wParam,
+        ref NativeRectangle lParam);
+
+    private const string GltfWorkflowResultMessage = """
+        已写入资源
+        • models\external_full_workflow.rigid_model_v2
+        • animations\skeletons\externalworkflowarmature.anim
+        • models\external_full_workflow_move.anim
+        • models\external_full_workflow_nod.anim
+        • models\tex\externalworkflowmesh_part1_base_colour.dds
+
+        警告
+        • 蒙皮权重：6 个顶点超过四骨权重，已保留最强四项并重新归一化；丢弃权重总量为 15.0%。
+        • 缺少法线，已根据最终三角形重建。
+        • 缺少切线，已根据最终三角形重建。
+
+        材质导入摘要
+        • MaskMaterial：透明遮罩阈值 0.4
+        • MaskMaterial：跳过自发光（Emissive）
+        • MaskMaterial：跳过环境遮蔽（Occlusion）
+
+        自动人形缩放
+        • 源人物高度：4
+        • humanoid01 参考高度：2
+        • 最终倍率：0.5
+        • 已自动缩放到 humanoid01 人形尺寸。
+        """;
 
     private static IEnumerable<T> FindVisualDescendants<T>(
         DependencyObject parent)
@@ -828,6 +1208,53 @@ public class UiRemainingEditorFamilyGallery
             ExportSupportEnum.HighPriority;
     }
 
+    private sealed class BlockingGltfImporterViewModel :
+        RmvToGltfImporterViewModel,
+        IImporterViewModel
+    {
+        private readonly TaskCompletionSource<bool> _importerStarted;
+        private readonly TaskCompletionSource<bool> _importerCompleted;
+        private readonly TaskCompletionSource<bool> _releaseImporter;
+
+        public BlockingGltfImporterViewModel(
+            GltfImporter importer,
+            TaskCompletionSource<bool> importerStarted,
+            TaskCompletionSource<bool> importerCompleted,
+            TaskCompletionSource<bool> releaseImporter)
+            : base(importer)
+        {
+            _importerStarted = importerStarted;
+            _importerCompleted = importerCompleted;
+            _releaseImporter = releaseImporter;
+        }
+
+        public bool ExecuteCalled { get; private set; }
+
+        ImportResult IImporterViewModel.Execute(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType)
+        {
+            ExecuteCalled = true;
+            _importerStarted.TrySetResult(true);
+            try
+            {
+                if (!_releaseImporter.Task.Wait(TimeSpan.FromSeconds(10)))
+                    throw new TimeoutException("等待实际导入窗口进度验收超时。");
+                return base.Execute(
+                    importSource,
+                    outputPath,
+                    packFileContainer,
+                    gameType);
+            }
+            finally
+            {
+                _importerCompleted.TrySetResult(true);
+            }
+        }
+    }
+
     private sealed class GalleryImporter :
         IImporterViewModel,
         IViewProvider<RmvToGltfImporterView>
@@ -835,6 +1262,8 @@ public class UiRemainingEditorFamilyGallery
         public string DisplayName => "glTF → RMV2";
         public string OutputExtension => ".rigid_model_v2";
         public string[] InputExtensions => [".gltf", ".glb"];
+        public string NewSkeletonName { get; set; } =
+            "ExternalWorkflowArmature";
         public bool ImportMeshes { get; set; } = true;
         public bool ImportMaterials { get; set; } = true;
         public bool ConvertFromBlenderMaterialMap { get; set; } = true;
