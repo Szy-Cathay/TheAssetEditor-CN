@@ -1,35 +1,17 @@
-﻿using System.Windows;
-using Shared.Core.ErrorHandling.Exceptions;
-using Shared.Core.Services;
 using SharpGLTF.Schema2;
 
-namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
+namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers;
+
+public interface IGltfSceneSaver
 {
+    bool Save(ModelRoot modelRoot, string fullSystemPath);
+}
 
-    public interface IGltfSceneSaver
+public class GltfSceneSaver : IGltfSceneSaver
+{
+    public bool Save(ModelRoot modelRoot, string fullSystemPath)
     {
-        public void Save(ModelRoot modelRoot, string fullSystemPath);
-    }
-
-    public class GltfSceneSaver : IGltfSceneSaver
-    {
-        private readonly IStandardDialogs _exceptionService;
-
-        public GltfSceneSaver(IStandardDialogs exceptionService)
-        {
-            _exceptionService = exceptionService;
-        }
-
-        public void Save(ModelRoot modelRoot, string fullSystemPath)
-        {        
-            try
-            {
-                modelRoot.SaveGLTF(fullSystemPath);
-            }
-            catch (Exception ex)
-            {
-                _exceptionService.ShowExceptionWindow(ex);
-            }
-        }
+        modelRoot.SaveGLTF(fullSystemPath);
+        return true;
     }
 }

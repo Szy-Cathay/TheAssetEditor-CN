@@ -27,7 +27,7 @@ namespace Editors.ImportExport.Exporting.Presentation
         [ObservableProperty] ObservableCollection<IExporterViewModel> _possibleExporters = [];
         [ObservableProperty] IExporterViewModel? _selectedExporter;
         [ObservableProperty] string _systemPath = "";
-        [ObservableProperty] bool _createImportProject = true;
+        [ObservableProperty] bool _isOperationActive;
 
         public ExporterCoreViewModel(IEnumerable<IExporterViewModel> exporterViewModels)
         {
@@ -52,7 +52,13 @@ namespace Editors.ImportExport.Exporting.Presentation
                 SelectedExporter = PossibleExporters.First();
         }
 
-        public void Export() => SelectedExporter!.Execute(_inputFile, SystemPath, true);
+        public Task<bool> ExportAsync()
+        {
+            if (SelectedExporter == null || _inputFile == null)
+                throw new InvalidOperationException("没有可用于当前文件的导出器。");
+
+            return Task.Run(() => SelectedExporter.Execute(_inputFile, SystemPath));
+        }
 
         [RelayCommand]
         public void BrowsePathCommand()

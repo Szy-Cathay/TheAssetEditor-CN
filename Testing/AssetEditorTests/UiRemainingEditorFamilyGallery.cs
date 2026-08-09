@@ -22,6 +22,7 @@ using Editors.ImportExport.Misc;
 using Editors.Twui.Editor.ComponentEditor;
 using Editors.Twui.Editor.Presentation;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using NUnit.Framework;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
@@ -180,16 +181,10 @@ public class UiRemainingEditorFamilyGallery
         "export-rmv-gltf" => Host(
             new RmvToGltfExporterView
             {
-                DataContext = new GalleryModel
-                {
-                    ExportTextures = true,
-                    ConvertMaterialTextureToBlender = true,
-                    ConvertNormalTextureToBlue = true,
-                    ExportAnimations = true,
-                },
+                DataContext = CreateRmvToGltfExporterModel(),
             },
             720,
-            320),
+            420),
         "import-gltf-rmv" => Host(
             new RmvToGltfImporterView
             {
@@ -200,6 +195,8 @@ public class UiRemainingEditorFamilyGallery
                     ImportAnimations = true,
                     ConvertFromBlenderMaterialMap = true,
                     ConvertNormalTextureToOrange = true,
+                    AutoDetectAnimationKeysPerSecond = true,
+                    CanEditAnimationKeysPerSecond = false,
                     AnimationKeysPerSecond = 30,
                 },
             },
@@ -294,12 +291,11 @@ public class UiRemainingEditorFamilyGallery
         var exporter = new GalleryExporter();
         var viewModel = new ExporterCoreViewModel([exporter])
         {
-            SystemPath = "C:\\输出\\empire_general.glb",
+            SystemPath = "C:\\输出\\empire_general.gltf",
             SelectedExporter = exporter,
-            CreateImportProject = true,
         };
         viewModel.PossibleExporters.Add(exporter);
-        return new ExportWindow(viewModel);
+        return new ExportWindow(viewModel, Mock.Of<IStandardDialogs>());
     }
 
     private static Window CreateImportWindow()
@@ -311,10 +307,9 @@ public class UiRemainingEditorFamilyGallery
         {
             SystemPath = "C:\\导入\\empire_general.glb",
             SelectedImporter = importer,
-            CreateImportProject = true,
         };
         viewModel.PossibleImporters.Add(importer);
-        return new ImportWindow(viewModel);
+        return new ImportWindow(viewModel, Mock.Of<IStandardDialogs>());
     }
 
     private static Window CreateControllerHost()
@@ -462,6 +457,33 @@ public class UiRemainingEditorFamilyGallery
             },
         },
     };
+
+    private static GalleryModel CreateRmvToGltfExporterModel()
+    {
+        var options = new[]
+        {
+            new GalleryModel { DisplayName = @"animations\battle\humanoid23\stand_idle.anim" },
+            new GalleryModel { DisplayName = @"animations\battle\humanoid23\run.anim" },
+        };
+        return new GalleryModel
+        {
+            ExportTextures = true,
+            ConvertMaterialTextureToBlender = true,
+            ConvertNormalTextureToBlue = true,
+            HasSkeleton = true,
+            ExportSkeleton = true,
+            CanExportAnimations = true,
+            ExportAnimations = true,
+            AvailableAnimations = options,
+            SelectedAvailableAnimation = options[1],
+            AnimationFiles = new[] { options[0] },
+            SelectedAnimation = options[0],
+            CanAddAnimation = true,
+            CanRemoveAnimation = true,
+            AddAnimationCommand = GalleryCommand.Instance,
+            RemoveAnimationCommand = GalleryCommand.Instance,
+        };
+    }
 
     private static GalleryModel CreateCscModel() => new()
     {
@@ -755,31 +777,68 @@ public class UiRemainingEditorFamilyGallery
         }
     }
 
-    private sealed class GalleryExporter : IExporterViewModel
+    private sealed class GalleryExporter :
+        IExporterViewModel,
+        IViewProvider<RmvToGltfExporterView>
     {
-        public string DisplayName => "RMV2 → glTF";
-        public string OutputExtension => ".glb";
-        public void Execute(
-            PackFile exportSource,
-            string outputPath,
-            bool generateImporter)
+        public GalleryExporter()
         {
+            SelectedAvailableAnimation = AvailableAnimations.FirstOrDefault();
+        }
+
+        public string DisplayName => "RMV2 → glTF";
+        public string OutputExtension => ".gltf";
+        public bool ExportTextures { get; set; } = true;
+        public bool ConvertMaterialTextureToBlender { get; set; } = true;
+        public bool ConvertNormalTextureToBlue { get; set; } = true;
+        public bool HasSkeleton { get; set; } = true;
+        public bool ExportSkeleton { get; set; } = true;
+        public bool CanExportAnimations => HasSkeleton && ExportSkeleton;
+        public bool ExportAnimations { get; set; } = true;
+        public ObservableCollection<GalleryModel> AvailableAnimations { get; } =
+        [
+            new GalleryModel { DisplayName = @"animations\battle\humanoid23\stand_idle.anim" },
+        ];
+        public ObservableCollection<GalleryModel> AnimationFiles { get; } = [];
+        public GalleryModel? SelectedAvailableAnimation { get; set; }
+        public GalleryModel? SelectedAnimation { get; set; }
+        public bool CanAddAnimation => true;
+        public bool CanRemoveAnimation => SelectedAnimation != null;
+        public ICommand AddAnimationCommand => GalleryCommand.Instance;
+        public ICommand RemoveAnimationCommand => GalleryCommand.Instance;
+        public bool Execute(
+            PackFile exportSource,
+            string outputPath)
+        {
+            return true;
         }
         public ExportSupportEnum CanExportFile(PackFile file) =>
             ExportSupportEnum.HighPriority;
     }
 
-    private sealed class GalleryImporter : IImporterViewModel
+    private sealed class GalleryImporter :
+        IImporterViewModel,
+        IViewProvider<RmvToGltfImporterView>
     {
         public string DisplayName => "glTF → RMV2";
         public string OutputExtension => ".rigid_model_v2";
         public string[] InputExtensions => [".gltf", ".glb"];
-        public void Execute(
+        public bool ImportMeshes { get; set; } = true;
+        public bool ImportMaterials { get; set; } = true;
+        public bool ConvertFromBlenderMaterialMap { get; set; } = true;
+        public bool ConvertNormalTextureToOrange { get; set; } = true;
+        public bool ImportAnimations { get; set; } = true;
+        public bool AutoDetectAnimationKeysPerSecond { get; set; } = true;
+        public bool CanEditAnimationKeysPerSecond =>
+            ImportAnimations && !AutoDetectAnimationKeysPerSecond;
+        public float AnimationKeysPerSecond { get; set; } = 30;
+        public bool Execute(
             PackFile exportSource,
             string outputPath,
             PackFileContainer packFileContainer,
             GameTypeEnum gameType)
         {
+            return true;
         }
         public ImportSupportEnum CanImportFile(PackFile file) =>
             ImportSupportEnum.HighPriority;
@@ -794,7 +853,15 @@ public class UiRemainingEditorFamilyGallery
     private sealed class GalleryModel
     {
         public object? ActiveImage { get; set; }
+        public object? AddAnimationCommand { get; set; }
+        public object? AnimationFiles { get; set; }
         public object? AnimationKeysPerSecond { get; set; }
+        public object? AvailableAnimations { get; set; }
+        public object? AutoDetectAnimationKeysPerSecond { get; set; }
+        public object? CanEditAnimationKeysPerSecond { get; set; }
+        public object? CanAddAnimation { get; set; }
+        public object? CanExportAnimations { get; set; }
+        public object? CanRemoveAnimation { get; set; }
         public object? CanRedo { get; set; }
         public object? CanUndo { get; set; }
         public object? Children { get; set; }
@@ -805,7 +872,6 @@ public class UiRemainingEditorFamilyGallery
         public object? ConvertMaterialTextureToBlender { get; set; }
         public object? ConvertNormalTextureToBlue { get; set; }
         public object? ConvertNormalTextureToOrange { get; set; }
-        public object? CreateImportProject { get; set; }
         public object? CurrentTime { get; set; }
         public object? CurveSeriesList { get; set; }
         public object? CurveStructureLocked { get; set; }
@@ -813,6 +879,7 @@ public class UiRemainingEditorFamilyGallery
         public object? DisplayName { get; set; }
         public object? Duration { get; set; }
         public object? ExportAnimations { get; set; }
+        public object? ExportSkeleton { get; set; }
         public object? ExportTextures { get; set; }
         public object? FocusSelectedCommand { get; set; }
         public object? Format { get; set; }
@@ -822,6 +889,7 @@ public class UiRemainingEditorFamilyGallery
         public object? FormatRCheckbox { get; set; }
         public object? FormatRgbaCheckbox { get; set; }
         public object? HasSelection { get; set; }
+        public object? HasSkeleton { get; set; }
         public object? HasUnsavedChanges { get; set; }
         public object? Height { get; set; }
         public object? ImagePath { get; set; }
@@ -844,11 +912,14 @@ public class UiRemainingEditorFamilyGallery
         public object? ReleaseName { get; set; }
         public object? ReleaseNotes { get; set; }
         public object? ReleaseNotesItems { get; set; }
+        public object? RemoveAnimationCommand { get; set; }
         public object? ResetViewCommand { get; set; }
         public object? Scene { get; set; }
         public object? SceneRootItems { get; set; }
         public object? SelectedComponent { get; set; }
         public object? SelectedComponentViewModel { get; set; }
+        public object? SelectedAnimation { get; set; }
+        public object? SelectedAvailableAnimation { get; set; }
         public object? ShowInPreviewRenderer { get; set; }
         public object? StatusText { get; set; }
         public object? StopCommand { get; set; }

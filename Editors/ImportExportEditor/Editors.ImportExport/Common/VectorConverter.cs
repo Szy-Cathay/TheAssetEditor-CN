@@ -7,9 +7,27 @@ namespace Editors.ImportExport.Common
         public static Vector4 NormalizeTangentVector4(Vector4 tangent)
         {
             // normalize only the xyz components of the tangent, the w component is the handedness (1 or -1) in sharpGLTF
-            var tempTangent = Vector3.Normalize(new Vector3(tangent.X, tangent.Y, tangent.Z));
-            return new Vector4(tempTangent.X, tempTangent.Y, tempTangent.Z, tangent.W);
+            var tempTangent = new Vector3(tangent.X, tangent.Y, tangent.Z);
+            if (!IsFinite(tempTangent) || tempTangent.LengthSquared() <= 0.000000000001f)
+                tempTangent = Vector3.UnitX;
+            else
+                tempTangent = Vector3.Normalize(tempTangent);
+
+            var handedness = float.IsFinite(tangent.W) && tangent.W < 0 ? -1 : 1;
+            return new Vector4(tempTangent.X, tempTangent.Y, tempTangent.Z, handedness);
         }
+
+        public static Vector3 NormalizeVector3(Vector3 value, Vector3 fallback)
+        {
+            if (!IsFinite(value) || value.LengthSquared() <= 0.000000000001f)
+                return fallback;
+            return Vector3.Normalize(value);
+        }
+
+        private static bool IsFinite(Vector3 value) =>
+            float.IsFinite(value.X) &&
+            float.IsFinite(value.Y) &&
+            float.IsFinite(value.Z);
 
         public static Quaternion GetSys(Microsoft.Xna.Framework.Quaternion q) => new Quaternion(q.X, q.Y, q.Z, q.W);
         public static Vector4 GetSys(Microsoft.Xna.Framework.Vector4 v) => new Vector4(v.X, v.Y, v.Z, v.W);

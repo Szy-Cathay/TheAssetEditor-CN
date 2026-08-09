@@ -1,51 +1,63 @@
-﻿using System;
-using System.Collections.Generic;
-using CommonControls;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using Editors.ImportExport.Common;
 using Editors.ImportExport.Exporting.Presentation;
-using Editors.ImportExport.Importing.Presentation;
-using Editors.ImportExport.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using WindowHandling;
 
-namespace Editors.ImportExport.Importing.Presentation
+namespace Editors.ImportExport.Importing.Presentation;
+
+public partial class ImportWindow : AssetEditorWindow
 {
-    public partial class ImportWindow : Window
+    private readonly ImporterCoreViewModel _viewModel;
+    private readonly IStandardDialogs _standardDialogs;
+
+    public ImportWindow(
+        ImporterCoreViewModel viewModel,
+        IStandardDialogs standardDialogs)
     {
-        private readonly ImporterCoreViewModel _viewModel;
+        InitializeComponent();
+        _viewModel = viewModel;
+        _standardDialogs = standardDialogs;
+        DataContext = _viewModel;
+    }
 
-        public ImportWindow(ImporterCoreViewModel viewModel)
+    internal void Initialize(
+        PackFileContainer packFileContainer,
+        string packPath,
+        string diskFile)
+    {
+        _viewModel.Initialize(packFileContainer, packPath, diskFile);
+    }
+
+    private async void ImportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!PathValidator.IsValid(_viewModel.SystemPath))
         {
-            InitializeComponent();
-            DarkTitleBarHelper.Enable(this);
-            _viewModel = viewModel;
-            DataContext = _viewModel;
+            _standardDialogs.ShowDialogBox(
+                LocalizationManager.Instance.Get("Msg.InvalidOrEmptyPath"),
+                LocalizationManager.Instance.Get("Msg.GeneralError"));
+            return;
         }
 
-        internal void Initialize(PackFileContainer packFileContainer, string packPath, string diskFile)
+        ImportButton.IsEnabled = false;
+        _viewModel.IsOperationActive = true;
+        var succeeded = false;
+        try
         {
-            _viewModel.Initialize(packFileContainer, packPath, diskFile);            
+            succeeded = await _viewModel.ImportAsync();
+        }
+        catch (Exception ex)
+        {
+            _standardDialogs.ShowExceptionWindow(ex, "高级 glTF/GLB 导入失败。");
+        }
+        finally
+        {
+            _viewModel.IsOperationActive = false;
+            ImportButton.IsEnabled = true;
         }
 
-        private void ImportButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!PathValidator.IsValid(_viewModel.SystemPath))
-            {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.InvalidOrEmptyPath"), LocalizationManager.Instance.Get("Msg.GeneralError"));
-                return;
-            }
-
-            _viewModel.Import();
+        if (succeeded)
             Close();
-        }       
     }
 }

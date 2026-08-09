@@ -31,7 +31,7 @@ namespace Editors.ImportExport.Importing.Presentation
         [ObservableProperty] ObservableCollection<IImporterViewModel> _possibleImporters = [];
         [ObservableProperty] IImporterViewModel? _selectedImporter;
         [ObservableProperty] string _systemPath = "";
-        [ObservableProperty] bool _createImportProject = true;
+        [ObservableProperty] bool _isOperationActive;
 
         public ImporterCoreViewModel(IEnumerable<IImporterViewModel> exporterViewModels, ApplicationSettingsService applicationSettings)
         {
@@ -56,6 +56,9 @@ namespace Editors.ImportExport.Importing.Presentation
             if(_inputFile == null)
                 throw new ArgumentNullException(nameof(_inputFile), "Fatal Eroor, cannot be null");
 
+            PossibleImporters.Clear();
+            SelectedImporter = null;
+
             foreach (var viewModel in _exporterViewModels)
             {
                 var supported = viewModel.CanImportFile(_inputFile);
@@ -72,7 +75,17 @@ namespace Editors.ImportExport.Importing.Presentation
                 SelectedImporter = PossibleImporters.First();
         }
 
-        public void Import() => SelectedImporter!.Execute(_inputFile, _packPath, _destPackFileContainer, _applicationSettings.CurrentSettings.CurrentGame);
+        public Task<bool> ImportAsync()
+        {
+            if (SelectedImporter == null || _inputFile == null || _destPackFileContainer == null)
+                throw new InvalidOperationException("没有可用于当前文件的导入器。");
+
+            return Task.Run(() => SelectedImporter.Execute(
+                _inputFile,
+                _packPath,
+                _destPackFileContainer,
+                _applicationSettings.CurrentSettings.CurrentGame));
+        }
 
         [RelayCommand]
         public void BrowsePathCommand()

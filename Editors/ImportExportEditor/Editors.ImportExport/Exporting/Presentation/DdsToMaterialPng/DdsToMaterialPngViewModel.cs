@@ -22,9 +22,10 @@ namespace Editors.ImportExport.Exporting.Presentation.DdsToMaterialPng
 
         public ExportSupportEnum CanExportFile(PackFile file) => _exporter.CanExportFile(file);
 
-        public void Execute(PackFile exportSource, string outputPath, bool generateImporter) 
+        public bool Execute(PackFile exportSource, string outputPath)
         {
             _exporter.Export(exportSource.Name, outputPath, SwapBlender);
+            return true;
         }
     }
 }

@@ -5,11 +5,12 @@ namespace Test.ImportExport.Exporting.Exporters.RmvToGlft
 {
     public class TestGltfSceneSaver : IGltfSceneSaver
     {
-        public void Save(ModelRoot modelRoot, string fullSystemPath)
+        public bool Save(ModelRoot modelRoot, string fullSystemPath)
         {
             IsSaveCalled = true;
             FullSystemPath = fullSystemPath;
             ModelRoot = modelRoot;
+            return true;
         }
 
         public bool IsSaveCalled { get; set; }

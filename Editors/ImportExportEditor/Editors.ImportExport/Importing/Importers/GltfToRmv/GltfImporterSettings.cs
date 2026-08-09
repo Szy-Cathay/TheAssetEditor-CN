@@ -15,6 +15,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         bool ConvertNormalTextureFromBlueToOrangeType,
         bool ImportAnimations,
         float AnimationKeysPerSecond,
-        bool MirrorMesh
+        bool MirrorMesh,
+        bool AutoDetectAnimationKeysPerSecond = true
     );
 }

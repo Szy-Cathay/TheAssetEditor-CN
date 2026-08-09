@@ -11,6 +11,8 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf
         bool ConvertMaterialTextureToBlender,
         bool ConvertNormalTextureToBlue,
         bool ExportAnimations,
-        bool MirrorMesh
+        bool MirrorMesh,
+        global::Shared.Core.Settings.GameTypeEnum SelectedGame = global::Shared.Core.Settings.GameTypeEnum.Unknown,
+        bool ExportSkeleton = true
     );
 }

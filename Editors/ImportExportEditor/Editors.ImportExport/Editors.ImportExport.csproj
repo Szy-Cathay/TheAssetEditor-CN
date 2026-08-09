@@ -3,13 +3,17 @@
 	<ItemGroup>
 		<Using Include="Shared.Ui.BaseDialogs.StandardDialog.UnifiedMessageBox" Alias="MessageBox" />
 	</ItemGroup>
-	<PropertyGroup>
+  <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <WarningsAsErrors>true</WarningsAsErrors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Test.ImportExport" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\GameWorld\View3D\GameWorld.Core.csproj" />

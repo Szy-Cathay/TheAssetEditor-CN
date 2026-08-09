@@ -1,11 +1,15 @@
 ﻿
+using System.IO;
+
 namespace Editors.ImportExport.Misc
 {
     public static class FileExtensionHelper
     {
         public static bool IsGltfFile(string fileName)
-        {            
-            return fileName.EndsWith(".gltf", StringComparison.InvariantCultureIgnoreCase);
+        {
+            var extension = Path.GetExtension(fileName);
+            return extension.Equals(".gltf", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".glb", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsDdsFile(string fileName)
