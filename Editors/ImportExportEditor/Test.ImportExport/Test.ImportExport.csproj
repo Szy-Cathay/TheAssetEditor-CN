@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <None Include="TestData\Gltf\blender_external_skeleton.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TestData\Gltf\external_full_workflow.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="TestData\Gltf\external_mesh_attributes.gltf" CopyToOutputDirectory="PreserveNewest" />
     <None Include="TestData\Gltf\vertex_limit.gltf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
