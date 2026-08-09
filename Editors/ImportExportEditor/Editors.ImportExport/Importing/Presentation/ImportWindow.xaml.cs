@@ -114,18 +114,18 @@ public partial class ImportWindow : AssetEditorWindow
         if (result.HumanoidScale != null)
         {
             var scaleItems = new List<string>();
-            if (result.HumanoidScale.SourceHeight != null)
-            {
-                scaleItems.Add(LocalizationManager.Instance.GetFormat(
+            scaleItems.Add(result.HumanoidScale.SourceHeight != null
+                ? LocalizationManager.Instance.GetFormat(
                     "GltfImporter.ScaleSummary.SourceHeight",
-                    result.HumanoidScale.SourceHeight.Value));
-            }
-            if (result.HumanoidScale.ReferenceHeight != null)
-            {
-                scaleItems.Add(LocalizationManager.Instance.GetFormat(
+                    result.HumanoidScale.SourceHeight.Value)
+                : LocalizationManager.Instance.Get(
+                    "GltfImporter.ScaleSummary.SourceHeightUnavailable"));
+            scaleItems.Add(result.HumanoidScale.ReferenceHeight != null
+                ? LocalizationManager.Instance.GetFormat(
                     "GltfImporter.ScaleSummary.ReferenceHeight",
-                    result.HumanoidScale.ReferenceHeight.Value));
-            }
+                    result.HumanoidScale.ReferenceHeight.Value)
+                : LocalizationManager.Instance.Get(
+                    "GltfImporter.ScaleSummary.ReferenceHeightUnavailable"));
             scaleItems.Add(LocalizationManager.Instance.GetFormat(
                 "GltfImporter.ScaleSummary.ScaleFactor",
                 result.HumanoidScale.ScaleFactor));

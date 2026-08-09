@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Numerics;
 using Editors.ImportExport.Importing;
 using Shared.Core.Services;
@@ -38,7 +38,9 @@ internal static class HumanoidScaleCalculator
         AnimationFile sourceSkeleton,
         Func<AnimationFile> getReferenceSkeleton)
     {
-        var sourceMeasurement = Measure(sourceSkeleton, "源骨架");
+        var sourceMeasurement = Measure(
+            sourceSkeleton,
+            LocalizationManager.Instance.Get("GltfImporter.ScaleSkeleton.Source"));
         if (sourceMeasurement.Status == MeasurementStatus.NotHumanoid)
         {
             return new HumanoidScaleImportSummary(
@@ -93,9 +95,18 @@ internal static class HumanoidScaleCalculator
         string skeletonLabel)
     {
         var pose = CreatePose(skeleton);
-        var head = FindAnchor(pose, "头部", s_headAliases);
-        var leftFoot = FindAnchor(pose, "左脚", s_leftFootAliases);
-        var rightFoot = FindAnchor(pose, "右脚", s_rightFootAliases);
+        var head = FindAnchor(
+            pose,
+            LocalizationManager.Instance.Get("GltfImporter.ScaleAnchor.Head"),
+            s_headAliases);
+        var leftFoot = FindAnchor(
+            pose,
+            LocalizationManager.Instance.Get("GltfImporter.ScaleAnchor.LeftFoot"),
+            s_leftFootAliases);
+        var rightFoot = FindAnchor(
+            pose,
+            LocalizationManager.Instance.Get("GltfImporter.ScaleAnchor.RightFoot"),
+            s_rightFootAliases);
         var anchors = new[] { head, leftFoot, rightFoot };
         var matchedCount = anchors.Count(anchor => anchor.Index != null);
         if (matchedCount == 0)

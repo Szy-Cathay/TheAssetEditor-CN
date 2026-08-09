@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using Editors.ImportImport.Importing.Presentation.RmvToGltf;
@@ -298,6 +298,34 @@ public class GltfHumanoidAutoScaleTests
     }
 
     [Test]
+    public void Import_HumanoidForAnotherGame_ReturnsFailureAndLeavesPackUnchanged()
+    {
+        var glbPath = CreateExternalHumanoidGlb(sourceHeight: 4);
+        try
+        {
+            var destination = CreateDestinationWithExistingFile(out var existingFile);
+            var result = CreateImporter(
+                destination,
+                CreateReferenceContainer("ca", height: 2, isCaPack: true)).Import(
+                    CreateSettings(
+                        glbPath,
+                        destination,
+                        gameType: GameTypeEnum.Warhammer2));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("战锤3"));
+                AssertDestinationUnchanged(destination, existingFile);
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
     public void ImporterViewModel_DisablingAutoScale_ReachesImporterSettings()
     {
         var glbPath = CreateExternalHumanoidGlb(sourceHeight: 4);
@@ -418,11 +446,12 @@ public class GltfHumanoidAutoScaleTests
         string glbPath,
         PackFileContainer destination,
         bool autoScaleHumanoid = true,
-        bool importAnimations = true) => new(
+        bool importAnimations = true,
+        GameTypeEnum gameType = GameTypeEnum.Warhammer3) => new(
         glbPath,
         "models",
         destination,
-        GameTypeEnum.Warhammer3,
+        gameType,
         true,
         false,
         false,

@@ -167,6 +167,17 @@ public class GltfToRmvImporterViewModelTests
                 "目标 Pack 已存在资源：models\\test.rigid_model_v2",
                 "目标 Pack 已存在资源：models\\test.anim",
             ]));
+        var disabledMessage = ImportWindow.BuildResultMessage(new ImportResult(
+            true,
+            [],
+            [],
+            [],
+            HumanoidScale: new HumanoidScaleImportSummary(
+                false,
+                null,
+                null,
+                1,
+                "未应用：用户已关闭自动人形缩放。")));
 
         Assert.Multiple(() =>
         {
@@ -175,6 +186,10 @@ public class GltfToRmvImporterViewModelTests
             Assert.That(successMessage, Does.Contain("源人物高度：4"));
             Assert.That(successMessage, Does.Contain("humanoid01 参考高度：2"));
             Assert.That(successMessage, Does.Contain("最终倍率：0.5"));
+            Assert.That(disabledMessage, Does.Contain("源人物高度：未测量"));
+            Assert.That(disabledMessage, Does.Contain("humanoid01 参考高度：未测量"));
+            Assert.That(disabledMessage, Does.Contain("最终倍率：1"));
+            Assert.That(disabledMessage, Does.Contain("用户已关闭"));
             Assert.That(failureMessage, Does.Contain(@"models\test.rigid_model_v2"));
             Assert.That(failureMessage, Does.Contain(@"models\test.anim"));
         });

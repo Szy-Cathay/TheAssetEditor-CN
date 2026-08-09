@@ -12,6 +12,7 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
 using SharpGLTF.Schema2;
@@ -247,6 +248,11 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     null,
                     1,
                     LocalizationManager.Instance.Get("GltfImporter.ScaleReason.NoExternalSkeleton"));
+            }
+            if (settings.SelectedGame != GameTypeEnum.Warhammer3)
+            {
+                throw new InvalidDataException(LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.AutoScaleRequiresWarhammer3"));
             }
 
             return HumanoidScaleCalculator.Calculate(
