@@ -191,6 +191,7 @@ public class UiRemainingEditorFamilyGallery
             {
                 DataContext = new GalleryModel
                 {
+                    NewSkeletonName = "ExternalArmature",
                     ImportMeshes = true,
                     ImportMaterials = true,
                     ImportAnimations = true,
@@ -903,6 +904,7 @@ public class UiRemainingEditorFamilyGallery
         public object? IsSceneRootSelected { get; set; }
         public object? Loop { get; set; }
         public object? Name { get; set; }
+        public object? NewSkeletonName { get; set; }
         public object? NumMipMaps { get; set; }
         public object? ParsedTwuiFile { get; set; }
         public object? Playback { get; set; }

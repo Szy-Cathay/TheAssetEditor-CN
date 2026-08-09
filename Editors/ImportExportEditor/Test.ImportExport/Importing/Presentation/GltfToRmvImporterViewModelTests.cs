@@ -5,6 +5,7 @@ using Editors.ImportImport.Importing.Presentation.RmvToGltf;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using SharpGLTF.Schema2;
 
 namespace Test.ImportExport.Importing.Presentation;
 
@@ -26,6 +27,95 @@ public class GltfToRmvImporterViewModelTests
 
         viewModel.ImportAnimations = false;
         Assert.That(viewModel.CanEditAnimationKeysPerSecond, Is.False);
+    }
+
+    [Test]
+    public void Initialize_StandardGlb_UsesSkinNameAsEditableSkeletonDefault()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var root = scene.CreateNode("root");
+        modelRoot.CreateSkin("ExternalArmature").BindJoints(
+            System.Numerics.Matrix4x4.Identity,
+            root);
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(inputPath);
+            var viewModel = new RmvToGltfImporterViewModel(null!);
+
+            viewModel.Initialize(new PackFile(
+                inputPath,
+                new FileSystemSource(inputPath)));
+
+            Assert.That(viewModel.NewSkeletonName, Is.EqualTo("ExternalArmature"));
+            viewModel.NewSkeletonName = "CustomSkeleton";
+            Assert.That(viewModel.NewSkeletonName, Is.EqualTo("CustomSkeleton"));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [Test]
+    public void Initialize_StandardGlbWithoutSkinSkeletonProperty_UsesArmatureName()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var armature = scene.CreateNode("ExternalArmature");
+        var root = armature.CreateNode("root");
+        var skin = modelRoot.CreateSkin();
+        skin.BindJoints(System.Numerics.Matrix4x4.Identity, root);
+        skin.Skeleton = null;
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(inputPath);
+            var viewModel = new RmvToGltfImporterViewModel(null!);
+
+            viewModel.Initialize(new PackFile(
+                inputPath,
+                new FileSystemSource(inputPath)));
+
+            Assert.That(viewModel.NewSkeletonName, Is.EqualTo("ExternalArmature"));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [Test]
+    public void Initialize_GltfWithCyclicNonJointAncestors_DoesNotHang()
+    {
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.gltf");
+        try
+        {
+            File.WriteAllText(inputPath, """
+                {
+                  "asset": { "version": "2.0" },
+                  "nodes": [
+                    { "children": [1] },
+                    { "children": [0, 2] },
+                    { "name": "root" }
+                  ],
+                  "skins": [{ "joints": [2] }]
+                }
+                """);
+            var viewModel = new RmvToGltfImporterViewModel(null!);
+
+            var initializeTask = Task.Run(() => viewModel.Initialize(new PackFile(
+                inputPath,
+                new FileSystemSource(inputPath))));
+
+            Assert.That(initializeTask.Wait(TimeSpan.FromSeconds(1)), Is.True);
+            Assert.That(viewModel.NewSkeletonName, Is.EqualTo(Path.GetFileNameWithoutExtension(inputPath)));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
     }
 
     [Test]

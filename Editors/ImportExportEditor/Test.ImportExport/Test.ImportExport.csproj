@@ -31,4 +31,8 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="TestData\Gltf\blender_external_skeleton.glb" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -155,7 +155,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         {
             var modelRoot = CreateModelRoot(settings);
 
-            var skeletonData = GetSkeletonData(modelRoot);
+            var skeletonData = GetSkeletonData(settings, modelRoot);
             var pendingFiles = new List<NewPackFileEntry>();
 
             if (settings.ImportAnimations && modelRoot.LogicalAnimations.Count > 0 && skeletonData.skeletonAnimFile == null)
@@ -239,7 +239,9 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             }
         }
 
-        private (string? skeletonName, AnimationFile? skeletonAnimFile, bool wasCreated) GetSkeletonData(ModelRoot? modelRoot)
+        private (string? skeletonName, AnimationFile? skeletonAnimFile, bool wasCreated) GetSkeletonData(
+            GltfImporterSettings settings,
+            ModelRoot? modelRoot)
         {
             if (modelRoot == null)
                 throw new ArgumentException($"Invalid Input: {nameof(modelRoot)} == {modelRoot}");
@@ -249,7 +251,15 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             if (string.IsNullOrWhiteSpace(skeletonName))
             {
                 if (modelRoot.LogicalSkins.Count > 0)
-                    throw new InvalidDataException("glTF 包含蒙皮网格，但缺少“//skeleton//骨架名”节点，无法安全映射到游戏骨架。");
+                {
+                    var importedSkeleton = GltfSkeletonImporter.BuildExternal(
+                        modelRoot,
+                        settings.InputGltfFile,
+                        settings.NewSkeletonName,
+                        mirrorMesh: true);
+                    skeletonName = importedSkeleton.Header.SkeletonName;
+                    return (skeletonName, importedSkeleton, true);
+                }
 
                 _logger.Information("Skeleton ID not found in scene; importing as a static model.");
                 return ("", null, false);

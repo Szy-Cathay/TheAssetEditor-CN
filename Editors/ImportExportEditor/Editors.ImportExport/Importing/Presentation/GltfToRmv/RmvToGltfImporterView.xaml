@@ -24,19 +24,34 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Margin="0,0,16,8" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMeshes}" />
+        <TextBlock
+            Margin="0,0,16,8"
+            VerticalAlignment="Center"
+            Text="{loc:Loc RmvToGltfImporter.NewSkeletonName}" />
+        <TextBox
+            Grid.Column="1"
+            Width="240"
+            Margin="0,0,0,8"
+            AutomationProperties.Name="{loc:Loc RmvToGltfImporter.NewSkeletonName}"
+            Style="{StaticResource AeInput.TextBox}"
+            Text="{Binding NewSkeletonName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.NewSkeletonName}" />
+
+        <TextBlock Grid.Row="1" Margin="0,0,16,8" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMeshes}" />
         <CheckBox
+            Grid.Row="1"
             Grid.Column="1"
             Margin="0,0,0,8"
             IsChecked="{Binding ImportMeshes, Mode=TwoWay}"
             Style="{StaticResource AeInput.CheckBox}"
             ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMeshes}" />
 
-        <TextBlock Grid.Row="1" Margin="0,0,16,8" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMaterials}" />
+        <TextBlock Grid.Row="2" Margin="0,0,16,8" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportMaterials}" />
         <CheckBox
-            Grid.Row="1"
+            Grid.Row="2"
             Grid.Column="1"
             Margin="0,0,0,8"
             IsChecked="{Binding ImportMaterials, Mode=TwoWay}"
@@ -44,13 +59,13 @@
             ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportMaterials}" />
 
         <TextBlock
-            Grid.Row="2"
+            Grid.Row="3"
             Margin="18,0,16,8"
             VerticalAlignment="Center"
             Foreground="{DynamicResource AeBrush.TextSecondary}"
             Text="{loc:Loc RmvToGltfImporter.ConvertMaterialMap}" />
         <CheckBox
-            Grid.Row="2"
+            Grid.Row="3"
             Grid.Column="1"
             Margin="0,0,0,8"
             IsChecked="{Binding ConvertFromBlenderMaterialMap, Mode=TwoWay}"
@@ -59,13 +74,13 @@
             ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ConvertMaterialMap}" />
 
         <TextBlock
-            Grid.Row="3"
+            Grid.Row="4"
             Margin="18,0,16,12"
             VerticalAlignment="Center"
             Foreground="{DynamicResource AeBrush.TextSecondary}"
             Text="{loc:Loc RmvToGltfImporter.ConvertNormalMap}" />
         <CheckBox
-            Grid.Row="3"
+            Grid.Row="4"
             Grid.Column="1"
             Margin="0,0,0,12"
             IsChecked="{Binding ConvertNormalTextureToOrange, Mode=TwoWay}"
@@ -73,16 +88,16 @@
             Style="{StaticResource AeInput.CheckBox}"
             ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ConvertNormalMap}" />
 
-        <TextBlock Grid.Row="4" Margin="0,0,16,8" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportAnimations}" />
+        <TextBlock Grid.Row="5" Margin="0,0,16,8" VerticalAlignment="Center" Text="{loc:Loc RmvToGltfImporter.ImportAnimations}" />
         <CheckBox
-            Grid.Row="4"
+            Grid.Row="5"
             Grid.Column="1"
             Margin="0,0,0,8"
             IsChecked="{Binding ImportAnimations, Mode=TwoWay}"
             Style="{StaticResource AeInput.CheckBox}"
             ToolTip="{loc:Loc RmvToGltfImporter.ToolTip.ImportAnimations}" />
 
-        <Grid Grid.Row="5" Grid.ColumnSpan="2" Margin="18,0,0,0" IsEnabled="{Binding ImportAnimations}">
+        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="18,0,0,0" IsEnabled="{Binding ImportAnimations}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
