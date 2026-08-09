@@ -17,12 +17,19 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
             TextureType textureType,
             GameTypeEnum gameType,
             string outFileName,
-            bool convertSpecialTexture = true)
+            bool convertSpecialTexture = true,
+            float alphaThreshold = 0.5f)
         {
             using var scratchImagePng = TexHelper.Instance.LoadFromWICFile(
                 inputPath,
                 GetWicFlags(textureType));
-            return Import(scratchImagePng, textureType, gameType, outFileName, convertSpecialTexture);
+            return Import(
+                scratchImagePng,
+                textureType,
+                gameType,
+                outFileName,
+                convertSpecialTexture,
+                alphaThreshold);
         }
 
         public static PackFile Import(
@@ -30,7 +37,8 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
             TextureType textureType,
             GameTypeEnum gameType,
             string outFileName,
-            bool convertSpecialTexture = true)
+            bool convertSpecialTexture = true,
+            float alphaThreshold = 0.5f)
         {
             using var memoryStream = new MemoryStream();
             inputStream.CopyTo(memoryStream);
@@ -42,7 +50,13 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
                     imageHandle.AddrOfPinnedObject(),
                     imageBytes.LongLength,
                     GetWicFlags(textureType));
-                return Import(scratchImagePng, textureType, gameType, outFileName, convertSpecialTexture);
+                return Import(
+                    scratchImagePng,
+                    textureType,
+                    gameType,
+                    outFileName,
+                    convertSpecialTexture,
+                    alphaThreshold);
             }
             finally
             {
@@ -55,7 +69,8 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
             TextureType textureType,
             GameTypeEnum gameType,
             string outFileName,
-            bool convertSpecialTexture)
+            bool convertSpecialTexture,
+            float alphaThreshold)
         {
             var processedImage = ImageProcessorFactory
                 .CreateImageProcessor(textureType, convertSpecialTexture)
@@ -64,7 +79,10 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
             using (var imageWithMips = processedImage.GenerateMipMaps(TEX_FILTER_FLAGS.DEFAULT, 0))
             {
                 var ddsFormat = DDSFormatHelper.GetDDSFormat(gameType, textureType);
-                using var ddsImage = imageWithMips.Compress(ddsFormat, TEX_COMPRESS_FLAGS.DEFAULT, 0.5f);
+                using var ddsImage = imageWithMips.Compress(
+                    ddsFormat,
+                    TEX_COMPRESS_FLAGS.DEFAULT,
+                    alphaThreshold);
                 var ddsFlags = gameType == GameTypeEnum.Warhammer3
                     ? DDS_FLAGS.FORCE_DX10_EXT
                     : DDS_FLAGS.NONE;

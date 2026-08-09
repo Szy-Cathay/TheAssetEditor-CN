@@ -2,6 +2,7 @@
 using System.Numerics;
 using Editors.ImportExport.Common;
 using Shared.GameFormats.RigidModel;
+using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.RigidModel.Vertex;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
@@ -26,7 +27,11 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             {
                 var rmvMesh = lodLevel[i];
                 var meshTextures = textures.Where(x=>x.MeshIndex == i).ToList();
-                var gltfMaterial = Create(settings, rmvMesh.Material.ModelName + "_Material", meshTextures);
+                var gltfMaterial = Create(
+                    settings,
+                    rmvMesh.Material.ModelName + "_Material",
+                    meshTextures,
+                    IsAlphaEnabled(rmvMesh.Material));
                 var gltfMesh = GenerateMesh(rmvMesh.Mesh, rmvMesh.Material.ModelName, gltfMaterial, hasSkeleton, settings.MirrorMesh);
                 meshes.Add(gltfMesh);
             }
@@ -162,12 +167,23 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             return glTfvertex;
         }
 
-        MaterialBuilder Create(RmvToGltfExporterSettings settings, string materialName, List<TextureResult> texturesForModel)
+        private static bool IsAlphaEnabled(IRmvMaterial material) =>
+            material is WeightedMaterial weightedMaterial &&
+            weightedMaterial.IntParams.TryGet(
+                WeightedParamterIds.IntParams_Alpha_index,
+                out var alphaMode) &&
+            alphaMode != 0;
+
+        MaterialBuilder Create(
+            RmvToGltfExporterSettings settings,
+            string materialName,
+            List<TextureResult> texturesForModel,
+            bool alphaEnabled)
         {
             var material = new MaterialBuilder(materialName)
                   .WithDoubleSide(true)
                   .WithMetallicRoughness()
-                  .WithAlpha(AlphaMode.MASK);
+                  .WithAlpha(alphaEnabled ? AlphaMode.MASK : AlphaMode.OPAQUE);
 
             foreach (var texture in texturesForModel)
             {

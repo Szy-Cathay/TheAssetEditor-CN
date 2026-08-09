@@ -5,11 +5,14 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using Editors.ImportExport.Importing;
 using Editors.ImportExport.Importing.Importers.PngToDds;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
+using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.RigidModel.Types;
 using SharpGLTF.Schema2;
 using TextureType = Shared.GameFormats.RigidModel.Types.TextureType;
@@ -45,7 +48,23 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
     }
     public class RmvMaterialBuilder
     {
-        public IReadOnlyList<NewPackFileEntry> BuildRmvFileMaterials(
+        internal static void ValidateMaterialModes(ModelRoot modelRoot)
+        {
+            var blendMaterials = modelRoot.LogicalMaterials
+                .Where(material => material.Alpha == SharpGLTF.Schema2.AlphaMode.BLEND)
+                .Select(GetMaterialName)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+            if (blendMaterials.Count == 0)
+                return;
+
+            throw new InvalidDataException(LocalizationManager.Instance.GetFormat(
+                "GltfImporter.Error.BlendMaterials",
+                string.Join("、", blendMaterials)));
+        }
+
+        internal RmvMaterialBuildResult BuildRmvFileMaterials(
             GltfImporterSettings settings,
             SharpGLTF.Schema2.ModelRoot modelRoot,
             RmvFile rmvFile)
@@ -54,6 +73,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
 
             var textureEntries = new List<NewPackFileEntry>();
             var importedTexturePaths = new Dictionary<TextureCacheKey, string>();
+            var maskedMaterials = new HashSet<MaskedMaterialImportSummary>();
+            var skippedSemantics = new HashSet<SkippedMaterialSemantic>();
             var meshSources = RmvMeshBuilder.GetMeshSources(modelRoot);
             for (int i = 0; i < meshSources.Count; i++)
             {
@@ -62,12 +83,23 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                     meshSources[i],
                     rmvFile.ModelList[0][i],
                     textureEntries,
-                    importedTexturePaths
+                    importedTexturePaths,
+                    maskedMaterials,
+                    skippedSemantics
                 );
             }
 
             rmvFile.RecalculateOffsets();
-            return textureEntries;
+            return new RmvMaterialBuildResult(
+                textureEntries,
+                new MaterialImportSummary(
+                    maskedMaterials
+                        .OrderBy(item => item.MaterialName, StringComparer.Ordinal)
+                        .ToList(),
+                    skippedSemantics
+                        .OrderBy(item => item.MaterialName, StringComparer.Ordinal)
+                        .ThenBy(item => item.Semantic, StringComparer.Ordinal)
+                        .ToList()));
         }
 
         private void BuildRmvModelMaterial(
@@ -75,19 +107,38 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             RmvMeshBuilder.MeshSource source,
             RmvModel rmvModel,
             ICollection<NewPackFileEntry> textureEntries,
-            IDictionary<TextureCacheKey, string> importedTexturePaths)
+            IDictionary<TextureCacheKey, string> importedTexturePaths,
+            ISet<MaskedMaterialImportSummary> maskedMaterials,
+            ISet<SkippedMaterialSemantic> skippedSemantics)
         {
             var gltfMaterial = source.Primitive.Material;
             var assignedTextureTypes = new HashSet<TextureType>();
+            SetAlphaMode(rmvModel, gltfMaterial);
+            var alphaThreshold = GetAlphaThreshold(gltfMaterial);
+            if (gltfMaterial?.Alpha == SharpGLTF.Schema2.AlphaMode.MASK)
+            {
+                maskedMaterials.Add(new MaskedMaterialImportSummary(
+                    GetMaterialName(gltfMaterial),
+                    alphaThreshold));
+            }
 
             foreach (var itText in gltfMaterial?.Channels ?? [])
             {
-                if (itText.Texture == null) continue;
-
                 if (!TextureTypeHelper.GetRmvTextureTypeFromGltfIdString(
                     itText.Key,
                     out var textureType,
-                    out var postFixString)) continue; // gltf string id doesn't match any of the rmv texture types
+                    out var postFixString))
+                {
+                    if (ShouldReportSkippedSemantic(itText))
+                    {
+                        skippedSemantics.Add(new SkippedMaterialSemantic(
+                            GetMaterialName(gltfMaterial!),
+                            itText.Key));
+                    }
+                    continue;
+                }
+
+                if (itText.Texture == null) continue;
 
                 var gameType = settings.SelectedGame;                
                 
@@ -105,7 +156,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                     textureType,
                     gameType,
                     Path.GetFileName(texturePackFolder),
-                    shouldConvert);
+                    shouldConvert,
+                    textureType == TextureType.BaseColour ? alphaThreshold : 0.5f);
 
                 AddTexture(
                     rmvModel,
@@ -115,7 +167,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                     texturePackFolder,
                     ddsPackFile,
                     gameType,
-                    shouldConvert);
+                    shouldConvert,
+                    textureType == TextureType.BaseColour ? alphaThreshold : 0.5f);
                 assignedTextureTypes.Add(textureType);
             }
 
@@ -130,7 +183,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 importedTexturePaths,
                 assignedTextureTypes,
                 TextureType.BaseColour,
-                "base_colour");
+                "base_colour",
+                alphaThreshold);
             AddNeutralTextureIfMissing(
                 settings,
                 source.ModelName,
@@ -160,6 +214,35 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 "mask");
         }
 
+        private static bool ShouldReportSkippedSemantic(MaterialChannel channel) =>
+            channel.Texture != null ||
+            channel.Parameters.Any(parameter => !parameter.IsDefault);
+
+        private static void SetAlphaMode(
+            RmvModel rmvModel,
+            SharpGLTF.Schema2.Material? gltfMaterial)
+        {
+            if (rmvModel.Material is not WeightedMaterial weightedMaterial)
+                throw new InvalidDataException(LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.UnsupportedRmvMaterialForAlpha"));
+
+            weightedMaterial.IntParams.Set(
+                WeightedParamterIds.IntParams_Alpha_index,
+                gltfMaterial?.Alpha == SharpGLTF.Schema2.AlphaMode.MASK ? 1 : 0);
+        }
+
+        private static float GetAlphaThreshold(
+            SharpGLTF.Schema2.Material? gltfMaterial) =>
+            gltfMaterial?.Alpha == SharpGLTF.Schema2.AlphaMode.MASK
+                ? gltfMaterial.AlphaCutoff
+                : 0.5f;
+
+        private static string GetMaterialName(
+            SharpGLTF.Schema2.Material material) =>
+            string.IsNullOrWhiteSpace(material.Name)
+                ? LocalizationManager.Instance.Get("GltfImporter.Material.Unnamed")
+                : material.Name;
+
         private static void AddNeutralTextureIfMissing(
             GltfImporterSettings settings,
             string modelName,
@@ -168,7 +251,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             IDictionary<TextureCacheKey, string> importedTexturePaths,
             ISet<TextureType> assignedTextureTypes,
             TextureType textureType,
-            string postFix)
+            string postFix,
+            float alphaThreshold = 0.5f)
         {
             if (assignedTextureTypes.Contains(textureType))
                 return;
@@ -182,7 +266,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 textureType,
                 settings.SelectedGame,
                 Path.GetFileName(texturePath),
-                shouldConvert);
+                shouldConvert,
+                alphaThreshold);
             AddTexture(
                 rmvModel,
                 textureEntries,
@@ -191,7 +276,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 texturePath,
                 ddsPackFile,
                 settings.SelectedGame,
-                shouldConvert);
+                shouldConvert,
+                alphaThreshold);
         }
 
         private static void AddTexture(
@@ -202,7 +288,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             string texturePath,
             PackFile ddsPackFile,
             GameTypeEnum gameType,
-            bool shouldConvert)
+            bool shouldConvert,
+            float alphaThreshold)
         {
             var hash = Convert.ToHexString(SHA256.HashData(
                 ddsPackFile.DataSource.ReadData()));
@@ -210,6 +297,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 gameType,
                 textureType,
                 shouldConvert,
+                alphaThreshold,
                 hash);
             if (importedTexturePaths.TryGetValue(cacheKey, out var importedPath))
             {
@@ -228,6 +316,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             GameTypeEnum GameType,
             TextureType TextureType,
             bool ShouldConvert,
+            float AlphaThreshold,
             string ContentHash);
 
         private static Stream CreateNeutralTextureStream(TextureType textureType)
@@ -293,5 +382,9 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 throw new Exception("ERROR: unexpected rmv2 mesh count mismatch");
         }
     }
+
+    internal sealed record RmvMaterialBuildResult(
+        IReadOnlyList<NewPackFileEntry> Files,
+        MaterialImportSummary Summary);
 }
 
