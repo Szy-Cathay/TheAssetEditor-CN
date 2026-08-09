@@ -111,6 +111,30 @@ public partial class ImportWindow : AssetEditorWindow
                 result.Warnings));
         }
 
+        if (result.HumanoidScale != null)
+        {
+            var scaleItems = new List<string>();
+            scaleItems.Add(result.HumanoidScale.SourceHeight != null
+                ? LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.ScaleSummary.SourceHeight",
+                    result.HumanoidScale.SourceHeight.Value)
+                : LocalizationManager.Instance.Get(
+                    "GltfImporter.ScaleSummary.SourceHeightUnavailable"));
+            scaleItems.Add(result.HumanoidScale.ReferenceHeight != null
+                ? LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.ScaleSummary.ReferenceHeight",
+                    result.HumanoidScale.ReferenceHeight.Value)
+                : LocalizationManager.Instance.Get(
+                    "GltfImporter.ScaleSummary.ReferenceHeightUnavailable"));
+            scaleItems.Add(LocalizationManager.Instance.GetFormat(
+                "GltfImporter.ScaleSummary.ScaleFactor",
+                result.HumanoidScale.ScaleFactor));
+            scaleItems.Add(result.HumanoidScale.Reason);
+            sections.Add(BuildSection(
+                LocalizationManager.Instance.Get("ImportWindow.HumanoidScaleHeading"),
+                scaleItems));
+        }
+
         return string.Join(Environment.NewLine + Environment.NewLine, sections);
     }
 
