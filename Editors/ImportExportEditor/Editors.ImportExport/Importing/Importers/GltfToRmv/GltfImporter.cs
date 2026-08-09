@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using Editors.ImportExport.Importing;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using Editors.ImportExport.Misc;
 using Editors.Shared.Core.Services;
@@ -9,6 +10,7 @@ using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
@@ -51,33 +53,37 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             return rmv2File;
         }
 
-        private void SaveRmvFileToPack(GltfImporterSettings settings, string importedFileName, RmvFile rmv2File)
+        private static NewPackFileEntry CreateRmvEntry(
+            GltfImporterSettings settings,
+            string importedFileName,
+            RmvFile rmv2File)
         {
             var bytesRmv2 = ModelFactory.Create().Save(rmv2File);
 
             var packFileImported = new PackFile(importedFileName, new MemorySource(bytesRmv2));
-            var newFile = new NewPackFileEntry(settings.DestinationPackPath, packFileImported);
-
-            PackFileDispatcherWriter.AddFilesToPack(
-                _packFileService,
-                settings.DestinationPackFileContainer,
-                [newFile]);
+            return new NewPackFileEntry(settings.DestinationPackPath, packFileImported);
         }
 
-        private void ImportMaterials(GltfImporterSettings settings, ModelRoot modelRoot, RmvFile rmv2File)
-        {
+        private IReadOnlyList<NewPackFileEntry> ImportMaterials(
+            GltfImporterSettings settings,
+            ModelRoot modelRoot,
+            RmvFile rmv2File) =>
             _materialBuilder.BuildRmvFileMaterials(settings, modelRoot, rmv2File);
-        }
 
-        private void ImportAnimations(GltfImporterSettings settings, ModelRoot modelRoot, AnimationFile? skeletonAnimFile, string skeletonName)
+        private static IReadOnlyList<NewPackFileEntry> ImportAnimations(
+            GltfImporterSettings settings,
+            ModelRoot modelRoot,
+            AnimationFile? skeletonAnimFile,
+            string skeletonName)
         {
             if (modelRoot.LogicalAnimations.Count == 0)
-                return;
+                return [];
             if (skeletonAnimFile == null)
                 throw new InvalidDataException("glTF 包含动画，但未能确定对应的游戏骨架，已停止导入以避免生成损坏的 ANIM 文件。");
 
             var baseFileName = Path.GetFileNameWithoutExtension(settings.InputGltfFile);
             var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var animationEntries = new List<NewPackFileEntry>();
             for (var animationIndex = 0; animationIndex < modelRoot.LogicalAnimations.Count; animationIndex++)
             {
                 var animation = modelRoot.LogicalAnimations[animationIndex];
@@ -98,12 +104,12 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 var importedFileName = GetUniqueFileName(candidateFileName, usedFileNames);
                 var animBytes = AnimationFile.ConvertToBytes(animFile);
                 var packFileImported = new PackFile(importedFileName, new MemorySource(animBytes));
-                var newFile = new NewPackFileEntry(settings.DestinationPackPath, packFileImported);
-                PackFileDispatcherWriter.AddFilesToPack(
-                    _packFileService,
-                    settings.DestinationPackFileContainer,
-                    [newFile]);
+                animationEntries.Add(new NewPackFileEntry(
+                    settings.DestinationPackPath,
+                    packFileImported));
             }
+
+            return animationEntries;
         }
 
         private static string GetUniqueFileName(string candidate, HashSet<string> usedFileNames)
@@ -132,11 +138,25 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             return name.Replace(' ', '_');
         }
 
-        public bool Import(GltfImporterSettings settings)
+        public ImportResult Import(GltfImporterSettings settings)
+        {
+            try
+            {
+                return ImportCore(settings);
+            }
+            catch (Exception exception)
+            {
+                _logger.Error(exception, "Failed to import glTF file {InputFile}", settings.InputGltfFile);
+                return ImportResult.Failure(exception);
+            }
+        }
+
+        private ImportResult ImportCore(GltfImporterSettings settings)
         {
             var modelRoot = CreateModelRoot(settings);
 
             var skeletonData = GetSkeletonData(modelRoot);
+            var pendingFiles = new List<NewPackFileEntry>();
 
             if (settings.ImportAnimations && modelRoot.LogicalAnimations.Count > 0 && skeletonData.skeletonAnimFile == null)
                 throw new InvalidDataException("导入 glTF 动画需要有效的游戏骨架标识和已加载的 CA Pack 文件。");
@@ -144,7 +164,11 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             if (skeletonData.wasCreated &&
                 skeletonData.skeletonAnimFile != null &&
                 (settings.ImportMeshes || settings.ImportAnimations))
-                SaveSkeletonToPack(skeletonData.skeletonName!, skeletonData.skeletonAnimFile, settings);
+            {
+                pendingFiles.Add(CreateSkeletonEntry(
+                    skeletonData.skeletonName!,
+                    skeletonData.skeletonAnimFile));
+            }
 
             RmvFile? rmv2File = null;
             if (settings.ImportMeshes || settings.ImportMaterials)
@@ -158,16 +182,48 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     throw new InvalidDataException("glTF 场景中没有可导入的网格。");
 
                 if (settings.ImportMaterials)
-                    ImportMaterials(settings, modelRoot, rmv2File);
+                    pendingFiles.AddRange(ImportMaterials(settings, modelRoot, rmv2File));
             }
 
             if (settings.ImportAnimations)
-                ImportAnimations(settings, modelRoot, skeletonData.skeletonAnimFile, skeletonData.skeletonName ?? "");
+            {
+                pendingFiles.AddRange(ImportAnimations(
+                    settings,
+                    modelRoot,
+                    skeletonData.skeletonAnimFile,
+                    skeletonData.skeletonName ?? ""));
+            }
 
             if (settings.ImportMeshes && rmv2File != null)
-                SaveRmvFileToPack(settings, GetImportedPackFileName(settings), rmv2File);
+            {
+                pendingFiles.Add(CreateRmvEntry(
+                    settings,
+                    GetImportedPackFileName(settings),
+                    rmv2File));
+            }
 
-            return true;
+            var validation = ValidatePendingFiles(pendingFiles);
+            if (validation.Errors.Count != 0)
+                return ImportResult.Failure(validation.Errors);
+
+            if (validation.Files.Count != 0)
+            {
+                var conflicts = PackFileDispatcherWriter.AddFilesToPackIfNoConflicts(
+                    _packFileService,
+                    settings.DestinationPackFileContainer,
+                    validation.Files,
+                    validation.Paths);
+                if (conflicts.Count != 0)
+                {
+                    return ImportResult.Failure(conflicts
+                        .Select(path => LocalizationManager.Instance.GetFormat(
+                            "GltfImporter.TargetConflict",
+                            path))
+                        .ToList());
+                }
+            }
+
+            return ImportResult.Success(validation.Paths);
         }
 
         private static ModelRoot CreateModelRoot(GltfImporterSettings settings)
@@ -216,22 +272,60 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 $"找不到游戏骨架“{skeletonName}”，且 glTF 不包含可用于创建骨架的蒙皮数据。");
         }
 
-        private void SaveSkeletonToPack(
+        private static NewPackFileEntry CreateSkeletonEntry(
             string skeletonName,
-            AnimationFile skeleton,
-            GltfImporterSettings settings)
+            AnimationFile skeleton)
         {
             var fileName = Path.GetFileNameWithoutExtension(skeletonName) + ".anim";
             var packFile = new PackFile(
                 fileName,
                 new MemorySource(AnimationFile.ConvertToBytes(skeleton)));
-            PackFileDispatcherWriter.AddFilesToPack(
-                _packFileService,
-                settings.DestinationPackFileContainer,
-                [new NewPackFileEntry(@"animations\skeletons", packFile)]);
+            return new NewPackFileEntry(@"animations\skeletons", packFile);
         }
 
         private static string GetImportedPackFileName(GltfImporterSettings settings) => Path.GetFileNameWithoutExtension(settings.InputGltfFile) + ".rigid_model_v2";
+
+        private static (
+            List<NewPackFileEntry> Files,
+            IReadOnlyList<string> Paths,
+            IReadOnlyList<string> Errors)
+            ValidatePendingFiles(
+                IReadOnlyList<NewPackFileEntry> pendingFiles)
+        {
+            var normalizedFiles = pendingFiles
+                .Select(entry =>
+                {
+                    var path = FolderProjectPathPolicy.EnsureResourcePath(
+                        Path.Combine(
+                            (entry.DirectoyPath ?? "").Trim(),
+                            entry.PackFile.Name.Trim()))
+                        .ToLowerInvariant();
+                    var file = new PackFile(
+                        Path.GetFileName(path),
+                        entry.PackFile.DataSource);
+                    return new NewPackFileEntry(
+                        Path.GetDirectoryName(path) ?? "",
+                        file);
+                })
+                .ToList();
+            var paths = normalizedFiles
+                .Select(entry => Path.Combine(
+                    entry.DirectoyPath,
+                    entry.PackFile.Name))
+                .ToList();
+            var duplicatePaths = paths
+                .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var errors = duplicatePaths
+                .Select(path => LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.DuplicateTarget",
+                    path))
+                .ToList();
+            return (normalizedFiles, paths, errors);
+        }
 
         private static string FetchSkeletonIdStringFromScene(ModelRoot modelRoot)
         {

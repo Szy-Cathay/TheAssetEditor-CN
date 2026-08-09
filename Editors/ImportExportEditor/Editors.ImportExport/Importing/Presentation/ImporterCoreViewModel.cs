@@ -2,6 +2,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Editors.ImportExport.Importing;
 using Editors.ImportExport.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
@@ -75,7 +76,7 @@ namespace Editors.ImportExport.Importing.Presentation
                 SelectedImporter = PossibleImporters.First();
         }
 
-        public Task<bool> ImportAsync()
+        public Task<ImportResult> ImportAsync()
         {
             if (SelectedImporter == null || _inputFile == null || _destPackFileContainer == null)
                 throw new InvalidOperationException("没有可用于当前文件的导入器。");

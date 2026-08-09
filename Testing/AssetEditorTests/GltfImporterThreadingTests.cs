@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Numerics;
 using System.Windows.Data;
 using Editors.ImportExport.Importing.Importers.GltfToRmv;
@@ -8,7 +8,6 @@ using Moq;
 using NUnit.Framework;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
-using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
@@ -48,9 +47,7 @@ public class GltfImporterThreadingTests
                         It.IsAny<List<NewPackFileEntry>>(),
                         It.IsAny<bool>()))
                     .Callback(() => uiCollection.Add(1));
-                var materialBuilder = new RmvMaterialBuilder(
-                    packFileService.Object,
-                    Mock.Of<IStandardDialogs>());
+                var materialBuilder = new RmvMaterialBuilder();
                 var skeletonLookup = new Mock<ISkeletonAnimationLookUpHelper>();
                 if (writePath == PackWritePath.Animation)
                 {

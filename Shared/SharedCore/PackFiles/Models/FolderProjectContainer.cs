@@ -10,6 +10,13 @@ public readonly record struct FolderProjectReconciliation(
     int Removed,
     int Updated);
 
+public sealed class FolderProjectFileConflictException(
+    IReadOnlyList<string> paths) :
+    IOException($"The destinations already exist: {string.Join(", ", paths)}")
+{
+    public IReadOnlyList<string> Paths { get; } = paths.ToArray();
+}
+
 public sealed class FolderProjectReconciledEventArgs(
     FolderProjectReconciliation changes,
     IReadOnlyList<PackFile> addedFiles,
@@ -443,7 +450,10 @@ public sealed class FolderProjectContainer :
         return ExecuteSerializedMutation(
             () =>
             {
-                var writes = new List<Shared.Core.PackFiles.PackFileWrite>();
+                var validatedFiles = new List<(
+                    Shared.Core.PackFiles.NewPackFileEntry Entry,
+                    string RelativePath,
+                    string FullPath)>();
                 foreach (var entry in newFiles)
                 {
                     if (string.IsNullOrWhiteSpace(entry.PackFile.Name))
@@ -461,17 +471,25 @@ public sealed class FolderProjectContainer :
                         FolderProjectPathPolicy.ResolveFilePath(
                             ProjectRoot,
                             relativePath);
-                    if (File.Exists(fullPath) && !overwriteExisting)
-                    {
-                        throw new IOException(
-                            $"The destination already exists: {fullPath}");
-                    }
-                    writes.Add(new Shared.Core.PackFiles.PackFileWrite(
-                        relativePath,
-                        entry.PackFile.DataSource.ReadData()));
+                    validatedFiles.Add((entry, relativePath, fullPath));
                 }
 
-                return ApplyFileWritesCore(writes);
+                var conflicts = overwriteExisting
+                    ? []
+                    : validatedFiles
+                        .Where(item => File.Exists(item.FullPath))
+                        .Select(item => item.RelativePath)
+                        .ToList();
+                if (conflicts.Count != 0)
+                    throw new FolderProjectFileConflictException(conflicts);
+
+                var writes = validatedFiles
+                    .Select(item => new Shared.Core.PackFiles.PackFileWrite(
+                        item.RelativePath,
+                        item.Entry.PackFile.DataSource.ReadData()))
+                    .ToList();
+
+                return ApplyFileWritesCore(writes, overwriteExisting);
             });
     }
 
@@ -479,13 +497,18 @@ public sealed class FolderProjectContainer :
         IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
     {
         return ExecuteSerializedMutation(
-            () => ApplyFileWritesCore(writes));
+            () => ApplyFileWritesCore(writes, overwriteExisting: true));
     }
 
     private List<PackFile> ApplyFileWritesCore(
-        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
+        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes,
+        bool overwriteExisting)
     {
         var prepared = new List<PreparedFileWrite>();
+        var validatedWrites = new List<(
+            string RelativePath,
+            string FullPath,
+            byte[] Content)>();
         var uniquePaths = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
         var createdDirectories = new HashSet<string>(
@@ -505,16 +528,39 @@ public sealed class FolderProjectContainer :
                 var fullPath = FolderProjectPathPolicy.ResolveFilePath(
                     ProjectRoot,
                     relativePath);
-                var directoryPath = Path.GetDirectoryName(fullPath)!;
-                if (createdDirectories.Add(directoryPath))
-                    Directory.CreateDirectory(directoryPath);
-                var tempPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-                prepared.Add(new PreparedFileWrite(
+                validatedWrites.Add((
                     relativePath,
                     fullPath,
+                    write.Content));
+            }
+
+            if (!overwriteExisting)
+            {
+                var conflicts = validatedWrites
+                    .Where(write => File.Exists(write.FullPath))
+                    .Select(write => write.RelativePath)
+                    .ToList();
+                if (conflicts.Count != 0)
+                {
+                    throw new FolderProjectFileConflictException(
+                        conflicts);
+                }
+            }
+
+            foreach (var write in validatedWrites)
+            {
+                var directoryPath = Path.GetDirectoryName(
+                    write.FullPath)!;
+                if (createdDirectories.Add(directoryPath))
+                    Directory.CreateDirectory(directoryPath);
+                var tempPath =
+                    $"{write.FullPath}.{Guid.NewGuid():N}.tmp";
+                prepared.Add(new PreparedFileWrite(
+                    write.RelativePath,
+                    write.FullPath,
                     tempPath,
                     write.Content,
-                    File.Exists(fullPath)));
+                    overwriteExisting && File.Exists(write.FullPath)));
             }
 
             try
@@ -605,6 +651,19 @@ public sealed class FolderProjectContainer :
                     RestoreCommittedFile(
                         committed[index].FullPath,
                         committed[index].BackupPath);
+                }
+
+                if (!overwriteExisting)
+                {
+                    var conflicts = prepared
+                        .Where(write => File.Exists(write.FullPath))
+                        .Select(write => write.RelativePath)
+                        .ToList();
+                    if (conflicts.Count != 0)
+                    {
+                        throw new FolderProjectFileConflictException(
+                            conflicts);
+                    }
                 }
 
                 if (failure is AggregateException parallelFailure)

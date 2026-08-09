@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,6 +17,7 @@ using Editors.ImportExport.Exporting.Presentation;
 using Editors.ImportExport.Exporting.Presentation.DdsToMaterialPng;
 using Editors.ImportExport.Exporting.Presentation.DdsToNormalPng;
 using Editors.ImportExport.Exporting.Presentation.RmvToGltf;
+using Editors.ImportExport.Importing;
 using Editors.ImportExport.Importing.Presentation;
 using Editors.ImportExport.Misc;
 using Editors.Twui.Editor.ComponentEditor;
@@ -832,13 +833,13 @@ public class UiRemainingEditorFamilyGallery
         public bool CanEditAnimationKeysPerSecond =>
             ImportAnimations && !AutoDetectAnimationKeysPerSecond;
         public float AnimationKeysPerSecond { get; set; } = 30;
-        public bool Execute(
+        public ImportResult Execute(
             PackFile exportSource,
             string outputPath,
             PackFileContainer packFileContainer,
             GameTypeEnum gameType)
         {
-            return true;
+            return ImportResult.Success([]);
         }
         public ImportSupportEnum CanImportFile(PackFile file) =>
             ImportSupportEnum.HighPriority;
