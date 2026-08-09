@@ -1,7 +1,8 @@
-using Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers;
+﻿using Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using GameWorld.Core.Animation;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.GameFormats.Animation;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
@@ -14,6 +15,9 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest;
 
 public class AnimationBuilderTests
 {
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
+
     [Test]
     public void Build_SkinJointUsesDifferentLocalBasis_PreservesSkinnedPosition()
     {
@@ -172,6 +176,62 @@ public class AnimationBuilderTests
             animation);
 
         Assert.That(result.Header.FrameRate, Is.EqualTo(30.0f));
+    }
+
+    [Test]
+    public void Build_AnimatedTransformContainsShear_ThrowsWithAnimationAndBoneNames()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var joint = scene.CreateNode("root");
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("skinned_mesh");
+        geometry.UsePrimitive(
+                new MaterialBuilder("material").WithMetallicRoughness())
+            .AddTriangle(
+                CreateSkinnedVertex(Numerics.Vector3.Zero),
+                CreateSkinnedVertex(Numerics.Vector3.UnitX),
+                CreateSkinnedVertex(Numerics.Vector3.UnitY));
+        scene.CreateNode("mesh").WithSkinnedMesh(
+            modelRoot.CreateMesh(geometry),
+            (joint, Numerics.Matrix4x4.Identity));
+        var animation = modelRoot.CreateAnimation("Sheared Action");
+        animation.CreateScaleChannel(joint, new Dictionary<float, Numerics.Vector3>
+        {
+            [0] = new Numerics.Vector3(2, 1, 1),
+            [1] = new Numerics.Vector3(2, 1, 1),
+        });
+        var skeleton = CreateSingleBoneSkeleton();
+        var targetBindRotation = Numerics.Quaternion.CreateFromAxisAngle(
+            Numerics.Vector3.UnitZ,
+            -MathF.PI / 4.0f);
+        skeleton.AnimationParts[0].DynamicFrames[0].Quaternion[0] =
+            new Shared.GameFormats.RigidModel.Transforms.RmvVector4(
+                targetBindRotation.X,
+                targetBindRotation.Y,
+                targetBindRotation.Z,
+                targetBindRotation.W);
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            AnimationBuilder.Build(
+                new AnimationBuilderSettings(
+                    modelRoot,
+                    "test",
+                    1.0f,
+                    new PackFileContainer("test"),
+                    "animations",
+                    false),
+                skeleton,
+                animation));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("Sheared Action"));
+            Assert.That(exception.Message, Does.Contain("root"));
+            Assert.That(exception.Message, Does.Contain("剪切"));
+        });
     }
 
     [Test]
