@@ -653,6 +653,19 @@ public sealed class FolderProjectContainer :
                         committed[index].BackupPath);
                 }
 
+                if (!overwriteExisting)
+                {
+                    var conflicts = prepared
+                        .Where(write => File.Exists(write.FullPath))
+                        .Select(write => write.RelativePath)
+                        .ToList();
+                    if (conflicts.Count != 0)
+                    {
+                        throw new FolderProjectFileConflictException(
+                            conflicts);
+                    }
+                }
+
                 if (failure is AggregateException parallelFailure)
                     RethrowSingleParallelFailure(parallelFailure);
                 throw;

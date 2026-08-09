@@ -1,4 +1,7 @@
+using Moq;
 using Shared.ByteParsing;
+using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
@@ -730,6 +733,70 @@ public class FolderProjectContainerTests
                 File.Exists(
                     Path.Combine(project.Path, "db", "new.bin")),
                 Is.False);
+        });
+    }
+
+    [Test]
+    public void AddFiles_TargetAppearsDuringFinalCommitWithoutOverwrite_ReportsConflictAndRollsBackBatch()
+    {
+        using var project = new TemporaryDirectory();
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var firstCommitted = new ManualResetEventSlim(false);
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = new PackFileService(eventHub.Object);
+        container.CommitPreparedFile = (tempPath, fullPath) =>
+        {
+            if (Path.GetFileName(fullPath).Equals(
+                    "new.bin",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                File.Move(tempPath, fullPath);
+                firstCommitted.Set();
+                return;
+            }
+
+            if (!firstCommitted.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException(
+                    "The first file was not committed.");
+            }
+            File.WriteAllBytes(fullPath, [9, 8, 7]);
+            File.Move(tempPath, fullPath);
+        };
+
+        var exception = Assert.Throws<FolderProjectFileConflictException>(
+            () => service.AddFilesToPack(
+                container,
+                [
+                    new NewPackFileEntry(
+                        "db",
+                        PackFile.CreateFromBytes("new.bin", [1, 2, 3])),
+                    new NewPackFileEntry(
+                        "db",
+                        PackFile.CreateFromBytes("late.bin", [4, 5, 6])),
+                ],
+                overwriteExisting: false));
+        var changeEvents = eventHub.Invocations
+            .Select(invocation => invocation.Arguments.SingleOrDefault())
+            .OfType<FolderProjectChangedEvent>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Paths,
+                Is.EquivalentTo(new[] { @"db\late.bin" }));
+            Assert.That(
+                File.ReadAllBytes(
+                    Path.Combine(project.Path, "db", "late.bin")),
+                Is.EqualTo(new byte[] { 9, 8, 7 }));
+            Assert.That(
+                File.Exists(
+                    Path.Combine(project.Path, "db", "new.bin")),
+                Is.False);
+            Assert.That(container.FileList, Is.Empty);
+            Assert.That(changeEvents, Is.Empty);
         });
     }
 
