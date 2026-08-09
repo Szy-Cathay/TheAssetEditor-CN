@@ -211,6 +211,53 @@ public class GltfImporterAtomicImportTests
     }
 
     [Test]
+    public void Import_VertexLimitFixture_ReportsEverySegmentAndLeavesPackUnchanged()
+    {
+        var gltfPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "vertex_limit.gltf");
+        var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+        var destination = new PackFileContainer("test");
+        const string existingPath = @"models\existing.bin";
+        var existingFile = new PackFile(
+            "existing.bin",
+            new MemorySource([7, 8, 9]));
+        destination.FileList[existingPath] = existingFile;
+        var importer = new GltfImporter(
+            packFileService,
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+
+        var result = importer.Import(new GltfImporterSettings(
+            gltfPath,
+            "models",
+            destination,
+            GameTypeEnum.Warhammer3,
+            true,
+            false,
+            false,
+            false,
+            false,
+            20,
+            true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Errors, Has.Some.Contains("first_instance"));
+            Assert.That(result.Errors, Has.Some.Contains("second_instance"));
+            Assert.That(result.Errors, Has.Some.Contains("65536"));
+            Assert.That(destination.FileList, Has.Count.EqualTo(1));
+            Assert.That(destination.FileList[existingPath], Is.SameAs(existingFile));
+            Assert.That(
+                existingFile.DataSource.ReadData(),
+                Is.EqualTo(new byte[] { 7, 8, 9 }));
+        });
+    }
+
+    [Test]
     public void Import_ModelSkeletonAnimationAndTexture_SucceedsWithOnePackWriteAndReportsEveryOutput()
     {
         var imagePath = CreatePng();

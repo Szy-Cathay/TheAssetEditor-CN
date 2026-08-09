@@ -1,7 +1,8 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.IO;
 using System.Text;
 using Editors.ImportExport.Common;
+using Shared.Core.Services;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.LodHeader;
@@ -32,6 +33,13 @@ public class RmvMeshBuilder
         GltfImporterSettings settings,
         ModelRoot modelRoot,
         AnimationFile? animSkeletonFile,
+        string skeletonName) =>
+        BuildWithSummary(settings, modelRoot, animSkeletonFile, skeletonName).File;
+
+    internal static RmvMeshBuildResult BuildWithSummary(
+        GltfImporterSettings settings,
+        ModelRoot modelRoot,
+        AnimationFile? animSkeletonFile,
         string skeletonName)
     {
         ArgumentNullException.ThrowIfNull(modelRoot);
@@ -41,7 +49,20 @@ public class RmvMeshBuilder
 
         var meshSources = GetMeshSources(modelRoot);
         if (meshSources.Count == 0)
-            return null;
+            return new RmvMeshBuildResult(null, new RmvMeshImportSummary([]));
+
+        var oversizedSegments = meshSources
+            .Where(source =>
+                source.Primitive.GetVertexColumns().Positions?.Count() > ushort.MaxValue + 1)
+            .Select(source => source.ModelName)
+            .ToList();
+        if (oversizedSegments.Count > 0)
+        {
+            throw new InvalidDataException(LocalizationManager.Instance.GetFormat(
+                "GltfImporter.Error.VertexLimit",
+                ushort.MaxValue + 1,
+                string.Join("、", oversizedSegments)));
+        }
 
         const int lodCount = 1;
         var rmv2File = new RmvFile
@@ -65,16 +86,20 @@ public class RmvMeshBuilder
         rmv2File.LodHeaders[0].MeshCount = (uint)meshSources.Count;
 
         var modelList = new List<RmvModel>();
+        var segmentSummaries = new List<RmvMeshSegmentImportSummary>();
         foreach (var source in meshSources)
         {
             var sourceSkeleton = source.Node.Skin != null ? animSkeletonFile : null;
-            var rmv2Mesh = GenerateRmvMesh(source, sourceSkeleton);
+            var (rmv2Mesh, summary) = GenerateRmvMesh(source, sourceSkeleton);
             modelList.Add(CreateRmvModel(rmv2Mesh, source.ModelName, sourceSkeleton));
+            segmentSummaries.Add(summary);
         }
 
         rmv2File.ModelList[0] = modelList.ToArray();
         rmv2File.RecalculateOffsets();
-        return rmv2File;
+        return new RmvMeshBuildResult(
+            rmv2File,
+            new RmvMeshImportSummary(segmentSummaries));
     }
 
     public static IReadOnlyList<MeshSource> GetMeshSources(ModelRoot modelRoot)
@@ -131,13 +156,13 @@ public class RmvMeshBuilder
         }
     }
 
-    private static RmvMesh GenerateRmvMesh(MeshSource source, AnimationFile? animSkeletonFile)
+    private static (RmvMesh Mesh, RmvMeshSegmentImportSummary Summary) GenerateRmvMesh(
+        MeshSource source,
+        AnimationFile? animSkeletonFile)
     {
         var vertexBufferColumns = source.Primitive.GetVertexColumns();
         if (vertexBufferColumns.Positions == null || !vertexBufferColumns.Positions.Any())
             throw new InvalidDataException($"网格“{source.ModelName}”没有顶点数据。");
-        if (vertexBufferColumns.Positions.Count() > ushort.MaxValue + 1)
-            throw new InvalidDataException($"网格“{source.ModelName}”超过 RMV2 单网格 65536 顶点限制。");
 
         var worldMatrix = source.Node.WorldMatrix;
         if (!Matrix4x4.Invert(worldMatrix, out var inverseWorldMatrix))
@@ -145,43 +170,85 @@ public class RmvMeshBuilder
         var normalMatrix = Matrix4x4.Transpose(inverseWorldMatrix);
 
         var positionsCount = vertexBufferColumns.Positions.Count();
+        var rebuildNormals = vertexBufferColumns.Normals == null;
+        var rebuildTangents = vertexBufferColumns.Tangents == null;
+        var defaultTextureCoordinates = vertexBufferColumns.TexCoords0 == null;
+        var ignoreVertexColors = vertexBufferColumns.Colors0 != null ||
+            vertexBufferColumns.Colors1 != null;
+        var ignoreMorphTargets = source.Primitive.MorphTargetsCount > 0;
         var rmv2Mesh = new RmvMesh
         {
             VertexList = new CommonVertex[positionsCount],
         };
+        var affectedVertices = 0;
+        var maximumDiscardedWeight = 0f;
+        var verticesAboveTenPercentDiscarded = 0;
 
         for (var vertexIndex = 0; vertexIndex < positionsCount; vertexIndex++)
         {
             var vertexBuilder = vertexBufferColumns.GetVertex<
                 VertexPositionNormalTangent,
                 VertexTexture1,
-                VertexJoints4>(vertexIndex);
-            rmv2Mesh.VertexList[vertexIndex] = ConvertToRmvVertex(
+                VertexJoints8>(vertexIndex);
+            var converted = ConvertToRmvVertex(
                 vertexBuilder,
                 source.Node.Skin,
                 animSkeletonFile,
                 worldMatrix,
                 normalMatrix);
+            rmv2Mesh.VertexList[vertexIndex] = converted.Vertex;
+            if (converted.DiscardedWeight > 0)
+            {
+                affectedVertices++;
+                maximumDiscardedWeight = Math.Max(
+                    maximumDiscardedWeight,
+                    converted.DiscardedWeight);
+                if (converted.DiscardedWeight > 0.100001f)
+                    verticesAboveTenPercentDiscarded++;
+            }
         }
 
-        var indices = source.Primitive.GetIndices();
-        if (indices.Count % 3 != 0)
-            throw new InvalidDataException($"网格“{source.ModelName}”的索引不是三角形列表。");
-
-        rmv2Mesh.IndexList = new ushort[indices.Count];
-        for (var index = 0; index < indices.Count; index += 3)
+        if (source.Primitive.DrawPrimitiveType is not (
+            PrimitiveType.TRIANGLES or
+            PrimitiveType.TRIANGLE_STRIP or
+            PrimitiveType.TRIANGLE_FAN))
         {
-            rmv2Mesh.IndexList[index] = checked((ushort)indices[index]);
-            rmv2Mesh.IndexList[index + 2] = checked((ushort)indices[index + 1]);
-            rmv2Mesh.IndexList[index + 1] = checked((ushort)indices[index + 2]);
+            throw new InvalidDataException(LocalizationManager.Instance.GetFormat(
+                "GltfImporter.Error.UnsupportedPrimitiveType",
+                source.ModelName,
+                source.Primitive.DrawPrimitiveType));
         }
 
+        var triangles = source.Primitive.GetTriangleIndices().ToList();
+        rmv2Mesh.IndexList = new ushort[triangles.Count * 3];
+        for (var triangleIndex = 0; triangleIndex < triangles.Count; triangleIndex++)
+        {
+            var triangle = triangles[triangleIndex];
+            var outputIndex = triangleIndex * 3;
+            rmv2Mesh.IndexList[outputIndex] = checked((ushort)triangle.A);
+            rmv2Mesh.IndexList[outputIndex + 2] = checked((ushort)triangle.B);
+            rmv2Mesh.IndexList[outputIndex + 1] = checked((ushort)triangle.C);
+        }
+
+        if (rebuildNormals)
+            RebuildNormals(rmv2Mesh);
         TangentBasisCalculator.CalculateForRmv2Mesh(rmv2Mesh);
-        return rmv2Mesh;
+        return (
+            rmv2Mesh,
+            new RmvMeshSegmentImportSummary(
+                source.ModelName,
+                affectedVertices,
+                maximumDiscardedWeight,
+                verticesAboveTenPercentDiscarded,
+                rebuildNormals,
+                rebuildTangents,
+                defaultTextureCoordinates,
+                ignoreVertexColors,
+                ignoreMorphTargets));
     }
 
-    private static CommonVertex ConvertToRmvVertex(
-        VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> vertexBuilder,
+    private static (CommonVertex Vertex, float DiscardedWeight) ConvertToRmvVertex(
+        VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints8> vertexBuilder,
         Skin? skin,
         AnimationFile? animSkeletonFile,
         Matrix4x4 worldMatrix,
@@ -204,33 +271,52 @@ public class RmvMeshBuilder
 
         rmv2Vertex.BoneIndex = new byte[rmv2Vertex.WeightCount];
         rmv2Vertex.BoneWeight = new float[rmv2Vertex.WeightCount];
+        if (rmv2Vertex.WeightCount == 0)
+            return (rmv2Vertex, 0);
 
-        for (var bindingIndex = 0; bindingIndex < rmv2Vertex.WeightCount; bindingIndex++)
+        var bindings = Enumerable.Range(0, 8)
+            .Select(bindingIndex => new
+            {
+                BindingIndex = bindingIndex,
+                Binding = vertexBuilder.Skinning.GetBinding(bindingIndex),
+            })
+            .Where(item => item.Binding.Weight > 0)
+            .OrderByDescending(item => item.Binding.Weight)
+            .ThenBy(item => item.BindingIndex)
+            .ToList();
+        if (bindings.Count == 0)
         {
-            var weight = vertexBuilder.Skinning.Weights[bindingIndex];
-            rmv2Vertex.BoneWeight[bindingIndex] = weight;
-            if (weight <= 0)
-                continue;
-
-            var boneTableIndex = GetMappedBoneTableIndex(
-                vertexBuilder,
-                skin!,
-                animSkeletonFile!,
-                bindingIndex);
-            rmv2Vertex.BoneIndex[bindingIndex] = checked((byte)boneTableIndex);
+            throw new InvalidDataException(LocalizationManager.Instance.Get(
+                "GltfImporter.Error.MissingVertexWeights"));
         }
 
-        return rmv2Vertex;
+        var totalWeight = bindings.Sum(item => item.Binding.Weight);
+        var selected = bindings.Take(rmv2Vertex.WeightCount).ToList();
+        var selectedWeight = selected.Sum(item => item.Binding.Weight);
+        var discardedWeight = bindings
+            .Skip(rmv2Vertex.WeightCount)
+            .Sum(item => item.Binding.Weight) / totalWeight;
+        var quantizedWeights = QuantizeWeights(
+            selected.Select(item => item.Binding.Weight / selectedWeight).ToArray());
+
+        for (var outputIndex = 0; outputIndex < selected.Count; outputIndex++)
+        {
+            rmv2Vertex.BoneWeight[outputIndex] = quantizedWeights[outputIndex] / (float)byte.MaxValue;
+            rmv2Vertex.BoneIndex[outputIndex] = checked((byte)GetMappedBoneTableIndex(
+                selected[outputIndex].Binding.Index,
+                skin!,
+                animSkeletonFile!));
+        }
+
+        return (rmv2Vertex, discardedWeight);
     }
 
     private static int GetMappedBoneTableIndex(
-        VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> vertexBuilder,
+        int jointIndex,
         Skin skin,
-        AnimationFile animSkeletonFile,
-        int bindingIndex)
+        AnimationFile animSkeletonFile)
     {
-        var binding = vertexBuilder.Skinning.GetBinding(bindingIndex);
-        var joint = skin.GetJoint(binding.Index);
+        var joint = skin.GetJoint(jointIndex);
         var boneTableIndex = Array.FindIndex<BoneInfo>(
             animSkeletonFile.Bones,
             x => string.Equals(x.Name, joint.Joint.Name, StringComparison.OrdinalIgnoreCase));
@@ -242,6 +328,69 @@ public class RmvMeshBuilder
 
         return boneTableIndex;
     }
+
+    private static byte[] QuantizeWeights(IReadOnlyList<float> weights)
+    {
+        var scaledWeights = weights
+            .Select((weight, index) => new
+            {
+                Index = index,
+                Scaled = weight * byte.MaxValue,
+            })
+            .ToList();
+        var quantized = scaledWeights
+            .Select(item => (byte)MathF.Floor(item.Scaled))
+            .ToArray();
+        var remainder = byte.MaxValue - quantized.Sum(value => value);
+
+        foreach (var item in scaledWeights
+            .OrderByDescending(item => item.Scaled - MathF.Floor(item.Scaled))
+            .ThenBy(item => item.Index)
+            .Take(remainder))
+        {
+            quantized[item.Index]++;
+        }
+
+        return quantized;
+    }
+
+    private static void RebuildNormals(RmvMesh mesh)
+    {
+        foreach (var vertex in mesh.VertexList)
+            vertex.Normal = XNA.Vector3.Zero;
+
+        for (var index = 0; index < mesh.IndexList.Length; index += 3)
+        {
+            var first = mesh.VertexList[mesh.IndexList[index]];
+            var second = mesh.VertexList[mesh.IndexList[index + 1]];
+            var third = mesh.VertexList[mesh.IndexList[index + 2]];
+            var firstEdge = ToVector3(second.Position - first.Position);
+            var secondEdge = ToVector3(third.Position - first.Position);
+            var faceNormal = XNA.Vector3.Cross(firstEdge, secondEdge);
+            if (!IsFinite(faceNormal) || faceNormal.LengthSquared() <= 0.000000000001f)
+                continue;
+
+            first.Normal += faceNormal;
+            second.Normal += faceNormal;
+            third.Normal += faceNormal;
+        }
+
+        foreach (var vertex in mesh.VertexList)
+        {
+            vertex.Normal = IsFinite(vertex.Normal) &&
+                vertex.Normal.LengthSquared() > 0.000000000001f
+                ? XNA.Vector3.Normalize(vertex.Normal)
+                : XNA.Vector3.UnitZ;
+        }
+    }
+
+    private static XNA.Vector3 ToVector3(XNA.Vector4 value) =>
+        new(value.X, value.Y, value.Z);
+
+    private static bool IsFinite(XNA.Vector3 value) =>
+        float.IsFinite(value.X) &&
+        float.IsFinite(value.Y) &&
+        float.IsFinite(value.Z);
 
     private static RmvModel CreateRmvModel(
         RmvMesh rmv2Mesh,

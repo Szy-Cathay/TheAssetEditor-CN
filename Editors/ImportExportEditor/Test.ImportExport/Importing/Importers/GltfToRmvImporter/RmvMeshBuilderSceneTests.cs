@@ -9,12 +9,14 @@ using Shared.TestUtility;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
+using Shared.GameFormats.RigidModel.Vertex;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
 using SharpGLTF.Schema2;
+using XNA = Microsoft.Xna.Framework;
 
 namespace Test.ImportExport.Importing.Importers.GltfImporterTest;
 
@@ -53,6 +55,100 @@ public class RmvMeshBuilderSceneTests
         var firstInstanceX = result.ModelList[0][0].Mesh.VertexList[0].Position.X;
         var secondInstanceX = result.ModelList[0][2].Mesh.VertexList[0].Position.X;
         Assert.That(secondInstanceX, Is.EqualTo(firstInstanceX - 5).Within(0.0001f));
+    }
+
+    [Test]
+    public void BuildWithSummary_MoreThanFourInfluences_KeepsStableStrongestFourAndQuantizesTo255()
+    {
+        var geometry = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints8>("mesh");
+        var primitive = geometry.UsePrimitive(CreateMaterial("material"));
+        var bindings = new (int, float)[]
+        {
+            (0, 0.05f),
+            (1, 0.30f),
+            (2, 0.10f),
+            (3, 0.25f),
+            (4, 0.15f),
+            (5, 0.10f),
+            (6, 0.05f),
+            (7, 0),
+        };
+        primitive.AddTriangle(
+            CreateEightInfluenceVertex(0, 0, bindings),
+            CreateEightInfluenceVertex(1, 0, bindings),
+            CreateEightInfluenceVertex(0, 1, bindings));
+
+        var modelRoot = ModelRoot.CreateModel();
+        var mesh = modelRoot.CreateMesh(geometry);
+        var scene = modelRoot.UseScene("default");
+        var armature = scene.CreateNode("armature");
+        var joints = new Node[8];
+        var parent = armature;
+        for (var index = 0; index < joints.Length; index++)
+        {
+            joints[index] = parent.CreateNode($"bone_{index}");
+            parent = joints[index];
+        }
+        scene.CreateNode("mesh_node").WithSkinnedMesh(
+            mesh,
+            joints.Select(joint => (joint, Matrix4x4.Identity)).ToArray());
+        var skeleton = CreateSkeletonFile(
+            "test_skeleton",
+            joints.Select(joint => joint.Name).ToArray());
+
+        var result = RmvMeshBuilder.BuildWithSummary(
+            CreateSettings(),
+            modelRoot,
+            skeleton,
+            "test_skeleton");
+
+        var vertex = result.File!.ModelList[0][0].Mesh.VertexList[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(vertex.BoneIndex, Is.EqualTo(new byte[] { 1, 3, 4, 2 }));
+            Assert.That(
+                vertex.BoneWeight.Select(weight => (byte)(weight * byte.MaxValue)).Sum(value => value),
+                Is.EqualTo(byte.MaxValue));
+            Assert.That(result.Summary.TotalAffectedVertices, Is.EqualTo(3));
+            Assert.That(result.Summary.Segments.Single().ModelName, Is.EqualTo("mesh_node"));
+            Assert.That(result.Summary.Segments.Single().AffectedVertices, Is.EqualTo(3));
+            Assert.That(result.Summary.MaximumDiscardedWeight, Is.EqualTo(0.20f).Within(0.0001f));
+            Assert.That(result.Summary.VerticesAboveTenPercentDiscarded, Is.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public void BuildWithSummary_MissingNormalTangentAndUv_RebuildsFiniteBasisAndReportsRepairs()
+    {
+        var geometry = new MeshBuilder<VertexPosition, VertexEmpty, VertexEmpty>("mesh");
+        var primitive = geometry.UsePrimitive(CreateMaterial("material"));
+        primitive.AddTriangle(
+            CreatePositionOnlyVertex(0, 0),
+            CreatePositionOnlyVertex(1, 0),
+            CreatePositionOnlyVertex(0, 1));
+        var modelRoot = ModelRoot.CreateModel();
+        var mesh = modelRoot.CreateMesh(geometry);
+        modelRoot.UseScene("default").CreateNode("mesh_node").WithMesh(mesh);
+
+        var result = RmvMeshBuilder.BuildWithSummary(
+            CreateSettings(),
+            modelRoot,
+            null,
+            "");
+
+        var segment = result.Summary.Segments.Single();
+        var vertices = result.File!.ModelList[0][0].Mesh.VertexList;
+        Assert.Multiple(() =>
+        {
+            Assert.That(segment.RebuiltNormals, Is.True);
+            Assert.That(segment.RebuiltTangents, Is.True);
+            Assert.That(segment.DefaultedTextureCoordinates, Is.True);
+            Assert.That(vertices, Has.All.Matches<CommonVertex>(vertex =>
+                IsFiniteUnitVector(vertex.Normal) &&
+                IsFiniteUnitVector(vertex.Tangent) &&
+                IsFiniteUnitVector(vertex.BiNormal) &&
+                vertex.Uv == XNA.Vector2.Zero));
+        });
     }
 
     [Test]
@@ -324,6 +420,47 @@ public class RmvMeshBuilderSceneTests
             Assert.That(rmv.Header.SkeletonName, Is.EqualTo("ExternalArmature"));
             Assert.That(skeleton.Header.SkeletonName, Is.EqualTo("ExternalArmature"));
             Assert.That(skeleton.Bones.Select(bone => bone.Name), Is.EqualTo(new[] { "root", "child" }));
+        });
+    }
+
+    [Test]
+    public void Import_ExternalMeshAttributeFixture_RepairsGeometryAndReportsEveryLoss()
+    {
+        var gltfPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "external_mesh_attributes.gltf");
+        var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+        var destination = new PackFileContainer("test");
+        var importer = new GltfImporter(
+            packFileService,
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+
+        var result = importer.Import(CreateSettings(gltfPath, destination));
+
+        Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
+        var rmv = ModelFactory.Create().Load(
+            destination.FileList[@"models\external_mesh_attributes.rigid_model_v2"]
+                .DataSource.ReadData());
+        var vertices = rmv.ModelList[0][0].Mesh.VertexList;
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Warnings, Has.Some.Contains("3 个顶点"));
+            Assert.That(result.Warnings, Has.Some.Contains("mesh_node"));
+            Assert.That(result.Warnings, Has.Some.Contains("20.0%"));
+            Assert.That(result.Warnings, Has.Some.Contains("法线"));
+            Assert.That(result.Warnings, Has.Some.Contains("切线"));
+            Assert.That(result.Warnings, Has.Some.Contains("UV"));
+            Assert.That(result.Warnings, Has.Some.Contains("顶点色"));
+            Assert.That(result.Warnings, Has.Some.Contains("形态键"));
+            Assert.That(vertices, Has.All.Matches<CommonVertex>(vertex =>
+                vertex.BoneWeight.Select(weight => (byte)(weight * byte.MaxValue)).Sum(value => value) == byte.MaxValue &&
+                IsFiniteUnitVector(vertex.Normal) &&
+                IsFiniteUnitVector(vertex.Tangent) &&
+                IsFiniteUnitVector(vertex.BiNormal) &&
+                vertex.Uv == XNA.Vector2.Zero));
         });
     }
 
@@ -702,6 +839,41 @@ public class RmvMeshBuilderSceneTests
         };
     }
 
+    private static AnimationFile CreateSkeletonFile(
+        string skeletonName,
+        IReadOnlyList<string?> boneNames)
+    {
+        var frame = new AnimationFile.Frame
+        {
+            Transforms = boneNames.Select(_ => new RmvVector3(0, 0, 0)).ToList(),
+            Quaternion = boneNames.Select(_ => new RmvVector4(0, 0, 0, 1)).ToList(),
+        };
+        return new AnimationFile
+        {
+            Header = new AnimationFile.AnimationHeader
+            {
+                Version = 7,
+                SkeletonName = skeletonName,
+                AnimationTotalPlayTimeInSec = 0.1f,
+            },
+            Bones = boneNames
+                .Select((name, index) => new AnimationFile.BoneInfo
+                {
+                    Id = index,
+                    ParentId = -1,
+                    Name = name!,
+                })
+                .ToArray(),
+            AnimationParts =
+            [
+                new AnimationFile.AnimationPart
+                {
+                    DynamicFrames = [frame, frame],
+                },
+            ],
+        };
+    }
+
     private static MaterialBuilder CreateMaterial(string name) =>
         new MaterialBuilder(name).WithMetallicRoughness();
 
@@ -727,4 +899,33 @@ public class RmvMeshBuilderSceneTests
         vertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
         return vertex;
     }
+
+    private static VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints8> CreateEightInfluenceVertex(
+        float x,
+        float y,
+        (int, float)[] bindings)
+    {
+        var vertex = new VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints8>();
+        vertex.Geometry.Position = new Vector3(x, y, 0);
+        vertex.Geometry.Normal = Vector3.UnitZ;
+        vertex.Geometry.Tangent = new Vector4(1, 0, 0, 1);
+        vertex.Material.TexCoord = new Vector2(x, y);
+        vertex.Skinning.SetBindings(bindings);
+        return vertex;
+    }
+
+    private static VertexBuilder<VertexPosition, VertexEmpty, VertexEmpty> CreatePositionOnlyVertex(
+        float x,
+        float y)
+    {
+        var vertex = new VertexBuilder<VertexPosition, VertexEmpty, VertexEmpty>();
+        vertex.Geometry.Position = new Vector3(x, y, 0);
+        return vertex;
+    }
+
+    private static bool IsFiniteUnitVector(XNA.Vector3 value) =>
+        float.IsFinite(value.X) &&
+        float.IsFinite(value.Y) &&
+        float.IsFinite(value.Z) &&
+        Math.Abs(value.LengthSquared() - 1) < 0.0001f;
 }
