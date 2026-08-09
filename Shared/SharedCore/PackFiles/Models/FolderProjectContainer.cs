@@ -489,7 +489,7 @@ public sealed class FolderProjectContainer :
                         item.Entry.PackFile.DataSource.ReadData()))
                     .ToList();
 
-                return ApplyFileWritesCore(writes);
+                return ApplyFileWritesCore(writes, overwriteExisting);
             });
     }
 
@@ -497,13 +497,18 @@ public sealed class FolderProjectContainer :
         IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
     {
         return ExecuteSerializedMutation(
-            () => ApplyFileWritesCore(writes));
+            () => ApplyFileWritesCore(writes, overwriteExisting: true));
     }
 
     private List<PackFile> ApplyFileWritesCore(
-        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
+        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes,
+        bool overwriteExisting)
     {
         var prepared = new List<PreparedFileWrite>();
+        var validatedWrites = new List<(
+            string RelativePath,
+            string FullPath,
+            byte[] Content)>();
         var uniquePaths = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
         var createdDirectories = new HashSet<string>(
@@ -523,16 +528,39 @@ public sealed class FolderProjectContainer :
                 var fullPath = FolderProjectPathPolicy.ResolveFilePath(
                     ProjectRoot,
                     relativePath);
-                var directoryPath = Path.GetDirectoryName(fullPath)!;
-                if (createdDirectories.Add(directoryPath))
-                    Directory.CreateDirectory(directoryPath);
-                var tempPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-                prepared.Add(new PreparedFileWrite(
+                validatedWrites.Add((
                     relativePath,
                     fullPath,
+                    write.Content));
+            }
+
+            if (!overwriteExisting)
+            {
+                var conflicts = validatedWrites
+                    .Where(write => File.Exists(write.FullPath))
+                    .Select(write => write.RelativePath)
+                    .ToList();
+                if (conflicts.Count != 0)
+                {
+                    throw new FolderProjectFileConflictException(
+                        conflicts);
+                }
+            }
+
+            foreach (var write in validatedWrites)
+            {
+                var directoryPath = Path.GetDirectoryName(
+                    write.FullPath)!;
+                if (createdDirectories.Add(directoryPath))
+                    Directory.CreateDirectory(directoryPath);
+                var tempPath =
+                    $"{write.FullPath}.{Guid.NewGuid():N}.tmp";
+                prepared.Add(new PreparedFileWrite(
+                    write.RelativePath,
+                    write.FullPath,
                     tempPath,
                     write.Content,
-                    File.Exists(fullPath)));
+                    overwriteExisting && File.Exists(write.FullPath)));
             }
 
             try
