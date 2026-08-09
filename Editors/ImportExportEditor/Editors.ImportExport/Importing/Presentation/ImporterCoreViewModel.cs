@@ -66,6 +66,7 @@ namespace Editors.ImportExport.Importing.Presentation
                 if (supported == ImportSupportEnum.NotSupported)
                     continue;
 
+                viewModel.Initialize(_inputFile);
                 PossibleImporters.Add(viewModel);                
 
                 if (supported == ImportSupportEnum.HighPriority)

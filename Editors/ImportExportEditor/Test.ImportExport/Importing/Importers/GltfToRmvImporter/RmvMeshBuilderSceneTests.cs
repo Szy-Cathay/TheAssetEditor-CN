@@ -7,6 +7,7 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.TestUtility;
 using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.Core.Settings;
 using SharpGLTF.Geometry;
@@ -229,6 +230,273 @@ public class RmvMeshBuilderSceneTests
     }
 
     [Test]
+    public void Import_StandardGlbWithoutSkeletonMarker_CreatesNamedExternalSkeletonAndRmv()
+    {
+        var modelRoot = CreateSkinnedModelRoot(null);
+        modelRoot.LogicalSkins.Single().Name = "ExternalArmature";
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+            var destination = new PackFileContainer("test");
+
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                true,
+                false,
+                false,
+                false,
+                false,
+                20,
+                true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.True);
+                Assert.That(
+                    destination.FileList.Keys,
+                    Does.Contain(@"animations\skeletons\externalarmature.anim"));
+                Assert.That(
+                    destination.FileList.Keys,
+                    Does.Contain($"models\\{Path.GetFileNameWithoutExtension(glbPath)}.rigid_model_v2".ToLowerInvariant()));
+            });
+
+            var skeleton = AnimationFile.Create(
+                destination.FileList[@"animations\skeletons\externalarmature.anim"]);
+            Assert.Multiple(() =>
+            {
+                Assert.That(skeleton.Header.SkeletonName, Is.EqualTo("ExternalArmature"));
+                Assert.That(skeleton.Bones.Select(bone => bone.Name), Is.EqualTo(new[] { "root", "child" }));
+                Assert.That(skeleton.Bones.Select(bone => bone.ParentId), Is.EqualTo(new[] { -1, 0 }));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_BlenderExternalSkeletonFixture_CreatesLod0ModelAndSkeleton()
+    {
+        var glbPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "blender_external_skeleton.glb");
+        var modelRoot = ModelRoot.Load(glbPath);
+        Assert.That(
+            modelRoot.LogicalNodes,
+            Has.None.Matches<Node>(node =>
+                node.Name?.StartsWith("//skeleton//", StringComparison.OrdinalIgnoreCase) == true));
+
+        var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+        var destination = new PackFileContainer("test");
+        var importer = new GltfImporter(
+            packFileService,
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+
+        var result = importer.Import(CreateSettings(glbPath, destination));
+
+        Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
+        var rmvPath = @"models\blender_external_skeleton.rigid_model_v2";
+        var skeletonPath = @"animations\skeletons\externalarmature.anim";
+        var rmv = ModelFactory.Create().Load(
+            destination.FileList[rmvPath].DataSource.ReadData());
+        var skeleton = AnimationFile.Create(destination.FileList[skeletonPath]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(rmv.LodHeaders, Has.Length.EqualTo(1));
+            Assert.That(rmv.ModelList[0], Has.Length.EqualTo(1));
+            Assert.That(rmv.Header.SkeletonName, Is.EqualTo("ExternalArmature"));
+            Assert.That(skeleton.Header.SkeletonName, Is.EqualTo("ExternalArmature"));
+            Assert.That(skeleton.Bones.Select(bone => bone.Name), Is.EqualTo(new[] { "root", "child" }));
+        });
+    }
+
+    [Test]
+    public void Import_StandardGlbWithEditedSkeletonName_UsesRequestedName()
+    {
+        var modelRoot = CreateSkinnedModelRoot(null);
+        modelRoot.LogicalSkins.Single().Name = "ExternalArmature";
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(glbPath, destination) with
+            {
+                NewSkeletonName = "CustomSkeleton",
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.True);
+                Assert.That(
+                    destination.FileList.Keys,
+                    Does.Contain(@"animations\skeletons\customskeleton.anim"));
+                Assert.That(
+                    AnimationFile.Create(
+                        destination.FileList[@"animations\skeletons\customskeleton.anim"])
+                        .Header.SkeletonName,
+                    Is.EqualTo("CustomSkeleton"));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_ExternalSkinWithPathInSkeletonName_ReturnsFailureAndLeavesPackUnchanged()
+    {
+        var modelRoot = CreateSkinnedModelRoot(null);
+        modelRoot.LogicalSkins.Single().Name = "ExternalArmature";
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(glbPath, destination) with
+            {
+                NewSkeletonName = @"folder\CustomSkeleton",
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("骨架名称"));
+                Assert.That(destination.FileList, Is.Empty);
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_EquivalentSkinInstances_UsesOneLogicalSkeletonForEveryMesh()
+    {
+        var modelRoot = CreateMultipleSkinnedModelRoot(equivalentHierarchy: true);
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(glbPath, destination));
+
+            Assert.That(result.Succeeded, Is.True);
+            var rmvPath = $"models\\{Path.GetFileNameWithoutExtension(glbPath)}.rigid_model_v2"
+                .ToLowerInvariant();
+            var rmv = ModelFactory.Create().Load(
+                destination.FileList[rmvPath].DataSource.ReadData());
+            Assert.Multiple(() =>
+            {
+                Assert.That(rmv.ModelList[0], Has.Length.EqualTo(2));
+                Assert.That(
+                    destination.FileList.Keys.Count(path =>
+                        path.StartsWith(@"animations\skeletons\", StringComparison.OrdinalIgnoreCase)),
+                    Is.EqualTo(1));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_DifferentSkinHierarchies_ReturnsFailureAndLeavesPackUnchanged()
+    {
+        var modelRoot = CreateMultipleSkinnedModelRoot(equivalentHierarchy: false);
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(glbPath, destination));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("多套逻辑骨架"));
+                Assert.That(destination.FileList, Is.Empty);
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_DifferentSkinJointSets_ReturnsFailureAndLeavesPackUnchanged()
+    {
+        var modelRoot = CreateMultipleSkinnedModelRoot(
+            equivalentHierarchy: true,
+            secondChildName: "other_child");
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(glbPath, destination));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("多套逻辑骨架"));
+                Assert.That(destination.FileList, Is.Empty);
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
     public void Import_ExistingGameSkeleton_DoesNotCopySkeletonAnim()
     {
         var modelRoot = CreateSkinnedModelRoot("test_skeleton");
@@ -258,7 +526,8 @@ public class RmvMeshBuilderSceneTests
                 false,
                 false,
                 20,
-                true);
+                true,
+                NewSkeletonName: "ShouldBeIgnored");
 
             importer.Import(settings);
 
@@ -270,6 +539,9 @@ public class RmvMeshBuilderSceneTests
                 Assert.That(
                     destination.FileList.Keys,
                     Does.Not.Contain("animations\\skeletons\\test_skeleton.anim"));
+                Assert.That(
+                    destination.FileList.Keys,
+                    Does.Not.Contain("animations\\skeletons\\shouldbeignored.anim"));
             });
         }
         finally
@@ -291,20 +563,68 @@ public class RmvMeshBuilderSceneTests
         20,
         true);
 
-    private static ModelRoot CreateSkinnedModelRoot(string skeletonName)
+    private static GltfImporterSettings CreateSettings(
+        string inputFile,
+        PackFileContainer destination) => new(
+        inputFile,
+        "models",
+        destination,
+        GameTypeEnum.Warhammer3,
+        true,
+        false,
+        false,
+        false,
+        false,
+        20,
+        true);
+
+    private static ModelRoot CreateSkinnedModelRoot(string? skeletonName)
     {
         var geometry = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>("mesh");
         AddTriangle(geometry.UsePrimitive(CreateMaterial("material")), 0);
         var modelRoot = ModelRoot.CreateModel();
         var mesh = modelRoot.CreateMesh(geometry);
         var scene = modelRoot.UseScene("default");
-        scene.CreateNode($"//skeleton//{skeletonName}");
+        if (skeletonName != null)
+            scene.CreateNode($"//skeleton//{skeletonName}");
         var root = scene.CreateNode("root");
         var child = root.CreateNode("child");
         scene.CreateNode("mesh_node").WithSkinnedMesh(
             mesh,
             (root, Matrix4x4.Identity),
             (child, Matrix4x4.Identity));
+        return modelRoot;
+    }
+
+    private static ModelRoot CreateMultipleSkinnedModelRoot(
+        bool equivalentHierarchy,
+        string secondChildName = "child")
+    {
+        var geometry = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>("mesh");
+        AddTriangle(geometry.UsePrimitive(CreateMaterial("material")), 0);
+        var modelRoot = ModelRoot.CreateModel();
+        var mesh = modelRoot.CreateMesh(geometry);
+        var scene = modelRoot.UseScene("default");
+
+        var firstRoot = scene.CreateNode("root");
+        var firstChild = firstRoot.CreateNode("child");
+        scene.CreateNode("first_mesh").WithSkinnedMesh(
+            mesh,
+            (firstRoot, Matrix4x4.Identity),
+            (firstChild, Matrix4x4.Identity));
+        modelRoot.LogicalSkins.Last().Name = "ExternalArmature";
+
+        var secondArmature = scene.CreateNode("second_armature");
+        var secondRoot = secondArmature.CreateNode("root");
+        var secondChild = equivalentHierarchy
+            ? secondRoot.CreateNode(secondChildName)
+            : secondArmature.CreateNode(secondChildName);
+        scene.CreateNode("second_mesh").WithSkinnedMesh(
+            mesh,
+            (secondRoot, Matrix4x4.Identity),
+            (secondChild, Matrix4x4.Identity));
+        modelRoot.LogicalSkins.Last().Name = "ExternalArmatureCopy";
+
         return modelRoot;
     }
 

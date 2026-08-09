@@ -12,6 +12,7 @@ using Editors.ImportExport.Importing.Presentation.RmvToGltf;
 using Editors.ImportExport.Misc;
 using Editors.ImportExport.Common;
 using Shared.Core.Services;
+using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 
 namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
 {
@@ -30,6 +31,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         [ObservableProperty] bool _importAnimations = true;
         [ObservableProperty] bool _autoDetectAnimationKeysPerSecond = true;
         [ObservableProperty] float _animationKeysPerSecond = 20.0f;
+        [ObservableProperty] string _newSkeletonName = "";
 
         public bool CanEditAnimationKeysPerSecond =>
             ImportAnimations && !AutoDetectAnimationKeysPerSecond;
@@ -40,6 +42,9 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         }
 
         public ImportSupportEnum CanImportFile(PackFile file) => _Importer.CanImportFile(file);
+
+        public void Initialize(PackFile inputFile) =>
+            NewSkeletonName = GltfSkeletonNameReader.GetDefaultName(inputFile.Name);
 
         public ImportResult Execute(PackFile importSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType)
         {
@@ -58,7 +63,8 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 ImportAnimations: this.ImportAnimations,
                 AnimationKeysPerSecond: this.AnimationKeysPerSecond,
                 MirrorMesh: true,
-                AutoDetectAnimationKeysPerSecond: this.AutoDetectAnimationKeysPerSecond);
+                AutoDetectAnimationKeysPerSecond: this.AutoDetectAnimationKeysPerSecond,
+                NewSkeletonName: this.NewSkeletonName);
 
             return _Importer.Import(settings);
         }

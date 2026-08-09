@@ -14,6 +14,7 @@ namespace Editors.ImportExport.Importing.Presentation
         public string DisplayName { get; }
         string OutputExtension { get; }
         string[] InputExtensions { get; } // ADDed THIS!
+        void Initialize(PackFile inputFile) { }
         ImportResult Execute(PackFile exportSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType);
         public ImportSupportEnum CanImportFile(PackFile file);
 
