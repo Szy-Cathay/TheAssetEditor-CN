@@ -62,7 +62,7 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             var standardDialog = new Mock<IStandardDialogs>();
             var sceneLoader = new GltfSceneLoader(standardDialog.Object);
             var materialBuilder = new RmvMaterialBuilder(pfs, standardDialog.Object);
-            var importer = new GltfImporter(pfs, standardDialog.Object, skeletontonLookupHelper, materialBuilder);
+            var importer = new GltfImporter(pfs, skeletontonLookupHelper, materialBuilder);
             var packFileContainer = new PackFileContainer("new");
             var settings = new GltfImporterSettings(TestData.InputGtlfFile, "skeletons", packFileContainer, Shared.Core.Settings.GameTypeEnum.Warhammer3, true, true, true, true, true, 20.0f, true);
 
@@ -84,17 +84,19 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             Assert.That(rmv2File!.ModelList[0][0]!.Material!.GetAllTextures().Count(), Is.EqualTo(TestData.Rmv2Expected.Lod0Mesh0TextureCount));
             Assert.That(rmv2File!.ModelList[0][0]!.Mesh.IndexList.Length, Is.EqualTo(TestData.Rmv2Expected.Lod0Mesh0IndexCount));
             Assert.That(rmv2File!.ModelList[0][0]!.Mesh.VertexList.Length, Is.EqualTo(TestData.Rmv2Expected.Lod0Mesh0VertexCount));
+            Assert.That(
+                packFileContainer.FileList.Keys.Any(path => Path.GetFileName(path).Contains(" _")),
+                Is.False);
         }
 
         [Test]
-        public void InvalidGltf_UsesStandardErrorDialog()
+        public void InvalidGltf_ThrowsReadableError()
         {
             var packFileService = new Mock<IPackFileService>();
             var standardDialogs = new Mock<IStandardDialogs>();
             var materialBuilder = new RmvMaterialBuilder(packFileService.Object, standardDialogs.Object);
             var importer = new GltfImporter(
                 packFileService.Object,
-                standardDialogs.Object,
                 Mock.Of<ISkeletonAnimationLookUpHelper>(),
                 materialBuilder);
             var settings = new GltfImporterSettings(
@@ -110,11 +112,8 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
                 20.0f,
                 false);
 
-            Assert.DoesNotThrow(() => importer.Import(settings));
-
-            standardDialogs.Verify(
-                x => x.ShowErrorViewDialog("Advanced Import Error", It.IsAny<ErrorList>(), false),
-                Times.Once);
+            var exception = Assert.Throws<InvalidDataException>(() => importer.Import(settings));
+            Assert.That(exception!.Message, Does.Contain("无法读取 glTF/GLB 文件"));
         }
     }
 

@@ -1,95 +1,77 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
-using CommonControls;
-using Microsoft.Xna.Framework.Graphics;
+using Editors.ImportExport.Common;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using WindowHandling;
 
-namespace Editors.ImportExport.Exporting.Presentation
+namespace Editors.ImportExport.Exporting.Presentation;
+
+public partial class ExportWindow : AssetEditorWindow
 {
-    /// <summary>
-    /// Interaction logic for ExportWindow.xaml
-    /// </summary>
-    public partial class ExportWindow : Window
+    private readonly ExporterCoreViewModel _viewModel;
+    private readonly IStandardDialogs _standardDialogs;
+
+    public ExportWindow(
+        ExporterCoreViewModel viewModel,
+        IStandardDialogs standardDialogs)
     {
-        private readonly ExporterCoreViewModel _viewModel;
-
-        public ExportWindow(ExporterCoreViewModel viewModel)
-        {
-            InitializeComponent();
-            DarkTitleBarHelper.Enable(this);
-            _viewModel = viewModel;
-            DataContext = _viewModel;
-        }
-
-        internal void Initialize(PackFile packFile)
-        {
-            _viewModel.Initialize(packFile);
-        }
-
-        private void ExportButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!PathValidator.IsValid(_viewModel.SystemPath))
-            {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.InvalidOrEmptyPath"), LocalizationManager.Instance.Get("Msg.GeneralError"));
-                return;
-            }
-
-            _viewModel.Export();
-            Close();
-        }
+        InitializeComponent();
+        _viewModel = viewModel;
+        _standardDialogs = standardDialogs;
+        DataContext = _viewModel;
     }
 
-    // TODO: should be moved to a shared library
-    public static class PathValidator
+    internal void Initialize(PackFile packFile)
     {
-        public static bool IsValid(string fileName)
+        _viewModel.Initialize(packFile);
+    }
+
+    private async void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!PathValidator.IsValid(_viewModel.SystemPath))
         {
-            if (string.IsNullOrWhiteSpace(fileName))
-            {
-                return false;
-            }
-
-            if (!IsValidFileName(fileName))
-            {
-                return false;
-            }
-
-            if (!IsValidFolder(fileName))
-            {
-                return false;
-            }
-
-            return true;
+            _standardDialogs.ShowDialogBox(
+                LocalizationManager.Instance.Get("Msg.InvalidOrEmptyPath"),
+                LocalizationManager.Instance.Get("Msg.GeneralError"));
+            return;
         }
 
-        private static bool IsValidFileName(string fileName)
+        ExportButton.IsEnabled = false;
+        _viewModel.IsOperationActive = true;
+        var succeeded = false;
+        try
         {
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            var fileNamOnly = Path.GetFileName(fileName);
-            foreach (char c in fileNamOnly)
-            {
-                if (Array.Exists(invalidChars, invalidChar => invalidChar == c))
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            succeeded = await _viewModel.ExportAsync();
+        }
+        catch (Exception ex)
+        {
+            _standardDialogs.ShowExceptionWindow(ex, "高级 glTF 导出失败。");
+        }
+        finally
+        {
+            _viewModel.IsOperationActive = false;
+            ExportButton.IsEnabled = true;
         }
 
-        private static bool IsValidFolder(string fileName)
-        {
-            char[] invalidChars = Path.GetInvalidPathChars();
-            var folder = Path.GetDirectoryName(fileName);
-            foreach (char c in folder)
-            {
-                if (Array.Exists(invalidChars, invalidChar => invalidChar == c))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
+        if (succeeded)
+            Close();
+    }
+}
+
+public static class PathValidator
+{
+    public static bool IsValid(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            return false;
+
+        var fileNameOnly = Path.GetFileName(fileName);
+        if (fileNameOnly.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            return false;
+
+        var folder = Path.GetDirectoryName(fileName);
+        return !string.IsNullOrWhiteSpace(folder) &&
+               folder.IndexOfAny(Path.GetInvalidPathChars()) < 0;
     }
 }

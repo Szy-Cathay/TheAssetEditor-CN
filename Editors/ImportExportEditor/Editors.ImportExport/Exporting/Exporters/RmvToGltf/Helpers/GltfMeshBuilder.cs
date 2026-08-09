@@ -12,10 +12,14 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
 {
     public class GltfMeshBuilder
     {
-        public List<IMeshBuilder<MaterialBuilder>> Build(RmvFile rmv2, List<TextureResult> textures, RmvToGltfExporterSettings settings)
+        public List<IMeshBuilder<MaterialBuilder>> Build(
+            RmvFile rmv2,
+            List<TextureResult> textures,
+            RmvToGltfExporterSettings settings,
+            bool willHaveSkeleton)
         {
             var lodLevel = rmv2.ModelList.First();
-            var hasSkeleton = string.IsNullOrWhiteSpace(rmv2.Header.SkeletonName) == false;
+            var hasSkeleton = willHaveSkeleton && string.IsNullOrWhiteSpace(rmv2.Header.SkeletonName) == false;
 
             var meshes = new List<IMeshBuilder<MaterialBuilder>>();
             for(var i = 0; i < lodLevel.Length; i++)
@@ -29,18 +33,53 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             return meshes;
         }
 
-        MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> GenerateMesh(RmvMesh rmvMesh, string modelName, MaterialBuilder material, bool hasSkeleton, bool doMirror)
+        IMeshBuilder<MaterialBuilder> GenerateMesh(
+            RmvMesh rmvMesh,
+            string modelName,
+            MaterialBuilder material,
+            bool hasSkeleton,
+            bool doMirror)
         {
-            var mesh = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>(modelName);
-            if (hasSkeleton)
+            if (!hasSkeleton)
+            {
+                return GenerateMesh<VertexEmpty>(
+                    rmvMesh,
+                    modelName,
+                    material,
+                    doMirror,
+                    null);
+            }
+
+            return GenerateMesh<VertexJoints4>(
+                rmvMesh,
+                modelName,
+                material,
+                doMirror,
+                (source, target) => source.WeightCount > 0
+                    ? SetVertexInfluences(source, target)
+                    : SetFallbackInfluence(target));
+        }
+
+        MeshBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning> GenerateMesh<TSkinning>(
+            RmvMesh rmvMesh,
+            string modelName,
+            MaterialBuilder material,
+            bool doMirror,
+            Func<CommonVertex,
+                VertexBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning>,
+                VertexBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning>>? setSkinning)
+            where TSkinning : struct, IVertexSkinning
+        {
+            var mesh = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning>(modelName);
+            if (setSkinning != null)
                 mesh.VertexPreprocessor.SetValidationPreprocessors();
 
             var prim = mesh.UsePrimitive(material);
 
-            var vertexList = new List<VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>>();
+            var vertexList = new List<VertexBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning>>();
             foreach (var vertex in rmvMesh.VertexList)
             {
-                var glTfvertex = new VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>();
+                var glTfvertex = new VertexBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning>();
                 glTfvertex.Geometry.Position = new Vector3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z);
                 glTfvertex.Geometry.Normal = new Vector3(vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z);
                 glTfvertex.Geometry.Tangent = new Vector4(vertex.Tangent.X, vertex.Tangent.Y, vertex.Tangent.Z, 1);
@@ -48,17 +87,14 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
 
                 glTfvertex.Geometry.Position = VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Position), doMirror));
 
-                glTfvertex.Geometry.Normal = Vector3.Normalize(VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Normal), doMirror)));
+                glTfvertex.Geometry.Normal = VecConv.NormalizeVector3(
+                    VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Normal), doMirror)),
+                    Vector3.UnitZ);
                 glTfvertex.Geometry.Tangent = VecConv.NormalizeTangentVector4(VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Tangent), doMirror)));
 
-                if (hasSkeleton)
-                {
-                    glTfvertex = SetVertexInfluences(vertex, glTfvertex);
-                }
-                else
-                {
-                    glTfvertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
-                }
+                if (setSkinning != null)
+                    glTfvertex = setSkinning(vertex, glTfvertex);
+
                 vertexList.Add(glTfvertex);
             }
 
@@ -85,31 +121,44 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             return mesh;
         }
 
+        private static VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> SetFallbackInfluence(
+            VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> vertex)
+        {
+            vertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
+
+            return vertex;
+        }
+
 
         VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> SetVertexInfluences(CommonVertex vertex, VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> glTfvertex)
         {
-            if (vertex.WeightCount == 2)
+            var weights = new float[4];
+            var indices = new int[4];
+            var count = Math.Clamp(vertex.WeightCount, 0, 4);
+
+            for (var index = 0; index < count; index++)
             {
-                var rigging = new (int, float)[2] {
-                        (vertex.BoneIndex[0], vertex.BoneWeight[0]),
-                        (vertex.BoneIndex[1], 1.0f - vertex.BoneWeight[0])
-                        };
-
-                glTfvertex.Skinning.SetBindings(rigging);
-
-            }
-            else if (vertex.WeightCount == 4)
-            {
-                var rigging = new (int, float)[4] {
-                        (vertex.BoneIndex[0], vertex.BoneWeight[0]),
-                        (vertex.BoneIndex[1], vertex.BoneWeight[1]),
-                        (vertex.BoneIndex[2], vertex.BoneWeight[2]),
-                        (vertex.BoneIndex[3], 1.0f - (vertex.BoneWeight[0] + vertex.BoneWeight[1] + vertex.BoneWeight[2]))
-                        };
-
-                glTfvertex.Skinning.SetBindings(rigging);
+                indices[index] = vertex.BoneIndex[index];
+                weights[index] = Math.Max(0, vertex.BoneWeight[index]);
             }
 
+            var sum = weights.Sum();
+            if (sum <= float.Epsilon)
+            {
+                indices[0] = count > 0 ? vertex.BoneIndex[0] : 0;
+                weights[0] = 1;
+            }
+            else
+            {
+                for (var index = 0; index < weights.Length; index++)
+                    weights[index] /= sum;
+            }
+
+            glTfvertex.Skinning.SetBindings(
+                (indices[0], weights[0]),
+                (indices[1], weights[1]),
+                (indices[2], weights[2]),
+                (indices[3], weights[3]));
             return glTfvertex;
         }
 

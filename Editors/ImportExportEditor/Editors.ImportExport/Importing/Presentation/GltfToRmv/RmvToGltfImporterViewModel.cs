@@ -9,6 +9,8 @@ using Shared.Core.Settings;
 using Shared.Ui.Common.DataTemplates;
 using Editors.ImportExport.Importing.Presentation.RmvToGltf;
 using Editors.ImportExport.Misc;
+using Editors.ImportExport.Common;
+using Shared.Core.Services;
 
 namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
 {
@@ -16,7 +18,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
     {
         private readonly GltfImporter _Importer;
 
-        public string DisplayName => "Gltf Importer";
+        public string DisplayName => LocalizationManager.Instance.Get("RmvToGltfImporter.DisplayName");
         public string OutputExtension => ".rigid_model_v2";
         public string[] InputExtensions => new string[] { ".gltf", ".glb" };
 
@@ -25,7 +27,11 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         [ObservableProperty] bool _convertFromBlenderMaterialMap = true;
         [ObservableProperty] bool _convertNormalTextureToOrange = true;
         [ObservableProperty] bool _importAnimations = true;
+        [ObservableProperty] bool _autoDetectAnimationKeysPerSecond = true;
         [ObservableProperty] float _animationKeysPerSecond = 20.0f;
+
+        public bool CanEditAnimationKeysPerSecond =>
+            ImportAnimations && !AutoDetectAnimationKeysPerSecond;
 
         public RmvToGltfImporterViewModel(GltfImporter Importer)
         {
@@ -34,8 +40,11 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
 
         public ImportSupportEnum CanImportFile(PackFile file) => _Importer.CanImportFile(file);
 
-        public void Execute(PackFile importSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType)
+        public bool Execute(PackFile importSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType)
         {
+            if (!float.IsFinite(AnimationKeysPerSecond) || AnimationKeysPerSecond <= 0)
+                throw new ArgumentOutOfRangeException(nameof(AnimationKeysPerSecond), "动画采样率必须大于 0。");
+
             var settings = new GltfImporterSettings(
                 InputGltfFile: importSource.Name,
                 DestinationPackPath: outputPath,
@@ -47,9 +56,16 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 ConvertNormalTextureFromBlueToOrangeType: this.ConvertNormalTextureToOrange,
                 ImportAnimations: this.ImportAnimations,
                 AnimationKeysPerSecond: this.AnimationKeysPerSecond,
-                MirrorMesh: true);
+                MirrorMesh: true,
+                AutoDetectAnimationKeysPerSecond: this.AutoDetectAnimationKeysPerSecond);
 
-            _Importer.Import(settings);
+            return _Importer.Import(settings);
         }
+
+        partial void OnImportAnimationsChanged(bool value) =>
+            OnPropertyChanged(nameof(CanEditAnimationKeysPerSecond));
+
+        partial void OnAutoDetectAnimationKeysPerSecondChanged(bool value) =>
+            OnPropertyChanged(nameof(CanEditAnimationKeysPerSecond));
     }
 }

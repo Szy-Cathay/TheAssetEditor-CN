@@ -61,34 +61,32 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
         {
             ValidateInput_BuildRmvFileMaterials(modelRoot, rmvFile);
 
-            for (int i = 0; i < modelRoot.LogicalMeshes.Count; i++)
+            var meshSources = RmvMeshBuilder.GetMeshSources(modelRoot);
+            for (int i = 0; i < meshSources.Count; i++)
             {
                 BuildRmvModelMaterial(
                     settings,
-                    modelRoot.LogicalMeshes[i],
-                    (rmvFile.ModelList.Any() && rmvFile.ModelList[0].Any())
-                    ?
+                    meshSources[i],
                     rmvFile.ModelList[0][i]
-                    :
-                    null
                 );
             }
 
             rmvFile.RecalculateOffsets();
         }
 
-        private void BuildRmvModelMaterial(GltfImporterSettings settings, Mesh mesh, RmvModel rmvModel)
+        private void BuildRmvModelMaterial(
+            GltfImporterSettings settings,
+            RmvMeshBuilder.MeshSource source,
+            RmvModel rmvModel)
         {
-            if (!ValidateInput_BuildRmvModelMaterial(mesh)) return;
-
-            var primitive = mesh.Primitives.First();
-            var gltfMaterial = primitive.Material;
+            var gltfMaterial = source.Primitive.Material;
+            if (gltfMaterial == null || !gltfMaterial.Channels.Any())
+                return;
 
             foreach (var itText in gltfMaterial.Channels)
             {
                 if (itText.Texture == null) continue;
 
-                var texPath = itText.Texture.PrimaryImage.Content.SourcePath;
                 if (!TextureTypeHelper.GetRmvTextureTypeFromGltfIdString(
                     itText.Key,
                     out var textureType,
@@ -96,11 +94,21 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
 
                 var gameType = settings.SelectedGame;                
                 
-                var texturePackFolder = GetTexturePackFolder(settings, mesh.Name, postFixString);
-                var DEBUG___textureName = itText.Texture.PrimaryImage.Name;
+                var texturePackFolder = GetTexturePackFolder(settings, source.ModelName, postFixString);
+                var shouldConvert = textureType switch
+                {
+                    TextureType.MaterialMap => settings.ConvertMaterialFromBlenderType,
+                    TextureType.Normal => settings.ConvertNormalTextureFromBlueToOrangeType,
+                    _ => true,
+                };
 
-                // import texture PNG -> DDS
-                var ddsPackFile = PngToDdsImporter.Import(texPath, textureType, gameType, Path.GetFileName(texturePackFolder));
+                using var imageStream = itText.Texture.PrimaryImage.Content.Open();
+                var ddsPackFile = PngToDdsImporter.Import(
+                    imageStream,
+                    textureType,
+                    gameType,
+                    Path.GetFileName(texturePackFolder),
+                    shouldConvert);
 
                 rmvModel.Material.SetTexture(textureType, texturePackFolder);
 
@@ -108,7 +116,10 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                 if (!settings.DestinationPackFileContainer.FileList.ContainsKey(texturePackFolder))
                 {
                     var newFile = new NewPackFileEntry(Path.GetDirectoryName(texturePackFolder) ?? "", ddsPackFile);
-                    _packFileService.AddFilesToPack(settings.DestinationPackFileContainer, [newFile]);
+                    PackFileDispatcherWriter.AddFilesToPack(
+                        _packFileService,
+                        settings.DestinationPackFileContainer,
+                        [newFile]);
                 }
 
             }
@@ -118,7 +129,13 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
         {
             // set file name
             var textureNameBase = meshName.Any() ? meshName : Path.GetFileNameWithoutExtension(settings.InputGltfFile);
-            var textureFileName = @$"{textureNameBase} {(postFixString.Any() ? @$"_{postFixString}.dds" : ".dds")}";
+            foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+                textureNameBase = textureNameBase.Replace(invalidCharacter, '_');
+            textureNameBase = textureNameBase.Trim().TrimEnd('.');
+            if (string.IsNullOrWhiteSpace(textureNameBase))
+                textureNameBase = "texture";
+
+            var textureFileName = $"{textureNameBase}{(postFixString.Any() ? $"_{postFixString}.dds" : ".dds")}";
 
             var texturePackFolder = settings.DestinationPackPath + @"\tex";
             var textureFullPackPath = @$"{texturePackFolder}\{textureFileName}";
@@ -140,32 +157,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             if (!rmvFile.ModelList.Any())
                 throw new Exception("ERROR: unexpected not meshes in rmv2 file struct");
 
-            if (rmvFile.ModelList[0].Length != modelRoot.LogicalMeshes.Count)
+            if (rmvFile.ModelList[0].Length != RmvMeshBuilder.GetMeshSources(modelRoot).Count)
                 throw new Exception("ERROR: unexpected rmv2 mesh count mismatch");
-        }
-
-        private static bool ValidateInput_BuildRmvModelMaterial(Mesh mesh)
-        {
-            if (mesh == null)
-                throw new ArgumentNullException(nameof(mesh), "Invalid Mesh: Mesh can't be null");
-
-            if (mesh.Primitives == null || !mesh.Primitives.Any())
-                throw new Exception($"Invalid Mesh: No Primitives found in mesh. Primitives.Count = {mesh.Primitives?.Count}");
-
-            var primitive = mesh.Primitives.First();
-
-            if (primitive == null)
-                throw new Exception("Invalid Mesh: primitive[0] can't be null ");
-
-            var gltfMaterial = primitive.Material;
-
-            if (gltfMaterial == null)
-                return false;
-            
-            if (gltfMaterial.Channels == null || !gltfMaterial.Channels.Any())
-                return false;
-
-            return true;
         }
     }
 }

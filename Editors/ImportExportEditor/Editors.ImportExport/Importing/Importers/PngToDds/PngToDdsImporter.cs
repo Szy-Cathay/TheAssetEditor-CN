@@ -1,4 +1,6 @@
 ﻿using DirectXTexNet;
+using System.IO;
+using System.Runtime.InteropServices;
 using Editors.ImportExport.Importing.Importers.PngToDds.Helpers;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
@@ -10,27 +12,64 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
 
     public class PngToDdsImporter
     {
-        static public PackFile Import(string inputPath, TextureType textureType, GameTypeEnum gameType, string outFileName)
+        public static PackFile Import(
+            string inputPath,
+            TextureType textureType,
+            GameTypeEnum gameType,
+            string outFileName,
+            bool convertSpecialTexture = true)
         {
-            ScratchImage scratchImagePng = TexHelper.Instance.LoadFromWICFile(inputPath, WIC_FLAGS.DEFAULT_SRGB);
+            using var scratchImagePng = TexHelper.Instance.LoadFromWICFile(inputPath, WIC_FLAGS.DEFAULT_SRGB);
+            return Import(scratchImagePng, textureType, gameType, outFileName, convertSpecialTexture);
+        }
 
-            bool isUncompressed = scratchImagePng.GetMetadata().Format == DXGI_FORMAT.B8G8R8A8_UNORM || scratchImagePng.GetMetadata().Format == DXGI_FORMAT.B8G8R8A8_UNORM_SRGB;
+        public static PackFile Import(
+            Stream inputStream,
+            TextureType textureType,
+            GameTypeEnum gameType,
+            string outFileName,
+            bool convertSpecialTexture = true)
+        {
+            using var memoryStream = new MemoryStream();
+            inputStream.CopyTo(memoryStream);
+            var imageBytes = memoryStream.ToArray();
+            var imageHandle = GCHandle.Alloc(imageBytes, GCHandleType.Pinned);
+            try
+            {
+                using var scratchImagePng = TexHelper.Instance.LoadFromWICMemory(
+                    imageHandle.AddrOfPinnedObject(),
+                    imageBytes.LongLength,
+                    WIC_FLAGS.DEFAULT_SRGB);
+                return Import(scratchImagePng, textureType, gameType, outFileName, convertSpecialTexture);
+            }
+            finally
+            {
+                imageHandle.Free();
+            }
+        }
 
-            var processedImage = ImageProcessorFactory.CreateImageProcessor(textureType).Transform(scratchImagePng);
-            // process image based on texture type
+        private static PackFile Import(
+            ScratchImage scratchImagePng,
+            TextureType textureType,
+            GameTypeEnum gameType,
+            string outFileName,
+            bool convertSpecialTexture)
+        {
+            var processedImage = ImageProcessorFactory
+                .CreateImageProcessor(textureType, convertSpecialTexture)
+                .Transform(scratchImagePng);
+            using (processedImage)
+            using (var imageWithMips = processedImage.GenerateMipMaps(TEX_FILTER_FLAGS.DEFAULT, 0))
+            {
+                var ddsFormat = DDSFormatHelper.GetDDSFormat(gameType, textureType);
+                using var ddsImage = imageWithMips.Compress(ddsFormat, TEX_COMPRESS_FLAGS.DEFAULT, 0.5f);
+                using var ddsMemStream = ddsImage.SaveToDDSMemory(DDS_FLAGS.NONE);
 
-            var imageWithMips = processedImage.GenerateMipMaps(TEX_FILTER_FLAGS.DEFAULT, 0);
-            var ddsFormat = DDSFormatHelper.GetDDSFormat(gameType, textureType);
-            var ddsImage = imageWithMips.Compress(ddsFormat, TEX_COMPRESS_FLAGS.DEFAULT, 0.5f);
+                var ddsBytes = new byte[ddsMemStream.Length];
+                ddsMemStream.Read(ddsBytes, 0, ddsBytes.Length);
 
-            var ddsMemStream = ddsImage.SaveToDDSMemory(DDS_FLAGS.NONE);
-
-            byte[] ddsBytes = new byte[ddsMemStream.Length];
-            ddsMemStream.Read(ddsBytes, 0, ddsBytes.Length);
-
-            var ddsPackFile = new PackFile(outFileName, new MemorySource(ddsBytes));
-
-            return ddsPackFile;
+                return new PackFile(outFileName, new MemorySource(ddsBytes));
+            }
         }
     }
 }

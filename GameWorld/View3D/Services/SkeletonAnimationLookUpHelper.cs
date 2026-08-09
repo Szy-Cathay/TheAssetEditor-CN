@@ -110,13 +110,17 @@ namespace GameWorld.Core.Services
                 var containerIndex = new ContainerIndex();
                 foreach (var discovered in discoveredAnimations)
                 {
-                    var animationReference = new AnimationReference(discovered.FullPath, packFileContainer);
+                    var isSkeletonFile = IsSkeletonPath(discovered.FullPath);
+                    var animationReference = new AnimationReference(
+                        discovered.FullPath,
+                        packFileContainer,
+                        isSkeletonFile);
                     var indexedAnimation = new IndexedAnimation(
                         discovered.PackFile,
                         discovered.FullPath,
                         discovered.SkeletonName,
                         animationReference,
-                        IsSkeletonPath(discovered.FullPath));
+                        isSkeletonFile);
 
                     containerIndex.Animations.Add(indexedAnimation);
                     _animationIndexByFile[discovered.PackFile] = indexedAnimation;
@@ -384,7 +388,7 @@ namespace GameWorld.Core.Services
                 var fullPath = _packFileService.GetFullPath(animation, container);
                 var foundFile = _packFileService.FindFile(fullPath, container);
                 return ReferenceEquals(foundFile, animation)
-                    ? new AnimationReference(fullPath, container)
+                    ? new AnimationReference(fullPath, container, IsSkeletonPath(fullPath))
                     : null;
             }
         }
@@ -432,14 +436,19 @@ namespace GameWorld.Core.Services
     // Delete this piece of shit
     public class AnimationReference
     {
-        public AnimationReference(string animationFile, PackFileContainer container)
+        public AnimationReference(
+            string animationFile,
+            PackFileContainer container,
+            bool isSkeletonFile = false)
         {
             AnimationFile = animationFile;
             Container = container;
+            IsSkeletonFile = isSkeletonFile;
         }
 
         public string AnimationFile { get; set; }
         public PackFileContainer Container { get; set; }
+        public bool IsSkeletonFile { get; }
 
         public override string ToString()
         {

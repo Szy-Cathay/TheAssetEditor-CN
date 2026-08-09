@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -40,10 +41,14 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             var doMirror = settings.MirrorMesh;
             var gameSkeleton = new GameSkeleton(skeletonAnimFile, null);
             var animationClip = new AnimationClip(animationToExport, gameSkeleton);
+            if (animationClip.DynamicFrames.Count == 0)
+                throw new InvalidDataException($"动画“{animationName}”不包含任何动态帧。");
+            if (!float.IsFinite(animationToExport.Header.FrameRate) || animationToExport.Header.FrameRate <= 0)
+                throw new InvalidDataException($"动画“{animationName}”的帧率无效。");
 
-            var secondsPerFrame = animationClip.PlayTimeInSec / animationClip.DynamicFrames.Count;            
+            var secondsPerFrame = 1.0f / animationToExport.Header.FrameRate;
 
-            var gltfAnimation = modelRoot.CreateAnimation(animationName);
+            var gltfAnimation = modelRoot.CreateAnimation(Path.GetFileNameWithoutExtension(animationName));
 
             for (var boneIndex = 0; boneIndex < animationClip.AnimationBoneCount; boneIndex++)
             {

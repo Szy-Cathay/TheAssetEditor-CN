@@ -9,7 +9,7 @@ namespace Editors.ImportExport.Exporting.Exporters
         public string DisplayName { get; }
         string OutputExtension { get; }
 
-        public void Execute(PackFile exportSource, string outputPath, bool generateImporter);
+        bool Execute(PackFile exportSource, string outputPath);
         public ExportSupportEnum CanExportFile(PackFile file);
     }
 }

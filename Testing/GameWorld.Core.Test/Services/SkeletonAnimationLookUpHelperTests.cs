@@ -84,6 +84,36 @@ namespace Test.GameWorld.Core.Services
         }
 
         [Test]
+        public void GetAnimationsForSkeleton_ClassifiesSkeletonAndActionFiles()
+        {
+            var container = CreateContainer("classification");
+            AddAnimation(
+                container,
+                "animations\\skeletons\\humanoid.anim",
+                "humanoid");
+            AddAnimation(
+                container,
+                "animations\\battle\\humanoid\\stand_idle.anim",
+                "humanoid");
+            var (service, eventHub) = CreateService(container);
+
+            using var helper = new SkeletonAnimationLookUpHelper(service, eventHub);
+
+            var references = helper.GetAnimationsForSkeleton("humanoid");
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    references.Single(reference => reference.AnimationFile.Contains("skeletons"))
+                        .IsSkeletonFile,
+                    Is.True);
+                Assert.That(
+                    references.Single(reference => reference.AnimationFile.Contains("stand_idle"))
+                        .IsSkeletonFile,
+                    Is.False);
+            });
+        }
+
+        [Test]
         public void KnownBrokenPath_WithDifferentCasing_IsSkipped()
         {
             var container = CreateContainer("broken");

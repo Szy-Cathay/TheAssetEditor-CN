@@ -11,7 +11,7 @@ namespace Editors.ImportExport.Exporting.Exporters.DdsToNormalPng
 
     public interface IDdsToNormalPngExporter
     {
-        public string Export(string filePath, string outputPath, bool convertToBlueNormalMap);
+        public string Export(string filePath, string outputPath, bool convertToBlueNormalMap, string? outputFileName = null);
         public ExportSupportEnum CanExportFile(PackFile file);
     }
 
@@ -35,15 +35,15 @@ namespace Editors.ImportExport.Exporting.Exporters.DdsToNormalPng
             return ExportSupportEnum.NotSupported;
         }
 
-        public string Export(string filePath, string outputPath, bool convertToBlueNormalMap)
+        public string Export(string filePath, string outputPath, bool convertToBlueNormalMap, string? outputFileName = null)
         {
             var packFile = _pfs.FindFile(filePath);
             if (packFile == null)
                 return "";
 
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
+            var fileName = outputFileName ?? Path.GetFileNameWithoutExtension(filePath) + ".png";
             var outDirectory = Path.GetDirectoryName(outputPath);
-            var fullFilePath = outDirectory + "/" + fileName + ".png";
+            var fullFilePath = Path.Combine(outDirectory!, Path.GetFileName(fileName));
 
             var bytes = packFile.DataSource.ReadData();
             if (bytes == null || !bytes.Any())

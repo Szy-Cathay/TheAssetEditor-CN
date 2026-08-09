@@ -10,7 +10,7 @@ namespace Editors.ImportExport.Exporting.Exporters.DdsToMaterialPng
 
     public interface IDdsToMaterialPngExporter
     {
-        public string Export(string filePath, string outputPath, bool convertToBlenderFormat);
+        public string Export(string filePath, string outputPath, bool convertToBlenderFormat, string? outputFileName = null);
         public ExportSupportEnum CanExportFile(PackFile file);
     }
 
@@ -24,15 +24,15 @@ namespace Editors.ImportExport.Exporting.Exporters.DdsToMaterialPng
             _imageSaveHandler = imageSaveHandler;
         }
 
-        public string Export(string filePath, string outputPath, bool convertToBlenderFormat)
+        public string Export(string filePath, string outputPath, bool convertToBlenderFormat, string? outputFileName = null)
         {
             var packFile = _pfs.FindFile(filePath);
             if (packFile == null)            
                 return "";
 
-            var fileName = Path.GetFileNameWithoutExtension(filePath);
+            var fileName = outputFileName ?? Path.GetFileNameWithoutExtension(filePath) + ".png";
             var outDirectory = Path.GetDirectoryName(outputPath);
-            var outFilePath = outDirectory + "/" + fileName + ".png";
+            var outFilePath = Path.Combine(outDirectory!, Path.GetFileName(fileName));
 
             var bytes = packFile.DataSource.ReadData();
             if (bytes == null || !bytes.Any())
