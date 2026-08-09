@@ -206,17 +206,19 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             if (validation.Errors.Count != 0)
                 return ImportResult.Failure(validation.Errors);
 
-            if (pendingFiles.Count != 0)
+            if (validation.Files.Count != 0)
             {
                 var conflicts = PackFileDispatcherWriter.AddFilesToPackIfNoConflicts(
                     _packFileService,
                     settings.DestinationPackFileContainer,
-                    pendingFiles,
+                    validation.Files,
                     validation.Paths);
                 if (conflicts.Count != 0)
                 {
                     return ImportResult.Failure(conflicts
-                        .Select(path => $"目标 Pack 已存在资源：{path}")
+                        .Select(path => LocalizationManager.Instance.GetFormat(
+                            "GltfImporter.TargetConflict",
+                            path))
                         .ToList());
                 }
             }
@@ -283,16 +285,33 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
 
         private static string GetImportedPackFileName(GltfImporterSettings settings) => Path.GetFileNameWithoutExtension(settings.InputGltfFile) + ".rigid_model_v2";
 
-        private static (IReadOnlyList<string> Paths, IReadOnlyList<string> Errors)
+        private static (
+            List<NewPackFileEntry> Files,
+            IReadOnlyList<string> Paths,
+            IReadOnlyList<string> Errors)
             ValidatePendingFiles(
                 IReadOnlyList<NewPackFileEntry> pendingFiles)
         {
-            var paths = pendingFiles
-                .Select(entry => FolderProjectPathPolicy.EnsureResourcePath(
-                    Path.Combine(
-                        entry.DirectoyPath ?? "",
-                        entry.PackFile.Name.Trim())))
-                .Select(path => path.ToLowerInvariant())
+            var normalizedFiles = pendingFiles
+                .Select(entry =>
+                {
+                    var path = FolderProjectPathPolicy.EnsureResourcePath(
+                        Path.Combine(
+                            (entry.DirectoyPath ?? "").Trim(),
+                            entry.PackFile.Name.Trim()))
+                        .ToLowerInvariant();
+                    var file = new PackFile(
+                        Path.GetFileName(path),
+                        entry.PackFile.DataSource);
+                    return new NewPackFileEntry(
+                        Path.GetDirectoryName(path) ?? "",
+                        file);
+                })
+                .ToList();
+            var paths = normalizedFiles
+                .Select(entry => Path.Combine(
+                    entry.DirectoyPath,
+                    entry.PackFile.Name))
                 .ToList();
             var duplicatePaths = paths
                 .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -301,9 +320,11 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var errors = duplicatePaths
-                .Select(path => $"导入内容包含重复目标：{path}")
+                .Select(path => LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.DuplicateTarget",
+                    path))
                 .ToList();
-            return (paths, errors);
+            return (normalizedFiles, paths, errors);
         }
 
         private static string FetchSkeletonIdStringFromScene(ModelRoot modelRoot)

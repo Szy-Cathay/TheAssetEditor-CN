@@ -873,6 +873,8 @@
   "ImportWindow.WarningHeading": "警告",
   "ImportWindow.ErrorHeading": "失败原因",
   "ImportWindow.NoOutputs": "导入完成，但没有生成资源。",
+  "GltfImporter.TargetConflict": "目标 Pack 已存在资源：{0}",
+  "GltfImporter.DuplicateTarget": "导入内容包含重复目标：{0}",
 
   "ExportWindow.Title": "导出",
   "ExportWindow.SystemPath": "系统路径",

@@ -25,11 +25,18 @@ internal static class PackFileDispatcherWriter
             if (conflicts.Count != 0)
                 return conflicts;
 
-            packFileService.AddFilesToPack(
-                container,
-                files,
-                overwriteExisting: false);
-            return [];
+            try
+            {
+                packFileService.AddFilesToPack(
+                    container,
+                    files,
+                    overwriteExisting: false);
+                return [];
+            }
+            catch (FolderProjectFileConflictException exception)
+            {
+                return exception.Paths;
+            }
         }
 
         var dispatcher = Application.Current?.Dispatcher;

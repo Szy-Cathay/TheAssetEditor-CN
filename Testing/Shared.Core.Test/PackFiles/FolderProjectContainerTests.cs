@@ -642,7 +642,7 @@ public class FolderProjectContainerTests
                             "item.bin",
                             [9, 8, 7])),
                 ]),
-            Throws.TypeOf<IOException>());
+            Throws.TypeOf<FolderProjectFileConflictException>());
         Assert.That(
             File.ReadAllBytes(
                 Path.Combine(project.Path, "db", "item.bin")),

@@ -8,6 +8,7 @@ using GameWorld.Core.Services;
 using Moq;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.TestUtility;
 using SharpGLTF.Geometry;
@@ -19,6 +20,9 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest;
 
 public class GltfImporterAtomicImportTests
 {
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
+
     [Test]
     public void Import_ModelTargetExists_ReturnsConflictAndLeavesPackUnchanged()
     {
@@ -41,7 +45,7 @@ public class GltfImporterAtomicImportTests
 
             var result = importer.Import(new GltfImporterSettings(
                 glbPath,
-                "models",
+                " models ",
                 destination,
                 GameTypeEnum.Warhammer3,
                 true,
@@ -70,9 +74,9 @@ public class GltfImporterAtomicImportTests
     }
 
     [Test]
-    public void Import_MeshVertexLimitFailsAfterSkeletonBuild_ReturnsFailureAndLeavesPackUnchanged()
+    public void Import_InvalidAnimationRateAfterSkeletonAndMeshBuild_ReturnsFailureAndLeavesPackUnchanged()
     {
-        var glbPath = CreateOversizedSkinnedGlb();
+        var glbPath = CreateAnimatedSkinnedGlb();
         try
         {
             var packFileService = PackFileSerivceTestHelper.Create(
@@ -96,9 +100,10 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 false,
-                false,
-                20,
-                true);
+                true,
+                0,
+                true,
+                false);
 
             ImportResult? result = null;
             Exception? thrownException = null;
@@ -126,6 +131,82 @@ public class GltfImporterAtomicImportTests
         finally
         {
             File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_FolderProjectDiskConflictsMissingFromFileList_ReportsEveryConflictAndLeavesDiskUnchanged()
+    {
+        var glbPath = CreateAnimatedSkinnedGlb();
+        var projectRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"AssetEditorGltfImport-{Guid.NewGuid():N}");
+        var baseName = Path.GetFileNameWithoutExtension(glbPath)
+            .ToLowerInvariant();
+        var conflictPaths = new[]
+        {
+            $@"models\{baseName}.anim",
+            $@"models\{baseName}.rigid_model_v2",
+        };
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(projectRoot, "models"));
+            for (var index = 0; index < conflictPaths.Length; index++)
+            {
+                File.WriteAllBytes(
+                    Path.Combine(projectRoot, conflictPaths[index]),
+                    [(byte)(index + 1)]);
+            }
+
+            using var destination = FolderProjectContainer.Create(
+                projectRoot,
+                new FolderProjectSettings { Name = "test" });
+            foreach (var conflictPath in conflictPaths)
+                destination.FileList.Remove(conflictPath);
+            var packFileService = PackFileSerivceTestHelper.Create(
+                TestData.InputPack);
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                true,
+                false,
+                false,
+                false,
+                true,
+                20,
+                true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Count.EqualTo(conflictPaths.Length));
+                foreach (var conflictPath in conflictPaths)
+                    Assert.That(result.Errors, Has.Some.Contains(conflictPath));
+                for (var index = 0; index < conflictPaths.Length; index++)
+                {
+                    Assert.That(
+                        File.ReadAllBytes(Path.Combine(projectRoot, conflictPaths[index])),
+                        Is.EqualTo(new[] { (byte)(index + 1) }));
+                }
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        projectRoot,
+                        @"animations\skeletons\test_skeleton.anim")),
+                    Is.False);
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+            if (Directory.Exists(projectRoot))
+                Directory.Delete(projectRoot, recursive: true);
         }
     }
 
@@ -333,43 +414,12 @@ public class GltfImporterAtomicImportTests
         return path;
     }
 
-    private static string CreateOversizedSkinnedGlb()
+    private static string CreateAnimatedSkinnedGlb(string? imagePath = null)
     {
         var material = new MaterialBuilder("material")
             .WithMetallicRoughness();
-        var geometry = new MeshBuilder<
-            VertexPositionNormalTangent,
-            VertexTexture1,
-            VertexJoints4>("mesh");
-        var primitive = geometry.UsePrimitive(material);
-        for (var triangleIndex = 0; triangleIndex < 21_846; triangleIndex++)
-        {
-            var x = triangleIndex * 2;
-            primitive.AddTriangle(
-                CreateVertex(x, 0),
-                CreateVertex(x + 1, 0),
-                CreateVertex(x, 1));
-        }
-
-        var modelRoot = ModelRoot.CreateModel();
-        var mesh = modelRoot.CreateMesh(geometry);
-        var scene = modelRoot.UseScene("default");
-        scene.CreateNode("//skeleton//test_skeleton");
-        var root = scene.CreateNode("root");
-        scene.CreateNode("mesh_node").WithSkinnedMesh(
-            mesh,
-            (root, Matrix4x4.Identity));
-
-        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
-        modelRoot.SaveGLB(path);
-        return path;
-    }
-
-    private static string CreateAnimatedSkinnedGlb(string imagePath)
-    {
-        var material = new MaterialBuilder("material")
-            .WithMetallicRoughness()
-            .WithChannelImage(KnownChannel.BaseColor, imagePath);
+        if (imagePath != null)
+            material.WithChannelImage(KnownChannel.BaseColor, imagePath);
         var geometry = new MeshBuilder<
             VertexPositionNormalTangent,
             VertexTexture1,

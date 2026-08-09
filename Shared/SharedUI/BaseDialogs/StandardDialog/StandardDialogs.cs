@@ -109,10 +109,26 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
 
         public void ShowDialogBox(string message, string title)
         {
+            ShowDialogBox(message, title, UiMessageBoxIcon.None);
+        }
+
+        public void ShowDialogBox(
+            string message,
+            string title,
+            UiMessageBoxIcon image)
+        {
             var dialog = new MessageDialogWindow(
                 title,
                 message,
-                MessageDialogButtonSet.Ok);
+                MessageDialogButtonSet.Ok,
+                image switch
+                {
+                    UiMessageBoxIcon.Error => MessageBoxImage.Error,
+                    UiMessageBoxIcon.Warning => MessageBoxImage.Warning,
+                    UiMessageBoxIcon.Question => MessageBoxImage.Question,
+                    UiMessageBoxIcon.Information => MessageBoxImage.Information,
+                    _ => MessageBoxImage.None,
+                });
             ShowOwnedDialog(dialog);
         }
 

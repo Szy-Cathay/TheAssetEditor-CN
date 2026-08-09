@@ -21,6 +21,10 @@ namespace Shared.Core.Services
             string initialTitle = "",
             string initialDescription = "");
         void ShowDialogBox(string message, string title = "Error");
+        void ShowDialogBox(
+            string message,
+            string title,
+            UiMessageBoxIcon image);
         ShowMessageBoxResult ShowYesNoBox(string message, string title);
     }
 

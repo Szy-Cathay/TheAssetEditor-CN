@@ -10,6 +10,13 @@ public readonly record struct FolderProjectReconciliation(
     int Removed,
     int Updated);
 
+public sealed class FolderProjectFileConflictException(
+    IReadOnlyList<string> paths) :
+    IOException($"The destinations already exist: {string.Join(", ", paths)}")
+{
+    public IReadOnlyList<string> Paths { get; } = paths.ToArray();
+}
+
 public sealed class FolderProjectReconciledEventArgs(
     FolderProjectReconciliation changes,
     IReadOnlyList<PackFile> addedFiles,
@@ -443,7 +450,10 @@ public sealed class FolderProjectContainer :
         return ExecuteSerializedMutation(
             () =>
             {
-                var writes = new List<Shared.Core.PackFiles.PackFileWrite>();
+                var validatedFiles = new List<(
+                    Shared.Core.PackFiles.NewPackFileEntry Entry,
+                    string RelativePath,
+                    string FullPath)>();
                 foreach (var entry in newFiles)
                 {
                     if (string.IsNullOrWhiteSpace(entry.PackFile.Name))
@@ -461,15 +471,23 @@ public sealed class FolderProjectContainer :
                         FolderProjectPathPolicy.ResolveFilePath(
                             ProjectRoot,
                             relativePath);
-                    if (File.Exists(fullPath) && !overwriteExisting)
-                    {
-                        throw new IOException(
-                            $"The destination already exists: {fullPath}");
-                    }
-                    writes.Add(new Shared.Core.PackFiles.PackFileWrite(
-                        relativePath,
-                        entry.PackFile.DataSource.ReadData()));
+                    validatedFiles.Add((entry, relativePath, fullPath));
                 }
+
+                var conflicts = overwriteExisting
+                    ? []
+                    : validatedFiles
+                        .Where(item => File.Exists(item.FullPath))
+                        .Select(item => item.RelativePath)
+                        .ToList();
+                if (conflicts.Count != 0)
+                    throw new FolderProjectFileConflictException(conflicts);
+
+                var writes = validatedFiles
+                    .Select(item => new Shared.Core.PackFiles.PackFileWrite(
+                        item.RelativePath,
+                        item.Entry.PackFile.DataSource.ReadData()))
+                    .ToList();
 
                 return ApplyFileWritesCore(writes);
             });

@@ -66,7 +66,8 @@ public partial class ImportWindow : AssetEditorWindow
         {
             _standardDialogs.ShowDialogBox(
                 resultMessage,
-                LocalizationManager.Instance.Get("ImportWindow.SuccessTitle"));
+                LocalizationManager.Instance.Get("ImportWindow.SuccessTitle"),
+                UiMessageBoxIcon.Information);
             Close();
             return;
         }
@@ -81,7 +82,8 @@ public partial class ImportWindow : AssetEditorWindow
 
         _standardDialogs.ShowDialogBox(
             resultMessage,
-            LocalizationManager.Instance.Get("ImportWindow.FailureTitle"));
+            LocalizationManager.Instance.Get("ImportWindow.FailureTitle"),
+            UiMessageBoxIcon.Error);
     }
 
     internal static string BuildResultMessage(ImportResult result)
