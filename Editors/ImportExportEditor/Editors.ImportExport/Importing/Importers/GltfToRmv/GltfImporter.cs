@@ -68,7 +68,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             return new NewPackFileEntry(settings.DestinationPackPath, packFileImported);
         }
 
-        private IReadOnlyList<NewPackFileEntry> ImportMaterials(
+        private RmvMaterialBuildResult ImportMaterials(
             GltfImporterSettings settings,
             ModelRoot modelRoot,
             RmvFile rmv2File) =>
@@ -142,11 +142,14 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         private ImportResult ImportCore(GltfImporterSettings settings)
         {
             var modelRoot = CreateModelRoot(settings);
+            if (settings.ImportMeshes || settings.ImportMaterials)
+                RmvMaterialBuilder.ValidateMaterialModes(modelRoot);
 
             var skeletonData = GetSkeletonData(settings, modelRoot);
             var humanoidScale = GetHumanoidScale(settings, skeletonData);
             var scaleFactor = humanoidScale.ScaleFactor;
             var pendingFiles = new List<NewPackFileEntry>();
+            MaterialImportSummary? materialSummary = null;
 
             if (settings.ImportAnimations && modelRoot.LogicalAnimations.Count > 0 && skeletonData.skeletonAnimFile == null)
                 throw new InvalidDataException("导入 glTF 动画需要有效的游戏骨架标识和已加载的 CA Pack 文件。");
@@ -167,7 +170,11 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     throw new InvalidDataException("glTF 场景中没有可导入的网格。");
 
                 if (settings.ImportMaterials)
-                    pendingFiles.AddRange(ImportMaterials(settings, modelRoot, rmv2File));
+                {
+                    var materialBuildResult = ImportMaterials(settings, modelRoot, rmv2File);
+                    pendingFiles.AddRange(materialBuildResult.Files);
+                    materialSummary = materialBuildResult.Summary;
+                }
             }
 
             if (settings.ImportAnimations)
@@ -224,7 +231,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             return ImportResult.Success(
                 validation.Paths,
                 BuildMeshWarnings(meshSummary),
-                humanoidScale);
+                humanoidScale,
+                materialSummary);
         }
 
         private HumanoidScaleImportSummary GetHumanoidScale(

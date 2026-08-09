@@ -161,7 +161,13 @@ public class GltfToRmvImporterViewModelTests
                 4,
                 2,
                 0.5f,
-                "已按原版 humanoid01 绑定姿势应用统一倍率。")));
+                "已按原版 humanoid01 绑定姿势应用统一倍率。"),
+            MaterialSummary: new MaterialImportSummary(
+                [new MaskedMaterialImportSummary("hair_mask", 0.7f)],
+                [
+                    new SkippedMaterialSemantic("decorated", "Emissive"),
+                    new SkippedMaterialSemantic("decorated", "Occlusion"),
+                ])));
         var failureMessage = ImportWindow.BuildResultMessage(
             ImportResult.Failure([
                 "目标 Pack 已存在资源：models\\test.rigid_model_v2",
@@ -186,6 +192,11 @@ public class GltfToRmvImporterViewModelTests
             Assert.That(successMessage, Does.Contain("源人物高度：4"));
             Assert.That(successMessage, Does.Contain("humanoid01 参考高度：2"));
             Assert.That(successMessage, Does.Contain("最终倍率：0.5"));
+            Assert.That(successMessage, Does.Contain("hair_mask"));
+            Assert.That(successMessage, Does.Contain("裁切阈值：0.7"));
+            Assert.That(successMessage, Does.Contain("自发光（Emissive）"));
+            Assert.That(successMessage, Does.Contain("环境遮蔽（Occlusion）"));
+            Assert.That(successMessage, Does.Contain("不会根据文件名或 Blender 节点猜测"));
             Assert.That(disabledMessage, Does.Contain("源人物高度：未测量"));
             Assert.That(disabledMessage, Does.Contain("humanoid01 参考高度：未测量"));
             Assert.That(disabledMessage, Does.Contain("最终倍率：1"));

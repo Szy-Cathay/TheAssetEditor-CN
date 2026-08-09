@@ -111,6 +111,27 @@ public partial class ImportWindow : AssetEditorWindow
                 result.Warnings));
         }
 
+        if (result.MaterialSummary != null)
+        {
+            var materialItems = result.MaterialSummary.MaskedMaterials
+                .Select(item => LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.MaterialSummary.Mask",
+                    item.MaterialName,
+                    item.AlphaCutoff))
+                .Concat(result.MaterialSummary.SkippedSemantics.Select(item =>
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.MaterialSummary.Skipped",
+                        item.MaterialName,
+                        GetMaterialSemanticDisplayName(item.Semantic))))
+                .ToList();
+            if (materialItems.Count != 0)
+            {
+                sections.Add(BuildSection(
+                    LocalizationManager.Instance.Get("ImportWindow.MaterialHeading"),
+                    materialItems));
+            }
+        }
+
         if (result.HumanoidScale != null)
         {
             var scaleItems = new List<string>();
@@ -137,6 +158,18 @@ public partial class ImportWindow : AssetEditorWindow
 
         return string.Join(Environment.NewLine + Environment.NewLine, sections);
     }
+
+    private static string GetMaterialSemanticDisplayName(string semantic) =>
+        semantic switch
+        {
+            "Emissive" => LocalizationManager.Instance.Get(
+                "GltfImporter.MaterialSemantic.Emissive"),
+            "Occlusion" => LocalizationManager.Instance.Get(
+                "GltfImporter.MaterialSemantic.Occlusion"),
+            _ => LocalizationManager.Instance.GetFormat(
+                "GltfImporter.MaterialSemantic.Unsupported",
+                semantic),
+        };
 
     private static string BuildSection(
         string heading,
