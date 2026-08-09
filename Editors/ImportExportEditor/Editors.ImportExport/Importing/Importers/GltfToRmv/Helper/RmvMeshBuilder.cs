@@ -40,7 +40,8 @@ public class RmvMeshBuilder
         GltfImporterSettings settings,
         ModelRoot modelRoot,
         AnimationFile? animSkeletonFile,
-        string skeletonName)
+        string skeletonName,
+        float scaleFactor = 1)
     {
         ArgumentNullException.ThrowIfNull(modelRoot);
 
@@ -90,7 +91,10 @@ public class RmvMeshBuilder
         foreach (var source in meshSources)
         {
             var sourceSkeleton = source.Node.Skin != null ? animSkeletonFile : null;
-            var (rmv2Mesh, summary) = GenerateRmvMesh(source, sourceSkeleton);
+            var (rmv2Mesh, summary) = GenerateRmvMesh(
+                source,
+                sourceSkeleton,
+                scaleFactor);
             modelList.Add(CreateRmvModel(rmv2Mesh, source.ModelName, sourceSkeleton));
             segmentSummaries.Add(summary);
         }
@@ -158,7 +162,8 @@ public class RmvMeshBuilder
 
     private static (RmvMesh Mesh, RmvMeshSegmentImportSummary Summary) GenerateRmvMesh(
         MeshSource source,
-        AnimationFile? animSkeletonFile)
+        AnimationFile? animSkeletonFile,
+        float scaleFactor)
     {
         var vertexBufferColumns = source.Primitive.GetVertexColumns();
         if (vertexBufferColumns.Positions == null || !vertexBufferColumns.Positions.Any())
@@ -195,7 +200,8 @@ public class RmvMeshBuilder
                 source.Node.Skin,
                 animSkeletonFile,
                 worldMatrix,
-                normalMatrix);
+                normalMatrix,
+                scaleFactor);
             rmv2Mesh.VertexList[vertexIndex] = converted.Vertex;
             if (converted.DiscardedWeight > 0)
             {
@@ -252,9 +258,10 @@ public class RmvMeshBuilder
         Skin? skin,
         AnimationFile? animSkeletonFile,
         Matrix4x4 worldMatrix,
-        Matrix4x4 normalMatrix)
+        Matrix4x4 normalMatrix,
+        float scaleFactor)
     {
-        var position = Vector3.Transform(vertexBuilder.Geometry.Position, worldMatrix);
+        var position = Vector3.Transform(vertexBuilder.Geometry.Position, worldMatrix) * scaleFactor;
         var normal = Vector3.TransformNormal(vertexBuilder.Geometry.Normal, normalMatrix);
         if (normal.LengthSquared() > 0.000000000001f)
             normal = Vector3.Normalize(normal);

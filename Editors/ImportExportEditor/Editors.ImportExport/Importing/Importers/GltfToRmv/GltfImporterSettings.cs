@@ -17,6 +17,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         float AnimationKeysPerSecond,
         bool MirrorMesh,
         bool AutoDetectAnimationKeysPerSecond = true,
-        string? NewSkeletonName = null
+        string? NewSkeletonName = null,
+        bool AutoScaleHumanoid = true
     );
 }

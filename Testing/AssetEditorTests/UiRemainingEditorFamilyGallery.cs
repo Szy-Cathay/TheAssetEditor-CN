@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -197,6 +198,7 @@ public class UiRemainingEditorFamilyGallery
                     ImportAnimations = true,
                     ConvertFromBlenderMaterialMap = true,
                     ConvertNormalTextureToOrange = true,
+                    AutoScaleHumanoid = true,
                     AutoDetectAnimationKeysPerSecond = true,
                     CanEditAnimationKeysPerSecond = false,
                     AnimationKeysPerSecond = 30,
@@ -698,6 +700,14 @@ public class UiRemainingEditorFamilyGallery
             });
         }
 
+        if (variant == "import-gltf-rmv")
+        {
+            var autoScaleCheckBox = FindVisualDescendants<CheckBox>(window)
+                .Single(checkBox => AutomationProperties.GetName(checkBox) ==
+                    "自动缩放到 humanoid01 人形尺寸");
+            NUnitAssert.That(autoScaleCheckBox.IsChecked, Is.True);
+        }
+
         if (variant == "shared-colour-picker")
         {
             var picker = FindVisualDescendants<ColourPickerButtonView>(window)
@@ -830,6 +840,7 @@ public class UiRemainingEditorFamilyGallery
         public bool ConvertFromBlenderMaterialMap { get; set; } = true;
         public bool ConvertNormalTextureToOrange { get; set; } = true;
         public bool ImportAnimations { get; set; } = true;
+        public bool AutoScaleHumanoid { get; set; } = true;
         public bool AutoDetectAnimationKeysPerSecond { get; set; } = true;
         public bool CanEditAnimationKeysPerSecond =>
             ImportAnimations && !AutoDetectAnimationKeysPerSecond;
@@ -860,6 +871,7 @@ public class UiRemainingEditorFamilyGallery
         public object? AnimationKeysPerSecond { get; set; }
         public object? AvailableAnimations { get; set; }
         public object? AutoDetectAnimationKeysPerSecond { get; set; }
+        public object? AutoScaleHumanoid { get; set; }
         public object? CanEditAnimationKeysPerSecond { get; set; }
         public object? CanAddAnimation { get; set; }
         public object? CanExportAnimations { get; set; }

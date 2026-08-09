@@ -19,6 +19,7 @@ public class GltfToRmvImporterViewModelTests
         Assert.Multiple(() =>
         {
             Assert.That(viewModel.AutoDetectAnimationKeysPerSecond, Is.True);
+            Assert.That(viewModel.AutoScaleHumanoid, Is.True);
             Assert.That(viewModel.CanEditAnimationKeysPerSecond, Is.False);
         });
 
@@ -154,7 +155,13 @@ public class GltfToRmvImporterViewModelTests
             true,
             [@"models\test.rigid_model_v2"],
             ["测试警告"],
-            []));
+            [],
+            HumanoidScale: new HumanoidScaleImportSummary(
+                true,
+                4,
+                2,
+                0.5f,
+                "已按原版 humanoid01 绑定姿势应用统一倍率。")));
         var failureMessage = ImportWindow.BuildResultMessage(
             ImportResult.Failure([
                 "目标 Pack 已存在资源：models\\test.rigid_model_v2",
@@ -165,6 +172,9 @@ public class GltfToRmvImporterViewModelTests
         {
             Assert.That(successMessage, Does.Contain(@"models\test.rigid_model_v2"));
             Assert.That(successMessage, Does.Contain("测试警告"));
+            Assert.That(successMessage, Does.Contain("源人物高度：4"));
+            Assert.That(successMessage, Does.Contain("humanoid01 参考高度：2"));
+            Assert.That(successMessage, Does.Contain("最终倍率：0.5"));
             Assert.That(failureMessage, Does.Contain(@"models\test.rigid_model_v2"));
             Assert.That(failureMessage, Does.Contain(@"models\test.anim"));
         });

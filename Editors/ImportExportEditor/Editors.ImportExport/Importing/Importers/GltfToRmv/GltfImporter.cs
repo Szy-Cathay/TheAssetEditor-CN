@@ -22,6 +22,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
     public class GltfImporter
     {
         private const string Value = "//skeleton//";
+        private const string HumanoidSkeletonPath = @"animations\skeletons\humanoid01.anim";
         private readonly IPackFileService _packFileService;
         private readonly ILogger _logger = Logging.Create<GltfImporter>();
         private readonly ISkeletonAnimationLookUpHelper _skeletonLookUpHelper;
@@ -46,12 +47,14 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             GltfImporterSettings settings,
             ModelRoot modelRoot,
             AnimationFile? skeletonAnimFile,
-            string skeletonName) =>
+            string skeletonName,
+            float scaleFactor) =>
             RmvMeshBuilder.BuildWithSummary(
                 settings,
                 modelRoot,
                 skeletonAnimFile,
-                skeletonName);
+                skeletonName,
+                scaleFactor);
 
         private static NewPackFileEntry CreateRmvEntry(
             GltfImporterSettings settings,
@@ -74,7 +77,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             GltfImporterSettings settings,
             ModelRoot modelRoot,
             AnimationFile? skeletonAnimFile,
-            string skeletonName)
+            string skeletonName,
+            float scaleFactor)
         {
             if (modelRoot.LogicalAnimations.Count == 0)
                 return [];
@@ -96,6 +100,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                         settings.AutoDetectAnimationKeysPerSecond),
                     skeletonAnimFile,
                     animation);
+                HumanoidScaleCalculator.ScaleTranslations(animFile, scaleFactor);
 
                 var candidateFileName =
                     $"{baseFileName}_{GetSafeAnimationName(animation, animationIndex)}.anim";
@@ -138,19 +143,12 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             var modelRoot = CreateModelRoot(settings);
 
             var skeletonData = GetSkeletonData(settings, modelRoot);
+            var humanoidScale = GetHumanoidScale(settings, skeletonData);
+            var scaleFactor = humanoidScale.ScaleFactor;
             var pendingFiles = new List<NewPackFileEntry>();
 
             if (settings.ImportAnimations && modelRoot.LogicalAnimations.Count > 0 && skeletonData.skeletonAnimFile == null)
                 throw new InvalidDataException("导入 glTF 动画需要有效的游戏骨架标识和已加载的 CA Pack 文件。");
-
-            if (skeletonData.wasCreated &&
-                skeletonData.skeletonAnimFile != null &&
-                (settings.ImportMeshes || settings.ImportAnimations))
-            {
-                pendingFiles.Add(CreateSkeletonEntry(
-                    skeletonData.skeletonName!,
-                    skeletonData.skeletonAnimFile));
-            }
 
             RmvFile? rmv2File = null;
             var meshSummary = new RmvMeshImportSummary([]);
@@ -160,7 +158,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     settings,
                     modelRoot,
                     skeletonData.skeletonAnimFile,
-                    skeletonData.skeletonName ?? "");
+                    skeletonData.skeletonName ?? "",
+                    scaleFactor);
                 rmv2File = meshBuildResult.File;
                 meshSummary = meshBuildResult.Summary;
                 if (rmv2File == null)
@@ -176,7 +175,20 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     settings,
                     modelRoot,
                     skeletonData.skeletonAnimFile,
-                    skeletonData.skeletonName ?? ""));
+                    skeletonData.skeletonName ?? "",
+                    scaleFactor));
+            }
+
+            if (skeletonData.wasCreated &&
+                skeletonData.skeletonAnimFile != null &&
+                (settings.ImportMeshes || settings.ImportAnimations))
+            {
+                HumanoidScaleCalculator.ScaleTranslations(
+                    skeletonData.skeletonAnimFile,
+                    scaleFactor);
+                pendingFiles.Add(CreateSkeletonEntry(
+                    skeletonData.skeletonName!,
+                    skeletonData.skeletonAnimFile));
             }
 
             if (settings.ImportMeshes && rmv2File != null)
@@ -210,7 +222,56 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
 
             return ImportResult.Success(
                 validation.Paths,
-                BuildMeshWarnings(meshSummary));
+                BuildMeshWarnings(meshSummary),
+                humanoidScale);
+        }
+
+        private HumanoidScaleImportSummary GetHumanoidScale(
+            GltfImporterSettings settings,
+            (string? skeletonName, AnimationFile? skeletonAnimFile, bool wasCreated, bool isExternal) skeletonData)
+        {
+            if (!settings.AutoScaleHumanoid)
+            {
+                return new HumanoidScaleImportSummary(
+                    false,
+                    null,
+                    null,
+                    1,
+                    LocalizationManager.Instance.Get("GltfImporter.ScaleReason.Disabled"));
+            }
+            if (!skeletonData.isExternal || skeletonData.skeletonAnimFile == null)
+            {
+                return new HumanoidScaleImportSummary(
+                    false,
+                    null,
+                    null,
+                    1,
+                    LocalizationManager.Instance.Get("GltfImporter.ScaleReason.NoExternalSkeleton"));
+            }
+
+            return HumanoidScaleCalculator.Calculate(
+                skeletonData.skeletonAnimFile,
+                GetCaHumanoidSkeleton);
+        }
+
+        private AnimationFile GetCaHumanoidSkeleton()
+        {
+            foreach (var container in _packFileService
+                         .GetAllPackfileContainers()
+                         .Where(container => container.IsCaPackFile)
+                         .Reverse())
+            {
+                var entry = container.FileList.FirstOrDefault(item =>
+                    string.Equals(
+                        item.Key.Replace('/', '\\'),
+                        HumanoidSkeletonPath,
+                        StringComparison.OrdinalIgnoreCase));
+                if (entry.Value != null)
+                    return AnimationFile.Create(entry.Value);
+            }
+
+            throw new InvalidDataException(LocalizationManager.Instance.Get(
+                "GltfImporter.Error.MissingCaHumanoidSkeleton"));
         }
 
         private static IReadOnlyList<string> BuildMeshWarnings(
@@ -287,7 +348,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             }
         }
 
-        private (string? skeletonName, AnimationFile? skeletonAnimFile, bool wasCreated) GetSkeletonData(
+        private (string? skeletonName, AnimationFile? skeletonAnimFile, bool wasCreated, bool isExternal) GetSkeletonData(
             GltfImporterSettings settings,
             ModelRoot? modelRoot)
         {
@@ -306,16 +367,16 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                         settings.NewSkeletonName,
                         mirrorMesh: true);
                     skeletonName = importedSkeleton.Header.SkeletonName;
-                    return (skeletonName, importedSkeleton, true);
+                    return (skeletonName, importedSkeleton, true, true);
                 }
 
                 _logger.Information("Skeleton ID not found in scene; importing as a static model.");
-                return ("", null, false);
+                return ("", null, false, false);
             }
 
             var skeletonAnimFile = _skeletonLookUpHelper.GetSkeletonFileFromName(skeletonName);
             if (skeletonAnimFile != null)
-                return (skeletonName, skeletonAnimFile, false);
+                return (skeletonName, skeletonAnimFile, false, false);
 
             if (modelRoot.LogicalSkins.Count > 0)
             {
@@ -323,7 +384,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     modelRoot,
                     skeletonName,
                     mirrorMesh: true);
-                return (skeletonName, importedSkeleton, true);
+                return (skeletonName, importedSkeleton, true, false);
             }
 
             throw new InvalidDataException(

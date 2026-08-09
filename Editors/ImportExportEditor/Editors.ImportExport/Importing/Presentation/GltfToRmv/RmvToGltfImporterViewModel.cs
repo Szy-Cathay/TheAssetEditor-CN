@@ -29,6 +29,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         [ObservableProperty] bool _convertFromBlenderMaterialMap = true;
         [ObservableProperty] bool _convertNormalTextureToOrange = true;
         [ObservableProperty] bool _importAnimations = true;
+        [ObservableProperty] bool _autoScaleHumanoid = true;
         [ObservableProperty] bool _autoDetectAnimationKeysPerSecond = true;
         [ObservableProperty] float _animationKeysPerSecond = 20.0f;
         [ObservableProperty] string _newSkeletonName = "";
@@ -64,7 +65,8 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 AnimationKeysPerSecond: this.AnimationKeysPerSecond,
                 MirrorMesh: true,
                 AutoDetectAnimationKeysPerSecond: this.AutoDetectAnimationKeysPerSecond,
-                NewSkeletonName: this.NewSkeletonName);
+                NewSkeletonName: this.NewSkeletonName,
+                AutoScaleHumanoid: this.AutoScaleHumanoid);
 
             return _Importer.Import(settings);
         }
