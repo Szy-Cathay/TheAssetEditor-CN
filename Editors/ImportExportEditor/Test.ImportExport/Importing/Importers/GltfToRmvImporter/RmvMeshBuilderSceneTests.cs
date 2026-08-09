@@ -9,6 +9,7 @@ using Shared.TestUtility;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
@@ -19,6 +20,9 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest;
 
 public class RmvMeshBuilderSceneTests
 {
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
+
     [Test]
     public void Build_UsesEveryPrimitiveAndSceneNodeInstance()
     {
@@ -497,6 +501,38 @@ public class RmvMeshBuilderSceneTests
     }
 
     [Test]
+    public void Import_EquivalentSkinStructuresWithDifferentBindPoses_ReturnsFailureAndLeavesPackUnchanged()
+    {
+        var modelRoot = CreateMultipleSkinnedModelRoot(
+            equivalentHierarchy: true,
+            secondChildTranslationY: 2);
+        var glbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(glbPath, destination));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("绑定姿势不一致"));
+                Assert.That(destination.FileList, Is.Empty);
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
     public void Import_ExistingGameSkeleton_DoesNotCopySkeletonAnim()
     {
         var modelRoot = CreateSkinnedModelRoot("test_skeleton");
@@ -598,7 +634,8 @@ public class RmvMeshBuilderSceneTests
 
     private static ModelRoot CreateMultipleSkinnedModelRoot(
         bool equivalentHierarchy,
-        string secondChildName = "child")
+        string secondChildName = "child",
+        float secondChildTranslationY = 0)
     {
         var geometry = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>("mesh");
         AddTriangle(geometry.UsePrimitive(CreateMaterial("material")), 0);
@@ -619,10 +656,17 @@ public class RmvMeshBuilderSceneTests
         var secondChild = equivalentHierarchy
             ? secondRoot.CreateNode(secondChildName)
             : secondArmature.CreateNode(secondChildName);
+        secondChild.LocalMatrix = Matrix4x4.CreateTranslation(
+            0,
+            secondChildTranslationY,
+            0);
         scene.CreateNode("second_mesh").WithSkinnedMesh(
             mesh,
             (secondRoot, Matrix4x4.Identity),
-            (secondChild, Matrix4x4.Identity));
+            (secondChild, Matrix4x4.CreateTranslation(
+                0,
+                -secondChildTranslationY,
+                0)));
         modelRoot.LogicalSkins.Last().Name = "ExternalArmatureCopy";
 
         return modelRoot;

@@ -1,11 +1,15 @@
 using System.Numerics;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
+using Shared.Core.Services;
 using SharpGLTF.Schema2;
 
 namespace Test.ImportExport.Importing.Importers.GltfImporterTest;
 
 public class GltfSkeletonImporterTests
 {
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
+
     [Test]
     public void Build_PreservesJointOrderHierarchyAndBindPose()
     {
@@ -167,6 +171,26 @@ public class GltfSkeletonImporterTests
         var skin = modelRoot.CreateSkin();
         skin.Skeleton = armature;
         skin.BindJoints(Matrix4x4.Identity, root);
+
+        var result = GltfSkeletonImporter.BuildExternal(
+            modelRoot,
+            "hero_source.glb",
+            skeletonName: null,
+            mirrorMesh: true);
+
+        Assert.That(result.Header.SkeletonName, Is.EqualTo("ExternalArmature"));
+    }
+
+    [Test]
+    public void BuildExternal_WithoutSkinSkeletonProperty_UsesNamedJointAncestor()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var armature = scene.CreateNode("ExternalArmature");
+        var root = armature.CreateNode("root");
+        var skin = modelRoot.CreateSkin();
+        skin.BindJoints(Matrix4x4.Identity, root);
+        skin.Skeleton = null;
 
         var result = GltfSkeletonImporter.BuildExternal(
             modelRoot,

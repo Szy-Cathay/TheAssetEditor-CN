@@ -1,5 +1,6 @@
 using System.IO;
 using System.Numerics;
+using Shared.Core.Services;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
 using SharpGLTF.Schema2;
@@ -15,13 +16,19 @@ public static class GltfSkeletonImporter
     {
         ArgumentNullException.ThrowIfNull(modelRoot);
         if (string.IsNullOrWhiteSpace(skeletonName))
-            throw new InvalidDataException("glTF 缺少骨架名称，无法创建游戏骨架。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.MissingSkeletonName"));
+        }
 
         var skin = modelRoot.LogicalSkins
             .OrderByDescending(candidate => candidate.JointsCount)
             .FirstOrDefault();
         if (skin == null || skin.JointsCount == 0)
-            throw new InvalidDataException("glTF 不包含可导入的蒙皮骨架。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.NoSkin"));
+        }
 
         return Build(skin, skeletonName, mirrorMesh, bakeAncestorTransform: false);
     }
@@ -35,7 +42,10 @@ public static class GltfSkeletonImporter
         ArgumentNullException.ThrowIfNull(modelRoot);
         var skins = modelRoot.LogicalSkins.ToList();
         if (skins.Count == 0)
-            throw new InvalidDataException("glTF 不包含可导入的蒙皮骨架。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.NoSkin"));
+        }
 
         var logicalSkeletons = skins
             .GroupBy(CreateSkeletonSignature, StringComparer.Ordinal)
@@ -43,13 +53,19 @@ public static class GltfSkeletonImporter
         if (logicalSkeletons.Count != 1)
         {
             throw new InvalidDataException(
-                "glTF 包含多套逻辑骨架；不同关节集合或父子层级不能自动合并。");
+                LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.MultipleLogicalSkeletons"));
         }
 
-        foreach (var equivalentSkin in logicalSkeletons[0].Skip(1))
-            ValidateExternalSkin(equivalentSkin);
+        var equivalentSkins = logicalSkeletons[0].ToList();
+        var skin = equivalentSkins[0];
+        var referenceBindPose = ValidateExternalSkin(skin);
+        foreach (var equivalentSkin in equivalentSkins.Skip(1))
+        {
+            var equivalentBindPose = ValidateExternalSkin(equivalentSkin);
+            ValidateEquivalentBindPose(referenceBindPose, equivalentBindPose);
+        }
 
-        var skin = logicalSkeletons[0].First();
         var resolvedName = string.IsNullOrWhiteSpace(skeletonName)
             ? GetDefaultSkeletonName(skin, inputFile)
             : skeletonName.Trim();
@@ -58,22 +74,20 @@ public static class GltfSkeletonImporter
             resolvedName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
             throw new InvalidDataException(
-                "新骨架名称不能包含路径或无效的文件名字符。");
+                LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.InvalidSkeletonName"));
         }
 
         return Build(skin, resolvedName, mirrorMesh, bakeAncestorTransform: true);
     }
 
-    private static void ValidateExternalSkin(Skin skin)
+    private static Dictionary<Node, Matrix4x4> ValidateExternalSkin(Skin skin)
     {
-        var joints = Enumerable.Range(0, skin.JointsCount)
-            .Select(index => skin.GetJoint(index).Joint)
-            .ToList();
-        var jointSet = joints.ToHashSet();
-        foreach (var joint in joints)
-            ValidateBoneLocalTransform(joint, FindJointParent(joint, jointSet));
+        var context = GetValidatedJointContext(skin);
+        foreach (var joint in context.Joints)
+            ValidateBoneLocalTransform(joint, FindJointParent(joint, context.JointSet));
 
-        GetBindWorldMatrices(skin);
+        return GetBindWorldMatrices(skin);
     }
 
     private static AnimationFile Build(
@@ -83,23 +97,13 @@ public static class GltfSkeletonImporter
         bool bakeAncestorTransform)
     {
         if (string.IsNullOrWhiteSpace(skeletonName))
-            throw new InvalidDataException("glTF 缺少骨架名称，无法创建游戏骨架。");
-        if (skin.JointsCount > 256)
-            throw new InvalidDataException("glTF 骨架超过 RMV2 可表示的 256 根骨骼限制。");
-
-        var sourceJoints = Enumerable.Range(0, skin.JointsCount)
-            .Select(index => skin.GetJoint(index).Joint)
-            .ToList();
-        if (sourceJoints.Any(joint => string.IsNullOrWhiteSpace(joint.Name)))
-            throw new InvalidDataException("glTF 骨架包含未命名骨骼，无法安全导入。");
-        if (sourceJoints.Select(joint => joint.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
-            sourceJoints.Count)
         {
-            throw new InvalidDataException("glTF 骨架包含重名骨骼，无法安全映射到 RMV2。");
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.MissingSkeletonName"));
         }
 
-        var jointSet = sourceJoints.ToHashSet();
-        var orderedJoints = OrderParentsBeforeChildren(sourceJoints, jointSet);
+        var context = GetValidatedJointContext(skin);
+        var orderedJoints = context.OrderedJoints;
         var boneIndexes = orderedJoints
             .Select((joint, index) => (joint, index))
             .ToDictionary(item => item.joint, item => item.index);
@@ -114,7 +118,7 @@ public static class GltfSkeletonImporter
         for (var boneIndex = 0; boneIndex < orderedJoints.Count; boneIndex++)
         {
             var joint = orderedJoints[boneIndex];
-            var parent = FindJointParent(joint, jointSet);
+            var parent = FindJointParent(joint, context.JointSet);
             Matrix4x4 localMatrix;
             if (bakeAncestorTransform)
             {
@@ -127,7 +131,9 @@ public static class GltfSkeletonImporter
                             out var inverseParent))
                     {
                         throw new InvalidDataException(
-                            $"glTF 骨骼“{parent.Name}”的绑定变换不可逆。");
+                            LocalizationManager.Instance.GetFormat(
+                                "GltfImporter.Error.ParentBindNotInvertible",
+                                parent.Name));
                     }
 
                     localMatrix *= inverseParent;
@@ -139,16 +145,31 @@ public static class GltfSkeletonImporter
                 if (parent != null)
                 {
                     if (!Matrix4x4.Invert(parent.WorldMatrix, out var inverseParent))
-                        throw new InvalidDataException($"glTF 骨骼“{parent.Name}”的绑定变换不可逆。");
+                    {
+                        throw new InvalidDataException(
+                            LocalizationManager.Instance.GetFormat(
+                                "GltfImporter.Error.ParentBindNotInvertible",
+                                parent.Name));
+                    }
 
                     localMatrix *= inverseParent;
                 }
             }
 
             if (!Matrix4x4.Decompose(localMatrix, out var scale, out var rotation, out var translation))
-                throw new InvalidDataException($"glTF 骨骼“{joint.Name}”的绑定变换无法分解。");
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.BindNotDecomposable",
+                        joint.Name));
+            }
             if (!IsUnitScale(scale))
-                throw new InvalidDataException($"glTF 骨骼“{joint.Name}”包含缩放；ANIM 骨架无法安全保存骨骼缩放。");
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.BoneScale",
+                        joint.Name));
+            }
 
             rotation = Quaternion.Normalize(rotation);
             bones[boneIndex] = new AnimationFile.BoneInfo
@@ -202,17 +223,23 @@ public static class GltfSkeletonImporter
             if (!Matrix4x4.Invert(joint.InverseBindMatrix, out var bindWorldMatrix))
             {
                 throw new InvalidDataException(
-                    $"glTF 骨骼“{joint.Joint.Name}”的逆绑定矩阵不可逆。");
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.InverseBindNotInvertible",
+                        joint.Joint.Name));
             }
             if (HasShear(bindWorldMatrix))
             {
                 throw new InvalidDataException(
-                    $"glTF 骨骼“{joint.Joint.Name}”的绑定变换包含剪切，ANIM 骨架无法安全保存。");
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.BindShear",
+                        joint.Joint.Name));
             }
             if (!Matrix4x4.Decompose(bindWorldMatrix, out _, out _, out _))
             {
                 throw new InvalidDataException(
-                    $"glTF 骨骼“{joint.Joint.Name}”的绑定变换无法分解。");
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.BindNotDecomposable",
+                        joint.Joint.Name));
             }
 
             result[joint.Joint] = bindWorldMatrix;
@@ -224,7 +251,12 @@ public static class GltfSkeletonImporter
     private static Matrix4x4 RemoveScale(Node joint, Matrix4x4 matrix)
     {
         if (!Matrix4x4.Decompose(matrix, out _, out var rotation, out var translation))
-            throw new InvalidDataException($"glTF 骨骼“{joint.Name}”的绑定变换无法分解。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Error.BindNotDecomposable",
+                    joint.Name));
+        }
 
         return Matrix4x4.CreateFromQuaternion(Quaternion.Normalize(rotation)) *
                Matrix4x4.CreateTranslation(translation);
@@ -239,7 +271,9 @@ public static class GltfSkeletonImporter
             if (!Matrix4x4.Invert(visualParent.WorldMatrix, out var inverseParent))
             {
                 throw new InvalidDataException(
-                    $"glTF 骨骼“{joint.Name}”的父级变换不可逆。");
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.ParentTransformNotInvertible",
+                        joint.Name));
             }
 
             localMatrix *= inverseParent;
@@ -248,16 +282,30 @@ public static class GltfSkeletonImporter
         if (HasShear(localMatrix))
         {
             throw new InvalidDataException(
-                $"glTF 骨骼“{joint.Name}”包含剪切；ANIM 骨架无法安全保存。");
+                LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Error.LocalShear",
+                    joint.Name));
         }
         if (!Matrix4x4.Invert(localMatrix, out _))
-            throw new InvalidDataException($"glTF 骨骼“{joint.Name}”的局部绑定变换不可逆。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Error.LocalBindNotInvertible",
+                    joint.Name));
+        }
         if (!Matrix4x4.Decompose(localMatrix, out var scale, out _, out _))
-            throw new InvalidDataException($"glTF 骨骼“{joint.Name}”的局部绑定变换无法分解。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Error.LocalBindNotDecomposable",
+                    joint.Name));
+        }
         if (!IsUnitScale(scale))
         {
             throw new InvalidDataException(
-                $"glTF 骨骼“{joint.Name}”包含缩放；ANIM 骨架无法安全保存骨骼缩放。");
+                LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Error.BoneScale",
+                    joint.Name));
         }
     }
 
@@ -277,30 +325,92 @@ public static class GltfSkeletonImporter
                Math.Abs(Vector3.Dot(y, z)) > 0.0001f;
     }
 
-    private static string CreateSkeletonSignature(Skin skin)
+    private static void ValidateEquivalentBindPose(
+        IReadOnlyDictionary<Node, Matrix4x4> reference,
+        IReadOnlyDictionary<Node, Matrix4x4> candidate)
+    {
+        var referenceByName = reference.ToDictionary(
+            item => item.Key.Name,
+            item => item.Value,
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var item in candidate)
+        {
+            if (!referenceByName.TryGetValue(item.Key.Name, out var referenceMatrix) ||
+                !AreNearlyEqual(referenceMatrix, item.Value))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.Error.BindPoseMismatch",
+                        item.Key.Name));
+            }
+        }
+    }
+
+    private static bool AreNearlyEqual(Matrix4x4 first, Matrix4x4 second)
+    {
+        var difference = first - second;
+        return Math.Abs(difference.M11) <= 0.0001f &&
+               Math.Abs(difference.M12) <= 0.0001f &&
+               Math.Abs(difference.M13) <= 0.0001f &&
+               Math.Abs(difference.M14) <= 0.0001f &&
+               Math.Abs(difference.M21) <= 0.0001f &&
+               Math.Abs(difference.M22) <= 0.0001f &&
+               Math.Abs(difference.M23) <= 0.0001f &&
+               Math.Abs(difference.M24) <= 0.0001f &&
+               Math.Abs(difference.M31) <= 0.0001f &&
+               Math.Abs(difference.M32) <= 0.0001f &&
+               Math.Abs(difference.M33) <= 0.0001f &&
+               Math.Abs(difference.M34) <= 0.0001f &&
+               Math.Abs(difference.M41) <= 0.0001f &&
+               Math.Abs(difference.M42) <= 0.0001f &&
+               Math.Abs(difference.M43) <= 0.0001f &&
+               Math.Abs(difference.M44) <= 0.0001f;
+    }
+
+    private static SkeletonJointContext GetValidatedJointContext(Skin skin)
     {
         if (skin.JointsCount == 0)
-            throw new InvalidDataException("glTF 包含没有关节的蒙皮，无法创建游戏骨架。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.EmptySkin"));
+        }
+        if (skin.JointsCount > 256)
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.TooManyBones"));
+        }
 
         var joints = Enumerable.Range(0, skin.JointsCount)
             .Select(index => skin.GetJoint(index).Joint)
             .ToList();
         if (joints.Any(joint => string.IsNullOrWhiteSpace(joint.Name)))
-            throw new InvalidDataException("glTF 骨架包含未命名骨骼，无法安全导入。");
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.UnnamedBone"));
+        }
         if (joints.Select(joint => joint.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
             joints.Count)
         {
-            throw new InvalidDataException("glTF 骨架包含忽略大小写后重名的骨骼，无法安全导入。");
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get("GltfImporter.Error.DuplicateBoneName"));
         }
 
         var jointSet = joints.ToHashSet();
-        OrderParentsBeforeChildren(joints, jointSet);
+        return new SkeletonJointContext(
+            joints,
+            jointSet,
+            OrderParentsBeforeChildren(joints, jointSet));
+    }
+
+    private static string CreateSkeletonSignature(Skin skin)
+    {
+        var context = GetValidatedJointContext(skin);
         return string.Join(
             "|",
-            joints
+            context.Joints
                 .Select(joint =>
                 {
-                    var parent = FindJointParent(joint, jointSet);
+                    var parent = FindJointParent(joint, context.JointSet);
                     return $"{joint.Name.ToLowerInvariant()}>{parent?.Name.ToLowerInvariant() ?? "<root>"}";
                 })
                 .OrderBy(value => value, StringComparer.Ordinal));
@@ -313,7 +423,49 @@ public static class GltfSkeletonImporter
         if (!string.IsNullOrWhiteSpace(skin.Skeleton?.Name))
             return skin.Skeleton.Name;
 
+        var ancestorName = GetNamedJointAncestor(skin);
+        if (!string.IsNullOrWhiteSpace(ancestorName))
+            return ancestorName;
+
         return Path.GetFileNameWithoutExtension(inputFile);
+    }
+
+    private static string? GetNamedJointAncestor(Skin skin)
+    {
+        var context = GetValidatedJointContext(skin);
+        var rootJoints = context.Joints
+            .Where(joint => FindJointParent(joint, context.JointSet) == null)
+            .ToList();
+        if (rootJoints.Count == 0)
+            return null;
+
+        var candidate = rootJoints[0].VisualParent;
+        while (candidate != null)
+        {
+            if (!string.IsNullOrWhiteSpace(candidate.Name) &&
+                rootJoints.All(root => IsVisualAncestor(candidate, root)))
+            {
+                return candidate.Name;
+            }
+
+            candidate = candidate.VisualParent;
+        }
+
+        return null;
+    }
+
+    private static bool IsVisualAncestor(Node candidate, Node node)
+    {
+        var parent = node.VisualParent;
+        while (parent != null)
+        {
+            if (ReferenceEquals(parent, candidate))
+                return true;
+
+            parent = parent.VisualParent;
+        }
+
+        return false;
     }
 
     private static List<Node> OrderParentsBeforeChildren(
@@ -330,7 +482,11 @@ public static class GltfSkeletonImporter
                 if (state == 2)
                     return;
                 if (state == 1)
-                    throw new InvalidDataException("glTF 骨架包含循环父级关系。");
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.Get(
+                            "GltfImporter.Error.CyclicSkeleton"));
+                }
             }
 
             visitStates[joint] = 1;
@@ -360,6 +516,11 @@ public static class GltfSkeletonImporter
         Math.Abs(scale.X - 1) <= 0.0001f &&
         Math.Abs(scale.Y - 1) <= 0.0001f &&
         Math.Abs(scale.Z - 1) <= 0.0001f;
+
+    private sealed record SkeletonJointContext(
+        IReadOnlyList<Node> Joints,
+        HashSet<Node> JointSet,
+        IReadOnlyList<Node> OrderedJoints);
 
     private static AnimationFile.Frame CloneFrame(AnimationFile.Frame frame) => new()
     {

@@ -37,6 +37,10 @@ internal static class GltfSkeletonNameReader
             {
                 return nodeName.GetString()!;
             }
+
+            var ancestorName = GetNamedJointAncestor(document.RootElement, skin);
+            if (!string.IsNullOrWhiteSpace(ancestorName))
+                return ancestorName;
         }
         catch (Exception)
         {
@@ -44,6 +48,92 @@ internal static class GltfSkeletonNameReader
         }
 
         return fallback;
+    }
+
+    private static string? GetNamedJointAncestor(
+        JsonElement root,
+        JsonElement skin)
+    {
+        if (!root.TryGetProperty("nodes", out var nodes) ||
+            !skin.TryGetProperty("joints", out var joints))
+        {
+            return null;
+        }
+
+        var parentIndexes = Enumerable.Repeat(-1, nodes.GetArrayLength()).ToArray();
+        for (var parentIndex = 0; parentIndex < nodes.GetArrayLength(); parentIndex++)
+        {
+            if (!nodes[parentIndex].TryGetProperty("children", out var children))
+                continue;
+
+            foreach (var child in children.EnumerateArray())
+            {
+                if (child.TryGetInt32(out var childIndex) &&
+                    childIndex >= 0 &&
+                    childIndex < parentIndexes.Length)
+                {
+                    parentIndexes[childIndex] = parentIndex;
+                }
+            }
+        }
+
+        var jointIndexes = joints.EnumerateArray()
+            .Where(joint => joint.TryGetInt32(out _))
+            .Select(joint => joint.GetInt32())
+            .Where(index => index >= 0 && index < parentIndexes.Length)
+            .Distinct()
+            .ToList();
+        var jointSet = jointIndexes.ToHashSet();
+        var rootJoints = jointIndexes
+            .Where(index => FindJointParent(index, parentIndexes, jointSet) < 0)
+            .ToList();
+        if (rootJoints.Count == 0)
+            return null;
+
+        var candidate = parentIndexes[rootJoints[0]];
+        while (candidate >= 0)
+        {
+            if (rootJoints.All(rootJoint =>
+                    IsAncestor(candidate, rootJoint, parentIndexes)) &&
+                nodes[candidate].TryGetProperty("name", out var candidateName) &&
+                !string.IsNullOrWhiteSpace(candidateName.GetString()))
+            {
+                return candidateName.GetString();
+            }
+
+            candidate = parentIndexes[candidate];
+        }
+
+        return null;
+    }
+
+    private static int FindJointParent(
+        int jointIndex,
+        IReadOnlyList<int> parentIndexes,
+        HashSet<int> jointSet)
+    {
+        var parent = parentIndexes[jointIndex];
+        while (parent >= 0 && !jointSet.Contains(parent))
+            parent = parentIndexes[parent];
+
+        return parent;
+    }
+
+    private static bool IsAncestor(
+        int candidate,
+        int nodeIndex,
+        IReadOnlyList<int> parentIndexes)
+    {
+        var parent = parentIndexes[nodeIndex];
+        while (parent >= 0)
+        {
+            if (parent == candidate)
+                return true;
+
+            parent = parentIndexes[parent];
+        }
+
+        return false;
     }
 
     private static JsonDocument LoadJsonDocument(string inputFile)

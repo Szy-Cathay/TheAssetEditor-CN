@@ -59,6 +59,34 @@ public class GltfToRmvImporterViewModelTests
     }
 
     [Test]
+    public void Initialize_StandardGlbWithoutSkinSkeletonProperty_UsesArmatureName()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var armature = scene.CreateNode("ExternalArmature");
+        var root = armature.CreateNode("root");
+        var skin = modelRoot.CreateSkin();
+        skin.BindJoints(System.Numerics.Matrix4x4.Identity, root);
+        skin.Skeleton = null;
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            modelRoot.SaveGLB(inputPath);
+            var viewModel = new RmvToGltfImporterViewModel(null!);
+
+            viewModel.Initialize(new PackFile(
+                inputPath,
+                new FileSystemSource(inputPath)));
+
+            Assert.That(viewModel.NewSkeletonName, Is.EqualTo("ExternalArmature"));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [Test]
     public async Task ImportAsync_ReturnsStructuredImporterResult()
     {
         var expected = ImportResult.Failure(["目标 Pack 已存在资源：models\\test.rigid_model_v2"]);
