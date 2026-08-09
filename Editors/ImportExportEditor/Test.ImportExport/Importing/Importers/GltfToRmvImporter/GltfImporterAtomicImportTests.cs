@@ -427,6 +427,9 @@ public class GltfImporterAtomicImportTests
                 Assert.That(result.OutputPaths, Is.EqualTo(new[]
                 {
                     @"tex\mesh_node_base_colour.dds",
+                    @"tex\mesh_node_normal.dds",
+                    @"tex\mesh_node_material_map.dds",
+                    @"tex\mesh_node_mask.dds",
                 }));
                 Assert.That(destination.FileList.Keys, Is.EquivalentTo(result.OutputPaths));
             });

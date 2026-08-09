@@ -6,4 +6,6 @@
 
 `vertex_limit.gltf` is a compact standard glTF 2.0 scene whose shared primitive is instanced twice and exceeds the RMV2 per-segment vertex limit without embedding a large binary buffer.
 
+The PBR import tests generate small standard OPAQUE GLB and `.gltf` fixtures at runtime from procedural triangles and solid-color images. They cover embedded and relative external images, base color, normal, metallic-roughness, equivalent decoded-image deduplication, and missing-image failure without carrying third-party assets.
+
 All fixtures were created specifically for this repository and are dedicated to the public domain under CC0-1.0: <https://creativecommons.org/publicdomain/zero/1.0/>.

@@ -40,7 +40,7 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             public const int lod0MeshCount = 4;
             public const int Lod0Mesh0IndexCount = 25539;
             public const int Lod0Mesh0VertexCount = 6397;
-            public const int Lod0Mesh0TextureCount = 3;
+            public const int Lod0Mesh0TextureCount = 4;
         }
     }
 

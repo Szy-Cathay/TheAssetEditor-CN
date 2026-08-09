@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Numerics;
 using System.Windows.Data;
+using Editors.ImportExport.Importing;
 using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using GameWorld.Core.Services;
@@ -8,6 +9,7 @@ using Moq;
 using NUnit.Framework;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
@@ -23,6 +25,9 @@ namespace AssetEditorTests;
 [NonParallelizable]
 public class GltfImporterThreadingTests
 {
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
+
     [TestCase(PackWritePath.Model)]
     [TestCase(PackWritePath.Animation)]
     [TestCase(PackWritePath.Texture)]
@@ -32,7 +37,7 @@ public class GltfImporterThreadingTests
         var glbPath = CreateGlb(writePath);
         try
         {
-            var completion = new TaskCompletionSource<(Exception?, int)>(
+            var completion = new TaskCompletionSource<(Exception?, int, ImportResult?)>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
             WpfTestApplicationHost.Invoke(_application =>
@@ -78,9 +83,10 @@ public class GltfImporterThreadingTests
                 async Task RunImportAsync()
                 {
                     Exception? exception = null;
+                    ImportResult? importResult = null;
                     try
                     {
-                        await Task.Run(() => importer.Import(settings));
+                        importResult = await Task.Run(() => importer.Import(settings));
                     }
                     catch (Exception caughtException)
                     {
@@ -88,7 +94,7 @@ public class GltfImporterThreadingTests
                     }
 
                     GC.KeepAlive(collectionView);
-                    completion.TrySetResult((exception, uiCollection.Count));
+                    completion.TrySetResult((exception, uiCollection.Count, importResult));
                 }
             });
 
@@ -98,6 +104,11 @@ public class GltfImporterThreadingTests
             Assert.Multiple(() =>
             {
                 Assert.That(result.Item1, Is.Null);
+                Assert.That(
+                    result.Item3?.Succeeded,
+                    Is.True,
+                    result.Item3?.Exception?.ToString() ??
+                    string.Join(Environment.NewLine, result.Item3?.Errors ?? []));
                 Assert.That(result.Item2, Is.GreaterThan(0));
             });
         }

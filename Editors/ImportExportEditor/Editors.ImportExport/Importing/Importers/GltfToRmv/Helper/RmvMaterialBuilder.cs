@@ -1,20 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
 using Editors.ImportExport.Importing.Importers.PngToDds;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Types;
-using SharpDX.DirectWrite;
 using SharpGLTF.Schema2;
 using TextureType = Shared.GameFormats.RigidModel.Types.TextureType;
-using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
-using Microsoft.VisualBasic;
 
 namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
 {
@@ -54,8 +52,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
         {
             ValidateInput_BuildRmvFileMaterials(modelRoot, rmvFile);
 
-            var textureEntries = new Dictionary<string, NewPackFileEntry>(
-                StringComparer.OrdinalIgnoreCase);
+            var textureEntries = new List<NewPackFileEntry>();
+            var importedTexturePaths = new Dictionary<TextureCacheKey, string>();
             var meshSources = RmvMeshBuilder.GetMeshSources(modelRoot);
             for (int i = 0; i < meshSources.Count; i++)
             {
@@ -63,25 +61,26 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                     settings,
                     meshSources[i],
                     rmvFile.ModelList[0][i],
-                    textureEntries
+                    textureEntries,
+                    importedTexturePaths
                 );
             }
 
             rmvFile.RecalculateOffsets();
-            return textureEntries.Values.ToList();
+            return textureEntries;
         }
 
         private void BuildRmvModelMaterial(
             GltfImporterSettings settings,
             RmvMeshBuilder.MeshSource source,
             RmvModel rmvModel,
-            Dictionary<string, NewPackFileEntry> textureEntries)
+            ICollection<NewPackFileEntry> textureEntries,
+            IDictionary<TextureCacheKey, string> importedTexturePaths)
         {
             var gltfMaterial = source.Primitive.Material;
-            if (gltfMaterial == null || !gltfMaterial.Channels.Any())
-                return;
+            var assignedTextureTypes = new HashSet<TextureType>();
 
-            foreach (var itText in gltfMaterial.Channels)
+            foreach (var itText in gltfMaterial?.Channels ?? [])
             {
                 if (itText.Texture == null) continue;
 
@@ -108,15 +107,150 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                     Path.GetFileName(texturePackFolder),
                     shouldConvert);
 
-                rmvModel.Material.SetTexture(textureType, texturePackFolder);
-
-                if (!textureEntries.ContainsKey(texturePackFolder))
-                {
-                    var newFile = new NewPackFileEntry(Path.GetDirectoryName(texturePackFolder) ?? "", ddsPackFile);
-                    textureEntries.Add(texturePackFolder, newFile);
-                }
-
+                AddTexture(
+                    rmvModel,
+                    textureEntries,
+                    importedTexturePaths,
+                    textureType,
+                    texturePackFolder,
+                    ddsPackFile,
+                    gameType,
+                    shouldConvert);
+                assignedTextureTypes.Add(textureType);
             }
+
+            if (settings.SelectedGame != GameTypeEnum.Warhammer3)
+                return;
+
+            AddNeutralTextureIfMissing(
+                settings,
+                source.ModelName,
+                rmvModel,
+                textureEntries,
+                importedTexturePaths,
+                assignedTextureTypes,
+                TextureType.BaseColour,
+                "base_colour");
+            AddNeutralTextureIfMissing(
+                settings,
+                source.ModelName,
+                rmvModel,
+                textureEntries,
+                importedTexturePaths,
+                assignedTextureTypes,
+                TextureType.Normal,
+                "normal");
+            AddNeutralTextureIfMissing(
+                settings,
+                source.ModelName,
+                rmvModel,
+                textureEntries,
+                importedTexturePaths,
+                assignedTextureTypes,
+                TextureType.MaterialMap,
+                "material_map");
+            AddNeutralTextureIfMissing(
+                settings,
+                source.ModelName,
+                rmvModel,
+                textureEntries,
+                importedTexturePaths,
+                assignedTextureTypes,
+                TextureType.Mask,
+                "mask");
+        }
+
+        private static void AddNeutralTextureIfMissing(
+            GltfImporterSettings settings,
+            string modelName,
+            RmvModel rmvModel,
+            ICollection<NewPackFileEntry> textureEntries,
+            IDictionary<TextureCacheKey, string> importedTexturePaths,
+            ISet<TextureType> assignedTextureTypes,
+            TextureType textureType,
+            string postFix)
+        {
+            if (assignedTextureTypes.Contains(textureType))
+                return;
+
+            var texturePath = GetTexturePackFolder(settings, modelName, postFix);
+            var shouldConvert = textureType is
+                TextureType.MaterialMap or TextureType.Normal;
+            using var imageStream = CreateNeutralTextureStream(textureType);
+            var ddsPackFile = PngToDdsImporter.Import(
+                imageStream,
+                textureType,
+                settings.SelectedGame,
+                Path.GetFileName(texturePath),
+                shouldConvert);
+            AddTexture(
+                rmvModel,
+                textureEntries,
+                importedTexturePaths,
+                textureType,
+                texturePath,
+                ddsPackFile,
+                settings.SelectedGame,
+                shouldConvert);
+        }
+
+        private static void AddTexture(
+            RmvModel rmvModel,
+            ICollection<NewPackFileEntry> textureEntries,
+            IDictionary<TextureCacheKey, string> importedTexturePaths,
+            TextureType textureType,
+            string texturePath,
+            PackFile ddsPackFile,
+            GameTypeEnum gameType,
+            bool shouldConvert)
+        {
+            var hash = Convert.ToHexString(SHA256.HashData(
+                ddsPackFile.DataSource.ReadData()));
+            var cacheKey = new TextureCacheKey(
+                gameType,
+                textureType,
+                shouldConvert,
+                hash);
+            if (importedTexturePaths.TryGetValue(cacheKey, out var importedPath))
+            {
+                rmvModel.Material.SetTexture(textureType, importedPath);
+                return;
+            }
+
+            rmvModel.Material.SetTexture(textureType, texturePath);
+            importedTexturePaths.Add(cacheKey, texturePath);
+            textureEntries.Add(new NewPackFileEntry(
+                Path.GetDirectoryName(texturePath) ?? "",
+                ddsPackFile));
+        }
+
+        private readonly record struct TextureCacheKey(
+            GameTypeEnum GameType,
+            TextureType TextureType,
+            bool ShouldConvert,
+            string ContentHash);
+
+        private static Stream CreateNeutralTextureStream(TextureType textureType)
+        {
+            var color = textureType switch
+            {
+                TextureType.BaseColour => Color.FromArgb(255, 255, 255, 255),
+                TextureType.Normal => Color.FromArgb(255, 128, 128, 255),
+                TextureType.MaterialMap => Color.FromArgb(255, 0, 255, 0),
+                TextureType.Mask => Color.FromArgb(255, 0, 0, 0),
+                _ => throw new ArgumentOutOfRangeException(nameof(textureType)),
+            };
+            using var bitmap = new Bitmap(4, 4, PixelFormat.Format32bppArgb);
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                for (var x = 0; x < bitmap.Width; x++)
+                    bitmap.SetPixel(x, y, color);
+            }
+
+            var stream = new MemoryStream();
+            bitmap.Save(stream, ImageFormat.Png);
+            stream.Position = 0;
+            return stream;
         }
 
         private static string GetTexturePackFolder(GltfImporterSettings settings, string meshName, string postFixString)
