@@ -42,16 +42,16 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             return ImportSupportEnum.NotSupported;
         }
 
-        private RmvFile? ImportMeshes(GltfImporterSettings settings, ModelRoot modelRoot, AnimationFile? skeletonAnimFile, string skeletonName)
-        {
-            var importedFileName = GetImportedPackFileName(settings);
-
-            var rmv2File = RmvMeshBuilder.Build(settings, modelRoot, skeletonAnimFile, skeletonName);
-            if (rmv2File == null)
-                return null;
-
-            return rmv2File;
-        }
+        private static RmvMeshBuildResult ImportMeshes(
+            GltfImporterSettings settings,
+            ModelRoot modelRoot,
+            AnimationFile? skeletonAnimFile,
+            string skeletonName) =>
+            RmvMeshBuilder.BuildWithSummary(
+                settings,
+                modelRoot,
+                skeletonAnimFile,
+                skeletonName);
 
         private static NewPackFileEntry CreateRmvEntry(
             GltfImporterSettings settings,
@@ -171,13 +171,16 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             }
 
             RmvFile? rmv2File = null;
+            var meshSummary = new RmvMeshImportSummary([]);
             if (settings.ImportMeshes || settings.ImportMaterials)
             {
-                rmv2File = ImportMeshes(
+                var meshBuildResult = ImportMeshes(
                     settings,
                     modelRoot,
                     skeletonData.skeletonAnimFile,
                     skeletonData.skeletonName ?? "");
+                rmv2File = meshBuildResult.File;
+                meshSummary = meshBuildResult.Summary;
                 if (rmv2File == null)
                     throw new InvalidDataException("glTF 场景中没有可导入的网格。");
 
@@ -223,7 +226,70 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 }
             }
 
-            return ImportResult.Success(validation.Paths);
+            return ImportResult.Success(
+                validation.Paths,
+                BuildMeshWarnings(meshSummary));
+        }
+
+        private static IReadOnlyList<string> BuildMeshWarnings(
+            RmvMeshImportSummary summary)
+        {
+            var warnings = new List<string>();
+            if (summary.TotalAffectedVertices > 0)
+            {
+                var segments = string.Join(
+                    "；",
+                    summary.Segments
+                        .Where(segment => segment.AffectedVertices > 0)
+                        .Select(segment => LocalizationManager.Instance.GetFormat(
+                            "GltfImporter.Warning.WeightSegment",
+                            segment.ModelName,
+                            segment.AffectedVertices)));
+                warnings.Add(LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Warning.WeightLimit",
+                    summary.TotalAffectedVertices,
+                    segments,
+                    summary.MaximumDiscardedWeight,
+                    summary.VerticesAboveTenPercentDiscarded));
+            }
+
+            AddSegmentWarning(
+                warnings,
+                summary.Segments.Where(segment => segment.RebuiltNormals),
+                "GltfImporter.Warning.RebuiltNormals");
+            AddSegmentWarning(
+                warnings,
+                summary.Segments.Where(segment => segment.RebuiltTangents),
+                "GltfImporter.Warning.RebuiltTangents");
+            AddSegmentWarning(
+                warnings,
+                summary.Segments.Where(segment => segment.DefaultedTextureCoordinates),
+                "GltfImporter.Warning.DefaultedUv");
+            AddSegmentWarning(
+                warnings,
+                summary.Segments.Where(segment => segment.IgnoredVertexColors),
+                "GltfImporter.Warning.IgnoredVertexColors");
+            AddSegmentWarning(
+                warnings,
+                summary.Segments.Where(segment => segment.IgnoredMorphTargets),
+                "GltfImporter.Warning.IgnoredMorphTargets");
+            return warnings;
+        }
+
+        private static void AddSegmentWarning(
+            ICollection<string> warnings,
+            IEnumerable<RmvMeshSegmentImportSummary> segments,
+            string localizationKey)
+        {
+            var names = segments
+                .Select(segment => segment.ModelName)
+                .ToList();
+            if (names.Count == 0)
+                return;
+
+            warnings.Add(LocalizationManager.Instance.GetFormat(
+                localizationKey,
+                string.Join("、", names)));
         }
 
         private static ModelRoot CreateModelRoot(GltfImporterSettings settings)
