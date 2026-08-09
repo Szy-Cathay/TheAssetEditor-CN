@@ -91,7 +91,8 @@ internal static class GltfSkeletonNameReader
             return null;
 
         var candidate = parentIndexes[rootJoints[0]];
-        while (candidate >= 0)
+        var visitedCandidates = new HashSet<int>();
+        while (candidate >= 0 && visitedCandidates.Add(candidate))
         {
             if (rootJoints.All(rootJoint =>
                     IsAncestor(candidate, rootJoint, parentIndexes)) &&
@@ -113,10 +114,15 @@ internal static class GltfSkeletonNameReader
         HashSet<int> jointSet)
     {
         var parent = parentIndexes[jointIndex];
-        while (parent >= 0 && !jointSet.Contains(parent))
+        var visited = new HashSet<int>();
+        while (parent >= 0 &&
+               !jointSet.Contains(parent) &&
+               visited.Add(parent))
+        {
             parent = parentIndexes[parent];
+        }
 
-        return parent;
+        return parent >= 0 && jointSet.Contains(parent) ? parent : -1;
     }
 
     private static bool IsAncestor(
@@ -125,7 +131,8 @@ internal static class GltfSkeletonNameReader
         IReadOnlyList<int> parentIndexes)
     {
         var parent = parentIndexes[nodeIndex];
-        while (parent >= 0)
+        var visited = new HashSet<int>();
+        while (parent >= 0 && visited.Add(parent))
         {
             if (parent == candidate)
                 return true;

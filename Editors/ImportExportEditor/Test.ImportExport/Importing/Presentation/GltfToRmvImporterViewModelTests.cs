@@ -87,6 +87,38 @@ public class GltfToRmvImporterViewModelTests
     }
 
     [Test]
+    public void Initialize_GltfWithCyclicNonJointAncestors_DoesNotHang()
+    {
+        var inputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.gltf");
+        try
+        {
+            File.WriteAllText(inputPath, """
+                {
+                  "asset": { "version": "2.0" },
+                  "nodes": [
+                    { "children": [1] },
+                    { "children": [0, 2] },
+                    { "name": "root" }
+                  ],
+                  "skins": [{ "joints": [2] }]
+                }
+                """);
+            var viewModel = new RmvToGltfImporterViewModel(null!);
+
+            var initializeTask = Task.Run(() => viewModel.Initialize(new PackFile(
+                inputPath,
+                new FileSystemSource(inputPath))));
+
+            Assert.That(initializeTask.Wait(TimeSpan.FromSeconds(1)), Is.True);
+            Assert.That(viewModel.NewSkeletonName, Is.EqualTo(Path.GetFileNameWithoutExtension(inputPath)));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [Test]
     public async Task ImportAsync_ReturnsStructuredImporterResult()
     {
         var expected = ImportResult.Failure(["目标 Pack 已存在资源：models\\test.rigid_model_v2"]);
