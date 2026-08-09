@@ -867,6 +867,12 @@
   "ImportWindow.GltfHint": "支持 .gltf 与 .glb。蒙皮模型需包含 //skeleton//骨架名 节点；优先复用已加载的同名游戏骨架，缺失时自动创建。",
   "ImportWindow.ProgressTitle": "正在导入 glTF/GLB",
   "ImportWindow.ProgressStatus": "正在验证场景并转换网格、材质与动画…",
+  "ImportWindow.SuccessTitle": "导入完成",
+  "ImportWindow.FailureTitle": "导入失败",
+  "ImportWindow.OutputPathsHeading": "已写入资源",
+  "ImportWindow.WarningHeading": "警告",
+  "ImportWindow.ErrorHeading": "失败原因",
+  "ImportWindow.NoOutputs": "导入完成，但没有生成资源。",
 
   "ExportWindow.Title": "导出",
   "ExportWindow.SystemPath": "系统路径",

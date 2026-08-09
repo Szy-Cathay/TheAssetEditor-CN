@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 
@@ -6,20 +6,36 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 
 internal static class PackFileDispatcherWriter
 {
-    public static void AddFilesToPack(
+    public static IReadOnlyList<string> AddFilesToPackIfNoConflicts(
         IPackFileService packFileService,
         PackFileContainer container,
-        List<NewPackFileEntry> files)
+        List<NewPackFileEntry> files,
+        IReadOnlyList<string> targetPaths)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher == null || dispatcher.CheckAccess())
+        IReadOnlyList<string> AddFiles()
         {
-            packFileService.AddFilesToPack(container, files);
-            return;
+            var existingPaths = container.FileList.Keys
+                .Select(path => path.Replace('/', '\\').Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var conflicts = targetPaths
+                .Where(existingPaths.Contains)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (conflicts.Count != 0)
+                return conflicts;
+
+            packFileService.AddFilesToPack(
+                container,
+                files,
+                overwriteExisting: false);
+            return [];
         }
 
-        dispatcher.Invoke(() => packFileService.AddFilesToPack(
-            container,
-            files));
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+            return AddFiles();
+
+        return dispatcher.Invoke(AddFiles);
     }
 }

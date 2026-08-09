@@ -1,11 +1,10 @@
-using System.Numerics;
+﻿using System.Numerics;
 using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using GameWorld.Core.Services;
 using Moq;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
-using Shared.Core.Services;
 using Shared.TestUtility;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
@@ -65,8 +64,7 @@ public class RmvMeshBuilderSceneTests
         {
             modelRoot.SaveGLB(glbPath);
             var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
-            var standardDialogs = Mock.Of<IStandardDialogs>();
-            var materialBuilder = new RmvMaterialBuilder(packFileService, standardDialogs);
+            var materialBuilder = new RmvMaterialBuilder();
             var importer = new GltfImporter(
                 packFileService,
                 Mock.Of<ISkeletonAnimationLookUpHelper>(),
@@ -85,7 +83,7 @@ public class RmvMeshBuilderSceneTests
                 20,
                 true);
 
-            var succeeded = importer.Import(settings);
+            var succeeded = importer.Import(settings).Succeeded;
 
             Assert.That(succeeded, Is.True);
             Assert.That(
@@ -152,9 +150,7 @@ public class RmvMeshBuilderSceneTests
             skeletonLookup
                 .Setup(service => service.GetSkeletonFileFromName("test_skeleton"))
                 .Returns(skeleton);
-            var materialBuilder = new RmvMaterialBuilder(
-                packFileService,
-                Mock.Of<IStandardDialogs>());
+            var materialBuilder = new RmvMaterialBuilder();
             var importer = new GltfImporter(
                 packFileService,
                 skeletonLookup.Object,
@@ -197,9 +193,7 @@ public class RmvMeshBuilderSceneTests
         {
             modelRoot.SaveGLB(glbPath);
             var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
-            var materialBuilder = new RmvMaterialBuilder(
-                packFileService,
-                Mock.Of<IStandardDialogs>());
+            var materialBuilder = new RmvMaterialBuilder();
             var importer = new GltfImporter(
                 packFileService,
                 Mock.Of<ISkeletonAnimationLookUpHelper>(),
@@ -247,9 +241,7 @@ public class RmvMeshBuilderSceneTests
             skeletonLookup
                 .Setup(service => service.GetSkeletonFileFromName("test_skeleton"))
                 .Returns(CreateSkeletonFile("test_skeleton"));
-            var materialBuilder = new RmvMaterialBuilder(
-                packFileService,
-                Mock.Of<IStandardDialogs>());
+            var materialBuilder = new RmvMaterialBuilder();
             var importer = new GltfImporter(
                 packFileService,
                 skeletonLookup.Object,

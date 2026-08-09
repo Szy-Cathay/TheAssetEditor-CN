@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Editors.ImportExport.Importing.Importers.PngToDds;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
-using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Types;
@@ -48,36 +47,35 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
     }
     public class RmvMaterialBuilder
     {
-        private readonly IPackFileService _packFileService;
-        private readonly IStandardDialogs _exceptionService;        
-
-        public RmvMaterialBuilder(IPackFileService packFileSerivce, IStandardDialogs exceptionService)
-        {
-            _packFileService = packFileSerivce;
-            _exceptionService = exceptionService;
-        }
-
-        public void BuildRmvFileMaterials(GltfImporterSettings settings, SharpGLTF.Schema2.ModelRoot modelRoot, RmvFile rmvFile)
+        public IReadOnlyList<NewPackFileEntry> BuildRmvFileMaterials(
+            GltfImporterSettings settings,
+            SharpGLTF.Schema2.ModelRoot modelRoot,
+            RmvFile rmvFile)
         {
             ValidateInput_BuildRmvFileMaterials(modelRoot, rmvFile);
 
+            var textureEntries = new Dictionary<string, NewPackFileEntry>(
+                StringComparer.OrdinalIgnoreCase);
             var meshSources = RmvMeshBuilder.GetMeshSources(modelRoot);
             for (int i = 0; i < meshSources.Count; i++)
             {
                 BuildRmvModelMaterial(
                     settings,
                     meshSources[i],
-                    rmvFile.ModelList[0][i]
+                    rmvFile.ModelList[0][i],
+                    textureEntries
                 );
             }
 
             rmvFile.RecalculateOffsets();
+            return textureEntries.Values.ToList();
         }
 
         private void BuildRmvModelMaterial(
             GltfImporterSettings settings,
             RmvMeshBuilder.MeshSource source,
-            RmvModel rmvModel)
+            RmvModel rmvModel,
+            Dictionary<string, NewPackFileEntry> textureEntries)
         {
             var gltfMaterial = source.Primitive.Material;
             if (gltfMaterial == null || !gltfMaterial.Channels.Any())
@@ -112,14 +110,10 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
 
                 rmvModel.Material.SetTexture(textureType, texturePackFolder);
 
-                // make sure we don't add the same file to .pack more the once, as several meshes, may use the same texture, 
-                if (!settings.DestinationPackFileContainer.FileList.ContainsKey(texturePackFolder))
+                if (!textureEntries.ContainsKey(texturePackFolder))
                 {
                     var newFile = new NewPackFileEntry(Path.GetDirectoryName(texturePackFolder) ?? "", ddsPackFile);
-                    PackFileDispatcherWriter.AddFilesToPack(
-                        _packFileService,
-                        settings.DestinationPackFileContainer,
-                        [newFile]);
+                    textureEntries.Add(texturePackFolder, newFile);
                 }
 
             }
@@ -137,8 +131,12 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
 
             var textureFileName = $"{textureNameBase}{(postFixString.Any() ? $"_{postFixString}.dds" : ".dds")}";
 
-            var texturePackFolder = settings.DestinationPackPath + @"\tex";
-            var textureFullPackPath = @$"{texturePackFolder}\{textureFileName}";
+            var texturePackFolder = Path.Combine(
+                settings.DestinationPackPath,
+                "tex");
+            var textureFullPackPath = Path.Combine(
+                texturePackFolder,
+                textureFileName);
 
             return textureFullPackPath;
         }

@@ -2,6 +2,7 @@
 using Editors.ImportExport.Exporting.Exporters.RmvToGltf;
 using Editors.ImportExport.Exporting.Presentation.RmvToGltf;
 using Editors.ImportExport.Importing.Importers;
+using Editors.ImportExport.Importing;
 using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Presentation;
 using Shared.Core.PackFiles.Models;
@@ -40,7 +41,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
 
         public ImportSupportEnum CanImportFile(PackFile file) => _Importer.CanImportFile(file);
 
-        public bool Execute(PackFile importSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType)
+        public ImportResult Execute(PackFile importSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType)
         {
             if (!float.IsFinite(AnimationKeysPerSecond) || AnimationKeysPerSecond <= 0)
                 throw new ArgumentOutOfRangeException(nameof(AnimationKeysPerSecond), "动画采样率必须大于 0。");

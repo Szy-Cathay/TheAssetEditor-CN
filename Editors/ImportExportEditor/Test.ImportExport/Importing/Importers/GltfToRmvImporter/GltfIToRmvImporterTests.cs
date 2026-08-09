@@ -61,7 +61,7 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             var sceneSaver = new TestGltfSceneSaver();
             var standardDialog = new Mock<IStandardDialogs>();
             var sceneLoader = new GltfSceneLoader(standardDialog.Object);
-            var materialBuilder = new RmvMaterialBuilder(pfs, standardDialog.Object);
+            var materialBuilder = new RmvMaterialBuilder();
             var importer = new GltfImporter(pfs, skeletontonLookupHelper, materialBuilder);
             var packFileContainer = new PackFileContainer("new");
             var settings = new GltfImporterSettings(TestData.InputGtlfFile, "skeletons", packFileContainer, Shared.Core.Settings.GameTypeEnum.Warhammer3, true, true, true, true, true, 20.0f, true);
@@ -90,11 +90,10 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
         }
 
         [Test]
-        public void InvalidGltf_ThrowsReadableError()
+        public void InvalidGltf_ReturnsReadableFailure()
         {
             var packFileService = new Mock<IPackFileService>();
-            var standardDialogs = new Mock<IStandardDialogs>();
-            var materialBuilder = new RmvMaterialBuilder(packFileService.Object, standardDialogs.Object);
+            var materialBuilder = new RmvMaterialBuilder();
             var importer = new GltfImporter(
                 packFileService.Object,
                 Mock.Of<ISkeletonAnimationLookUpHelper>(),
@@ -112,8 +111,14 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
                 20.0f,
                 false);
 
-            var exception = Assert.Throws<InvalidDataException>(() => importer.Import(settings));
-            Assert.That(exception!.Message, Does.Contain("无法读取 glTF/GLB 文件"));
+            var result = importer.Import(settings);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("无法读取 glTF/GLB 文件"));
+                Assert.That(result.Exception, Is.TypeOf<InvalidDataException>());
+            });
         }
     }
 
@@ -132,7 +137,7 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             var skeletontonLookupHelper = new SkeletonAnimationLookUpHelper(pfs, eventHub.Object);
             var skeletontonBuilder = new GltfSkeletonBuilder(pfs);
             var animationBuilder = new GltfAnimationBuilder(pfs);
-            var materialBuilder = new RmvMaterialBuilder(pfs, standardDialog.Object);
+            var materialBuilder = new RmvMaterialBuilder();
             var sceneLoader = new GltfSceneLoader(standardDialog.Object);
             var skeletonFile = skeletontonLookupHelper.GetSkeletonFileFromName(TestData.Rmv2Expected.skeletonName);
             var packFileContainer = new PackFileContainer("new");
@@ -166,7 +171,7 @@ namespace Test.ImportExport.Importing.Importers.GltfImporterTest
             var skeletontonLookupHelper = new SkeletonAnimationLookUpHelper(pfs, eventHub.Object);
             var skeletontonBuilder = new GltfSkeletonBuilder(pfs);
             var animationBuilder = new GltfAnimationBuilder(pfs);
-            var materialBuilder = new RmvMaterialBuilder(pfs, standardDialog.Object);
+            var materialBuilder = new RmvMaterialBuilder();
             var sceneLoader = new GltfSceneLoader(standardDialog.Object);
             var skeletonFile = skeletontonLookupHelper.GetSkeletonFileFromName(TestData.Rmv2Expected.skeletonName);
             var packFileContainer = new PackFileContainer("new");
