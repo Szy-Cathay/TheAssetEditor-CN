@@ -19,7 +19,9 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
             string outFileName,
             bool convertSpecialTexture = true)
         {
-            using var scratchImagePng = TexHelper.Instance.LoadFromWICFile(inputPath, WIC_FLAGS.DEFAULT_SRGB);
+            using var scratchImagePng = TexHelper.Instance.LoadFromWICFile(
+                inputPath,
+                GetWicFlags(textureType));
             return Import(scratchImagePng, textureType, gameType, outFileName, convertSpecialTexture);
         }
 
@@ -39,7 +41,7 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
                 using var scratchImagePng = TexHelper.Instance.LoadFromWICMemory(
                     imageHandle.AddrOfPinnedObject(),
                     imageBytes.LongLength,
-                    WIC_FLAGS.DEFAULT_SRGB);
+                    GetWicFlags(textureType));
                 return Import(scratchImagePng, textureType, gameType, outFileName, convertSpecialTexture);
             }
             finally
@@ -63,7 +65,10 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
             {
                 var ddsFormat = DDSFormatHelper.GetDDSFormat(gameType, textureType);
                 using var ddsImage = imageWithMips.Compress(ddsFormat, TEX_COMPRESS_FLAGS.DEFAULT, 0.5f);
-                using var ddsMemStream = ddsImage.SaveToDDSMemory(DDS_FLAGS.NONE);
+                var ddsFlags = gameType == GameTypeEnum.Warhammer3
+                    ? DDS_FLAGS.FORCE_DX10_EXT
+                    : DDS_FLAGS.NONE;
+                using var ddsMemStream = ddsImage.SaveToDDSMemory(ddsFlags);
 
                 var ddsBytes = new byte[ddsMemStream.Length];
                 ddsMemStream.Read(ddsBytes, 0, ddsBytes.Length);
@@ -71,5 +76,10 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds
                 return new PackFile(outFileName, new MemorySource(ddsBytes));
             }
         }
+
+        private static WIC_FLAGS GetWicFlags(TextureType textureType) =>
+            textureType is TextureType.BaseColour or TextureType.Diffuse or TextureType.Specular
+                ? WIC_FLAGS.DEFAULT_SRGB
+                : WIC_FLAGS.IGNORE_SRGB;
     }
 }

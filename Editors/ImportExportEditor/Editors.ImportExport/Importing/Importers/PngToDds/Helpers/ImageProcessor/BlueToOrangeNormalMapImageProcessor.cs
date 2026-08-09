@@ -1,12 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using DirectXTexNet;
 using Editors.ImportExport.Common.Interfaces;
-using Microsoft.Xna.Framework;
 
 namespace Editors.ImportExport.Importing.Importers.PngToDds.Helpers.ImageProcessor
 {
@@ -14,10 +9,19 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds.Helpers.ImageProcess
     {
         public ScratchImage Transform(ScratchImage scratchImage)
         {
-            if (!(scratchImage.GetMetadata().Format == DXGI_FORMAT.B8G8R8A8_UNORM || scratchImage.GetMetadata().Format == DXGI_FORMAT.B8G8R8A8_UNORM_SRGB))
+            var format = scratchImage.GetMetadata().Format;
+            if (format is not DXGI_FORMAT.B8G8R8A8_UNORM and
+                not DXGI_FORMAT.B8G8R8A8_UNORM_SRGB and
+                not DXGI_FORMAT.R8G8B8A8_UNORM and
+                not DXGI_FORMAT.R8G8B8A8_UNORM_SRGB)
             {
                 throw new Exception($"Error: image format is {scratchImage.GetMetadata().Format}  should be uncompressed RGBA8 (BC_B8G8R8A8_UNORM)");
             }
+
+            var isBgra = format is DXGI_FORMAT.B8G8R8A8_UNORM or
+                DXGI_FORMAT.B8G8R8A8_UNORM_SRGB;
+            var redOffset = isBgra ? 2 : 0;
+            var blueOffset = isBgra ? 0 : 2;
 
             var copyScratchImage = scratchImage.CreateImageCopy(0, false, CP_FLAGS.NONE);
             var srcImage = copyScratchImage.GetImage(0, 0, 0);
@@ -28,15 +32,13 @@ namespace Editors.ImportExport.Importing.Importers.PngToDds.Helpers.ImageProcess
 
             for (int index = 0; index < srcImage.SlicePitch; index += 4)
             {
-                var x_red = rgbaBytes[index + 2];
+                var x_red = rgbaBytes[index + redOffset];
                 var y_green = rgbaBytes[index + 1];
 
-                rgbaBytes[index + 0] = 0;
+                rgbaBytes[index + blueOffset] = 0;
                 rgbaBytes[index + 1] = y_green;
-                rgbaBytes[index + 2] = 255;
+                rgbaBytes[index + redOffset] = 255;
                 rgbaBytes[index + 3] = x_red;
-
-                rgbaBytes[index + 1] = ColorChannels.GammaComponent(rgbaBytes[index + 1], 1 / 2.2f);
             }
 
             // copy processed pixel back to the image pixel pointer½
