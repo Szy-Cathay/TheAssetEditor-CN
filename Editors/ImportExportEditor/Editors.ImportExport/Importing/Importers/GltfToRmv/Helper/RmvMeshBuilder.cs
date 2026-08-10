@@ -22,6 +22,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 /// </summary>
 public class RmvMeshBuilder
 {
+    private const int MaxVerticesPerSegment = ushort.MaxValue + 1;
+
     public sealed record MeshSource(
         Node Node,
         Mesh Mesh,
@@ -50,20 +52,7 @@ public class RmvMeshBuilder
 
         var meshSources = GetMeshSources(modelRoot);
         if (meshSources.Count == 0)
-            return new RmvMeshBuildResult(null, new RmvMeshImportSummary([]));
-
-        var oversizedSegments = meshSources
-            .Where(source =>
-                source.Primitive.GetVertexColumns().Positions?.Count() > ushort.MaxValue + 1)
-            .Select(source => source.ModelName)
-            .ToList();
-        if (oversizedSegments.Count > 0)
-        {
-            throw new InvalidDataException(LocalizationManager.Instance.GetFormat(
-                "GltfImporter.Error.VertexLimit",
-                ushort.MaxValue + 1,
-                string.Join("、", oversizedSegments)));
-        }
+            return new RmvMeshBuildResult(null, new RmvMeshImportSummary([]), []);
 
         const int lodCount = 1;
         var rmv2File = new RmvFile
@@ -84,27 +73,61 @@ public class RmvMeshBuilder
             100.0f,
             0,
             0);
-        rmv2File.LodHeaders[0].MeshCount = (uint)meshSources.Count;
-
         var modelList = new List<RmvModel>();
+        var modelSources = new List<MeshSource>();
         var segmentSummaries = new List<RmvMeshSegmentImportSummary>();
+        var splitPrimitiveCount = 0;
+        var generatedSplitSegmentCount = 0;
+        var reservedSourceNames = meshSources
+            .Select(source => source.ModelName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var usedOutputNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var source in meshSources)
         {
             var sourceSkeleton = source.Node.Skin != null ? animSkeletonFile : null;
-            var (rmv2Mesh, summary) = GenerateRmvMesh(
+            var generationResult = GenerateRmvMeshes(
                 source,
                 sourceSkeleton,
                 scaleFactor,
                 settings.SourceForwardDirection);
-            modelList.Add(CreateRmvModel(rmv2Mesh, source.ModelName, sourceSkeleton));
-            segmentSummaries.Add(summary);
+            var generatedSegments = generationResult.Segments;
+            if (generationResult.SourceExceededVertexLimit)
+            {
+                splitPrimitiveCount++;
+                generatedSplitSegmentCount += generatedSegments.Count;
+            }
+
+            for (var segmentIndex = 0;
+                 segmentIndex < generatedSegments.Count;
+                 segmentIndex++)
+            {
+                var (rmv2Mesh, originalSummary) = generatedSegments[segmentIndex];
+                var modelName = GetUniqueOutputModelName(
+                    source.ModelName,
+                    segmentIndex,
+                    generatedSegments.Count,
+                    reservedSourceNames,
+                    usedOutputNames);
+                var summary = originalSummary with { ModelName = modelName };
+                modelList.Add(CreateRmvModel(
+                    rmv2Mesh,
+                    modelName,
+                    sourceSkeleton));
+                modelSources.Add(source);
+                segmentSummaries.Add(summary);
+            }
         }
 
+        rmv2File.LodHeaders[0].MeshCount = (uint)modelList.Count;
         rmv2File.ModelList[0] = modelList.ToArray();
         rmv2File.RecalculateOffsets();
         return new RmvMeshBuildResult(
             rmv2File,
-            new RmvMeshImportSummary(segmentSummaries));
+            new RmvMeshImportSummary(
+                segmentSummaries,
+                splitPrimitiveCount,
+                generatedSplitSegmentCount),
+            modelSources);
     }
 
     public static IReadOnlyList<MeshSource> GetMeshSources(ModelRoot modelRoot)
@@ -161,7 +184,11 @@ public class RmvMeshBuilder
         }
     }
 
-    private static (RmvMesh Mesh, RmvMeshSegmentImportSummary Summary) GenerateRmvMesh(
+    private sealed record MeshGenerationResult(
+        IReadOnlyList<(RmvMesh Mesh, RmvMeshSegmentImportSummary Summary)> Segments,
+        bool SourceExceededVertexLimit);
+
+    private static MeshGenerationResult GenerateRmvMeshes(
         MeshSource source,
         AnimationFile? animSkeletonFile,
         float scaleFactor,
@@ -186,39 +213,6 @@ public class RmvMeshBuilder
         var ignoreVertexColors = vertexBufferColumns.Colors0 != null ||
             vertexBufferColumns.Colors1 != null;
         var ignoreMorphTargets = source.Primitive.MorphTargetsCount > 0;
-        var rmv2Mesh = new RmvMesh
-        {
-            VertexList = new CommonVertex[positionsCount],
-        };
-        var affectedVertices = 0;
-        var maximumDiscardedWeight = 0f;
-        var verticesAboveTenPercentDiscarded = 0;
-
-        for (var vertexIndex = 0; vertexIndex < positionsCount; vertexIndex++)
-        {
-            var vertexBuilder = vertexBufferColumns.GetVertex<
-                VertexPositionNormalTangent,
-                VertexTexture1,
-                VertexJoints8>(vertexIndex);
-            var converted = ConvertToRmvVertex(
-                vertexBuilder,
-                source.Node.Skin,
-                animSkeletonFile,
-                worldMatrix,
-                normalMatrix,
-                scaleFactor,
-                sourceForwardDirection);
-            rmv2Mesh.VertexList[vertexIndex] = converted.Vertex;
-            if (converted.DiscardedWeight > 0)
-            {
-                affectedVertices++;
-                maximumDiscardedWeight = Math.Max(
-                    maximumDiscardedWeight,
-                    converted.DiscardedWeight);
-                if (converted.DiscardedWeight > 0.100001f)
-                    verticesAboveTenPercentDiscarded++;
-            }
-        }
 
         if (source.Primitive.DrawPrimitiveType is not (
             PrimitiveType.TRIANGLES or
@@ -231,32 +225,214 @@ public class RmvMeshBuilder
                 source.Primitive.DrawPrimitiveType));
         }
 
-        var triangles = source.Primitive.GetTriangleIndices().ToList();
-        rmv2Mesh.IndexList = new ushort[triangles.Count * 3];
-        for (var triangleIndex = 0; triangleIndex < triangles.Count; triangleIndex++)
+        var triangles = source.Primitive.GetTriangleIndices()
+            .Select(triangle => (
+                A: checked((int)triangle.A),
+                B: checked((int)triangle.B),
+                C: checked((int)triangle.C)))
+            .ToList();
+        var plans = CreateSegmentPlans(source, positionsCount, triangles);
+        var output = new List<(RmvMesh, RmvMeshSegmentImportSummary)>(plans.Count);
+        foreach (var plan in plans)
         {
-            var triangle = triangles[triangleIndex];
-            var outputIndex = triangleIndex * 3;
-            rmv2Mesh.IndexList[outputIndex] = checked((ushort)triangle.A);
-            rmv2Mesh.IndexList[outputIndex + 2] = checked((ushort)triangle.B);
-            rmv2Mesh.IndexList[outputIndex + 1] = checked((ushort)triangle.C);
+            var rmv2Mesh = new RmvMesh
+            {
+                VertexList = new CommonVertex[plan.SourceVertexIndices.Count],
+                IndexList = plan.Indices,
+            };
+            var affectedVertices = 0;
+            var maximumDiscardedWeight = 0f;
+            var verticesAboveTenPercentDiscarded = 0;
+
+            for (var outputVertexIndex = 0;
+                 outputVertexIndex < plan.SourceVertexIndices.Count;
+                 outputVertexIndex++)
+            {
+                var sourceVertexIndex = plan.SourceVertexIndices[outputVertexIndex];
+                var vertexBuilder = vertexBufferColumns.GetVertex<
+                    VertexPositionNormalTangent,
+                    VertexTexture1,
+                    VertexJoints8>(sourceVertexIndex);
+                var converted = ConvertToRmvVertex(
+                    vertexBuilder,
+                    source.Node.Skin,
+                    animSkeletonFile,
+                    worldMatrix,
+                    normalMatrix,
+                    scaleFactor,
+                    sourceForwardDirection);
+                rmv2Mesh.VertexList[outputVertexIndex] = converted.Vertex;
+                if (converted.DiscardedWeight > 0)
+                {
+                    affectedVertices++;
+                    maximumDiscardedWeight = Math.Max(
+                        maximumDiscardedWeight,
+                        converted.DiscardedWeight);
+                    if (converted.DiscardedWeight > 0.100001f)
+                        verticesAboveTenPercentDiscarded++;
+                }
+            }
+
+            if (rebuildNormals)
+                RebuildNormals(rmv2Mesh);
+            TangentBasisCalculator.CalculateForRmv2Mesh(rmv2Mesh);
+            output.Add((
+                rmv2Mesh,
+                new RmvMeshSegmentImportSummary(
+                    plan.ModelName,
+                    affectedVertices,
+                    maximumDiscardedWeight,
+                    verticesAboveTenPercentDiscarded,
+                    rebuildNormals,
+                    rebuildTangents,
+                    defaultTextureCoordinates,
+                    ignoreVertexColors,
+                    ignoreMorphTargets)));
         }
 
-        if (rebuildNormals)
-            RebuildNormals(rmv2Mesh);
-        TangentBasisCalculator.CalculateForRmv2Mesh(rmv2Mesh);
-        return (
-            rmv2Mesh,
-            new RmvMeshSegmentImportSummary(
+        return new MeshGenerationResult(
+            output,
+            positionsCount > MaxVerticesPerSegment);
+    }
+
+    private static string GetUniqueOutputModelName(
+        string sourceModelName,
+        int segmentIndex,
+        int segmentCount,
+        ISet<string> reservedSourceNames,
+        ISet<string> usedOutputNames)
+    {
+        if (segmentCount == 1)
+        {
+            usedOutputNames.Add(sourceModelName);
+            return sourceModelName;
+        }
+
+        var baseName = $"{sourceModelName}_split{segmentIndex + 1}";
+        var modelName = baseName;
+        for (var duplicateIndex = 2;
+             reservedSourceNames.Contains(modelName) || !usedOutputNames.Add(modelName);
+             duplicateIndex++)
+        {
+            modelName = $"{baseName}_instance{duplicateIndex}";
+        }
+
+        return modelName;
+    }
+
+    private sealed record MeshSegmentPlan(
+        string ModelName,
+        IReadOnlyList<int> SourceVertexIndices,
+        ushort[] Indices);
+
+    private static IReadOnlyList<MeshSegmentPlan> CreateSegmentPlans(
+        MeshSource source,
+        int positionsCount,
+        IReadOnlyList<(int A, int B, int C)> triangles)
+    {
+        foreach (var triangle in triangles)
+        {
+            ValidateVertexIndex(source, positionsCount, triangle.A);
+            ValidateVertexIndex(source, positionsCount, triangle.B);
+            ValidateVertexIndex(source, positionsCount, triangle.C);
+        }
+
+        if (positionsCount <= MaxVerticesPerSegment)
+        {
+            var indices = new ushort[triangles.Count * 3];
+            for (var triangleIndex = 0; triangleIndex < triangles.Count; triangleIndex++)
+            {
+                var triangle = triangles[triangleIndex];
+                var outputIndex = triangleIndex * 3;
+                indices[outputIndex] = checked((ushort)triangle.A);
+                indices[outputIndex + 2] = checked((ushort)triangle.B);
+                indices[outputIndex + 1] = checked((ushort)triangle.C);
+            }
+
+            return
+            [
+                new MeshSegmentPlan(
+                    source.ModelName,
+                    Enumerable.Range(0, positionsCount).ToArray(),
+                    indices),
+            ];
+        }
+
+        var rawSegments = new List<(IReadOnlyList<int> Vertices, ushort[] Indices)>();
+        var sourceVertices = new List<int>(MaxVerticesPerSegment);
+        var localIndices = new List<ushort>();
+        var localIndexBySource = new Dictionary<int, ushort>(MaxVerticesPerSegment);
+
+        void FlushSegment()
+        {
+            if (localIndices.Count == 0)
+                return;
+
+            rawSegments.Add((sourceVertices.ToArray(), localIndices.ToArray()));
+            sourceVertices.Clear();
+            localIndices.Clear();
+            localIndexBySource.Clear();
+        }
+
+        ushort GetOrAddVertex(int sourceVertexIndex)
+        {
+            if (localIndexBySource.TryGetValue(sourceVertexIndex, out var localIndex))
+                return localIndex;
+
+            localIndex = checked((ushort)sourceVertices.Count);
+            localIndexBySource.Add(sourceVertexIndex, localIndex);
+            sourceVertices.Add(sourceVertexIndex);
+            return localIndex;
+        }
+
+        foreach (var triangle in triangles)
+        {
+            var newVertexCount = localIndexBySource.ContainsKey(triangle.A) ? 0 : 1;
+            if (triangle.B != triangle.A &&
+                !localIndexBySource.ContainsKey(triangle.B))
+            {
+                newVertexCount++;
+            }
+            if (triangle.C != triangle.A &&
+                triangle.C != triangle.B &&
+                !localIndexBySource.ContainsKey(triangle.C))
+            {
+                newVertexCount++;
+            }
+            if (localIndices.Count > 0 &&
+                localIndexBySource.Count + newVertexCount > MaxVerticesPerSegment)
+            {
+                FlushSegment();
+            }
+
+            localIndices.Add(GetOrAddVertex(triangle.A));
+            localIndices.Add(GetOrAddVertex(triangle.C));
+            localIndices.Add(GetOrAddVertex(triangle.B));
+        }
+
+        FlushSegment();
+        return rawSegments
+            .Select((segment, index) => new MeshSegmentPlan(
+                rawSegments.Count == 1
+                    ? source.ModelName
+                    : $"{source.ModelName}_split{index + 1}",
+                segment.Vertices,
+                segment.Indices))
+            .ToList();
+    }
+
+    private static void ValidateVertexIndex(
+        MeshSource source,
+        int positionsCount,
+        int vertexIndex)
+    {
+        if (vertexIndex < 0 || vertexIndex >= positionsCount)
+        {
+            throw new InvalidDataException(LocalizationManager.Instance.GetFormat(
+                "GltfImporter.Error.InvalidTriangleVertex",
                 source.ModelName,
-                affectedVertices,
-                maximumDiscardedWeight,
-                verticesAboveTenPercentDiscarded,
-                rebuildNormals,
-                rebuildTangents,
-                defaultTextureCoordinates,
-                ignoreVertexColors,
-                ignoreMorphTargets));
+                vertexIndex));
+        }
     }
 
     private static (CommonVertex Vertex, float DiscardedWeight) ConvertToRmvVertex(

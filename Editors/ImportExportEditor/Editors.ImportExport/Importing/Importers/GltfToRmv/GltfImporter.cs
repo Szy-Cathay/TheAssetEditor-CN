@@ -71,8 +71,13 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         private RmvMaterialBuildResult ImportMaterials(
             GltfImporterSettings settings,
             ModelRoot modelRoot,
-            RmvFile rmv2File) =>
-            _materialBuilder.BuildRmvFileMaterials(settings, modelRoot, rmv2File);
+            RmvFile rmv2File,
+            IReadOnlyList<RmvMeshBuilder.MeshSource> modelSources) =>
+            _materialBuilder.BuildRmvFileMaterials(
+                settings,
+                modelRoot,
+                rmv2File,
+                modelSources);
 
         private static IReadOnlyList<NewPackFileEntry> ImportAnimations(
             GltfImporterSettings settings,
@@ -159,6 +164,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
 
             RmvFile? rmv2File = null;
             var meshSummary = new RmvMeshImportSummary([]);
+            IReadOnlyList<RmvMeshBuilder.MeshSource> modelSources = [];
             if (settings.ImportMeshes || settings.ImportMaterials)
             {
                 var meshBuildResult = ImportMeshes(
@@ -169,12 +175,17 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     scaleFactor);
                 rmv2File = meshBuildResult.File;
                 meshSummary = meshBuildResult.Summary;
+                modelSources = meshBuildResult.ModelSources;
                 if (rmv2File == null)
                     throw new InvalidDataException("glTF 场景中没有可导入的网格。");
 
                 if (settings.ImportMaterials)
                 {
-                    var materialBuildResult = ImportMaterials(settings, modelRoot, rmv2File);
+                    var materialBuildResult = ImportMaterials(
+                        settings,
+                        modelRoot,
+                        rmv2File,
+                        modelSources);
                     pendingFiles.AddRange(materialBuildResult.Files);
                     materialSummary = materialBuildResult.Summary;
                 }
@@ -319,6 +330,14 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             RmvMeshImportSummary summary)
         {
             var warnings = new List<string>();
+            if (summary.SplitPrimitiveCount > 0)
+            {
+                warnings.Add(LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Warning.SplitPrimitives",
+                    summary.SplitPrimitiveCount,
+                    summary.GeneratedSplitSegmentCount));
+            }
+
             if (summary.TotalAffectedVertices > 0)
             {
                 var segments = string.Join(
