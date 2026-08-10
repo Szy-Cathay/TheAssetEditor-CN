@@ -94,7 +94,8 @@ public class RmvMeshBuilder
             var (rmv2Mesh, summary) = GenerateRmvMesh(
                 source,
                 sourceSkeleton,
-                scaleFactor);
+                scaleFactor,
+                settings.SourceForwardDirection);
             modelList.Add(CreateRmvModel(rmv2Mesh, source.ModelName, sourceSkeleton));
             segmentSummaries.Add(summary);
         }
@@ -163,7 +164,8 @@ public class RmvMeshBuilder
     private static (RmvMesh Mesh, RmvMeshSegmentImportSummary Summary) GenerateRmvMesh(
         MeshSource source,
         AnimationFile? animSkeletonFile,
-        float scaleFactor)
+        float scaleFactor,
+        GltfSourceForwardDirection sourceForwardDirection)
     {
         var vertexBufferColumns = source.Primitive.GetVertexColumns();
         if (vertexBufferColumns.Positions == null || !vertexBufferColumns.Positions.Any())
@@ -204,7 +206,8 @@ public class RmvMeshBuilder
                 animSkeletonFile,
                 worldMatrix,
                 normalMatrix,
-                scaleFactor);
+                scaleFactor,
+                sourceForwardDirection);
             rmv2Mesh.VertexList[vertexIndex] = converted.Vertex;
             if (converted.DiscardedWeight > 0)
             {
@@ -262,18 +265,32 @@ public class RmvMeshBuilder
         AnimationFile? animSkeletonFile,
         Matrix4x4 worldMatrix,
         Matrix4x4 normalMatrix,
-        float scaleFactor)
+        float scaleFactor,
+        GltfSourceForwardDirection sourceForwardDirection)
     {
         var position = Vector3.Transform(vertexBuilder.Geometry.Position, worldMatrix) * scaleFactor;
         var normal = Vector3.TransformNormal(vertexBuilder.Geometry.Normal, normalMatrix);
         if (normal.LengthSquared() > 0.000000000001f)
             normal = Vector3.Normalize(normal);
 
+        var gamePosition = GltfSourceForwardConverter.ConvertGameVector(
+            new Vector3(-position.X, position.Y, position.Z),
+            sourceForwardDirection);
+        var gameNormal = GltfSourceForwardConverter.ConvertGameVector(
+            new Vector3(-normal.X, normal.Y, normal.Z),
+            sourceForwardDirection);
         var rmv2Vertex = new CommonVertex
         {
-            Position = new XNA.Vector4(-position.X, position.Y, position.Z, 1),
+            Position = new XNA.Vector4(
+                gamePosition.X,
+                gamePosition.Y,
+                gamePosition.Z,
+                1),
             Uv = VecConv.GetXna(vertexBuilder.Material.TexCoord),
-            Normal = new XNA.Vector3(-normal.X, normal.Y, normal.Z),
+            Normal = new XNA.Vector3(
+                gameNormal.X,
+                gameNormal.Y,
+                gameNormal.Z),
             Tangent = XNA.Vector3.Zero,
             BiNormal = XNA.Vector3.Zero,
             WeightCount = animSkeletonFile == null || skin == null ? 0 : 4,

@@ -229,6 +229,8 @@ public class UiRemainingEditorFamilyGallery
                         resultMessage,
                         Does.Contain("external_full_workflow.rigid_model_v2"));
                     NUnitAssert.That(resultMessage, Does.Contain("蒙皮权重"));
+                    NUnitAssert.That(resultMessage, Does.Contain("源模型正面方向"));
+                    NUnitAssert.That(resultMessage, Does.Contain("+Z（标准 glTF）"));
                     NUnitAssert.That(
                         destination.FileList.Keys,
                         Has.Some.EndsWith(".rigid_model_v2"));
@@ -404,13 +406,16 @@ public class UiRemainingEditorFamilyGallery
                     ConvertFromBlenderMaterialMap = true,
                     ConvertNormalTextureToOrange = true,
                     AutoScaleHumanoid = true,
+                    SourceForwardDirections = CreateSourceForwardDirections(),
+                    SourceForwardDirection =
+                        GltfSourceForwardDirection.PositiveX,
                     AutoDetectAnimationKeysPerSecond = true,
                     CanEditAnimationKeysPerSecond = false,
                     AnimationKeysPerSecond = 30,
                 },
             },
             760,
-            420),
+            460),
         "import-result" => new MessageDialogWindow(
             "导入成功",
             GltfWorkflowResultMessage,
@@ -932,7 +937,35 @@ public class UiRemainingEditorFamilyGallery
             var autoScaleCheckBox = FindVisualDescendants<CheckBox>(window)
                 .Single(checkBox => AutomationProperties.GetName(checkBox) ==
                     "自动缩放到 humanoid01 人形尺寸");
-            NUnitAssert.That(autoScaleCheckBox.IsChecked, Is.True);
+            var sourceForwardComboBox = FindVisualDescendants<ComboBox>(window)
+                .Single(comboBox => AutomationProperties.GetName(comboBox) ==
+                    "源模型正面方向");
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(autoScaleCheckBox.IsChecked, Is.True);
+                NUnitAssert.That(
+                    sourceForwardComboBox.SelectedValue,
+                    Is.EqualTo(GltfSourceForwardDirection.PositiveX));
+                NUnitAssert.That(
+                    sourceForwardComboBox.Items
+                        .Cast<KeyValuePair<string, GltfSourceForwardDirection>>()
+                        .Select(option => option.Key),
+                    Is.EqualTo(new[]
+                    {
+                        "+Z（标准 glTF）",
+                        "+X（Unreal/PSK）",
+                    }));
+            });
+        }
+
+        if (variant == "import-window")
+        {
+            var sourceForwardComboBox = FindVisualDescendants<ComboBox>(window)
+                .Single(comboBox => AutomationProperties.GetName(comboBox) ==
+                    "源模型正面方向");
+            NUnitAssert.That(
+                sourceForwardComboBox.SelectedValue,
+                Is.EqualTo(GltfSourceForwardDirection.PositiveZ));
         }
 
         if (variant == "import-result")
@@ -946,6 +979,8 @@ public class UiRemainingEditorFamilyGallery
                 NUnitAssert.That(dialog.Message, Does.Contain("MaskMaterial"));
                 NUnitAssert.That(dialog.Message, Does.Contain("自发光（Emissive）"));
                 NUnitAssert.That(dialog.Message, Does.Contain("环境遮蔽（Occlusion）"));
+                NUnitAssert.That(dialog.Message, Does.Contain("源模型正面方向"));
+                NUnitAssert.That(dialog.Message, Does.Contain("+X（Unreal/PSK）"));
             });
         }
 
@@ -1135,7 +1170,19 @@ public class UiRemainingEditorFamilyGallery
         • humanoid01 参考高度：2
         • 最终倍率：0.5
         • 已自动缩放到 humanoid01 人形尺寸。
+
+        源模型正面方向
+        • 实际采用：+X（Unreal/PSK）
+        • 已将源 +X 确定性旋转到游戏 +Z 正面。
         """;
+
+    private static IReadOnlyList<
+        KeyValuePair<string, GltfSourceForwardDirection>>
+        CreateSourceForwardDirections() =>
+        [
+            new("+Z（标准 glTF）", GltfSourceForwardDirection.PositiveZ),
+            new("+X（Unreal/PSK）", GltfSourceForwardDirection.PositiveX),
+        ];
 
     private static IEnumerable<T> FindVisualDescendants<T>(
         DependencyObject parent)
@@ -1270,6 +1317,11 @@ public class UiRemainingEditorFamilyGallery
         public bool ConvertNormalTextureToOrange { get; set; } = true;
         public bool ImportAnimations { get; set; } = true;
         public bool AutoScaleHumanoid { get; set; } = true;
+        public IReadOnlyList<KeyValuePair<string, GltfSourceForwardDirection>>
+            SourceForwardDirections { get; } =
+            CreateSourceForwardDirections();
+        public GltfSourceForwardDirection SourceForwardDirection { get; set; } =
+            GltfSourceForwardDirection.PositiveZ;
         public bool AutoDetectAnimationKeysPerSecond { get; set; } = true;
         public bool CanEditAnimationKeysPerSecond =>
             ImportAnimations && !AutoDetectAnimationKeysPerSecond;
@@ -1360,6 +1412,8 @@ public class UiRemainingEditorFamilyGallery
         public object? ResetViewCommand { get; set; }
         public object? Scene { get; set; }
         public object? SceneRootItems { get; set; }
+        public object? SourceForwardDirection { get; set; }
+        public object? SourceForwardDirections { get; set; }
         public object? SelectedComponent { get; set; }
         public object? SelectedComponentViewModel { get; set; }
         public object? SelectedAnimation { get; set; }

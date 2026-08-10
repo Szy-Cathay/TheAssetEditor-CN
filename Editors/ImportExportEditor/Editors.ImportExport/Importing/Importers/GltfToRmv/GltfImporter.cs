@@ -102,6 +102,9 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     skeletonAnimFile,
                     animation);
                 HumanoidScaleCalculator.ScaleTranslations(animFile, scaleFactor);
+                GltfSourceForwardConverter.ConvertAnimation(
+                    animFile,
+                    settings.SourceForwardDirection);
 
                 var candidateFileName =
                     $"{baseFileName}_{GetSafeAnimationName(animation, animationIndex)}.anim";
@@ -194,6 +197,9 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 HumanoidScaleCalculator.ScaleTranslations(
                     skeletonData.skeletonAnimFile,
                     scaleFactor);
+                GltfSourceForwardConverter.ConvertAnimation(
+                    skeletonData.skeletonAnimFile,
+                    settings.SourceForwardDirection);
                 pendingFiles.Add(CreateSkeletonEntry(
                     skeletonData.skeletonName!,
                     skeletonData.skeletonAnimFile));
@@ -232,8 +238,29 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 validation.Paths,
                 BuildMeshWarnings(meshSummary),
                 humanoidScale,
-                materialSummary);
+                materialSummary,
+                BuildSourceForwardSummary(settings.SourceForwardDirection));
         }
+
+        private static SourceForwardImportSummary BuildSourceForwardSummary(
+            GltfSourceForwardDirection sourceForwardDirection) =>
+            sourceForwardDirection switch
+            {
+                GltfSourceForwardDirection.PositiveZ => new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.PositiveZ"),
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.Conversion.PositiveZ")),
+                GltfSourceForwardDirection.PositiveX => new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.PositiveX"),
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.Conversion.PositiveX")),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(sourceForwardDirection),
+                    sourceForwardDirection,
+                    null),
+            };
 
         private HumanoidScaleImportSummary GetHumanoidScale(
             GltfImporterSettings settings,

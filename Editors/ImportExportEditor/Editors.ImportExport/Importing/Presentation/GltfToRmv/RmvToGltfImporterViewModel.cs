@@ -30,12 +30,28 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         [ObservableProperty] bool _convertNormalTextureToOrange = true;
         [ObservableProperty] bool _importAnimations = true;
         [ObservableProperty] bool _autoScaleHumanoid = true;
+        [ObservableProperty]
+        GltfSourceForwardDirection _sourceForwardDirection =
+            GltfSourceForwardDirection.PositiveZ;
         [ObservableProperty] bool _autoDetectAnimationKeysPerSecond = true;
         [ObservableProperty] float _animationKeysPerSecond = 20.0f;
         [ObservableProperty] string _newSkeletonName = "";
 
         public bool CanEditAnimationKeysPerSecond =>
             ImportAnimations && !AutoDetectAnimationKeysPerSecond;
+
+        public IReadOnlyList<KeyValuePair<string, GltfSourceForwardDirection>>
+            SourceForwardDirections { get; } =
+            [
+                new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.PositiveZ"),
+                    GltfSourceForwardDirection.PositiveZ),
+                new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.PositiveX"),
+                    GltfSourceForwardDirection.PositiveX),
+            ];
 
         public RmvToGltfImporterViewModel(GltfImporter Importer)
         {
@@ -66,7 +82,8 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 MirrorMesh: true,
                 AutoDetectAnimationKeysPerSecond: this.AutoDetectAnimationKeysPerSecond,
                 NewSkeletonName: this.NewSkeletonName,
-                AutoScaleHumanoid: this.AutoScaleHumanoid);
+                AutoScaleHumanoid: this.AutoScaleHumanoid,
+                SourceForwardDirection: this.SourceForwardDirection);
 
             return _Importer.Import(settings);
         }
