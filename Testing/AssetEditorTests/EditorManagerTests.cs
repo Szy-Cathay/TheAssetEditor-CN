@@ -1,6 +1,8 @@
 using System.Windows;
 using AssetEditor.Services;
 using Moq;
+using Shared.Core.DependencyInjection;
+using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
@@ -13,6 +15,128 @@ namespace AssetEditorTests
     [NUnit.Framework.TestFixture]
     public class EditorManagerTests
     {
+        [NUnit.Framework.Test]
+        [NUnit.Framework.NonParallelizable]
+        public void CreateFromFile_ReusesOpenEditorUntilItIsClosed()
+        {
+            var file = PackFile.CreateFromBytes(
+                "test.variantmeshdefinition",
+                [1]);
+            var container = new PackFileContainer("test.pack");
+            var firstEditor = new TestFileEditor();
+            var reopenedEditor = new TestFileEditor();
+            var scopeRepository = new Mock<IScopeRepository>();
+            scopeRepository
+                .SetupSequence(repository => repository.CreateScope(
+                    typeof(TestFileEditor)))
+                .Returns(firstEditor)
+                .Returns(reopenedEditor);
+            var toolSelector = new Mock<IToolSelectorUiProvider>();
+            toolSelector
+                .Setup(provider => provider.CreateAndShow(
+                    It.IsAny<IEnumerable<EditorEnums>>()))
+                .Returns(EditorEnums.Kitbash_Editor);
+            var editorDatabase = new EditorDatabase(
+                scopeRepository.Object,
+                toolSelector.Object);
+            EditorInfoBuilder
+                .Create<TestFileEditor, object>(
+                    EditorEnums.XML_VariantMesh_Editor)
+                .AddExtention(".variantmeshdefinition", 100)
+                .Build(editorDatabase);
+            EditorInfoBuilder
+                .Create<TestFileEditor, object>(
+                    EditorEnums.Kitbash_Editor)
+                .AddExtention(".variantmeshdefinition", 50)
+                .Build(editorDatabase);
+            var packFileService = new Mock<IPackFileService>();
+            packFileService
+                .Setup(service => service.GetFullPath(file, null))
+                .Returns("variantmeshes/test.variantmeshdefinition");
+            packFileService
+                .Setup(service => service.GetPackFileContainer(file))
+                .Returns(container);
+            var manager = new EditorManager(
+                Mock.Of<IGlobalEventHub>(),
+                packFileService.Object,
+                editorDatabase,
+                (_, _, _) => MessageBoxResult.Yes);
+            var initialOpenCount =
+                ApplicationStateRecorder.GetNumberOfOpenedEditors();
+
+            var firstResult = manager.CreateFromFile(
+                file,
+                EditorEnums.XML_VariantMesh_Editor);
+            manager.SelectedEditorIndex = -1;
+            var repeatedResult = manager.CreateFromFile(file, null);
+            var differentPreferredResult = manager.CreateFromFile(
+                file,
+                EditorEnums.Kitbash_Editor);
+
+            NUnit.Framework.Assert.Multiple(() =>
+            {
+                NUnit.Framework.Assert.That(
+                    firstResult,
+                    NUnit.Framework.Is.SameAs(firstEditor));
+                NUnit.Framework.Assert.That(
+                    repeatedResult,
+                    NUnit.Framework.Is.SameAs(firstEditor));
+                NUnit.Framework.Assert.That(
+                    differentPreferredResult,
+                    NUnit.Framework.Is.SameAs(firstEditor));
+                NUnit.Framework.Assert.That(
+                    manager.CurrentEditorsList,
+                    NUnit.Framework.Is.EqualTo(new[] { firstEditor }));
+                NUnit.Framework.Assert.That(
+                    manager.SelectedEditorIndex,
+                    NUnit.Framework.Is.Zero);
+                NUnit.Framework.Assert.That(
+                    ApplicationStateRecorder.GetNumberOfOpenedEditors(),
+                    NUnit.Framework.Is.EqualTo(initialOpenCount + 1));
+            });
+            toolSelector.Verify(
+                provider => provider.CreateAndShow(
+                    It.IsAny<IEnumerable<EditorEnums>>()),
+                Times.Never);
+            scopeRepository.Verify(
+                repository => repository.CreateScope(
+                    typeof(TestFileEditor)),
+                Times.Once);
+
+            manager.CloseTool(firstEditor);
+            var reopenedResult = manager.CreateFromFile(file, null);
+
+            NUnit.Framework.Assert.Multiple(() =>
+            {
+                NUnit.Framework.Assert.That(
+                    reopenedResult,
+                    NUnit.Framework.Is.SameAs(reopenedEditor));
+                NUnit.Framework.Assert.That(
+                    manager.CurrentEditorsList,
+                    NUnit.Framework.Is.EqualTo(new[] { reopenedEditor }));
+                NUnit.Framework.Assert.That(
+                    manager.SelectedEditorIndex,
+                    NUnit.Framework.Is.Zero);
+                NUnit.Framework.Assert.That(
+                    ApplicationStateRecorder.GetNumberOfOpenedEditors(),
+                    NUnit.Framework.Is.EqualTo(initialOpenCount + 2));
+            });
+            toolSelector.Verify(
+                provider => provider.CreateAndShow(
+                    It.IsAny<IEnumerable<EditorEnums>>()),
+                Times.Once);
+            scopeRepository.Verify(
+                repository => repository.CreateScope(
+                    typeof(TestFileEditor)),
+                Times.Exactly(2));
+            scopeRepository.Verify(
+                repository => repository.RemoveScope(firstEditor),
+                Times.Once);
+            NUnit.Framework.Assert.That(
+                firstEditor.CloseCount,
+                NUnit.Framework.Is.EqualTo(1));
+        }
+
         [NUnit.Framework.Test]
         public void BeforePackFileContainerRemoved_DefersClosingUntilUnloadIsApproved()
         {
@@ -436,6 +560,17 @@ namespace AssetEditorTests
             }
 
             return editor;
+        }
+
+        private sealed class TestFileEditor : IEditorInterface, IFileEditor
+        {
+            public string DisplayName { get; set; } = "Test editor";
+            public PackFile CurrentFile { get; private set; } = null!;
+            public int CloseCount { get; private set; }
+
+            public void LoadFile(PackFile file) => CurrentFile = file;
+
+            public void Close() => CloseCount++;
         }
     }
 }
