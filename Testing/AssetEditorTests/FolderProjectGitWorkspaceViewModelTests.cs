@@ -260,6 +260,71 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
+    public async Task VisibleGitManagement_DirectoryChangeRefreshesProjectSettings()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        Action<FolderProjectChangedEvent>? changed = null;
+        var eventHub = new Mock<IGlobalEventHub>();
+        eventHub.Setup(item => item.Register(
+                It.IsAny<object>(),
+                It.IsAny<Action<FolderProjectChangedEvent>>()))
+            .Callback<object, Action<FolderProjectChangedEvent>>(
+                (_, callback) => changed = callback);
+        var workspace = CreateWorkspace(
+            out var versionControl,
+            out var service,
+            eventHub: eventHub.Object);
+        service.Setup(item => item.GetStatus(
+                project.ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(
+                        new[] { FolderProjectSettings.CnFileName }))))
+            .Returns(
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "master",
+                    "1111111",
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    [
+                        new FolderProjectWorkingChange(
+                            FolderProjectSettings.CnFileName,
+                            FolderProjectWorkingChangeKind.Modified |
+                            FolderProjectWorkingChangeKind.Unstaged),
+                    ]));
+        workspace.SetEditableContainer(project);
+        versionControl.HasRepositorySnapshot = true;
+        workspace.ShowGitManagement();
+
+        changed!(
+            new FolderProjectChangedEvent(
+                project,
+                new FolderProjectChangeSet(
+                    1,
+                    [],
+                    [
+                        new FolderProjectDirectoryChange(
+                            "empty",
+                            FolderProjectDirectoryChangeKind.Added),
+                    ])));
+        await workspace.WorkingChangesRefreshTask;
+
+        NUnitAssert.That(
+            versionControl.WorkingChanges.Select(item => item.RepositoryPath),
+            Is.EqualTo(new[] { FolderProjectSettings.CnFileName }));
+        service.Verify(
+            item => item.GetStatus(
+                project.ProjectRoot,
+                It.Is<IReadOnlyList<string>>(
+                    paths => paths.SequenceEqual(
+                        new[] { FolderProjectSettings.CnFileName }))),
+            Times.Once);
+    }
+
+    [Test]
     public async Task LargeFolderProjectChangeBatch_UsesOneFullStatusRefresh()
     {
         using var directory = new TemporaryDirectory();

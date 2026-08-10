@@ -238,6 +238,11 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
                 if (!string.IsNullOrWhiteSpace(change.PreviousPath))
                     _pendingWorkingChangePaths.Add(change.PreviousPath);
             }
+            if (e.ChangeSet.DirectoryChanges.Count != 0)
+            {
+                _pendingWorkingChangePaths.Add(
+                    FolderProjectSettings.CnFileName);
+            }
             if (_pendingWorkingChangePaths.Count >
                 MaxIncrementalStatusPaths)
             {
