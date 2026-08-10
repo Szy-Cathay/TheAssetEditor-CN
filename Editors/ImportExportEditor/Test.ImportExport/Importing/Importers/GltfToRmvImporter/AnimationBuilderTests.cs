@@ -293,6 +293,68 @@ public class AnimationBuilderTests
     }
 
     [Test]
+    public void Build_UnitScaleKeysWithRetargetMatrixDrift_DoesNotRejectScale()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var joint = scene.CreateNode("root");
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("skinned_mesh");
+        geometry.UsePrimitive(
+                new MaterialBuilder("material").WithMetallicRoughness())
+            .AddTriangle(
+                CreateSkinnedVertex(Numerics.Vector3.Zero),
+                CreateSkinnedVertex(Numerics.Vector3.UnitX),
+                CreateSkinnedVertex(Numerics.Vector3.UnitY));
+        scene.CreateNode("mesh").WithSkinnedMesh(
+            modelRoot.CreateMesh(geometry),
+            (joint, Numerics.Matrix4x4.Identity));
+        var animation = modelRoot.CreateAnimation("Blender Roundtrip");
+        animation.CreateScaleChannel(joint, new Dictionary<float, Numerics.Vector3>
+        {
+            [0] = Numerics.Vector3.One,
+            [1] = new Numerics.Vector3(0.9999999f, 1, 1),
+        });
+        animation.CreateRotationChannel(joint, new Dictionary<float, Numerics.Quaternion>
+        {
+            [0] = Numerics.Quaternion.Identity,
+            [1] = Numerics.Quaternion.Identity,
+        });
+        var skeleton = CreateSingleBoneSkeleton();
+        var targetBindRotation = Numerics.Quaternion.CreateFromAxisAngle(
+            Numerics.Vector3.UnitZ,
+            MathF.PI / 2.0f);
+        const float storedQuaternionLength = 1.000078f;
+        skeleton.AnimationParts[0].DynamicFrames[0].Quaternion[0] =
+            new Shared.GameFormats.RigidModel.Transforms.RmvVector4(
+                targetBindRotation.X * storedQuaternionLength,
+                targetBindRotation.Y * storedQuaternionLength,
+                targetBindRotation.Z * storedQuaternionLength,
+                targetBindRotation.W * storedQuaternionLength);
+
+        var imported = AnimationBuilder.Build(
+            new AnimationBuilderSettings(
+                modelRoot,
+                "test",
+                1.0f,
+                new PackFileContainer("test"),
+                "animations",
+                false),
+            skeleton,
+            animation);
+
+        var rotation = imported.AnimationParts[0].DynamicFrames[0].Quaternion[0];
+        var rotationLength = MathF.Sqrt(
+            rotation.X * rotation.X +
+            rotation.Y * rotation.Y +
+            rotation.Z * rotation.Z +
+            rotation.W * rotation.W);
+        Assert.That(rotationLength, Is.EqualTo(1.0f).Within(0.000001f));
+    }
+
+    [Test]
     public void TrackSampler_PartialTranslationChannel_PreservesNodeRotation()
     {
         var modelRoot = ModelRoot.CreateModel();
