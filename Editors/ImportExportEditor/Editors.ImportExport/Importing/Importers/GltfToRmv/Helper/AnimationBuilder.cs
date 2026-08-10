@@ -24,7 +24,8 @@ public class AnimationBuilder
     public static AnimationFile Build(
         AnimationBuilderSettings settings,
         AnimationFile skeletonAnimFile,
-        Animation animation)
+        Animation animation,
+        Action<int, int>? reportProgress = null)
     {
         if (!float.IsFinite(settings.KeysPerSecond) || settings.KeysPerSecond <= 0)
             throw new ArgumentOutOfRangeException(nameof(settings.KeysPerSecond), "动画采样率必须大于 0。");
@@ -65,6 +66,7 @@ public class AnimationBuilder
             settings.ModelRoot,
             skeletonAnimFile,
             animation);
+        reportProgress?.Invoke(0, keyCount);
 
         for (var keyIndex = 0; keyIndex < keyCount; keyIndex++)
         {
@@ -78,9 +80,21 @@ public class AnimationBuilder
                 keyTime,
                 frame);
             part.DynamicFrames.Add(frame);
+            var completed = keyIndex + 1;
+            if (ShouldReportProgress(completed, keyCount))
+                reportProgress?.Invoke(completed, keyCount);
         }
 
         return newAnimFile;
+    }
+
+    private static bool ShouldReportProgress(int completed, int total)
+    {
+        if (completed == total)
+            return true;
+
+        var interval = Math.Max(1, total / 100);
+        return completed % interval == 0;
     }
 
     private static float? DetectSamplingRate(ModelRoot modelRoot, Animation animation)

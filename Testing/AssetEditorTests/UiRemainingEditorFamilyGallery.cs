@@ -198,12 +198,23 @@ public class UiRemainingEditorFamilyGallery
                 var progressWindow = Application.Current.Windows
                     .OfType<OperationProgressWindow>()
                     .Single(window => window.Owner == importWindow);
+                var progressView = FindVisualDescendants<OperationProgressView>(
+                    progressWindow).Single();
                 NUnitAssert.Multiple(() =>
                 {
                     NUnitAssert.That(progressWindow.IsVisible, Is.True);
                     NUnitAssert.That(
                         progressWindow.Title,
                         Is.EqualTo("正在导入 glTF/GLB"));
+                    NUnitAssert.That(
+                        progressView.StatusText,
+                        Is.EqualTo("正在转换网格 1/2…"));
+                    NUnitAssert.That(
+                        progressView.CurrentDetailText,
+                        Is.EqualTo("模型“body” · 顶点 25/100"));
+                    NUnitAssert.That(progressView.ProgressValue, Is.EqualTo(25));
+                    NUnitAssert.That(progressView.ProgressMaximum, Is.EqualTo(100));
+                    NUnitAssert.That(progressView.IsProgressIndeterminate, Is.False);
                 });
                 Capture(
                     progressWindow,
@@ -1281,9 +1292,40 @@ public class UiRemainingEditorFamilyGallery
             PackFile importSource,
             string outputPath,
             PackFileContainer packFileContainer,
-            GameTypeEnum gameType)
+            GameTypeEnum gameType) =>
+            ExecuteCore(
+                importSource,
+                outputPath,
+                packFileContainer,
+                gameType,
+                null);
+
+        ImportResult IImporterViewModel.Execute(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress) =>
+            ExecuteCore(
+                importSource,
+                outputPath,
+                packFileContainer,
+                gameType,
+                progress);
+
+        private ImportResult ExecuteCore(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress)
         {
             ExecuteCalled = true;
+            progress?.Report(new OperationProgressUpdate(
+                "正在转换网格 1/2…",
+                "模型“body” · 顶点 25/100",
+                25,
+                100));
             _importerStarted.TrySetResult(true);
             try
             {
@@ -1293,7 +1335,8 @@ public class UiRemainingEditorFamilyGallery
                     importSource,
                     outputPath,
                     packFileContainer,
-                    gameType);
+                    gameType,
+                    progress);
             }
             finally
             {

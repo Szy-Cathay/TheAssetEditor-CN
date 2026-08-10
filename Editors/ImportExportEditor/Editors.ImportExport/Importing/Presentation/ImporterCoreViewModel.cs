@@ -6,6 +6,7 @@ using Editors.ImportExport.Importing;
 using Editors.ImportExport.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
+using Shared.Ui.Common.OperationProgress;
 
 namespace Editors.ImportExport.Importing.Presentation
 {
@@ -77,7 +78,8 @@ namespace Editors.ImportExport.Importing.Presentation
                 SelectedImporter = PossibleImporters.First();
         }
 
-        public Task<ImportResult> ImportAsync()
+        public Task<ImportResult> ImportAsync(
+            IProgress<OperationProgressUpdate>? progress = null)
         {
             if (SelectedImporter == null || _inputFile == null || _destPackFileContainer == null)
                 throw new InvalidOperationException("没有可用于当前文件的导入器。");
@@ -86,7 +88,8 @@ namespace Editors.ImportExport.Importing.Presentation
                 _inputFile,
                 _packPath,
                 _destPackFileContainer,
-                _applicationSettings.CurrentSettings.CurrentGame));
+                _applicationSettings.CurrentSettings.CurrentGame,
+                progress));
         }
 
         [RelayCommand]

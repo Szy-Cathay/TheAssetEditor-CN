@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
@@ -69,6 +70,7 @@ public sealed class OperationProgressWindowHost : FrameworkElement
             new PropertyMetadata(string.Empty));
 
     private OperationProgressWindow? _window;
+    private Task _completionTask = Task.CompletedTask;
     private readonly OperationProgressVisibilityController
         _visibilityController;
 
@@ -136,6 +138,12 @@ public sealed class OperationProgressWindowHost : FrameworkElement
         set => SetValue(CancelTextProperty, value);
     }
 
+    public Task CompleteAsync()
+    {
+        SetCurrentValue(IsOperationActiveProperty, false);
+        return _completionTask;
+    }
+
     private void OnLoaded(object sender, RoutedEventArgs eventArgs)
     {
         if (IsOperationActive)
@@ -194,12 +202,13 @@ public sealed class OperationProgressWindowHost : FrameworkElement
         var host = (OperationProgressWindowHost)dependencyObject;
         if (eventArgs.NewValue is true)
         {
+            host._completionTask = Task.CompletedTask;
             if (host.IsLoaded)
                 host._visibilityController.Begin();
         }
         else
         {
-            _ = host._visibilityController.EndAsync();
+            host._completionTask = host._visibilityController.EndAsync();
         }
     }
 }

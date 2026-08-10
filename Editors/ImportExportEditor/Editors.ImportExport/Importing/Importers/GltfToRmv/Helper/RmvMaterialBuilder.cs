@@ -13,6 +13,7 @@ using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
+using Shared.Ui.Common.OperationProgress;
 using Shared.GameFormats.RigidModel.Types;
 using SharpGLTF.Schema2;
 using TextureType = Shared.GameFormats.RigidModel.Types.TextureType;
@@ -68,7 +69,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             GltfImporterSettings settings,
             SharpGLTF.Schema2.ModelRoot modelRoot,
             RmvFile rmvFile,
-            IReadOnlyList<RmvMeshBuilder.MeshSource> meshSources)
+            IReadOnlyList<RmvMeshBuilder.MeshSource> meshSources,
+            IProgress<OperationProgressUpdate>? progress = null)
         {
             ValidateInput_BuildRmvFileMaterials(modelRoot, rmvFile, meshSources);
 
@@ -78,6 +80,14 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             var skippedSemantics = new HashSet<SkippedMaterialSemantic>();
             for (int i = 0; i < meshSources.Count; i++)
             {
+                progress?.Report(new OperationProgressUpdate(
+                    LocalizationManager.Instance.GetFormat(
+                        "ImportWindow.Progress.Materials",
+                        i + 1,
+                        meshSources.Count),
+                    meshSources[i].ModelName,
+                    i,
+                    meshSources.Count));
                 BuildRmvModelMaterial(
                     settings,
                     meshSources[i],
@@ -87,6 +97,14 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
                     maskedMaterials,
                     skippedSemantics
                 );
+                progress?.Report(new OperationProgressUpdate(
+                    LocalizationManager.Instance.GetFormat(
+                        "ImportWindow.Progress.Materials",
+                        i + 1,
+                        meshSources.Count),
+                    meshSources[i].ModelName,
+                    i + 1,
+                    meshSources.Count));
             }
 
             rmvFile.RecalculateOffsets();

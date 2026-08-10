@@ -12,6 +12,7 @@ using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.GameFormats.RigidModel.Vertex;
+using Shared.Ui.Common.OperationProgress;
 using Shared.TestUtility;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
@@ -63,7 +64,11 @@ public class GltfFullWorkflowImportTests
         });
 
         var destination = new PackFileContainer("test");
-        var importer = CreateImporter(destination);
+        var progressUpdates = new List<OperationProgressUpdate>();
+        OperationProgressUpdate? progressAtPackWrite = null;
+        var importer = CreateImporter(
+            destination,
+            () => progressAtPackWrite = progressUpdates.LastOrDefault());
         var result = importer.Import(new GltfImporterSettings(
             glbPath,
             "models",
@@ -77,7 +82,8 @@ public class GltfFullWorkflowImportTests
             AnimationKeysPerSecond: 24,
             MirrorMesh: true,
             AutoDetectAnimationKeysPerSecond: true,
-            AutoScaleHumanoid: true));
+            AutoScaleHumanoid: true),
+            new InlineProgress<OperationProgressUpdate>(progressUpdates.Add));
 
         Assert.That(
             result.Succeeded,
@@ -198,6 +204,40 @@ public class GltfFullWorkflowImportTests
             Assert.That(message, Does.Contain("源模型正面方向"));
             Assert.That(message, Does.Contain("+Z（标准 glTF）"));
             Assert.That(message, Does.Contain("未增加额外旋转"));
+            Assert.That(
+                progressUpdates[0].Status,
+                Is.EqualTo("正在读取并验证 glTF/GLB…"));
+            Assert.That(progressUpdates[0].Total, Is.Zero);
+            Assert.That(
+                progressUpdates,
+                Has.Some.Matches<OperationProgressUpdate>(update =>
+                    update.Status.StartsWith(
+                        "正在转换网格",
+                        StringComparison.Ordinal) &&
+                    update.Completed > 0 &&
+                    update.Completed < update.Total &&
+                    !string.IsNullOrWhiteSpace(update.Detail)));
+            Assert.That(
+                progressUpdates,
+                Has.Some.Matches<OperationProgressUpdate>(update =>
+                    update.Status.StartsWith(
+                        "正在转换动画",
+                        StringComparison.Ordinal) &&
+                    update.Completed > 0 &&
+                    update.Completed < update.Total &&
+                    update.Detail?.Contains(
+                        "采样帧",
+                        StringComparison.Ordinal) == true));
+            Assert.That(
+                progressAtPackWrite?.Status,
+                Is.EqualTo("正在写入当前 Pack…"));
+            Assert.That(progressAtPackWrite?.Total, Is.Zero);
+            Assert.That(
+                progressUpdates[^1].Status,
+                Is.EqualTo("导入处理完成"));
+            Assert.That(
+                progressUpdates[^1].Completed,
+                Is.EqualTo(progressUpdates[^1].Total));
         });
     }
 
@@ -465,7 +505,9 @@ public class GltfFullWorkflowImportTests
         });
     }
 
-    private static GltfImporter CreateImporter(PackFileContainer destination)
+    private static GltfImporter CreateImporter(
+        PackFileContainer destination,
+        Action? beforePackWrite = null)
     {
         var innerPackFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
         var referenceContainer = CreateReferenceContainer();
@@ -480,14 +522,22 @@ public class GltfFullWorkflowImportTests
                 It.IsAny<bool>()))
             .Callback<PackFileContainer, List<NewPackFileEntry>, bool>(
                 (container, entries, overwriteExisting) =>
+                {
+                    beforePackWrite?.Invoke();
                     innerPackFileService.AddFilesToPack(
                         container,
                         entries,
-                        overwriteExisting));
+                        overwriteExisting);
+                });
         return new GltfImporter(
             packFileService.Object,
             Mock.Of<ISkeletonAnimationLookUpHelper>(),
             new RmvMaterialBuilder());
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 
     private static GltfImporterSettings CreateFullWorkflowSettings(

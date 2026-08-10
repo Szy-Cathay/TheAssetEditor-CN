@@ -84,7 +84,17 @@ namespace AssetEditor.ViewModels
         void OpenFile(PackFile file) => _uiCommandFactory.Create<OpenEditorCommand>().Execute(file);
 
         [RelayCommand]
-        internal async Task Closing(IEditorInterface? editor)
+        internal Task Closing(IEditorInterface? editor) =>
+            ClosingCore(editor, null);
+
+        internal Task ClosingWithProgressCompletion(
+            IEditorInterface? editor,
+            Func<Task> completeProgressWindowAsync) =>
+            ClosingCore(editor, completeProgressWindowAsync);
+
+        private async Task ClosingCore(
+            IEditorInterface? editor,
+            Func<Task>? completeProgressWindowAsync)
         {
             IsClosingWithoutPrompt = false;
             var hasUnsavedPackFiles = FileTree.Files.Any(
@@ -152,6 +162,24 @@ namespace AssetEditor.ViewModels
             }
             progressTimer.Tick += (_, _) => ApplyProgress(currentProgress);
 
+            var progressCompleted = false;
+            async Task CompleteProgressAsync()
+            {
+                if (progressCompleted)
+                    return;
+
+                progressCompleted = true;
+                progressTimer.Stop();
+                stopwatch.Stop();
+                LoadingStatusText = "";
+                LoadingProgressDetailText = "";
+                LoadingProgressValue = 0;
+                LoadingProgressIsIndeterminate = false;
+                IsLoadingPacks = false;
+                if (completeProgressWindowAsync != null)
+                    await completeProgressWindowAsync();
+            }
+
             IsLoadingPacks = true;
             ApplyProgress(currentProgress);
             progressTimer.Start();
@@ -163,17 +191,12 @@ namespace AssetEditor.ViewModels
                 IsClosingWithoutPrompt =
                     await _folderProjectCloseGuard.CanCloseAsync(
                         project,
-                        ApplyProgress);
+                        ApplyProgress,
+                        CompleteProgressAsync);
             }
             finally
             {
-                progressTimer.Stop();
-                stopwatch.Stop();
-                LoadingStatusText = "";
-                LoadingProgressDetailText = "";
-                LoadingProgressValue = 0;
-                LoadingProgressIsIndeterminate = false;
-                IsLoadingPacks = false;
+                await CompleteProgressAsync();
             }
         }
 

@@ -9,6 +9,7 @@ using Shared.GameFormats.RigidModel.LodHeader;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.RigidModel.Types;
 using Shared.GameFormats.RigidModel.Vertex;
+using Shared.Ui.Common.OperationProgress;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Schema2;
@@ -43,7 +44,8 @@ public class RmvMeshBuilder
         ModelRoot modelRoot,
         AnimationFile? animSkeletonFile,
         string skeletonName,
-        float scaleFactor = 1)
+        float scaleFactor = 1,
+        IProgress<OperationProgressUpdate>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(modelRoot);
 
@@ -82,14 +84,20 @@ public class RmvMeshBuilder
             .Select(source => source.ModelName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var usedOutputNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var source in meshSources)
+        for (var sourceIndex = 0;
+             sourceIndex < meshSources.Count;
+             sourceIndex++)
         {
+            var source = meshSources[sourceIndex];
             var sourceSkeleton = source.Node.Skin != null ? animSkeletonFile : null;
             var generationResult = GenerateRmvMeshes(
                 source,
                 sourceSkeleton,
                 scaleFactor,
-                settings.SourceForwardDirection);
+                settings.SourceForwardDirection,
+                sourceIndex,
+                meshSources.Count,
+                progress);
             var generatedSegments = generationResult.Segments;
             if (generationResult.SourceExceededVertexLimit)
             {
@@ -192,7 +200,10 @@ public class RmvMeshBuilder
         MeshSource source,
         AnimationFile? animSkeletonFile,
         float scaleFactor,
-        GltfSourceForwardDirection sourceForwardDirection)
+        GltfSourceForwardDirection sourceForwardDirection,
+        int sourceIndex,
+        int sourceCount,
+        IProgress<OperationProgressUpdate>? progress)
     {
         var vertexBufferColumns = source.Primitive.GetVertexColumns();
         if (vertexBufferColumns.Positions == null || !vertexBufferColumns.Positions.Any())
@@ -225,6 +236,14 @@ public class RmvMeshBuilder
                 source.Primitive.DrawPrimitiveType));
         }
 
+        progress?.Report(new OperationProgressUpdate(
+            LocalizationManager.Instance.GetFormat(
+                "ImportWindow.Progress.Meshes",
+                sourceIndex + 1,
+                sourceCount),
+            LocalizationManager.Instance.GetFormat(
+                "ImportWindow.Progress.MeshPreparing",
+                source.ModelName)));
         var triangles = source.Primitive.GetTriangleIndices()
             .Select(triangle => (
                 A: checked((int)triangle.A),
@@ -233,6 +252,9 @@ public class RmvMeshBuilder
             .ToList();
         var plans = CreateSegmentPlans(source, positionsCount, triangles);
         var output = new List<(RmvMesh, RmvMeshSegmentImportSummary)>(plans.Count);
+        var totalOutputVertices = plans.Sum(plan => plan.SourceVertexIndices.Count);
+        var completedVertices = 0L;
+        ReportVertexProgress();
         foreach (var plan in plans)
         {
             var rmv2Mesh = new RmvMesh
@@ -262,6 +284,9 @@ public class RmvMeshBuilder
                     scaleFactor,
                     sourceForwardDirection);
                 rmv2Mesh.VertexList[outputVertexIndex] = converted.Vertex;
+                completedVertices++;
+                if (ShouldReportProgress(completedVertices, totalOutputVertices))
+                    ReportVertexProgress();
                 if (converted.DiscardedWeight > 0)
                 {
                     affectedVertices++;
@@ -273,6 +298,14 @@ public class RmvMeshBuilder
                 }
             }
 
+            progress?.Report(new OperationProgressUpdate(
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.Meshes",
+                    sourceIndex + 1,
+                    sourceCount),
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.MeshFinishing",
+                    source.ModelName)));
             if (rebuildNormals)
                 RebuildNormals(rmv2Mesh);
             TangentBasisCalculator.CalculateForRmv2Mesh(rmv2Mesh);
@@ -293,6 +326,29 @@ public class RmvMeshBuilder
         return new MeshGenerationResult(
             output,
             positionsCount > MaxVerticesPerSegment);
+
+        void ReportVertexProgress() => progress?.Report(
+            new OperationProgressUpdate(
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.Meshes",
+                    sourceIndex + 1,
+                    sourceCount),
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.MeshVertices",
+                    source.ModelName,
+                    completedVertices,
+                    totalOutputVertices),
+                completedVertices,
+                totalOutputVertices));
+    }
+
+    private static bool ShouldReportProgress(long completed, long total)
+    {
+        if (completed == total)
+            return true;
+
+        var interval = Math.Max(1, total / 100);
+        return completed % interval == 0;
     }
 
     private static string GetUniqueOutputModelName(
