@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -38,27 +40,8 @@ public class UiMainShellGallery
     [TestCase(ThemeType.HighContrastLight, "focus")]
     public void MainShell_RendersRequiredThemeAndWidth(
         ThemeType theme,
-        string variant)
-    {
-        var settings = new ApplicationSettingsService();
-        var autoSaveService = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
-        var editorDatabase = new Mock<IEditorDatabase>();
-        editorDatabase
-            .Setup(database => database.GetViewTypeFromViewModel(
-                typeof(ShellPreviewEditor)))
-            .Returns(typeof(MainShellPreviewEditorView));
-        using var services = new ServiceCollection()
-            .AddSingleton(LocalizationManager.Instance)
-            .AddSingleton(settings)
-            .AddSingleton(autoSaveService)
-            .BuildServiceProvider();
-
-        WpfTestApplicationHost.InvokeWithThemeResources(
-            services,
-            () => Render(theme, variant, editorDatabase.Object));
-    }
+        string variant) => WithMainShellServices(
+            editorDatabase => Render(theme, variant, editorDatabase));
 
     [TestCase(ThemeType.DarkTheme)]
     [TestCase(ThemeType.LightTheme)]
@@ -141,7 +124,7 @@ public class UiMainShellGallery
                         Has.Count.EqualTo(5));
                 });
 
-                closeButton.Command.Execute(closeButton.CommandParameter);
+                InvokeButton(closeButton);
                 window.UpdateLayout();
 
                 var itemsHolder = (Panel)editors.Template.FindName(
@@ -176,8 +159,7 @@ public class UiMainShellGallery
 
                 var selectedCloseButton =
                     FindVisualChild<Button>(nextSelectedTab)!;
-                selectedCloseButton.Command.Execute(
-                    selectedCloseButton.CommandParameter);
+                InvokeButton(selectedCloseButton);
                 window.UpdateLayout();
 
                 NUnitAssert.Multiple(() =>
@@ -200,7 +182,57 @@ public class UiMainShellGallery
 
     private static void WithWrappedEditorTabs(
         ThemeType theme,
-        Action<MainWindow, ShellPreviewViewModel, CachedTabControl> verify)
+        Action<MainWindow, ShellPreviewViewModel, CachedTabControl> verify) =>
+        WithMainShellServices(editorDatabase =>
+        {
+            var previousTheme = ThemesController.CurrentTheme;
+            MainWindow? window = null;
+            try
+            {
+                ThemesController.SetTheme(theme);
+                var viewModel = new ShellPreviewViewModel(
+                    editorDatabase,
+                    includeEditors: false,
+                    isLoading: false,
+                    gitEnabled: true);
+                foreach (var name in s_wrappedEditorNames)
+                {
+                    viewModel.EditorManager.CurrentEditorsList.Add(
+                        new ShellPreviewEditor(name));
+                }
+
+                window = new MainWindow(
+                    ((IAssetEditorMain)Application.Current).ServiceProvider)
+                {
+                    Width = 1800,
+                    Height = 760,
+                    WindowStyle = WindowStyle.None,
+                    ResizeMode = ResizeMode.NoResize,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    DataContext = viewModel,
+                };
+                window.Show();
+                window.UpdateLayout();
+
+                var editors = (CachedTabControl)window.FindName(
+                    "EditorsTabControl");
+                editors.Width = 720;
+                editors.HorizontalAlignment = HorizontalAlignment.Left;
+                editors.SelectedIndex = 0;
+                editors.ApplyTemplate();
+                window.UpdateLayout();
+                verify(window, viewModel, editors);
+            }
+            finally
+            {
+                window?.Close();
+                ThemesController.SetTheme(previousTheme);
+            }
+        });
+
+    private static void WithMainShellServices(
+        Action<IEditorDatabase> action)
     {
         var settings = new ApplicationSettingsService();
         var autoSaveService = new PackAutoSaveService(
@@ -219,56 +251,10 @@ public class UiMainShellGallery
 
         WpfTestApplicationHost.InvokeWithThemeResources(
             services,
-            () =>
-            {
-                var previousTheme = ThemesController.CurrentTheme;
-                MainWindow? window = null;
-                try
-                {
-                    ThemesController.SetTheme(theme);
-                    var viewModel = new ShellPreviewViewModel(
-                        editorDatabase.Object,
-                        includeEditors: false,
-                        isLoading: false,
-                        gitEnabled: true);
-                    foreach (var name in WrappedEditorNames)
-                    {
-                        viewModel.EditorManager.CurrentEditorsList.Add(
-                            new ShellPreviewEditor(name));
-                    }
-
-                    window = new MainWindow(
-                        ((IAssetEditorMain)Application.Current).ServiceProvider)
-                    {
-                        Width = 1800,
-                        Height = 760,
-                        WindowStyle = WindowStyle.None,
-                        ResizeMode = ResizeMode.NoResize,
-                        ShowActivated = false,
-                        ShowInTaskbar = false,
-                        DataContext = viewModel,
-                    };
-                    window.Show();
-                    window.UpdateLayout();
-
-                    var editors = (CachedTabControl)window.FindName(
-                        "EditorsTabControl");
-                    editors.Width = 720;
-                    editors.HorizontalAlignment = HorizontalAlignment.Left;
-                    editors.SelectedIndex = 0;
-                    editors.ApplyTemplate();
-                    window.UpdateLayout();
-                    verify(window, viewModel, editors);
-                }
-                finally
-                {
-                    window?.Close();
-                    ThemesController.SetTheme(previousTheme);
-                }
-            });
+            () => action(editorDatabase.Object));
     }
 
-    private static readonly string[] WrappedEditorNames =
+    private static readonly string[] s_wrappedEditorNames =
     {
         "3k_dlc05_unit_wood_bandit_gang.variantmeshdefinition",
         "3k_dlc05_unit_wood_tiger_guard.variantmeshdefinition",
@@ -302,6 +288,17 @@ public class UiMainShellGallery
             RoutedEvent = Mouse.PreviewMouseDownEvent,
             Source = element,
         });
+
+    private static void InvokeButton(Button button)
+    {
+        var peer = new ButtonAutomationPeer(button);
+        var provider = (IInvokeProvider)peer.GetPattern(
+            PatternInterface.Invoke);
+        provider.Invoke();
+        button.Dispatcher.Invoke(
+            () => { },
+            System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+    }
 
     private static object VisibleContent(Panel itemsHolder) =>
         itemsHolder.Children
@@ -396,14 +393,7 @@ public class UiMainShellGallery
                 }
             });
 
-            var dpi = VisualTreeHelper.GetDpi(window);
-            var bitmap = new RenderTargetBitmap(
-                (int)Math.Ceiling(window.ActualWidth * dpi.DpiScaleX),
-                (int)Math.Ceiling(window.ActualHeight * dpi.DpiScaleY),
-                dpi.PixelsPerInchX,
-                dpi.PixelsPerInchY,
-                PixelFormats.Pbgra32);
-            bitmap.Render(window);
+            var bitmap = RenderToBitmap(window);
 
             NUnitAssert.Multiple(() =>
             {
@@ -411,19 +401,9 @@ public class UiMainShellGallery
                 NUnitAssert.That(bitmap.PixelHeight, Is.GreaterThan(0));
             });
 
-            var outputDirectory = Environment.GetEnvironmentVariable(
-                "AE_UI_QA_OUTPUT");
-            if (!string.IsNullOrWhiteSpace(outputDirectory))
-            {
-                Directory.CreateDirectory(outputDirectory);
-                var path = Path.Combine(
-                    outputDirectory,
-                    $"main-shell-{variant}-{theme}.png");
-                using var stream = File.Create(path);
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                encoder.Save(stream);
-            }
+            SaveSnapshot(
+                window,
+                $"main-shell-{variant}-{theme}.png");
 
             if (variant == "normal")
             {
@@ -505,6 +485,19 @@ public class UiMainShellGallery
             return;
 
         Directory.CreateDirectory(outputDirectory);
+        var bitmap = RenderToBitmap(element);
+
+        using var stream = File.Create(Path.Combine(
+            outputDirectory,
+            fileName));
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        encoder.Save(stream);
+    }
+
+    private static RenderTargetBitmap RenderToBitmap(
+        FrameworkElement element)
+    {
         var dpi = VisualTreeHelper.GetDpi(element);
         var bitmap = new RenderTargetBitmap(
             (int)Math.Ceiling(element.ActualWidth * dpi.DpiScaleX),
@@ -513,13 +506,7 @@ public class UiMainShellGallery
             dpi.PixelsPerInchY,
             PixelFormats.Pbgra32);
         bitmap.Render(element);
-
-        using var stream = File.Create(Path.Combine(
-            outputDirectory,
-            fileName));
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        encoder.Save(stream);
+        return bitmap;
     }
 
     private static TreeViewItem TreeItem(
