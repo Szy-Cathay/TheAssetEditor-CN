@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
@@ -198,14 +198,7 @@ public class ToolSelectorWindowTests
     }
 
     private static void RaiseDoubleClick(UIElement element) =>
-        element.RaiseEvent(new MouseButtonEventArgs(
-            Mouse.PrimaryDevice,
-            Environment.TickCount,
-            MouseButton.Left)
-        {
-            RoutedEvent = Control.MouseDoubleClickEvent,
-            Source = element,
-        });
+        RaiseMouseButtonEvent(element, Control.MouseDoubleClickEvent);
 
     private static void RaiseSingleClick(
         ToolSelectorWindow window,
