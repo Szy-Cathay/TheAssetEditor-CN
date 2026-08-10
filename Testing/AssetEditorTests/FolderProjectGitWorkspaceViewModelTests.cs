@@ -1965,7 +1965,7 @@ public class FolderProjectGitWorkspaceViewModelTests
                 sidebarTabs.Attribute("Style")?.Value,
                 Is.EqualTo("{StaticResource AeShell.WorkspaceSidebar}"));
             NUnitAssert.That(
-                editorHeader.Attribute("Height")?.Value,
+                editorHeader.Attribute("MinHeight")?.Value,
                 Is.EqualTo("{StaticResource AeSize.TabHeight}"));
             NUnitAssert.That(
                 workspaceStyle.Descendants(presentation + "TabPanel"),
@@ -2017,6 +2017,9 @@ public class FolderProjectGitWorkspaceViewModelTests
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
                 "AeShell.EditorTabs");
+        var editorHeaderRow = editorStyle
+            .Descendants(presentation + "RowDefinition")
+            .First();
         var splitterStyle = shell.Descendants(presentation + "Style")
             .Single(element =>
                 element.Attribute(xaml + "Key")?.Value ==
@@ -2041,8 +2044,11 @@ public class FolderProjectGitWorkspaceViewModelTests
                         setter.Attribute("Value")?.Value == "0"),
                 Is.True);
             NUnitAssert.That(
-                editorHeader.Attribute("Height")?.Value,
+                editorHeader.Attribute("MinHeight")?.Value,
                 Is.EqualTo("{StaticResource AeSize.TabHeight}"));
+            NUnitAssert.That(
+                editorHeaderRow.Attribute("Height")?.Value,
+                Is.EqualTo("Auto"));
             NUnitAssert.That(
                 editorHeader.Parent?.Attribute("Background")?.Value,
                 Is.EqualTo("{DynamicResource AeBrush.Surface1}"));

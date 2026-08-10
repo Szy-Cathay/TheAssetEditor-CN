@@ -147,7 +147,7 @@
                 <ControlTemplate TargetType="{x:Type views:CachedTabControl}">
                     <Grid KeyboardNavigation.TabNavigation="Local">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="24" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <Border
@@ -156,7 +156,7 @@
                             BorderThickness="0,0,0,1">
                             <TabPanel
                                 x:Name="HeaderPanel"
-                                Height="{StaticResource AeSize.TabHeight}"
+                                MinHeight="{StaticResource AeSize.TabHeight}"
                                 IsItemsHost="True"
                                 KeyboardNavigation.TabIndex="1"
                                 Panel.ZIndex="1" />

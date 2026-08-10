@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -108,6 +109,13 @@ namespace AssetEditor.Views
             {
                 if (e.ChangedButton == MouseButton.Left)
                 {
+                    if (e.OriginalSource is DependencyObject source &&
+                        FindParent<ButtonBase>(source) is not null)
+                    {
+                        _draggedItem = null;
+                        return;
+                    }
+
                     _lastMouseDown = e.GetPosition(EditorsTabControl);
 
                     var item = (TabItem)sender;
@@ -231,6 +239,21 @@ namespace AssetEditor.Views
                 if (childOfChild != null)
                     return childOfChild;
             }
+            return null;
+        }
+
+        private static T? FindParent<T>(DependencyObject child)
+            where T : DependencyObject
+        {
+            DependencyObject? current = child;
+            while (current is not null)
+            {
+                if (current is T match)
+                    return match;
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
             return null;
         }
     }
