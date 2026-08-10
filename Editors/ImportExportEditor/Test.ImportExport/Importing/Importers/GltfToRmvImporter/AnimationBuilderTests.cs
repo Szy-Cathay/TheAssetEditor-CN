@@ -88,6 +88,64 @@ public class AnimationBuilderTests
             Is.LessThan(0.0001f));
     }
 
+    [TestCase(0.00005f, -1.00005f)]
+    [TestCase(0.0002f, -1.0f)]
+    public void Build_NearlyEquivalentBindPose_UsesExpectedAnimationBasis(
+        float sourceBindTranslation,
+        float expectedTranslation)
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var joint = scene.CreateNode("root");
+        joint.LocalMatrix = Numerics.Matrix4x4.CreateTranslation(
+            sourceBindTranslation,
+            0,
+            0);
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("skinned_mesh");
+        geometry.UsePrimitive(
+                new MaterialBuilder("material").WithMetallicRoughness())
+            .AddTriangle(
+                CreateSkinnedVertex(Numerics.Vector3.Zero),
+                CreateSkinnedVertex(Numerics.Vector3.UnitX),
+                CreateSkinnedVertex(Numerics.Vector3.UnitY));
+        scene.CreateNode("mesh").WithSkinnedMesh(
+            modelRoot.CreateMesh(geometry),
+            (joint, Numerics.Matrix4x4.CreateTranslation(
+                -sourceBindTranslation,
+                0,
+                0)));
+        var animation = modelRoot.CreateAnimation("near_bind_boundary");
+        var animatedTranslation = new Numerics.Vector3(
+            sourceBindTranslation + 1,
+            0,
+            0);
+        animation.CreateTranslationChannel(
+            joint,
+            new Dictionary<float, Numerics.Vector3>
+            {
+                [0] = animatedTranslation,
+                [1] = animatedTranslation,
+            });
+
+        var imported = AnimationBuilder.Build(
+            new AnimationBuilderSettings(
+                modelRoot,
+                "test",
+                1.0f,
+                new PackFileContainer("test"),
+                "animations",
+                false),
+            CreateSingleBoneSkeleton(),
+            animation);
+
+        Assert.That(
+            imported.AnimationParts[0].DynamicFrames[0].Transforms[0].X,
+            Is.EqualTo(expectedTranslation).Within(0.000001f));
+    }
+
     [Test]
     public void Build_UniformGltfKeys_AutoDetectsSamplingRateAndAnimDuration()
     {

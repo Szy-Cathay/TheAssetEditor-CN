@@ -164,6 +164,10 @@ def create_mesh(armature, bone_names, materials):
         group = mesh.vertex_groups.new(name=bone_name)
         group.add(range(len(vertices)), weight, "REPLACE")
     mesh.scale = (2.0, 2.0, 2.0)
+    bpy.context.view_layer.objects.active = mesh
+    mesh.select_set(True)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    mesh.select_set(False)
     world_matrix = mesh.matrix_world.copy()
     mesh.parent = armature
     mesh.matrix_world = world_matrix

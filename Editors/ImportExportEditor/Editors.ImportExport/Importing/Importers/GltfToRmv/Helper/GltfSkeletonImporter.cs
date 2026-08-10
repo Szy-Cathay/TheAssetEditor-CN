@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Numerics;
 using Shared.Core.Services;
 using Shared.GameFormats.Animation;
@@ -264,11 +264,13 @@ public static class GltfSkeletonImporter
 
     private static void ValidateBoneLocalTransform(Node joint, Node? parentJoint)
     {
-        var localMatrix = joint.WorldMatrix;
+        var localMatrix = GetVisualWorldMatrix(joint);
         var visualParent = parentJoint ?? joint.VisualParent;
         if (visualParent != null)
         {
-            if (!Matrix4x4.Invert(visualParent.WorldMatrix, out var inverseParent))
+            if (!Matrix4x4.Invert(
+                    GetVisualWorldMatrix(visualParent),
+                    out var inverseParent))
             {
                 throw new InvalidDataException(
                     LocalizationManager.Instance.GetFormat(
@@ -307,6 +309,15 @@ public static class GltfSkeletonImporter
                     "GltfImporter.Error.BoneScale",
                     joint.Name));
         }
+    }
+
+    private static Matrix4x4 GetVisualWorldMatrix(Node node)
+    {
+        var worldMatrix = node.LocalMatrix;
+        for (var parent = node.VisualParent; parent != null; parent = parent.VisualParent)
+            worldMatrix *= parent.LocalMatrix;
+
+        return worldMatrix;
     }
 
     private static bool HasShear(Matrix4x4 matrix)

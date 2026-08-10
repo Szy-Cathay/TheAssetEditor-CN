@@ -1,11 +1,21 @@
-using Editors.ImportExport.Exporting.Exporters.RmvToGltf;
+﻿using Editors.ImportExport.Exporting.Exporters.RmvToGltf;
 using Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers;
+using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 using GameWorld.Core.Animation;
+using GameWorld.Core.Services;
+using Moq;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel;
 using Shared.TestUtility;
+using SharpGLTF.Geometry;
+using SharpGLTF.Geometry.VertexTypes;
+using SharpGLTF.Materials;
 using SharpGLTF.Schema2;
+using Test.ImportExport.Exporting.Exporters.RmvToGlft;
 using Test.TestingUtility.TestUtility;
 using Xna = Microsoft.Xna.Framework;
 
@@ -15,6 +25,10 @@ public class AnimationRoundTripTests
 {
     private const string SkeletonPath = @"animations\skeletons\humanoid01.anim";
     private const string AnimationPath = @"animations\battle\humanoid01\2handed_hammer\stand\hu1_2hh_stand_idle_01.anim";
+    private const string ModelPath = @"variantmeshes\wh_variantmodels\hu1\emp\emp_karl_franz\emp_karl_franz.rigid_model_v2";
+
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
 
 
     [Test]
@@ -46,6 +60,7 @@ public class AnimationRoundTripTests
             exportSettings,
             gltfSkeleton,
             modelRoot);
+        AddMinimalSkinnedMesh(modelRoot, gltfSkeleton);
 
         var importedAnimation = AnimationBuilder.Build(
             new AnimationBuilderSettings(
@@ -57,6 +72,157 @@ public class AnimationRoundTripTests
             skeleton,
             modelRoot.LogicalAnimations.Single());
 
+        AssertAnimationsMatch(originalAnimation, importedAnimation, skeleton);
+    }
+
+    [Test]
+    public void ExportThenImport_RealHumanoidModel_PreservesNumericDataAndDoesNotCopySkeleton()
+    {
+        var packFileService = PackFileSerivceTestHelper.Create(
+            PathHelper.GetDataFolder(@"Data\Karl_and_celestialgeneral_Pack"));
+        var modelPackFile = packFileService.FindFile(ModelPath);
+        var skeletonPackFile = packFileService.FindFile(SkeletonPath);
+        Assert.That(modelPackFile, Is.Not.Null);
+        Assert.That(skeletonPackFile, Is.Not.Null);
+
+        var skeleton = AnimationFile.Create(skeletonPackFile!);
+        var originalModel = ModelFactory.Create().Load(
+            modelPackFile!.DataSource.ReadData());
+        var skeletonLookup = new Mock<ISkeletonAnimationLookUpHelper>();
+        skeletonLookup
+            .Setup(lookup => lookup.GetSkeletonFileFromName("humanoid01"))
+            .Returns(skeleton);
+        var textureHandler = new Mock<IGltfTextureHandler>();
+        textureHandler
+            .Setup(handler => handler.HandleTextures(
+                It.IsAny<RmvFile>(),
+                It.IsAny<RmvToGltfExporterSettings>()))
+            .Returns([]);
+        var sceneSaver = new TestGltfSceneSaver();
+        var glbPath = Path.Combine(
+            Path.GetTempPath(),
+            $"original_humanoid_roundtrip_{Guid.NewGuid():N}.glb");
+
+        try
+        {
+            var exportSettings = new RmvToGltfExporterSettings(
+                modelPackFile,
+                [],
+                glbPath,
+                ExportMaterials: false,
+                ConvertMaterialTextureToBlender: false,
+                ConvertNormalTextureToBlue: false,
+                ExportAnimations: false,
+                MirrorMesh: true,
+                SelectedGame: GameTypeEnum.Warhammer3);
+            var exporter = new RmvToGltfExporter(
+                sceneSaver,
+                new GltfMeshBuilder(),
+                textureHandler.Object,
+                new GltfSkeletonBuilder(packFileService),
+                new GltfAnimationBuilder(packFileService),
+                skeletonLookup.Object);
+
+            Assert.That(exporter.Export(exportSettings), Is.True);
+            sceneSaver.ModelRoot!.SaveGLB(glbPath);
+
+            var destination = new PackFileContainer("roundtrip");
+            var importer = new GltfImporter(
+                packFileService,
+                skeletonLookup.Object,
+                new RmvMaterialBuilder());
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                ImportMeshes: true,
+                ImportMaterials: false,
+                ConvertMaterialFromBlenderType: false,
+                ConvertNormalTextureFromBlueToOrangeType: false,
+                ImportAnimations: false,
+                AnimationKeysPerSecond: 20,
+                MirrorMesh: true,
+                AutoDetectAnimationKeysPerSecond: false,
+                AutoScaleHumanoid: false));
+
+            Assert.That(
+                result.Succeeded,
+                Is.True,
+                result.Exception?.ToString() ??
+                string.Join(Environment.NewLine, result.Errors));
+            var importedModelPath = result.OutputPaths.Single(path =>
+                path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase));
+            var importedModel = ModelFactory.Create().Load(
+                destination.FileList[importedModelPath].DataSource.ReadData());
+            var originalBounds = GetLod0Bounds(originalModel);
+            var importedBounds = GetLod0Bounds(importedModel);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    importedModel.ModelList[0].Sum(model => model.Mesh.IndexList.Length),
+                    Is.EqualTo(originalModel.ModelList[0]
+                        .Sum(model => model.Mesh.IndexList.Length)));
+                Assert.That(
+                    Xna.Vector3.Distance(originalBounds.Min, importedBounds.Min),
+                    Is.LessThan(0.001f));
+                Assert.That(
+                    Xna.Vector3.Distance(originalBounds.Max, importedBounds.Max),
+                    Is.LessThan(0.001f));
+                Assert.That(
+                    result.OutputPaths,
+                    Does.Not.Contain(SkeletonPath));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    private static void AddMinimalSkinnedMesh(
+        ModelRoot modelRoot,
+        ProcessedGltfSkeleton skeleton)
+    {
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("minimal_skinned_mesh");
+        var primitive = geometry.UsePrimitive(
+            new MaterialBuilder("material").WithMetallicRoughness());
+        primitive.AddTriangle(
+            CreateSkinnedVertex(0, 0),
+            CreateSkinnedVertex(1, 0),
+            CreateSkinnedVertex(0, 1));
+        modelRoot.DefaultScene!.CreateNode("minimal_skinned_mesh")
+            .WithSkinnedMesh(
+                modelRoot.CreateMesh(geometry),
+                skeleton.Data.ToArray());
+    }
+
+    private static VertexBuilder<
+        VertexPositionNormalTangent,
+        VertexTexture1,
+        VertexJoints4> CreateSkinnedVertex(float x, float y)
+    {
+        var vertex = new VertexBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>();
+        vertex.Geometry.Position = new System.Numerics.Vector3(x, y, 0);
+        vertex.Geometry.Normal = System.Numerics.Vector3.UnitZ;
+        vertex.Geometry.Tangent = new System.Numerics.Vector4(1, 0, 0, 1);
+        vertex.Material.TexCoord = new System.Numerics.Vector2(x, y);
+        vertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
+        return vertex;
+    }
+
+    private static void AssertAnimationsMatch(
+        AnimationFile originalAnimation,
+        AnimationFile importedAnimation,
+        AnimationFile skeleton)
+    {
         var gameSkeleton = new GameSkeleton(skeleton, null!);
         var originalClip = new AnimationClip(originalAnimation, gameSkeleton);
         var importedClip = new AnimationClip(importedAnimation, gameSkeleton);
@@ -131,6 +297,24 @@ public class AnimationRoundTripTests
                 Is.LessThan(0.0001f),
                 $"最大骨骼世界位置误差位于 {worldPositionLocation}");
         });
+    }
+
+    private static (Xna.Vector3 Min, Xna.Vector3 Max) GetLod0Bounds(RmvFile model)
+    {
+        var min = new Xna.Vector3(float.PositiveInfinity);
+        var max = new Xna.Vector3(float.NegativeInfinity);
+        foreach (var vertex in model.ModelList[0]
+                     .SelectMany(segment => segment.Mesh.VertexList))
+        {
+            var position = new Xna.Vector3(
+                vertex.Position.X,
+                vertex.Position.Y,
+                vertex.Position.Z);
+            min = Xna.Vector3.Min(min, position);
+            max = Xna.Vector3.Max(max, position);
+        }
+
+        return (min, max);
     }
 
     private static Xna.Matrix[] BuildWorldTransforms(
