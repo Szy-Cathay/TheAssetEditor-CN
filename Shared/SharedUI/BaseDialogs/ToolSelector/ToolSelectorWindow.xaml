@@ -30,6 +30,7 @@
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                     <Setter Property="Background" Value="Transparent" />
+                    <EventSetter Event="MouseDoubleClick" Handler="PossibleTool_MouseDoubleClick" />
                    
                 </Style>
             </ListView.ItemContainerStyle>
