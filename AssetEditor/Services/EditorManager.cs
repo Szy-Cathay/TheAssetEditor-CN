@@ -66,8 +66,22 @@ namespace AssetEditor.Services
                 return null;
             }
 
-            var fullFileName = _packFileService.GetFullPath(file);
             var owner = _packFileService.GetPackFileContainer(file);
+            for (var i = 0; i < CurrentEditorsList.Count; i++)
+            {
+                var existingEditor = CurrentEditorsList[i];
+                if (existingEditor is IFileEditor existingFileEditor &&
+                    existingFileEditor.CurrentFile == file)
+                {
+                    _logger.Here().Information($"Attempting to open file '{file.Name}', but is is already open");
+                    if (owner != null)
+                        _editorOwners[existingEditor] = owner;
+                    SelectedEditorIndex = i;
+                    return existingEditor;
+                }
+            }
+
+            var fullFileName = _packFileService.GetFullPath(file);
             var editorViewModel = _editorDatabase.Create(fullFileName, preferedEditor);
             if (editorViewModel == null)
             {
@@ -79,23 +93,6 @@ namespace AssetEditor.Services
             // TODO: Ensure we can only get here if we have a fileEditor
             if (editorViewModel is IFileEditor fileEditor)
             {
-                // Ensure file is not already open
-                for (var i = 0; i < CurrentEditorsList.Count; i++)
-                {
-                    var existingEditor = CurrentEditorsList[i];
-                    if (existingEditor is IFileEditor existingFileEditor)
-                    {
-                        if (existingFileEditor.CurrentFile == file)
-                        {
-                            _logger.Here().Information($"Attempting to open file '{file.Name}', but is is already open");
-                            if (owner != null)
-                                _editorOwners[existingEditor] = owner;
-                            SelectedEditorIndex = i;
-                            return CurrentEditorsList[i];
-                        }
-                    }
-                }
-
                 // Open the file
                 _logger.Here().Information($"Opening {file.Name} with {editorViewModel?.GetType().Name}");
                 fileEditor.LoadFile(file);
