@@ -14,7 +14,8 @@ public interface IFolderProjectCloseGuard
 {
     Task<bool> CanCloseAsync(
         FolderProjectContainer? project,
-        Action<FolderProjectCloseProgress>? reportProgress = null);
+        Action<FolderProjectCloseProgress>? reportProgress = null,
+        Func<Task>? completeProgressBeforePrompt = null);
 }
 
 public enum FolderProjectCloseProgressStage
@@ -68,7 +69,8 @@ public sealed class FolderProjectCloseGuard :
 
     public async Task<bool> CanCloseAsync(
         FolderProjectContainer? project,
-        Action<FolderProjectCloseProgress>? reportProgress = null)
+        Action<FolderProjectCloseProgress>? reportProgress = null,
+        Func<Task>? completeProgressBeforePrompt = null)
     {
         reportProgress?.Invoke(
             new FolderProjectCloseProgress(
@@ -95,6 +97,8 @@ public sealed class FolderProjectCloseGuard :
         }
         catch
         {
+            await CompleteProgressBeforePromptAsync(
+                completeProgressBeforePrompt);
             _showMessage(
                 LocalizationManager.Instance.Get(
                     "FolderProject.Close.StatusCheckFailed"),
@@ -114,6 +118,8 @@ public sealed class FolderProjectCloseGuard :
         if (status.IsClean)
             return true;
 
+        await CompleteProgressBeforePromptAsync(
+            completeProgressBeforePrompt);
         var result = _showMessage(
             LocalizationManager.Instance.GetFormat(
                 "FolderProject.Close.UncommittedChanges",
@@ -130,4 +136,8 @@ public sealed class FolderProjectCloseGuard :
         _eventHub.Publish(new OpenFolderProjectGitPanelEvent());
         return false;
     }
+
+    private static Task CompleteProgressBeforePromptAsync(
+        Func<Task>? completeProgressBeforePrompt) =>
+        completeProgressBeforePrompt?.Invoke() ?? Task.CompletedTask;
 }

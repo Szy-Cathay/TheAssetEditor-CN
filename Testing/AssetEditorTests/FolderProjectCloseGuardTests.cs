@@ -132,6 +132,51 @@ public class FolderProjectCloseGuardTests
         });
     }
 
+    [NUnit.Framework.Test]
+    public async Task CanCloseAsync_DirtyProject_ClosesProgressBeforePrompt()
+    {
+        using var project = CreateInitializedProject();
+        var service = new Mock<IFolderProjectVersionControlService>();
+        service.Setup(item => item.GetStatus(project.ProjectRoot))
+            .Returns(new FolderProjectRepositoryStatus(
+                true,
+                "master",
+                "1111111111111111111111111111111111111111",
+                false,
+                FolderProjectRepositoryOperationState.None,
+                [
+                    new FolderProjectWorkingChange(
+                        "db/test.tsv",
+                        FolderProjectWorkingChangeKind.Modified),
+                ]));
+        var order = new List<string>();
+        var guard = new FolderProjectCloseGuard(
+            service.Object,
+            new TestEventHub(),
+            (_, _, _) =>
+            {
+                order.Add("prompt");
+                return MessageBoxResult.Cancel;
+            });
+
+        var canClose = await guard.CanCloseAsync(
+            project,
+            completeProgressBeforePrompt: () =>
+            {
+                order.Add("progress-closed");
+                return Task.CompletedTask;
+            });
+
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(canClose, NUnit.Framework.Is.False);
+            NUnit.Framework.Assert.That(
+                order,
+                NUnit.Framework.Is.EqualTo(
+                    new[] { "progress-closed", "prompt" }));
+        });
+    }
+
     private static FolderProjectContainer CreateInitializedProject()
     {
         var projectRoot = Path.Combine(

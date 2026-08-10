@@ -13,6 +13,7 @@ using Editors.ImportExport.Misc;
 using Editors.ImportExport.Common;
 using Shared.Core.Services;
 using Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
+using Shared.Ui.Common.OperationProgress;
 
 namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
 {
@@ -63,7 +64,24 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         public void Initialize(PackFile inputFile) =>
             NewSkeletonName = GltfSkeletonNameReader.GetDefaultName(inputFile.Name);
 
-        public ImportResult Execute(PackFile importSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType)
+        public ImportResult Execute(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType) =>
+            Execute(
+                importSource,
+                outputPath,
+                packFileContainer,
+                gameType,
+                null);
+
+        public ImportResult Execute(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress)
         {
             if (!float.IsFinite(AnimationKeysPerSecond) || AnimationKeysPerSecond <= 0)
                 throw new ArgumentOutOfRangeException(nameof(AnimationKeysPerSecond), "动画采样率必须大于 0。");
@@ -85,7 +103,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 AutoScaleHumanoid: this.AutoScaleHumanoid,
                 SourceForwardDirection: this.SourceForwardDirection);
 
-            return _Importer.Import(settings);
+            return _Importer.Import(settings, progress);
         }
 
         partial void OnImportAnimationsChanged(bool value) =>

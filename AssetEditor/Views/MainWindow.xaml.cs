@@ -66,7 +66,9 @@ namespace AssetEditor.Views
             _closeCheckRunning = true;
             try
             {
-                await viewModel.Closing(null);
+                await viewModel.ClosingWithProgressCompletion(
+                    null,
+                    ApplicationLoadingProgress.CompleteAsync);
                 if (!viewModel.IsClosingWithoutPrompt)
                     return;
 

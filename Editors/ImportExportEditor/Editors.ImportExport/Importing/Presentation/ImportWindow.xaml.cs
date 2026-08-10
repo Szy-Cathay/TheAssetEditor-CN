@@ -1,9 +1,11 @@
 ﻿using System.Windows;
 using Editors.ImportExport.Common;
+using System.Windows.Controls;
 using Editors.ImportExport.Exporting.Presentation;
 using Editors.ImportExport.Importing;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using Shared.Ui.Common.OperationProgress;
 using WindowHandling;
 
 namespace Editors.ImportExport.Importing.Presentation;
@@ -12,12 +14,16 @@ public partial class ImportWindow : AssetEditorWindow
 {
     private readonly ImporterCoreViewModel _viewModel;
     private readonly IStandardDialogs _standardDialogs;
+    private readonly OperationProgressWindowHost _importOperationProgress;
 
     public ImportWindow(
         ImporterCoreViewModel viewModel,
         IStandardDialogs standardDialogs)
     {
         InitializeComponent();
+        _importOperationProgress = ((Grid)Content).Children
+            .OfType<OperationProgressWindowHost>()
+            .Single();
         _viewModel = viewModel;
         _standardDialogs = standardDialogs;
         DataContext = _viewModel;
@@ -42,11 +48,13 @@ public partial class ImportWindow : AssetEditorWindow
         }
 
         ImportButton.IsEnabled = false;
+        ResetProgress();
         _viewModel.IsOperationActive = true;
         ImportResult? result = null;
         try
         {
-            result = await _viewModel.ImportAsync();
+            var progress = new Progress<OperationProgressUpdate>(ApplyProgress);
+            result = await _viewModel.ImportAsync(progress);
         }
         catch (Exception ex)
         {
@@ -55,6 +63,7 @@ public partial class ImportWindow : AssetEditorWindow
         finally
         {
             _viewModel.IsOperationActive = false;
+            await _importOperationProgress.CompleteAsync();
             ImportButton.IsEnabled = true;
         }
 
@@ -84,6 +93,28 @@ public partial class ImportWindow : AssetEditorWindow
             resultMessage,
             LocalizationManager.Instance.Get("ImportWindow.FailureTitle"),
             UiMessageBoxIcon.Error);
+    }
+
+    private void ResetProgress()
+    {
+        _importOperationProgress.StatusText =
+            LocalizationManager.Instance.Get("ImportWindow.ProgressStatus");
+        _importOperationProgress.CurrentDetailText = string.Empty;
+        _importOperationProgress.ProgressValue = 0;
+        _importOperationProgress.ProgressMaximum = 1;
+        _importOperationProgress.IsProgressIndeterminate = true;
+    }
+
+    private void ApplyProgress(OperationProgressUpdate progress)
+    {
+        _importOperationProgress.StatusText = progress.Status;
+        _importOperationProgress.CurrentDetailText = progress.Detail ?? string.Empty;
+        _importOperationProgress.IsProgressIndeterminate = progress.Total <= 0;
+        _importOperationProgress.ProgressMaximum = Math.Max(1, progress.Total);
+        _importOperationProgress.ProgressValue = Math.Clamp(
+            progress.Completed,
+            0,
+            _importOperationProgress.ProgressMaximum);
     }
 
     internal static string BuildResultMessage(ImportResult result)

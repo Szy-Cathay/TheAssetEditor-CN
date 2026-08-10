@@ -15,6 +15,7 @@ using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
+using Shared.Ui.Common.OperationProgress;
 using SharpGLTF.Schema2;
 
 
@@ -49,13 +50,15 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             ModelRoot modelRoot,
             AnimationFile? skeletonAnimFile,
             string skeletonName,
-            float scaleFactor) =>
+            float scaleFactor,
+            IProgress<OperationProgressUpdate>? progress) =>
             RmvMeshBuilder.BuildWithSummary(
                 settings,
                 modelRoot,
                 skeletonAnimFile,
                 skeletonName,
-                scaleFactor);
+                scaleFactor,
+                progress);
 
         private static NewPackFileEntry CreateRmvEntry(
             GltfImporterSettings settings,
@@ -72,19 +75,22 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             GltfImporterSettings settings,
             ModelRoot modelRoot,
             RmvFile rmv2File,
-            IReadOnlyList<RmvMeshBuilder.MeshSource> modelSources) =>
+            IReadOnlyList<RmvMeshBuilder.MeshSource> modelSources,
+            IProgress<OperationProgressUpdate>? progress) =>
             _materialBuilder.BuildRmvFileMaterials(
                 settings,
                 modelRoot,
                 rmv2File,
-                modelSources);
+                modelSources,
+                progress);
 
         private static IReadOnlyList<NewPackFileEntry> ImportAnimations(
             GltfImporterSettings settings,
             ModelRoot modelRoot,
             AnimationFile? skeletonAnimFile,
             string skeletonName,
-            float scaleFactor)
+            float scaleFactor,
+            IProgress<OperationProgressUpdate>? progress)
         {
             if (modelRoot.LogicalAnimations.Count == 0)
                 return [];
@@ -96,6 +102,9 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             for (var animationIndex = 0; animationIndex < modelRoot.LogicalAnimations.Count; animationIndex++)
             {
                 var animation = modelRoot.LogicalAnimations[animationIndex];
+                var animationName = GetSafeAnimationName(
+                    animation,
+                    animationIndex);
                 var animFile = AnimationBuilder.Build(
                     new AnimationBuilderSettings(
                         modelRoot,
@@ -105,19 +114,48 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                         settings.DestinationPackPath,
                         settings.AutoDetectAnimationKeysPerSecond),
                     skeletonAnimFile,
-                    animation);
+                    animation,
+                    (completed, total) => progress?.Report(
+                        new OperationProgressUpdate(
+                            LocalizationManager.Instance.GetFormat(
+                                "ImportWindow.Progress.Animations",
+                                animationIndex + 1,
+                                modelRoot.LogicalAnimations.Count),
+                            LocalizationManager.Instance.GetFormat(
+                                "ImportWindow.Progress.AnimationFrames",
+                                animationName,
+                                completed,
+                                total),
+                            completed,
+                            total)));
+                progress?.Report(new OperationProgressUpdate(
+                    LocalizationManager.Instance.GetFormat(
+                        "ImportWindow.Progress.Animations",
+                        animationIndex + 1,
+                        modelRoot.LogicalAnimations.Count),
+                    LocalizationManager.Instance.GetFormat(
+                        "ImportWindow.Progress.AnimationFinishing",
+                        animationName)));
                 HumanoidScaleCalculator.ScaleTranslations(animFile, scaleFactor);
                 GltfSourceForwardConverter.ConvertAnimation(
                     animFile,
                     settings.SourceForwardDirection);
 
                 var candidateFileName =
-                    $"{baseFileName}_{GetSafeAnimationName(animation, animationIndex)}.anim";
+                    $"{baseFileName}_{animationName}.anim";
                 var animBytes = AnimationFile.ConvertToBytes(animFile);
                 var packFileImported = new PackFile(candidateFileName, new MemorySource(animBytes));
                 animationEntries.Add(new NewPackFileEntry(
                     settings.DestinationPackPath,
                     packFileImported));
+                progress?.Report(new OperationProgressUpdate(
+                    LocalizationManager.Instance.GetFormat(
+                        "ImportWindow.Progress.Animations",
+                        animationIndex + 1,
+                        modelRoot.LogicalAnimations.Count),
+                    candidateFileName,
+                    animationIndex + 1,
+                    modelRoot.LogicalAnimations.Count));
             }
 
             return animationEntries;
@@ -134,11 +172,13 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             return name.Replace(' ', '_');
         }
 
-        public ImportResult Import(GltfImporterSettings settings)
+        public ImportResult Import(
+            GltfImporterSettings settings,
+            IProgress<OperationProgressUpdate>? progress = null)
         {
             try
             {
-                return ImportCore(settings);
+                return ImportCore(settings, progress);
             }
             catch (Exception exception)
             {
@@ -147,9 +187,23 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             }
         }
 
-        private ImportResult ImportCore(GltfImporterSettings settings)
+        private ImportResult ImportCore(
+            GltfImporterSettings settings,
+            IProgress<OperationProgressUpdate>? progress)
         {
+            progress?.Report(new OperationProgressUpdate(
+                LocalizationManager.Instance.Get(
+                    "ImportWindow.Progress.LoadingScene"),
+                Path.GetFileName(settings.InputGltfFile)));
             var modelRoot = CreateModelRoot(settings);
+            progress?.Report(new OperationProgressUpdate(
+                LocalizationManager.Instance.Get(
+                    "ImportWindow.Progress.InspectingScene"),
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.SceneSummary",
+                    RmvMeshBuilder.GetMeshSources(modelRoot).Count,
+                    modelRoot.LogicalMaterials.Count,
+                    modelRoot.LogicalAnimations.Count)));
             if (settings.ImportMeshes || settings.ImportMaterials)
                 RmvMaterialBuilder.ValidateMaterialModes(modelRoot);
 
@@ -172,7 +226,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     modelRoot,
                     skeletonData.skeletonAnimFile,
                     skeletonData.skeletonName ?? "",
-                    scaleFactor);
+                    scaleFactor,
+                    progress);
                 rmv2File = meshBuildResult.File;
                 meshSummary = meshBuildResult.Summary;
                 modelSources = meshBuildResult.ModelSources;
@@ -185,7 +240,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                         settings,
                         modelRoot,
                         rmv2File,
-                        modelSources);
+                        modelSources,
+                        progress);
                     pendingFiles.AddRange(materialBuildResult.Files);
                     materialSummary = materialBuildResult.Summary;
                 }
@@ -198,7 +254,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     modelRoot,
                     skeletonData.skeletonAnimFile,
                     skeletonData.skeletonName ?? "",
-                    scaleFactor));
+                    scaleFactor,
+                    progress));
             }
 
             if (skeletonData.wasCreated &&
@@ -224,12 +281,24 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     rmv2File));
             }
 
+            progress?.Report(new OperationProgressUpdate(
+                LocalizationManager.Instance.Get(
+                    "ImportWindow.Progress.ValidatingOutputs"),
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.OutputCount",
+                    pendingFiles.Count)));
             var validation = ValidatePendingFiles(pendingFiles);
             if (validation.Errors.Count != 0)
                 return ImportResult.Failure(validation.Errors);
 
             if (validation.Files.Count != 0)
             {
+                progress?.Report(new OperationProgressUpdate(
+                    LocalizationManager.Instance.Get(
+                        "ImportWindow.Progress.WritingPack"),
+                    LocalizationManager.Instance.GetFormat(
+                        "ImportWindow.Progress.OutputCount",
+                        validation.Files.Count)));
                 var conflicts = PackFileDispatcherWriter.AddFilesToPackIfNoConflicts(
                     _packFileService,
                     settings.DestinationPackFileContainer,
@@ -244,6 +313,15 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                         .ToList());
                 }
             }
+
+            progress?.Report(new OperationProgressUpdate(
+                LocalizationManager.Instance.Get(
+                    "ImportWindow.Progress.Completed"),
+                LocalizationManager.Instance.GetFormat(
+                    "ImportWindow.Progress.OutputCount",
+                    validation.Files.Count),
+                validation.Files.Count,
+                validation.Files.Count));
 
             return ImportResult.Success(
                 validation.Paths,

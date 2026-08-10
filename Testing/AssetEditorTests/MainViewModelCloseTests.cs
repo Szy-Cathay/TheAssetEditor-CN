@@ -97,6 +97,131 @@ public class MainViewModelCloseTests
     }
 
     [NUnit.Framework.Test]
+    public void Closing_DirtyFolderProject_ClosesProgressWindowBeforePrompt()
+    {
+        var projectRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"ae-folder-close-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(projectRoot);
+
+        try
+        {
+            using var project = FolderProjectContainer.Create(
+                projectRoot,
+                new FolderProjectSettings { Name = "工程" });
+            var editorManager = new Mock<IEditorManager>();
+            editorManager
+                .Setup(manager => manager.ShouldBlockCloseCommand(
+                    It.IsAny<IEditorInterface>(),
+                    false))
+                .Returns(true);
+            var promptReached = new TaskCompletionSource<(bool, bool)>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var closeGuard = new Mock<IFolderProjectCloseGuard>();
+            closeGuard
+                .Setup(guard => guard.CanCloseAsync(
+                    project,
+                    It.IsAny<Action<FolderProjectCloseProgress>>(),
+                    It.IsAny<Func<Task>>()))
+                .Returns((
+                    FolderProjectContainer? _,
+                    Action<FolderProjectCloseProgress> reportProgress,
+                    Func<Task> completeProgressBeforePrompt) =>
+                    RunCloseCheckAsync(
+                        reportProgress,
+                        completeProgressBeforePrompt));
+            var viewModel = CreateMainViewModel(
+                editorManager.Object,
+                project,
+                closeGuard.Object);
+            var settings = new ApplicationSettingsService(
+                GameTypeEnum.Warhammer3);
+            var serviceProvider = new ServiceCollection()
+                .AddSingleton(LocalizationManager.Instance)
+                .AddSingleton(settings)
+                .AddSingleton(new PackAutoSaveService(
+                    Mock.Of<IPackFileService>(),
+                    settings))
+                .BuildServiceProvider();
+
+            WpfTestApplicationHost.InvokeWithThemeResources(
+                serviceProvider,
+                () =>
+                {
+                    var window = new MainWindow(serviceProvider)
+                    {
+                        DataContext = viewModel,
+                        Left = -10000,
+                        Top = -10000,
+                        ShowActivated = false,
+                    };
+                    try
+                    {
+                        var dispatcherFrame = new DispatcherFrame();
+                        promptReached.Task.ContinueWith(
+                            _ => window.Dispatcher.BeginInvoke(
+                                new Action(() =>
+                                    dispatcherFrame.Continue = false),
+                                DispatcherPriority.Background));
+                        window.Show();
+                        window.Dispatcher.BeginInvoke(
+                            new Action(window.Close),
+                            DispatcherPriority.Normal);
+                        Dispatcher.PushFrame(dispatcherFrame);
+
+                        var visibility = promptReached.Task.GetAwaiter()
+                            .GetResult();
+                        NUnit.Framework.Assert.Multiple(() =>
+                        {
+                            NUnit.Framework.Assert.That(
+                                visibility.Item1,
+                                NUnit.Framework.Is.True,
+                                "关闭检查期间没有显示汇总进度窗口。");
+                            NUnit.Framework.Assert.That(
+                                visibility.Item2,
+                                NUnit.Framework.Is.False,
+                                "确认回调开始时汇总进度窗口仍然可见。");
+                        });
+                    }
+                    finally
+                    {
+                        window.DataContext = null;
+                        if (window.IsVisible)
+                            window.Close();
+                    }
+                });
+            viewModel.FileTree.Dispose();
+
+            async Task<bool> RunCloseCheckAsync(
+                Action<FolderProjectCloseProgress> reportProgress,
+                Func<Task> completeProgressBeforePrompt)
+            {
+                reportProgress(new FolderProjectCloseProgress(
+                    FolderProjectCloseProgressStage.SummarizingChanges,
+                    3,
+                    3,
+                    1));
+                await Task.Delay(650);
+                var wasVisible = Application.Current.Windows
+                    .OfType<Shared.Ui.Common.OperationProgress
+                        .OperationProgressWindow>()
+                    .Any();
+                await completeProgressBeforePrompt();
+                var isVisible = Application.Current.Windows
+                    .OfType<Shared.Ui.Common.OperationProgress
+                        .OperationProgressWindow>()
+                    .Any();
+                promptReached.TrySetResult((wasVisible, isVisible));
+                return false;
+            }
+        }
+        finally
+        {
+            Directory.Delete(projectRoot, true);
+        }
+    }
+
+    [NUnit.Framework.Test]
     public void Closing_FolderProjectOutputOutOfDate_DoesNotReportUnsavedPackFiles()
     {
         var projectRoot = Path.Combine(
@@ -184,10 +309,12 @@ public class MainViewModelCloseTests
             closeGuard
                 .Setup(guard => guard.CanCloseAsync(
                     project,
-                    It.IsAny<Action<FolderProjectCloseProgress>>()))
+                    It.IsAny<Action<FolderProjectCloseProgress>>(),
+                    It.IsAny<Func<Task>>()))
                 .Returns((
                     FolderProjectContainer? _,
-                    Action<FolderProjectCloseProgress> reportProgress) =>
+                    Action<FolderProjectCloseProgress> reportProgress,
+                    Func<Task> _) =>
                 {
                     reportProgress(
                         new FolderProjectCloseProgress(
@@ -339,7 +466,8 @@ public class MainViewModelCloseTests
             closeGuard ?? Mock.Of<IFolderProjectCloseGuard>(
                 guard => guard.CanCloseAsync(
                     It.IsAny<FolderProjectContainer>(),
-                    It.IsAny<Action<FolderProjectCloseProgress>>()) ==
+                    It.IsAny<Action<FolderProjectCloseProgress>>(),
+                    It.IsAny<Func<Task>>()) ==
                     Task.FromResult(true)));
     }
 

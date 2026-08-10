@@ -472,6 +472,55 @@ public class OperationProgressViewTests
     }
 
     [Test]
+    public void IndependentProgressHost_CompleteAsync_WaitsUntilWindowCloses()
+    {
+        InvokeWithWpfApplication(() =>
+        {
+            var host = new OperationProgressWindowHost
+            {
+                WindowTitle = "正在读取音频",
+                StatusText = "正在解析 WEM",
+            };
+            var owner = new Window
+            {
+                Content = host,
+                Width = 320,
+                Height = 180,
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.None,
+                Left = -10000,
+                Top = -10000,
+            };
+
+            try
+            {
+                owner.Show();
+                host.IsOperationActive = true;
+                PumpDispatcher(TimeSpan.FromMilliseconds(600));
+
+                var completion = host.CompleteAsync();
+
+                Assert.That(completion.IsCompleted, Is.False);
+                PumpDispatcher(TimeSpan.FromMilliseconds(350));
+                Assert.Multiple(() =>
+                {
+                    Assert.That(completion.IsCompletedSuccessfully, Is.True);
+                    Assert.That(
+                        Application.Current.Windows
+                            .OfType<OperationProgressWindow>(),
+                        Is.Empty);
+                });
+            }
+            finally
+            {
+                host.IsOperationActive = false;
+                owner.Close();
+            }
+        });
+    }
+
+    [Test]
     public void EmbeddedProgress_DelaysShowAndKeepsVisibleBriefly()
     {
         InvokeWithWpfApplication(() =>
