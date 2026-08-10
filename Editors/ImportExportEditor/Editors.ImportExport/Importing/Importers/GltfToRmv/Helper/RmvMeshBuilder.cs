@@ -169,7 +169,10 @@ public class RmvMeshBuilder
         if (vertexBufferColumns.Positions == null || !vertexBufferColumns.Positions.Any())
             throw new InvalidDataException($"网格“{source.ModelName}”没有顶点数据。");
 
-        var worldMatrix = source.Node.WorldMatrix;
+        // glTF applies only joint transforms to skinned meshes.
+        var worldMatrix = source.Node.Skin == null
+            ? source.Node.WorldMatrix
+            : Matrix4x4.Identity;
         if (!Matrix4x4.Invert(worldMatrix, out var inverseWorldMatrix))
             throw new InvalidDataException($"节点“{source.Node.Name}”的变换矩阵不可逆，无法安全导入网格。");
         var normalMatrix = Matrix4x4.Transpose(inverseWorldMatrix);

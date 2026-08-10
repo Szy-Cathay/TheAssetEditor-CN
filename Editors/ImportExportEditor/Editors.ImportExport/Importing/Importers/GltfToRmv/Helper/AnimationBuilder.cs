@@ -195,23 +195,22 @@ public class AnimationBuilder
 
     private sealed class SkinAnimationRetargeter
     {
+        private const float EquivalentBindTransformTolerance = 0.0001f;
+
         private sealed record JointBinding(
             Node Joint,
             Matrix4x4 InverseBindMatrix,
-            Vector3 DefaultScale,
-            Quaternion DefaultRotation,
-            Vector3 DefaultTranslation,
             bool HasScaleChannel,
             bool HasTranslationChannel,
             bool HasRotationChannel);
 
         private readonly AnimationFile _skeleton;
         private readonly JointBinding?[] _jointBindings;
-        private readonly Vector3[] _sourceBindScales;
-        private readonly Quaternion[] _sourceBindRotations;
-        private readonly Vector3[] _sourceBindTranslations;
+        private readonly Matrix4x4[] _sourceBindWorld;
+        private readonly Matrix4x4[] _inverseSourceDefaultWorld;
         private readonly Matrix4x4[] _targetBindLocal;
         private readonly Matrix4x4[] _targetBindWorld;
+        private readonly bool _useSourceLocalTracks;
 
         private SkinAnimationRetargeter(
             AnimationFile skeleton,
@@ -220,9 +219,8 @@ public class AnimationBuilder
         {
             _skeleton = skeleton;
             _jointBindings = new JointBinding?[skeleton.Bones.Length];
-            _sourceBindScales = new Vector3[skeleton.Bones.Length];
-            _sourceBindRotations = new Quaternion[skeleton.Bones.Length];
-            _sourceBindTranslations = new Vector3[skeleton.Bones.Length];
+            _sourceBindWorld = new Matrix4x4[skeleton.Bones.Length];
+            _inverseSourceDefaultWorld = new Matrix4x4[skeleton.Bones.Length];
             _targetBindLocal = new Matrix4x4[skeleton.Bones.Length];
             _targetBindWorld = new Matrix4x4[skeleton.Bones.Length];
 
@@ -237,25 +235,9 @@ public class AnimationBuilder
                 var joint = skin.GetJoint(jointIndex);
                 if (boneIndexesByName.TryGetValue(joint.Joint.Name, out var boneIndex))
                 {
-                    if (!Matrix4x4.Invert(joint.Joint.LocalMatrix, out _) ||
-                        !Matrix4x4.Decompose(
-                            joint.Joint.LocalMatrix,
-                            out var defaultScale,
-                            out var defaultRotation,
-                            out var defaultTranslation))
-                    {
-                        throw new InvalidDataException(
-                            LocalizationManager.Instance.GetFormat(
-                                "GltfImporter.Error.LocalBindNotDecomposable",
-                                joint.Joint.Name));
-                    }
-
                     _jointBindings[boneIndex] = new JointBinding(
                         joint.Joint,
                         joint.InverseBindMatrix,
-                        defaultScale,
-                        Quaternion.Normalize(defaultRotation),
-                        defaultTranslation,
                         animation.FindScaleChannel(joint.Joint) != null,
                         animation.FindTranslationChannel(joint.Joint) != null,
                         animation.FindRotationChannel(joint.Joint) != null);
@@ -264,6 +246,7 @@ public class AnimationBuilder
 
             BuildSourceBindTransforms();
             BuildTargetBindMatrices();
+            _useSourceLocalTracks = CanUseSourceLocalTracks();
         }
 
         public static SkinAnimationRetargeter? TryCreate(
@@ -318,70 +301,25 @@ public class AnimationBuilder
             float time,
             Frame frame)
         {
+            if (_useSourceLocalTracks)
+            {
+                FillSourceLocalFrame(animation, time, frame);
+                return;
+            }
+
             var desiredWorld = new Matrix4x4[_skeleton.Bones.Length];
-            var sampledSourceWorld = new Matrix4x4[_skeleton.Bones.Length];
             var localTranslations = new Vector3[_skeleton.Bones.Length];
             var localRotations = new Quaternion[_skeleton.Bones.Length];
             var visitStates = new byte[_skeleton.Bones.Length];
-            var sourceVisitStates = new byte[_skeleton.Bones.Length];
 
-            Matrix4x4 BuildSampledSourceWorld(int boneIndex)
+            Matrix4x4 BuildSourceAnimationDelta(int boneIndex)
             {
-                if (sourceVisitStates[boneIndex] == 2)
-                    return sampledSourceWorld[boneIndex];
-                if (sourceVisitStates[boneIndex] == 1)
-                    throw new InvalidDataException(
-                        LocalizationManager.Instance.GetFormat(
-                            "GltfImporter.Error.TargetSkeletonCycle",
-                            boneIndex));
-
-                sourceVisitStates[boneIndex] = 1;
                 var binding = _jointBindings[boneIndex];
                 if (binding == null)
-                {
-                    sourceVisitStates[boneIndex] = 2;
                     return Matrix4x4.Identity;
-                }
 
-                var parentIndex = GetValidatedParentIndex(boneIndex);
-                var parentWorld = parentIndex >= 0 && _jointBindings[parentIndex] != null
-                    ? BuildSampledSourceWorld(parentIndex)
-                    : Matrix4x4.Identity;
-                var sampledLocal = binding.Joint.GetLocalTransform(animation, time);
-                var scale = _sourceBindScales[boneIndex];
-                if (binding.HasScaleChannel)
-                {
-                    scale = new Vector3(
-                        scale.X * sampledLocal.Scale.X / binding.DefaultScale.X,
-                        scale.Y * sampledLocal.Scale.Y / binding.DefaultScale.Y,
-                        scale.Z * sampledLocal.Scale.Z / binding.DefaultScale.Z);
-                }
-
-                var rotation = _sourceBindRotations[boneIndex];
-                if (binding.HasRotationChannel)
-                {
-                    var rotationMatrix =
-                        Matrix4x4.CreateFromQuaternion(rotation) *
-                        Matrix4x4.CreateFromQuaternion(
-                            Quaternion.Inverse(binding.DefaultRotation)) *
-                        Matrix4x4.CreateFromQuaternion(sampledLocal.Rotation);
-                    rotation = Quaternion.Normalize(
-                        Quaternion.CreateFromRotationMatrix(rotationMatrix));
-                }
-
-                var translation = _sourceBindTranslations[boneIndex];
-                if (binding.HasTranslationChannel)
-                {
-                    translation += sampledLocal.Translation - binding.DefaultTranslation;
-                }
-
-                sampledSourceWorld[boneIndex] =
-                    Matrix4x4.CreateScale(scale) *
-                    Matrix4x4.CreateFromQuaternion(rotation) *
-                    Matrix4x4.CreateTranslation(translation) *
-                    parentWorld;
-                sourceVisitStates[boneIndex] = 2;
-                return sampledSourceWorld[boneIndex];
+                return _inverseSourceDefaultWorld[boneIndex] *
+                       GetVisualWorldMatrix(binding.Joint, animation, time);
             }
 
             Matrix4x4 BuildDesiredWorld(int boneIndex)
@@ -403,8 +341,7 @@ public class AnimationBuilder
                 var retargetedWorld = binding == null
                     ? _targetBindLocal[boneIndex] * parentWorld
                     : _targetBindWorld[boneIndex] *
-                      binding.InverseBindMatrix *
-                      BuildSampledSourceWorld(boneIndex);
+                      BuildSourceAnimationDelta(boneIndex);
                 var localTransform = retargetedWorld;
                 if (parentIndex >= 0)
                 {
@@ -435,7 +372,11 @@ public class AnimationBuilder
                     throw new InvalidDataException(
                         $"glTF 动画在骨骼“{_skeleton.Bones[boneIndex].Name}”处无法分解为平移和旋转。");
                 }
-                if (!IsUnitScale(scale))
+                if ((binding?.HasScaleChannel == true &&
+                     !IsUnitScale(
+                         binding.Joint.GetLocalTransform(animation, time).Scale,
+                         0.0001f)) ||
+                    !IsUnitScale(scale, 0.0001f))
                 {
                     throw new InvalidDataException(
                         LocalizationManager.Instance.GetFormat(
@@ -493,19 +434,127 @@ public class AnimationBuilder
             }
         }
 
+        private void FillSourceLocalFrame(
+            Animation animation,
+            float time,
+            Frame frame)
+        {
+            frame.Transforms = new List<RmvVector3>(_skeleton.Bones.Length);
+            frame.Quaternion = new List<RmvVector4>(_skeleton.Bones.Length);
+            var bindFrame = _skeleton.AnimationParts[0].DynamicFrames[0];
+            for (var boneIndex = 0; boneIndex < _skeleton.Bones.Length; boneIndex++)
+            {
+                var binding = _jointBindings[boneIndex];
+                var gameTranslation = bindFrame.Transforms[boneIndex].ToVector3();
+                var gameRotation = bindFrame.Quaternion[boneIndex].ToQuaternion();
+                if (binding != null)
+                {
+                    var sourceTransform = binding.Joint.GetLocalTransform(animation, time);
+                    if (binding.HasScaleChannel &&
+                        !IsUnitScale(sourceTransform.Scale, 0.0001f))
+                    {
+                        throw new InvalidDataException(
+                            LocalizationManager.Instance.GetFormat(
+                                "GltfImporter.Error.AnimationScale",
+                                GetAnimationName(animation),
+                                _skeleton.Bones[boneIndex].Name,
+                                time));
+                    }
+
+                    if (binding.HasTranslationChannel)
+                    {
+                        gameTranslation = new Xna.Vector3(
+                            -sourceTransform.Translation.X,
+                            sourceTransform.Translation.Y,
+                            sourceTransform.Translation.Z);
+                    }
+                    if (binding.HasRotationChannel)
+                    {
+                        gameRotation = new Xna.Quaternion(
+                            sourceTransform.Rotation.X,
+                            -sourceTransform.Rotation.Y,
+                            -sourceTransform.Rotation.Z,
+                            sourceTransform.Rotation.W);
+                    }
+                }
+
+                frame.Transforms.Add(new RmvVector3(gameTranslation));
+                frame.Quaternion.Add(new RmvVector4(
+                    gameRotation.X,
+                    gameRotation.Y,
+                    gameRotation.Z,
+                    gameRotation.W));
+            }
+        }
+
+        private bool CanUseSourceLocalTracks()
+        {
+            var boundJoints = _jointBindings
+                .Where(binding => binding != null)
+                .Select(binding => binding!.Joint)
+                .ToHashSet();
+            for (var boneIndex = 0; boneIndex < _skeleton.Bones.Length; boneIndex++)
+            {
+                var binding = _jointBindings[boneIndex];
+                if (binding == null)
+                {
+                    return false;
+                }
+                if (!AreNearlyEqual(binding.Joint.LocalMatrix, _targetBindLocal[boneIndex]))
+                {
+                    return false;
+                }
+                if (!AreNearlyEqual(
+                        GetVisualWorldMatrix(binding.Joint),
+                        _sourceBindWorld[boneIndex]))
+                {
+                    return false;
+                }
+
+                var parentIndex = GetValidatedParentIndex(boneIndex);
+                var expectedParentJoint = parentIndex < 0
+                    ? null
+                    : _jointBindings[parentIndex]?.Joint;
+                var visualParent = binding.Joint.VisualParent;
+                while (visualParent != expectedParentJoint)
+                {
+                    if (visualParent == null ||
+                        boundJoints.Contains(visualParent) ||
+                        !AreNearlyEqual(visualParent.LocalMatrix, Matrix4x4.Identity))
+                    {
+                        return false;
+                    }
+
+                    visualParent = visualParent.VisualParent;
+                }
+            }
+
+            return true;
+        }
+
         private void BuildSourceBindTransforms()
         {
-            var sourceBindWorld = new Matrix4x4[_skeleton.Bones.Length];
             for (var boneIndex = 0; boneIndex < _skeleton.Bones.Length; boneIndex++)
             {
                 var binding = _jointBindings[boneIndex];
                 if (binding == null)
                     continue;
-                if (!Matrix4x4.Invert(binding.InverseBindMatrix, out sourceBindWorld[boneIndex]))
+                if (!Matrix4x4.Invert(
+                        binding.InverseBindMatrix,
+                        out _sourceBindWorld[boneIndex]))
                 {
                     throw new InvalidDataException(
                         LocalizationManager.Instance.GetFormat(
                             "GltfImporter.Error.InverseBindNotInvertible",
+                            binding.Joint.Name));
+                }
+                if (!Matrix4x4.Invert(
+                        GetVisualWorldMatrix(binding.Joint),
+                        out _inverseSourceDefaultWorld[boneIndex]))
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.GetFormat(
+                            "GltfImporter.Error.ParentTransformNotInvertible",
                             binding.Joint.Name));
                 }
             }
@@ -516,11 +565,13 @@ public class AnimationBuilder
                 if (binding == null)
                     continue;
 
-                var sourceBindLocal = sourceBindWorld[boneIndex];
+                var sourceBindLocal = _sourceBindWorld[boneIndex];
                 var parentIndex = GetValidatedParentIndex(boneIndex);
                 if (parentIndex >= 0 && _jointBindings[parentIndex] != null)
                 {
-                    if (!Matrix4x4.Invert(sourceBindWorld[parentIndex], out var inverseParent))
+                    if (!Matrix4x4.Invert(
+                            _sourceBindWorld[parentIndex],
+                            out var inverseParent))
                     {
                         throw new InvalidDataException(
                             LocalizationManager.Instance.GetFormat(
@@ -540,18 +591,15 @@ public class AnimationBuilder
                 }
                 if (!Matrix4x4.Decompose(
                         sourceBindLocal,
-                        out _sourceBindScales[boneIndex],
-                        out _sourceBindRotations[boneIndex],
-                        out _sourceBindTranslations[boneIndex]))
+                        out _,
+                        out _,
+                        out _))
                 {
                     throw new InvalidDataException(
                         LocalizationManager.Instance.GetFormat(
                             "GltfImporter.Error.BindNotDecomposable",
                             binding.Joint.Name));
                 }
-
-                _sourceBindRotations[boneIndex] =
-                    Quaternion.Normalize(_sourceBindRotations[boneIndex]);
             }
         }
 
@@ -649,9 +697,52 @@ public class AnimationBuilder
                    Math.Abs(Vector3.Dot(y, z)) > 0.0001f;
         }
 
-        private static bool IsUnitScale(Vector3 scale) =>
-            Math.Abs(scale.X - 1) <= 0.0001f &&
-            Math.Abs(scale.Y - 1) <= 0.0001f &&
-            Math.Abs(scale.Z - 1) <= 0.0001f;
+        private static bool IsUnitScale(Vector3 scale, float tolerance) =>
+            Math.Abs(scale.X - 1) <= tolerance &&
+            Math.Abs(scale.Y - 1) <= tolerance &&
+            Math.Abs(scale.Z - 1) <= tolerance;
+
+        private static bool AreNearlyEqual(
+            Matrix4x4 left,
+            Matrix4x4 right) =>
+            Math.Abs(left.M11 - right.M11) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M12 - right.M12) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M13 - right.M13) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M14 - right.M14) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M21 - right.M21) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M22 - right.M22) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M23 - right.M23) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M24 - right.M24) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M31 - right.M31) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M32 - right.M32) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M33 - right.M33) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M34 - right.M34) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M41 - right.M41) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M42 - right.M42) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M43 - right.M43) <= EquivalentBindTransformTolerance &&
+            Math.Abs(left.M44 - right.M44) <= EquivalentBindTransformTolerance;
+
+        private static Matrix4x4 GetVisualWorldMatrix(
+            Node node,
+            Animation? animation = null,
+            float time = 0)
+        {
+            Matrix4x4 GetLocalMatrix(Node current)
+            {
+                if (animation == null)
+                    return current.LocalMatrix;
+
+                var transform = current.GetLocalTransform(animation, time);
+                return Matrix4x4.CreateScale(transform.Scale) *
+                       Matrix4x4.CreateFromQuaternion(transform.Rotation) *
+                       Matrix4x4.CreateTranslation(transform.Translation);
+            }
+
+            var worldMatrix = GetLocalMatrix(node);
+            for (var parent = node.VisualParent; parent != null; parent = parent.VisualParent)
+                worldMatrix *= GetLocalMatrix(parent);
+
+            return worldMatrix;
+        }
     }
 }

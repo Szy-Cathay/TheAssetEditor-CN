@@ -13,7 +13,11 @@ using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.GameFormats.RigidModel.Vertex;
 using Shared.TestUtility;
+using SharpGLTF.Geometry;
+using SharpGLTF.Geometry.VertexTypes;
+using SharpGLTF.Materials;
 using SharpGLTF.Schema2;
+using Numerics = System.Numerics;
 
 namespace Test.ImportExport.Importing.Importers.GltfImporterTest;
 
@@ -153,7 +157,7 @@ public class GltfFullWorkflowImportTests
             Assert.That(
                 moveAnimation.AnimationParts[0].DynamicFrames[^1]
                     .Transforms[rootBoneIndex].Z,
-                Is.EqualTo(0.125f).Within(0.001f));
+                Is.EqualTo(0.25f).Within(0.001f));
             Assert.That(
                 Math.Abs(nodAnimation.AnimationParts[0].DynamicFrames[^1]
                     .Quaternion[headBoneIndex].X),
@@ -190,6 +194,120 @@ public class GltfFullWorkflowImportTests
             Assert.That(message, Does.Contain("自发光（Emissive）"));
             Assert.That(message, Does.Contain("环境遮蔽（Occlusion）"));
         });
+    }
+
+    [Test]
+    public void Import_SkinnedMeshUnderScaledAncestor_KeepsMeshSkeletonAndRootInSameSpace()
+    {
+        var glbPath = CreateScaledAncestorGlb();
+        try
+        {
+            var destination = new PackFileContainer("test");
+            var result = CreateImporter(destination).Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                ImportMeshes: true,
+                ImportMaterials: false,
+                ConvertMaterialFromBlenderType: false,
+                ConvertNormalTextureFromBlueToOrangeType: false,
+                ImportAnimations: true,
+                AnimationKeysPerSecond: 1,
+                MirrorMesh: true,
+                AutoDetectAnimationKeysPerSecond: false,
+                AutoScaleHumanoid: true));
+
+            Assert.That(
+                result.Succeeded,
+                Is.True,
+                string.Join(Environment.NewLine, result.Errors));
+
+            var baseName = Path.GetFileNameWithoutExtension(glbPath).ToLowerInvariant();
+            var rmv = ModelFactory.Create().Load(
+                destination.FileList[$@"models\{baseName}.rigid_model_v2"]
+                    .DataSource.ReadData());
+            var skeleton = AnimationFile.Create(
+                destination.FileList[@"animations\skeletons\scaledarmature.anim"]);
+            var animation = AnimationFile.Create(
+                destination.FileList[$@"models\{baseName}_root_move.anim"]);
+            var vertices = rmv.ModelList[0]
+                .SelectMany(model => model.Mesh.VertexList)
+                .ToList();
+            var modelHeight = vertices.Max(vertex => vertex.Position.Y) -
+                              vertices.Min(vertex => vertex.Position.Y);
+            var rootIndex = Array.FindIndex(
+                skeleton.Bones,
+                bone => bone.Name == "root");
+            var headIndex = Array.FindIndex(
+                skeleton.Bones,
+                bone => bone.Name == "head");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.HumanoidScale!.SourceHeight, Is.EqualTo(1).Within(0.0001f));
+                Assert.That(result.HumanoidScale.ReferenceHeight, Is.EqualTo(2).Within(0.0001f));
+                Assert.That(result.HumanoidScale.ScaleFactor, Is.EqualTo(2).Within(0.0001f));
+                Assert.That(modelHeight, Is.EqualTo(2).Within(0.0001f));
+                Assert.That(
+                    skeleton.AnimationParts[0].DynamicFrames[0]
+                        .Transforms[headIndex].Y,
+                    Is.EqualTo(2).Within(0.0001f));
+                Assert.That(
+                    animation.AnimationParts[0].DynamicFrames[^1]
+                        .Transforms[rootIndex].Y,
+                    Is.EqualTo(0.6f).Within(0.0001f));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_SkinnedMeshWithSingularAncestor_ReturnsChineseErrorAndLeavesPackUnchanged()
+    {
+        var fixtureDirectory = CreateSingularAncestorGltf();
+        var gltfPath = Path.Combine(fixtureDirectory, "singular_ancestor.gltf");
+        try
+        {
+            const string existingPath = @"models\existing.bin";
+            var destination = new PackFileContainer("test");
+            var existingFile = new PackFile(
+                "existing.bin",
+                new MemorySource([7, 8, 9]));
+            destination.FileList[existingPath] = existingFile;
+
+            var result = CreateImporter(destination).Import(new GltfImporterSettings(
+                gltfPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                ImportMeshes: true,
+                ImportMaterials: false,
+                ConvertMaterialFromBlenderType: false,
+                ConvertNormalTextureFromBlueToOrangeType: false,
+                ImportAnimations: false,
+                AnimationKeysPerSecond: 20,
+                MirrorMesh: true,
+                AutoScaleHumanoid: false));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("不可逆"));
+                Assert.That(destination.FileList, Has.Count.EqualTo(1));
+                Assert.That(destination.FileList[existingPath], Is.SameAs(existingFile));
+                Assert.That(
+                    existingFile.DataSource.ReadData(),
+                    Is.EqualTo(new byte[] { 7, 8, 9 }));
+            });
+        }
+        finally
+        {
+            Directory.Delete(fixtureDirectory, recursive: true);
+        }
     }
 
     [Test]
@@ -324,6 +442,131 @@ public class GltfFullWorkflowImportTests
             ],
             AnimationParts = [part],
         };
+    }
+
+    private static string CreateScaledAncestorGlb()
+    {
+        const float ancestorScale = 0.003f;
+        const float sourceHeight = 1;
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var armature = scene.CreateNode("ScaledArmature");
+        armature.LocalMatrix = Numerics.Matrix4x4.CreateScale(ancestorScale);
+        var root = armature.CreateNode("root");
+        var leftFoot = root.CreateNode("toe_left_0");
+        leftFoot.LocalMatrix = Numerics.Matrix4x4.CreateTranslation(-25, 0, 0);
+        var rightFoot = root.CreateNode("toe_right_0");
+        rightFoot.LocalMatrix = Numerics.Matrix4x4.CreateTranslation(25, 0, 0);
+        var head = root.CreateNode("head");
+        head.LocalMatrix = Numerics.Matrix4x4.CreateTranslation(
+            0,
+            sourceHeight / ancestorScale,
+            0);
+
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("scaled_mesh");
+        geometry.UsePrimitive(
+                new MaterialBuilder("material").WithMetallicRoughness())
+            .AddTriangle(
+                CreateScaledAncestorVertex(0, 0),
+                CreateScaledAncestorVertex(1, 0),
+                CreateScaledAncestorVertex(0, sourceHeight));
+        var mesh = modelRoot.CreateMesh(geometry);
+        Assert.That(Numerics.Matrix4x4.Invert(
+            root.WorldMatrix,
+            out var rootInverseBind), Is.True);
+        Assert.That(Numerics.Matrix4x4.Invert(
+            leftFoot.WorldMatrix,
+            out var leftFootInverseBind), Is.True);
+        Assert.That(Numerics.Matrix4x4.Invert(
+            rightFoot.WorldMatrix,
+            out var rightFootInverseBind), Is.True);
+        Assert.That(Numerics.Matrix4x4.Invert(
+            head.WorldMatrix,
+            out var headInverseBind), Is.True);
+        armature.CreateNode("mesh_node").WithSkinnedMesh(
+            mesh,
+            (root, rootInverseBind),
+            (leftFoot, leftFootInverseBind),
+            (rightFoot, rightFootInverseBind),
+            (head, headInverseBind));
+        modelRoot.LogicalSkins.Single().Name = "ScaledArmature";
+        modelRoot.CreateAnimation("Root Move").CreateTranslationChannel(
+            root,
+            new Dictionary<float, Numerics.Vector3>
+            {
+                [0] = Numerics.Vector3.Zero,
+                [1] = new Numerics.Vector3(0, 100, 0),
+            });
+
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"scaled_ancestor_{Guid.NewGuid():N}.glb");
+        modelRoot.SaveGLB(path);
+        return path;
+    }
+
+    private static string CreateSingularAncestorGltf()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var armature = scene.CreateNode("InvalidArmature");
+        armature.LocalMatrix = Numerics.Matrix4x4.CreateScale(2);
+        var root = armature.CreateNode("root");
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("invalid_mesh");
+        geometry.UsePrimitive(
+                new MaterialBuilder("material").WithMetallicRoughness())
+            .AddTriangle(
+                CreateScaledAncestorVertex(0, 0),
+                CreateScaledAncestorVertex(1, 0),
+                CreateScaledAncestorVertex(0, 1));
+        var mesh = modelRoot.CreateMesh(geometry);
+        Assert.That(Numerics.Matrix4x4.Invert(
+            root.WorldMatrix,
+            out var rootInverseBind), Is.True);
+        armature.CreateNode("mesh_node").WithSkinnedMesh(
+            mesh,
+            (root, rootInverseBind));
+        modelRoot.LogicalSkins.Single().Name = "InvalidArmature";
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"singular_ancestor_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "singular_ancestor.gltf");
+        modelRoot.SaveGLTF(path);
+
+        var json = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(path))!;
+        var armatureJson = json["nodes"]![armature.LogicalIndex]!.AsObject();
+        armatureJson.Remove("matrix");
+        armatureJson.Remove("rotation");
+        armatureJson.Remove("translation");
+        armatureJson["scale"] = new System.Text.Json.Nodes.JsonArray(0, 1, 1);
+        File.WriteAllText(path, json.ToJsonString());
+        return directory;
+    }
+
+    private static VertexBuilder<
+        VertexPositionNormalTangent,
+        VertexTexture1,
+        VertexJoints4> CreateScaledAncestorVertex(float x, float y)
+    {
+        var vertex = new VertexBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>();
+        vertex.Geometry.Position = new Numerics.Vector3(x, y, 0);
+        vertex.Geometry.Normal = Numerics.Vector3.UnitZ;
+        vertex.Geometry.Tangent = new Numerics.Vector4(1, 0, 0, 1);
+        vertex.Material.TexCoord = new Numerics.Vector2(x, y);
+        vertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
+        return vertex;
     }
 
     private static AnimationFile.Frame CloneFrame(AnimationFile.Frame frame) => new()
