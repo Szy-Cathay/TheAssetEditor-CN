@@ -156,6 +156,19 @@ public partial class ImportWindow : AssetEditorWindow
                 scaleItems));
         }
 
+        if (result.SourceForward != null)
+        {
+            sections.Add(BuildSection(
+                LocalizationManager.Instance.Get(
+                    "ImportWindow.SourceForwardHeading"),
+                [
+                    LocalizationManager.Instance.GetFormat(
+                        "GltfImporter.SourceForward.Summary.Direction",
+                        result.SourceForward.SourceDirection),
+                    result.SourceForward.Conversion,
+                ]));
+        }
+
         return string.Join(Environment.NewLine + Environment.NewLine, sections);
     }
 

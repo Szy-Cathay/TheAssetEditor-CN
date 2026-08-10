@@ -1,4 +1,5 @@
 ﻿using Editors.ImportExport.Importing;
+using Editors.ImportExport.Importing.Importers.GltfToRmv;
 using Editors.ImportExport.Importing.Presentation;
 using Editors.ImportExport.Misc;
 using Editors.ImportImport.Importing.Presentation.RmvToGltf;
@@ -11,6 +12,9 @@ namespace Test.ImportExport.Importing.Presentation;
 
 public class GltfToRmvImporterViewModelTests
 {
+    [SetUp]
+    public void SetUp() => new LocalizationManager().LoadLanguage();
+
     [Test]
     public void AnimationSampling_DefaultsToAutoAndManualFieldTracksAvailability()
     {
@@ -20,6 +24,23 @@ public class GltfToRmvImporterViewModelTests
         {
             Assert.That(viewModel.AutoDetectAnimationKeysPerSecond, Is.True);
             Assert.That(viewModel.AutoScaleHumanoid, Is.True);
+            Assert.That(
+                viewModel.SourceForwardDirection,
+                Is.EqualTo(GltfSourceForwardDirection.PositiveZ));
+            Assert.That(
+                viewModel.SourceForwardDirections.Select(option => option.Value),
+                Is.EqualTo(new[]
+                {
+                    GltfSourceForwardDirection.PositiveZ,
+                    GltfSourceForwardDirection.PositiveX,
+                }));
+            Assert.That(
+                viewModel.SourceForwardDirections.Select(option => option.Key),
+                Is.EqualTo(new[]
+                {
+                    "+Z（标准 glTF）",
+                    "+X（Unreal/PSK）",
+                }));
             Assert.That(viewModel.CanEditAnimationKeysPerSecond, Is.False);
         });
 
@@ -167,7 +188,10 @@ public class GltfToRmvImporterViewModelTests
                 [
                     new SkippedMaterialSemantic("decorated", "Emissive"),
                     new SkippedMaterialSemantic("decorated", "Occlusion"),
-                ])));
+                ]),
+            SourceForward: new SourceForwardImportSummary(
+                "+X（Unreal/PSK）",
+                "已将源 +X 确定性旋转到游戏 +Z 正面。")));
         var failureMessage = ImportWindow.BuildResultMessage(
             ImportResult.Failure([
                 "目标 Pack 已存在资源：models\\test.rigid_model_v2",
@@ -197,6 +221,9 @@ public class GltfToRmvImporterViewModelTests
             Assert.That(successMessage, Does.Contain("自发光（Emissive）"));
             Assert.That(successMessage, Does.Contain("环境遮蔽（Occlusion）"));
             Assert.That(successMessage, Does.Contain("不会根据文件名或 Blender 节点猜测"));
+            Assert.That(successMessage, Does.Contain("源模型正面方向"));
+            Assert.That(successMessage, Does.Contain("+X（Unreal/PSK）"));
+            Assert.That(successMessage, Does.Contain("游戏 +Z"));
             Assert.That(disabledMessage, Does.Contain("源人物高度：未测量"));
             Assert.That(disabledMessage, Does.Contain("humanoid01 参考高度：未测量"));
             Assert.That(disabledMessage, Does.Contain("最终倍率：1"));

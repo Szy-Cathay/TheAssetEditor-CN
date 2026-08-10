@@ -193,7 +193,116 @@ public class GltfFullWorkflowImportTests
             Assert.That(message, Does.Contain("MaskMaterial"));
             Assert.That(message, Does.Contain("自发光（Emissive）"));
             Assert.That(message, Does.Contain("环境遮蔽（Occlusion）"));
+            Assert.That(result.SourceForward!.SourceDirection,
+                Is.EqualTo("+Z（标准 glTF）"));
+            Assert.That(message, Does.Contain("源模型正面方向"));
+            Assert.That(message, Does.Contain("+Z（标准 glTF）"));
+            Assert.That(message, Does.Contain("未增加额外旋转"));
         });
+    }
+
+    [Test]
+    public void Import_SourcePositiveX_RotatesEveryAssetAfterAutoScaleAndReportsDirection()
+    {
+        var glbPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "external_full_workflow.glb");
+        var positiveZDestination = new PackFileContainer("positive-z");
+        var positiveXDestination = new PackFileContainer("positive-x");
+        var positiveZResult = CreateImporter(positiveZDestination).Import(
+            CreateFullWorkflowSettings(
+                glbPath,
+                positiveZDestination,
+                GltfSourceForwardDirection.PositiveZ));
+        var positiveXViewModel = new RmvToGltfImporterViewModel(
+            CreateImporter(positiveXDestination))
+        {
+            SourceForwardDirection = GltfSourceForwardDirection.PositiveX,
+            AnimationKeysPerSecond = 24,
+        };
+        positiveXViewModel.Initialize(new PackFile(
+            glbPath,
+            new FileSystemSource(glbPath)));
+        var positiveXResult = positiveXViewModel.Execute(
+            new PackFile(glbPath, new FileSystemSource(glbPath)),
+            "models",
+            positiveXDestination,
+            GameTypeEnum.Warhammer3);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(positiveZResult.Succeeded, Is.True,
+                string.Join(Environment.NewLine, positiveZResult.Errors));
+            Assert.That(positiveXResult.Succeeded, Is.True,
+                string.Join(Environment.NewLine, positiveXResult.Errors));
+            Assert.That(
+                positiveXResult.HumanoidScale!.SourceHeight,
+                Is.EqualTo(positiveZResult.HumanoidScale!.SourceHeight).Within(0.0001f));
+            Assert.That(
+                positiveXResult.HumanoidScale.ReferenceHeight,
+                Is.EqualTo(positiveZResult.HumanoidScale.ReferenceHeight).Within(0.0001f));
+            Assert.That(
+                positiveXResult.HumanoidScale.ScaleFactor,
+                Is.EqualTo(positiveZResult.HumanoidScale.ScaleFactor).Within(0.0001f));
+            Assert.That(
+                positiveXResult.SourceForward!.SourceDirection,
+                Is.EqualTo("+X（Unreal/PSK）"));
+            Assert.That(
+                positiveXResult.SourceForward.Conversion,
+                Does.Contain("游戏 +Z"));
+        });
+
+        const string rmvPath = @"models\external_full_workflow.rigid_model_v2";
+        const string skeletonPath =
+            @"animations\skeletons\externalworkflowarmature.anim";
+        var positiveZRmv = ModelFactory.Create().Load(
+            positiveZDestination.FileList[rmvPath].DataSource.ReadData());
+        var positiveXRmv = ModelFactory.Create().Load(
+            positiveXDestination.FileList[rmvPath].DataSource.ReadData());
+        var positiveZVertices = positiveZRmv.ModelList[0]
+            .SelectMany(model => model.Mesh.VertexList)
+            .ToList();
+        var positiveXVertices = positiveXRmv.ModelList[0]
+            .SelectMany(model => model.Mesh.VertexList)
+            .ToList();
+        Assert.That(positiveXVertices, Has.Count.EqualTo(positiveZVertices.Count));
+        for (var vertexIndex = 0; vertexIndex < positiveZVertices.Count; vertexIndex++)
+        {
+            AssertVectorRotated(
+                ToNumerics(positiveZVertices[vertexIndex].Position),
+                ToNumerics(positiveXVertices[vertexIndex].Position));
+            AssertVectorRotated(
+                ToNumerics(positiveZVertices[vertexIndex].Normal),
+                ToNumerics(positiveXVertices[vertexIndex].Normal),
+                0.01f);
+        }
+
+        var positiveZSkeleton = AnimationFile.Create(
+            positiveZDestination.FileList[skeletonPath]);
+        var positiveXSkeleton = AnimationFile.Create(
+            positiveXDestination.FileList[skeletonPath]);
+        AssertAnimationRotated(positiveZSkeleton, positiveXSkeleton);
+
+        foreach (var animationPath in new[]
+                 {
+                     @"models\external_full_workflow_move.anim",
+                     @"models\external_full_workflow_nod.anim",
+                 })
+        {
+            var positiveZAnimation = AnimationFile.Create(
+                positiveZDestination.FileList[animationPath]);
+            var positiveXAnimation = AnimationFile.Create(
+                positiveXDestination.FileList[animationPath]);
+            AssertAnimationRotated(positiveZAnimation, positiveXAnimation);
+        }
+
+        Assert.That(
+            ImportWindow.BuildResultMessage(positiveXResult),
+            Does.Contain("源模型正面方向")
+                .And.Contain("+X（Unreal/PSK）")
+                .And.Contain("游戏 +Z"));
     }
 
     [Test]
@@ -380,6 +489,136 @@ public class GltfFullWorkflowImportTests
             Mock.Of<ISkeletonAnimationLookUpHelper>(),
             new RmvMaterialBuilder());
     }
+
+    private static GltfImporterSettings CreateFullWorkflowSettings(
+        string glbPath,
+        PackFileContainer destination,
+        GltfSourceForwardDirection sourceForwardDirection) =>
+        new(
+            glbPath,
+            "models",
+            destination,
+            GameTypeEnum.Warhammer3,
+            ImportMeshes: true,
+            ImportMaterials: true,
+            ConvertMaterialFromBlenderType: true,
+            ConvertNormalTextureFromBlueToOrangeType: true,
+            ImportAnimations: true,
+            AnimationKeysPerSecond: 24,
+            MirrorMesh: true,
+            AutoDetectAnimationKeysPerSecond: true,
+            AutoScaleHumanoid: true,
+            SourceForwardDirection: sourceForwardDirection);
+
+    private static void AssertAnimationRotated(
+        AnimationFile positiveZ,
+        AnimationFile positiveX)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(positiveX.Bones.Select(bone => bone.Name),
+                Is.EqualTo(positiveZ.Bones.Select(bone => bone.Name)));
+            Assert.That(positiveX.AnimationParts,
+                Has.Count.EqualTo(positiveZ.AnimationParts.Count));
+        });
+        for (var partIndex = 0; partIndex < positiveZ.AnimationParts.Count; partIndex++)
+        {
+            var positiveZPart = positiveZ.AnimationParts[partIndex];
+            var positiveXPart = positiveX.AnimationParts[partIndex];
+            if (positiveZPart.StaticFrame != null)
+            {
+                Assert.That(positiveXPart.StaticFrame, Is.Not.Null);
+                AssertFrameRotated(
+                    positiveZPart.StaticFrame,
+                    positiveXPart.StaticFrame!);
+            }
+
+            Assert.That(positiveXPart.DynamicFrames,
+                Has.Count.EqualTo(positiveZPart.DynamicFrames.Count));
+            for (var frameIndex = 0;
+                 frameIndex < positiveZPart.DynamicFrames.Count;
+                 frameIndex++)
+            {
+                AssertFrameRotated(
+                    positiveZPart.DynamicFrames[frameIndex],
+                    positiveXPart.DynamicFrames[frameIndex]);
+            }
+        }
+    }
+
+    private static void AssertFrameRotated(
+        AnimationFile.Frame positiveZ,
+        AnimationFile.Frame positiveX)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(positiveX.Transforms,
+                Has.Count.EqualTo(positiveZ.Transforms.Count));
+            Assert.That(positiveX.Quaternion,
+                Has.Count.EqualTo(positiveZ.Quaternion.Count));
+        });
+        for (var transformIndex = 0;
+             transformIndex < positiveZ.Transforms.Count;
+             transformIndex++)
+        {
+            AssertVectorRotated(
+                ToNumerics(positiveZ.Transforms[transformIndex]),
+                ToNumerics(positiveX.Transforms[transformIndex]));
+        }
+        for (var rotationIndex = 0;
+             rotationIndex < positiveZ.Quaternion.Count;
+             rotationIndex++)
+        {
+            var expected = RotatePositiveX(
+                ToNumerics(positiveZ.Quaternion[rotationIndex]));
+            var actual = ToNumerics(positiveX.Quaternion[rotationIndex]);
+            Assert.That(
+                Math.Abs(Numerics.Quaternion.Dot(expected, actual)),
+                Is.EqualTo(1).Within(0.0001f));
+        }
+    }
+
+    private static void AssertVectorRotated(
+        Numerics.Vector3 positiveZ,
+        Numerics.Vector3 positiveX,
+        float tolerance = 0.0001f) =>
+        Assert.That(
+            Numerics.Vector3.Distance(
+                positiveX,
+                Numerics.Vector3.Transform(
+                    positiveZ,
+                    Numerics.Matrix4x4.CreateRotationY(MathF.PI / 2))),
+            Is.LessThanOrEqualTo(tolerance));
+
+    private static Numerics.Quaternion RotatePositiveX(
+        Numerics.Quaternion positiveZ)
+    {
+        var basis = Numerics.Matrix4x4.CreateRotationY(MathF.PI / 2);
+        var converted = Numerics.Matrix4x4.Transpose(basis) *
+                        Numerics.Matrix4x4.CreateFromQuaternion(positiveZ) *
+                        basis;
+        Assert.That(Numerics.Matrix4x4.Decompose(
+            converted,
+            out _,
+            out var rotation,
+            out _), Is.True);
+        return Numerics.Quaternion.Normalize(rotation);
+    }
+
+    private static Numerics.Vector3 ToNumerics(
+        Microsoft.Xna.Framework.Vector4 value) =>
+        new(value.X, value.Y, value.Z);
+
+    private static Numerics.Vector3 ToNumerics(
+        Microsoft.Xna.Framework.Vector3 value) =>
+        new(value.X, value.Y, value.Z);
+
+    private static Numerics.Vector3 ToNumerics(RmvVector3 value) =>
+        new(value.X, value.Y, value.Z);
+
+    private static Numerics.Quaternion ToNumerics(RmvVector4 value) =>
+        new(value.X, value.Y, value.Z, value.W);
+
 
     private static PackFileContainer CreateReferenceContainer()
     {

@@ -7,20 +7,23 @@ public sealed record ImportResult(
     IReadOnlyList<string> Errors,
     Exception? Exception = null,
     HumanoidScaleImportSummary? HumanoidScale = null,
-    MaterialImportSummary? MaterialSummary = null)
+    MaterialImportSummary? MaterialSummary = null,
+    SourceForwardImportSummary? SourceForward = null)
 {
     public static ImportResult Success(
         IReadOnlyList<string> outputPaths,
         IReadOnlyList<string>? warnings = null,
         HumanoidScaleImportSummary? humanoidScale = null,
-        MaterialImportSummary? materialSummary = null) =>
+        MaterialImportSummary? materialSummary = null,
+        SourceForwardImportSummary? sourceForward = null) =>
         new(
             true,
             outputPaths,
             warnings ?? [],
             [],
             HumanoidScale: humanoidScale,
-            MaterialSummary: materialSummary);
+            MaterialSummary: materialSummary,
+            SourceForward: sourceForward);
 
     public static ImportResult Failure(Exception exception) =>
         new(false, [], [], [exception.Message], exception);
@@ -36,6 +39,10 @@ public sealed record HumanoidScaleImportSummary(
     float? ReferenceHeight,
     float ScaleFactor,
     string Reason);
+
+public sealed record SourceForwardImportSummary(
+    string SourceDirection,
+    string Conversion);
 
 public sealed record MaterialImportSummary(
     IReadOnlyList<MaskedMaterialImportSummary> MaskedMaterials,
