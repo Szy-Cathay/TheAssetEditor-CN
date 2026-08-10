@@ -196,6 +196,8 @@ public class AnimationBuilder
     private sealed class SkinAnimationRetargeter
     {
         private const float EquivalentBindTransformTolerance = 0.0001f;
+        private const float SourceScaleTolerance = 0.0001f;
+        private const float RetargetedScaleTolerance = 0.0002f;
 
         private sealed record JointBinding(
             Node Joint,
@@ -372,11 +374,18 @@ public class AnimationBuilder
                     throw new InvalidDataException(
                         $"glTF 动画在骨骼“{_skeleton.Bones[boneIndex].Name}”处无法分解为平移和旋转。");
                 }
-                if ((binding?.HasScaleChannel == true &&
-                     !IsUnitScale(
-                         binding.Joint.GetLocalTransform(animation, time).Scale,
-                         0.0001f)) ||
-                    !IsUnitScale(scale, 0.0001f))
+                var hasUnitSourceScale = binding?.HasScaleChannel != true ||
+                    IsUnitScale(
+                        binding.Joint.GetLocalTransform(animation, time).Scale,
+                        SourceScaleTolerance);
+                // Blender can emit explicit unit scale keys while tiny bind-pose
+                // differences force the animation through world-space retargeting.
+                var retargetedScaleTolerance =
+                    binding?.HasScaleChannel == true && hasUnitSourceScale
+                        ? RetargetedScaleTolerance
+                        : SourceScaleTolerance;
+                if (!hasUnitSourceScale ||
+                    !IsUnitScale(scale, retargetedScaleTolerance))
                 {
                     throw new InvalidDataException(
                         LocalizationManager.Instance.GetFormat(
@@ -451,7 +460,7 @@ public class AnimationBuilder
                 {
                     var sourceTransform = binding.Joint.GetLocalTransform(animation, time);
                     if (binding.HasScaleChannel &&
-                        !IsUnitScale(sourceTransform.Scale, 0.0001f))
+                        !IsUnitScale(sourceTransform.Scale, SourceScaleTolerance))
                     {
                         throw new InvalidDataException(
                             LocalizationManager.Instance.GetFormat(

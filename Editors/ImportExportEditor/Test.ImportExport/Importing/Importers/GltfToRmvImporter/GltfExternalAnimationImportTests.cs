@@ -157,7 +157,7 @@ public class GltfExternalAnimationImportTests
                 new Dictionary<float, Vector3>
                 {
                     [0.00f] = Vector3.One,
-                    [0.05f] = new Vector3(2, 1, 1),
+                    [0.05f] = new Vector3(1.00015f, 1, 1),
                 });
         });
 
@@ -173,6 +173,7 @@ public class GltfExternalAnimationImportTests
                 Assert.That(result.Succeeded, Is.False);
                 Assert.That(result.Errors, Has.Some.Contains("Scaled Action"));
                 Assert.That(result.Errors, Has.Some.Contains("root"));
+                Assert.That(result.Errors, Has.Some.Contains("0.05"));
                 Assert.That(result.Errors, Has.Some.Contains("缩放"));
                 AssertDestinationUnchanged(destination, existingFile);
             });
@@ -180,6 +181,80 @@ public class GltfExternalAnimationImportTests
         finally
         {
             File.Delete(glbPath);
+        }
+    }
+
+    [TestCase(".gltf")]
+    [TestCase(".glb")]
+    public void Import_BlenderRoundTripWithUnitScaleKeys_CreatesAnimation(
+        string extension)
+    {
+        var fixture = CreateExistingGameSkeletonRoundTrip(extension);
+
+        try
+        {
+            var destination = new PackFileContainer("test");
+            var skeletonLookup = new Mock<ISkeletonAnimationLookUpHelper>();
+            skeletonLookup
+                .Setup(lookup => lookup.GetSkeletonFileFromName("test_skeleton"))
+                .Returns(fixture.Skeleton);
+            var importer = new GltfImporter(
+                PackFileSerivceTestHelper.Create(TestData.InputPack),
+                skeletonLookup.Object,
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(CreateSettings(fixture.Path, destination));
+
+            Assert.That(
+                result.Succeeded,
+                Is.True,
+                result.Exception?.ToString() ??
+                string.Join(Environment.NewLine, result.Errors));
+            var animationPath = result.OutputPaths.Single(path =>
+                path.EndsWith(
+                    "_blender_roundtrip.anim",
+                    StringComparison.OrdinalIgnoreCase));
+            var imported = AnimationFile.Create(destination.FileList[animationPath]);
+            var frames = imported.AnimationParts[0].DynamicFrames;
+            var firstFrame = frames[0];
+            var rotation = firstFrame.Quaternion[0];
+            var rotationLength = MathF.Sqrt(
+                rotation.X * rotation.X +
+                rotation.Y * rotation.Y +
+                rotation.Z * rotation.Z +
+                rotation.W * rotation.W);
+            var storedRotation = fixture.Skeleton.AnimationParts[0]
+                .DynamicFrames[0].Quaternion[0];
+            var expectedRotation = Quaternion.Normalize(new Quaternion(
+                storedRotation.X,
+                storedRotation.Y,
+                storedRotation.Z,
+                storedRotation.W));
+            var actualRotation = Quaternion.Normalize(new Quaternion(
+                rotation.X,
+                rotation.Y,
+                rotation.Z,
+                rotation.W));
+            Assert.Multiple(() =>
+            {
+                Assert.That(rotationLength, Is.EqualTo(1.0f).Within(0.0001f));
+                Assert.That(
+                    MathF.Abs(Quaternion.Dot(expectedRotation, actualRotation)),
+                    Is.GreaterThan(0.9999f));
+                foreach (var frame in frames)
+                {
+                    Assert.That(frame.Transforms[0].X, Is.Zero.Within(0.000001f));
+                    Assert.That(frame.Transforms[0].Y, Is.Zero.Within(0.000001f));
+                    Assert.That(frame.Transforms[0].Z, Is.Zero.Within(0.000001f));
+                }
+                Assert.That(
+                    result.OutputPaths,
+                    Does.Not.Contain(@"animations\skeletons\test_skeleton.anim"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(fixture.Directory, true);
         }
     }
 
@@ -334,6 +409,99 @@ public class GltfExternalAnimationImportTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
         modelRoot.SaveGLB(path);
         return path;
+    }
+
+    private static (string Directory, string Path, AnimationFile Skeleton)
+        CreateExistingGameSkeletonRoundTrip(string extension)
+    {
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("mesh");
+        geometry.UsePrimitive(
+                new MaterialBuilder("material").WithMetallicRoughness())
+            .AddTriangle(
+                CreateVertex(0, 0),
+                CreateVertex(1, 0),
+                CreateVertex(0, 1));
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        scene.CreateNode("//skeleton//test_skeleton");
+        var joint = scene.CreateNode("root");
+        scene.CreateNode("mesh_node").WithSkinnedMesh(
+            modelRoot.CreateMesh(geometry),
+            (joint, Matrix4x4.Identity));
+        var animation = modelRoot.CreateAnimation("Blender Roundtrip");
+        animation.CreateScaleChannel(joint, new Dictionary<float, Vector3>
+        {
+            [0] = Vector3.One,
+            [1] = new Vector3(0.9999999f, 1, 1),
+        });
+        animation.CreateRotationChannel(joint, new Dictionary<float, Quaternion>
+        {
+            [0] = Quaternion.Identity,
+            [1] = Quaternion.Identity,
+        });
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"gltf_original_roundtrip_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"original_roundtrip{extension}");
+        if (string.Equals(extension, ".gltf", StringComparison.OrdinalIgnoreCase))
+            modelRoot.SaveGLTF(path);
+        else
+            modelRoot.SaveGLB(path);
+
+        return (directory, path, CreateStoredGameSkeleton());
+    }
+
+    private static AnimationFile CreateStoredGameSkeleton()
+    {
+        var targetBindRotation = Quaternion.CreateFromAxisAngle(
+            Vector3.UnitZ,
+            MathF.PI / 2.0f);
+        const float storedQuaternionLength = 1.000078f;
+        var frame = new AnimationFile.Frame
+        {
+            Transforms =
+            [
+                new Shared.GameFormats.RigidModel.Transforms.RmvVector3(0, 0, 0),
+            ],
+            Quaternion =
+            [
+                new Shared.GameFormats.RigidModel.Transforms.RmvVector4(
+                    targetBindRotation.X * storedQuaternionLength,
+                    targetBindRotation.Y * storedQuaternionLength,
+                    targetBindRotation.Z * storedQuaternionLength,
+                    targetBindRotation.W * storedQuaternionLength),
+            ],
+        };
+        var part = new AnimationFile.AnimationPart
+        {
+            DynamicFrames = [frame],
+        };
+        part.TranslationMappings.Add(new AnimationFile.AnimationBoneMapping(0));
+        part.RotationMappings.Add(new AnimationFile.AnimationBoneMapping(0));
+
+        return new AnimationFile
+        {
+            Header = new AnimationFile.AnimationHeader
+            {
+                FrameRate = 20,
+                SkeletonName = "test_skeleton",
+            },
+            Bones =
+            [
+                new AnimationFile.BoneInfo
+                {
+                    Id = 0,
+                    ParentId = -1,
+                    Name = "root",
+                },
+            ],
+            AnimationParts = [part],
+        };
     }
 
     private static VertexBuilder<
