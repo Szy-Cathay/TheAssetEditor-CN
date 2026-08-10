@@ -67,15 +67,15 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
         internal RmvMaterialBuildResult BuildRmvFileMaterials(
             GltfImporterSettings settings,
             SharpGLTF.Schema2.ModelRoot modelRoot,
-            RmvFile rmvFile)
+            RmvFile rmvFile,
+            IReadOnlyList<RmvMeshBuilder.MeshSource> meshSources)
         {
-            ValidateInput_BuildRmvFileMaterials(modelRoot, rmvFile);
+            ValidateInput_BuildRmvFileMaterials(modelRoot, rmvFile, meshSources);
 
             var textureEntries = new List<NewPackFileEntry>();
             var importedTexturePaths = new Dictionary<TextureCacheKey, string>();
             var maskedMaterials = new HashSet<MaskedMaterialImportSummary>();
             var skippedSemantics = new HashSet<SkippedMaterialSemantic>();
-            var meshSources = RmvMeshBuilder.GetMeshSources(modelRoot);
             for (int i = 0; i < meshSources.Count; i++)
             {
                 BuildRmvModelMaterial(
@@ -364,7 +364,10 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             return textureFullPackPath;
         }
 
-        private static void ValidateInput_BuildRmvFileMaterials(ModelRoot modelRoot, RmvFile rmvFile)
+        private static void ValidateInput_BuildRmvFileMaterials(
+            ModelRoot modelRoot,
+            RmvFile rmvFile,
+            IReadOnlyList<RmvMeshBuilder.MeshSource> meshSources)
         {
             if (modelRoot == null)
                 throw new ArgumentNullException(nameof(modelRoot), "Invalid Scene: ModelRoot can't be null");
@@ -378,7 +381,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
             if (!rmvFile.ModelList.Any())
                 throw new Exception("ERROR: unexpected not meshes in rmv2 file struct");
 
-            if (rmvFile.ModelList[0].Length != RmvMeshBuilder.GetMeshSources(modelRoot).Count)
+            if (rmvFile.ModelList[0].Length != meshSources.Count)
                 throw new Exception("ERROR: unexpected rmv2 mesh count mismatch");
         }
     }

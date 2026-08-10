@@ -10,6 +10,9 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using Shared.GameFormats.RigidModel;
+using Shared.GameFormats.RigidModel.Types;
+using Shared.GameFormats.RigidModel.Vertex;
 using Shared.TestUtility;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
@@ -211,7 +214,7 @@ public class GltfImporterAtomicImportTests
     }
 
     [Test]
-    public void Import_VertexLimitFixture_ReportsEverySegmentAndLeavesPackUnchanged()
+    public void Import_VertexLimitFixture_AutomaticallySplitsEveryInstanceAndReportsSummary()
     {
         var gltfPath = Path.Combine(
             TestContext.CurrentContext.TestDirectory,
@@ -245,16 +248,293 @@ public class GltfImporterAtomicImportTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(result.Succeeded, Is.True);
+            Assert.That(result.Warnings, Has.Some.Contains("2 个超过限制的原始模型分段"));
+            Assert.That(result.Warnings, Has.Some.Contains("4 个 RMV2 分段"));
+            Assert.That(destination.FileList, Has.Count.EqualTo(2));
+            Assert.That(destination.FileList[existingPath], Is.SameAs(existingFile));
+            Assert.That(
+                existingFile.DataSource.ReadData(),
+                Is.EqualTo(new byte[] { 7, 8, 9 }));
+
+            var rmvPath = destination.FileList.Keys.Single(path =>
+                path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase));
+            var rmv = ModelFactory.Create().Load(
+                destination.FileList[rmvPath].DataSource.ReadData());
+            Assert.That(rmv.ModelList[0], Has.Length.EqualTo(4));
+            Assert.That(
+                rmv.ModelList[0].Select(model => model.Mesh.VertexList.Length),
+                Is.EqualTo(new[] { 65535, 3, 65535, 3 }));
+            Assert.That(
+                rmv.ModelList[0],
+                Has.All.Matches<RmvModel>(model =>
+                    model.Mesh.IndexList.All(index => index < model.Mesh.VertexList.Length)));
+        });
+    }
+
+    [Test]
+    public void Import_ExactVertexLimitFixture_KeepsSingleSegmentWithoutSplitWarning()
+    {
+        var gltfPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "vertex_limit_exact.gltf");
+        var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+        var destination = new PackFileContainer("test");
+        var importer = new GltfImporter(
+            packFileService,
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+
+        var result = importer.Import(new GltfImporterSettings(
+            gltfPath,
+            "models",
+            destination,
+            GameTypeEnum.Warhammer3,
+            true,
+            false,
+            false,
+            false,
+            false,
+            20,
+            true));
+
+        Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
+        var rmvPath = destination.FileList.Keys.Single(path =>
+            path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase));
+        var rmv = ModelFactory.Create().Load(
+            destination.FileList[rmvPath].DataSource.ReadData());
+        Assert.Multiple(() =>
+        {
+            Assert.That(rmv.ModelList[0], Has.Length.EqualTo(1));
+            Assert.That(rmv.ModelList[0][0].Mesh.VertexList, Has.Length.EqualTo(65536));
+            Assert.That(result.Warnings, Has.None.Contains("自动拆分"));
+        });
+    }
+
+    [Test]
+    public void Import_OversizedSparsePrimitive_ReportsCompactedSegment()
+    {
+        var gltfPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "vertex_limit_sparse.gltf");
+        var destination = new PackFileContainer("test");
+        var importer = new GltfImporter(
+            PackFileSerivceTestHelper.Create(TestData.InputPack),
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+
+        var result = importer.Import(new GltfImporterSettings(
+            gltfPath,
+            "models",
+            destination,
+            GameTypeEnum.Warhammer3,
+            true,
+            false,
+            false,
+            false,
+            false,
+            20,
+            true));
+
+        Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
+        var rmvPath = destination.FileList.Keys.Single(path =>
+            path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase));
+        var rmv = ModelFactory.Create().Load(
+            destination.FileList[rmvPath].DataSource.ReadData());
+        Assert.Multiple(() =>
+        {
+            Assert.That(rmv.ModelList[0], Has.Length.EqualTo(1));
+            Assert.That(rmv.ModelList[0][0].Mesh.VertexList, Has.Length.EqualTo(3));
+            Assert.That(result.Warnings, Has.Some.Contains("1 个超过限制的原始模型分段"));
+            Assert.That(result.Warnings, Has.Some.Contains("1 个 RMV2 分段"));
+        });
+    }
+
+    [Test]
+    public void Import_UnsupportedPrimitive_ReturnsChineseErrorAndLeavesPackUnchanged()
+    {
+        var gltfPath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "TestData",
+            "Gltf",
+            "unsupported_primitive.gltf");
+        var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+        var destination = new PackFileContainer("test");
+        const string existingPath = @"models\existing.bin";
+        var existingFile = new PackFile("existing.bin", new MemorySource([7, 8, 9]));
+        destination.FileList[existingPath] = existingFile;
+        var importer = new GltfImporter(
+            packFileService,
+            Mock.Of<ISkeletonAnimationLookUpHelper>(),
+            new RmvMaterialBuilder());
+
+        var result = importer.Import(new GltfImporterSettings(
+            gltfPath,
+            "models",
+            destination,
+            GameTypeEnum.Warhammer3,
+            true,
+            false,
+            false,
+            false,
+            false,
+            20,
+            true));
+
+        Assert.Multiple(() =>
+        {
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Errors, Has.Some.Contains("first_instance"));
-            Assert.That(result.Errors, Has.Some.Contains("second_instance"));
-            Assert.That(result.Errors, Has.Some.Contains("65536"));
+            Assert.That(result.Errors, Has.Some.Contains("仅支持三角形"));
             Assert.That(destination.FileList, Has.Count.EqualTo(1));
             Assert.That(destination.FileList[existingPath], Is.SameAs(existingFile));
             Assert.That(
                 existingFile.DataSource.ReadData(),
                 Is.EqualTo(new byte[] { 7, 8, 9 }));
         });
+    }
+
+    [Test]
+    public void Import_OversizedIndexedSkinnedMaterialPrimitive_PreservesTrianglesAndAttributes()
+    {
+        const int sourceTriangleCount = 32768;
+        const int sourceVertexCount = 65537;
+        var imagePath = CreatePng();
+        var glbPath = CreateOversizedIndexedSkinnedGlb(
+            sourceTriangleCount,
+            imagePath);
+        try
+        {
+            var packFileService = PackFileSerivceTestHelper.Create(TestData.InputPack);
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                true,
+                true,
+                false,
+                false,
+                false,
+                20,
+                true,
+                NewSkeletonName: "oversized_test_skeleton",
+                AutoScaleHumanoid: false));
+
+            Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
+            var rmvPath = destination.FileList.Keys.Single(path =>
+                path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase));
+            var rmv = ModelFactory.Create().Load(
+                destination.FileList[rmvPath].DataSource.ReadData());
+            var models = rmv.ModelList[0];
+            var splitModels = models.Take(2).ToArray();
+            var duplicatedCenterVertices = splitModels
+                .SelectMany(model => model.Mesh.VertexList)
+                .Where(vertex => Math.Abs(vertex.Position.X) < 0.0001f)
+                .ToList();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(models, Has.Length.EqualTo(3));
+                Assert.That(
+                    models.Select(model => model.Mesh.VertexList.Length),
+                    Is.EqualTo(new[] { 65535, 3, 3 }));
+                Assert.That(
+                    splitModels.Sum(model => model.Mesh.VertexList.Length),
+                    Is.EqualTo(sourceVertexCount + 1));
+                Assert.That(
+                    splitModels.Sum(model => model.Mesh.IndexList.Length),
+                    Is.EqualTo(sourceTriangleCount * 3));
+                Assert.That(
+                    models.Select(model => model.Material.ModelName),
+                    Is.Unique);
+                Assert.That(
+                    models.Select(model => model.Material.ModelName),
+                    Does.Contain("mesh_node_split1"));
+                Assert.That(
+                    models,
+                    Has.All.Matches<RmvModel>(model =>
+                        model.Material.MaterialId == ModelMaterialEnum.weighted &&
+                        model.Material.GetAllTextures().Any(texture =>
+                            texture.TexureType == TextureType.BaseColour)));
+                Assert.That(
+                    models.SelectMany(model => model.Mesh.VertexList),
+                    Has.All.Matches<CommonVertex>(vertex =>
+                        vertex.WeightCount == 4 &&
+                        vertex.BoneIndex.SequenceEqual(new byte[] { 0, 1, 2, 3 }) &&
+                        Math.Abs(vertex.BoneWeight[0] - 0.4f) < 0.003f &&
+                        Math.Abs(vertex.BoneWeight[1] - 0.3f) < 0.003f &&
+                        Math.Abs(vertex.BoneWeight[2] - 0.2f) < 0.003f &&
+                        Math.Abs(vertex.BoneWeight[3] - 0.1f) < 0.003f &&
+                        Math.Abs(vertex.BoneWeight.Sum() - 1) < 0.0001f));
+                Assert.That(
+                    models.SelectMany(model => model.Mesh.VertexList),
+                    Has.All.Matches<CommonVertex>(vertex =>
+                        Vector3.Dot(
+                            new Vector3(vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z),
+                            Vector3.UnitZ) > 0.99f));
+                Assert.That(
+                    models.SelectMany(model => model.Mesh.VertexList),
+                    Has.All.Matches<CommonVertex>(vertex =>
+                        Vector3.Dot(
+                            new Vector3(vertex.Tangent.X, vertex.Tangent.Y, vertex.Tangent.Z),
+                            -Vector3.UnitX) > 0.99f));
+                Assert.That(
+                    models.SelectMany(model => model.Mesh.VertexList),
+                    Has.All.Matches<CommonVertex>(vertex =>
+                        Vector3.Dot(
+                            new Vector3(vertex.BiNormal.X, vertex.BiNormal.Y, vertex.BiNormal.Z),
+                            Vector3.UnitY) > 0.99f));
+                Assert.That(
+                    splitModels,
+                    Has.All.Matches<RmvModel>(model =>
+                    {
+                        var centerIndex = Array.FindIndex(
+                            model.Mesh.VertexList,
+                            vertex => Math.Abs(vertex.Position.X) < 0.0001f);
+                        return centerIndex >= 0 &&
+                            model.Mesh.IndexList.Chunk(3).All(indices =>
+                                indices[0] == centerIndex &&
+                                indices[1] != centerIndex &&
+                                indices[2] != centerIndex &&
+                                model.Mesh.VertexList[indices[1]].Uv ==
+                                    new Microsoft.Xna.Framework.Vector2(1, 1) &&
+                                model.Mesh.VertexList[indices[2]].Uv ==
+                                    new Microsoft.Xna.Framework.Vector2(1, 0) &&
+                                model.Mesh.VertexList[indices[1]].Position.X ==
+                                    model.Mesh.VertexList[indices[2]].Position.X &&
+                                model.Mesh.VertexList[indices[1]].Position.Y == 1 &&
+                                model.Mesh.VertexList[indices[2]].Position.Y == 0) &&
+                            model.Mesh.IndexList
+                                .Where(index => index != centerIndex)
+                                .GroupBy(index => index)
+                                .All(group => group.Count() == 1);
+                    }));
+                Assert.That(duplicatedCenterVertices, Has.Count.EqualTo(2));
+                Assert.That(
+                    duplicatedCenterVertices.All(vertex =>
+                        vertex.Uv.X == 0 && vertex.Uv.Y == 0),
+                    Is.True);
+                Assert.That(
+                    splitModels.Select(model => model.Material.GetAllTextures()
+                        .Single(texture => texture.TexureType == TextureType.BaseColour).Path),
+                    Has.All.EqualTo(@"models\tex\mesh_node_base_colour.dds"));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+            File.Delete(imagePath);
+        }
     }
 
     [Test]
@@ -499,6 +779,84 @@ public class GltfImporterAtomicImportTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
         modelRoot.SaveGLB(path);
         return path;
+    }
+
+    private static string CreateOversizedIndexedSkinnedGlb(
+        int triangleCount,
+        string imagePath)
+    {
+        var material = new MaterialBuilder("material")
+            .WithMetallicRoughness()
+            .WithChannelImage(KnownChannel.BaseColor, imagePath);
+        var geometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("mesh");
+        var primitive = geometry.UsePrimitive(material);
+        var center = CreateOversizedVertex(Vector3.Zero, Vector2.Zero);
+        for (var triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+        {
+            var x = triangleIndex + 1;
+            primitive.AddTriangle(
+                center,
+                CreateOversizedVertex(new Vector3(x, 0, 0), new Vector2(1, 0)),
+                CreateOversizedVertex(new Vector3(x, 1, 0), new Vector2(1, 1)));
+        }
+
+        var collisionGeometry = new MeshBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>("collision_mesh");
+        collisionGeometry.UsePrimitive(material).AddTriangle(
+            CreateOversizedVertex(new Vector3(0, 0, 1), Vector2.Zero),
+            CreateOversizedVertex(new Vector3(1, 0, 1), new Vector2(1, 0)),
+            CreateOversizedVertex(new Vector3(1, 1, 1), new Vector2(1, 1)));
+
+        var modelRoot = ModelRoot.CreateModel();
+        var mesh = modelRoot.CreateMesh(geometry);
+        var collisionMesh = modelRoot.CreateMesh(collisionGeometry);
+        var scene = modelRoot.UseScene("default");
+        var root = scene.CreateNode("root");
+        var bone1 = root.CreateNode("bone1");
+        var bone2 = bone1.CreateNode("bone2");
+        var bone3 = bone2.CreateNode("bone3");
+        scene.CreateNode("mesh_node").WithSkinnedMesh(
+            mesh,
+            (root, Matrix4x4.Identity),
+            (bone1, Matrix4x4.Identity),
+            (bone2, Matrix4x4.Identity),
+            (bone3, Matrix4x4.Identity));
+        scene.CreateNode("mesh_node_split1").WithSkinnedMesh(
+            collisionMesh,
+            (root, Matrix4x4.Identity),
+            (bone1, Matrix4x4.Identity),
+            (bone2, Matrix4x4.Identity),
+            (bone3, Matrix4x4.Identity));
+
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.glb");
+        modelRoot.SaveGLB(path);
+        return path;
+    }
+
+    private static VertexBuilder<
+        VertexPositionNormalTangent,
+        VertexTexture1,
+        VertexJoints4> CreateOversizedVertex(Vector3 position, Vector2 uv)
+    {
+        var vertex = new VertexBuilder<
+            VertexPositionNormalTangent,
+            VertexTexture1,
+            VertexJoints4>();
+        vertex.Geometry.Position = position;
+        vertex.Geometry.Normal = Vector3.UnitZ;
+        vertex.Geometry.Tangent = new Vector4(1, 0, 0, 1);
+        vertex.Material.TexCoord = uv;
+        vertex.Skinning.SetBindings(
+            (0, 0.4f),
+            (1, 0.3f),
+            (2, 0.2f),
+            (3, 0.1f));
+        return vertex;
     }
 
     private static string CreatePng()

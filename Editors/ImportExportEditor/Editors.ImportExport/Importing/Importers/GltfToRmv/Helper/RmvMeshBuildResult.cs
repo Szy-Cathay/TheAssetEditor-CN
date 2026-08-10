@@ -4,10 +4,13 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper;
 
 internal sealed record RmvMeshBuildResult(
     RmvFile? File,
-    RmvMeshImportSummary Summary);
+    RmvMeshImportSummary Summary,
+    IReadOnlyList<RmvMeshBuilder.MeshSource> ModelSources);
 
 internal sealed record RmvMeshImportSummary(
-    IReadOnlyList<RmvMeshSegmentImportSummary> Segments)
+    IReadOnlyList<RmvMeshSegmentImportSummary> Segments,
+    int SplitPrimitiveCount = 0,
+    int GeneratedSplitSegmentCount = 0)
 {
     public int TotalAffectedVertices => Segments.Sum(segment => segment.AffectedVertices);
 

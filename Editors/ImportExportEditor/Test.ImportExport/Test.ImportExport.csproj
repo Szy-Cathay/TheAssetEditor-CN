@@ -36,6 +36,9 @@
     <None Include="TestData\Gltf\external_full_workflow.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="TestData\Gltf\external_mesh_attributes.gltf" CopyToOutputDirectory="PreserveNewest" />
     <None Include="TestData\Gltf\vertex_limit.gltf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TestData\Gltf\vertex_limit_exact.gltf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TestData\Gltf\vertex_limit_sparse.gltf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TestData\Gltf\unsupported_primitive.gltf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
