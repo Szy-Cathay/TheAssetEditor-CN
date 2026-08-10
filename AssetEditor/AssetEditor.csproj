@@ -100,7 +100,7 @@
         </PropertyGroup>
 
         <RemoveDir Directories="$(UpdaterPublishDir)" />
-        <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" RemoveProperties="PublishProfile" Properties="PublishDir=$(UpdaterPublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishReadyToRun=$(PublishReadyToRun)" />
+        <MSBuild Projects="$(UpdaterProject)" Targets="Restore;Publish" RemoveProperties="PublishProfile" Properties="PublishDir=$(UpdaterPublishDir);Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=true;PublishReadyToRun=$(PublishReadyToRun)" />
     </Target>
 
     <Target Name="ExcludeLegacyDotNetRuntimeFromPublish" AfterTargets="ComputeFilesToPublish">
