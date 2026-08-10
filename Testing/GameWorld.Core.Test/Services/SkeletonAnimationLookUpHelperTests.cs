@@ -291,6 +291,42 @@ namespace Test.GameWorld.Core.Services
         }
 
         [Test]
+        public void AddFilesToPack_FolderProjectAnimation_IsAvailableWithoutReopeningProject()
+        {
+            var projectPath = Path.Combine(
+                Path.GetTempPath(),
+                $"ae-animation-refresh-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(projectPath);
+            try
+            {
+                using var container = FolderProjectContainer.Create(
+                    projectPath,
+                    new FolderProjectSettings { Name = "工程" });
+                var (service, eventHub) = CreateService(container);
+
+                using var helper = new SkeletonAnimationLookUpHelper(service, eventHub);
+                service.AddFilesToPack(
+                    container,
+                    [
+                        new NewPackFileEntry(
+                            @"animations\battle\humanoid",
+                            PackFile.CreateFromBytes(
+                                "imported.anim",
+                                CreateAnimationBytes("folder_project_skeleton"))),
+                    ]);
+
+                Assert.That(
+                    helper.GetAnimationsForSkeleton("folder_project_skeleton")
+                        .Select(reference => reference.AnimationFile),
+                    Does.Contain(@"animations\battle\humanoid\imported.anim"));
+            }
+            finally
+            {
+                Directory.Delete(projectPath, true);
+            }
+        }
+
+        [Test]
         public void SaveNonAnimationFile_DoesNotRebuildAnimationIndex()
         {
             var container = CreateContainer("non_animation_update");

@@ -61,6 +61,9 @@ namespace GameWorld.Core.Services
             _globalEventHub.Register<PackFileContainerFilesUpdatedEvent>(
                 this,
                 x => RefreshIfAnimationFilesChanged(x.Container, x.ChangedFiles));
+            _globalEventHub.Register<FolderProjectChangedEvent>(
+                this,
+                RefreshIfAnimationFilesChanged);
 
             _globalEventHub.Register<PackFileContainerRemovedEvent>(this, x => UnloadAnimationFromContainer(x.Container));
             _globalEventHub.Register<PackFileContainerFilesRemovedEvent>(
@@ -93,13 +96,36 @@ namespace GameWorld.Core.Services
             lock (_threadLock)
             {
                 containsAnimation = files.Any(x =>
-                    string.Equals(Path.GetExtension(x.Name), ".anim", StringComparison.OrdinalIgnoreCase) ||
+                    IsAnimationPath(x.Name) ||
                     _animationIndexByFile.ContainsKey(x));
             }
 
             if (containsAnimation)
                 PackfileContainerRefresh(packFileContainer);
         }
+
+        private void RefreshIfAnimationFilesChanged(
+            FolderProjectChangedEvent changedEvent)
+        {
+            bool containsAnimation;
+            lock (_threadLock)
+            {
+                containsAnimation = changedEvent.ChangeSet.RequiresReload ||
+                    changedEvent.ChangeSet.FileChanges.Any(change =>
+                        IsAnimationPath(change.Path) ||
+                        IsAnimationPath(change.PreviousPath) ||
+                        _animationIndexByFile.ContainsKey(change.File));
+            }
+
+            if (containsAnimation)
+                PackfileContainerRefresh(changedEvent.Container);
+        }
+
+        private static bool IsAnimationPath(string? path) =>
+            string.Equals(
+                Path.GetExtension(path),
+                ".anim",
+                StringComparison.OrdinalIgnoreCase);
 
         private void LoadFromPackFileContainer(PackFileContainer packFileContainer)
         {
