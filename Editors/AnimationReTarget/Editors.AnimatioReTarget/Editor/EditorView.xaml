@@ -20,50 +20,9 @@
             Content="{loc:Loc AnimReTarget.AutoMapBones}"
             Style="{StaticResource AeButton.Primary}"
             ToolTip="{loc:Loc AnimReTarget.AutoMapBones.ToolTip}" />
-        <Border
+        <presentation:BoneMappingReviewView
             DockPanel.Dock="Bottom"
-            Margin="4">
-            <Border.Style>
-                <Style BasedOn="{StaticResource AeFeedback.Notice}" TargetType="Border">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding BoneManager.LastAutoMappingSummary}" Value="{x:Null}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <StackPanel>
-                <TextBlock
-                    Style="{StaticResource AeText.SectionTitle}"
-                    Text="{loc:Loc AnimReTarget.AutoMapSummary.Title}" />
-                <UniformGrid Margin="0,4,0,0" Columns="3">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.Confirmed}" />
-                        <TextBlock
-                            Margin="4,0,0,0"
-                            Foreground="{DynamicResource AeBrush.Success}"
-                            FontWeight="SemiBold"
-                            Text="{Binding BoneManager.LastAutoMappingSummary.ConfirmedCount}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.ReviewRequired}" />
-                        <TextBlock
-                            Margin="4,0,0,0"
-                            Foreground="{DynamicResource AeBrush.Warning}"
-                            FontWeight="SemiBold"
-                            Text="{Binding BoneManager.LastAutoMappingSummary.ReviewRequiredCount}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.Unmatched}" />
-                        <TextBlock
-                            Margin="4,0,0,0"
-                            Foreground="{DynamicResource AeBrush.Danger}"
-                            FontWeight="SemiBold"
-                            Text="{Binding BoneManager.LastAutoMappingSummary.UnmatchedCount}" />
-                    </StackPanel>
-                </UniformGrid>
-            </StackPanel>
-        </Border>
+            MaxHeight="360" />
         <Button DockPanel.Dock="Bottom" Content="{loc:Loc AnimReTarget.ApplySettings}" Command="{Binding UpdateAnimationCommand}" Margin="2" />
         <Button DockPanel.Dock="Bottom" Content="{loc:Loc General.Save}" Command="{Binding SaveManager.ShowSaveSettingsCommand}"  Margin="2" />
         <Button DockPanel.Dock="Bottom" Content="{loc:Loc AnimReTarget.OpenBoneMappingWindow}" Command="{Binding BoneManager.ShowBoneMappingWindowCommand}" Margin="2" />

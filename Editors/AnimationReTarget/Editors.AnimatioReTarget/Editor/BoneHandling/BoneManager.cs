@@ -13,6 +13,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
 {
     public partial class BoneManager : ObservableObject
     {
+        private const int MaxReviewCandidates = 5;
+
         record SkeletonInfo(string Name, AnimationFile Data);
 
         private readonly IStandardDialogs _standardDialogs;
@@ -23,11 +25,15 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         private RemappedAnimatedBoneConfiguration? _activeConfig;
         private SkeletonInfo? _sourceSkeleton;
         private SkeletonInfo? _targetSkeleton;
+        private readonly HashSet<int> _intentionallyUnmappedTargetBones = [];
 
         [ObservableProperty] SkeletonBoneNode_new? _selectedBone;
         [ObservableProperty] ObservableCollection<SkeletonBoneNode_new> _bones = [];
         [ObservableProperty] ObservableCollection<SkeletonBoneNode_new> _flatBoneList = [];
         [ObservableProperty] BoneAutoMappingSummary? _lastAutoMappingSummary;
+        [ObservableProperty] ObservableCollection<BoneMappingReviewItem> _reviewItems = [];
+        [ObservableProperty] bool _canBatchRetarget;
+        [ObservableProperty] string _batchRetargetGateText = "";
 
         partial void OnBonesChanged(ObservableCollection<SkeletonBoneNode_new> value)
         {
@@ -128,8 +134,13 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
 
             SelectedBone = Bones.FirstOrDefault();
             _activeConfig = null;
+            _intentionallyUnmappedTargetBones.Clear();
             LastAutoMappingSummary = null;
+            ReviewItems = [];
+            CanBatchRetarget = false;
+            BatchRetargetGateText = "";
             AutoMapBonesCommand.NotifyCanExecuteChanged();
+            ShowManualBoneMappingCommand.NotifyCanExecuteChanged();
         }
 
         public void ApplyDefaultMapping()
@@ -146,18 +157,139 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         public void AutoMapBones()
         {
             CreateMappingConfig();
+            RefreshSummaryFromCurrentMappings();
+        }
+
+        private void SetSummary(BoneAutoMappingSummary summary)
+        {
+            ApplySummaryStatus(summary);
+            LastAutoMappingSummary = summary;
+            ReviewItems = new ObservableCollection<BoneMappingReviewItem>(summary.Items
+                .Where(item => item.Status is
+                    BoneAutoMappingStatus.ReviewRequired or BoneAutoMappingStatus.Unmatched)
+                .Select(CreateReviewItem));
+            CanBatchRetarget = summary.CanBatchRetarget;
+            BatchRetargetGateText = CreateGateText(summary);
+            ConfirmCandidateCommand.NotifyCanExecuteChanged();
+            MarkIntentionalUnmappedCommand.NotifyCanExecuteChanged();
+            ShowManualBoneMappingCommand.NotifyCanExecuteChanged();
+        }
+
+        private static BoneMappingReviewItem CreateReviewItem(BoneAutoMappingItem item)
+        {
+            var statusText = item.Status == BoneAutoMappingStatus.ReviewRequired
+                ? LocalizationManager.Instance.Get("AnimReTarget.BoneReview.Status.ReviewRequired")
+                : LocalizationManager.Instance.Get("AnimReTarget.BoneReview.Status.Unmatched");
+            var reasonText = item.IssueReason switch
+            {
+                BoneAutoMappingIssueReason.MultipleCandidates => LocalizationManager.Instance.GetFormat(
+                    "AnimReTarget.BoneReview.Reason.MultipleCandidates",
+                    item.Candidates.Count),
+                BoneAutoMappingIssueReason.ParentConflict => LocalizationManager.Instance.Get(
+                    "AnimReTarget.BoneReview.Reason.ParentConflict"),
+                _ => LocalizationManager.Instance.Get("AnimReTarget.BoneReview.Reason.NoCandidate")
+            };
+
+            return new BoneMappingReviewItem(
+                item.TargetBoneIndex,
+                item.TargetBoneName,
+                item.Status,
+                statusText,
+                reasonText,
+                item.CanMarkIntentionalUnmapped,
+                item.Candidates.Take(MaxReviewCandidates).Select(candidate => new BoneMappingReviewCandidate(
+                    candidate.TargetBoneIndex,
+                    candidate.SourceBoneIndex,
+                    candidate.SourceBoneName,
+                    LocalizationManager.Instance.GetFormat(
+                        "AnimReTarget.BoneReview.ConfirmCandidate",
+                        candidate.SourceBoneName)))
+                    .ToArray());
+        }
+
+        private static string CreateGateText(BoneAutoMappingSummary summary)
+        {
+            if (summary.CanBatchRetarget)
+                return LocalizationManager.Instance.Get("AnimReTarget.BatchGate.Ready");
+            if (summary.CoreBlockingCount > 0)
+            {
+                return LocalizationManager.Instance.GetFormat(
+                    "AnimReTarget.BatchGate.BlockedCore",
+                    summary.CoreBlockingCount,
+                    summary.BlockingCount - summary.CoreBlockingCount);
+            }
+
+            return LocalizationManager.Instance.GetFormat(
+                "AnimReTarget.BatchGate.Blocked",
+                summary.BlockingCount);
+        }
+
+        private void RefreshSummaryFromCurrentMappings()
+        {
             var existingMappings = FlatBoneList
                 .Where(bone => bone.HasMapping)
                 .ToDictionary(bone => bone.BoneIndex, bone => bone.MappedIndex);
-
             var summary = HighConfidenceBoneMapper.CreateSummary(
                 _sourceSkeleton!.Data,
                 _targetSkeleton!.Data,
-                existingMappings);
+                existingMappings,
+                _intentionallyUnmappedTargetBones);
             ApplyConfirmedMappings(summary, existingMappings);
             SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig!);
-            ApplySummaryStatus(summary);
-            LastAutoMappingSummary = summary;
+            SetSummary(summary);
+        }
+
+        private bool CanConfirmCandidate(BoneMappingReviewCandidate? candidate)
+        {
+            return candidate != null && ReviewItems.Any(item =>
+                item.TargetBoneIndex == candidate.TargetBoneIndex &&
+                item.Candidates.Any(current => current.SourceBoneIndex == candidate.SourceBoneIndex));
+        }
+
+        [RelayCommand(CanExecute = nameof(CanConfirmCandidate))]
+        public void ConfirmCandidate(BoneMappingReviewCandidate? candidate)
+        {
+            if (candidate != null)
+                ApplyManualMapping(candidate.TargetBoneIndex, candidate.SourceBoneIndex);
+        }
+
+        public bool ApplyManualMapping(int targetBoneIndex, int sourceBoneIndex)
+        {
+            if (_targetSkeleton == null || _sourceSkeleton == null)
+                return false;
+
+            CreateMappingConfig();
+            var targetBone = SkeletonBoneNodeHelper.GetNodeFromId(targetBoneIndex, _activeConfig!.MeshBones);
+            var sourceBone = SkeletonBoneNodeHelper.GetNodeFromId(sourceBoneIndex, _activeConfig.ParentModelBones);
+            if (targetBone == null || sourceBone == null)
+                return false;
+
+            targetBone.MappedBoneIndex.Value = sourceBone.BoneIndex.Value;
+            targetBone.MappedBoneName.Value = sourceBone.Name.Value;
+            _intentionallyUnmappedTargetBones.Remove(targetBoneIndex);
+            SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig);
+            RefreshSummaryFromCurrentMappings();
+            return true;
+        }
+
+        private bool CanMarkIntentionalUnmapped(BoneMappingReviewItem? reviewItem)
+        {
+            return reviewItem?.CanMarkIntentionalUnmapped == true &&
+                   ReviewItems.Any(item => item.TargetBoneIndex == reviewItem.TargetBoneIndex);
+        }
+
+        [RelayCommand(CanExecute = nameof(CanMarkIntentionalUnmapped))]
+        public void MarkIntentionalUnmapped(BoneMappingReviewItem? reviewItem)
+        {
+            if (reviewItem == null || !CanMarkIntentionalUnmapped(reviewItem))
+                return;
+
+            CreateMappingConfig();
+            var mapping = SkeletonBoneNodeHelper.GetNodeFromId(reviewItem.TargetBoneIndex, _activeConfig!.MeshBones);
+            mapping?.ClearMapping(false);
+            _intentionallyUnmappedTargetBones.Add(reviewItem.TargetBoneIndex);
+            SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig);
+            RefreshSummaryFromCurrentMappings();
         }
 
         private void ApplyConfirmedMappings(
@@ -199,6 +331,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                     BoneAutoMappingStatus.ReviewRequired => LocalizationManager.Instance.GetFormat(
                         "AnimReTarget.AutoMapBoneStatus.ReviewRequired",
                         item.Candidates.Count),
+                    BoneAutoMappingStatus.IntentionallyUnmapped => LocalizationManager.Instance.Get(
+                        "AnimReTarget.AutoMapBoneStatus.IntentionallyUnmapped"),
                     _ => LocalizationManager.Instance.Get("AnimReTarget.AutoMapSummary.Unmatched")
                 };
             }
@@ -206,9 +340,30 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
 
         [RelayCommand] void ShowBoneMappingWindow()
         {
+            ShowBoneMappingWindow(null);
+        }
+
+        private bool CanShowManualBoneMapping(BoneMappingReviewItem? reviewItem)
+        {
+            return reviewItem != null &&
+                   _targetSkeleton != null &&
+                   _sourceSkeleton != null &&
+                   ReviewItems.Any(item => item.TargetBoneIndex == reviewItem.TargetBoneIndex);
+        }
+
+        [RelayCommand(CanExecute = nameof(CanShowManualBoneMapping))]
+        public void ShowManualBoneMapping(BoneMappingReviewItem? reviewItem)
+        {
+            ShowBoneMappingWindow(reviewItem);
+        }
+
+        private void ShowBoneMappingWindow(BoneMappingReviewItem? reviewItem)
+        {
             if (_targetSkeleton == null || _sourceSkeleton == null)
             {
-                _standardDialogs.ShowDialogBox("Source or target skeleton not selected", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("AnimReTarget.BoneReview.MissingSkeleton"),
+                    LocalizationManager.Instance.Get("General.Error"));
                 return;
             }
 
@@ -217,12 +372,23 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
             // Make this possible to use without being a modal!
             var handle = _boneMappingWindowFactory.Create();
             handle.ViewModel.Initialize(_activeConfig);
+            handle.ViewModel.OnlyShowUsedBones.Value = false;
+            handle.ViewModel.ParentModelBones.RefreshFilter();
+            if (reviewItem != null)
+            {
+                handle.ViewModel.MeshBones.SelectedItem = SkeletonBoneNodeHelper.GetNodeFromId(
+                    reviewItem.TargetBoneIndex,
+                    _activeConfig!.MeshBones);
+            }
             var result = handle.ShowDialog();
 
             if ((result.HasValue && result.Value == true) == false)
                 return;
 
             SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig);
+            foreach (var mappedBone in FlatBoneList.Where(bone => bone.HasMapping))
+                _intentionallyUnmappedTargetBones.Remove(mappedBone.BoneIndex);
+            RefreshSummaryFromCurrentMappings();
         }
 
         void CreateMappingConfig()

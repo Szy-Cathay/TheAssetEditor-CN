@@ -6,7 +6,23 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
     {
         Confirmed,
         ReviewRequired,
-        Unmatched
+        Unmatched,
+        IntentionallyUnmapped
+    }
+
+    public enum BoneAutoMappingIssueReason
+    {
+        None,
+        NoCandidate,
+        MultipleCandidates,
+        ParentConflict
+    }
+
+    public enum BoneRetargetRole
+    {
+        Other,
+        CoreAction,
+        Accessory
     }
 
     public enum BoneAutoMappingEvidence
@@ -22,7 +38,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
     public sealed record BoneAutoMappingCandidate(
         int SourceBoneIndex,
         string SourceBoneName,
-        BoneAutoMappingEvidence Evidence);
+        BoneAutoMappingEvidence Evidence,
+        int TargetBoneIndex);
 
     public sealed record BoneAutoMappingItem(
         int TargetBoneIndex,
@@ -31,7 +48,14 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         int? SourceBoneIndex,
         string? SourceBoneName,
         BoneAutoMappingEvidence Evidence,
-        IReadOnlyList<BoneAutoMappingCandidate> Candidates);
+        IReadOnlyList<BoneAutoMappingCandidate> Candidates,
+        BoneAutoMappingIssueReason IssueReason,
+        BoneRetargetRole Role)
+    {
+        public bool CanMarkIntentionalUnmapped =>
+            Role == BoneRetargetRole.Accessory &&
+            Status is BoneAutoMappingStatus.ReviewRequired or BoneAutoMappingStatus.Unmatched;
+    }
 
     public sealed class BoneAutoMappingSummary
     {
@@ -44,6 +68,13 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         public int ConfirmedCount => Items.Count(item => item.Status == BoneAutoMappingStatus.Confirmed);
         public int ReviewRequiredCount => Items.Count(item => item.Status == BoneAutoMappingStatus.ReviewRequired);
         public int UnmatchedCount => Items.Count(item => item.Status == BoneAutoMappingStatus.Unmatched);
+        public int IntentionalUnmappedCount => Items.Count(item => item.Status == BoneAutoMappingStatus.IntentionallyUnmapped);
+        public int BlockingCount => Items.Count(item =>
+            item.Status is BoneAutoMappingStatus.ReviewRequired or BoneAutoMappingStatus.Unmatched);
+        public int CoreBlockingCount => Items.Count(item =>
+            item.Role == BoneRetargetRole.CoreAction &&
+            item.Status is BoneAutoMappingStatus.ReviewRequired or BoneAutoMappingStatus.Unmatched);
+        public bool CanBatchRetarget => BlockingCount == 0;
     }
 
     public static class HighConfidenceBoneMapper
@@ -53,7 +84,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         public static BoneAutoMappingSummary CreateSummary(
             AnimationFile sourceSkeleton,
             AnimationFile targetSkeleton,
-            IReadOnlyDictionary<int, int>? existingMappings = null)
+            IReadOnlyDictionary<int, int>? existingMappings = null,
+            IReadOnlySet<int>? intentionallyUnmappedTargetBones = null)
         {
             var confirmedMappings = new Dictionary<int, int>();
             var items = new List<BoneAutoMappingItem>();
@@ -61,7 +93,12 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                          .OrderBy(bone => GetBoneDepth(targetSkeleton, bone))
                          .ThenBy(bone => bone.Id))
             {
-                var item = CreateItem(sourceSkeleton, targetBone, existingMappings, confirmedMappings);
+                var item = CreateItem(
+                    sourceSkeleton,
+                    targetBone,
+                    existingMappings,
+                    intentionallyUnmappedTargetBones,
+                    confirmedMappings);
                 items.Add(item);
                 if (item.Status == BoneAutoMappingStatus.Confirmed && item.SourceBoneIndex.HasValue)
                     confirmedMappings[targetBone.Id] = item.SourceBoneIndex.Value;
@@ -74,8 +111,10 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
             AnimationFile sourceSkeleton,
             AnimationFile.BoneInfo targetBone,
             IReadOnlyDictionary<int, int>? existingMappings,
+            IReadOnlySet<int>? intentionallyUnmappedTargetBones,
             IReadOnlyDictionary<int, int> confirmedMappings)
         {
+            var role = ClassifyRole(targetBone.Name);
             if (existingMappings?.TryGetValue(targetBone.Id, out var existingSourceBoneIndex) == true)
             {
                 var existingSourceBone = sourceSkeleton.Bones
@@ -85,7 +124,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                     var existingCandidate = new BoneAutoMappingCandidate(
                         existingSourceBone.Id,
                         existingSourceBone.Name,
-                        BoneAutoMappingEvidence.ExistingMapping);
+                        BoneAutoMappingEvidence.ExistingMapping,
+                        targetBone.Id);
                     return new BoneAutoMappingItem(
                         targetBone.Id,
                         targetBone.Name,
@@ -93,14 +133,32 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                         existingSourceBone.Id,
                         existingSourceBone.Name,
                         BoneAutoMappingEvidence.ExistingMapping,
-                        [existingCandidate]);
+                        [existingCandidate],
+                        BoneAutoMappingIssueReason.None,
+                        role);
                 }
+            }
+
+            if (role == BoneRetargetRole.Accessory &&
+                intentionallyUnmappedTargetBones?.Contains(targetBone.Id) == true)
+            {
+                return new BoneAutoMappingItem(
+                    targetBone.Id,
+                    targetBone.Name,
+                    BoneAutoMappingStatus.IntentionallyUnmapped,
+                    null,
+                    null,
+                    BoneAutoMappingEvidence.None,
+                    [],
+                    BoneAutoMappingIssueReason.None,
+                    role);
             }
 
             var candidates = CreateCandidates(
                 sourceSkeleton.Bones.Where(sourceBone =>
                     string.Equals(sourceBone.Name, targetBone.Name, StringComparison.OrdinalIgnoreCase)),
-                BoneAutoMappingEvidence.ExactName);
+                BoneAutoMappingEvidence.ExactName,
+                targetBone.Id);
 
             if (candidates.Length == 0)
             {
@@ -108,7 +166,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                 candidates = CreateCandidates(
                     sourceSkeleton.Bones.Where(sourceBone =>
                         NormalizeName(sourceBone.Name) == normalizedTargetName),
-                    BoneAutoMappingEvidence.NormalizedName);
+                    BoneAutoMappingEvidence.NormalizedName,
+                    targetBone.Id);
             }
 
             if (candidates.Length == 0 && KnownAliases.TryGetValue(NormalizeName(targetBone.Name), out var aliasGroup))
@@ -117,7 +176,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                     sourceSkeleton.Bones.Where(sourceBone =>
                         KnownAliases.TryGetValue(NormalizeName(sourceBone.Name), out var sourceAliasGroup) &&
                         sourceAliasGroup == aliasGroup),
-                    BoneAutoMappingEvidence.KnownAlias);
+                    BoneAutoMappingEvidence.KnownAlias,
+                    targetBone.Id);
             }
 
             if (confirmedMappings.TryGetValue(targetBone.ParentId, out var sourceParentBoneIndex))
@@ -150,7 +210,9 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                         null,
                         null,
                         BoneAutoMappingEvidence.None,
-                        candidates);
+                        candidates,
+                        BoneAutoMappingIssueReason.ParentConflict,
+                        role);
                 }
             }
 
@@ -164,7 +226,9 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                     candidate.SourceBoneIndex,
                     candidate.SourceBoneName,
                     candidate.Evidence,
-                    candidates);
+                    candidates,
+                    BoneAutoMappingIssueReason.None,
+                    role);
             }
 
             var status = candidates.Length == 0
@@ -177,20 +241,68 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                 null,
                 null,
                 BoneAutoMappingEvidence.None,
-                candidates);
+                candidates,
+                candidates.Length == 0
+                    ? BoneAutoMappingIssueReason.NoCandidate
+                    : BoneAutoMappingIssueReason.MultipleCandidates,
+                role);
         }
 
         private static BoneAutoMappingCandidate[] CreateCandidates(
             IEnumerable<AnimationFile.BoneInfo> sourceBones,
-            BoneAutoMappingEvidence evidence)
+            BoneAutoMappingEvidence evidence,
+            int targetBoneIndex)
         {
             return sourceBones
                 .OrderBy(sourceBone => sourceBone.Id)
                 .Select(sourceBone => new BoneAutoMappingCandidate(
                     sourceBone.Id,
                     sourceBone.Name,
-                    evidence))
+                    evidence,
+                    targetBoneIndex))
                 .ToArray();
+        }
+
+        private static BoneRetargetRole ClassifyRole(string boneName)
+        {
+            var normalizedName = NormalizeName(boneName);
+            if (ContainsAny(normalizedName, "skirt", "cape", "cloak", "weapon", "prop", "hair"))
+                return BoneRetargetRole.Accessory;
+
+            if (ContainsAny(
+                    normalizedName,
+                    "root",
+                    "pelvis",
+                    "hip",
+                    "spine",
+                    "head",
+                    "neck",
+                    "clav",
+                    "shoulder",
+                    "arm",
+                    "upperarm",
+                    "lowerarm",
+                    "forearm",
+                    "hand",
+                    "leg",
+                    "upleg",
+                    "upperleg",
+                    "lowerleg",
+                    "thigh",
+                    "calf",
+                    "knee",
+                    "foot",
+                    "toe"))
+            {
+                return BoneRetargetRole.CoreAction;
+            }
+
+            return BoneRetargetRole.Other;
+        }
+
+        private static bool ContainsAny(string value, params string[] fragments)
+        {
+            return fragments.Any(value.Contains);
         }
 
         private static string NormalizeName(string name)
