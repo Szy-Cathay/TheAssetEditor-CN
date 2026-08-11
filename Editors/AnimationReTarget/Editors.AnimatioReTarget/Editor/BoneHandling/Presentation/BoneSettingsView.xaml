@@ -60,6 +60,7 @@
                                 <TextBlock Text=" ["/>
                                 <TextBlock Text="{Binding BoneIndex, UpdateSourceTrigger=PropertyChanged}"/>
                                 <TextBlock Text="]"/>
+                                <TextBlock Margin="8,0,0,0" Text="{Binding AutoMappingStatusText}"/>
                             </StackPanel>
                         </HierarchicalDataTemplate>
                     </TreeView.ItemTemplate>

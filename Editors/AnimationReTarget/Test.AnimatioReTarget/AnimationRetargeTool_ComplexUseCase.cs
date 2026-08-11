@@ -34,7 +34,7 @@ namespace Test.AnimatioReTarget
             Step0_SelectSource_NoGeneratedSet(runner, editor!);
             Step1_SelectTarget_GeneratedSet(runner, editor!);
             Step2_TryGeneratingAnimation(runner, editor!);
-            Step3_ApplyDefaultMapping(runner, editor!);
+            Step3_AutoMapBones(editor!);
             Step4_GenerateAnimation(runner, editor!);
             Step5_UpdateAnimationSettingsAndGenerateAnimation(runner, editor!, outputPackFile);
             // UpdateSouceAndValidate(runner, editor!);
@@ -60,6 +60,7 @@ namespace Test.AnimatioReTarget
             // Validate that generated is not set
             var generated = editor.GetSceneObjectFromId(AnimationRetargetIds.Generated);
             Assert.That(generated.Data.Skeleton, Is.Null);
+            Assert.That(editor.BoneManager.AutoMapBonesCommand.CanExecute(null), Is.False);
         }
 
         private void Step1_SelectTarget_GeneratedSet(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
@@ -80,6 +81,7 @@ namespace Test.AnimatioReTarget
             Assert.That(generated.Data.SkeletonName.Value, Is.EqualTo(@"animations\skeletons\humanoid01e.anim"));
             var meshCount = SceneNodeHelper.GetChildrenOfType<Rmv2MeshNode>(generated.Data.ModelNode);
             Assert.That(meshCount, Is.Not.Zero);
+            Assert.That(editor.BoneManager.AutoMapBonesCommand.CanExecute(null), Is.True);
         }
 
         private void Step2_TryGeneratingAnimation(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
@@ -90,14 +92,26 @@ namespace Test.AnimatioReTarget
         }
 
 
-        private void Step3_ApplyDefaultMapping(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
+        private void Step3_AutoMapBones(AnimationRetargetEditor editor)
         {
-            var count0 = SkeletonBoneNodeHelper.CountMappedBones(editor.BoneManager.Bones);
-            editor.BoneManager.ApplyDefaultMapping();
-            var count1 = SkeletonBoneNodeHelper.CountMappedBones(editor.BoneManager.Bones);
+            editor.BoneManager.AutoMapBonesCommand.Execute(null);
 
-            Assert.That(count0, Is.EqualTo(0));
-            Assert.That(count1, Is.EqualTo(57));
+            var summary = editor.BoneManager.LastAutoMappingSummary;
+            Assert.That(summary, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(summary!.Items, Has.Count.EqualTo(96));
+                Assert.That(summary.ConfirmedCount, Is.GreaterThan(50));
+                Assert.That(summary.UnmatchedCount, Is.GreaterThan(0));
+
+                var root = SkeletonBoneNodeHelper.GetNodeFromName("root", editor.BoneManager.Bones);
+                Assert.That(root, Is.Not.Null);
+                Assert.That(root!.MappedIndex, Is.EqualTo(7));
+
+                var weapon = SkeletonBoneNodeHelper.GetNodeFromName("weapon_1", editor.BoneManager.Bones);
+                Assert.That(weapon, Is.Not.Null);
+                Assert.That(weapon!.MappedIndex, Is.EqualTo(1));
+            });
         }
 
         private void Step4_GenerateAnimation(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
@@ -112,7 +126,7 @@ namespace Test.AnimatioReTarget
         {
             Assert.That(outputPackFile.FileList.Count, Is.EqualTo(0));
 
-            var bone = SkeletonBoneNodeHelper.GetNodeFromName("skirt_back_0", editor.BoneManager.Bones);
+            var bone = SkeletonBoneNodeHelper.GetNodeFromName("skirt_back_left_0", editor.BoneManager.Bones);
             bone.TranslationOffset.X.Value = 10;
 
             editor.UpdateAnimation();

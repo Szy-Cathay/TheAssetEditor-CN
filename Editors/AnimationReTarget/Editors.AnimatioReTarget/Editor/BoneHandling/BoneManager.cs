@@ -27,6 +27,7 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         [ObservableProperty] SkeletonBoneNode_new? _selectedBone;
         [ObservableProperty] ObservableCollection<SkeletonBoneNode_new> _bones = [];
         [ObservableProperty] ObservableCollection<SkeletonBoneNode_new> _flatBoneList = [];
+        [ObservableProperty] BoneAutoMappingSummary? _lastAutoMappingSummary;
 
         partial void OnBonesChanged(ObservableCollection<SkeletonBoneNode_new> value)
         {
@@ -122,21 +123,86 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         void Invalidate()
         {
             Bones.Clear();
-            if (_sourceSkeleton != null)
-            {
-                Bones = SkeletonBoneNodeHelper.Build(_sourceSkeleton.Data);
-            }
+            if (_targetSkeleton != null)
+                Bones = SkeletonBoneNodeHelper.Build(_targetSkeleton.Data);
+
             SelectedBone = Bones.FirstOrDefault();
             _activeConfig = null;
+            LastAutoMappingSummary = null;
+            AutoMapBonesCommand.NotifyCanExecuteChanged();
         }
 
         public void ApplyDefaultMapping()
         {
-            CreateMappingConfig();
-            BoneMappingHelper.AutomapDirectBoneLinksBasedOnNames(_activeConfig.MeshBones.First(), _activeConfig.ParentModelBones);
-            SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig);
+            AutoMapBones();
         }
 
+        private bool CanAutoMapBones()
+        {
+            return _sourceSkeleton != null && _targetSkeleton != null;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanAutoMapBones))]
+        public void AutoMapBones()
+        {
+            CreateMappingConfig();
+            var existingMappings = FlatBoneList
+                .Where(bone => bone.HasMapping)
+                .ToDictionary(bone => bone.BoneIndex, bone => bone.MappedIndex);
+
+            var summary = HighConfidenceBoneMapper.CreateSummary(
+                _sourceSkeleton!.Data,
+                _targetSkeleton!.Data,
+                existingMappings);
+            ApplyConfirmedMappings(summary, existingMappings);
+            SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig!);
+            ApplySummaryStatus(summary);
+            LastAutoMappingSummary = summary;
+        }
+
+        private void ApplyConfirmedMappings(
+            BoneAutoMappingSummary summary,
+            IReadOnlyDictionary<int, int> existingMappings)
+        {
+            foreach (var item in summary.Items)
+            {
+                if (item.Status != BoneAutoMappingStatus.Confirmed ||
+                    !item.SourceBoneIndex.HasValue ||
+                    existingMappings.ContainsKey(item.TargetBoneIndex))
+                {
+                    continue;
+                }
+
+                var mapping = SkeletonBoneNodeHelper.GetNodeFromId(item.TargetBoneIndex, _activeConfig!.MeshBones);
+                if (mapping == null)
+                    continue;
+
+                mapping.MappedBoneIndex.Value = item.SourceBoneIndex.Value;
+                mapping.MappedBoneName.Value = item.SourceBoneName!;
+            }
+        }
+
+        private void ApplySummaryStatus(BoneAutoMappingSummary summary)
+        {
+            foreach (var item in summary.Items)
+            {
+                var bone = SkeletonBoneNodeHelper.GetNodeFromId(item.TargetBoneIndex, Bones);
+                if (bone == null)
+                    continue;
+
+                bone.AutoMappingStatus = item.Status;
+                bone.AutoMappingStatusText = item.Status switch
+                {
+                    BoneAutoMappingStatus.Confirmed => LocalizationManager.Instance.GetFormat(
+                        "AnimReTarget.AutoMapBoneStatus.Confirmed",
+                        item.SourceBoneName ?? ""),
+                    BoneAutoMappingStatus.ReviewRequired => LocalizationManager.Instance.GetFormat(
+                        "AnimReTarget.AutoMapBoneStatus.ReviewRequired",
+                        item.Candidates.Count),
+                    _ => LocalizationManager.Instance.Get("AnimReTarget.AutoMapSummary.Unmatched")
+                };
+            }
+        }
 
         [RelayCommand] void ShowBoneMappingWindow()
         {
