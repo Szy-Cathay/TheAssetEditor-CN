@@ -1,0 +1,211 @@
+﻿<UserControl
+    x:Class="Editors.AnimatioReTarget.Editor.BoneHandling.Presentation.BoneMappingReviewView"
+    x:Name="ReviewRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="360"
+    d:DesignWidth="800"
+    KeyboardNavigation.TabNavigation="Continue"
+    mc:Ignorable="d">
+    <UserControl.Style>
+        <Style TargetType="{x:Type UserControl}">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding BoneManager.LastAutoMappingSummary}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Style>
+
+    <Expander
+        Header="{loc:Loc AnimReTarget.BoneReview.Title}"
+        IsExpanded="True">
+        <Grid Margin="8,4,8,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    Foreground="{DynamicResource AeBrush.TextSecondary}"
+                    Style="{StaticResource AeText.Caption}"
+                    Text="{loc:Loc AnimReTarget.BoneReview.Description}"
+                    TextWrapping="Wrap" />
+                <UniformGrid Grid.Row="1" Margin="0,8,0,0" Columns="4">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.Confirmed}" />
+                        <TextBlock Margin="4,0,0,0" FontWeight="SemiBold" Text="{Binding BoneManager.LastAutoMappingSummary.ConfirmedCount}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.ReviewRequired}" />
+                        <TextBlock Margin="4,0,0,0" FontWeight="SemiBold" Text="{Binding BoneManager.LastAutoMappingSummary.ReviewRequiredCount}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.Unmatched}" />
+                        <TextBlock Margin="4,0,0,0" FontWeight="SemiBold" Text="{Binding BoneManager.LastAutoMappingSummary.UnmatchedCount}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{loc:Loc AnimReTarget.AutoMapSummary.IntentionallyUnmapped}" />
+                        <TextBlock Margin="4,0,0,0" FontWeight="SemiBold" Text="{Binding BoneManager.LastAutoMappingSummary.IntentionalUnmappedCount}" />
+                    </StackPanel>
+                </UniformGrid>
+            </Grid>
+
+            <Border
+                Grid.Row="1"
+                Margin="0,8,0,0"
+                AutomationProperties.Name="{loc:Loc AnimReTarget.BatchGate.AutomationName}"
+                Style="{StaticResource AeFeedback.Notice}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border>
+                        <Border.Style>
+                            <Style BasedOn="{StaticResource AeFeedback.DangerIcon}" TargetType="{x:Type Border}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding BoneManager.CanBatchRetarget}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource AeBrush.Success}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock FontWeight="SemiBold" Text="{loc:Loc AnimReTarget.BatchGate.Title}" />
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            Foreground="{DynamicResource AeBrush.TextSecondary}"
+                            Text="{Binding BoneManager.BatchRetargetGateText}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2" Margin="0,8,0,0">
+                <ListBox
+                    x:Name="ReviewList"
+                    MaxHeight="240"
+                    AutomationProperties.Name="{loc:Loc AnimReTarget.BoneReview.ListAutomationName}"
+                    ItemsSource="{Binding BoneManager.ReviewItems}"
+                    KeyboardNavigation.DirectionalNavigation="Contained"
+                    ScrollViewer.CanContentScroll="True"
+                    VirtualizingPanel.IsVirtualizing="True"
+                    VirtualizingPanel.VirtualizationMode="Recycling">
+                    <ListBox.Style>
+                        <Style BasedOn="{StaticResource AeList.View}" TargetType="{x:Type ListBox}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BoneManager.ReviewItems.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.Style>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding TargetBoneName}" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Foreground="{DynamicResource AeBrush.Warning}"
+                                        Text="{Binding StatusText}" />
+                                </Grid>
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Margin="0,4,0,0"
+                                    Foreground="{DynamicResource AeBrush.TextSecondary}"
+                                    Text="{Binding ReasonText}"
+                                    TextWrapping="Wrap" />
+                                <WrapPanel Grid.Row="2" Margin="0,8,0,0">
+                                    <ItemsControl ItemsSource="{Binding Candidates}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button
+                                                    Margin="0,0,4,4"
+                                                    AutomationProperties.Name="{Binding DisplayText}"
+                                                    Command="{Binding DataContext.BoneManager.ConfirmCandidateCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="{Binding DisplayText}"
+                                                    Style="{StaticResource AeButton.Primary}"
+                                                    ToolTip="{loc:Loc AnimReTarget.BoneReview.ConfirmCandidate.ToolTip}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Button
+                                        Margin="0,0,4,4"
+                                        AutomationProperties.Name="{loc:Loc AnimReTarget.BoneReview.ManualMapping}"
+                                        Command="{Binding DataContext.BoneManager.ShowManualBoneMappingCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                        CommandParameter="{Binding}"
+                                        Content="{loc:Loc AnimReTarget.BoneReview.ManualMapping}"
+                                        Style="{StaticResource AeButton.Secondary}"
+                                        ToolTip="{loc:Loc AnimReTarget.BoneReview.ManualMapping.ToolTip}" />
+                                    <Button
+                                        Margin="0,0,4,4"
+                                        AutomationProperties.Name="{loc:Loc AnimReTarget.BoneReview.MarkIntentionalUnmapped}"
+                                        Command="{Binding DataContext.BoneManager.MarkIntentionalUnmappedCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                        CommandParameter="{Binding}"
+                                        Content="{loc:Loc AnimReTarget.BoneReview.MarkIntentionalUnmapped}"
+                                        ToolTip="{loc:Loc AnimReTarget.BoneReview.MarkIntentionalUnmapped.ToolTip}">
+                                        <Button.Style>
+                                            <Style BasedOn="{StaticResource AeButton.Quiet}" TargetType="{x:Type Button}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CanMarkIntentionalUnmapped}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </WrapPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Border>
+                    <Border.Style>
+                        <Style BasedOn="{StaticResource AeEmptyState.Panel}" TargetType="{x:Type Border}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BoneManager.ReviewItems.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource AeEmptyState.Title}" Text="{loc:Loc AnimReTarget.BoneReview.Empty.Title}" />
+                        <TextBlock Style="{StaticResource AeEmptyState.Description}" Text="{loc:Loc AnimReTarget.BoneReview.Empty.Description}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Expander>
+</UserControl>

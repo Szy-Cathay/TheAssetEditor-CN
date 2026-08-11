@@ -192,6 +192,122 @@ namespace Test.AnimatioReTarget
         }
 
         [Test]
+        public void CreateSummary_UnresolvedCoreBone_BlocksBatchRetargeting()
+        {
+            var source = CreateSkeleton(("cape", -1));
+            var target = CreateSkeleton(("root", -1));
+
+            var summary = HighConfidenceBoneMapper.CreateSummary(source, target);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(summary.CanBatchRetarget, Is.False);
+                Assert.That(summary.BlockingCount, Is.EqualTo(1));
+                Assert.That(summary.CoreBlockingCount, Is.EqualTo(1));
+                Assert.That(summary.Items.Single().Role, Is.EqualTo(BoneRetargetRole.CoreAction));
+                Assert.That(summary.Items.Single().IssueReason, Is.EqualTo(BoneAutoMappingIssueReason.NoCandidate));
+            });
+        }
+
+        [TestCase("arm_left_0")]
+        [TestCase("bn_leftarm")]
+        [TestCase("leg_left_1")]
+        [TestCase("bn_leftleg")]
+        public void CreateSummary_CommonArmAndLegNames_AreCoreActionBones(string boneName)
+        {
+            var source = CreateSkeleton(("unrelated", -1));
+            var target = CreateSkeleton((boneName, -1));
+
+            var item = HighConfidenceBoneMapper.CreateSummary(source, target).Items.Single();
+
+            Assert.That(item.Role, Is.EqualTo(BoneRetargetRole.CoreAction));
+        }
+
+        [Test]
+        public void CreateSummary_IntentionalAccessorySkip_IsCountedSeparatelyAndPassesGate()
+        {
+            var source = CreateSkeleton(("root", -1));
+            var target = CreateSkeleton(("cape_back_0", -1));
+
+            var unresolved = HighConfidenceBoneMapper.CreateSummary(source, target);
+            var intentional = HighConfidenceBoneMapper.CreateSummary(
+                source,
+                target,
+                intentionallyUnmappedTargetBones: new HashSet<int> { 0 });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(unresolved.CanBatchRetarget, Is.False);
+                Assert.That(unresolved.Items.Single().CanMarkIntentionalUnmapped, Is.True);
+                Assert.That(intentional.CanBatchRetarget, Is.True);
+                Assert.That(intentional.IntentionalUnmappedCount, Is.EqualTo(1));
+                Assert.That(intentional.UnmatchedCount, Is.Zero);
+                Assert.That(
+                    intentional.Items.Single().Status,
+                    Is.EqualTo(BoneAutoMappingStatus.IntentionallyUnmapped));
+                Assert.That(
+                    intentional.Items.Single().Role,
+                    Is.EqualTo(BoneRetargetRole.Accessory));
+            });
+        }
+
+        [Test]
+        public void CreateSummary_CoreBone_CannotBeMarkedIntentionalUnmapped()
+        {
+            var source = CreateSkeleton(("cape", -1));
+            var target = CreateSkeleton(("pelvis", -1));
+
+            var summary = HighConfidenceBoneMapper.CreateSummary(
+                source,
+                target,
+                intentionallyUnmappedTargetBones: new HashSet<int> { 0 });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(summary.CanBatchRetarget, Is.False);
+                Assert.That(summary.IntentionalUnmappedCount, Is.Zero);
+                Assert.That(summary.Items.Single().Status, Is.EqualTo(BoneAutoMappingStatus.Unmatched));
+                Assert.That(summary.Items.Single().CanMarkIntentionalUnmapped, Is.False);
+            });
+        }
+
+        [Test]
+        public void CreateSummary_ExistingManualMapping_WinsOverIntentionalSkip()
+        {
+            var source = CreateSkeleton(("manual_cape", -1));
+            var target = CreateSkeleton(("cape_back_0", -1));
+
+            var item = HighConfidenceBoneMapper.CreateSummary(
+                    source,
+                    target,
+                    new Dictionary<int, int> { [0] = 0 },
+                    new HashSet<int> { 0 })
+                .Items.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(item.Status, Is.EqualTo(BoneAutoMappingStatus.Confirmed));
+                Assert.That(item.Evidence, Is.EqualTo(BoneAutoMappingEvidence.ExistingMapping));
+                Assert.That(item.SourceBoneName, Is.EqualTo("manual_cape"));
+            });
+        }
+
+        [Test]
+        public void CreateSummary_AmbiguousCandidate_ExplainsWhyReviewIsRequired()
+        {
+            var source = CreateSkeleton(("socket", -1), ("socket", -1));
+            var target = CreateSkeleton(("socket", -1));
+
+            var item = HighConfidenceBoneMapper.CreateSummary(source, target).Items.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(item.IssueReason, Is.EqualTo(BoneAutoMappingIssueReason.MultipleCandidates));
+                Assert.That(item.Candidates, Has.All.Property(nameof(BoneAutoMappingCandidate.TargetBoneIndex)).EqualTo(0));
+            });
+        }
+
+        [Test]
         public void CreateSummary_SameInput_ProducesStableOrderedResult()
         {
             var source = CreateSkeleton(("root", -1), ("socket", 0), ("socket", 0));
