@@ -1,19 +1,30 @@
 ﻿using System.Reflection;
-using Octokit;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Shared.Core.ErrorHandling;
 
 namespace Shared.Core.Services
 {
+    public sealed record UpdateRelease(
+        string TagName,
+        string Name,
+        string Body,
+        string HtmlUrl,
+        DateTimeOffset? PublishedAt);
+
     public class VersionChecker
     {
         private static readonly ILogger s_logger = Logging.Create<VersionChecker>();
 
-        private const string GitHubOwner = "Szy-Cathay";
-        private const string GitHubRepository = "TheAssetEditor-CN";
+        private const string GiteeOwner = "szy-cathay";
+        private const string GiteeRepository = "AssetEditor-CN-Downloads";
+        private static readonly Uri s_releasesApiUri = new(
+            $"https://gitee.com/api/v5/repos/{GiteeOwner}/{GiteeRepository}/releases?per_page=100");
+        private static readonly HttpClient s_httpClient = CreateHttpClient();
 
-        public static async Task<List<Release>?> GetNewerReleases()
+        public static async Task<List<UpdateRelease>?> GetNewerReleases()
         {
-            var releases = await GetReleasesAsync();
+            var releases = await GetReleasesAsync(s_httpClient);
             if (releases == null || releases.Count == 0)
                 return null;
 
@@ -25,24 +36,48 @@ namespace Shared.Core.Services
             return null;
         }
 
-        private static async Task<IReadOnlyList<Release>?> GetReleasesAsync()
+        internal static async Task<IReadOnlyList<UpdateRelease>?> GetReleasesAsync(
+            HttpClient httpClient)
         {
+            ArgumentNullException.ThrowIfNull(httpClient);
+
             try
             {
-                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor.CN"));
-                var releases = await gitHubClient.Repository.Release.GetAll(GitHubOwner, GitHubRepository);
-                return releases.Count > 0 ? releases : null;
+                using var response = await httpClient.GetAsync(s_releasesApiUri);
+                response.EnsureSuccessStatusCode();
+                await using var responseStream = await response.Content.ReadAsStreamAsync();
+                var releases = await JsonSerializer.DeserializeAsync<List<GiteeRelease>>(
+                    responseStream);
+                if (releases == null || releases.Count == 0)
+                    return null;
+
+                return releases
+                    .Where(release => TryParseReleaseVersion(release.TagName, out _))
+                    .Select(release => new UpdateRelease(
+                        release.TagName!,
+                        string.IsNullOrWhiteSpace(release.Name) ? release.TagName! : release.Name,
+                        release.Body ?? string.Empty,
+                        $"https://gitee.com/{GiteeOwner}/{GiteeRepository}/releases/tag/{Uri.EscapeDataString(release.TagName!)}",
+                        release.CreatedAt))
+                    .OrderByDescending(release => ParseReleaseVersion(release.TagName))
+                    .ToList();
             }
-            catch (ApiException exception)
+            catch (Exception exception) when (
+                exception is HttpRequestException
+                or JsonException
+                or TaskCanceledException
+                or NotSupportedException)
             {
-                s_logger.Information($"Unable to retrieve latest release from GitHub: {exception.Message}");
+                s_logger.Information($"Unable to retrieve latest release from Gitee: {exception.Message}");
                 return null;
             }
         }
 
-        private static List<Release> GetReleasesSinceCurrentVersion(IReadOnlyList<Release> releases, Version currentVersion)
+        private static List<UpdateRelease> GetReleasesSinceCurrentVersion(
+            IReadOnlyList<UpdateRelease> releases,
+            Version currentVersion)
         {
-            var newerReleases = new List<Release>();
+            var newerReleases = new List<UpdateRelease>();
             foreach (var release in releases)
             {
                 var releaseVersion = ParseReleaseVersion(release.TagName);
@@ -76,5 +111,28 @@ namespace Shared.Core.Services
             var cleanedVersion = tagName.Trim().TrimStart('v', 'V');
             return new Version(cleanedVersion);
         }
+
+        private static bool TryParseReleaseVersion(string? tagName, out Version? version)
+        {
+            version = null;
+            if (string.IsNullOrWhiteSpace(tagName))
+                return false;
+
+            return Version.TryParse(tagName.Trim().TrimStart('v', 'V'), out version);
+        }
+
+        private static HttpClient CreateHttpClient()
+        {
+            var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AssetEditor.CN");
+            return httpClient;
+        }
+
+        private sealed record GiteeRelease(
+            [property: JsonPropertyName("tag_name")] string? TagName,
+            [property: JsonPropertyName("name")] string? Name,
+            [property: JsonPropertyName("body")] string? Body,
+            [property: JsonPropertyName("created_at")] DateTimeOffset? CreatedAt);
     }
 }

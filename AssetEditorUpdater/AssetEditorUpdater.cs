@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using Octokit;
+using System.Text.Json;
 using FileMode = System.IO.FileMode;
 
 namespace AssetEditorUpdater
@@ -11,8 +11,8 @@ namespace AssetEditorUpdater
 
     public class AssetEditorUpdater
     {
-        private const string GitHubOwner = "Szy-Cathay";
-        private const string GitHubRepository = "TheAssetEditor-CN";
+        private static readonly Uri s_latestReleaseUri = new(
+            "https://gitee.com/api/v5/repos/szy-cathay/AssetEditor-CN-Downloads/releases/latest");
         private const string AssetEditorExe = "AssetEditor.CN.exe";
         private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
          
@@ -272,7 +272,8 @@ namespace AssetEditorUpdater
                 installationDirectory,
                 workspace);
             var updateDirectory = workspace.UpdateDirectory;
-            var latestRelease = await GetLatestReleaseAsync();
+            using var httpClient = CreateHttpClient();
+            var latestRelease = await GetLatestReleaseAsync(httpClient);
             if (latestRelease == null)
                 return;
 
@@ -286,14 +287,18 @@ namespace AssetEditorUpdater
 
             Console.WriteLine($"正在将 Asset Editor 国区版从 {installedVersion} 更新到 {latestVersion}。");
 
-            var asset = GetAsset(latestRelease);
+            var downloadPlan = await GetDownloadPlanAsync(httpClient, latestRelease);
+            if (downloadPlan == null)
+                return;
+
             workspace = UpdateInstaller.ValidateWorkspace(
                 installationDirectory,
                 workspace);
             updateDirectory = workspace.UpdateDirectory;
-            var assetPath = GetAssetDownloadPath(updateDirectory, asset.Name);
+            var assetPath = GetAssetDownloadPath(updateDirectory, downloadPlan.ArchiveName);
             var downloadResult = await DownloadAssetAsync(
-                asset.BrowserDownloadUrl,
+                httpClient,
+                downloadPlan,
                 assetPath,
                 installationDirectory,
                 workspace);
@@ -312,17 +317,41 @@ namespace AssetEditorUpdater
             Console.ReadKey();
         }
 
-        private static async Task<Release?> GetLatestReleaseAsync()
+        private static async Task<GiteeRelease?> GetLatestReleaseAsync(HttpClient httpClient)
         {
             try
             {
-                var gitHubClient = new GitHubClient(new ProductHeaderValue("AssetEditor.CN"));
-                var releases = await gitHubClient.Repository.Release.GetAll(GitHubOwner, GitHubRepository);
-                return releases.Count > 0 ? releases[0] : null;
+                return await GiteeUpdateSource.GetLatestReleaseAsync(
+                    httpClient,
+                    s_latestReleaseUri);
             }
-            catch (ApiException exception)
+            catch (Exception exception) when (
+                exception is HttpRequestException
+                or JsonException
+                or TaskCanceledException
+                or NotSupportedException)
             {
-                Console.WriteLine($"无法从 GitHub 获取最新版本：{exception.Message}");
+                Console.WriteLine($"无法从 Gitee 获取最新版本：{exception.Message}");
+                return null;
+            }
+        }
+
+        private static async Task<GiteeDownloadPlan?> GetDownloadPlanAsync(
+            HttpClient httpClient,
+            GiteeRelease latestRelease)
+        {
+            try
+            {
+                return await GiteeUpdateSource.CreateDownloadPlanAsync(httpClient, latestRelease);
+            }
+            catch (Exception exception) when (
+                exception is HttpRequestException
+                or JsonException
+                or InvalidDataException
+                or TaskCanceledException
+                or NotSupportedException)
+            {
+                Console.WriteLine($"Gitee 更新文件清单无效：{exception.Message}");
                 return null;
             }
         }
@@ -345,19 +374,6 @@ namespace AssetEditorUpdater
         {
             var cleanedVersion = tagName.Trim().TrimStart('v', 'V');
             return new Version(cleanedVersion);
-        }
-
-        private static ReleaseAsset GetAsset(Release latestRelease)
-        {
-            if (latestRelease.Assets.Count != 1)
-                throw new InvalidOperationException($"Expected 1 asset, found {latestRelease.Assets.Count}.");
-
-            var asset = latestRelease.Assets[0];
-            var extension = Path.GetExtension(asset.Name);
-            if (!IsZipAssetName(asset.Name))
-                throw new InvalidOperationException($"Asset has extension {extension}, expected .zip.");
-
-            return asset;
         }
 
         internal static bool IsZipAssetName(string assetName)
@@ -510,7 +526,8 @@ namespace AssetEditorUpdater
         }
 
         private static async Task<bool> DownloadAssetAsync(
-            string downloadUrl,
+            HttpClient httpClient,
+            GiteeDownloadPlan downloadPlan,
             string downloadPath,
             string installationDirectory,
             UpdaterWorkspace workspace)
@@ -519,15 +536,9 @@ namespace AssetEditorUpdater
 
             try
             {
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetEditor.CN");
-
-                using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
-                response.EnsureSuccessStatusCode();
-
-                await using var responseStream = await response.Content.ReadAsStreamAsync();
-                await CopyAssetDownloadAsync(
-                    responseStream,
+                await GiteeUpdateSource.DownloadArchiveAsync(
+                    httpClient,
+                    downloadPlan,
                     downloadPath,
                     installationDirectory,
                     workspace);
@@ -536,9 +547,17 @@ namespace AssetEditorUpdater
             }
             catch
             {
-                Console.WriteLine("无法从 GitHub 下载最新版本。");
+                Console.WriteLine("无法从 Gitee 下载并校验最新版本。");
                 return false;
             }
+        }
+
+        private static HttpClient CreateHttpClient()
+        {
+            var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(30);
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AssetEditor.CN");
+            return httpClient;
         }
 
         private static void LaunchAssetEditor(string installationDirectory, string assetEditorPath)
