@@ -57,8 +57,6 @@ namespace GameWorld.Core.Animation
     public class AnimationPlayer
     {
         public event FrameChanged OnFrameChanged;
-        public event Action OnPlaybackCompleted;
-        public event Action OnPlaybackPositionChanged;
 
         GameSkeleton _skeleton;
         TimeSpanExtension _timeSinceStart;
@@ -99,7 +97,6 @@ namespace GameWorld.Core.Animation
                     var frameIndex = MathUtil.EnsureRange(value, 0, FrameCount() - 1);
                     var timeInUs = FrameToStartTimeUs(frameIndex);
                     _timeSinceStart = TimeSpanExtension.FromMicroseconds(timeInUs);
-                    OnPlaybackPositionChanged?.Invoke();
                     OnFrameChanged?.Invoke(CurrentFrame);
                 }
                 else
@@ -140,8 +137,6 @@ namespace GameWorld.Core.Animation
                 return;
 
             var animationLengthUs = GetAnimationLengthUs();
-            var playbackCompleted = false;
-            AnimationClip completedAnimation = null;
             if (animationLengthUs != 0 && IsPlaying)
             {
                 _timeSinceStart.TimeSpan += gameTime.ElapsedGameTime;
@@ -155,8 +150,6 @@ namespace GameWorld.Core.Animation
                     {
                         _timeSinceStart = TimeSpanExtension.FromMicroseconds(animationLengthUs);
                         IsPlaying = false;
-                        playbackCompleted = true;
-                        completedAnimation = _animationClip;
                     }
                 }
 
@@ -164,8 +157,6 @@ namespace GameWorld.Core.Animation
             }
 
             Refresh();
-            if (playbackCompleted && ReferenceEquals(_animationClip, completedAnimation))
-                OnPlaybackCompleted?.Invoke();
         }
 
         public void Refresh()
@@ -209,7 +200,6 @@ namespace GameWorld.Core.Animation
 
             _timeSinceStart = TimeSpanExtension.FromMicroseconds(
                 requestedTimeUs);
-            OnPlaybackPositionChanged?.Invoke();
             OnFrameChanged?.Invoke(CurrentFrame);
             Refresh();
         }

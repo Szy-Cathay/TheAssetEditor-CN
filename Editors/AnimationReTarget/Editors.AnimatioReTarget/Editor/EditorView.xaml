@@ -11,19 +11,8 @@
     <DockPanel >
         <settings:SettingsView DockPanel.Dock="Top"/>
 
+        <Button DockPanel.Dock="Bottom" Content="{loc:Loc AnimReTarget.ApplySettings}" Command="{Binding UpdateAnimationCommand}" Margin="2" />
         <Button DockPanel.Dock="Bottom" Content="{loc:Loc General.Save}" Command="{Binding SaveManager.ShowSaveSettingsCommand}"  Margin="2" />
-        <presentation:BoneMappingReviewView
-            DockPanel.Dock="Bottom"
-            MaxHeight="480" />
-        <Button
-            DockPanel.Dock="Bottom"
-            Margin="4"
-            Height="{StaticResource AeSize.ProminentControlHeight}"
-            AutomationProperties.Name="{loc:Loc AnimReTarget.AutoMapBones}"
-            Command="{Binding BoneManager.AutoMapBonesCommand}"
-            Content="{loc:Loc AnimReTarget.AutoMapBones}"
-            Style="{StaticResource AeButton.Primary}"
-            ToolTip="{loc:Loc AnimReTarget.AutoMapBones.ToolTip}" />
         <Button DockPanel.Dock="Bottom" Content="{loc:Loc AnimReTarget.OpenBoneMappingWindow}" Command="{Binding BoneManager.ShowBoneMappingWindowCommand}" Margin="2" />
 
         <presentation:BoneSettingsView DockPanel.Dock="Top"/>

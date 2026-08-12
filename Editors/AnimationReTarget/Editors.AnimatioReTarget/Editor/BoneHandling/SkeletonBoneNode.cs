@@ -18,8 +18,6 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         [ObservableProperty] int _parnetBoneIndex = -1;
         [ObservableProperty] int _mappedIndex = -1;
         [ObservableProperty] bool _hasMapping = false;
-        [ObservableProperty] BoneAutoMappingStatus? _autoMappingStatus;
-        [ObservableProperty] string _autoMappingStatusText = "";
 
         [ObservableProperty] bool _isLocalOffset = false;  // Not implemented, testing
         [ObservableProperty] float _boneLengthMult = 1;
