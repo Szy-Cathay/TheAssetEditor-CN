@@ -146,7 +146,8 @@ namespace Shared.GameFormats.WsModel
                     Textures[TextureType.Specular] = texturePath;
                 if (textureSlotName.Contains("base_colour", StringComparison.InvariantCultureIgnoreCase))
                     Textures[TextureType.BaseColour] = texturePath;
-                if (textureSlotName.Contains("material_map", StringComparison.InvariantCultureIgnoreCase))
+                if (textureSlotName.Contains("material_map", StringComparison.InvariantCultureIgnoreCase) ||
+                    textureSlotName.Contains("surface_map", StringComparison.InvariantCultureIgnoreCase))
                     Textures[TextureType.MaterialMap] = texturePath;
                 if (textureSlotName.Contains("xml_blood_map", StringComparison.InvariantCultureIgnoreCase))
                     Textures[TextureType.Blood] = texturePath;
