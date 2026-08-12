@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using AssetEditor.ViewModels;
 using AssetEditor.Views.Updater;
 using Microsoft.Extensions.DependencyInjection;
-using Octokit;
 using Shared.Core.Events;
+using Shared.Core.Services;
 
 namespace AssetEditor.UiCommands
 {
@@ -12,7 +12,7 @@ namespace AssetEditor.UiCommands
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider;
 
-        public void Execute(List<Release> newerReleases)
+        public void Execute(List<UpdateRelease> newerReleases)
         {
             var window = _serviceProvider.GetRequiredService<UpdaterWindow>();
             var viewModel = _serviceProvider.GetRequiredService<UpdaterViewModel>();

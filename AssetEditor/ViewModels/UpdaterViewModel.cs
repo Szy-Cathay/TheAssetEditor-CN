@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Octokit;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Services;
@@ -13,10 +12,10 @@ using Application = System.Windows.Application;
 
 namespace AssetEditor.ViewModels
 {
-    public class ReleaseNoteItem(Release release)
+    public class ReleaseNoteItem(UpdateRelease release)
     {
         public string ReleaseName { get; } = $"## [{release.Name}]({release.HtmlUrl})";
-        public string PublishedAt { get; } = $"{release.PublishedAt!.Value:dd MMM yyyy}";
+        public string PublishedAt { get; } = release.PublishedAt?.ToString("dd MMM yyyy") ?? string.Empty;
         public string ReleaseNotes { get; } = release.Body;
     }
 
@@ -30,12 +29,12 @@ namespace AssetEditor.ViewModels
         private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
         private const string UpdaterDirectoryName = "Updater";
 
-        private List<Release> _newerReleases = [];
+        private List<UpdateRelease> _newerReleases = [];
 
         [ObservableProperty] private ObservableCollection<ReleaseNoteItem> _releaseNotesItems = [];
         [ObservableProperty] private string _updateInfo = string.Empty;
 
-        public void SetReleaseInfo(List<Release> newerReleases)
+        public void SetReleaseInfo(List<UpdateRelease> newerReleases)
         {
             _newerReleases = newerReleases;
 

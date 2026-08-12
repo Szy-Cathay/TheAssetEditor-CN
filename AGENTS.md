@@ -70,7 +70,7 @@
 - 用户数据必须隔离在 `%USERPROFILE%\AssetEditor.CN`。
 - 本地应用数据、配置、缓存、日志、更新目录和备份不得与上游版本共用。
 - IPC 管道必须保持为 `AssetEditor.CN.Ipc`。
-- 更新源必须保持为 `Szy-Cathay/TheAssetEditor-CN`。
+- 程序内置更新检查与安装包下载源必须保持为 Gitee 仓库 `szy-cathay/AssetEditor-CN-Downloads`；源码、问题跟踪和 GitHub Release 仍使用 `Szy-Cathay/TheAssetEditor-CN`。
 - 用户可见界面仅保留中文；新增界面文本必须接入 `AssetEditor/Language_Cn.json`。
 - 不重新引入语言选择器、英文或法文运行时本地化入口。
 - 保留现有 C# 命名空间和 `RootNamespace`，不得进行全仓命名空间替换。

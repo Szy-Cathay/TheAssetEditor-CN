@@ -1,6 +1,6 @@
 # Asset Editor 国区版
 
-[下载最新版本](https://github.com/Szy-Cathay/TheAssetEditor-CN/releases/latest) · [查看上游项目](https://github.com/donkeyProgramming/TheAssetEditor) · [问题反馈](https://github.com/Szy-Cathay/TheAssetEditor-CN/issues)
+[下载完整安装包](https://github.com/Szy-Cathay/TheAssetEditor-CN/releases/latest) · [国内更新源](https://gitee.com/szy-cathay/AssetEditor-CN-Downloads/releases) · [查看上游项目](https://github.com/donkeyProgramming/TheAssetEditor) · [问题反馈](https://github.com/Szy-Cathay/TheAssetEditor-CN/issues)
 
 > **仓库来源**
 >
@@ -27,7 +27,8 @@ Asset Editor 国区版是一款运行在 Windows 上的《全面战争》系列�
 - 更新器：`AssetEditor.CN.Updater.exe`
 - 用户数据目录：`%USERPROFILE%\AssetEditor.CN`
 - IPC 接口：`AssetEditor.CN.Ipc`
-- 更新来源：`Szy-Cathay/TheAssetEditor-CN`
+- 程序更新来源：Gitee `szy-cathay/AssetEditor-CN-Downloads`
+- 源码与问题跟踪：GitHub `Szy-Cathay/TheAssetEditor-CN`
 - 用户界面：仅提供中文
 
 国区版可以和原版 Asset Editor 同时安装。两者不共用配置、缓存、日志、更新目录或 IPC 接口。

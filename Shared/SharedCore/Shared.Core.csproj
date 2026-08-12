@@ -21,7 +21,6 @@
         <PackageReference Include="FluentValidation" Version="12.1.1" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.4.0" />
-        <PackageReference Include="Octokit" Version="14.0.0" />
         <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.4.1" />
         <PackageReference Include="Pfim" Version="0.11.4" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

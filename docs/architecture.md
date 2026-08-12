@@ -53,6 +53,7 @@
 ### 更新器
 
 - 主程序只启动发布包内的独立更新器；国区版运行时身份以根 `AGENTS.md` 为准。
+- 主程序从 Gitee `szy-cathay/AssetEditor-CN-Downloads` 检查版本；更新器读取同一发行版中的清单，按清单顺序下载小于 Gitee 单附件限制的 ZIP 分片，合并后校验每个分片和完整 ZIP 的 SHA-256。
 - 更新安装必须验证安装目录与事务目录不重叠，拒绝重解析点、路径别名重叠和非自有事务工作区。
 - updater payload 复制后逐文件复核 SHA-256；安装在事务目录完成暂存、备份和替换，失败时尝试回滚并保留原始错误。
 - 发布布局同时由 `AssetEditor/AssetEditor.csproj` 的 `PublishUpdater` 目标和 `AssetEditor/Properties/PublishProfiles/FolderProfile.pubxml` 决定。
