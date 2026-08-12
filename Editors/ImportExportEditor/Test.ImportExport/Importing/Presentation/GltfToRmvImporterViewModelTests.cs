@@ -33,6 +33,8 @@ public class GltfToRmvImporterViewModelTests
                 {
                     GltfSourceForwardDirection.PositiveZ,
                     GltfSourceForwardDirection.PositiveX,
+                    GltfSourceForwardDirection.NegativeX,
+                    GltfSourceForwardDirection.NegativeZ,
                 }));
             Assert.That(
                 viewModel.SourceForwardDirections.Select(option => option.Key),
@@ -40,6 +42,8 @@ public class GltfToRmvImporterViewModelTests
                 {
                     "+Z（标准 glTF）",
                     "+X（Unreal/PSK）",
+                    "-X",
+                    "-Z",
                 }));
             Assert.That(viewModel.CanEditAnimationKeysPerSecond, Is.False);
         });

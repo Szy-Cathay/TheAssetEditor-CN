@@ -241,8 +241,16 @@ public class GltfFullWorkflowImportTests
         });
     }
 
-    [Test]
-    public void Import_SourcePositiveX_RotatesEveryAssetAfterAutoScaleAndReportsDirection()
+    [TestCase(
+        GltfSourceForwardDirection.PositiveX,
+        MathF.PI / 2,
+        "+X（Unreal/PSK）")]
+    [TestCase(GltfSourceForwardDirection.NegativeX, -MathF.PI / 2, "-X")]
+    [TestCase(GltfSourceForwardDirection.NegativeZ, MathF.PI, "-Z")]
+    public void Import_NonPositiveZForward_RotatesEveryAssetAfterAutoScaleAndReportsDirection(
+        GltfSourceForwardDirection sourceForwardDirection,
+        float rotationRadians,
+        string sourceDirectionLabel)
     {
         var glbPath = Path.Combine(
             TestContext.CurrentContext.TestDirectory,
@@ -250,47 +258,47 @@ public class GltfFullWorkflowImportTests
             "Gltf",
             "external_full_workflow.glb");
         var positiveZDestination = new PackFileContainer("positive-z");
-        var positiveXDestination = new PackFileContainer("positive-x");
+        var rotatedDestination = new PackFileContainer("rotated");
         var positiveZResult = CreateImporter(positiveZDestination).Import(
             CreateFullWorkflowSettings(
                 glbPath,
                 positiveZDestination,
                 GltfSourceForwardDirection.PositiveZ));
-        var positiveXViewModel = new RmvToGltfImporterViewModel(
-            CreateImporter(positiveXDestination))
+        var rotatedViewModel = new RmvToGltfImporterViewModel(
+            CreateImporter(rotatedDestination))
         {
-            SourceForwardDirection = GltfSourceForwardDirection.PositiveX,
+            SourceForwardDirection = sourceForwardDirection,
             AnimationKeysPerSecond = 24,
         };
-        positiveXViewModel.Initialize(new PackFile(
+        rotatedViewModel.Initialize(new PackFile(
             glbPath,
             new FileSystemSource(glbPath)));
-        var positiveXResult = positiveXViewModel.Execute(
+        var rotatedResult = rotatedViewModel.Execute(
             new PackFile(glbPath, new FileSystemSource(glbPath)),
             "models",
-            positiveXDestination,
+            rotatedDestination,
             GameTypeEnum.Warhammer3);
 
         Assert.Multiple(() =>
         {
             Assert.That(positiveZResult.Succeeded, Is.True,
                 string.Join(Environment.NewLine, positiveZResult.Errors));
-            Assert.That(positiveXResult.Succeeded, Is.True,
-                string.Join(Environment.NewLine, positiveXResult.Errors));
+            Assert.That(rotatedResult.Succeeded, Is.True,
+                string.Join(Environment.NewLine, rotatedResult.Errors));
             Assert.That(
-                positiveXResult.HumanoidScale!.SourceHeight,
+                rotatedResult.HumanoidScale!.SourceHeight,
                 Is.EqualTo(positiveZResult.HumanoidScale!.SourceHeight).Within(0.0001f));
             Assert.That(
-                positiveXResult.HumanoidScale.ReferenceHeight,
+                rotatedResult.HumanoidScale.ReferenceHeight,
                 Is.EqualTo(positiveZResult.HumanoidScale.ReferenceHeight).Within(0.0001f));
             Assert.That(
-                positiveXResult.HumanoidScale.ScaleFactor,
+                rotatedResult.HumanoidScale.ScaleFactor,
                 Is.EqualTo(positiveZResult.HumanoidScale.ScaleFactor).Within(0.0001f));
             Assert.That(
-                positiveXResult.SourceForward!.SourceDirection,
-                Is.EqualTo("+X（Unreal/PSK）"));
+                rotatedResult.SourceForward!.SourceDirection,
+                Is.EqualTo(sourceDirectionLabel));
             Assert.That(
-                positiveXResult.SourceForward.Conversion,
+                rotatedResult.SourceForward.Conversion,
                 Does.Contain("游戏 +Z"));
         });
 
@@ -299,31 +307,36 @@ public class GltfFullWorkflowImportTests
             @"animations\skeletons\externalworkflowarmature.anim";
         var positiveZRmv = ModelFactory.Create().Load(
             positiveZDestination.FileList[rmvPath].DataSource.ReadData());
-        var positiveXRmv = ModelFactory.Create().Load(
-            positiveXDestination.FileList[rmvPath].DataSource.ReadData());
+        var rotatedRmv = ModelFactory.Create().Load(
+            rotatedDestination.FileList[rmvPath].DataSource.ReadData());
         var positiveZVertices = positiveZRmv.ModelList[0]
             .SelectMany(model => model.Mesh.VertexList)
             .ToList();
-        var positiveXVertices = positiveXRmv.ModelList[0]
+        var rotatedVertices = rotatedRmv.ModelList[0]
             .SelectMany(model => model.Mesh.VertexList)
             .ToList();
-        Assert.That(positiveXVertices, Has.Count.EqualTo(positiveZVertices.Count));
+        Assert.That(rotatedVertices, Has.Count.EqualTo(positiveZVertices.Count));
         for (var vertexIndex = 0; vertexIndex < positiveZVertices.Count; vertexIndex++)
         {
             AssertVectorRotated(
                 ToNumerics(positiveZVertices[vertexIndex].Position),
-                ToNumerics(positiveXVertices[vertexIndex].Position));
+                ToNumerics(rotatedVertices[vertexIndex].Position),
+                rotationRadians);
             AssertVectorRotated(
                 ToNumerics(positiveZVertices[vertexIndex].Normal),
-                ToNumerics(positiveXVertices[vertexIndex].Normal),
+                ToNumerics(rotatedVertices[vertexIndex].Normal),
+                rotationRadians,
                 0.01f);
         }
 
         var positiveZSkeleton = AnimationFile.Create(
             positiveZDestination.FileList[skeletonPath]);
-        var positiveXSkeleton = AnimationFile.Create(
-            positiveXDestination.FileList[skeletonPath]);
-        AssertAnimationRotated(positiveZSkeleton, positiveXSkeleton);
+        var rotatedSkeleton = AnimationFile.Create(
+            rotatedDestination.FileList[skeletonPath]);
+        AssertAnimationRotated(
+            positiveZSkeleton,
+            rotatedSkeleton,
+            rotationRadians);
 
         foreach (var animationPath in new[]
                  {
@@ -333,15 +346,18 @@ public class GltfFullWorkflowImportTests
         {
             var positiveZAnimation = AnimationFile.Create(
                 positiveZDestination.FileList[animationPath]);
-            var positiveXAnimation = AnimationFile.Create(
-                positiveXDestination.FileList[animationPath]);
-            AssertAnimationRotated(positiveZAnimation, positiveXAnimation);
+            var rotatedAnimation = AnimationFile.Create(
+                rotatedDestination.FileList[animationPath]);
+            AssertAnimationRotated(
+                positiveZAnimation,
+                rotatedAnimation,
+                rotationRadians);
         }
 
         Assert.That(
-            ImportWindow.BuildResultMessage(positiveXResult),
+            ImportWindow.BuildResultMessage(rotatedResult),
             Does.Contain("源模型正面方向")
-                .And.Contain("+X（Unreal/PSK）")
+                .And.Contain(sourceDirectionLabel)
                 .And.Contain("游戏 +Z"));
     }
 
@@ -562,28 +578,30 @@ public class GltfFullWorkflowImportTests
 
     private static void AssertAnimationRotated(
         AnimationFile positiveZ,
-        AnimationFile positiveX)
+        AnimationFile rotated,
+        float rotationRadians)
     {
         Assert.Multiple(() =>
         {
-            Assert.That(positiveX.Bones.Select(bone => bone.Name),
+            Assert.That(rotated.Bones.Select(bone => bone.Name),
                 Is.EqualTo(positiveZ.Bones.Select(bone => bone.Name)));
-            Assert.That(positiveX.AnimationParts,
+            Assert.That(rotated.AnimationParts,
                 Has.Count.EqualTo(positiveZ.AnimationParts.Count));
         });
         for (var partIndex = 0; partIndex < positiveZ.AnimationParts.Count; partIndex++)
         {
             var positiveZPart = positiveZ.AnimationParts[partIndex];
-            var positiveXPart = positiveX.AnimationParts[partIndex];
+            var rotatedPart = rotated.AnimationParts[partIndex];
             if (positiveZPart.StaticFrame != null)
             {
-                Assert.That(positiveXPart.StaticFrame, Is.Not.Null);
+                Assert.That(rotatedPart.StaticFrame, Is.Not.Null);
                 AssertFrameRotated(
                     positiveZPart.StaticFrame,
-                    positiveXPart.StaticFrame!);
+                    rotatedPart.StaticFrame!,
+                    rotationRadians);
             }
 
-            Assert.That(positiveXPart.DynamicFrames,
+            Assert.That(rotatedPart.DynamicFrames,
                 Has.Count.EqualTo(positiveZPart.DynamicFrames.Count));
             for (var frameIndex = 0;
                  frameIndex < positiveZPart.DynamicFrames.Count;
@@ -591,20 +609,22 @@ public class GltfFullWorkflowImportTests
             {
                 AssertFrameRotated(
                     positiveZPart.DynamicFrames[frameIndex],
-                    positiveXPart.DynamicFrames[frameIndex]);
+                    rotatedPart.DynamicFrames[frameIndex],
+                    rotationRadians);
             }
         }
     }
 
     private static void AssertFrameRotated(
         AnimationFile.Frame positiveZ,
-        AnimationFile.Frame positiveX)
+        AnimationFile.Frame rotated,
+        float rotationRadians)
     {
         Assert.Multiple(() =>
         {
-            Assert.That(positiveX.Transforms,
+            Assert.That(rotated.Transforms,
                 Has.Count.EqualTo(positiveZ.Transforms.Count));
-            Assert.That(positiveX.Quaternion,
+            Assert.That(rotated.Quaternion,
                 Has.Count.EqualTo(positiveZ.Quaternion.Count));
         });
         for (var transformIndex = 0;
@@ -613,15 +633,17 @@ public class GltfFullWorkflowImportTests
         {
             AssertVectorRotated(
                 ToNumerics(positiveZ.Transforms[transformIndex]),
-                ToNumerics(positiveX.Transforms[transformIndex]));
+                ToNumerics(rotated.Transforms[transformIndex]),
+                rotationRadians);
         }
         for (var rotationIndex = 0;
              rotationIndex < positiveZ.Quaternion.Count;
              rotationIndex++)
         {
-            var expected = RotatePositiveX(
-                ToNumerics(positiveZ.Quaternion[rotationIndex]));
-            var actual = ToNumerics(positiveX.Quaternion[rotationIndex]);
+            var expected = Rotate(
+                ToNumerics(positiveZ.Quaternion[rotationIndex]),
+                rotationRadians);
+            var actual = ToNumerics(rotated.Quaternion[rotationIndex]);
             Assert.That(
                 Math.Abs(Numerics.Quaternion.Dot(expected, actual)),
                 Is.EqualTo(1).Within(0.0001f));
@@ -630,20 +652,22 @@ public class GltfFullWorkflowImportTests
 
     private static void AssertVectorRotated(
         Numerics.Vector3 positiveZ,
-        Numerics.Vector3 positiveX,
+        Numerics.Vector3 rotated,
+        float rotationRadians,
         float tolerance = 0.0001f) =>
         Assert.That(
             Numerics.Vector3.Distance(
-                positiveX,
+                rotated,
                 Numerics.Vector3.Transform(
                     positiveZ,
-                    Numerics.Matrix4x4.CreateRotationY(MathF.PI / 2))),
+                    Numerics.Matrix4x4.CreateRotationY(rotationRadians))),
             Is.LessThanOrEqualTo(tolerance));
 
-    private static Numerics.Quaternion RotatePositiveX(
-        Numerics.Quaternion positiveZ)
+    private static Numerics.Quaternion Rotate(
+        Numerics.Quaternion positiveZ,
+        float rotationRadians)
     {
-        var basis = Numerics.Matrix4x4.CreateRotationY(MathF.PI / 2);
+        var basis = Numerics.Matrix4x4.CreateRotationY(rotationRadians);
         var converted = Numerics.Matrix4x4.Transpose(basis) *
                         Numerics.Matrix4x4.CreateFromQuaternion(positiveZ) *
                         basis;

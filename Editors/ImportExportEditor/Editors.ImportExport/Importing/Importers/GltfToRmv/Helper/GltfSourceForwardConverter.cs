@@ -8,6 +8,10 @@ internal static class GltfSourceForwardConverter
 {
     private static readonly Matrix4x4 s_positiveXToGamePositiveZ =
         Matrix4x4.CreateRotationY(MathF.PI / 2);
+    private static readonly Matrix4x4 s_negativeXToGamePositiveZ =
+        Matrix4x4.CreateRotationY(-MathF.PI / 2);
+    private static readonly Matrix4x4 s_negativeZToGamePositiveZ =
+        Matrix4x4.CreateRotationY(MathF.PI);
 
     public static Vector3 ConvertGameVector(
         Vector3 value,
@@ -58,6 +62,10 @@ internal static class GltfSourceForwardConverter
         {
             GltfSourceForwardDirection.PositiveX =>
                 s_positiveXToGamePositiveZ,
+            GltfSourceForwardDirection.NegativeX =>
+                s_negativeXToGamePositiveZ,
+            GltfSourceForwardDirection.NegativeZ =>
+                s_negativeZToGamePositiveZ,
             _ => throw new ArgumentOutOfRangeException(
                 nameof(sourceForwardDirection),
                 sourceForwardDirection,
