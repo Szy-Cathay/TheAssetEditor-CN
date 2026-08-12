@@ -17,6 +17,15 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
 
         record SkeletonInfo(string Name, AnimationFile Data);
 
+        enum MappingApprovalState
+        {
+            Unavailable,
+            PreviewRequired,
+            Previewing,
+            ConfirmationRequired,
+            Confirmed
+        }
+
         private readonly IStandardDialogs _standardDialogs;
         private readonly IAbstractFormFactory<BoneMappingWindow> _boneMappingWindowFactory;
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
@@ -26,14 +35,24 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         private SkeletonInfo? _sourceSkeleton;
         private SkeletonInfo? _targetSkeleton;
         private readonly HashSet<int> _intentionallyUnmappedTargetBones = [];
+        private Dictionary<int, int>? _lastMappingSnapshot;
+        private HashSet<int> _lastIntentionalUnmappedSnapshot = [];
+        private MappingApprovalState _mappingApprovalState;
+        private long _mappingRevision;
 
         [ObservableProperty] SkeletonBoneNode_new? _selectedBone;
         [ObservableProperty] ObservableCollection<SkeletonBoneNode_new> _bones = [];
         [ObservableProperty] ObservableCollection<SkeletonBoneNode_new> _flatBoneList = [];
         [ObservableProperty] BoneAutoMappingSummary? _lastAutoMappingSummary;
         [ObservableProperty] ObservableCollection<BoneMappingReviewItem> _reviewItems = [];
-        [ObservableProperty] bool _canBatchRetarget;
+        [ObservableProperty] bool _isMappingStructurallyReady;
         [ObservableProperty] string _batchRetargetGateText = "";
+
+        public bool IsPreviewingCurrentMapping => _mappingApprovalState == MappingApprovalState.Previewing;
+        public bool HasPreviewedCurrentMapping => _mappingApprovalState is
+            MappingApprovalState.ConfirmationRequired or MappingApprovalState.Confirmed;
+        public bool IsMappingConfirmed => _mappingApprovalState == MappingApprovalState.Confirmed;
+        public bool CanBatchRetarget => IsMappingStructurallyReady && IsMappingConfirmed;
 
         partial void OnBonesChanged(ObservableCollection<SkeletonBoneNode_new> value)
         {
@@ -135,11 +154,16 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
             SelectedBone = Bones.FirstOrDefault();
             _activeConfig = null;
             _intentionallyUnmappedTargetBones.Clear();
+            _lastMappingSnapshot = null;
+            _lastIntentionalUnmappedSnapshot.Clear();
+            _mappingRevision++;
             LastAutoMappingSummary = null;
             ReviewItems = [];
-            CanBatchRetarget = false;
+            IsMappingStructurallyReady = false;
+            SetApprovalState(MappingApprovalState.Unavailable);
             BatchRetargetGateText = "";
             AutoMapBonesCommand.NotifyCanExecuteChanged();
+            ConfirmMappingCommand.NotifyCanExecuteChanged();
             ShowManualBoneMappingCommand.NotifyCanExecuteChanged();
         }
 
@@ -168,9 +192,11 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                 .Where(item => item.Status is
                     BoneAutoMappingStatus.ReviewRequired or BoneAutoMappingStatus.Unmatched)
                 .Select(CreateReviewItem));
-            CanBatchRetarget = summary.CanBatchRetarget;
+            IsMappingStructurallyReady = summary.CanBatchRetarget;
             BatchRetargetGateText = CreateGateText(summary);
+            OnPropertyChanged(nameof(CanBatchRetarget));
             ConfirmCandidateCommand.NotifyCanExecuteChanged();
+            ConfirmMappingCommand.NotifyCanExecuteChanged();
             MarkIntentionalUnmappedCommand.NotifyCanExecuteChanged();
             ShowManualBoneMappingCommand.NotifyCanExecuteChanged();
         }
@@ -207,10 +233,8 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                     .ToArray());
         }
 
-        private static string CreateGateText(BoneAutoMappingSummary summary)
+        private string CreateGateText(BoneAutoMappingSummary summary)
         {
-            if (summary.CanBatchRetarget)
-                return LocalizationManager.Instance.Get("AnimReTarget.BatchGate.Ready");
             if (summary.CoreBlockingCount > 0)
             {
                 return LocalizationManager.Instance.GetFormat(
@@ -218,10 +242,20 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                     summary.CoreBlockingCount,
                     summary.BlockingCount - summary.CoreBlockingCount);
             }
+            if (!summary.CanBatchRetarget)
+            {
+                return LocalizationManager.Instance.GetFormat(
+                    "AnimReTarget.BatchGate.Blocked",
+                    summary.BlockingCount);
+            }
+            if (IsMappingConfirmed)
+                return LocalizationManager.Instance.Get("AnimReTarget.BatchGate.Confirmed");
+            if (HasPreviewedCurrentMapping)
+                return LocalizationManager.Instance.Get("AnimReTarget.BatchGate.ConfirmationRequired");
+            if (IsPreviewingCurrentMapping)
+                return LocalizationManager.Instance.Get("AnimReTarget.BatchGate.PreviewInProgress");
 
-            return LocalizationManager.Instance.GetFormat(
-                "AnimReTarget.BatchGate.Blocked",
-                summary.BlockingCount);
+            return LocalizationManager.Instance.Get("AnimReTarget.BatchGate.PreviewRequired");
         }
 
         private void RefreshSummaryFromCurrentMappings()
@@ -236,7 +270,88 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
                 _intentionallyUnmappedTargetBones);
             ApplyConfirmedMappings(summary, existingMappings);
             SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig!);
+            var currentMappings = GetCurrentMappings();
+            if (!MappingStateMatchesSnapshot(currentMappings))
+            {
+                _mappingRevision++;
+                SetApprovalState(MappingApprovalState.PreviewRequired);
+            }
+            _lastMappingSnapshot = currentMappings;
+            _lastIntentionalUnmappedSnapshot = new HashSet<int>(_intentionallyUnmappedTargetBones);
             SetSummary(summary);
+        }
+
+        public long? BeginMappingPreview()
+        {
+            if (LastAutoMappingSummary == null)
+                return null;
+
+            if (!IsMappingConfirmed)
+                SetApprovalState(MappingApprovalState.Previewing);
+            return _mappingRevision;
+        }
+
+        public void CompleteMappingPreview(long mappingRevision)
+        {
+            if (LastAutoMappingSummary == null || mappingRevision != _mappingRevision || IsMappingConfirmed)
+                return;
+
+            SetApprovalState(MappingApprovalState.ConfirmationRequired);
+        }
+
+        public void CancelMappingPreview(long mappingRevision)
+        {
+            if (mappingRevision != _mappingRevision || !IsPreviewingCurrentMapping)
+                return;
+
+            SetApprovalState(MappingApprovalState.PreviewRequired);
+        }
+
+        private bool CanConfirmMapping()
+        {
+            return IsMappingStructurallyReady &&
+                   _mappingApprovalState == MappingApprovalState.ConfirmationRequired;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanConfirmMapping))]
+        public void ConfirmMapping()
+        {
+            if (!CanConfirmMapping())
+                return;
+
+            SetApprovalState(MappingApprovalState.Confirmed);
+        }
+
+        private void SetApprovalState(MappingApprovalState state)
+        {
+            if (_mappingApprovalState == state)
+                return;
+
+            _mappingApprovalState = state;
+            OnPropertyChanged(nameof(IsPreviewingCurrentMapping));
+            OnPropertyChanged(nameof(HasPreviewedCurrentMapping));
+            OnPropertyChanged(nameof(IsMappingConfirmed));
+            OnPropertyChanged(nameof(CanBatchRetarget));
+            if (LastAutoMappingSummary != null)
+                BatchRetargetGateText = CreateGateText(LastAutoMappingSummary);
+            ConfirmMappingCommand.NotifyCanExecuteChanged();
+        }
+
+        private Dictionary<int, int> GetCurrentMappings()
+        {
+            return FlatBoneList
+                .Where(bone => bone.HasMapping)
+                .ToDictionary(bone => bone.BoneIndex, bone => bone.MappedIndex);
+        }
+
+        private bool MappingStateMatchesSnapshot(IReadOnlyDictionary<int, int> currentMappings)
+        {
+            return _lastMappingSnapshot != null &&
+                   _lastMappingSnapshot.Count == currentMappings.Count &&
+                   _lastMappingSnapshot.All(mapping =>
+                       currentMappings.TryGetValue(mapping.Key, out var sourceBoneIndex) &&
+                       sourceBoneIndex == mapping.Value) &&
+                   _lastIntentionalUnmappedSnapshot.SetEquals(_intentionallyUnmappedTargetBones);
         }
 
         private bool CanConfirmCandidate(BoneMappingReviewCandidate? candidate)
@@ -370,25 +485,57 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
             CreateMappingConfig();
 
             // Make this possible to use without being a modal!
+            var editableConfig = CloneMappingConfig(_activeConfig!);
             var handle = _boneMappingWindowFactory.Create();
-            handle.ViewModel.Initialize(_activeConfig);
+            handle.ViewModel.Initialize(editableConfig);
             handle.ViewModel.OnlyShowUsedBones.Value = false;
             handle.ViewModel.ParentModelBones.RefreshFilter();
             if (reviewItem != null)
             {
                 handle.ViewModel.MeshBones.SelectedItem = SkeletonBoneNodeHelper.GetNodeFromId(
                     reviewItem.TargetBoneIndex,
-                    _activeConfig!.MeshBones);
+                    editableConfig.MeshBones);
             }
             var result = handle.ShowDialog();
 
             if ((result.HasValue && result.Value == true) == false)
                 return;
 
+            _activeConfig = editableConfig;
             SkeletonBoneNodeHelper.ApplyMapping(Bones, _activeConfig);
             foreach (var mappedBone in FlatBoneList.Where(bone => bone.HasMapping))
                 _intentionallyUnmappedTargetBones.Remove(mappedBone.BoneIndex);
             RefreshSummaryFromCurrentMappings();
+        }
+
+        private static RemappedAnimatedBoneConfiguration CloneMappingConfig(
+            RemappedAnimatedBoneConfiguration source)
+        {
+            return new RemappedAnimatedBoneConfiguration
+            {
+                MeshSkeletonName = source.MeshSkeletonName,
+                MeshBones = new ObservableCollection<AnimatedBone>(source.MeshBones.Select(CloneBone)),
+                ParnetModelSkeletonName = source.ParnetModelSkeletonName,
+                ParentModelBones = new ObservableCollection<AnimatedBone>(source.ParentModelBones.Select(CloneBone)),
+                SkeletonBoneHighlighter = source.SkeletonBoneHighlighter
+            };
+        }
+
+        private static AnimatedBone CloneBone(AnimatedBone source)
+        {
+            return new AnimatedBone
+            {
+                IsVisible = new NotifyAttr<bool>(source.IsVisible.Value),
+                Name = new NotifyAttr<string>(source.Name.Value),
+                BoneIndex = new NotifyAttr<int>(source.BoneIndex.Value),
+                Children = new ObservableCollection<AnimatedBone>(source.Children.Select(CloneBone)),
+                IsUsedByCurrentModel = new NotifyAttr<bool>(source.IsUsedByCurrentModel.Value),
+                MappedBoneName = new NotifyAttr<string>(source.MappedBoneName.Value),
+                MappedBoneIndex = new NotifyAttr<int>(source.MappedBoneIndex.Value),
+                BonePosOffset = source.BonePosOffset,
+                BoneRotOffset = source.BoneRotOffset,
+                BoneScaleOffset = source.BoneScaleOffset
+            };
         }
 
         void CreateMappingConfig()

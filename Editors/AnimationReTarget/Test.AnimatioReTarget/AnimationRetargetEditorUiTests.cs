@@ -43,6 +43,10 @@ namespace Test.AnimatioReTarget
                 Assert.That(reviewXaml, Does.Contain("LastAutoMappingSummary.ConfirmedCount"));
                 Assert.That(reviewXaml, Does.Contain("LastAutoMappingSummary.ReviewRequiredCount"));
                 Assert.That(reviewXaml, Does.Contain("LastAutoMappingSummary.UnmatchedCount"));
+                Assert.That(reviewXaml, Does.Contain("{loc:Loc AnimReTarget.Preview.Generate}"));
+                Assert.That(reviewXaml, Does.Contain("UpdateAnimationCommand"));
+                Assert.That(reviewXaml, Does.Contain("BoneManager.ConfirmMappingCommand"));
+                Assert.That(reviewXaml, Does.Contain("AnimReTarget.Preview.Checklist"));
                 Assert.That(boneSettingsXaml, Does.Contain("AutoMappingStatusText"));
             });
         }
@@ -60,6 +64,11 @@ namespace Test.AnimatioReTarget
                 Assert.That(language.GetProperty("AnimReTarget.AutoMapSummary.Confirmed").GetString(), Is.EqualTo("已确认"));
                 Assert.That(language.GetProperty("AnimReTarget.AutoMapSummary.ReviewRequired").GetString(), Is.EqualTo("待复核"));
                 Assert.That(language.GetProperty("AnimReTarget.AutoMapSummary.Unmatched").GetString(), Is.EqualTo("未匹配"));
+                Assert.That(language.GetProperty("AnimReTarget.Preview.Generate").GetString(), Is.EqualTo("生成并播放映射预览"));
+                Assert.That(language.GetProperty("AnimReTarget.ConfirmMapping").GetString(), Is.EqualTo("确认此映射方案"));
+                Assert.That(language.GetProperty("AnimReTarget.Preview.Checklist").GetString(), Does.Contain("左右肢体"));
+                Assert.That(language.GetProperty("AnimReTarget.BatchGate.PreviewInProgress").GetString(), Does.Contain("完整播放"));
+                Assert.That(language.GetProperty("AnimReTarget.BatchGate.Confirmed").GetString(), Does.Contain("已确认"));
             });
         }
 
