@@ -2,6 +2,7 @@
 using Editors.AnimatioReTarget.Editor.BoneHandling;
 using Editors.Shared.Core.Common;
 using GameWorld.Core.SceneNodes;
+using Microsoft.Xna.Framework;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.ToolCreation;
@@ -118,8 +119,41 @@ namespace Test.AnimatioReTarget
         {
             editor.UpdateAnimation();
 
-            // Check anim click
-            // Check player
+            var generated = editor.GetSceneObjectFromId(AnimationRetargetIds.Generated);
+            Assert.Multiple(() =>
+            {
+                Assert.That(generated, Is.Not.Null);
+                Assert.That(generated!.IsEnabled, Is.True);
+                Assert.That(generated.Data.AnimationClip, Is.Not.Null);
+                Assert.That(editor.Player.SelectedMainAnimation.Asset, Is.SameAs(generated.Data));
+                Assert.That(editor.Player.IsEnabled.Value, Is.True);
+                Assert.That(generated.Data.Player.IsPlaying, Is.True);
+                Assert.That(editor.BoneManager.IsPreviewingCurrentMapping, Is.True);
+                Assert.That(editor.BoneManager.HasPreviewedCurrentMapping, Is.False);
+                Assert.That(editor.BoneManager.IsMappingConfirmed, Is.False);
+            });
+
+            generated!.Data.Player.SeekToTimeSeconds(
+                generated.Data.Player.GetAnimationLengthUs() / 1_000_000f);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(editor.BoneManager.IsPreviewingCurrentMapping, Is.False);
+                Assert.That(editor.BoneManager.HasPreviewedCurrentMapping, Is.False);
+                Assert.That(editor.BoneManager.IsMappingConfirmed, Is.False);
+            });
+
+            editor.UpdateAnimation();
+            generated.Data.Player.Update(new GameTime(
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(generated.Data.Player.GetAnimationLengthUs() / 1000d + 1)));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(editor.BoneManager.IsPreviewingCurrentMapping, Is.False);
+                Assert.That(editor.BoneManager.HasPreviewedCurrentMapping, Is.True);
+                Assert.That(editor.BoneManager.IsMappingConfirmed, Is.False);
+            });
         }
 
         private void Step5_UpdateAnimationSettingsAndGenerateAnimation(AssetEditorTestRunner runner, AnimationRetargetEditor editor, PackFileContainer outputPackFile)

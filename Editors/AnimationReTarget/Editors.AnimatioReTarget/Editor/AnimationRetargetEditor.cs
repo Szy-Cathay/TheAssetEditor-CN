@@ -44,6 +44,9 @@ namespace Editors.AnimatioReTarget.Editor
         private SceneObject _target;
         private SceneObject _source;
         private SceneObject _generated;
+        private Action? _previewCompletionHandler;
+        private Action? _previewInterruptedHandler;
+        private bool _loopAnimationBeforePreview;
 
         [ObservableProperty] BoneManager _boneManager;
         [ObservableProperty] AnimationReTargetRenderingComponent _rendering;
@@ -131,7 +134,8 @@ namespace Editors.AnimatioReTarget.Editor
             _sceneObjectEditor.SetAnimation(_source, _pfs.GetFullPath(sourceInput.Animation));
         }
 
-        [RelayCommand]public void UpdateAnimation()
+        [RelayCommand]
+        public void UpdateAnimation()
         {
             var canUpdate = CanUpdateAnimation(out var errorText);
             if (canUpdate == false)
@@ -142,8 +146,51 @@ namespace Editors.AnimatioReTarget.Editor
 
             var newAnimationClip = UpdateAnimation(_source.AnimationClip);
             _sceneObjectEditor.SetAnimationClip(_generated, newAnimationClip, "Generated");
+            GetSceneObjectFromId(AnimationRetargetIds.Generated)!.IsEnabled = true;
             _player.SelectedMainAnimation = _player.PlayerItems.First(x => x.Asset == _generated);
-            
+            _player.IsEnabled.Value = true;
+            _player.SetAnimationFirstFrame();
+            WatchPreviewCompletion(BoneManager.BeginMappingPreview());
+            _player.ToggleAnimationPausePlay();
+        }
+
+        private void WatchPreviewCompletion(long? mappingRevision)
+        {
+            StopWatchingPreviewCompletion();
+            if (!mappingRevision.HasValue)
+                return;
+
+            _loopAnimationBeforePreview = _player.LoopAnimation.Value;
+            _player.LoopAnimation.Value = false;
+
+            void OnPreviewCompleted()
+            {
+                StopWatchingPreviewCompletion();
+                BoneManager.CompleteMappingPreview(mappingRevision.Value);
+            }
+
+            void OnPreviewInterrupted()
+            {
+                StopWatchingPreviewCompletion();
+                BoneManager.CancelMappingPreview(mappingRevision.Value);
+            }
+
+            _previewCompletionHandler = OnPreviewCompleted;
+            _previewInterruptedHandler = OnPreviewInterrupted;
+            _generated.Player.OnPlaybackCompleted += _previewCompletionHandler;
+            _generated.Player.OnPlaybackPositionChanged += _previewInterruptedHandler;
+        }
+
+        private void StopWatchingPreviewCompletion()
+        {
+            if (_previewCompletionHandler == null)
+                return;
+
+            _generated.Player.OnPlaybackCompleted -= _previewCompletionHandler;
+            _generated.Player.OnPlaybackPositionChanged -= _previewInterruptedHandler;
+            _player.LoopAnimation.Value = _loopAnimationBeforePreview;
+            _previewCompletionHandler = null;
+            _previewInterruptedHandler = null;
         }
 
         AnimationClip UpdateAnimation(AnimationClip animationToCopy)
@@ -157,13 +204,13 @@ namespace Editors.AnimatioReTarget.Editor
         {
             if (_target.Skeleton == null || _source.Skeleton == null)
             {
-                errorText = "Missing a skeleton?";
+                errorText = LocalizationManager.Instance.Get("AnimReTarget.Preview.MissingSkeleton");
                 return false;
             }
 
             if (_source.AnimationClip == null)
             {
-                errorText = "No animation to copy selected";
+                errorText = LocalizationManager.Instance.Get("AnimReTarget.Preview.MissingAnimation");
                 return false;
             }
 
@@ -173,6 +220,7 @@ namespace Editors.AnimatioReTarget.Editor
 
         public void Dispose()
         {
+            StopWatchingPreviewCompletion();
             _eventHub?.UnRegister(this);
         }
     }

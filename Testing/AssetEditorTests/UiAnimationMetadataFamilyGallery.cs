@@ -73,6 +73,9 @@ public class UiAnimationMetadataFamilyGallery
         "retarget-selected-bone",
         "retarget-editor",
         "retarget-editor-review-empty",
+        "retarget-editor-preview-playing",
+        "retarget-editor-preview-ready",
+        "retarget-editor-confirmed",
         "retarget-save-window",
         "retarget-settings",
         "metadata-main",
@@ -256,7 +259,19 @@ public class UiAnimationMetadataFamilyGallery
             900,
             760),
         "retarget-editor-review-empty" => Host(
-            new RetargetEditorView { DataContext = CreateBoneModel(reviewEmpty: true) },
+            new RetargetEditorView { DataContext = CreateBoneModel(RetargetApprovalGalleryState.PreviewRequired) },
+            900,
+            760),
+        "retarget-editor-preview-playing" => Host(
+            new RetargetEditorView { DataContext = CreateBoneModel(RetargetApprovalGalleryState.Previewing) },
+            900,
+            760),
+        "retarget-editor-preview-ready" => Host(
+            new RetargetEditorView { DataContext = CreateBoneModel(RetargetApprovalGalleryState.ConfirmationRequired) },
+            900,
+            760),
+        "retarget-editor-confirmed" => Host(
+            new RetargetEditorView { DataContext = CreateBoneModel(RetargetApprovalGalleryState.Confirmed) },
             900,
             760),
         "retarget-save-window" =>
@@ -583,8 +598,23 @@ public class UiAnimationMetadataFamilyGallery
         SoundFiles = new[] { "footsteps/armour_heavy" },
     };
 
-    private static GalleryModel CreateBoneModel(bool reviewEmpty = false)
+    private enum RetargetApprovalGalleryState
     {
+        NeedsReview,
+        PreviewRequired,
+        Previewing,
+        ConfirmationRequired,
+        Confirmed,
+    }
+
+    private static GalleryModel CreateBoneModel(
+        RetargetApprovalGalleryState approvalState = RetargetApprovalGalleryState.NeedsReview)
+    {
+        var reviewEmpty = approvalState != RetargetApprovalGalleryState.NeedsReview;
+        var previewing = approvalState == RetargetApprovalGalleryState.Previewing;
+        var previewed = approvalState is
+            RetargetApprovalGalleryState.ConfirmationRequired or RetargetApprovalGalleryState.Confirmed;
+        var confirmed = approvalState == RetargetApprovalGalleryState.Confirmed;
         var child = new GalleryModel
         {
             BoneName = "bip_spine_01",
@@ -655,11 +685,24 @@ public class UiAnimationMetadataFamilyGallery
                             Candidates = Array.Empty<object>(),
                         },
                     },
-                CanBatchRetarget = reviewEmpty,
-                BatchRetargetGateText = reviewEmpty
-                    ? "全部疑难骨骼已处理，可以执行批量重定向"
-                    : "仍有 1 个核心动作骨骼和 1 个其他骨骼未解决，批量重定向不可用",
+                IsMappingStructurallyReady = reviewEmpty,
+                IsPreviewingCurrentMapping = previewing,
+                HasPreviewedCurrentMapping = previewed || confirmed,
+                IsMappingConfirmed = confirmed,
+                CanBatchRetarget = confirmed,
+                BatchRetargetGateText = confirmed
+                    ? "映射方案已确认，可以执行批量重定向"
+                    : previewed
+                        ? "映射预览已完整播放；请检查实际动作后明确确认此映射方案"
+                        : previewing
+                            ? "映射预览正在播放；完整播放一遍后才能确认"
+                        : reviewEmpty
+                            ? "骨骼结构检查已通过；请先生成并播放当前映射预览"
+                            : "仍有 1 个核心动作骨骼和 1 个其他骨骼未解决，批量重定向不可用",
                 ConfirmCandidateCommand = GalleryCommand.Instance,
+                ConfirmMappingCommand = approvalState == RetargetApprovalGalleryState.ConfirmationRequired
+                    ? GalleryCommand.Instance
+                    : GalleryCommand.Disabled,
                 ShowManualBoneMappingCommand = GalleryCommand.Instance,
                 MarkIntentionalUnmappedCommand = GalleryCommand.Instance,
                 ShowBoneMappingWindowCommand = GalleryCommand.Instance,
@@ -876,9 +919,52 @@ public class UiAnimationMetadataFamilyGallery
                 .Any(textBlock => textBlock.IsVisible &&
                     Equals(textBlock.Text, "疑难骨骼已全部处理"));
 
+            var confirmButton = FindVisualDescendants<Button>(review).Single(button =>
+                Equals(button.Content, "确认此映射方案"));
+
             if (variant == "retarget-editor-review-empty")
             {
-                NUnitAssert.That(emptyState, Is.True);
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(emptyState, Is.True);
+                    NUnitAssert.That(confirmButton.IsEnabled, Is.False);
+                    NUnitAssert.That(FindVisualDescendants<TextBlock>(review).Any(textBlock =>
+                        textBlock.IsVisible &&
+                        textBlock.Text?.Contains("先生成并播放", StringComparison.Ordinal) == true), Is.True);
+                });
+            }
+            else if (variant == "retarget-editor-preview-ready")
+            {
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(emptyState, Is.True);
+                        NUnitAssert.That(confirmButton.IsEnabled, Is.True);
+                        NUnitAssert.That(FindVisualDescendants<TextBlock>(review).Any(textBlock =>
+                            textBlock.IsVisible &&
+                            textBlock.Text?.Contains("预览已完整播放", StringComparison.Ordinal) == true), Is.True);
+                });
+            }
+            else if (variant == "retarget-editor-preview-playing")
+            {
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(emptyState, Is.True);
+                    NUnitAssert.That(confirmButton.IsEnabled, Is.False);
+                    NUnitAssert.That(FindVisualDescendants<TextBlock>(review).Any(textBlock =>
+                        textBlock.IsVisible &&
+                        textBlock.Text?.Contains("预览正在播放", StringComparison.Ordinal) == true), Is.True);
+                });
+            }
+            else if (variant == "retarget-editor-confirmed")
+            {
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(emptyState, Is.True);
+                    NUnitAssert.That(confirmButton.IsEnabled, Is.False);
+                    NUnitAssert.That(FindVisualDescendants<TextBlock>(review).Any(textBlock =>
+                        textBlock.IsVisible &&
+                        textBlock.Text?.Contains("映射方案已确认", StringComparison.Ordinal) == true), Is.True);
+                });
             }
             else
             {
@@ -892,6 +978,7 @@ public class UiAnimationMetadataFamilyGallery
                 {
                     NUnitAssert.That(emptyState, Is.False);
                     NUnitAssert.That(blockedGateVisible, Is.True);
+                    NUnitAssert.That(confirmButton.IsEnabled, Is.False);
                     NUnitAssert.That(reviewButtons, Has.Some.Matches<Button>(button =>
                         Equals(button.Content, "确认候选：source_spine_02")));
                     NUnitAssert.That(reviewButtons, Has.Some.Matches<Button>(button =>
@@ -1066,9 +1153,17 @@ public class UiAnimationMetadataFamilyGallery
 
     private sealed class GalleryCommand : ICommand
     {
-        public static GalleryCommand Instance { get; } = new();
+        public static GalleryCommand Instance { get; } = new(true);
+        public static GalleryCommand Disabled { get; } = new(false);
 
-        public bool CanExecute(object? parameter) => true;
+        private readonly bool _canExecute;
+
+        private GalleryCommand(bool canExecute)
+        {
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object? parameter) => _canExecute;
 
         public void Execute(object? parameter)
         {
@@ -1207,6 +1302,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? Children { get; set; }
         public object? Candidates { get; set; }
         public object? ConfirmCandidateCommand { get; set; }
+        public object? ConfirmMappingCommand { get; set; }
         public object? ConfirmedCount { get; set; }
         public object? CopyActionCommand { get; set; }
         public object? CreateAnimations { get; set; }
@@ -1236,6 +1332,9 @@ public class UiAnimationMetadataFamilyGallery
         public object? IsDecodedCorrectly { get; set; }
         public object? IsEnabled { get; set; }
         public object? IsExpanded { get; set; }
+        public object? IsMappingConfirmed { get; set; }
+        public object? IsMappingStructurallyReady { get; set; }
+        public object? IsPreviewingCurrentMapping { get; set; }
         public object? IsReadOnly { get; set; }
         public object? IsRootNodeAnimation { get; set; }
         public object? IsSelected { get; set; }
@@ -1252,6 +1351,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? LoopAnimation { get; set; }
         public object? LoopCounter { get; set; }
         public object? LastAutoMappingSummary { get; set; }
+        public object? HasPreviewedCurrentMapping { get; set; }
         public object? MappedBoneIndex { get; set; }
         public object? MappedBoneName { get; set; }
         public object? MaxFrames { get; set; }
