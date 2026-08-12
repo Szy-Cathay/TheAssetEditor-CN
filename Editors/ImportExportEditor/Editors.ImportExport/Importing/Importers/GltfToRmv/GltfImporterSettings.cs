@@ -7,6 +7,8 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
     {
         PositiveZ,
         PositiveX,
+        NegativeX,
+        NegativeZ,
     }
 
     public record GltfImporterSettings

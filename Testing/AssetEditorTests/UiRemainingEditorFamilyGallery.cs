@@ -965,6 +965,8 @@ public class UiRemainingEditorFamilyGallery
                     {
                         "+Z（标准 glTF）",
                         "+X（Unreal/PSK）",
+                        "-X",
+                        "-Z",
                     }));
             });
         }
@@ -1193,6 +1195,8 @@ public class UiRemainingEditorFamilyGallery
         [
             new("+Z（标准 glTF）", GltfSourceForwardDirection.PositiveZ),
             new("+X（Unreal/PSK）", GltfSourceForwardDirection.PositiveX),
+            new("-X", GltfSourceForwardDirection.NegativeX),
+            new("-Z", GltfSourceForwardDirection.NegativeZ),
         ];
 
     private static IEnumerable<T> FindVisualDescendants<T>(

@@ -345,6 +345,16 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                         "GltfImporter.SourceForward.PositiveX"),
                     LocalizationManager.Instance.Get(
                         "GltfImporter.SourceForward.Conversion.PositiveX")),
+                GltfSourceForwardDirection.NegativeX => new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.NegativeX"),
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.Conversion.NegativeX")),
+                GltfSourceForwardDirection.NegativeZ => new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.NegativeZ"),
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.Conversion.NegativeZ")),
                 _ => throw new ArgumentOutOfRangeException(
                     nameof(sourceForwardDirection),
                     sourceForwardDirection,

@@ -52,6 +52,14 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                     LocalizationManager.Instance.Get(
                         "GltfImporter.SourceForward.PositiveX"),
                     GltfSourceForwardDirection.PositiveX),
+                new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.NegativeX"),
+                    GltfSourceForwardDirection.NegativeX),
+                new(
+                    LocalizationManager.Instance.Get(
+                        "GltfImporter.SourceForward.NegativeZ"),
+                    GltfSourceForwardDirection.NegativeZ),
             ];
 
         public RmvToGltfImporterViewModel(GltfImporter Importer)
