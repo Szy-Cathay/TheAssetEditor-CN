@@ -561,5 +561,6 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 _ => FolderProjectHistoryError.StorageFailure,
             },
             exception.Message,
-            exception);
+            exception,
+            exception.IsRollbackIncomplete);
 }

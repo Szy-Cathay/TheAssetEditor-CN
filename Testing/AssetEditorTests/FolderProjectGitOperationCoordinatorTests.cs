@@ -550,6 +550,89 @@ public class FolderProjectGitOperationCoordinatorTests
     }
 
     [Test]
+    public void ExecuteInPlaceTransactionalAsync_OperationFailureReconcilesLoadedProject()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        var packFileService = CreateRealPackFileService();
+        var original = CreateProject(projectRoot.Path);
+        packFileService.AddContainer(original);
+        var factory = new Mock<IFolderProjectFactory>();
+        var versionControl = CreateVersionControlMock(
+            projectRoot.Path,
+            FolderProjectMergePhase.None);
+        var coordinator = new FolderProjectGitOperationCoordinator(
+            packFileService,
+            factory.Object,
+            versionControl.Object);
+        var expected = new IOException("restore failed");
+        var addedPath = Path.Combine(projectRoot.Path, "reconciled.txt");
+
+        var exception = NUnitAssert.ThrowsAsync<IOException>(
+            async () => await coordinator.ExecuteInPlaceTransactionalAsync<int>(
+                projectRoot.Path,
+                () =>
+                {
+                    File.WriteAllText(addedPath, "disk state");
+                    throw expected;
+                },
+                _ => NUnitAssert.Fail("Completion should not run."),
+                _ => NUnitAssert.Fail("Rollback should not run.")));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(exception, Is.SameAs(expected));
+            NUnitAssert.That(
+                packFileService.GetAllPackfileContainers(),
+                Is.EqualTo(new PackFileContainer[] { original }));
+            NUnitAssert.That(original.FileList, Contains.Key("reconciled.txt"));
+            NUnitAssert.That(original.IsWatching, Is.True);
+        });
+        factory.VerifyNoOtherCalls();
+        packFileService.TryUnloadPackContainer(original);
+    }
+
+    [Test]
+    public void ExecuteInPlaceTransactionalAsync_IncompleteOperationRollbackIsolatesProject()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        var packFileService = CreateRealPackFileService();
+        var original = CreateProject(projectRoot.Path);
+        packFileService.AddContainer(original);
+        var factory = new Mock<IFolderProjectFactory>();
+        var versionControl = CreateVersionControlMock(
+            projectRoot.Path,
+            FolderProjectMergePhase.None);
+        var coordinator = new FolderProjectGitOperationCoordinator(
+            packFileService,
+            factory.Object,
+            versionControl.Object);
+        var expected = new FolderProjectHistoryException(
+            FolderProjectHistoryError.StorageFailure,
+            "restore failed",
+            new AggregateException(
+                new IOException("write failed"),
+                new IOException("rollback failed")),
+            isRollbackIncomplete: true);
+
+        var exception = NUnitAssert.ThrowsAsync<FolderProjectHistoryException>(
+            async () => await coordinator.ExecuteInPlaceTransactionalAsync<int>(
+                projectRoot.Path,
+                () => throw expected,
+                _ => NUnitAssert.Fail("Completion should not run."),
+                _ => NUnitAssert.Fail("Rollback should not run.")));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(exception, Is.SameAs(expected));
+            NUnitAssert.That(
+                packFileService.GetAllPackfileContainers(),
+                Is.Empty);
+            NUnitAssert.That(original.IsWatching, Is.False);
+        });
+        factory.VerifyNoOtherCalls();
+    }
+
+    [Test]
     public async Task ExecuteInPlaceTransactionalAsync_RollbackFailureIsolatesProject()
     {
         using var projectRoot = new TemporaryDirectory();

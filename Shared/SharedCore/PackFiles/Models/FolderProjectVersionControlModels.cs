@@ -38,14 +38,17 @@ public sealed class FolderProjectVersionControlException :
     InvalidOperationException
 {
     public FolderProjectVersionControlError Code { get; }
+    public bool IsRollbackIncomplete { get; }
 
     public FolderProjectVersionControlException(
         FolderProjectVersionControlError code,
         string message,
-        Exception? innerException = null)
+        Exception? innerException = null,
+        bool isRollbackIncomplete = false)
         : base(message, innerException)
     {
         Code = code;
+        IsRollbackIncomplete = isRollbackIncomplete;
     }
 }
 

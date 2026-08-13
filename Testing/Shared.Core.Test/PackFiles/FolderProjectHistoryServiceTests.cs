@@ -473,6 +473,32 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void BeginRestoreFile_PreservesIncompleteRollbackSignal()
+    {
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(service => service.BeginRestoreFile(
+                "project",
+                "restore-point",
+                "db/file.bin",
+                false))
+            .Throws(new FolderProjectVersionControlException(
+                FolderProjectVersionControlError.RepositoryFailure,
+                "rollback failed",
+                isRollbackIncomplete: true));
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var exception = Assert.Throws<FolderProjectHistoryException>(
+            () => service.BeginRestoreFile(
+                "project",
+                "restore-point",
+                "db/file.bin"));
+
+        Assert.That(exception!.IsRollbackIncomplete, Is.True);
+    }
+
+    [Test]
     public void DiscardChanges_RestoresTrackedAndRemovesSelectedUntrackedFile()
     {
         using var project = new TemporaryProject();

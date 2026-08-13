@@ -291,11 +291,14 @@ public sealed partial class FolderProjectVersionControlService
 
         if (rollbackFailures.Count != 0)
         {
-            throw new AggregateException(
+            throw new FolderProjectVersionControlException(
+                FolderProjectVersionControlError.RepositoryFailure,
                 "Discard failed and rollback was incomplete.",
-                failure == null
-                    ? rollbackFailures
-                    : [failure, .. rollbackFailures]);
+                new AggregateException(
+                    failure == null
+                        ? rollbackFailures
+                        : [failure, .. rollbackFailures]),
+                isRollbackIncomplete: true);
         }
         PrepareDiscardStagingForCleanup(
             rollback.StagingPath,

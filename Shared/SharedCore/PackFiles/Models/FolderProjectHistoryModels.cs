@@ -117,13 +117,16 @@ public enum FolderProjectHistoryError
 public sealed class FolderProjectHistoryException : InvalidOperationException
 {
     public FolderProjectHistoryError Code { get; }
+    public bool IsRollbackIncomplete { get; }
 
     public FolderProjectHistoryException(
         FolderProjectHistoryError code,
         string message,
-        Exception? innerException = null)
+        Exception? innerException = null,
+        bool isRollbackIncomplete = false)
         : base(message, innerException)
     {
         Code = code;
+        IsRollbackIncomplete = isRollbackIncomplete;
     }
 }

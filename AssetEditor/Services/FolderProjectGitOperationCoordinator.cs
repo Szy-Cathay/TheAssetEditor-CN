@@ -336,7 +336,56 @@ public sealed class FolderProjectGitOperationCoordinator :
         await rootGate.WaitAsync();
         try
         {
-            var result = await Task.Run(operation);
+            T result;
+            try
+            {
+                result = await Task.Run(operation);
+            }
+            catch (Exception operationFailure)
+            {
+                var requiresIsolation = operationFailure is
+                    FolderProjectHistoryException
+                    {
+                        IsRollbackIncomplete: true,
+                    };
+                Exception? reconciliationFailure = null;
+                if (!requiresIsolation)
+                {
+                    try
+                    {
+                        var loadedProject = FindLoadedProject(normalizedRoot);
+                        if (loadedProject != null)
+                            await Task.Run(loadedProject.RefreshFromDisk);
+                    }
+                    catch (Exception failure)
+                    {
+                        reconciliationFailure = failure;
+                    }
+                }
+
+                if (requiresIsolation || reconciliationFailure != null)
+                {
+                    var isolationFailure = IsolateLoadedProject(normalizedRoot);
+                    if (reconciliationFailure != null ||
+                        isolationFailure != null)
+                    {
+                        var hostFailure = reconciliationFailure == null
+                            ? isolationFailure!
+                            : isolationFailure == null
+                                ? reconciliationFailure
+                                : new AggregateException(
+                                    reconciliationFailure,
+                                    isolationFailure);
+                        throw new FolderProjectGitHostException(
+                            "The folder project was isolated after the operation failed.",
+                            hostFailure,
+                            operationFailure);
+                    }
+                }
+
+                ExceptionDispatchInfo.Capture(operationFailure).Throw();
+                throw new InvalidOperationException();
+            }
             try
             {
                 await Task.Run(() => completeOperation(result));

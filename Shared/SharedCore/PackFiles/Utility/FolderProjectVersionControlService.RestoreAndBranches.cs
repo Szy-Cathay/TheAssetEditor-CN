@@ -166,10 +166,11 @@ public sealed partial class FolderProjectVersionControlService
                     }
                     catch (Exception rollbackFailure)
                     {
-                        throw new AggregateException(
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError.RepositoryFailure,
                             "File restore failed and rollback was incomplete.",
-                            failure,
-                            rollbackFailure);
+                            new AggregateException(failure, rollbackFailure),
+                            isRollbackIncomplete: true);
                     }
                     throw;
                 }

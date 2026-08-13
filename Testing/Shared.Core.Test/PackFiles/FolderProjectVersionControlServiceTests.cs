@@ -1045,6 +1045,33 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void BeginRestoreFile_WhenWriteAndRollbackFail_MarksRollbackIncomplete()
+    {
+        using var project = new TemporaryDirectory(
+            "restore-file-incomplete-rollback");
+        var filePath = Path.Combine(project.Path, "tracked.txt");
+        File.WriteAllText(filePath, "one");
+        var setupService = new FolderProjectVersionControlService();
+        var initial = setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        setupService.CommitAll(project.Path, "第二版");
+        var service = new FolderProjectVersionControlService(
+            new FailRestoreWriteAndRollbackPlatform());
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.BeginRestoreFile(
+                project.Path,
+                initial.Id,
+                "tracked.txt"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.IsRollbackIncomplete, Is.True);
+            Assert.That(exception.InnerException, Is.TypeOf<AggregateException>());
+        });
+    }
+
+    [Test]
     public void DiscardChanges_WhenTrackedRestoreMoveFails_RollsBackFilesAndIndex()
     {
         using var project = new TemporaryDirectory(
@@ -1077,6 +1104,34 @@ public class FolderProjectVersionControlServiceTests
             Assert.That(
                 service.GetStatus(project.Path).Changes,
                 Has.Count.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void BeginDiscardChanges_WhenRollbackFails_MarksRollbackIncomplete()
+    {
+        using var project = new TemporaryDirectory(
+            "discard-incomplete-rollback");
+        var firstPath = Path.Combine(project.Path, "first.txt");
+        var secondPath = Path.Combine(project.Path, "second.txt");
+        File.WriteAllText(firstPath, "first original");
+        File.WriteAllText(secondPath, "second original");
+        var setupService = new FolderProjectVersionControlService();
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(firstPath, "first changed");
+        File.WriteAllText(secondPath, "second changed");
+        var service = new FolderProjectVersionControlService(
+            new FailDiscardRestoreAndRollbackPlatform("second.txt"));
+
+        var exception = Assert.Throws<FolderProjectVersionControlException>(
+            () => service.BeginDiscardChanges(
+                project.Path,
+                ["first.txt", "second.txt"]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.IsRollbackIncomplete, Is.True);
+            Assert.That(exception.InnerException, Is.TypeOf<AggregateException>());
         });
     }
 
@@ -3322,6 +3377,45 @@ public class FolderProjectVersionControlServiceTests
 
             base.MoveFile(sourcePath, destinationPath, overwrite);
         }
+    }
+
+    private sealed class FailRestoreWriteAndRollbackPlatform :
+        FolderProjectVersionControlPlatform
+    {
+        public override void MoveFile(
+            string sourcePath,
+            string destinationPath,
+            bool overwrite)
+        {
+            base.MoveFile(sourcePath, destinationPath, overwrite);
+            throw new IOException("Injected restore move failure.");
+        }
+
+        public override void DeleteFile(string path) =>
+            throw new IOException("Injected rollback delete failure.");
+    }
+
+    private sealed class FailDiscardRestoreAndRollbackPlatform(
+        string fileName) : FolderProjectVersionControlPlatform
+    {
+        public override void MoveFile(
+            string sourcePath,
+            string destinationPath,
+            bool overwrite)
+        {
+            if (Path.GetFileName(destinationPath).Equals(
+                    fileName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new IOException(
+                    "Injected tracked restore move failure.");
+            }
+
+            base.MoveFile(sourcePath, destinationPath, overwrite);
+        }
+
+        public override void DeleteFile(string path) =>
+            throw new IOException("Injected rollback delete failure.");
     }
 
     private sealed class FailDiscardCleanupPlatform :
