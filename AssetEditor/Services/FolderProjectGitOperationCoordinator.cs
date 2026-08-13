@@ -24,6 +24,19 @@ public interface IFolderProjectGitOperationCoordinator
         string projectRoot,
         Func<T> detachedOperation,
         bool openWhenComplete = false);
+
+    Task<T> ExecuteTransactionalAsync<T>(
+        string projectRoot,
+        Func<T> detachedOperation,
+        Action<T> completeOperation,
+        Action<T> rollbackOperation,
+        bool openWhenComplete = false);
+
+    Task<T> ExecuteInPlaceTransactionalAsync<T>(
+        string projectRoot,
+        Func<T> operation,
+        Action<T> completeOperation,
+        Action<T> rollbackOperation);
 }
 
 public sealed class FolderProjectGitOperationCanceledException :
@@ -74,6 +87,11 @@ internal class FolderProjectGitOperationPlatform
 
     public virtual void DeleteDirectory(string path) =>
         Directory.Delete(path, false);
+
+    public virtual void DeleteConfiguredEmptyDirectories(
+        string projectRoot,
+        Action deleteCore) =>
+        deleteCore();
 
     public virtual void CreateDirectory(string path) =>
         Directory.CreateDirectory(path);
@@ -181,6 +199,325 @@ public sealed class FolderProjectGitOperationCoordinator :
         {
             rootGate.Release();
         }
+    }
+
+    public async Task<T> ExecuteTransactionalAsync<T>(
+        string projectRoot,
+        Func<T> detachedOperation,
+        Action<T> completeOperation,
+        Action<T> rollbackOperation,
+        bool openWhenComplete = false)
+    {
+        ArgumentNullException.ThrowIfNull(detachedOperation);
+        ArgumentNullException.ThrowIfNull(completeOperation);
+        ArgumentNullException.ThrowIfNull(rollbackOperation);
+        var normalizedRoot = NormalizeProjectRoot(projectRoot);
+        var rootGate = _rootGates.GetOrAdd(
+            normalizedRoot,
+            _ => new SemaphoreSlim(1, 1));
+
+        await rootGate.WaitAsync();
+        try
+        {
+            var preparation = PrepareOperation(normalizedRoot);
+            if (preparation.OperationException != null)
+            {
+                return await CompleteOperationAsync<T>(
+                    normalizedRoot,
+                    preparation.LoadedProject,
+                    default,
+                    preparation.OperationException,
+                    openWhenComplete);
+            }
+
+            T result;
+            try
+            {
+                result = await Task.Run(detachedOperation);
+            }
+            catch (Exception exception)
+            {
+                return await CompleteOperationAsync<T>(
+                    normalizedRoot,
+                    preparation.LoadedProject,
+                    default,
+                    exception,
+                    openWhenComplete);
+            }
+
+            try
+            {
+                await ReattachAfterTransactionAsync(
+                    normalizedRoot,
+                    preparation.LoadedProject,
+                    openWhenComplete);
+            }
+            catch (Exception hostFailure)
+            {
+                var recoveryFailure = await RollbackAndReattachAfterTransactionAsync(
+                    normalizedRoot,
+                    preparation.LoadedProject,
+                    result,
+                    rollbackOperation,
+                    openWhenComplete);
+                if (recoveryFailure != null)
+                {
+                    throw new FolderProjectGitHostException(
+                        "The folder project could not be rolled back after reload failed.",
+                        recoveryFailure,
+                        hostFailure);
+                }
+
+                throw new FolderProjectGitHostException(
+                    "The folder project operation was rolled back after reload failed.",
+                    hostFailure);
+            }
+
+            try
+            {
+                await Task.Run(() => completeOperation(result));
+            }
+            catch (Exception completionFailure)
+            {
+                try
+                {
+                    var rollbackPreparation = PrepareOperation(normalizedRoot);
+                    if (rollbackPreparation.OperationException != null)
+                    {
+                        ExceptionDispatchInfo.Capture(
+                            rollbackPreparation.OperationException).Throw();
+                    }
+
+                    var recoveryFailure = await RollbackAndReattachAfterTransactionAsync(
+                        normalizedRoot,
+                        rollbackPreparation.LoadedProject,
+                        result,
+                        rollbackOperation,
+                        openWhenComplete);
+                    if (recoveryFailure != null)
+                    {
+                        ExceptionDispatchInfo.Capture(recoveryFailure).Throw();
+                    }
+                }
+                catch (Exception rollbackFailure)
+                {
+                    throw new FolderProjectGitHostException(
+                        "The folder project could not be rolled back after finalization failed.",
+                        rollbackFailure,
+                        completionFailure);
+                }
+
+                throw new FolderProjectGitHostException(
+                    "The folder project operation was rolled back after finalization failed.",
+                    completionFailure);
+            }
+            return result;
+        }
+        finally
+        {
+            rootGate.Release();
+        }
+    }
+
+    public async Task<T> ExecuteInPlaceTransactionalAsync<T>(
+        string projectRoot,
+        Func<T> operation,
+        Action<T> completeOperation,
+        Action<T> rollbackOperation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(completeOperation);
+        ArgumentNullException.ThrowIfNull(rollbackOperation);
+        var normalizedRoot = NormalizeProjectRoot(projectRoot);
+        var rootGate = _rootGates.GetOrAdd(
+            normalizedRoot,
+            _ => new SemaphoreSlim(1, 1));
+
+        await rootGate.WaitAsync();
+        try
+        {
+            T result;
+            try
+            {
+                result = await Task.Run(operation);
+            }
+            catch (Exception operationFailure)
+            {
+                var requiresIsolation = operationFailure is
+                    FolderProjectHistoryException
+                    {
+                        IsRollbackIncomplete: true,
+                    };
+                Exception? reconciliationFailure = null;
+                if (!requiresIsolation)
+                {
+                    try
+                    {
+                        var loadedProject = FindLoadedProject(normalizedRoot);
+                        if (loadedProject != null)
+                            await Task.Run(loadedProject.RefreshFromDisk);
+                    }
+                    catch (Exception failure)
+                    {
+                        reconciliationFailure = failure;
+                    }
+                }
+
+                if (requiresIsolation || reconciliationFailure != null)
+                {
+                    var isolationFailure = IsolateLoadedProject(normalizedRoot);
+                    if (reconciliationFailure != null ||
+                        isolationFailure != null)
+                    {
+                        var hostFailure = reconciliationFailure == null
+                            ? isolationFailure!
+                            : isolationFailure == null
+                                ? reconciliationFailure
+                                : new AggregateException(
+                                    reconciliationFailure,
+                                    isolationFailure);
+                        throw new FolderProjectGitHostException(
+                            "The folder project was isolated after the operation failed.",
+                            hostFailure,
+                            operationFailure);
+                    }
+                }
+
+                ExceptionDispatchInfo.Capture(operationFailure).Throw();
+                throw new InvalidOperationException();
+            }
+            try
+            {
+                await Task.Run(() => completeOperation(result));
+                return result;
+            }
+            catch (Exception operationFailure)
+            {
+                try
+                {
+                    await Task.Run(() => rollbackOperation(result));
+                    var loadedProject = FindLoadedProject(normalizedRoot);
+                    if (loadedProject != null)
+                        await Task.Run(loadedProject.RefreshFromDisk);
+                }
+                catch (Exception recoveryFailure)
+                {
+                    var isolationFailure = IsolateLoadedProject(
+                        normalizedRoot);
+                    throw new FolderProjectGitHostException(
+                        "The folder project was isolated after rollback failed.",
+                        isolationFailure == null
+                            ? recoveryFailure
+                            : new AggregateException(
+                                recoveryFailure,
+                                isolationFailure),
+                        operationFailure);
+                }
+
+                ExceptionDispatchInfo.Capture(operationFailure).Throw();
+                throw new InvalidOperationException();
+            }
+        }
+        finally
+        {
+            rootGate.Release();
+        }
+    }
+
+    private Exception? IsolateLoadedProject(string projectRoot)
+    {
+        var loadedProject = FindLoadedProject(projectRoot);
+        if (loadedProject == null)
+            return null;
+
+        try
+        {
+            _pendingReattach.TryRemove(projectRoot, out _);
+            if (ReferenceEquals(
+                    _packFileService.GetEditablePack(),
+                    loadedProject))
+            {
+                _packFileService.SetEditablePack(null);
+            }
+            if (!_packFileService.TryUnloadPackContainer(loadedProject))
+                throw new FolderProjectGitOperationCanceledException();
+            _pendingReattach.TryRemove(projectRoot, out _);
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
+
+    private async Task<Exception?> RollbackAndReattachAfterTransactionAsync<T>(
+        string projectRoot,
+        FolderProjectContainer? loadedProject,
+        T result,
+        Action<T> rollbackOperation,
+        bool openWhenComplete)
+    {
+        var failures = new List<Exception>();
+        var preparationSucceeded = true;
+        var rollbackSucceeded = false;
+        try
+        {
+            _platform.DeleteConfiguredEmptyDirectories(
+                projectRoot,
+                () => RemoveAllConfiguredEmptyDirectories(projectRoot));
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+            preparationSucceeded = false;
+        }
+        try
+        {
+            await Task.Run(() => rollbackOperation(result));
+            rollbackSucceeded = true;
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+        if (preparationSucceeded && rollbackSucceeded)
+        {
+            try
+            {
+                await ReattachAfterTransactionAsync(
+                    projectRoot,
+                    loadedProject,
+                    openWhenComplete);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        return failures.Count switch
+        {
+            0 => null,
+            1 => failures[0],
+            _ => new AggregateException(failures),
+        };
+    }
+
+    private async Task ReattachAfterTransactionAsync(
+        string projectRoot,
+        FolderProjectContainer? loadedProject,
+        bool openWhenComplete)
+    {
+        var reattachState = GetReattachState(
+            projectRoot,
+            loadedProject,
+            null,
+            openWhenComplete);
+        if (reattachState == null)
+            return;
+
+        var project = await Task.Run(() => OpenForReattach(projectRoot));
+        Attach(projectRoot, reattachState, project);
     }
 
     private T ExecuteCore<T>(
@@ -455,6 +792,14 @@ public sealed class FolderProjectGitOperationCoordinator :
 
             _platform.DeleteDirectory(fullPath);
         }
+    }
+
+    private void RemoveAllConfiguredEmptyDirectories(string projectRoot)
+    {
+        var settings = FolderProjectSettings.Load(projectRoot);
+        RemoveTemporaryEmptyDirectories(
+            projectRoot,
+            settings.EmptyDirectories.ToArray());
     }
 
     private void PrepareProjectForOpen(string projectRoot)

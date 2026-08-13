@@ -43,6 +43,44 @@ public interface IFolderProjectHistoryService
         string projectRoot,
         string restorePointId,
         Action<FolderProjectHistoryProgress> reportProgress);
+
+    int GetRestoreImpactCount(
+        string projectRoot,
+        string restorePointId);
+
+    FolderProjectRestoreResult RestoreProject(
+        string projectRoot,
+        FolderProjectRestorePoint restorePoint,
+        Action<FolderProjectHistoryProgress> reportProgress);
+
+    FolderProjectRestoreResult RestoreProject(
+        string projectRoot,
+        string restorePointId);
+
+    void RollbackProjectRestore(
+        string projectRoot,
+        FolderProjectRestoreResult result);
+
+    FolderProjectFileRestoreOperation BeginRestoreFile(
+        string projectRoot,
+        string restorePointId,
+        string relativePath,
+        bool overwriteUnrecordedChange = false);
+
+    void CompleteRestoreFile(FolderProjectFileRestoreOperation operation);
+
+    void RollbackRestoreFile(FolderProjectFileRestoreOperation operation);
+
+    FolderProjectDiscardResult BeginDiscardChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths,
+        Action<FolderProjectHistoryProgress> reportProgress);
+
+    void CompleteDiscardChanges(FolderProjectDiscardResult result);
+
+    void RollbackDiscardChanges(
+        string projectRoot,
+        FolderProjectDiscardResult result);
 }
 
 public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
@@ -213,6 +251,184 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
         }
     }
 
+    public int GetRestoreImpactCount(
+        string projectRoot,
+        string restorePointId)
+    {
+        try
+        {
+            return _versionControl.GetRestoreImpactCount(
+                projectRoot,
+                restorePointId);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectRestoreResult RestoreProject(
+        string projectRoot,
+        FolderProjectRestorePoint restorePoint,
+        Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(restorePoint);
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        try
+        {
+            var result = _versionControl.RestoreProject(
+                projectRoot,
+                restorePoint.Id,
+                _localization.GetFormat(
+                    "FolderProject.History.Restore.SafetyDescription",
+                    restorePoint.Description),
+                _localization.GetFormat(
+                    "FolderProject.History.Restore.Description",
+                    restorePoint.Description),
+                progress => reportProgress(MapProgress(progress)));
+            return new FolderProjectRestoreResult(
+                MapRestorePoint(
+                    result.RestoreCommit,
+                    MapSummary(_versionControl.GetCommitChangeSummary(
+                        projectRoot,
+                        result.RestoreCommit.Id))),
+                result.SafetyCommit == null
+                    ? null
+                    : MapRestorePoint(
+                        result.SafetyCommit,
+                        MapSummary(_versionControl.GetCommitChangeSummary(
+                            projectRoot,
+                            result.SafetyCommit.Id))))
+            {
+                Rollback = result.Rollback,
+            };
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectRestoreResult RestoreProject(
+        string projectRoot,
+        string restorePointId)
+    {
+        var restorePoint = GetRestorePoints(projectRoot)
+            .FirstOrDefault(point => point.Id == restorePointId) ??
+            throw new FolderProjectHistoryException(
+                FolderProjectHistoryError.RestorePointNotFound,
+                "The requested restore point does not exist.");
+        return RestoreProject(projectRoot, restorePoint, _ => { });
+    }
+
+    public void RollbackProjectRestore(
+        string projectRoot,
+        FolderProjectRestoreResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.Rollback == null)
+        {
+            throw new InvalidOperationException(
+                "The restore result has no rollback receipt.");
+        }
+
+        try
+        {
+            _versionControl.RollbackProjectRestore(
+                projectRoot,
+                result.Rollback);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectFileRestoreOperation BeginRestoreFile(
+        string projectRoot,
+        string restorePointId,
+        string relativePath,
+        bool overwriteUnrecordedChange = false)
+    {
+        try
+        {
+            var transaction = _versionControl.BeginRestoreFile(
+                projectRoot,
+                restorePointId,
+                relativePath,
+                overwriteUnrecordedChange);
+            return new FolderProjectFileRestoreOperation(
+                transaction.Result,
+                transaction);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public void CompleteRestoreFile(FolderProjectFileRestoreOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        _versionControl.CompleteRestoreFile(operation.Transaction);
+    }
+
+    public void RollbackRestoreFile(FolderProjectFileRestoreOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        try
+        {
+            _versionControl.RollbackRestoreFile(operation.Transaction);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectDiscardResult BeginDiscardChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths,
+        Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        try
+        {
+            var rollback = _versionControl.BeginDiscardChanges(
+                projectRoot,
+                relativePaths,
+                progress => reportProgress(MapProgress(progress)));
+            return new FolderProjectDiscardResult(rollback);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public void CompleteDiscardChanges(FolderProjectDiscardResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        _versionControl.CompleteDiscardChanges(result.Rollback);
+    }
+
+    public void RollbackDiscardChanges(
+        string projectRoot,
+        FolderProjectDiscardResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        try
+        {
+            _versionControl.RollbackDiscardChanges(
+                projectRoot,
+                result.Rollback);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
     private static FolderProjectUnrecordedChange MapUnrecordedChange(
         FolderProjectWorkingChange change)
     {
@@ -254,7 +470,10 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 : summary.Message,
             summary.CommittedAt,
             changeSummary,
-            initial);
+            initial)
+        {
+            PreviousRestorePointId = summary.ParentIds.FirstOrDefault(),
+        };
     }
 
     private static FolderProjectRestorePointChangeSummary MapSummary(
@@ -303,10 +522,10 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 FolderProjectVersionControlProgressStage
                     .ProcessingWorkingChanges =>
                     FolderProjectHistoryProgressStage
-                        .ProcessingUnrecordedChanges,
+                        .WritingProjectFiles,
                 FolderProjectVersionControlProgressStage.IndexingFiles =>
                     FolderProjectHistoryProgressStage
-                        .ProcessingUnrecordedChanges,
+                        .UpdatingHistory,
                 FolderProjectVersionControlProgressStage
                     .CreatingInitialCommit =>
                     FolderProjectHistoryProgressStage
@@ -342,5 +561,6 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 _ => FolderProjectHistoryError.StorageFailure,
             },
             exception.Message,
-            exception);
+            exception,
+            exception.IsRollbackIncomplete);
 }

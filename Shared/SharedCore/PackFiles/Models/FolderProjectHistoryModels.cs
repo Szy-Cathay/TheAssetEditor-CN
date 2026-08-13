@@ -63,7 +63,10 @@ public sealed record FolderProjectRestorePoint(
     string Description,
     DateTimeOffset CreatedAt,
     FolderProjectRestorePointChangeSummary ChangeSummary,
-    bool IsInitial);
+    bool IsInitial)
+{
+    public string? PreviousRestorePointId { get; init; }
+}
 
 public enum FolderProjectHistoryProgressStage
 {
@@ -74,6 +77,11 @@ public enum FolderProjectHistoryProgressStage
     CreatingRestorePoint,
     ReadingHistory,
     ReadingRestorePointChanges,
+    PreparingEditors,
+    UpdatingHistory,
+    WritingProjectFiles,
+    ReconcilingProject,
+    RefreshingInterface,
 }
 
 public sealed record FolderProjectHistoryProgress(
@@ -81,6 +89,20 @@ public sealed record FolderProjectHistoryProgress(
     string? Detail = null,
     long Completed = 0,
     long Total = 0);
+
+public sealed record FolderProjectRestoreResult(
+    FolderProjectRestorePoint RestorePoint,
+    FolderProjectRestorePoint? SafetyRestorePoint)
+{
+    public FolderProjectProjectRestoreRollback? Rollback { get; init; }
+}
+
+public sealed record FolderProjectDiscardResult(
+    FolderProjectDiscardRollback Rollback);
+
+public sealed record FolderProjectFileRestoreOperation(
+    FolderProjectFileRestoreResult Result,
+    FolderProjectFileRestoreTransaction Transaction);
 
 public enum FolderProjectHistoryError
 {
@@ -95,13 +117,16 @@ public enum FolderProjectHistoryError
 public sealed class FolderProjectHistoryException : InvalidOperationException
 {
     public FolderProjectHistoryError Code { get; }
+    public bool IsRollbackIncomplete { get; }
 
     public FolderProjectHistoryException(
         FolderProjectHistoryError code,
         string message,
-        Exception? innerException = null)
+        Exception? innerException = null,
+        bool isRollbackIncomplete = false)
         : base(message, innerException)
     {
         Code = code;
+        IsRollbackIncomplete = isRollbackIncomplete;
     }
 }

@@ -38,14 +38,17 @@ public sealed class FolderProjectVersionControlException :
     InvalidOperationException
 {
     public FolderProjectVersionControlError Code { get; }
+    public bool IsRollbackIncomplete { get; }
 
     public FolderProjectVersionControlException(
         FolderProjectVersionControlError code,
         string message,
-        Exception? innerException = null)
+        Exception? innerException = null,
+        bool isRollbackIncomplete = false)
         : base(message, innerException)
     {
         Code = code;
+        IsRollbackIncomplete = isRollbackIncomplete;
     }
 }
 
@@ -166,6 +169,39 @@ public sealed record FolderProjectFileRestoreResult(
     string CommitId,
     string RepositoryPath,
     long Size);
+
+public sealed record FolderProjectFileRestoreTransaction(
+    FolderProjectFileRestoreResult Result,
+    string StagingPath,
+    string TargetPath,
+    string? BackupPath);
+
+public sealed record FolderProjectProjectRestoreResult(
+    FolderProjectCommitSummary RestoreCommit,
+    FolderProjectCommitSummary? SafetyCommit,
+    FolderProjectProjectRestoreRollback Rollback);
+
+public sealed record FolderProjectProjectRestoreRollback(
+    string OriginalCommitId,
+    string RestoreCommitId,
+    string? SafetyCommitId,
+    FolderProjectIndexSnapshot Index);
+
+public sealed record FolderProjectDiscardRollback(
+    string StagingPath,
+    IReadOnlyList<FolderProjectDiscardBackup> Backups,
+    IReadOnlyList<string> AffectedPaths,
+    IReadOnlyList<string> CreatedDirectories,
+    FolderProjectIndexSnapshot Index);
+
+public sealed record FolderProjectIndexSnapshot(
+    bool Existed,
+    byte[] Bytes,
+    FileAttributes Attributes);
+
+public sealed record FolderProjectDiscardBackup(
+    string OriginalPath,
+    string StagedPath);
 
 public sealed record FolderProjectCommitEditSession(
     string OriginalCommitId,

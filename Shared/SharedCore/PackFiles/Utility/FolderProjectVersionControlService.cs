@@ -1,4 +1,5 @@
 ﻿using LibGit2Sharp;
+using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles.Models;
 
 namespace Shared.Core.PackFiles.Utility;
@@ -50,6 +51,17 @@ public interface IFolderProjectVersionControlService
     void DiscardChanges(
         string projectRoot,
         IReadOnlyList<string> relativePaths);
+
+    FolderProjectDiscardRollback BeginDiscardChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths,
+        Action<FolderProjectVersionControlProgress>? reportProgress = null);
+
+    void CompleteDiscardChanges(FolderProjectDiscardRollback rollback);
+
+    void RollbackDiscardChanges(
+        string projectRoot,
+        FolderProjectDiscardRollback rollback);
 
     FolderProjectCommitSummary CommitStaged(
         string projectRoot,
@@ -127,11 +139,36 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         string commitId);
 
+    int GetRestoreImpactCount(
+        string projectRoot,
+        string commitId);
+
     FolderProjectFileRestoreResult RestoreFile(
         string projectRoot,
         string commitId,
         string relativePath,
         bool overwriteWorkingChange = false);
+
+    FolderProjectFileRestoreTransaction BeginRestoreFile(
+        string projectRoot,
+        string commitId,
+        string relativePath,
+        bool overwriteWorkingChange = false);
+
+    void CompleteRestoreFile(FolderProjectFileRestoreTransaction transaction);
+
+    void RollbackRestoreFile(FolderProjectFileRestoreTransaction transaction);
+
+    FolderProjectProjectRestoreResult RestoreProject(
+        string projectRoot,
+        string commitId,
+        string safetyMessage,
+        string restoreMessage,
+        Action<FolderProjectVersionControlProgress> reportProgress);
+
+    void RollbackProjectRestore(
+        string projectRoot,
+        FolderProjectProjectRestoreRollback rollback);
 
     IReadOnlyList<FolderProjectBranchInfo> GetBranches(
         string projectRoot);
@@ -252,6 +289,13 @@ internal class FolderProjectVersionControlPlatform
         File.Move(sourcePath, destinationPath, overwrite);
     }
 
+    public virtual void MoveDirectory(
+        string sourcePath,
+        string destinationPath)
+    {
+        Directory.Move(sourcePath, destinationPath);
+    }
+
     public virtual Branch CheckoutBranch(
         Repository repository,
         Branch branch,
@@ -281,6 +325,11 @@ internal class FolderProjectVersionControlPlatform
     {
         File.Delete(path);
     }
+
+    public virtual void DeleteDirectory(string path)
+    {
+        Directory.Delete(path, recursive: true);
+    }
 }
 
 public sealed partial class FolderProjectVersionControlService :
@@ -298,6 +347,8 @@ public sealed partial class FolderProjectVersionControlService :
             ".wem",
         };
     private readonly FolderProjectVersionControlPlatform _platform;
+    private static readonly ILogger s_logger =
+        Logging.Create<FolderProjectVersionControlService>();
 
     public FolderProjectVersionControlService()
         : this(new FolderProjectVersionControlPlatform())
@@ -308,6 +359,91 @@ public sealed partial class FolderProjectVersionControlService :
         FolderProjectVersionControlPlatform platform)
     {
         _platform = platform;
+    }
+
+    private void FinalizeStagingDirectory(string stagingPath)
+    {
+        if (!Directory.Exists(stagingPath))
+            return;
+
+        var cleanupPath = Path.Combine(
+            Path.GetDirectoryName(stagingPath)!,
+            $"ae-cleanup-{Guid.NewGuid():N}");
+        _platform.MoveDirectory(stagingPath, cleanupPath);
+        TryDeleteFinalizedStagingDirectory(cleanupPath);
+    }
+
+    private void TryDeleteFinalizedStagingDirectory(string stagingPath)
+    {
+        try
+        {
+            if (Directory.Exists(stagingPath))
+            {
+                foreach (var file in Directory.EnumerateFiles(
+                             stagingPath,
+                             "*",
+                             SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                }
+                _platform.DeleteDirectory(stagingPath);
+            }
+        }
+        catch (Exception exception)
+        {
+            s_logger.Warning(
+                exception,
+                "Could not remove finalized folder project transaction data at {StagingPath}",
+                stagingPath);
+        }
+    }
+
+    private void TryFinalizeStagingDirectory(string stagingPath)
+    {
+        try
+        {
+            FinalizeStagingDirectory(stagingPath);
+        }
+        catch (Exception exception)
+        {
+            s_logger.Warning(
+                exception,
+                "Could not finalize folder project transaction data at {StagingPath}",
+                stagingPath);
+        }
+    }
+
+    private void RetryTransactionStagingCleanup(string repositoryPath)
+    {
+        try
+        {
+            foreach (var path in Directory.EnumerateDirectories(
+                         repositoryPath,
+                         "ae-cleanup-*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                TryDeleteFinalizedStagingDirectory(path);
+            }
+            foreach (var path in Directory.EnumerateDirectories(
+                         repositoryPath,
+                         "ae-*-*",
+                         SearchOption.TopDirectoryOnly)
+                     .Where(path =>
+                         !Path.GetFileName(path).StartsWith(
+                             "ae-cleanup-",
+                             StringComparison.Ordinal) &&
+                         !Directory.EnumerateFileSystemEntries(path).Any()))
+            {
+                TryFinalizeStagingDirectory(path);
+            }
+        }
+        catch (Exception exception)
+        {
+            s_logger.Warning(
+                exception,
+                "Could not scan finalized folder project transaction data at {RepositoryPath}",
+                repositoryPath);
+        }
     }
 
     public FolderProjectRepositoryStatus GetStatus(
@@ -1145,7 +1281,7 @@ public sealed partial class FolderProjectVersionControlService :
             });
     }
 
-    private static Repository OpenRepository(string projectRoot)
+    private Repository OpenRepository(string projectRoot)
     {
         var repositoryState = GetRepositoryState(projectRoot);
         if (repositoryState != RepositoryState.Initialized)
@@ -1159,7 +1295,9 @@ public sealed partial class FolderProjectVersionControlService :
                     : "The folder project has no local repository.");
         }
 
-        return new Repository(Path.GetFullPath(projectRoot));
+        var repository = new Repository(Path.GetFullPath(projectRoot));
+        RetryTransactionStagingCleanup(repository.Info.Path);
+        return repository;
     }
 
     private static void ValidateIdentity(

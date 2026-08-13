@@ -84,6 +84,7 @@ public class FolderProjectGitWorkspaceViewModelTests
             historyService.Object,
             Mock.Of<IFolderProjectUnsavedChangesService>(),
             Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
+            Mock.Of<IFolderProjectGitOperationCoordinator>(),
             Mock.Of<IStandardDialogs>(),
             LocalizationManager.Instance);
         var workspace = CreateWorkspace(
@@ -2671,6 +2672,29 @@ public class FolderProjectGitWorkspaceViewModelTests
             Func<T> detachedOperation,
             bool openWhenComplete = false) =>
             Task.FromResult(detachedOperation());
+
+        public Task<T> ExecuteTransactionalAsync<T>(
+            string projectRoot,
+            Func<T> detachedOperation,
+            Action<T> completeOperation,
+            Action<T> rollbackOperation,
+            bool openWhenComplete = false)
+        {
+            var result = detachedOperation();
+            completeOperation(result);
+            return Task.FromResult(result);
+        }
+
+        public Task<T> ExecuteInPlaceTransactionalAsync<T>(
+            string projectRoot,
+            Func<T> operation,
+            Action<T> completeOperation,
+            Action<T> rollbackOperation)
+        {
+            var result = operation();
+            completeOperation(result);
+            return Task.FromResult(result);
+        }
     }
 
     private sealed class GitTemporaryDirectory : IDisposable

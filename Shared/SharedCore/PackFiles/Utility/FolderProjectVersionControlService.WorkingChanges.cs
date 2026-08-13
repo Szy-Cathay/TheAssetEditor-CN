@@ -25,8 +25,25 @@ public sealed partial class FolderProjectVersionControlService
         string projectRoot,
         IReadOnlyList<string> relativePaths)
     {
+        var rollback = BeginDiscardChanges(projectRoot, relativePaths);
+        try
+        {
+            CompleteDiscardChanges(rollback);
+        }
+        catch
+        {
+            RollbackDiscardChanges(projectRoot, rollback);
+            throw;
+        }
+    }
+
+    public FolderProjectDiscardRollback BeginDiscardChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths,
+        Action<FolderProjectVersionControlProgress>? reportProgress = null)
+    {
         var requestedPaths = ValidateChangePaths(relativePaths);
-        Execute(
+        return Execute(
             () =>
             {
                 var root = Path.GetFullPath(projectRoot);
@@ -72,171 +89,240 @@ public sealed partial class FolderProjectVersionControlService
                 var addedPaths = affectedPaths
                     .Except(trackedPaths, StringComparer.OrdinalIgnoreCase)
                     .ToList();
-                var snapshots = trackedPaths
-                    .Select(
-                        path => PolicyFileSnapshot.Capture(
-                            ResolveRestoreTarget(root, path)))
+                var originallyMissingTrackedPaths = trackedPaths
+                    .Where(path => !File.Exists(
+                        ResolveRestoreTarget(root, path)))
+                    .Select(path => ResolveRestoreTarget(root, path))
                     .ToList();
                 var indexSnapshot = GitIndexSnapshot.Capture(
                     Path.Combine(repository.Info.Path, "index"));
-                var stagedAddedFiles = new List<DiscardedFileBackup>();
+                var backups = new List<FolderProjectDiscardBackup>();
+                var createdDirectories = new List<string>();
                 var discardStagingPath = Path.Combine(
                     repository.Info.Path,
                     $"ae-discard-{Guid.NewGuid():N}");
-                var completed = false;
                 try
                 {
+                    reportProgress?.Invoke(
+                        new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage
+                                .IndexingFiles));
+                    Commands.Unstage(
+                        repository,
+                        affectedPaths,
+                        new ExplicitPathsOptions
+                        {
+                            ShouldFailOnUnmatchedPath = false,
+                        });
+                    reportProgress?.Invoke(
+                        new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage
+                                .ProcessingWorkingChanges));
+                    foreach (var path in affectedPaths)
+                    {
+                        var fullPath = ResolveRestoreTarget(root, path);
+                        if (Directory.Exists(fullPath))
+                        {
+                            throw new FolderProjectVersionControlException(
+                                FolderProjectVersionControlError.InvalidResourcePath,
+                                "Only files can be discarded.");
+                        }
+                        if (!File.Exists(fullPath))
+                            continue;
+
+                        Directory.CreateDirectory(discardStagingPath);
+                        var stagedPath = Path.Combine(
+                            discardStagingPath,
+                            $"{backups.Count:x8}.tmp");
+                        _platform.MoveFile(
+                            fullPath,
+                            stagedPath,
+                            overwrite: false);
+                        backups.Add(new FolderProjectDiscardBackup(
+                            fullPath,
+                            stagedPath));
+                    }
+
+                    foreach (var path in trackedPaths)
+                    {
+                        var directory = Path.GetDirectoryName(
+                            ResolveRestoreTarget(root, path))!;
+                        for (var current = directory;
+                             !Directory.Exists(current) &&
+                             !current.Equals(
+                                 root,
+                                 StringComparison.OrdinalIgnoreCase);
+                             current = Path.GetDirectoryName(current)!)
+                        {
+                            createdDirectories.Add(current);
+                        }
+                    }
                     if (trackedPaths.Count != 0)
                     {
-                        Commands.Unstage(
-                            repository,
-                            trackedPaths,
-                            new ExplicitPathsOptions
-                            {
-                                ShouldFailOnUnmatchedPath = false,
-                            });
                         RestoreTrackedFilesInParallel(
                             root,
                             head.Sha,
                             trackedPaths);
                     }
-
-                    if (addedPaths.Count != 0)
-                    {
-                        Commands.Unstage(
-                            repository,
-                            addedPaths,
-                            new ExplicitPathsOptions
-                            {
-                                ShouldFailOnUnmatchedPath = false,
-                            });
-                        foreach (var path in addedPaths)
-                        {
-                            var fullPath = ResolveRestoreTarget(root, path);
-                            if (Directory.Exists(fullPath))
-                            {
-                                throw new FolderProjectVersionControlException(
-                                    FolderProjectVersionControlError.InvalidResourcePath,
-                                    "Only files can be discarded.");
-                            }
-                            if (!File.Exists(fullPath))
-                                continue;
-
-                            Directory.CreateDirectory(discardStagingPath);
-                            var stagedPath = Path.Combine(
-                                discardStagingPath,
-                                $"{stagedAddedFiles.Count:x8}.tmp");
-                            _platform.MoveFile(
-                                fullPath,
-                                stagedPath,
-                                overwrite: false);
-                            stagedAddedFiles.Add(new DiscardedFileBackup(
-                                fullPath,
-                                stagedPath));
-                        }
-                    }
-
-                    completed = true;
                 }
                 catch (Exception failure)
                 {
-                    var rollbackFailures = new List<Exception>();
-                    for (var index = stagedAddedFiles.Count - 1;
-                         index >= 0;
-                         index--)
-                    {
-                        try
-                        {
-                            var backup = stagedAddedFiles[index];
-                            Directory.CreateDirectory(
-                                Path.GetDirectoryName(
-                                    backup.OriginalPath)!);
-                            _platform.MoveFile(
-                                backup.StagedPath,
-                                backup.OriginalPath,
-                                overwrite: true);
-                        }
-                        catch (Exception exception)
-                        {
-                            rollbackFailures.Add(exception);
-                        }
-                    }
-                    foreach (var snapshot in snapshots)
-                    {
-                        try
-                        {
-                            snapshot.Restore();
-                        }
-                        catch (Exception exception)
-                        {
-                            rollbackFailures.Add(exception);
-                        }
-                    }
-                    try
-                    {
-                        indexSnapshot.Restore(_platform);
-                    }
-                    catch (Exception exception)
-                    {
-                        rollbackFailures.Add(exception);
-                    }
-
-                    if (rollbackFailures.Count != 0)
-                    {
-                        throw new AggregateException(
-                            "Discard failed and rollback was incomplete.",
-                            [failure, .. rollbackFailures]);
-                    }
-                    throw;
-                }
-                finally
-                {
-                    if (completed)
-                    {
-                        TryDeleteDiscardStaging(
-                            discardStagingPath,
-                            stagedAddedFiles);
-                    }
-                    else if (Directory.Exists(discardStagingPath) &&
-                             stagedAddedFiles.All(
-                                 backup =>
-                                     !File.Exists(backup.StagedPath)))
-                    {
-                        TryDeleteDiscardStaging(
-                            discardStagingPath,
-                            stagedAddedFiles);
-                    }
+                    var rollback = CreateDiscardRollback();
+                    RollbackDiscardChangesCore(root, rollback, failure);
                 }
 
+                return CreateDiscardRollback();
+
+                FolderProjectDiscardRollback CreateDiscardRollback() =>
+                    new(
+                        discardStagingPath,
+                        backups,
+                        backups.Select(backup => backup.OriginalPath)
+                            .Concat(originallyMissingTrackedPaths)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+                        createdDirectories
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+                        new FolderProjectIndexSnapshot(
+                            indexSnapshot.Exists,
+                            indexSnapshot.Bytes,
+                            indexSnapshot.Attributes));
+            });
+    }
+
+    public void CompleteDiscardChanges(FolderProjectDiscardRollback rollback)
+    {
+        ArgumentNullException.ThrowIfNull(rollback);
+        PrepareDiscardStagingForCleanup(
+            rollback.StagingPath,
+            rollback.Backups);
+        FinalizeStagingDirectory(rollback.StagingPath);
+    }
+
+    public void RollbackDiscardChanges(
+        string projectRoot,
+        FolderProjectDiscardRollback rollback)
+    {
+        ArgumentNullException.ThrowIfNull(rollback);
+        Execute(
+            () =>
+            {
+                RollbackDiscardChangesCore(
+                    Path.GetFullPath(projectRoot),
+                    rollback,
+                    null);
                 return true;
             });
     }
 
-    private static void TryDeleteDiscardStaging(
+    private void RollbackDiscardChangesCore(
+        string projectRoot,
+        FolderProjectDiscardRollback rollback,
+        Exception? failure)
+    {
+        var rollbackFailures = new List<Exception>();
+        foreach (var fullPath in rollback.AffectedPaths)
+        {
+            try
+            {
+                if (File.Exists(fullPath))
+                {
+                    File.SetAttributes(fullPath, FileAttributes.Normal);
+                    _platform.DeleteFile(fullPath);
+                }
+            }
+            catch (Exception exception)
+            {
+                rollbackFailures.Add(exception);
+            }
+        }
+        for (var index = rollback.Backups.Count - 1;
+             index >= 0;
+             index--)
+        {
+            try
+            {
+                var backup = rollback.Backups[index];
+                if (!File.Exists(backup.StagedPath))
+                    continue;
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(backup.OriginalPath)!);
+                File.Move(
+                    backup.StagedPath,
+                    backup.OriginalPath,
+                    true);
+            }
+            catch (Exception exception)
+            {
+                rollbackFailures.Add(exception);
+            }
+        }
+        foreach (var directory in rollback.CreatedDirectories
+                     .OrderByDescending(path => path.Length))
+        {
+            try
+            {
+                if (Directory.Exists(directory) &&
+                    !Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    Directory.Delete(directory);
+                }
+            }
+            catch (Exception exception)
+            {
+                rollbackFailures.Add(exception);
+            }
+        }
+        try
+        {
+            using var repository = OpenRepository(projectRoot);
+            new GitIndexSnapshot(
+                    Path.Combine(repository.Info.Path, "index"),
+                    rollback.Index.Existed,
+                    rollback.Index.Bytes,
+                    rollback.Index.Attributes)
+                .Restore(_platform);
+        }
+        catch (Exception exception)
+        {
+            rollbackFailures.Add(exception);
+        }
+
+        if (rollbackFailures.Count != 0)
+        {
+            throw new FolderProjectVersionControlException(
+                FolderProjectVersionControlError.RepositoryFailure,
+                "Discard failed and rollback was incomplete.",
+                new AggregateException(
+                    failure == null
+                        ? rollbackFailures
+                        : [failure, .. rollbackFailures]),
+                isRollbackIncomplete: true);
+        }
+        PrepareDiscardStagingForCleanup(
+            rollback.StagingPath,
+            rollback.Backups);
+        TryFinalizeStagingDirectory(rollback.StagingPath);
+        if (failure != null)
+            ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private static void PrepareDiscardStagingForCleanup(
         string stagingPath,
-        IReadOnlyList<DiscardedFileBackup> backups)
+        IReadOnlyList<FolderProjectDiscardBackup> backups)
     {
         if (!Directory.Exists(stagingPath))
             return;
 
-        try
+        foreach (var backup in backups)
         {
-            foreach (var backup in backups)
+            if (File.Exists(backup.StagedPath))
             {
-                if (File.Exists(backup.StagedPath))
-                {
-                    File.SetAttributes(
-                        backup.StagedPath,
-                        FileAttributes.Normal);
-                }
+                File.SetAttributes(
+                    backup.StagedPath,
+                    FileAttributes.Normal);
             }
-            Directory.Delete(stagingPath, recursive: true);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
         }
     }
 
@@ -332,10 +418,6 @@ public sealed partial class FolderProjectVersionControlService
             }
         }
     }
-
-    private sealed record DiscardedFileBackup(
-        string OriginalPath,
-        string StagedPath);
 
     public FolderProjectCommitSummary CommitStaged(
         string projectRoot,

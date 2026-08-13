@@ -316,6 +316,454 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
+    public async Task RestoreProject_CancelDoesNotCallHistoryOrCoordinator()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("target", "目标状态");
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestoreImpactCount(
+                project.ProjectRoot,
+                point.Id))
+            .Returns(1);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.Cancel);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+
+        await viewModel.RestoreProjectCommand.ExecuteAsync(null);
+
+        history.Verify(item => item.RestoreProject(
+            It.IsAny<string>(),
+            It.IsAny<FolderProjectRestorePoint>(),
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Never);
+        coordinator.VerifyNoOtherCalls();
+        NUnitAssert.That(viewModel.SelectedRestorePoint, Is.SameAs(point));
+    }
+
+    [Test]
+    public async Task RestoreProject_ConfirmsScopeAndUsesCoordinator()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("target", "目标状态");
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.RestoreProject(
+                project.ProjectRoot,
+                point,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(new FolderProjectRestoreResult(point, null));
+        history.Setup(item => item.GetRestoreImpactCount(
+                project.ProjectRoot,
+                point.Id))
+            .Returns(1);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectRestoreResult>>(),
+                It.IsAny<Action<FolderProjectRestoreResult>>(),
+                It.IsAny<Action<FolderProjectRestoreResult>>(),
+                false))
+            .Returns<string, Func<FolderProjectRestoreResult>,
+                Action<FolderProjectRestoreResult>,
+                Action<FolderProjectRestoreResult>, bool>(
+                (_, operation, complete, _, _) =>
+                {
+                    var result = operation();
+                    complete(result);
+                    return Task.FromResult(result);
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+
+        await viewModel.RestoreProjectCommand.ExecuteAsync(null);
+
+        dialogs.Verify(item => item.ShowYesNoBox(
+            It.Is<string>(message =>
+                message.Contains("目标状态") &&
+                message.Contains("1") &&
+                message.Contains("重新加载")),
+            It.IsAny<string>()), Times.Once);
+        coordinator.Verify(item => item.ExecuteTransactionalAsync(
+            project.ProjectRoot,
+            It.IsAny<Func<FolderProjectRestoreResult>>(),
+            It.IsAny<Action<FolderProjectRestoreResult>>(),
+            It.IsAny<Action<FolderProjectRestoreResult>>(),
+            false), Times.Once);
+        history.Verify(item => item.RestoreProject(
+            project.ProjectRoot,
+            point,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+    }
+
+    [Test]
+    public async Task RestoreFile_DirtyTargetRequiresSecondConfirmation()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("target", "目标状态");
+        var change = new FolderProjectRestorePointChange(
+            "changed.bin",
+            null,
+            FolderProjectRestorePointChangeKind.Modified,
+            true);
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([change]);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.SetupSequence(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK)
+            .Returns(ShowMessageBoxResult.OK);
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePointChange = change;
+
+        await viewModel.RestoreFileCommand.ExecuteAsync(null);
+
+        dialogs.Verify(item => item.ShowYesNoBox(
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Exactly(2));
+        history.Verify(item => item.BeginRestoreFile(
+            project.ProjectRoot,
+            point.Id,
+            change.Path,
+            true), Times.Once);
+    }
+
+    [Test]
+    public async Task RestoreDeletedFile_UsesPreviousRestorePointVersion()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var previousId = new string('1', 40);
+        var point = RestorePoint(
+            new string('2', 40),
+            "删除文件",
+            previousRestorePointId: previousId);
+        var change = new FolderProjectRestorePointChange(
+            "deleted.bin",
+            null,
+            FolderProjectRestorePointChangeKind.Deleted,
+            true);
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([change]);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePointChange = change;
+
+        await viewModel.RestoreFileCommand.ExecuteAsync(null);
+
+        history.Verify(item => item.BeginRestoreFile(
+            project.ProjectRoot,
+            previousId,
+            change.Path,
+            false), Times.Once);
+    }
+
+    [Test]
+    public async Task RestoreFile_RollbackFailure_UsesCoordinatorIsolation()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("target", "目标状态");
+        var change = new FolderProjectRestorePointChange(
+            "changed.bin",
+            null,
+            FolderProjectRestorePointChangeKind.Modified,
+            true);
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([change]);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>()))
+            .ThrowsAsync(new FolderProjectGitHostException(
+                "rollback failed",
+                new IOException("rollback failed")));
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePointChange = change;
+
+        await viewModel.RestoreFileCommand.ExecuteAsync(null);
+
+        coordinator.Verify(item => item.ExecuteInPlaceTransactionalAsync(
+            project.ProjectRoot,
+            It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
+            It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+            It.IsAny<Action<FolderProjectFileRestoreOperation>>()), Times.Once);
+        dialogs.Verify(item => item.ShowExceptionWindow(
+            It.IsAny<FolderProjectGitHostException>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Test]
+    public async Task DiscardSelected_ReconcileFailureRollsBackBeforeCleanup()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var history = CreateHistoryService(project.ProjectRoot);
+        var discard = new FolderProjectDiscardResult(
+            new FolderProjectDiscardRollback(
+                "staging", [], [], [],
+                new FolderProjectIndexSnapshot(
+                    false, [], FileAttributes.Normal)));
+        history.Setup(item => item.BeginDiscardChanges(
+                project.ProjectRoot,
+                new[] { "changed.bin" },
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Callback(() => Directory.Delete(project.ProjectRoot, true))
+            .Returns(discard);
+        history.Setup(item => item.RollbackDiscardChanges(
+                project.ProjectRoot,
+                discard))
+            .Callback(() =>
+            {
+                Directory.CreateDirectory(project.ProjectRoot);
+                project.ProjectSettings.Save(project.ProjectRoot);
+            });
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>()))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>>(
+                (_, operation, _, rollback) =>
+                {
+                    var result = operation();
+                    rollback(result);
+                    throw new FolderProjectGitHostException(
+                        "reopen failed",
+                        new DirectoryNotFoundException());
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedUnrecordedChange =
+            viewModel.UnrecordedChanges.Single();
+
+        await viewModel.DiscardSelectedCommand.ExecuteAsync(null);
+
+        history.Verify(item => item.RollbackDiscardChanges(
+            project.ProjectRoot,
+            discard), Times.Once);
+        history.Verify(item => item.CompleteDiscardChanges(
+            It.IsAny<FolderProjectDiscardResult>()), Times.Never);
+        dialogs.Verify(item => item.ShowExceptionWindow(
+            It.IsAny<Exception>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Test]
+    public async Task DiscardAll_ConfirmsAndUsesCoordinator()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var history = CreateHistoryService(project.ProjectRoot);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        var discard = new FolderProjectDiscardResult(
+            new FolderProjectDiscardRollback(
+                "staging", [], [], [],
+                new FolderProjectIndexSnapshot(
+                    false, [], FileAttributes.Normal)));
+        history.Setup(item => item.BeginDiscardChanges(
+                project.ProjectRoot,
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(discard);
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                false))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>, bool>(
+                (_, operation, complete, _, _) =>
+                {
+                    var result = operation();
+                    complete(result);
+                    return Task.FromResult(result);
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.DiscardAllCommand.ExecuteAsync(null);
+
+        coordinator.Verify(item => item.ExecuteTransactionalAsync(
+            project.ProjectRoot,
+            It.IsAny<Func<FolderProjectDiscardResult>>(),
+            It.IsAny<Action<FolderProjectDiscardResult>>(),
+            It.IsAny<Action<FolderProjectDiscardResult>>(),
+            false), Times.Once);
+        history.Verify(item => item.BeginDiscardChanges(
+            project.ProjectRoot,
+            new[] { "changed.bin" },
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+    }
+
+    [Test]
+    public async Task DiscardAll_ConfirmsFreshDiskStatusAndUsesOnlyConfirmedPaths()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var history = CreateHistoryService(project.ProjectRoot);
+        history.SetupSequence(item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                [
+                    new FolderProjectUnrecordedChange(
+                        "cached.bin",
+                        FolderProjectUnrecordedChangeKind.Modified),
+                ]))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                [
+                    new FolderProjectUnrecordedChange(
+                        "cached.bin",
+                        FolderProjectUnrecordedChangeKind.Modified),
+                    new FolderProjectUnrecordedChange(
+                        "confirmed.bin",
+                        FolderProjectUnrecordedChangeKind.Added),
+                ]))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
+        var discard = new FolderProjectDiscardResult(
+            new FolderProjectDiscardRollback(
+                "staging", [], [], [],
+                new FolderProjectIndexSnapshot(
+                    false, [], FileAttributes.Normal)));
+        history.Setup(item => item.BeginDiscardChanges(
+                project.ProjectRoot,
+                new[] { "cached.bin", "confirmed.bin" },
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(discard);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                false))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>, bool>(
+                (_, operation, complete, _, _) =>
+                {
+                    var result = operation();
+                    complete(result);
+                    return Task.FromResult(result);
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.DiscardAllCommand.ExecuteAsync(null);
+
+        dialogs.Verify(item => item.ShowYesNoBox(
+            It.Is<string>(message => message.Contains("2")),
+            It.IsAny<string>()), Times.Once);
+        history.Verify(item => item.BeginDiscardChanges(
+            project.ProjectRoot,
+            new[] { "cached.bin", "confirmed.bin" },
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+    }
+
+    [Test]
     public void HistoryView_UsesSharedComponentsAndHidesAdvancedGitConcepts()
     {
         var path = Path.Combine(
@@ -335,6 +783,8 @@ public class FolderProjectHistoryViewModelTests
                                  "OperationProgressWindowHost"),
                 Is.True);
             NUnitAssert.That(source, Does.Contain("AeButton.Primary"));
+            NUnitAssert.That(source, Does.Contain("AeButton.Secondary"));
+            NUnitAssert.That(source, Does.Contain("AeButton.Danger"));
             NUnitAssert.That(source, Does.Contain("AeInput.TextBox"));
             NUnitAssert.That(source, Does.Contain("AeList.View"));
             NUnitAssert.That(
@@ -411,6 +861,10 @@ public class FolderProjectHistoryViewModelTests
                                 .Select(button => button.Content?.ToString()),
                             Does.Contain("创建还原点"));
                         NUnitAssert.That(
+                            FindDescendants<Button>(view)
+                                .Select(button => button.Content?.ToString()),
+                            Does.Contain("恢复整个工程"));
+                        NUnitAssert.That(
                             FindDescendants<TextBlock>(view)
                                 .Select(text => text.Text),
                             Does.Contain("工程历史"));
@@ -426,13 +880,61 @@ public class FolderProjectHistoryViewModelTests
     private static FolderProjectHistoryViewModel CreateViewModel(
         IFolderProjectHistoryService history,
         IFolderProjectUnsavedChangesService? unsaved = null,
-        IFolderProjectUnsavedChangesPrompt? prompt = null) =>
+        IFolderProjectUnsavedChangesPrompt? prompt = null,
+        IStandardDialogs? dialogs = null,
+        IFolderProjectGitOperationCoordinator? coordinator = null) =>
         new(
             history,
             unsaved ?? Mock.Of<IFolderProjectUnsavedChangesService>(),
             prompt ?? Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
-            Mock.Of<IStandardDialogs>(),
+            coordinator ?? CreateImmediateCoordinator(),
+            dialogs ?? Mock.Of<IStandardDialogs>(),
             LocalizationManager.Instance);
+
+    private static IFolderProjectGitOperationCoordinator
+        CreateImmediateCoordinator()
+    {
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>()))
+            .Returns<string, Func<FolderProjectFileRestoreOperation>,
+                Action<FolderProjectFileRestoreOperation>,
+                Action<FolderProjectFileRestoreOperation>>(
+                (_, operation, complete, rollback) =>
+                    ExecuteImmediate(operation, complete, rollback));
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>()))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>>(
+                (_, operation, complete, rollback) =>
+                    ExecuteImmediate(operation, complete, rollback));
+        return coordinator.Object;
+
+        static Task<T> ExecuteImmediate<T>(
+            Func<T> operation,
+            Action<T> complete,
+            Action<T> rollback)
+        {
+            var result = operation();
+            try
+            {
+                complete(result);
+            }
+            catch
+            {
+                rollback(result);
+                throw;
+            }
+            return Task.FromResult(result);
+        }
+    }
 
     private static Mock<IFolderProjectHistoryService> CreateHistoryService(
         string projectRoot,
@@ -471,13 +973,17 @@ public class FolderProjectHistoryViewModelTests
     private static FolderProjectRestorePoint RestorePoint(
         string id,
         string description,
-        bool initial = false) =>
+        bool initial = false,
+        string? previousRestorePointId = null) =>
         new(
             id,
             description,
             DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
             new FolderProjectRestorePointChangeSummary(1, 0, 0, 0, 0),
-            initial);
+            initial)
+        {
+            PreviousRestorePointId = previousRestorePointId,
+        };
 
     private static string FindSolutionRoot()
     {
