@@ -934,7 +934,7 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
-    public void DiscardChanges_WhenRollbackCleanupFails_RestoresFileAndReportsFailure()
+    public void DiscardChanges_WhenCommittedCleanupFails_KeepsDiscardedState()
     {
         using var project = new TemporaryDirectory(
             "discard-cleanup-failure");
@@ -945,11 +945,103 @@ public class FolderProjectVersionControlServiceTests
         var service = new FolderProjectVersionControlService(
             new FailDiscardCleanupPlatform());
 
+        service.DiscardChanges(project.Path, ["added.txt"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(addedPath), Is.False);
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.True);
+            Assert.That(
+                Directory.EnumerateDirectories(
+                    Path.Combine(project.Path, ".git"),
+                    "ae-cleanup-*").Count(),
+                Is.EqualTo(1));
+        });
+
+        var cleanupService = new FolderProjectVersionControlService();
+        cleanupService.GetStatus(project.Path);
+        Assert.That(
+            Directory.EnumerateDirectories(
+                Path.Combine(project.Path, ".git"),
+                "ae-cleanup-*").Count(),
+            Is.Zero);
+    }
+
+    [Test]
+    public void DiscardChanges_WhenStagingFinalizeFails_RestoresFile()
+    {
+        using var project = new TemporaryDirectory(
+            "discard-finalize-failure");
+        var addedPath = Path.Combine(project.Path, "added.txt");
+        var setupService = new FolderProjectVersionControlService();
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(addedPath, "new");
+        var service = new FolderProjectVersionControlService(
+            new FailDiscardFinalizePlatform());
+
         Assert.That(
             () => service.DiscardChanges(project.Path, ["added.txt"]),
-            Throws.TypeOf<FolderProjectVersionControlException>()
-                .With.InnerException.TypeOf<IOException>());
-        Assert.That(File.ReadAllText(addedPath), Is.EqualTo("new"));
+            Throws.TypeOf<IOException>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(addedPath), Is.EqualTo("new"));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.False);
+        });
+    }
+
+    [Test]
+    public void RestoreFile_WhenCommittedCleanupFails_KeepsRestoredVersion()
+    {
+        using var project = new TemporaryDirectory(
+            "restore-file-cleanup-failure");
+        var filePath = Path.Combine(project.Path, "tracked.txt");
+        File.WriteAllText(filePath, "one");
+        var setupService = new FolderProjectVersionControlService();
+        var initial = setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        setupService.CommitAll(project.Path, "第二版");
+        var service = new FolderProjectVersionControlService(
+            new FailDiscardCleanupPlatform());
+
+        var result = service.RestoreFile(
+            project.Path,
+            initial.Id,
+            "tracked.txt");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.CommitId, Is.EqualTo(initial.Id));
+            Assert.That(File.ReadAllText(filePath), Is.EqualTo("one"));
+            Assert.That(service.GetStatus(project.Path).IsClean, Is.False);
+            Assert.That(
+                Directory.EnumerateDirectories(
+                    Path.Combine(project.Path, ".git"),
+                    "ae-cleanup-*").Count(),
+                Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void RestoreFile_WhenStagingFinalizeFails_RestoresOriginalVersion()
+    {
+        using var project = new TemporaryDirectory(
+            "restore-file-finalize-failure");
+        var filePath = Path.Combine(project.Path, "tracked.txt");
+        File.WriteAllText(filePath, "one");
+        var setupService = new FolderProjectVersionControlService();
+        var initial = setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(filePath, "two");
+        setupService.CommitAll(project.Path, "第二版");
+        var service = new FolderProjectVersionControlService(
+            new FailDiscardFinalizePlatform());
+
+        Assert.That(
+            () => service.RestoreFile(
+                project.Path,
+                initial.Id,
+                "tracked.txt"),
+            Throws.TypeOf<IOException>());
+        Assert.That(File.ReadAllText(filePath), Is.EqualTo("two"));
     }
 
     [Test]
@@ -3237,6 +3329,24 @@ public class FolderProjectVersionControlServiceTests
     {
         public override void DeleteDirectory(string path) =>
             throw new IOException("Injected rollback cleanup failure.");
+    }
+
+    private sealed class FailDiscardFinalizePlatform :
+        FolderProjectVersionControlPlatform
+    {
+        public override void MoveDirectory(
+            string sourcePath,
+            string destinationPath)
+        {
+            if (Path.GetFileName(sourcePath).StartsWith(
+                    "ae-",
+                    StringComparison.Ordinal))
+            {
+                throw new IOException("Injected staging finalize failure.");
+            }
+
+            base.MoveDirectory(sourcePath, destinationPath);
+        }
     }
 
     private sealed class PostInitializeUnsafeStatePlatform :

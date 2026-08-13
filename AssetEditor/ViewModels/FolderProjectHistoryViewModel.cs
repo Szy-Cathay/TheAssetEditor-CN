@@ -368,14 +368,16 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         }
         catch (Exception failure)
         {
-            var rollbackFailures = new List<Exception>();
             try
             {
                 rollback(operation);
             }
             catch (Exception exception)
             {
-                rollbackFailures.Add(exception);
+                throw new AggregateException(
+                    "The operation failed and rollback was incomplete.",
+                    failure,
+                    exception);
             }
             try
             {
@@ -383,13 +385,10 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             }
             catch (Exception exception)
             {
-                rollbackFailures.Add(exception);
-            }
-            if (rollbackFailures.Count != 0)
-            {
                 throw new AggregateException(
-                    "The operation failed and rollback was incomplete.",
-                    [failure, .. rollbackFailures]);
+                    "The operation failed and project reconciliation was incomplete.",
+                    failure,
+                    exception);
             }
             throw;
         }

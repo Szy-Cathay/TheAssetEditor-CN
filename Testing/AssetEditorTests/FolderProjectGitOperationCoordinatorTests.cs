@@ -423,7 +423,7 @@ public class FolderProjectGitOperationCoordinatorTests
     }
 
     [Test]
-    public async Task ExecuteTransactionalAsync_WhenRollbackFails_StillReopensOriginalState()
+    public async Task ExecuteTransactionalAsync_WhenRollbackFails_RemainsDetached()
     {
         using var projectRoot = new TemporaryDirectory();
         var packFileService = CreateRealPackFileService();
@@ -464,11 +464,10 @@ public class FolderProjectGitOperationCoordinatorTests
                     Is.SameAs(expectedCompletion));
                 NUnitAssert.That(exception.HostException,
                     Is.SameAs(expectedRollback));
-                NUnitAssert.That(openCalls, Is.EqualTo(2));
-                NUnitAssert.That(reattached, Is.Not.Null);
+                NUnitAssert.That(openCalls, Is.EqualTo(1));
                 NUnitAssert.That(
                     packFileService.GetAllPackfileContainers(),
-                    Is.EqualTo(new PackFileContainer[] { reattached! }));
+                    Is.Empty);
             });
         }
         finally

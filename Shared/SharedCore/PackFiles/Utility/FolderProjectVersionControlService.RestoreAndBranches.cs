@@ -188,8 +188,7 @@ public sealed partial class FolderProjectVersionControlService
         FolderProjectFileRestoreTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(transaction);
-        if (Directory.Exists(transaction.StagingPath))
-            _platform.DeleteDirectory(transaction.StagingPath);
+        FinalizeStagingDirectory(transaction.StagingPath);
     }
 
     public void RollbackRestoreFile(
@@ -211,8 +210,7 @@ public sealed partial class FolderProjectVersionControlService
                 transaction.TargetPath,
                 overwrite: true);
         }
-        if (Directory.Exists(transaction.StagingPath))
-            _platform.DeleteDirectory(transaction.StagingPath);
+        TryDeleteFinalizedStagingDirectory(transaction.StagingPath);
     }
 
     public FolderProjectProjectRestoreResult RestoreProject(

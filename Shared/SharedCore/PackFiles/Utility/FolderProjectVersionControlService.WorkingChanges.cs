@@ -194,7 +194,10 @@ public sealed partial class FolderProjectVersionControlService
     public void CompleteDiscardChanges(FolderProjectDiscardRollback rollback)
     {
         ArgumentNullException.ThrowIfNull(rollback);
-        DeleteDiscardStaging(rollback.StagingPath, rollback.Backups);
+        PrepareDiscardStagingForCleanup(
+            rollback.StagingPath,
+            rollback.Backups);
+        FinalizeStagingDirectory(rollback.StagingPath);
     }
 
     public void RollbackDiscardChanges(
@@ -294,26 +297,12 @@ public sealed partial class FolderProjectVersionControlService
                     ? rollbackFailures
                     : [failure, .. rollbackFailures]);
         }
-        try
-        {
-            DeleteDiscardStaging(rollback.StagingPath, rollback.Backups);
-        }
-        catch (Exception exception)
-        {
-            if (failure != null)
-            {
-                throw new AggregateException(
-                    "Discard failed and rollback cleanup was incomplete.",
-                    failure,
-                    exception);
-            }
-            throw;
-        }
+        TryDeleteFinalizedStagingDirectory(rollback.StagingPath);
         if (failure != null)
             ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    private void DeleteDiscardStaging(
+    private static void PrepareDiscardStagingForCleanup(
         string stagingPath,
         IReadOnlyList<FolderProjectDiscardBackup> backups)
     {
@@ -329,7 +318,6 @@ public sealed partial class FolderProjectVersionControlService
                     FileAttributes.Normal);
             }
         }
-        _platform.DeleteDirectory(stagingPath);
     }
 
     private void RestoreTrackedFilesInParallel(

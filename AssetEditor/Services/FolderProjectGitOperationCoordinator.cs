@@ -316,6 +316,7 @@ public sealed class FolderProjectGitOperationCoordinator :
         bool openWhenComplete)
     {
         var failures = new List<Exception>();
+        var rollbackSucceeded = false;
         try
         {
             RemoveAllConfiguredEmptyDirectories(projectRoot);
@@ -327,21 +328,25 @@ public sealed class FolderProjectGitOperationCoordinator :
         try
         {
             await Task.Run(() => rollbackOperation(result));
+            rollbackSucceeded = true;
         }
         catch (Exception exception)
         {
             failures.Add(exception);
         }
-        try
+        if (rollbackSucceeded)
         {
-            await ReattachAfterTransactionAsync(
-                projectRoot,
-                loadedProject,
-                openWhenComplete);
-        }
-        catch (Exception exception)
-        {
-            failures.Add(exception);
+            try
+            {
+                await ReattachAfterTransactionAsync(
+                    projectRoot,
+                    loadedProject,
+                    openWhenComplete);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
         }
 
         return failures.Count switch

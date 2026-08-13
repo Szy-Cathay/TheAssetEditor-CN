@@ -1,4 +1,5 @@
 ﻿using LibGit2Sharp;
+using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles.Models;
 
 namespace Shared.Core.PackFiles.Utility;
@@ -288,6 +289,13 @@ internal class FolderProjectVersionControlPlatform
         File.Move(sourcePath, destinationPath, overwrite);
     }
 
+    public virtual void MoveDirectory(
+        string sourcePath,
+        string destinationPath)
+    {
+        Directory.Move(sourcePath, destinationPath);
+    }
+
     public virtual Branch CheckoutBranch(
         Repository repository,
         Branch branch,
@@ -339,6 +347,8 @@ public sealed partial class FolderProjectVersionControlService :
             ".wem",
         };
     private readonly FolderProjectVersionControlPlatform _platform;
+    private static readonly ILogger s_logger =
+        Logging.Create<FolderProjectVersionControlService>();
 
     public FolderProjectVersionControlService()
         : this(new FolderProjectVersionControlPlatform())
@@ -349,6 +359,55 @@ public sealed partial class FolderProjectVersionControlService :
         FolderProjectVersionControlPlatform platform)
     {
         _platform = platform;
+    }
+
+    private void FinalizeStagingDirectory(string stagingPath)
+    {
+        if (!Directory.Exists(stagingPath))
+            return;
+
+        var cleanupPath = Path.Combine(
+            Path.GetDirectoryName(stagingPath)!,
+            $"ae-cleanup-{Guid.NewGuid():N}");
+        _platform.MoveDirectory(stagingPath, cleanupPath);
+        TryDeleteFinalizedStagingDirectory(cleanupPath);
+    }
+
+    private void TryDeleteFinalizedStagingDirectory(string stagingPath)
+    {
+        try
+        {
+            if (Directory.Exists(stagingPath))
+                _platform.DeleteDirectory(stagingPath);
+        }
+        catch (Exception exception)
+        {
+            s_logger.Warning(
+                exception,
+                "Could not remove finalized folder project transaction data at {StagingPath}",
+                stagingPath);
+        }
+    }
+
+    private void TryDeleteFinalizedStagingDirectories(string repositoryPath)
+    {
+        try
+        {
+            foreach (var path in Directory.EnumerateDirectories(
+                         repositoryPath,
+                         "ae-cleanup-*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                TryDeleteFinalizedStagingDirectory(path);
+            }
+        }
+        catch (Exception exception)
+        {
+            s_logger.Warning(
+                exception,
+                "Could not scan finalized folder project transaction data at {RepositoryPath}",
+                repositoryPath);
+        }
     }
 
     public FolderProjectRepositoryStatus GetStatus(
@@ -1186,7 +1245,7 @@ public sealed partial class FolderProjectVersionControlService :
             });
     }
 
-    private static Repository OpenRepository(string projectRoot)
+    private Repository OpenRepository(string projectRoot)
     {
         var repositoryState = GetRepositoryState(projectRoot);
         if (repositoryState != RepositoryState.Initialized)
@@ -1200,7 +1259,9 @@ public sealed partial class FolderProjectVersionControlService :
                     : "The folder project has no local repository.");
         }
 
-        return new Repository(Path.GetFullPath(projectRoot));
+        var repository = new Repository(Path.GetFullPath(projectRoot));
+        TryDeleteFinalizedStagingDirectories(repository.Info.Path);
+        return repository;
     }
 
     private static void ValidateIdentity(
