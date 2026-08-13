@@ -16,6 +16,40 @@ namespace AssetEditorTests;
 public class ImportPackAsFolderProjectCommandTests
 {
     [Test]
+    public void Execute_ExplicitSourceAndSetupCanceled_ReturnsCancelled()
+    {
+        var importDialogs = new Mock<IFolderProjectImportDialogs>(
+            MockBehavior.Strict);
+        var setupDialogs = new Mock<IFolderProjectSetupDialogs>();
+        setupDialogs.Setup(item => item.ShowSetup(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns((FolderProjectSetupDialogResult?)null);
+        var packFiles = new Mock<IPackFileService>(
+            MockBehavior.Strict);
+        var loader = new Mock<IPackFileContainerLoader>(
+            MockBehavior.Strict);
+        var command = new ImportPackAsFolderProjectCommand(
+            packFiles.Object,
+            loader.Object,
+            Mock.Of<IFolderProjectFactory>(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            LoadLocalization(),
+            importDialogs.Object,
+            setupDialogs.Object);
+
+        var outcome = command.Execute(@"D:\packs\source.pack");
+
+        NUnitAssert.That(
+            outcome,
+            Is.EqualTo(FolderProjectImportOutcome.Cancelled));
+        importDialogs.VerifyNoOtherCalls();
+        loader.VerifyNoOtherCalls();
+        packFiles.VerifyNoOtherCalls();
+    }
+
+    [Test]
     [Apartment(ApartmentState.STA)]
     public void Execute_UsesSetupDialogValues()
     {
@@ -57,22 +91,30 @@ public class ImportPackAsFolderProjectCommandTests
         var progressVisible = false;
         var initializedWhileProgressVisible = false;
         var progressUpdates = new List<OperationProgressUpdate>();
-        progressRunner.Setup(item => item.Run(
+        progressRunner.Setup(item => item.RunCancelable(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
                 It.IsAny<Func<
                     Action<OperationProgressUpdate>,
+                    CancellationToken,
                     FolderProjectContainer?>>()))
             .Returns(
                 (string _,
                  string _,
+                 CancellationToken cancellationToken,
                  Func<Action<OperationProgressUpdate>,
+                     CancellationToken,
                      FolderProjectContainer?> operation) =>
                 {
                     progressVisible = true;
                     try
                     {
-                        return operation(progressUpdates.Add);
+                        return new FolderProjectProgressResult(
+                            operation(
+                                progressUpdates.Add,
+                                cancellationToken),
+                            false);
                     }
                     finally
                     {
@@ -136,12 +178,14 @@ public class ImportPackAsFolderProjectCommandTests
                         update.Total == 2),
                     Is.True);
             });
-            progressRunner.Verify(item => item.Run(
+            progressRunner.Verify(item => item.RunCancelable(
                 It.IsAny<string>(),
                 It.Is<string>(message =>
                     message.Contains("大型 Pack", StringComparison.Ordinal)),
+                It.IsAny<CancellationToken>(),
                 It.IsAny<Func<
                     Action<OperationProgressUpdate>,
+                    CancellationToken,
                     FolderProjectContainer?>>()), Times.Once);
             versionControl.Verify(item => item.Initialize(
                 project.Path,
@@ -252,6 +296,213 @@ public class ImportPackAsFolderProjectCommandTests
         dialogs.Verify(x => x.ShowDialogBox(
             It.IsAny<string>(),
             It.IsAny<string>()), Times.Once);
+    }
+
+    [Test]
+    public void Execute_CancelledAfterProgressStarts_LeavesTargetEmpty()
+    {
+        using var project = new TemporaryDirectory();
+        using var output = new TemporaryDirectory();
+        var source = new PackFileContainer("source")
+        {
+            Header = new PFHeader("PFH6", PackFileCAType.MOD),
+        };
+        source.FileList["entry.bin"] =
+            PackFile.CreateFromBytes("entry.bin", [1]);
+        var setupDialogs = new Mock<IFolderProjectSetupDialogs>();
+        setupDialogs.Setup(item => item.ShowSetup(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(new FolderProjectSetupDialogResult(
+                project.Path,
+                output.Path,
+                false));
+        var loader = new Mock<IPackFileContainerLoader>();
+        loader.Setup(item => item.Load("source.pack")).Returns(source);
+        var progressRunner = new Mock<IFolderProjectProgressRunner>();
+        progressRunner.Setup(item => item.RunCancelable(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<Func<
+                    Action<OperationProgressUpdate>,
+                    CancellationToken,
+                    FolderProjectContainer?>>()))
+            .Returns((
+                string _,
+                string _,
+                CancellationToken cancellationToken,
+                Func<Action<OperationProgressUpdate>,
+                    CancellationToken,
+                    FolderProjectContainer?> operation) =>
+            {
+                using var cancellation =
+                    CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken);
+                try
+                {
+                    operation(
+                        _ => cancellation.Cancel(),
+                        cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                    when (cancellation.IsCancellationRequested)
+                {
+                }
+
+                return new FolderProjectProgressResult(null, true);
+            });
+        var packFiles = new Mock<IPackFileService>(MockBehavior.Strict);
+        var command = new ImportPackAsFolderProjectCommand(
+            packFiles.Object,
+            loader.Object,
+            new FolderProjectFactory(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            LoadLocalization(),
+            Mock.Of<IFolderProjectImportDialogs>(),
+            setupDialogs.Object,
+            null,
+            Mock.Of<IFolderProjectVersionControlService>(),
+            progressRunner.Object);
+
+        var outcome = command.Execute("source.pack");
+
+        NUnitAssert.That(outcome, Is.EqualTo(
+            FolderProjectImportOutcome.Cancelled));
+        NUnitAssert.That(
+            Directory.EnumerateFileSystemEntries(project.Path),
+            Is.Empty);
+        packFiles.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public void Execute_GitInitializationFailure_RestoresEmptyTarget()
+    {
+        using var project = new TemporaryDirectory();
+        using var output = new TemporaryDirectory();
+        var source = new PackFileContainer("source")
+        {
+            Header = new PFHeader("PFH6", PackFileCAType.MOD),
+        };
+        source.FileList["entry.bin"] =
+            PackFile.CreateFromBytes("entry.bin", [1]);
+        var setupDialogs = new Mock<IFolderProjectSetupDialogs>();
+        setupDialogs.Setup(item => item.ShowSetup(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(new FolderProjectSetupDialogResult(
+                project.Path,
+                output.Path,
+                false));
+        var loader = new Mock<IPackFileContainerLoader>();
+        loader.Setup(item => item.Load("source.pack")).Returns(source);
+        var versionControl =
+            new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(item => item.Initialize(
+                project.Path,
+                It.IsAny<FolderProjectGitIdentity>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Throws(new InvalidOperationException("git failed"));
+        var progressRunner = CreateCancelableProgressRunner();
+        var packFiles = new Mock<IPackFileService>(
+            MockBehavior.Strict);
+        var command = new ImportPackAsFolderProjectCommand(
+            packFiles.Object,
+            loader.Object,
+            new FolderProjectFactory(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            LoadLocalization(),
+            Mock.Of<IFolderProjectImportDialogs>(),
+            setupDialogs.Object,
+            null,
+            versionControl.Object,
+            progressRunner.Object);
+
+        var outcome = command.Execute("source.pack");
+
+        NUnitAssert.That(outcome, Is.EqualTo(
+            FolderProjectImportOutcome.Failed));
+        NUnitAssert.That(
+            Directory.EnumerateFileSystemEntries(project.Path),
+            Is.Empty);
+        packFiles.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public void Execute_AddToWorkspaceThrows_RestoresEmptyTarget()
+    {
+        using var project = new TemporaryDirectory();
+        using var output = new TemporaryDirectory();
+        var source = new PackFileContainer("source")
+        {
+            Header = new PFHeader("PFH6", PackFileCAType.MOD),
+        };
+        source.FileList["entry.bin"] =
+            PackFile.CreateFromBytes("entry.bin", [1]);
+        var setupDialogs = new Mock<IFolderProjectSetupDialogs>();
+        setupDialogs.Setup(item => item.ShowSetup(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(new FolderProjectSetupDialogResult(
+                project.Path,
+                output.Path,
+                false));
+        var loader = new Mock<IPackFileContainerLoader>();
+        loader.Setup(item => item.Load("source.pack")).Returns(source);
+        var packFiles = new Mock<IPackFileService>();
+        packFiles.Setup(item => item.AddEditableFolderProject(
+                It.IsAny<FolderProjectContainer>()))
+            .Throws(new InvalidOperationException("workspace failed"));
+        var command = new ImportPackAsFolderProjectCommand(
+            packFiles.Object,
+            loader.Object,
+            new FolderProjectFactory(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            LoadLocalization(),
+            Mock.Of<IFolderProjectImportDialogs>(),
+            setupDialogs.Object,
+            null,
+            Mock.Of<IFolderProjectVersionControlService>(),
+            CreateCancelableProgressRunner().Object);
+
+        var outcome = command.Execute("source.pack");
+
+        NUnitAssert.That(outcome, Is.EqualTo(
+            FolderProjectImportOutcome.Failed));
+        NUnitAssert.That(
+            Directory.EnumerateFileSystemEntries(project.Path),
+            Is.Empty);
+        packFiles.Verify(item => item.AddEditableFolderProject(
+            It.IsAny<FolderProjectContainer>()), Times.Once);
+    }
+
+    private static Mock<IFolderProjectProgressRunner>
+        CreateCancelableProgressRunner()
+    {
+        var runner = new Mock<IFolderProjectProgressRunner>();
+        runner.Setup(item => item.RunCancelable(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<Func<
+                    Action<OperationProgressUpdate>,
+                    CancellationToken,
+                    FolderProjectContainer?>>()))
+            .Returns((
+                string _,
+                string _,
+                CancellationToken cancellationToken,
+                Func<Action<OperationProgressUpdate>,
+                    CancellationToken,
+                    FolderProjectContainer?> operation) =>
+                new FolderProjectProgressResult(
+                    operation(_ => { }, cancellationToken),
+                    false));
+        return runner;
     }
 
     private static LocalizationManager LoadLocalization()

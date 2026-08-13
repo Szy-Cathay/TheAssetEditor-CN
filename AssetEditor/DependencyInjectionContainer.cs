@@ -6,6 +6,7 @@ using AssetEditor.Views;
 using AssetEditor.Views.FolderProjectVersionControl;
 using AssetEditor.Views.Settings;
 using AssetEditor.Views.Updater;
+using Editors.Ipc;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.DependencyInjection;
 using Shared.Core.DevConfig;
@@ -29,6 +30,12 @@ namespace AssetEditor
             serviceCollection.AddSingleton<
                 IFolderProjectUnsavedChangesPrompt,
                 FolderProjectUnsavedChangesPrompt>();
+            serviceCollection.AddTransient<
+                IExternalPackOpenChoiceDialog,
+                ExternalPackOpenChoiceDialog>();
+            serviceCollection.AddTransient<
+                IExternalPackOpenWorkflow,
+                ExternalPackOpenWorkflow>();
 
             serviceCollection.AddTransient<OpenGamePackCommand>();
             serviceCollection.AddTransient<OpenReferencePackCommand>();

@@ -98,6 +98,8 @@ public sealed class FolderProjectContainer :
         SystemFilePath = Path.TrimEndingDirectorySeparator(
             Path.GetFullPath(projectRoot));
         ProjectSettings = settings;
+        if (!string.IsNullOrWhiteSpace(settings.SourcePackPath))
+            SourcePackFilePaths.Add(settings.SourcePackPath);
         Header = new PFHeader(
             PackFileVersionConverter.ToString(settings.PackFileVersion),
             settings.PackFileType)

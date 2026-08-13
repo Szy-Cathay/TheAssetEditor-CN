@@ -20,6 +20,13 @@ public interface IFolderProjectFactory
         string projectRoot,
         FolderProjectSettings settings,
         Action<FolderProjectImportProgress> reportProgress);
+
+    FolderProjectContainer ImportPack(
+        PackFileContainer source,
+        string projectRoot,
+        FolderProjectSettings settings,
+        Action<FolderProjectImportProgress> reportProgress,
+        CancellationToken cancellationToken);
 }
 
 public sealed record FolderProjectImportProgress(
@@ -56,6 +63,21 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
         FolderProjectSettings settings,
         Action<FolderProjectImportProgress>? reportProgress)
     {
+        return ImportPack(
+            source,
+            projectRoot,
+            settings,
+            reportProgress,
+            CancellationToken.None);
+    }
+
+    public FolderProjectContainer ImportPack(
+        PackFileContainer source,
+        string projectRoot,
+        FolderProjectSettings settings,
+        Action<FolderProjectImportProgress>? reportProgress,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -66,22 +88,26 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
                     source,
                     projectRoot,
                     settings,
-                    reportProgress));
+                    reportProgress,
+                    cancellationToken));
         }
 
         return ImportPackCore(
             source,
             projectRoot,
             settings,
-            reportProgress);
+            reportProgress,
+            cancellationToken);
     }
 
     private static FolderProjectContainer ImportPackCore(
         PackFileContainer source,
         string projectRoot,
         FolderProjectSettings settings,
-        Action<FolderProjectImportProgress>? reportProgress)
+        Action<FolderProjectImportProgress>? reportProgress,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var targetRoot = FolderProjectImportTargetValidator
             .ValidateEmptyTarget(projectRoot);
         if (!string.IsNullOrWhiteSpace(settings.OutputPackPath))
@@ -124,6 +150,7 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
         {
             for (var index = 0; index < entries.Count; index++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var (relativePath, file) = entries[index];
                 reportProgress?.Invoke(
                     new FolderProjectImportProgress(
@@ -141,6 +168,7 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
                 File.WriteAllBytes(outputPath, file.DataSource.ReadData());
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             settings.Save(stagingRoot);
 
             FolderProjectImportTargetValidator
@@ -148,6 +176,7 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
             Directory.Delete(targetRoot, false);
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Directory.Move(stagingRoot, targetRoot);
             }
             catch

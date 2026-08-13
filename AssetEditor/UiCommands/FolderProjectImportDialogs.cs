@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Windows.Forms;
 
 using AssetEditor.Views.FolderProject;
@@ -34,7 +35,19 @@ public interface IFolderProjectProgressRunner
         string message,
         Func<Action<OperationProgressUpdate>,
             FolderProjectContainer?> operation);
+
+    FolderProjectProgressResult RunCancelable(
+        string title,
+        string message,
+        CancellationToken cancellationToken,
+        Func<Action<OperationProgressUpdate>,
+            CancellationToken,
+            FolderProjectContainer?> operation);
 }
+
+public sealed record FolderProjectProgressResult(
+    FolderProjectContainer? Project,
+    bool Cancelled);
 
 internal static class FolderProjectVersionControlProgressAdapter
 {
@@ -104,5 +117,20 @@ public sealed class FolderProjectProgressRunner :
             title,
             message,
             operation).Run();
+    }
+
+    public FolderProjectProgressResult RunCancelable(
+        string title,
+        string message,
+        CancellationToken cancellationToken,
+        Func<Action<OperationProgressUpdate>,
+            CancellationToken,
+            FolderProjectContainer?> operation)
+    {
+        return new FolderProjectProgressWindow(
+            title,
+            message,
+            operation,
+            cancellationToken).RunCancelable();
     }
 }

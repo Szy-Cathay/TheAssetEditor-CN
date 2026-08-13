@@ -6,14 +6,14 @@ namespace Editors.Ipc
     public class IpcRequestHandler : IIpcRequestHandler
     {
         private readonly ILogger _logger = Logging.Create<IpcRequestHandler>();
-        private readonly IExternalPackLoader _packLoader;
+        private readonly IExternalPackOpenWorkflow _externalPackWorkflow;
         private readonly IExternalPackFileLookup _packFileLookup;
         private readonly IExternalFileOpenExecutor _fileOpenExecutor;
         private readonly IIpcUserNotifier _userNotifier;
 
-        public IpcRequestHandler(IExternalPackLoader packLoader, IExternalPackFileLookup packFileLookup, IExternalFileOpenExecutor fileOpenExecutor, IIpcUserNotifier userNotifier)
+        public IpcRequestHandler(IExternalPackOpenWorkflow externalPackWorkflow, IExternalPackFileLookup packFileLookup, IExternalFileOpenExecutor fileOpenExecutor, IIpcUserNotifier userNotifier)
         {
-            _packLoader = packLoader;
+            _externalPackWorkflow = externalPackWorkflow;
             _packFileLookup = packFileLookup;
             _fileOpenExecutor = fileOpenExecutor;
             _userNotifier = userNotifier;
@@ -33,9 +33,15 @@ namespace Editors.Ipc
             var packPathOnDisk = GetPackPathOnDisk(request);
             if (string.IsNullOrWhiteSpace(packPathOnDisk) == false)
             {
-                var loadResult = await _packLoader.EnsureLoadedAsync(packPathOnDisk, cancellationToken);
-                if (loadResult.Success == false)
-                    return IpcResponse.Failure(loadResult.Error ?? "Pack file load failed");
+                var openResult = await _externalPackWorkflow.OpenAsync(
+                    packPathOnDisk,
+                    cancellationToken);
+                if (!openResult.CanOpenRequestedFile)
+                {
+                    return IpcResponse.Failure(
+                        openResult.Error ?? GetExternalPackError(
+                            openResult.Status));
+                }
             }
 
             var normalizedPath = PackPathResolver.ResolvePackPath(request.Path);
@@ -63,6 +69,19 @@ namespace Editors.Ipc
                 return request.PackPathOnDisk;
 
             return string.Empty;
+        }
+
+        private static string GetExternalPackError(
+            ExternalPackOpenStatus status)
+        {
+            return status switch
+            {
+                ExternalPackOpenStatus.Cancelled =>
+                    "External Pack open canceled",
+                ExternalPackOpenStatus.RoleConflict =>
+                    "External Pack role conflict",
+                _ => "External Pack open failed",
+            };
         }
     }
 }

@@ -17,17 +17,4 @@ namespace Editors.Ipc
         Task ShowExternalOpenFailedAsync(string normalizedPath, CancellationToken cancellationToken);
     }
 
-    public interface IExternalPackLoader
-    {
-        Task<PackLoadResult> EnsureLoadedAsync(string packPathOnDisk, CancellationToken cancellationToken);
-    }
-
-    public class PackLoadResult
-    {
-        public bool Success { get; set; }
-        public string Error { get; set; }
-
-        public static PackLoadResult Ok() => new() { Success = true };
-        public static PackLoadResult Fail(string error) => new() { Success = false, Error = error };
-    }
 }
