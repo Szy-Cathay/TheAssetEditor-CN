@@ -23,20 +23,123 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 {
     public interface IMetaDataBuilder
     {
-        List<IMetaDataInstance> Create(ParsedMetadataFile? persistent, ParsedMetadataFile? metaData, ParsedMetadataAttribute? selectedMetaDataAttribute, SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat? fragment);
-        bool TryCreateMetaDataPreview(ParsedMetadataAttribute attribute,
-            bool isSelected, SceneNode root, ISkeletonProvider skeleton,
+        MetaDataBuildResult Build(
+            ParsedMetadataFile? persistent,
+            ParsedMetadataFile? metaData,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            SceneNode root,
+            ISkeletonProvider skeleton,
             AnimationPlayer rootPlayer,
-            out IMetaDataInstance? preview);
+            IAnimationBinGenericFormat? fragment);
+        MetaDataPreviewBuildResult BuildPreview(
+            ParsedMetadataAttribute attribute,
+            MetaDataDocumentOwner owner,
+            bool isSelected,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer);
     }
 
     public class MetaDataBuilder : IMetaDataBuilder
     {
-        private readonly ILogger _logger = Logging.Create<MetaDataBuilder>();
+        private readonly MetaDataPreviewBuilder _previewBuilder;
+        private readonly MetaDataRuleBuilder _ruleBuilder;
+
+        public MetaDataBuilder(
+            ComplexMeshLoader complexMeshLoader,
+            RenderEngineComponent resourceLibrary,
+            ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
+            IPackFileService packFileService,
+            AnimationsContainerComponent animationsContainerComponent)
+        {
+            var resourceResolver = new MetaDataResourceResolver(
+                packFileService);
+            _previewBuilder = new(
+                complexMeshLoader,
+                resourceLibrary,
+                skeletonAnimationLookUpHelper,
+                resourceResolver,
+                animationsContainerComponent);
+            _ruleBuilder = new(resourceResolver);
+        }
+
+        public MetaDataBuildResult Build(
+            ParsedMetadataFile? persistent,
+            ParsedMetadataFile? metaData,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer,
+            IAnimationBinGenericFormat? fragment)
+        {
+            var instances = new List<IMetaDataInstance>();
+            var rules = new List<GameWorld.Core.Animation.AnimationChange.IAnimationChangeRule>();
+            var diagnostics = new List<MetaDataBuildDiagnostic>();
+
+            if (metaData == null ||
+                metaData.GetItemsOfType<DisablePersistant_v10>().Count == 0)
+            {
+                _previewBuilder.AppendInstances(
+                    persistent,
+                    MetaDataDocumentOwner.Persistent,
+                    selectedMetaDataAttribute,
+                    root,
+                    skeleton,
+                    rootPlayer,
+                    instances,
+                    diagnostics);
+                _ruleBuilder.AppendRules(
+                    persistent,
+                    MetaDataDocumentOwner.Persistent,
+                    fragment,
+                    skeleton,
+                    rules,
+                    diagnostics);
+            }
+
+            _previewBuilder.AppendInstances(
+                metaData,
+                MetaDataDocumentOwner.Animation,
+                selectedMetaDataAttribute,
+                root,
+                skeleton,
+                rootPlayer,
+                instances,
+                diagnostics);
+            _ruleBuilder.AppendRules(
+                metaData,
+                MetaDataDocumentOwner.Animation,
+                fragment,
+                skeleton,
+                rules,
+                diagnostics);
+
+            return new(instances, rules, diagnostics);
+        }
+
+        public MetaDataPreviewBuildResult BuildPreview(
+            ParsedMetadataAttribute attribute,
+            MetaDataDocumentOwner owner,
+            bool isSelected,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer) =>
+            _previewBuilder.BuildPreview(
+                attribute,
+                owner,
+                isSelected,
+                root,
+                skeleton,
+                rootPlayer);
+    }
+
+    internal sealed class MetaDataPreviewBuilder
+    {
+        private readonly ILogger _logger = Logging.Create<MetaDataPreviewBuilder>();
         private readonly ComplexMeshLoader _complexMeshLoader;
         private readonly RenderEngineComponent _resourceLibrary;
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
-        private readonly IPackFileService _packFileService;
+        private readonly MetaDataResourceResolver _resourceResolver;
         private readonly AnimationsContainerComponent _animationsContainerComponent;
 
         private static Color s_color = Color.Black;
@@ -68,54 +171,68 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             float WidthForCorridor,
             float AngleForCone);
 
-        public MetaDataBuilder(ComplexMeshLoader complexMeshLoader,
+        public MetaDataPreviewBuilder(ComplexMeshLoader complexMeshLoader,
             RenderEngineComponent resourceLibrary,
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
-            IPackFileService packFileService,
+            MetaDataResourceResolver resourceResolver,
             AnimationsContainerComponent animationsContainerComponent)
         {
             _complexMeshLoader = complexMeshLoader;
             _resourceLibrary = resourceLibrary;
             _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
-            _packFileService = packFileService;
+            _resourceResolver = resourceResolver;
             _animationsContainerComponent = animationsContainerComponent;
         }
 
-        public List<IMetaDataInstance> Create(ParsedMetadataFile? persistent,
-            ParsedMetadataFile? metaData, ParsedMetadataAttribute? selectedMetaDataAttribute,
-            SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat? fragment)
+        public void AppendInstances(
+            ParsedMetadataFile? file,
+            MetaDataDocumentOwner owner,
+            ParsedMetadataAttribute? selectedMetaDataAttribute,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer,
+            ICollection<IMetaDataInstance> output,
+            ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
-            // Clear all
-            var output = new List<IMetaDataInstance>();
-
-            // Apply persistent meta data, if no disable is given.
-            if (metaData == null || metaData.GetItemsOfType<DisablePersistant_v10>().Count == 0)
-            {
-                var metaDataPersistent = ApplyMetaData(persistent, selectedMetaDataAttribute, root, skeleton, rootPlayer, fragment);
-                output.AddRange(metaDataPersistent);
-            }
-
-            var metaDataInstances = ApplyMetaData(metaData, selectedMetaDataAttribute, root, skeleton, rootPlayer, fragment);
-            output.AddRange(metaDataInstances);
-            return output;
+            ApplyMetaData(
+                file,
+                owner,
+                selectedMetaDataAttribute,
+                root,
+                skeleton,
+                rootPlayer,
+                output,
+                diagnostics);
         }
 
-        private IEnumerable<IMetaDataInstance> ApplyMetaData(ParsedMetadataFile? file, ParsedMetadataAttribute? selectedAttribute, SceneNode root, ISkeletonProvider skeleton, AnimationPlayer rootPlayer, IAnimationBinGenericFormat? fragment)
+        private void ApplyMetaData(
+            ParsedMetadataFile? file,
+            MetaDataDocumentOwner owner,
+            ParsedMetadataAttribute? selectedAttribute,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            AnimationPlayer rootPlayer,
+            ICollection<IMetaDataInstance> output,
+            ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
-            var output = new List<IMetaDataInstance>();
             if (file == null)
-                return output;
+                return;
 
             foreach (var animatedProp in file.GetItemsOfType<IAnimatedPropMeta>())
                 TryAddPreview(
                     output,
-                    animatedProp.GetType().Name,
+                    diagnostics,
+                    owner,
+                    (ParsedMetadataAttribute)animatedProp,
+                    root,
                     () => CreateAnimatedProp(
                         animatedProp,
                         root,
                         skeleton,
                         selectedAttribute,
-                        rootPlayer));
+                        rootPlayer,
+                        owner,
+                        diagnostics));
 
             foreach (var attribute in file.Attributes
                 .OfType<ParsedMetadataAttribute>())
@@ -124,20 +241,28 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 {
                     TryAddPreview(
                         output,
-                        attribute.Name,
+                        diagnostics,
+                        owner,
+                        attribute,
+                        root,
                         () => CreateOrdinaryProp(
                             propData,
                             root,
                             skeleton,
                             selectedAttribute,
-                            rootPlayer));
+                            rootPlayer,
+                            owner,
+                            diagnostics));
                 }
             }
 
             foreach (var item in file.GetItemsOfType<ImpactPosition_v2>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateStaticLocator(
                         item,
                         root,
@@ -150,7 +275,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<ImpactPosition_v10>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateStaticLocator(
                         item,
                         root,
@@ -163,7 +291,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<TargetPos_0>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateStaticLocator(
                         item,
                         root,
@@ -176,7 +307,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<TargetPos_10>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateStaticLocator(
                         item,
                         root,
@@ -189,7 +323,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<FirePos_v0>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateFireLocator(
                         item,
                         root,
@@ -201,7 +338,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<FirePos_v2>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateFireLocator(
                         item,
                         root,
@@ -213,7 +353,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<FirePos_v10>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateFireLocator(
                         item,
                         root,
@@ -225,7 +368,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<SplashAttack_v3>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateSplashAttack(
                         CreateSplashPreviewData(item),
                         root,
@@ -237,7 +383,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<SplashAttack_v10>())
                 TryAddPreview(
                     output,
-                    item.Name,
+                    diagnostics,
+                    owner,
+                    item,
+                    root,
                     () => CreateSplashAttack(
                         CreateSplashPreviewData(item),
                         root,
@@ -249,8 +398,17 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             foreach (var item in file.GetItemsOfType<IEffectMeta>())
                 TryAddPreview(
                     output,
-                    item.GetType().Name,
-                    () => CreateEffect(item, root, skeleton, selectedAttribute));
+                    diagnostics,
+                    owner,
+                    (ParsedMetadataAttribute)item,
+                    root,
+                    () => CreateEffect(
+                        item,
+                        root,
+                        skeleton,
+                        selectedAttribute,
+                        owner,
+                        diagnostics));
 
             foreach (var attribute in file.Attributes
                 .OfType<ParsedMetadataAttribute>())
@@ -262,7 +420,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 {
                     TryAddPreview(
                         output,
-                        attribute.Name,
+                        diagnostics,
+                        owner,
+                        attribute,
+                        root,
                         () => CreateSpatialMarker(
                             spatialBinding,
                             root,
@@ -270,43 +431,49 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                             selectedAttribute));
                 }
 
-                if (TryCreateBoneOnlyPreview(
+                if (IsBoneOnlyMetaData(attribute))
+                {
+                    TryAddPreview(
+                        output,
+                        diagnostics,
+                        owner,
                         attribute,
                         root,
-                        skeleton,
-                        selectedAttribute,
-                        out var bonePreview) &&
-                    bonePreview != null)
-                {
-                    output.Add(bonePreview);
+                        () =>
+                        {
+                            TryCreateBoneOnlyPreview(
+                                attribute,
+                                root,
+                                skeleton,
+                                selectedAttribute,
+                                out var bonePreview);
+                            if (bonePreview == null)
+                            {
+                                diagnostics.Add(
+                                    MetaDataDiagnosticFactory.Create(
+                                        attribute,
+                                        owner,
+                                        "SuperView.Diagnostics.MissingBone"));
+                            }
+                            return bonePreview;
+                        });
                 }
             }
-
-            foreach (var meteDataItem in file.GetItemsOfType<DockEquipment>())
-                TryAddRule(
-                    meteDataItem.Name,
-                    () => CreateEquipmentDock(
-                        meteDataItem,
-                        fragment,
-                        skeleton,
-                        rootPlayer));
-
-            foreach (var meteDataItem in file.GetItemsOfType<Transform_v10>())
-                TryAddRule(
-                    meteDataItem.Name,
-                    () => CreateTransform(meteDataItem, rootPlayer));
-
-            return output;
         }
 
-        public bool TryCreateMetaDataPreview(
+        public MetaDataPreviewBuildResult BuildPreview(
             ParsedMetadataAttribute attribute,
+            MetaDataDocumentOwner owner,
             bool isSelected,
             SceneNode root,
             ISkeletonProvider skeleton,
-            AnimationPlayer rootPlayer,
-            out IMetaDataInstance? preview)
+            AnimationPlayer rootPlayer)
         {
+            var diagnostics = new List<MetaDataBuildDiagnostic>();
+            if (attribute is Transform_v10 or DockEquipment)
+                return new(false, null, diagnostics);
+
+            var existingChildren = root.Children.ToHashSet();
             Func<IMetaDataInstance?>? create;
             if (attribute is IAnimatedPropMeta animatedProp)
             {
@@ -315,7 +482,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                     root,
                     skeleton,
                     isSelected ? attribute : null,
-                    rootPlayer);
+                    rootPlayer,
+                    owner,
+                    diagnostics);
             }
             else if (TryGetOrdinaryPropData(attribute, out var propData))
             {
@@ -324,7 +493,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                     root,
                     skeleton,
                     isSelected ? attribute : null,
-                    rootPlayer);
+                    rootPlayer,
+                    owner,
+                    diagnostics);
             }
             else
             {
@@ -401,7 +572,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         item,
                         root,
                         skeleton,
-                        isSelected ? attribute : null),
+                        isSelected ? attribute : null,
+                        owner,
+                        diagnostics),
                     _ => null
                 };
             }
@@ -431,30 +604,42 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 };
             }
             if (create == null)
-            {
-                preview = null;
-                return false;
-            }
+                return new(false, null, diagnostics);
 
             try
             {
-                preview = create();
+                var preview = create();
+                if (preview == null && IsBoneOnlyMetaData(attribute))
+                {
+                    diagnostics.Add(MetaDataDiagnosticFactory.Create(
+                        attribute,
+                        owner,
+                        "SuperView.Diagnostics.MissingBone"));
+                }
+                return new(true, preview, diagnostics);
             }
             catch (Exception e)
             {
+                RemoveNewChildren(root, existingChildren);
                 _logger.Here().Warning(
                     $"Skipping metadata preview for '{attribute.Name}': {e.Message}");
-                preview = null;
+                diagnostics.Add(MetaDataDiagnosticFactory.Create(
+                    attribute,
+                    owner,
+                    "SuperView.Diagnostics.PreviewUnavailable"));
+                return new(true, null, diagnostics);
             }
-
-            return true;
         }
 
         private void TryAddPreview(
             ICollection<IMetaDataInstance> output,
-            string tagName,
+            ICollection<MetaDataBuildDiagnostic> diagnostics,
+            MetaDataDocumentOwner owner,
+            ParsedMetadataAttribute source,
+            SceneNode root,
             Func<IMetaDataInstance?> create)
         {
+            var existingChildren = root.Children.ToHashSet();
             try
             {
                 var instance = create();
@@ -463,74 +648,26 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             }
             catch (Exception e)
             {
+                RemoveNewChildren(root, existingChildren);
                 _logger.Here().Warning(
-                    $"Skipping metadata preview for '{tagName}': {e.Message}");
+                    $"Skipping metadata preview for '{source.Name}': {e.Message}");
+                diagnostics.Add(MetaDataDiagnosticFactory.Create(
+                    source,
+                    owner,
+                    "SuperView.Diagnostics.PreviewUnavailable"));
             }
         }
 
-        private void TryAddRule(string tagName, Action create)
+        private static void RemoveNewChildren(
+            SceneNode root,
+            ISet<ISceneNode> existingChildren)
         {
-            try
+            foreach (var child in root.Children
+                .Where(child => !existingChildren.Contains(child))
+                .ToList())
             {
-                create();
+                root.RemoveObject(child);
             }
-            catch (Exception e)
-            {
-                _logger.Here().Warning(
-                    $"Skipping metadata preview rule for '{tagName}': {e.Message}");
-            }
-        }
-
-        private void CreateTransform(Transform_v10 transform, AnimationPlayer rootPlayer)
-        {
-            var rule = new TransformBoneRule(transform);
-            rootPlayer.AnimationRules.Add(rule);
-        }
-
-        private void CreateEquipmentDock(DockEquipment metaData, IAnimationBinGenericFormat? fragment, ISkeletonProvider skeleton, AnimationPlayer rootPlayer)
-        {
-            if (fragment == null)
-            {
-                _logger.Here().Error($"Unable to create docking, as animation is missing - select an animation");
-                return;
-            }
-
-            var animPath = fragment.Entries.FirstOrDefault(x => x.SlotName == metaData.AnimationSlotName)?.AnimationFile ??
-                           fragment.Entries.FirstOrDefault(x => x.SlotName == metaData.AnimationSlotName + "_2")?.AnimationFile;
-            if (animPath == null)
-            {
-                _logger.Here().Error($"Unable to create docking, as {metaData.AnimationSlotName} animation is missing");
-                return;
-            }
-
-            var finalBoneIndex = -1;
-            foreach (var potentialBoneName in metaData.SkeletonNameAlternatives)
-            {
-                finalBoneIndex = skeleton.Skeleton.GetBoneIndexByName(potentialBoneName);
-                if (finalBoneIndex != -1)
-                    break;
-            }
-
-            if (finalBoneIndex == -1)
-            {
-                var boneNames = string.Join(", ", metaData.SkeletonNameAlternatives);
-                _logger.Here().Error($"Unable to create docking, as {boneNames} bone is missing");
-                return;
-            }
-
-            var pf = _packFileService.FindFile(animPath);
-            if (pf == null)
-            {
-                _logger.Here().Warning(
-                    $"Skipping docking preview because animation '{animPath}' was not found.");
-                return;
-            }
-
-            var animFile = AnimationFile.Create(pf);
-            var clip = new AnimationClip(animFile, skeleton.Skeleton);
-
-            var rule = new DockEquipmentRule(finalBoneIndex, metaData.PropBoneId, clip, skeleton, metaData.StartTime, metaData.EndTime);
-            rootPlayer.AnimationRules.Add(rule);
         }
 
         private IMetaDataInstance? CreateAnimatedProp(
@@ -538,7 +675,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             SceneNode root,
             ISkeletonProvider rootSkeleton,
             ParsedMetadataAttribute? selectedMetaDataAttribute,
-            AnimationPlayer rootPlayer)
+            AnimationPlayer rootPlayer,
+            MetaDataDocumentOwner owner,
+            ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
             var source = (ParsedMetadataAttribute)animatedPropMeta;
             var data = new PropPreviewData(
@@ -557,7 +696,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 rootSkeleton,
                 selectedMetaDataAttribute,
                 rootPlayer,
-                true);
+                true,
+                owner,
+                diagnostics);
         }
 
         private IMetaDataInstance? CreateOrdinaryProp(
@@ -565,14 +706,18 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             SceneNode root,
             ISkeletonProvider rootSkeleton,
             ParsedMetadataAttribute? selectedMetaDataAttribute,
-            AnimationPlayer rootPlayer) =>
+            AnimationPlayer rootPlayer,
+            MetaDataDocumentOwner owner,
+            ICollection<MetaDataBuildDiagnostic> diagnostics) =>
             CreatePropPreview(
                 data,
                 root,
                 rootSkeleton,
                 selectedMetaDataAttribute,
                 rootPlayer,
-                false);
+                false,
+                owner,
+                diagnostics);
 
         private IMetaDataInstance? CreatePropPreview(
             PropPreviewData data,
@@ -580,7 +725,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             ISkeletonProvider rootSkeleton,
             ParsedMetadataAttribute? selectedMetaDataAttribute,
             AnimationPlayer rootPlayer,
-            bool attachThroughAnimation)
+            bool attachThroughAnimation,
+            MetaDataDocumentOwner owner,
+            ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
             if (!SpatialMetaDataCatalog.TryCreate(
                     data.Source,
@@ -595,7 +742,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             var color = selectedMetaDataAttribute == data.Source
                 ? s_selectedColor
                 : s_color;
-            var meshPath = _packFileService.FindFile(data.ModelName);
+            var meshPath = _resourceResolver.FindModel(
+                data.Source,
+                owner,
+                data.ModelName,
+                diagnostics);
             if (meshPath == null)
             {
                 _logger.Here().Warning(
@@ -614,7 +765,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             {
                 var animationPath = string.IsNullOrWhiteSpace(data.AnimationName)
                     ? null
-                    : _packFileService.FindFile(data.AnimationName);
+                    : _resourceResolver.FindAnimation(
+                        data.Source,
+                        owner,
+                        data.AnimationName,
+                        diagnostics);
                 propPlayer = _animationsContainerComponent.RegisterAnimationPlayer(
                     new AnimationPlayer(),
                     propName + Guid.NewGuid());
@@ -741,6 +896,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 
                 _logger.Here().Warning(
                     $"Skipping prop preview: {e.Message}");
+                diagnostics.Add(MetaDataDiagnosticFactory.Create(
+                    data.Source,
+                    owner,
+                    "SuperView.Diagnostics.PreviewUnavailable"));
                 return CreateSpatialMarker(
                     spatialBinding,
                     root,
@@ -1188,9 +1347,20 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             };
         }
 
-        private IMetaDataInstance CreateEffect(IEffectMeta effect, SceneNode root, ISkeletonProvider skeleton, ParsedMetadataAttribute? selectedAttribute)
+        private IMetaDataInstance CreateEffect(
+            IEffectMeta effect,
+            SceneNode root,
+            ISkeletonProvider skeleton,
+            ParsedMetadataAttribute? selectedAttribute,
+            MetaDataDocumentOwner owner,
+            ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
             var source = (ParsedMetadataAttribute)effect;
+            _resourceResolver.CheckEffect(
+                source,
+                owner,
+                effect.VfxName,
+                diagnostics);
             var node = new SimpleDrawableNode("Effect:" + effect.VfxName);
             var instance = new DrawableMetaInstance(
                 GetActiveTimeRange(source),
@@ -1205,7 +1375,22 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 () => new Quaternion(effect.Orientation));
             root.AddObject(node);
             if (effect.Tracking)
-                instance.FollowBone(skeleton, effect.NodeIndex);
+            {
+                if (skeleton?.Skeleton != null &&
+                    effect.NodeIndex >= 0 &&
+                    effect.NodeIndex < skeleton.Skeleton.BoneCount)
+                {
+                    instance.FollowBone(skeleton, effect.NodeIndex);
+                }
+                else
+                {
+                    diagnostics.Add(MetaDataDiagnosticFactory.Create(
+                        source,
+                        owner,
+                        "SuperView.Diagnostics.MissingBone",
+                        boneName: effect.NodeIndex.ToString()));
+                }
+            }
             return instance;
         }
 

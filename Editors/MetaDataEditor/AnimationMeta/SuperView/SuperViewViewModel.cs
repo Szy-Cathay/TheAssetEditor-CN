@@ -45,6 +45,7 @@ namespace Editors.AnimationMeta.SuperView
         private readonly HashSet<ParsedMetadataAttribute>
             _threeDimensionalEditingSources = new(
                 ReferenceEqualityComparer.Instance);
+        private List<MetaDataBuildDiagnostic> _metaDataDiagnostics = [];
 
         [ObservableProperty] MetaDataEditorViewModel _persistentMetaEditor = null!;
         [ObservableProperty] MetaDataEditorViewModel _metaEditor = null!;
@@ -231,6 +232,8 @@ namespace Editors.AnimationMeta.SuperView
             SelectedTabControllerIndex == 0
                 ? PersistentMetaEditor.SelectedAttribute
                 : MetaEditor.SelectedAttribute;
+        public IReadOnlyList<MetaDataBuildDiagnostic> MetaDataDiagnostics =>
+            _metaDataDiagnostics;
         public bool CanFocusSelectedMetaData =>
             GetSelectedSpatialPreview() != null;
         public bool CanEditSelectedCombatMetaData =>
@@ -519,7 +522,19 @@ namespace Editors.AnimationMeta.SuperView
             _threeDimensionalEditingSources.RemoveWhere(source =>
                 !currentSources.Contains(source));
 
-            _asset.Data.MetaDataItems = _metaDataFactory.Create(persist, meta, SelectedPreviewAttribute, _asset.Data.MainNode, _asset.Data, _asset.Data.Player, _asset.FragAndSlotSelection.FragmentList.SelectedItem);
+            var buildResult = _metaDataFactory.Build(
+                persist,
+                meta,
+                SelectedPreviewAttribute,
+                _asset.Data.MainNode,
+                _asset.Data,
+                _asset.Data.Player,
+                _asset.FragAndSlotSelection.FragmentList.SelectedItem);
+            _asset.Data.MetaDataItems = buildResult.Instances.ToList();
+            _asset.Data.Player.AnimationRules.AddRange(
+                buildResult.AnimationRules);
+            _metaDataDiagnostics = buildResult.Diagnostics.ToList();
+            OnPropertyChanged(nameof(MetaDataDiagnostics));
             _appliedSelectedPreviewAttribute = SelectedPreviewAttribute;
             ApplyCombatPreviewVisibility();
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
@@ -559,16 +574,20 @@ namespace Editors.AnimationMeta.SuperView
         private bool RefreshMetaDataPreview(
             ParsedMetadataAttribute attribute)
         {
-            if (!_metaDataFactory.TryCreateMetaDataPreview(
+            if (!TryGetDocumentOwner(attribute, out var owner))
+                return false;
+
+            var buildResult = _metaDataFactory.BuildPreview(
                 attribute,
+                owner,
                 ReferenceEquals(attribute, SelectedPreviewAttribute),
                 _asset.Data.MainNode,
                 _asset.Data,
-                _asset.Data.Player,
-                out var replacement))
-            {
+                _asset.Data.Player);
+            if (!buildResult.IsSupported)
                 return false;
-            }
+
+            var replacement = buildResult.Instance;
 
             var currentIndex = _asset.Data.MetaDataItems.FindIndex(item =>
                 item is IMetaDataPreview preview &&
@@ -589,10 +608,37 @@ namespace Editors.AnimationMeta.SuperView
                         replacement);
             }
 
+            _metaDataDiagnostics.RemoveAll(diagnostic =>
+                ReferenceEquals(diagnostic.Source, attribute));
+            _metaDataDiagnostics.AddRange(buildResult.Diagnostics);
+            OnPropertyChanged(nameof(MetaDataDiagnostics));
+
             ApplyCombatPreviewVisibility();
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
             OnPropertyChanged(nameof(CanConfigureSelectedMetaDataDisplayTime));
             return true;
+        }
+
+        private bool TryGetDocumentOwner(
+            ParsedMetadataAttribute attribute,
+            out MetaDataDocumentOwner owner)
+        {
+            if (PersistentMetaEditor.ParsedFile?.Attributes.Any(item =>
+                    ReferenceEquals(item, attribute)) == true)
+            {
+                owner = MetaDataDocumentOwner.Persistent;
+                return true;
+            }
+
+            if (MetaEditor.ParsedFile?.Attributes.Any(item =>
+                    ReferenceEquals(item, attribute)) == true)
+            {
+                owner = MetaDataDocumentOwner.Animation;
+                return true;
+            }
+
+            owner = default;
+            return false;
         }
 
         private void ApplyCombatPreviewVisibility()
