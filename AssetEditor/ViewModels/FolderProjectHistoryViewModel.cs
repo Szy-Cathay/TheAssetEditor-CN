@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetEditor.Services;
@@ -27,7 +26,6 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private FolderProjectContainer? _project;
     private int _selectedRestorePointRequestVersion;
     private int _activeOperationCount;
-    private bool _isUpdatingSelectedRestorePoint;
 
     [ObservableProperty] private bool _isReady;
     [ObservableProperty] private bool _isBusy;
@@ -146,9 +144,6 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     partial void OnSelectedRestorePointChanged(
         FolderProjectRestorePoint? value)
     {
-        if (_isUpdatingSelectedRestorePoint)
-            return;
-
         SelectedRestorePointChanges.Clear();
         HasSelectedRestorePointChanges = false;
         var requestVersion = ++_selectedRestorePointRequestVersion;
@@ -186,24 +181,6 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
             ReplaceCollection(SelectedRestorePointChanges, changes);
             HasSelectedRestorePointChanges = changes.Count != 0;
-            var loadedRestorePoint = restorePoint with
-            {
-                ChangeSummary = Summarize(changes),
-            };
-            var index = RestorePoints.IndexOf(restorePoint);
-            if (index >= 0)
-            {
-                _isUpdatingSelectedRestorePoint = true;
-                try
-                {
-                    RestorePoints[index] = loadedRestorePoint;
-                    SelectedRestorePoint = loadedRestorePoint;
-                }
-                finally
-                {
-                    _isUpdatingSelectedRestorePoint = false;
-                }
-            }
         }
         catch (FolderProjectHistoryException exception)
         {
@@ -373,21 +350,6 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             exception,
             _localization.Get("FolderProject.History.Error.Unexpected"));
     }
-
-    private static FolderProjectRestorePointChangeSummary Summarize(
-        IReadOnlyList<FolderProjectRestorePointChange> changes) =>
-        new(
-            changes.Count(change =>
-                change.Kind == FolderProjectRestorePointChangeKind.Added),
-            changes.Count(change =>
-                change.Kind == FolderProjectRestorePointChangeKind.Modified),
-            changes.Count(change =>
-                change.Kind == FolderProjectRestorePointChangeKind.Deleted),
-            changes.Count(change =>
-                change.Kind == FolderProjectRestorePointChangeKind.Renamed),
-            changes.Count(change =>
-                change.Kind ==
-                FolderProjectRestorePointChangeKind.TypeChanged));
 
     private static void ReplaceCollection<T>(
         ObservableCollection<T> target,

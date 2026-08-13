@@ -155,6 +155,13 @@ public sealed record FolderProjectCommitChange(
     FolderProjectCommitChangeKind Kind,
     bool IsBinary);
 
+public sealed record FolderProjectCommitChangeSummary(
+    int Added,
+    int Modified,
+    int Deleted,
+    int Renamed,
+    int TypeChanged);
+
 public sealed record FolderProjectFileRestoreResult(
     string CommitId,
     string RepositoryPath,

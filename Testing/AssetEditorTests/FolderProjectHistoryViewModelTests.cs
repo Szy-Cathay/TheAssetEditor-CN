@@ -249,9 +249,6 @@ public class FolderProjectHistoryViewModelTests
             project.ProjectRoot,
             point.Id,
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
-        NUnitAssert.That(
-            viewModel.SelectedRestorePoint?.ChangeSummary?.Modified,
-            Is.EqualTo(1));
     }
 
     [Test]
@@ -477,7 +474,7 @@ public class FolderProjectHistoryViewModelTests
             id,
             description,
             DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
-            null,
+            new FolderProjectRestorePointChangeSummary(1, 0, 0, 0, 0),
             initial);
 
     private static string FindSolutionRoot()

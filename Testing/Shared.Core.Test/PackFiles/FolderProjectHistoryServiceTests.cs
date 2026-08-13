@@ -257,6 +257,52 @@ public sealed class FolderProjectHistoryServiceTests
             Is.EqualTo(originalHistory.Select(item => item.Id)));
     }
 
+    [Test]
+    public void GetRestorePoints_IncludesSummaryWithoutReadingDetailedChanges()
+    {
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "调整单位数据",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            [new string('0', 40)]);
+        versionControl.Setup(item => item.GetHistory("project", 100))
+            .Returns([commit]);
+        versionControl.Setup(item => item.GetCommitChangeSummary(
+                "project",
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(
+                1,
+                2,
+                3,
+                4,
+                5));
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var history = service.GetRestorePoints("project");
+
+        Assert.That(
+            history.Single().ChangeSummary,
+            Is.EqualTo(new FolderProjectRestorePointChangeSummary(
+                1,
+                2,
+                3,
+                4,
+                5)));
+        versionControl.Verify(item => item.GetCommitChanges(
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Never);
+        versionControl.Verify(item => item.GetCommitChanges(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+            Times.Never);
+    }
+
     private sealed class TemporaryProject : IDisposable
     {
         public string Root { get; } = Path.Combine(

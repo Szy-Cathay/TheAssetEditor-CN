@@ -7,7 +7,6 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui">
     <UserControl.Resources>
         <local:HistoryChangeKindConverter x:Key="HistoryChangeKindConverter" />
-        <local:RestorePointSummaryConverter x:Key="RestorePointSummaryConverter" />
     </UserControl.Resources>
 
     <Grid Background="{DynamicResource AeBrush.Canvas}">
@@ -123,7 +122,8 @@
                                     Foreground="{DynamicResource AeBrush.TextMuted}"
                                     Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
                                 <TextBlock Foreground="{DynamicResource AeBrush.TextMuted}">
-                                    <Run Text="{Binding Converter={StaticResource RestorePointSummaryConverter}}" />
+                                    <Run Text="{loc:Loc FolderProject.History.ChangeSummaryPrefix}" />
+                                    <Run Text="{Binding ChangeSummary.Total}" />
                                 </TextBlock>
                             </StackPanel>
                         </DataTemplate>

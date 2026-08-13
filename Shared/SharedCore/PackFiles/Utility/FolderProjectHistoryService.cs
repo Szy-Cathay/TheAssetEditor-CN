@@ -47,9 +47,6 @@ public interface IFolderProjectHistoryService
 
 public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
 {
-    private static readonly FolderProjectGitIdentity s_localIdentity = new(
-        "AssetEditor.CN 本地用户",
-        "local@asseteditor.cn");
     private readonly IFolderProjectVersionControlService _versionControl;
     private readonly LocalizationManager _localization;
 
@@ -109,13 +106,16 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
         {
             var summary = _versionControl.Initialize(
                 projectRoot,
-                s_localIdentity,
+                new FolderProjectGitIdentity(
+                    _localization.Get(
+                        "FolderProject.History.LocalAuthorName"),
+                    "local@asseteditor.cn"),
                 "master",
                 progress => reportProgress(MapProgress(progress)));
             var changes = _versionControl.GetCommitChanges(
                 projectRoot,
                 summary.Id);
-            return MapRestorePoint(summary, changes);
+            return MapRestorePoint(summary, Summarize(changes));
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -148,7 +148,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             var changes = _versionControl.GetCommitChanges(
                 projectRoot,
                 summary.Id);
-            return MapRestorePoint(summary, changes);
+            return MapRestorePoint(summary, Summarize(changes));
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -172,7 +172,11 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             reportProgress(new FolderProjectHistoryProgress(
                 FolderProjectHistoryProgressStage.ReadingHistory));
             var history = _versionControl.GetHistory(projectRoot, maxCount);
-            return history.Select(summary => MapRestorePoint(summary, null))
+            return history.Select(summary => MapRestorePoint(
+                    summary,
+                    MapSummary(_versionControl.GetCommitChangeSummary(
+                        projectRoot,
+                        summary.Id))))
                 .ToList();
         }
         catch (FolderProjectVersionControlException exception)
@@ -239,7 +243,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
 
     private FolderProjectRestorePoint MapRestorePoint(
         FolderProjectCommitSummary summary,
-        IReadOnlyList<FolderProjectCommitChange>? changes)
+        FolderProjectRestorePointChangeSummary changeSummary)
     {
         var initial = summary.ParentIds.Count == 0;
         return new FolderProjectRestorePoint(
@@ -249,7 +253,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                     "FolderProject.History.InitialRestorePoint")
                 : summary.Message,
             summary.CommittedAt,
-            changes == null ? null : Summarize(changes),
+            changeSummary,
             initial);
     }
 
@@ -266,6 +270,15 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 change.Kind == FolderProjectCommitChangeKind.Renamed),
             changes.Count(change =>
                 change.Kind == FolderProjectCommitChangeKind.TypeChanged));
+
+    private static FolderProjectRestorePointChangeSummary MapSummary(
+        FolderProjectCommitChangeSummary summary) =>
+        new(
+            summary.Added,
+            summary.Modified,
+            summary.Deleted,
+            summary.Renamed,
+            summary.TypeChanged);
 
     private static FolderProjectRestorePointChange MapRestorePointChange(
         FolderProjectCommitChange change) =>

@@ -123,6 +123,10 @@ public interface IFolderProjectVersionControlService
         string commitId,
         Action<FolderProjectVersionControlProgress> reportProgress);
 
+    FolderProjectCommitChangeSummary GetCommitChangeSummary(
+        string projectRoot,
+        string commitId);
+
     FolderProjectFileRestoreResult RestoreFile(
         string projectRoot,
         string commitId,
@@ -1099,6 +1103,45 @@ public sealed partial class FolderProjectVersionControlService :
                         change => change.RepositoryPath,
                         StringComparer.Ordinal)
                     .ToList();
+            });
+    }
+
+    public FolderProjectCommitChangeSummary GetCommitChangeSummary(
+        string projectRoot,
+        string commitId)
+    {
+        var objectId = ParseFullCommitId(commitId);
+        return Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                var commit = repository.Lookup<Commit>(objectId);
+                if (commit == null)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitNotFound,
+                        "The requested commit does not exist.");
+                }
+
+                var parent = commit.Parents.FirstOrDefault();
+                var changes = repository.Diff.Compare<TreeChanges>(
+                    parent?.Tree!,
+                    commit.Tree,
+                    new CompareOptions
+                    {
+                        Similarity = SimilarityOptions.Renames,
+                    });
+                return new FolderProjectCommitChangeSummary(
+                    changes.Count(change =>
+                        change.Status == ChangeKind.Added),
+                    changes.Count(change =>
+                        change.Status == ChangeKind.Modified),
+                    changes.Count(change =>
+                        change.Status == ChangeKind.Deleted),
+                    changes.Count(change =>
+                        change.Status == ChangeKind.Renamed),
+                    changes.Count(change =>
+                        change.Status == ChangeKind.TypeChanged));
             });
     }
 

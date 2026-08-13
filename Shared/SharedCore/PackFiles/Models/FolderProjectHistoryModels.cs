@@ -62,7 +62,7 @@ public sealed record FolderProjectRestorePoint(
     string Id,
     string Description,
     DateTimeOffset CreatedAt,
-    FolderProjectRestorePointChangeSummary? ChangeSummary,
+    FolderProjectRestorePointChangeSummary ChangeSummary,
     bool IsInitial);
 
 public enum FolderProjectHistoryProgressStage
