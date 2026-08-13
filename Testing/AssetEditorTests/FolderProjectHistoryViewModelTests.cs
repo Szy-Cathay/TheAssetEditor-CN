@@ -364,6 +364,8 @@ public class FolderProjectHistoryViewModelTests
             {
                 var viewModel = CreateViewModel(
                     CreateHistoryService("project").Object);
+                viewModel.RestorePoints.Add(
+                    RestorePoint("initial", "初始还原点", true));
                 var view = new FolderProjectHistoryView
                 {
                     DataContext = viewModel,

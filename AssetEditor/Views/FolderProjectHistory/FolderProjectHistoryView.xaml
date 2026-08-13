@@ -123,7 +123,7 @@
                                     Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
                                 <TextBlock Foreground="{DynamicResource AeBrush.TextMuted}">
                                     <Run Text="{loc:Loc FolderProject.History.ChangeSummaryPrefix}" />
-                                    <Run Text="{Binding ChangeSummary.Total}" />
+                                    <Run Text="{Binding ChangeSummary.Total, Mode=OneWay}" />
                                 </TextBlock>
                             </StackPanel>
                         </DataTemplate>
