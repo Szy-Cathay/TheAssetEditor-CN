@@ -47,6 +47,9 @@ namespace Shared.Core
             services.AddSingleton<
                 IFolderProjectVersionControlService,
                 FolderProjectVersionControlService>();
+            services.AddSingleton<
+                IFolderProjectHistoryService,
+                FolderProjectHistoryService>();
             services.AddSingleton<PackAutoSaveService>();
         }
     }

@@ -85,8 +85,7 @@ public class ImportPackAsFolderProjectCommandTests
             .Callback<FolderProjectContainer>(container =>
                 importedProject = container)
             .Returns<FolderProjectContainer>(container => container);
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>();
+        var history = new Mock<IFolderProjectHistoryService>();
         var progressRunner = new Mock<IFolderProjectProgressRunner>();
         var progressVisible = false;
         var initializedWhileProgressVisible = false;
@@ -121,21 +120,18 @@ public class ImportPackAsFolderProjectCommandTests
                         progressVisible = false;
                     }
                 });
-        versionControl.Setup(item => item.Initialize(
+        history.Setup(item => item.Initialize(
                 project.Path,
-                It.IsAny<FolderProjectGitIdentity>(),
-                "master",
-                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Callback(
                 (
                     string _,
-                    FolderProjectGitIdentity _,
-                    string _,
-                    Action<FolderProjectVersionControlProgress> progress) =>
+                    Action<FolderProjectHistoryProgress> progress) =>
                 {
                     initializedWhileProgressVisible = progressVisible;
-                    progress(new FolderProjectVersionControlProgress(
-                        FolderProjectVersionControlProgressStage.IndexingFiles,
+                    progress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage
+                            .CreatingInitialRestorePoint,
                         "audio/git-index.wem",
                         1,
                         2));
@@ -150,7 +146,7 @@ public class ImportPackAsFolderProjectCommandTests
             importDialogs.Object,
             setupDialogs.Object,
             null,
-            versionControl.Object,
+            history.Object,
             progressRunner.Object);
 
         try
@@ -172,7 +168,7 @@ public class ImportPackAsFolderProjectCommandTests
                 NUnitAssert.That(initializedWhileProgressVisible, Is.True);
                 NUnitAssert.That(
                     progressUpdates.Any(update =>
-                        update.Status == "正在登记工程文件" &&
+                        update.Status == "正在创建初始还原点" &&
                         update.Detail == "audio/git-index.wem" &&
                         update.Completed == 1 &&
                         update.Total == 2),
@@ -187,11 +183,9 @@ public class ImportPackAsFolderProjectCommandTests
                     Action<OperationProgressUpdate>,
                     CancellationToken,
                     FolderProjectContainer?>>()), Times.Once);
-            versionControl.Verify(item => item.Initialize(
+            history.Verify(item => item.Initialize(
                 project.Path,
-                It.IsAny<FolderProjectGitIdentity>(),
-                "master",
-                It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+                It.IsAny<Action<FolderProjectHistoryProgress>>()),
                 Times.Once);
             packFileService.Verify(item =>
                 item.AddEditableFolderProject(
@@ -363,7 +357,7 @@ public class ImportPackAsFolderProjectCommandTests
             Mock.Of<IFolderProjectImportDialogs>(),
             setupDialogs.Object,
             null,
-            Mock.Of<IFolderProjectVersionControlService>(),
+            Mock.Of<IFolderProjectHistoryService>(),
             progressRunner.Object);
 
         var outcome = command.Execute("source.pack");
@@ -397,13 +391,10 @@ public class ImportPackAsFolderProjectCommandTests
                 false));
         var loader = new Mock<IPackFileContainerLoader>();
         loader.Setup(item => item.Load("source.pack")).Returns(source);
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>();
-        versionControl.Setup(item => item.Initialize(
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.Initialize(
                 project.Path,
-                It.IsAny<FolderProjectGitIdentity>(),
-                It.IsAny<string>(),
-                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Throws(new InvalidOperationException("git failed"));
         var progressRunner = CreateCancelableProgressRunner();
         var packFiles = new Mock<IPackFileService>(
@@ -418,7 +409,7 @@ public class ImportPackAsFolderProjectCommandTests
             Mock.Of<IFolderProjectImportDialogs>(),
             setupDialogs.Object,
             null,
-            versionControl.Object,
+            history.Object,
             progressRunner.Object);
 
         var outcome = command.Execute("source.pack");
@@ -466,7 +457,7 @@ public class ImportPackAsFolderProjectCommandTests
             Mock.Of<IFolderProjectImportDialogs>(),
             setupDialogs.Object,
             null,
-            Mock.Of<IFolderProjectVersionControlService>(),
+            Mock.Of<IFolderProjectHistoryService>(),
             CreateCancelableProgressRunner().Object);
 
         var outcome = command.Execute("source.pack");

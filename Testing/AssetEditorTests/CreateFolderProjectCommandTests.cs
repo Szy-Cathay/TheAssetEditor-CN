@@ -52,6 +52,27 @@ public class CreateFolderProjectCommandTests
     }
 
     [Test]
+    public void SetupWindow_DoesNotExposeGitConfiguration()
+    {
+        var path = Path.Combine(
+            FindSolutionRoot(),
+            "AssetEditor",
+            "Views",
+            "FolderProject",
+            "FolderProjectSetupWindow.xaml");
+        var xaml = File.ReadAllText(path);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(xaml, Does.Not.Contain("PrimaryBranch"));
+            NUnitAssert.That(xaml, Does.Not.Contain("Git"));
+            NUnitAssert.That(
+                xaml,
+                Does.Contain("FolderProject.Setup.HistoryRequired"));
+        });
+    }
+
+    [Test]
     public void FolderProjectCreation_UsesExpandableOperationProgress()
     {
         var viewDirectory = Path.Combine(
@@ -89,10 +110,8 @@ public class CreateFolderProjectCommandTests
                 new FolderProjectSetupDialogResult(
                     project.Path,
                     output.Path,
-                    true,
-                    "main"));
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>();
+                    true));
+        var history = new Mock<IFolderProjectHistoryService>();
         var progressRunner = new Mock<IFolderProjectProgressRunner>();
         var progressVisible = false;
         var initializedWhileProgressVisible = false;
@@ -119,21 +138,18 @@ public class CreateFolderProjectCommandTests
                         progressVisible = false;
                     }
                 });
-        versionControl.Setup(item => item.Initialize(
+        history.Setup(item => item.Initialize(
                 project.Path,
-                It.IsAny<FolderProjectGitIdentity>(),
-                "main",
-                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Callback(
                 (
                     string _,
-                    FolderProjectGitIdentity _,
-                    string _,
-                    Action<FolderProjectVersionControlProgress> progress) =>
+                    Action<FolderProjectHistoryProgress> progress) =>
                 {
                     initializedWhileProgressVisible = progressVisible;
-                    progress(new FolderProjectVersionControlProgress(
-                        FolderProjectVersionControlProgressStage.IndexingFiles,
+                    progress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage
+                            .CreatingInitialRestorePoint,
                         "audio/voice.wem",
                         1,
                         2));
@@ -152,7 +168,7 @@ public class CreateFolderProjectCommandTests
             Mock.Of<IStandardDialogs>(),
             LoadLocalization(),
             setupDialogs.Object,
-            versionControl.Object,
+            history.Object,
             progressRunner.Object);
 
         try
@@ -174,7 +190,7 @@ public class CreateFolderProjectCommandTests
                 NUnitAssert.That(initializedWhileProgressVisible, Is.True);
                 NUnitAssert.That(
                     progressUpdates.Any(update =>
-                        update.Status == "正在登记工程文件" &&
+                        update.Status == "正在创建初始还原点" &&
                         update.Detail == "audio/voice.wem" &&
                         update.Completed == 1 &&
                         update.Total == 2),
@@ -183,15 +199,15 @@ public class CreateFolderProjectCommandTests
             progressRunner.Verify(item => item.Run(
                 It.IsAny<string>(),
                 It.Is<string>(message =>
-                    message.Contains("首次", StringComparison.Ordinal)),
+                    message.Contains(
+                        "初始还原点",
+                        StringComparison.Ordinal)),
                 It.IsAny<Func<
                     Action<OperationProgressUpdate>,
                     FolderProjectContainer?>>()), Times.Once);
-            versionControl.Verify(item => item.Initialize(
+            history.Verify(item => item.Initialize(
                 project.Path,
-                It.IsAny<FolderProjectGitIdentity>(),
-                "main",
-                It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+                It.IsAny<Action<FolderProjectHistoryProgress>>()),
                 Times.Once);
             packFileService.Verify(item =>
                 item.AddEditableFolderProject(

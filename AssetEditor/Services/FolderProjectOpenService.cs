@@ -18,6 +18,7 @@ public interface IFolderProjectOpenService
 public sealed class FolderProjectOpenService(
     IPackFileService packFileService,
     IFolderProjectFactory folderProjectFactory,
+    IFolderProjectHistoryService historyService,
     IFolderProjectVersionControlService versionControlService,
     IFolderProjectVersionControlWindowService versionControlWindowService,
     ApplicationSettingsService settingsService,
@@ -54,15 +55,9 @@ public sealed class FolderProjectOpenService(
                 return;
             }
 
-            FolderProjectMergeState mergeState;
-            try
-            {
-                mergeState = versionControlService.GetMergeState(root);
-            }
-            catch (FolderProjectVersionControlException exception)
-                when (exception.Code ==
-                      FolderProjectVersionControlError
-                          .RepositoryNotInitialized)
+            var historyStatus = historyService.GetStatus(root);
+            if (historyStatus.Availability ==
+                FolderProjectHistoryAvailability.NotInitialized)
             {
                 dialogs.ShowDialogBox(
                     localizationManager.Get(
@@ -70,14 +65,19 @@ public sealed class FolderProjectOpenService(
                     localizationManager.Get("FolderProject.ErrorTitle"));
                 return;
             }
-            if (mergeState != null &&
-                mergeState.Phase != FolderProjectMergePhase.None)
+            if (historyStatus.Availability ==
+                FolderProjectHistoryAvailability.RecoveryRequired)
             {
-                versionControlWindowService.ShowDialog(
-                    root,
-                    GetProjectName(root),
-                    true);
-                return;
+                var mergeState = versionControlService.GetMergeState(root);
+                if (mergeState != null &&
+                    mergeState.Phase != FolderProjectMergePhase.None)
+                {
+                    versionControlWindowService.ShowDialog(
+                        root,
+                        GetProjectName(root),
+                        true);
+                    return;
+                }
             }
 
             if (packFileService.TryActivateFolderProject(root))

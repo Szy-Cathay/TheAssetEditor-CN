@@ -26,6 +26,7 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         new(StringComparer.OrdinalIgnoreCase);
     private string? _currentProjectRoot;
     private bool _requiresFullRefresh;
+    private bool _historyRefreshPending;
 
     [ObservableProperty] private bool _isEnabled;
     [ObservableProperty] private int _selectedSidebarTabIndex;
@@ -34,6 +35,7 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
     [ObservableProperty] private bool _isRepositoryEditorOpen;
 
     public FolderProjectVersionControlViewModel VersionControl { get; }
+    public FolderProjectHistoryViewModel? History { get; }
     public bool IsLoadingOperationVisibleInPanel =>
         VersionControl.IsLoadingOperation && !IsRepositoryEditorOpen;
     public Task WorkingChangesRefreshTask { get; private set; } =
@@ -52,15 +54,19 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         IEditorManager editorManager,
         IFolderProjectVersionControlWindowService
             versionControlWindowService,
-        IGlobalEventHub? eventHub = null)
+        IGlobalEventHub? eventHub = null,
+        FolderProjectHistoryViewModel? history = null)
     {
         VersionControl = versionControl;
+        History = history;
         _editorManager = editorManager;
         _versionControlWindowService = versionControlWindowService;
         _synchronizationContext = SynchronizationContext.Current;
         VersionControl.Branches.CollectionChanged +=
             (_, _) => OnPropertyChanged(nameof(FilteredBranches));
         VersionControl.PropertyChanged += OnVersionControlPropertyChanged;
+        if (History != null)
+            History.PropertyChanged += OnHistoryPropertyChanged;
         eventHub?.Register<FolderProjectChangedEvent>(
             this,
             OnFolderProjectChanged);
@@ -79,6 +85,8 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         {
             CloseRepositoryEditor();
             _currentProjectRoot = null;
+            History?.OpenProject(null);
+            _historyRefreshPending = false;
             ClearPendingWorkingChanges();
             IsEnabled = false;
             SelectedSidebarTabIndex = 0;
@@ -106,8 +114,14 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
             project.ProjectSettings.Name,
             false,
             refresh: false);
+        History?.OpenProject(project);
         if (SelectedSidebarTabIndex == 1 &&
-            VersionControl.RefreshCommand.CanExecute(null))
+            History != null)
+        {
+            StartHistoryRefresh(true);
+        }
+        else if (SelectedSidebarTabIndex == 1 &&
+                 VersionControl.RefreshCommand.CanExecute(null))
         {
             VersionControl.RefreshCommand.Execute(null);
         }
@@ -200,6 +214,12 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         if (value != 1 || !IsEnabled)
             return;
 
+        if (History != null)
+        {
+            StartHistoryRefresh(true);
+            return;
+        }
+
         if (!VersionControl.HasRepositorySnapshot &&
             VersionControl.RefreshCommand.CanExecute(null))
         {
@@ -225,6 +245,18 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
                 projectRoot,
                 StringComparison.OrdinalIgnoreCase))
         {
+            return;
+        }
+
+        if (History != null)
+        {
+            _historyRefreshPending = true;
+            RunOnSynchronizationContext(
+                () =>
+                {
+                    if (SelectedSidebarTabIndex == 1)
+                        StartHistoryRefresh(false);
+                });
             return;
         }
 
@@ -297,6 +329,31 @@ public partial class FolderProjectGitWorkspaceViewModel : ObservableObject
         {
             StartPendingWorkingChangesRefresh();
         }
+    }
+
+    private void OnHistoryPropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FolderProjectHistoryViewModel.IsBusy) &&
+            History is { IsBusy: false } &&
+            SelectedSidebarTabIndex == 1)
+        {
+            StartHistoryRefresh(false);
+        }
+    }
+
+    private void StartHistoryRefresh(bool force)
+    {
+        if (History == null || History.IsBusy)
+            return;
+        if (!force && !_historyRefreshPending)
+            return;
+        if (!History.RefreshCommand.CanExecute(null))
+            return;
+
+        _historyRefreshPending = false;
+        History.RefreshCommand.Execute(null);
     }
 
     partial void OnIsRepositoryEditorOpenChanged(bool value) =>

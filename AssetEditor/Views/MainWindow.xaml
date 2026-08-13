@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:AssetEditor.Views"
-        xmlns:gitViews="clr-namespace:AssetEditor.Views.FolderProjectVersionControl"
+        xmlns:historyViews="clr-namespace:AssetEditor.Views.FolderProjectHistory"
         xmlns:viewFactory="clr-namespace:Shared.Ui.Common.DataTemplates;assembly=Shared.Ui"
         xmlns:datatemplates="clr-namespace:Shared.Ui.Common.DataTemplates;assembly=Shared.Ui"
         xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
@@ -76,7 +76,7 @@
                         <materialIcons:MaterialIcon
                             Width="17"
                             Height="17"
-                            Kind="SourceBranch" />
+                            Kind="History" />
                     </ListBoxItem>
                 </ListBox>
 
@@ -121,9 +121,9 @@
                                     Style="{StaticResource AeShell.SidebarHeader}"
                                     Text="{loc:Loc MainWindow.Activity.Git}" />
                             </Border>
-                            <gitViews:FolderProjectGitPanelView
+                            <historyViews:FolderProjectHistoryView
                                 Grid.Row="1"
-                                DataContext="{Binding DataContext.GitWorkspace, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                DataContext="{Binding DataContext.GitWorkspace.History, RelativeSource={RelativeSource AncestorType=Window}}" />
                         </Grid>
                     </TabItem>
                 </TabControl>

@@ -21,6 +21,7 @@ public class OperationProgressViewTests
     private static readonly (string[] Path, int HostCount)[] IndependentProgressHostSurfaces =
     [
         (["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitPanelView.xaml"], 1),
+        (["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"], 1),
         (["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitRepositoryView.xaml"], 1),
         (["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectVersionControlWindow.xaml"], 1),
         (["AssetEditor", "Views", "MainWindow.xaml"], 1),

@@ -61,6 +61,48 @@ public class FolderProjectGitWorkspaceViewModelTests
     }
 
     [Test]
+    public async Task EditableContainer_OpensVisibleProjectHistory()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var historyService = new Mock<IFolderProjectHistoryService>();
+        historyService.Setup(item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
+        historyService.Setup(item => item.GetRestorePoints(
+                project.ProjectRoot,
+                100,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([]);
+        var history = new FolderProjectHistoryViewModel(
+            historyService.Object,
+            Mock.Of<IFolderProjectUnsavedChangesService>(),
+            Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
+            Mock.Of<IStandardDialogs>(),
+            LocalizationManager.Instance);
+        var workspace = CreateWorkspace(
+            out _,
+            history: history);
+
+        workspace.SetEditableContainer(project);
+        workspace.ShowGitManagement();
+        await history.RefreshCommand.ExecutionTask!;
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(workspace.History, Is.SameAs(history));
+            NUnitAssert.That(history.ProjectName, Is.EqualTo("测试工程"));
+            NUnitAssert.That(history.IsReady, Is.True);
+        });
+    }
+
+    [Test]
     public async Task InternalGitDetach_KeepsGitManagementSelected()
     {
         using var directory = new TemporaryDirectory();
@@ -2484,14 +2526,16 @@ public class FolderProjectGitWorkspaceViewModelTests
         out FolderProjectVersionControlViewModel versionControl,
         IEditorManager? editorManager = null,
         IFolderProjectVersionControlWindowService? windowService = null,
-        IGlobalEventHub? eventHub = null)
+        IGlobalEventHub? eventHub = null,
+        FolderProjectHistoryViewModel? history = null)
     {
         return CreateWorkspace(
             out versionControl,
             out _,
             editorManager,
             windowService,
-            eventHub);
+            eventHub,
+            history);
     }
 
     private static FolderProjectGitWorkspaceViewModel CreateWorkspace(
@@ -2499,7 +2543,8 @@ public class FolderProjectGitWorkspaceViewModelTests
         out Mock<IFolderProjectVersionControlService> service,
         IEditorManager? editorManager = null,
         IFolderProjectVersionControlWindowService? windowService = null,
-        IGlobalEventHub? eventHub = null)
+        IGlobalEventHub? eventHub = null,
+        FolderProjectHistoryViewModel? history = null)
     {
         var createdService =
             new Mock<IFolderProjectVersionControlService>();
@@ -2549,7 +2594,8 @@ public class FolderProjectGitWorkspaceViewModelTests
             editorManager ?? Mock.Of<IEditorManager>(),
             windowService ??
                 Mock.Of<IFolderProjectVersionControlWindowService>(),
-            eventHub);
+            eventHub,
+            history);
     }
 
     private static XDocument LoadView(string fileName)

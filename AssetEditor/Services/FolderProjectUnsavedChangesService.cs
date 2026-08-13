@@ -15,6 +15,7 @@ public enum FolderProjectUnsavedChangesOperation
 {
     Stage,
     CommitAll,
+    CreateRestorePoint,
 }
 
 public enum FolderProjectUnsavedChangesChoice
@@ -138,7 +139,10 @@ public sealed class FolderProjectUnsavedChangesPrompt(
         var window = new Window
         {
             Title = localization.Get(
-                "FolderProject.VersionControl.Unsaved.Title"),
+                operation == FolderProjectUnsavedChangesOperation
+                    .CreateRestorePoint
+                    ? "FolderProject.History.Unsaved.Title"
+                    : "FolderProject.VersionControl.Unsaved.Title"),
             Owner = owner,
             WindowStartupLocation = owner == null
                 ? WindowStartupLocation.CenterScreen
@@ -152,35 +156,64 @@ public sealed class FolderProjectUnsavedChangesPrompt(
         {
             window.Style = style;
         }
-        var buttons = new StackPanel
+        var content = new StackPanel
         {
             Margin = new Thickness(18),
+            MaxWidth = 560,
+        };
+        if (operation == FolderProjectUnsavedChangesOperation
+                .CreateRestorePoint)
+        {
+            content.Children.Add(new TextBlock
+            {
+                Text = localization.Get(
+                    "FolderProject.History.Unsaved.Message"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 16),
+            });
+        }
+        var buttons = new StackPanel
+        {
             Orientation = Orientation.Horizontal,
         };
         buttons.Children.Add(CreateButton(
-            operation == FolderProjectUnsavedChangesOperation.CommitAll
-                ? "FolderProject.VersionControl.Unsaved.SaveAndCommit"
-                : "FolderProject.VersionControl.Unsaved.Save",
+            operation switch
+            {
+                FolderProjectUnsavedChangesOperation.CommitAll =>
+                    "FolderProject.VersionControl.Unsaved.SaveAndCommit",
+                FolderProjectUnsavedChangesOperation.CreateRestorePoint =>
+                    "FolderProject.History.Unsaved.SaveAndCreate",
+                _ => "FolderProject.VersionControl.Unsaved.Save",
+            },
             true,
             value => choice = value,
             FolderProjectUnsavedChangesChoice.Save,
             window));
         buttons.Children.Add(CreateButton(
-            operation == FolderProjectUnsavedChangesOperation.CommitAll
-                ? "FolderProject.VersionControl.Unsaved.DontSaveAndCommit"
-                : "FolderProject.VersionControl.Unsaved.DontSave",
+            operation switch
+            {
+                FolderProjectUnsavedChangesOperation.CommitAll =>
+                    "FolderProject.VersionControl.Unsaved.DontSaveAndCommit",
+                FolderProjectUnsavedChangesOperation.CreateRestorePoint =>
+                    "FolderProject.History.Unsaved.DiskOnly",
+                _ => "FolderProject.VersionControl.Unsaved.DontSave",
+            },
             false,
             value => choice = value,
             FolderProjectUnsavedChangesChoice.DontSave,
             window));
         buttons.Children.Add(CreateButton(
-            "FolderProject.VersionControl.Unsaved.Cancel",
+            operation == FolderProjectUnsavedChangesOperation
+                .CreateRestorePoint
+                ? "FolderProject.History.Unsaved.Cancel"
+                : "FolderProject.VersionControl.Unsaved.Cancel",
             false,
             value => choice = value,
             FolderProjectUnsavedChangesChoice.Cancel,
             window,
             true));
-        window.Content = buttons;
+        content.Children.Add(buttons);
+        window.Content = content;
         window.ShowDialog();
         return choice;
     }
@@ -202,6 +235,13 @@ public sealed class FolderProjectUnsavedChangesPrompt(
             IsDefault = isDefault,
             IsCancel = isCancel,
         };
+        var styleKey = isDefault
+            ? "AeButton.Primary"
+            : isCancel
+                ? "AeButton.Quiet"
+                : "AeButton.Secondary";
+        if (Application.Current?.TryFindResource(styleKey) is Style style)
+            button.Style = style;
         button.Click += (_, _) =>
         {
             setChoice(choice);
