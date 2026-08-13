@@ -1,4 +1,4 @@
-using AssetEditor.UiCommands;
+﻿using AssetEditor.UiCommands;
 using Moq;
 using NUnit.Framework;
 using Shared.Core.PackFiles;
@@ -46,12 +46,11 @@ public class ImportPackAsFolderProjectCommandTests
                     true));
         FolderProjectContainer? importedProject = null;
         var packFileService = new Mock<IPackFileService>();
-        packFileService.Setup(item => item.AddContainer(
-                It.IsAny<PackFileContainer>(),
-                true))
-            .Callback<PackFileContainer, bool>((container, _) =>
-                importedProject = (FolderProjectContainer)container)
-            .Returns<PackFileContainer, bool>((container, _) => container);
+        packFileService.Setup(item => item.AddEditableFolderProject(
+                It.IsAny<FolderProjectContainer>()))
+            .Callback<FolderProjectContainer>(container =>
+                importedProject = container)
+            .Returns<FolderProjectContainer>(container => container);
         var versionControl =
             new Mock<IFolderProjectVersionControlService>();
         var progressRunner = new Mock<IFolderProjectProgressRunner>();
@@ -149,6 +148,10 @@ public class ImportPackAsFolderProjectCommandTests
                 It.IsAny<FolderProjectGitIdentity>(),
                 "master",
                 It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+                Times.Once);
+            packFileService.Verify(item =>
+                item.AddEditableFolderProject(
+                    It.IsAny<FolderProjectContainer>()),
                 Times.Once);
         }
         finally

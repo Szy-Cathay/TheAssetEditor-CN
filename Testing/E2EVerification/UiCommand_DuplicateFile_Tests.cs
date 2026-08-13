@@ -46,7 +46,7 @@ namespace Test.E2EVerification
             var project = FolderProjectContainer.Create(
                 projectRoot,
                 new FolderProjectSettings { Name = "工程" });
-            runner.PackFileService.AddContainer(project, true);
+            runner.PackFileService.AddEditableFolderProject(project);
 
             try
             {

@@ -1,3 +1,4 @@
+﻿using LibGit2Sharp;
 using Moq;
 using Shared.ByteParsing;
 using Shared.Core.Events;
@@ -56,6 +57,128 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
+    public void AddReferencePack_DoesNotReplaceEditableFolderProject()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var reference = new PackFileContainer("reference.pack")
+        {
+            SystemFilePath = @"D:\packs\reference.pack",
+        };
+        var service = CreateService();
+        service.AddEditableFolderProject(project);
+
+        var result = service.AddReferencePack(reference);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.SameAs(reference));
+            Assert.That(
+                service.GetEditablePack(),
+                Is.SameAs(project));
+            Assert.That(
+                project.Role,
+                Is.EqualTo(PackFileContainerRole.ProjectWorkspace));
+            Assert.That(
+                reference.Role,
+                Is.EqualTo(PackFileContainerRole.Reference));
+        });
+    }
+
+    [Test]
+    public void TryActivateFolderProject_WhenEditableEventThrows_RollsBackWorkspace()
+    {
+        using var firstRoot = new TemporaryDirectory();
+        using var secondRoot = new TemporaryDirectory();
+        using var first = FolderProjectContainer.Create(
+            firstRoot.Path,
+            new FolderProjectSettings { Name = "工程 A" });
+        using var second = FolderProjectContainer.Create(
+            secondRoot.Path,
+            new FolderProjectSettings { Name = "工程 B" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddEditableFolderProject(first);
+        service.AddEditableFolderProject(second);
+        service.SetEditablePack(first);
+        eventHub.Invocations.Clear();
+        var expected = new InvalidOperationException(
+            "editable event failed");
+        eventHub
+            .Setup(hub => hub.PublishGlobalEvent(
+                It.IsAny<
+                    PackFileContainerSetAsMainEditableEvent>()))
+            .Throws(expected);
+
+        var actual = Assert.Throws<InvalidOperationException>(() =>
+            service.TryActivateFolderProject(secondRoot.Path));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(expected));
+            Assert.That(service.GetEditablePack(), Is.SameAs(first));
+            Assert.That(
+                first.Role,
+                Is.EqualTo(PackFileContainerRole.ProjectWorkspace));
+            Assert.That(
+                second.Role,
+                Is.EqualTo(PackFileContainerRole.ProjectWorkspace));
+        });
+    }
+
+    [Test]
+    public void ReferencePack_CannotBecomeEditable()
+    {
+        var reference = new PackFileContainer("reference.pack")
+        {
+            SystemFilePath = @"D:\packs\reference.pack",
+        };
+        var service = CreateService();
+        service.AddReferencePack(reference);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            service.SetEditablePack(reference));
+
+        Assert.That(service.GetEditablePack(), Is.Null);
+    }
+
+    [Test]
+    public void ReferencePack_RejectsWritesAndDirectSave()
+    {
+        using var output = new TemporaryDirectory();
+        var outputPath = Path.Combine(output.Path, "reference.pack");
+        var reference = new PackFileContainer("reference.pack")
+        {
+            Header = new PFHeader("PFH6", PackFileCAType.MOD),
+            SystemFilePath = @"D:\packs\reference.pack",
+        };
+        var service = CreateService();
+        service.AddReferencePack(reference);
+
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                service.AddFilesToPack(
+                    reference,
+                    [
+                        new NewPackFileEntry(
+                            "db",
+                            PackFile.CreateFromBytes("item.bin", [1])),
+                    ]));
+            Assert.Throws<InvalidOperationException>(() =>
+                service.SavePackContainer(
+                    reference,
+                    outputPath,
+                    false,
+                    GameInformationDatabase.GetGameById(
+                        GameTypeEnum.Warhammer3)));
+            Assert.That(File.Exists(outputPath), Is.False);
+        });
+    }
+
+    [Test]
     public void Mutations_WriteThroughToProjectDirectory()
     {
         using var project = new TemporaryDirectory();
@@ -101,6 +224,39 @@ public class FolderProjectPackFileServiceTests
                     "final",
                     "renamed.bin")),
             Is.False);
+    }
+
+    [Test]
+    public void SaveFile_FolderProjectDoesNotCreateGitHistory()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var versionControl = new FolderProjectVersionControlService();
+        versionControl.Initialize(
+            project.Path,
+            new FolderProjectGitIdentity(
+                "AE Test",
+                "ae-test@example.invalid"));
+        string originalHead;
+        using (var repository = new Repository(project.Path))
+            originalHead = repository.Head.Tip.Sha;
+        var service = CreateService();
+        service.AddEditableFolderProject(container);
+
+        service.SaveFile(container.FileList[@"db\item.bin"], [2, 3]);
+
+        using var updatedRepository = new Repository(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllBytes(Path.Combine(project.Path, "db", "item.bin")),
+                Is.EqualTo(new byte[] { 2, 3 }));
+            Assert.That(updatedRepository.Head.Tip.Sha, Is.EqualTo(originalHead));
+            Assert.That(updatedRepository.Commits.Count(), Is.EqualTo(1));
+        });
     }
 
     [Test]
@@ -1350,6 +1506,49 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
+    public void SavePackContainer_FolderProjectDoesNotCreateGitHistory()
+    {
+        using var project = new TemporaryDirectory();
+        using var output = new TemporaryDirectory();
+        project.Write(@"db\item.bin", [1, 2, 3]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings
+            {
+                Name = "工程",
+                GameVersion = GameTypeEnum.Warhammer3,
+                PackFileVersion = PackFileVersion.PFH5,
+            });
+        var versionControl = new FolderProjectVersionControlService();
+        versionControl.Initialize(
+            project.Path,
+            new FolderProjectGitIdentity(
+                "AE Test",
+                "ae-test@example.invalid"));
+        string originalHead;
+        using (var repository = new Repository(project.Path))
+            originalHead = repository.Head.Tip.Sha;
+        var service = CreateService();
+        service.AddEditableFolderProject(container);
+        var outputPath = Path.Combine(output.Path, "generated.pack");
+
+        service.SavePackContainer(
+            container,
+            outputPath,
+            false,
+            GameInformationDatabase.GetGameById(
+                GameTypeEnum.Warhammer3));
+
+        using var updatedRepository = new Repository(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(outputPath), Is.True);
+            Assert.That(updatedRepository.Head.Tip.Sha, Is.EqualTo(originalHead));
+            Assert.That(updatedRepository.Commits.Count(), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void SavePackContainer_FolderProjectDoesNotCreateBackup()
     {
         using var project = new TemporaryDirectory();
@@ -1910,6 +2109,13 @@ public class FolderProjectPackFileServiceTests
 
         public void Dispose()
         {
+            foreach (var filePath in Directory.EnumerateFiles(
+                         Path,
+                         "*",
+                         SearchOption.AllDirectories))
+            {
+                File.SetAttributes(filePath, FileAttributes.Normal);
+            }
             Directory.Delete(Path, true);
         }
     }

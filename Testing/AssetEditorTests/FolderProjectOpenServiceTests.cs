@@ -96,7 +96,9 @@ public class FolderProjectOpenServiceTests
             .Returns(container);
         var packFiles = new Mock<IPackFileService>(
             MockBehavior.Strict);
-        packFiles.Setup(item => item.AddContainer(container, true))
+        packFiles.Setup(item => item.TryActivateFolderProject(project.Path))
+            .Returns(false);
+        packFiles.Setup(item => item.AddEditableFolderProject(container))
             .Callback(() => calls.Add("add"))
             .Returns(container);
         var service = new FolderProjectOpenService(
@@ -115,6 +117,47 @@ public class FolderProjectOpenServiceTests
             calls,
             Is.EqualTo(
                 new[] { "merge-state", "factory-open", "add" }));
+    }
+
+    [Test]
+    public void Open_AlreadyLoadedProject_ActivatesWithoutOpeningAgain()
+    {
+        using var project = new TemporaryFolderProject();
+        using var container = FolderProjectContainer.Open(project.Path);
+        var versionControl =
+            new Mock<IFolderProjectVersionControlService>(
+                MockBehavior.Strict);
+        versionControl.Setup(item => item.GetMergeState(project.Path))
+            .Returns(new FolderProjectMergeState(
+                FolderProjectMergePhase.None,
+                null,
+                null,
+                null,
+                null,
+                null,
+                [],
+                null));
+        var packFiles = new Mock<IPackFileService>(MockBehavior.Strict);
+        packFiles.Setup(item => item.TryActivateFolderProject(project.Path))
+            .Returns(true);
+        var factory = new Mock<IFolderProjectFactory>(MockBehavior.Strict);
+        var service = new FolderProjectOpenService(
+            packFiles.Object,
+            factory.Object,
+            versionControl.Object,
+            Mock.Of<IFolderProjectVersionControlWindowService>(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            new LocalizationManager());
+
+        service.Open(project.Path);
+
+        packFiles.Verify(
+            item => item.TryActivateFolderProject(project.Path),
+            Times.Once);
+        factory.Verify(
+            item => item.Open(It.IsAny<string>()),
+            Times.Never);
     }
 
     [Test]

@@ -26,7 +26,11 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             var appSettings = new ApplicationSettingsService(selectedGame);
             _pfs = new PackFileService(null);
             _pfs.EnforceGameFilesMustBeLoaded = false;
-            var _outputPack = _pfs.CreateNewPackFileContainer("output", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+            var outputPack = _pfs.CreateNewPackFileContainer(
+                "output",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            _pfs.SetEditablePack(outputPack);
 
             _abstractMaterialFactory = new CapabilityMaterialFactory(appSettings, null);
 
@@ -51,7 +55,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             var emissiveCap = material.GetCapability<EmissiveCapability>();
             Assert.That(emissiveCap.Emissive.TexturePath, Is.EqualTo($"texturePath/wsmodel/{TextureType.Emissive}.dds"));
             Assert.That(emissiveCap.EmissiveDistortion.TexturePath, Is.EqualTo($"texturePath/wsmodel/{TextureType.EmissiveDistortion}.dds"));
-            Assert.That(emissiveCap.EmissiveDirection, Is.EqualTo(new Vector2(1,2)));
+            Assert.That(emissiveCap.EmissiveDirection, Is.EqualTo(new Vector2(1, 2)));
             Assert.That(emissiveCap.EmissiveDistortStrength, Is.EqualTo(2));
             Assert.That(emissiveCap.EmissiveFresnelStrength, Is.EqualTo(3));
             Assert.That(emissiveCap.EmissiveSpeed, Is.EqualTo(4));
@@ -67,7 +71,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             Assert.That(emissiveCap.GradientTimes[3], Is.EqualTo(3));
             Assert.That(emissiveCap.EmissiveStrength, Is.EqualTo(7));
             Assert.That(emissiveCap.EmissiveTiling, Is.EqualTo(new Vector2(4, 5)));
-            Assert.That(emissiveCap.EmissiveTint, Is.EqualTo(new Vector3(5,6,7)));
+            Assert.That(emissiveCap.EmissiveTint, Is.EqualTo(new Vector3(5, 6, 7)));
         }
 
         [Test]

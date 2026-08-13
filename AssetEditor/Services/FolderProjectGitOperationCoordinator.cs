@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -399,11 +399,12 @@ public sealed class FolderProjectGitOperationCoordinator :
     {
         try
         {
-            var added = _packFileService.AddContainer(
+            var added = _packFileService.ReattachFolderProject(
                 project,
                 reattachState.InsertionIndex,
-                reattachState.WasEditable,
-                PackFileContainerAddedReason.InternalReattach);
+                reattachState.WasEditable
+                    ? FolderProjectReattachMode.Editable
+                    : FolderProjectReattachMode.Inactive);
             if (!ReferenceEquals(added, project))
             {
                 throw new InvalidOperationException(

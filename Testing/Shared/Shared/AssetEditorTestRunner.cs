@@ -41,7 +41,7 @@ namespace Test.TestingUtility.Shared
 
             PackFileService = ServiceProvider.GetRequiredService<IPackFileService>();
             CommandFactory = ServiceProvider.GetRequiredService<IUiCommandFactory>();
-            ScopeRepository = ServiceProvider.GetRequiredService<IScopeRepository>() ;
+            ScopeRepository = ServiceProvider.GetRequiredService<IScopeRepository>();
         }
 
         public PackFileContainer? LoadPackFile(string path, bool createOutputPackFile = true)
@@ -51,7 +51,7 @@ namespace Test.TestingUtility.Shared
             PackFileService.AddContainer(container);
 
             if (createOutputPackFile)
-                return PackFileService.CreateNewPackFileContainer("TestOutput", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+                return CreateOutputPack();
             return null;
         }
 
@@ -62,7 +62,7 @@ namespace Test.TestingUtility.Shared
                 IsCaPackFile = true,
                 SystemFilePath = @"c:\files\game\ca.pack"
             };
-            PackFileService.AddContainer(caConainter, false);
+            PackFileService.AddContainer(caConainter);
             return caConainter;
         }
 
@@ -83,13 +83,24 @@ namespace Test.TestingUtility.Shared
 
         public PackFileContainer CreateOutputPack()
         {
-            return PackFileService.CreateNewPackFileContainer("TestOutput", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+            var output = PackFileService.CreateNewPackFileContainer(
+                "TestOutput",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            PackFileService.SetEditablePack(output);
+            return output;
         }
 
 
         public PackFileContainer CreateEmptyPackFile(string packFileName, bool setAsEditable)
         {
-            return PackFileService.CreateNewPackFileContainer(packFileName, PackFileVersion.PFH5, PackFileCAType.MOD, setAsEditable);
+            var pack = PackFileService.CreateNewPackFileContainer(
+                packFileName,
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            if (setAsEditable)
+                PackFileService.SetEditablePack(pack);
+            return pack;
         }
 
         void MockServices(IServiceCollection services)

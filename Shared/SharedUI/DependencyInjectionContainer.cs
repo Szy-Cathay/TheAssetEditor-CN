@@ -37,7 +37,7 @@ namespace Shared.Ui
             services.AddScoped<AdvancedImportCommand>();
             services.AddScoped<CopyNodePathCommand>();
             services.AddScoped<ClosePackContainerFileCommand>();
-            services.AddScoped<CopyToEditablePackCommand>();
+            services.AddScoped<CopyToFolderProjectCommand>();
             services.AddScoped<CreateFolderCommand>();
             services.AddScoped<CollapseNodeCommand>();
             services.AddScoped<DuplicateFileCommand>();
@@ -52,7 +52,6 @@ namespace Shared.Ui
             services.AddScoped<OpenPackInFileExplorerCommand>();
             services.AddScoped<SaveAsPackFileContainerCommand>();
             services.AddScoped<SavePackFileContainerCommand>();
-            services.AddScoped<SetAsEditablePackCommand>();
             services.AddScoped<ToggleFolderProjectIgnoreCommand>();
             services.AddScoped<
                 ToggleFolderProjectCorruptionDetectionCommand>();

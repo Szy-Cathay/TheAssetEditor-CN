@@ -1,4 +1,4 @@
-using AssetEditor.Services;
+﻿using AssetEditor.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Shared.Core.Events.Global;
@@ -16,6 +16,46 @@ namespace AssetEditorTests;
 
 public class FolderProjectContextMenuTests
 {
+    [NUnit.Framework.Test]
+    [NUnit.Framework.Apartment(ApartmentState.STA)]
+    public void CopyFromReferencePack_TargetsActiveFolderProject()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var reference = new PackFileContainer("参考 Pack");
+        var file = PackFile.CreateFromBytes("file.bin", [1]);
+        reference.FileList["file.bin"] = file;
+        var root = new TreeNode(
+            reference.Name,
+            NodeType.Root,
+            reference,
+            null);
+        var fileNode = new TreeNode(
+            file.Name,
+            NodeType.File,
+            reference,
+            root,
+            file);
+        root.Children.Add(fileNode);
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(item => item.GetEditablePack())
+            .Returns(project);
+        var command = new CopyToFolderProjectCommand(
+            packFileService.Object,
+            Mock.Of<IStandardDialogs>());
+
+        command.Execute(fileNode);
+
+        packFileService.Verify(item =>
+            item.CopyFileFromOtherPackFile(
+                reference,
+                "file.bin",
+                project),
+            Times.Once);
+    }
+
     [NUnit.Framework.Test]
     public void ToggleIgnore_PersistsAndUpdatesSelectedSubtree()
     {
@@ -238,6 +278,8 @@ public class FolderProjectContextMenuTests
             using var project = FolderProjectContainer.Create(
                 projectRoot,
                 new FolderProjectSettings { Name = "工程" });
+            services.GetRequiredService<IPackFileService>()
+                .AddEditableFolderProject(project);
             var folderRoot = new TreeNode(
                 project.Name,
                 NodeType.Root,
@@ -412,6 +454,81 @@ public class FolderProjectContextMenuTests
                 .And.Not.Contain("Create"));
     }
 
+    [NUnit.Framework.Test]
+    public void ReferencePackContextMenu_IsReadOnlyAndExplainsMissingProject()
+    {
+        var serviceProvider =
+            new DependencyInjectionConfig(false).Build(true);
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var services = scope.ServiceProvider;
+            services.GetRequiredService<LocalizationManager>()
+                .LoadLanguage();
+            var packFileService =
+                services.GetRequiredService<IPackFileService>();
+            packFileService.EnforceGameFilesMustBeLoaded = false;
+            var reference = new PackFileContainer("参考 Pack")
+            {
+                Header = new PFHeader(
+                    PackFileVersionConverter.ToString(
+                        PackFileVersion.PFH5),
+                    PackFileCAType.MOD),
+                SystemFilePath = @"D:\packs\reference.pack",
+            };
+            packFileService.AddReferencePack(reference);
+            var root = new TreeNode(
+                reference.Name,
+                NodeType.Root,
+                reference,
+                null);
+            var file = new TreeNode(
+                "file.bin",
+                NodeType.File,
+                reference,
+                root,
+                PackFile.CreateFromBytes("file.bin", [1]));
+            root.Children.Add(file);
+            var menuBuilder = services
+                .GetServices<IContextMenuBuilder>()
+                .Single(builder =>
+                    builder.Type == ContextMenuType.MainApplication);
+
+            var rootItems = menuBuilder.Build(root);
+            var fileItems = menuBuilder.Build(file);
+            var names = FlattenMenuNames(rootItems)
+                .Concat(FlattenMenuNames(fileItems))
+                .ToList();
+            var copyItem = FindMenuItem(
+                fileItems,
+                "复制到当前工程（请先新建或打开工程）");
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    copyItem,
+                    NUnit.Framework.Is.Not.Null);
+                NUnitAssert.That(
+                    copyItem?.Command?.CanExecute(null),
+                    NUnit.Framework.Is.False);
+                NUnitAssert.That(
+                    names,
+                    NUnit.Framework.Does.Not.Contain("设为可编辑 Pack")
+                        .And.Not.Contain("保存")
+                        .And.Not.Contain("另存为")
+                        .And.Not.Contain("导入文件")
+                        .And.Not.Contain("导入目录")
+                        .And.Not.Contain("重命名")
+                        .And.Not.Contain("删除")
+                        .And.Not.Contain("复制"));
+            });
+        }
+        finally
+        {
+            (serviceProvider as IDisposable)?.Dispose();
+        }
+    }
+
     private static bool ContainsMenuItem(
         IEnumerable<ContextMenuItem2?> items,
         string displayName)
@@ -425,6 +542,24 @@ public class FolderProjectContextMenuTests
                      displayName)));
     }
 
+    private static ContextMenuItem2? FindMenuItem(
+        IEnumerable<ContextMenuItem2?> items,
+        string displayName)
+    {
+        foreach (var item in items)
+        {
+            if (item == null)
+                continue;
+            if (item.Name == displayName)
+                return item;
+            var child = FindMenuItem(item.ContextMenu, displayName);
+            if (child != null)
+                return child;
+        }
+
+        return null;
+    }
+
     private static IEnumerable<string> FlattenMenuNames(
         IEnumerable<ContextMenuItem2?> items)
     {
@@ -436,6 +571,21 @@ public class FolderProjectContextMenuTests
             yield return item.Name;
             foreach (var name in FlattenMenuNames(item.ContextMenu))
                 yield return name;
+        }
+    }
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public string Path { get; } = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"ae-reference-copy-{Guid.NewGuid():N}");
+
+        public TemporaryDirectory() => Directory.CreateDirectory(Path);
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

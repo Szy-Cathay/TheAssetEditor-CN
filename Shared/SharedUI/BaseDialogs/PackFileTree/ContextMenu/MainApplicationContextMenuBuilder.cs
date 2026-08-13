@@ -35,10 +35,16 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
 
         void CreateForFile(ContextMenuItem2 rootNode, TreeNode selectedNode)
         {
-            if (_packFileService.GetEditablePack() != selectedNode.FileOwner)
-                Add<CopyToEditablePackCommand>(selectedNode, rootNode);
+            var isCurrentProject = IsCurrentProject(selectedNode);
+            if (!isCurrentProject)
+            {
+                Add<CopyToFolderProjectCommand>(
+                    selectedNode,
+                    rootNode,
+                    includeWhenDisabled: true);
+            }
 
-            if (!selectedNode.FileOwner.IsCaPackFile)
+            if (isCurrentProject)
             {
                 AddSeperator(rootNode);
                 Add<DuplicateFileCommand>(selectedNode, rootNode);
@@ -48,7 +54,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             }
 
             Add<CopyNodePathCommand>(selectedNode, rootNode);
-            if (selectedNode.FileOwner is FolderProjectContainer)
+            if (isCurrentProject)
                 Add<ToggleFolderProjectIgnoreCommand>(
                     selectedNode,
                     rootNode);
@@ -78,7 +84,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
         void CreateForDirectory(ContextMenuItem2 rootNode, TreeNode selectedNode)
         {
             var isCaPack = selectedNode.FileOwner.IsCaPackFile;
-            var isCurrentEditable = _packFileService.GetEditablePack() == selectedNode.FileOwner;
+            var isCurrentProject = IsCurrentProject(selectedNode);
 
             if (selectedNode.NodeType == NodeType.Root)
             {
@@ -86,13 +92,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
                 Add<ClosePackContainerFileCommand>(selectedNode, rootNode);
                 AddSeperator(rootNode);
 
-
-                if (!isCaPack && isCurrentEditable == false)
-                    Add<SetAsEditablePackCommand>(selectedNode, rootNode);
-
-                if (!isCaPack)
+                if (isCurrentProject)
                 {
-                    AddSeperator(rootNode);
                     Add<SavePackFileContainerCommand>(selectedNode, rootNode);
                     Add<SaveAsPackFileContainerCommand>(selectedNode, rootNode);
                     if (selectedNode.FileOwner is FolderProjectContainer)
@@ -109,10 +110,15 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
                 }
             }
 
-            if (isCurrentEditable == false)
-                Add<CopyToEditablePackCommand>(selectedNode, rootNode);
+            if (!isCurrentProject)
+            {
+                Add<CopyToFolderProjectCommand>(
+                    selectedNode,
+                    rootNode,
+                    includeWhenDisabled: true);
+            }
 
-            if (!isCaPack)
+            if (isCurrentProject)
             {
                 var importFolder = AddChildMenu(
                     LocalizationManager.Instance.Get("ContextMenu.Import"),
@@ -148,5 +154,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             if (!isCaPack)
                 Add<OpenPackInFileExplorerCommand>(selectedNode, rootNode);
         }
+
+        private bool IsCurrentProject(TreeNode selectedNode) =>
+            selectedNode.FileOwner is FolderProjectContainer &&
+            ReferenceEquals(
+                _packFileService.GetEditablePack(),
+                selectedNode.FileOwner);
     }
 }

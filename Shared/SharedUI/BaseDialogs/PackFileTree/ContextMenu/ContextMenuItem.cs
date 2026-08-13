@@ -31,11 +31,14 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
         public ICommand? Command { get; set; }
         public ObservableCollection<ContextMenuItem2?> ContextMenu { get; set; } = [];
 
-        public ContextMenuItem2(string name, Action? action)
+        public ContextMenuItem2(
+            string name,
+            Action? action,
+            bool isEnabled = true)
         {
             Name = name;
             if (action != null)
-                Command = new RelayCommand(action);
+                Command = new RelayCommand(action, () => isEnabled);
         }
 
         public override string ToString() => Name;
