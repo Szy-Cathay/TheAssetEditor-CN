@@ -423,6 +423,62 @@ public class FolderProjectGitOperationCoordinatorTests
     }
 
     [Test]
+    public async Task ExecuteTransactionalAsync_WhenRollbackFails_StillReopensOriginalState()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        var packFileService = CreateRealPackFileService();
+        var original = CreateProject(projectRoot.Path);
+        packFileService.AddContainer(original);
+        FolderProjectContainer? reattached = null;
+        var openCalls = 0;
+        var factory = new Mock<IFolderProjectFactory>();
+        factory.Setup(item => item.Open(Normalize(projectRoot.Path)))
+            .Returns(() =>
+            {
+                openCalls++;
+                reattached = FolderProjectContainer.Open(projectRoot.Path);
+                return reattached;
+            });
+        var versionControl = CreateVersionControlMock(
+            projectRoot.Path,
+            FolderProjectMergePhase.None);
+        var coordinator = new FolderProjectGitOperationCoordinator(
+            packFileService,
+            factory.Object,
+            versionControl.Object);
+        var expectedCompletion = new IOException("history refresh failed");
+        var expectedRollback = new IOException("staging cleanup failed");
+
+        var exception = NUnitAssert.ThrowsAsync<FolderProjectGitHostException>(
+            async () => await coordinator.ExecuteTransactionalAsync(
+                projectRoot.Path,
+                () => 42,
+                _ => throw expectedCompletion,
+                _ => throw expectedRollback));
+
+        try
+        {
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(exception!.OperationException,
+                    Is.SameAs(expectedCompletion));
+                NUnitAssert.That(exception.HostException,
+                    Is.SameAs(expectedRollback));
+                NUnitAssert.That(openCalls, Is.EqualTo(2));
+                NUnitAssert.That(reattached, Is.Not.Null);
+                NUnitAssert.That(
+                    packFileService.GetAllPackfileContainers(),
+                    Is.EqualTo(new PackFileContainer[] { reattached! }));
+            });
+        }
+        finally
+        {
+            if (reattached != null)
+                packFileService.TryUnloadPackContainer(reattached);
+        }
+    }
+
+    [Test]
     public void Execute_OnlyTemporarilyRemovesSafeRegisteredEmptyDirectories()
     {
         using var projectRoot = new TemporaryDirectory();

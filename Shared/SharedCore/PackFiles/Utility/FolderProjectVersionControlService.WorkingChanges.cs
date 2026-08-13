@@ -39,7 +39,8 @@ public sealed partial class FolderProjectVersionControlService
 
     public FolderProjectDiscardRollback BeginDiscardChanges(
         string projectRoot,
-        IReadOnlyList<string> relativePaths)
+        IReadOnlyList<string> relativePaths,
+        Action<FolderProjectVersionControlProgress>? reportProgress = null)
     {
         var requestedPaths = ValidateChangePaths(relativePaths);
         return Execute(
@@ -102,6 +103,10 @@ public sealed partial class FolderProjectVersionControlService
                     $"ae-discard-{Guid.NewGuid():N}");
                 try
                 {
+                    reportProgress?.Invoke(
+                        new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage
+                                .IndexingFiles));
                     Commands.Unstage(
                         repository,
                         affectedPaths,
@@ -109,6 +114,10 @@ public sealed partial class FolderProjectVersionControlService
                         {
                             ShouldFailOnUnmatchedPath = false,
                         });
+                    reportProgress?.Invoke(
+                        new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage
+                                .ProcessingWorkingChanges));
                     foreach (var path in affectedPaths)
                     {
                         var fullPath = ResolveRestoreTarget(root, path);
@@ -175,9 +184,10 @@ public sealed partial class FolderProjectVersionControlService
                         createdDirectories
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList(),
-                        indexSnapshot.Exists,
-                        indexSnapshot.Bytes,
-                        indexSnapshot.Attributes);
+                        new FolderProjectIndexSnapshot(
+                            indexSnapshot.Exists,
+                            indexSnapshot.Bytes,
+                            indexSnapshot.Attributes));
             });
     }
 
@@ -266,9 +276,9 @@ public sealed partial class FolderProjectVersionControlService
             using var repository = OpenRepository(projectRoot);
             new GitIndexSnapshot(
                     Path.Combine(repository.Info.Path, "index"),
-                    rollback.IndexExisted,
-                    rollback.IndexBytes,
-                    rollback.IndexAttributes)
+                    rollback.Index.Existed,
+                    rollback.Index.Bytes,
+                    rollback.Index.Attributes)
                 .Restore(_platform);
         }
         catch (Exception exception)

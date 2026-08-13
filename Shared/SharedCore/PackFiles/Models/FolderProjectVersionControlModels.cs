@@ -182,18 +182,19 @@ public sealed record FolderProjectProjectRestoreRollback(
     string OriginalCommitId,
     string RestoreCommitId,
     string? SafetyCommitId,
-    bool IndexExisted,
-    byte[] IndexBytes,
-    FileAttributes IndexAttributes);
+    FolderProjectIndexSnapshot Index);
 
 public sealed record FolderProjectDiscardRollback(
     string StagingPath,
     IReadOnlyList<FolderProjectDiscardBackup> Backups,
     IReadOnlyList<string> AffectedPaths,
     IReadOnlyList<string> CreatedDirectories,
-    bool IndexExisted,
-    byte[] IndexBytes,
-    FileAttributes IndexAttributes);
+    FolderProjectIndexSnapshot Index);
+
+public sealed record FolderProjectIndexSnapshot(
+    bool Existed,
+    byte[] Bytes,
+    FileAttributes Attributes);
 
 public sealed record FolderProjectDiscardBackup(
     string OriginalPath,

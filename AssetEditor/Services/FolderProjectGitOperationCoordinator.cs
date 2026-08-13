@@ -243,20 +243,17 @@ public sealed class FolderProjectGitOperationCoordinator :
             }
             catch (Exception hostFailure)
             {
-                try
-                {
-                    RemoveAllConfiguredEmptyDirectories(normalizedRoot);
-                    await Task.Run(() => rollbackOperation(result));
-                    await ReattachAfterTransactionAsync(
-                        normalizedRoot,
-                        preparation.LoadedProject,
-                        openWhenComplete);
-                }
-                catch (Exception rollbackFailure)
+                var recoveryFailure = await RollbackAndReattachAfterTransactionAsync(
+                    normalizedRoot,
+                    preparation.LoadedProject,
+                    result,
+                    rollbackOperation,
+                    openWhenComplete);
+                if (recoveryFailure != null)
                 {
                     throw new FolderProjectGitHostException(
                         "The folder project could not be rolled back after reload failed.",
-                        rollbackFailure,
+                        recoveryFailure,
                         hostFailure);
                 }
 
@@ -279,12 +276,17 @@ public sealed class FolderProjectGitOperationCoordinator :
                         ExceptionDispatchInfo.Capture(
                             rollbackPreparation.OperationException).Throw();
                     }
-                    RemoveAllConfiguredEmptyDirectories(normalizedRoot);
-                    await Task.Run(() => rollbackOperation(result));
-                    await ReattachAfterTransactionAsync(
+
+                    var recoveryFailure = await RollbackAndReattachAfterTransactionAsync(
                         normalizedRoot,
                         rollbackPreparation.LoadedProject,
+                        result,
+                        rollbackOperation,
                         openWhenComplete);
+                    if (recoveryFailure != null)
+                    {
+                        ExceptionDispatchInfo.Capture(recoveryFailure).Throw();
+                    }
                 }
                 catch (Exception rollbackFailure)
                 {
@@ -304,6 +306,50 @@ public sealed class FolderProjectGitOperationCoordinator :
         {
             rootGate.Release();
         }
+    }
+
+    private async Task<Exception?> RollbackAndReattachAfterTransactionAsync<T>(
+        string projectRoot,
+        FolderProjectContainer? loadedProject,
+        T result,
+        Action<T> rollbackOperation,
+        bool openWhenComplete)
+    {
+        var failures = new List<Exception>();
+        try
+        {
+            RemoveAllConfiguredEmptyDirectories(projectRoot);
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+        try
+        {
+            await Task.Run(() => rollbackOperation(result));
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+        try
+        {
+            await ReattachAfterTransactionAsync(
+                projectRoot,
+                loadedProject,
+                openWhenComplete);
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        return failures.Count switch
+        {
+            0 => null,
+            1 => failures[0],
+            _ => new AggregateException(failures),
+        };
     }
 
     private async Task ReattachAfterTransactionAsync(

@@ -280,7 +280,38 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         var project = _project;
         if (project == null || UnrecordedChanges.Count == 0)
             return;
-        if (!Confirm("DiscardAll", UnrecordedChanges.Count))
+        FolderProjectHistoryStatus status;
+        BeginOperation();
+        try
+        {
+            status = await Task.Run(() => _historyService.GetStatus(
+                project.ProjectRoot,
+                ReportProgress));
+        }
+        catch (FolderProjectHistoryException exception)
+        {
+            ShowHistoryError(exception);
+            return;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception);
+            return;
+        }
+        finally
+        {
+            EndOperation();
+        }
+
+        var paths = status.UnrecordedChanges
+            .Select(change => change.Path)
+            .ToArray();
+        if (paths.Length == 0)
+        {
+            await RefreshCommand.ExecuteAsync(null);
+            return;
+        }
+        if (!Confirm("DiscardAll", paths.Length))
             return;
 
         await RunOperation(
@@ -293,12 +324,6 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                     project.ProjectRoot,
                     () =>
                     {
-                        var paths = _historyService.GetStatus(
-                                project.ProjectRoot,
-                                ReportProgress)
-                            .UnrecordedChanges
-                            .Select(change => change.Path)
-                            .ToArray();
                         var result = _historyService.BeginDiscardChanges(
                             project.ProjectRoot,
                             paths,
@@ -341,10 +366,31 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             complete(operation);
             return snapshot;
         }
-        catch
+        catch (Exception failure)
         {
-            rollback(operation);
-            project.RefreshFromDisk();
+            var rollbackFailures = new List<Exception>();
+            try
+            {
+                rollback(operation);
+            }
+            catch (Exception exception)
+            {
+                rollbackFailures.Add(exception);
+            }
+            try
+            {
+                project.RefreshFromDisk();
+            }
+            catch (Exception exception)
+            {
+                rollbackFailures.Add(exception);
+            }
+            if (rollbackFailures.Count != 0)
+            {
+                throw new AggregateException(
+                    "The operation failed and rollback was incomplete.",
+                    [failure, .. rollbackFailures]);
+            }
             throw;
         }
     }

@@ -510,8 +510,10 @@ public class FolderProjectHistoryViewModelTests
         using var project = CreateProject(directory.Path);
         var history = CreateHistoryService(project.ProjectRoot);
         var discard = new FolderProjectDiscardResult(
-            new FolderProjectDiscardRollback("staging", [], [], [], false, [],
-                FileAttributes.Normal));
+            new FolderProjectDiscardRollback(
+                "staging", [], [], [],
+                new FolderProjectIndexSnapshot(
+                    false, [], FileAttributes.Normal)));
         history.Setup(item => item.BeginDiscardChanges(
                 project.ProjectRoot,
                 new[] { "changed.bin" },
@@ -564,8 +566,10 @@ public class FolderProjectHistoryViewModelTests
             .Returns(ShowMessageBoxResult.OK);
         var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
         var discard = new FolderProjectDiscardResult(
-            new FolderProjectDiscardRollback("staging", [], [], [], false, [],
-                FileAttributes.Normal));
+            new FolderProjectDiscardRollback(
+                "staging", [], [], [],
+                new FolderProjectIndexSnapshot(
+                    false, [], FileAttributes.Normal)));
         history.Setup(item => item.BeginDiscardChanges(
                 project.ProjectRoot,
                 It.IsAny<IReadOnlyList<string>>(),
@@ -608,7 +612,7 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
-    public async Task DiscardAll_UsesFreshDiskStatusInsideCoordinator()
+    public async Task DiscardAll_ConfirmsFreshDiskStatusAndUsesOnlyConfirmedPaths()
     {
         using var directory = new TemporaryDirectory();
         using var project = CreateProject(directory.Path);
@@ -632,7 +636,7 @@ public class FolderProjectHistoryViewModelTests
                         "cached.bin",
                         FolderProjectUnrecordedChangeKind.Modified),
                     new FolderProjectUnrecordedChange(
-                        "late.bin",
+                        "confirmed.bin",
                         FolderProjectUnrecordedChangeKind.Added),
                 ]))
             .Returns(new FolderProjectHistoryStatus(
@@ -640,11 +644,13 @@ public class FolderProjectHistoryViewModelTests
                 "head",
                 []));
         var discard = new FolderProjectDiscardResult(
-            new FolderProjectDiscardRollback("staging", [], [], [], false, [],
-                FileAttributes.Normal));
+            new FolderProjectDiscardRollback(
+                "staging", [], [], [],
+                new FolderProjectIndexSnapshot(
+                    false, [], FileAttributes.Normal)));
         history.Setup(item => item.BeginDiscardChanges(
                 project.ProjectRoot,
-                new[] { "cached.bin", "late.bin" },
+                new[] { "cached.bin", "confirmed.bin" },
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns(discard);
         var dialogs = new Mock<IStandardDialogs>();
@@ -677,9 +683,12 @@ public class FolderProjectHistoryViewModelTests
 
         await viewModel.DiscardAllCommand.ExecuteAsync(null);
 
+        dialogs.Verify(item => item.ShowYesNoBox(
+            It.Is<string>(message => message.Contains("2")),
+            It.IsAny<string>()), Times.Once);
         history.Verify(item => item.BeginDiscardChanges(
             project.ProjectRoot,
-            new[] { "cached.bin", "late.bin" },
+            new[] { "cached.bin", "confirmed.bin" },
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
     }
 

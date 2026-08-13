@@ -318,9 +318,10 @@ public sealed partial class FolderProjectVersionControlService
                         originalHead.Sha,
                         restoreCommit!.Sha,
                         safetyCommit?.Sha,
-                        indexSnapshot.Exists,
-                        indexSnapshot.Bytes,
-                        indexSnapshot.Attributes));
+                        new FolderProjectIndexSnapshot(
+                            indexSnapshot.Exists,
+                            indexSnapshot.Bytes,
+                            indexSnapshot.Attributes)));
             });
     }
 
@@ -348,9 +349,9 @@ public sealed partial class FolderProjectVersionControlService
 
                 new GitIndexSnapshot(
                         Path.Combine(repository.Info.Path, "index"),
-                        rollback.IndexExisted,
-                        rollback.IndexBytes,
-                        rollback.IndexAttributes)
+                        rollback.Index.Existed,
+                        rollback.Index.Bytes,
+                        rollback.Index.Attributes)
                     .Restore(_platform);
                 return true;
             });

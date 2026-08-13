@@ -485,11 +485,12 @@ public sealed class FolderProjectHistoryServiceTests
         File.WriteAllBytes(trackedPath, [2]);
         File.WriteAllBytes(addedPath, [3]);
         File.WriteAllBytes(keptPath, [4]);
+        var progressStages = new List<FolderProjectHistoryProgressStage>();
 
         var result = service.BeginDiscardChanges(
             project.Root,
             ["db/tracked.bin", "db/added.bin"],
-            _ => { });
+            progress => progressStages.Add(progress.Stage));
         service.CompleteDiscardChanges(result);
 
         var status = service.GetStatus(project.Root);
@@ -501,6 +502,13 @@ public sealed class FolderProjectHistoryServiceTests
             Assert.That(
                 status.UnrecordedChanges.Select(change => change.Path),
                 Is.EqualTo(new[] { "db/kept.bin" }));
+            Assert.That(
+                progressStages,
+                Is.EqualTo(new[]
+                {
+                    FolderProjectHistoryProgressStage.UpdatingHistory,
+                    FolderProjectHistoryProgressStage.WritingProjectFiles,
+                }));
         });
     }
 

@@ -53,7 +53,8 @@ public interface IFolderProjectVersionControlService
 
     FolderProjectDiscardRollback BeginDiscardChanges(
         string projectRoot,
-        IReadOnlyList<string> relativePaths);
+        IReadOnlyList<string> relativePaths,
+        Action<FolderProjectVersionControlProgress>? reportProgress = null);
 
     void CompleteDiscardChanges(FolderProjectDiscardRollback rollback);
 
