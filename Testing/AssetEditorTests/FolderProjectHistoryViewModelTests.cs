@@ -70,6 +70,135 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
+    public async Task RecoverHistory_ConfirmsUsesCoordinatorAndClosesRecoveryFlow()
+    {
+        var projectRoot = Path.GetFullPath("legacy-project");
+        var recoveryStatus = new FolderProjectHistoryStatus(
+            FolderProjectHistoryAvailability.RecoveryRequired,
+            "head",
+            [])
+        {
+            RecoveryReason =
+                FolderProjectHistoryRecoveryReason.UnfinishedOperation,
+            CanRecover = true,
+        };
+        var readyStatus = new FolderProjectHistoryStatus(
+            FolderProjectHistoryAvailability.Ready,
+            "head",
+            [
+                new FolderProjectUnrecordedChange(
+                    "conflict.txt",
+                    FolderProjectUnrecordedChangeKind.Modified),
+            ]);
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.SetupSequence(item => item.GetStatus(
+                projectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(recoveryStatus)
+            .Returns(readyStatus);
+        history.Setup(item => item.GetRestorePoints(
+                projectRoot,
+                100,
+                It.IsAny<Action<FolderProjectHistoryProgress>>() ))
+            .Returns([]);
+        history.Setup(item => item.RecoverToSafeState(
+                projectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(readyStatus);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.Is<string>(message => message.Contains("保留当前磁盘文件")),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<
+            IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteAsync(
+                projectRoot,
+                It.IsAny<Func<FolderProjectHistoryStatus>>(),
+                true))
+            .Returns<string, Func<FolderProjectHistoryStatus>, bool>(
+                (_, operation, _) => Task.FromResult(operation()));
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        var completed = 0;
+        viewModel.RecoveryCompleted += (_, _) => completed++;
+        viewModel.OpenRecoveryProject(projectRoot, "旧工程");
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.IsRecoveryRequired, Is.True);
+            NUnitAssert.That(viewModel.IsReady, Is.False);
+            NUnitAssert.That(
+                viewModel.CreateRestorePointCommand.CanExecute(null),
+                Is.False);
+            NUnitAssert.That(
+                viewModel.RecoverHistoryCommand.CanExecute(null),
+                Is.True);
+        });
+
+        await viewModel.RecoverHistoryCommand.ExecuteAsync(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.IsReady, Is.True);
+            NUnitAssert.That(viewModel.IsRecoveryRequired, Is.False);
+            NUnitAssert.That(viewModel.UnrecordedChanges,
+                Has.One.Property("Path").EqualTo("conflict.txt"));
+            NUnitAssert.That(completed, Is.EqualTo(1));
+        });
+        history.Verify(item => item.RecoverToSafeState(
+            projectRoot,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+    }
+
+    [Test]
+    public async Task RecoverHistory_CancelLeavesRecoveryStateUntouched()
+    {
+        var projectRoot = Path.GetFullPath("legacy-project");
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(
+                projectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.RecoveryRequired,
+                "head",
+                [])
+            {
+                RecoveryReason =
+                    FolderProjectHistoryRecoveryReason.DetachedHistory,
+                CanRecover = true,
+            });
+        history.Setup(item => item.GetRestorePoints(
+                projectRoot,
+                100,
+                It.IsAny<Action<FolderProjectHistoryProgress>>() ))
+            .Returns([]);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.Cancel);
+        var coordinator = new Mock<
+            IFolderProjectGitOperationCoordinator>(MockBehavior.Strict);
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenRecoveryProject(projectRoot, "旧工程");
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.RecoverHistoryCommand.ExecuteAsync(null);
+
+        NUnitAssert.That(viewModel.IsRecoveryRequired, Is.True);
+        history.Verify(item => item.RecoverToSafeState(
+            It.IsAny<string>(),
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Never);
+    }
+
+    [Test]
     public async Task CreateRestorePoint_SaveChoiceSavesEditorsAndRecordsDisk()
     {
         using var directory = new TemporaryDirectory();
@@ -868,6 +997,60 @@ public class FolderProjectHistoryViewModelTests
                             FindDescendants<TextBlock>(view)
                                 .Select(text => text.Text),
                             Does.Contain("工程历史"));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void HistoryView_RendersRecoveryActionWithoutAdvancedConcepts()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var viewModel = CreateViewModel(
+                    CreateHistoryService("project").Object);
+                viewModel.OpenRecoveryProject(
+                    Path.GetFullPath("project"),
+                    "旧工程");
+                viewModel.IsRecoveryRequired = true;
+                viewModel.CanRecover = true;
+                viewModel.RecoveryText =
+                    "恢复会保留当前磁盘内容，冲突内容将作为未记录修改保留。";
+                var view = new FolderProjectHistoryView
+                {
+                    DataContext = viewModel,
+                };
+                var window = new Window
+                {
+                    Width = 500,
+                    Height = 760,
+                    Content = view,
+                    WindowStyle = WindowStyle.None,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            FindDescendants<Button>(view)
+                                .Select(button => button.Content?.ToString()),
+                            Does.Contain("保留当前文件并恢复工程"));
+                        NUnitAssert.That(
+                            FindDescendants<TextBlock>(view)
+                                .Select(text => text.Text),
+                            Does.Contain(viewModel.RecoveryText));
                     });
                 }
                 finally

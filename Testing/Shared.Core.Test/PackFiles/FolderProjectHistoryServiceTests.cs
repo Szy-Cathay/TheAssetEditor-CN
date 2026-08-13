@@ -39,6 +39,7 @@ public sealed class FolderProjectHistoryServiceTests
                     "GetRestorePoints",
                     "GetStatus",
                     "Initialize",
+                    "RecoverToSafeState",
                     "RestoreProject",
                     "RollbackDiscardChanges",
                     "RollbackProjectRestore",
@@ -195,6 +196,105 @@ public sealed class FolderProjectHistoryServiceTests
             "project",
             It.IsAny<Action<FolderProjectVersionControlProgress>>(),
             true), Times.Once);
+    }
+
+    [Test]
+    public void GetStatus_ClassifiesUnsafeLegacyStatesForRecovery()
+    {
+        var cases = new[]
+        {
+            (
+                new FolderProjectRepositoryStatus(
+                    true,
+                    null,
+                    "head",
+                    true,
+                    FolderProjectRepositoryOperationState.None,
+                    []),
+                FolderProjectHistoryRecoveryReason.DetachedHistory,
+                true),
+            (
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "main",
+                    "head",
+                    false,
+                    FolderProjectRepositoryOperationState.Merge,
+                    [
+                        new FolderProjectWorkingChange(
+                            "conflict.bin",
+                            FolderProjectWorkingChangeKind.Conflicted),
+                    ]),
+                FolderProjectHistoryRecoveryReason.UnfinishedOperation,
+                true),
+            (
+                new FolderProjectRepositoryStatus(
+                    true,
+                    "main",
+                    "head",
+                    false,
+                    FolderProjectRepositoryOperationState.None,
+                    []) { IsBusy = true },
+                FolderProjectHistoryRecoveryReason.RepositoryBusy,
+                false),
+        };
+
+        foreach (var testCase in cases)
+        {
+            var versionControl = new Mock<
+                IFolderProjectVersionControlService>();
+            versionControl.Setup(item => item.GetStatus(
+                    "project",
+                    It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+                    true))
+                .Returns(testCase.Item1);
+            var service = new FolderProjectHistoryService(
+                versionControl.Object,
+                LoadLocalization());
+
+            var status = service.GetStatus("project");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    status.Availability,
+                    Is.EqualTo(
+                        FolderProjectHistoryAvailability.RecoveryRequired));
+                Assert.That(status.RecoveryReason,
+                    Is.EqualTo(testCase.Item2));
+                Assert.That(status.CanRecover, Is.EqualTo(testCase.Item3));
+            });
+        }
+    }
+
+    [Test]
+    public void RecoverToSafeState_UsesNarrowHistoryContract()
+    {
+        var versionControl = new Mock<
+            IFolderProjectVersionControlService>();
+        versionControl.Setup(item => item.RecoverToSafeState("project"))
+            .Returns(new FolderProjectRepositoryStatus(
+                true,
+                "main",
+                "head",
+                false,
+                FolderProjectRepositoryOperationState.None,
+                []));
+        var progress = new List<FolderProjectHistoryProgress>();
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var status = service.RecoverToSafeState("project", progress.Add);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(status.Availability,
+                Is.EqualTo(FolderProjectHistoryAvailability.Ready));
+            Assert.That(progress.Select(item => item.Stage),
+                Does.Contain(
+                    FolderProjectHistoryProgressStage.RecoveringHistory));
+        });
     }
 
     [Test]

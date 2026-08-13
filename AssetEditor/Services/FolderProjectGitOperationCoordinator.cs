@@ -685,9 +685,18 @@ public sealed class FolderProjectGitOperationCoordinator :
         bool shouldReattach;
         try
         {
-            shouldReattach = _versionControl
-                .GetMergeState(projectRoot)
-                .Phase == FolderProjectMergePhase.None;
+            var status = _versionControl.GetStatus(projectRoot);
+            shouldReattach = !status.IsInitialized
+                ? operationException != null &&
+                  _pendingReattach.ContainsKey(projectRoot)
+                : !status.IsDetached &&
+                  status.OperationState ==
+                  FolderProjectRepositoryOperationState.None &&
+                  !status.IsBusy &&
+                  !status.HasPendingEditorOperation &&
+                  status.Changes.All(change =>
+                      !change.Kind.HasFlag(
+                          FolderProjectWorkingChangeKind.Conflicted));
         }
         catch (FolderProjectVersionControlException exception)
             when (operationException != null &&

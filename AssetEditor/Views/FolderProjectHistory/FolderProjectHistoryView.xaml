@@ -6,6 +6,7 @@
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToCollapsedConverter" />
         <local:HistoryChangeKindConverter x:Key="HistoryChangeKindConverter" />
     </UserControl.Resources>
 
@@ -49,6 +50,22 @@
                     Style="{StaticResource AeText.Caption}"
                     Text="{Binding AvailabilityText}"
                     TextWrapping="Wrap" />
+
+                <Border
+                    Margin="0,0,0,12"
+                    Style="{StaticResource AeFeedback.Notice}"
+                    Visibility="{Binding IsRecoveryRequired, Converter={StaticResource BoolToCollapsedConverter}}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="{Binding RecoveryText}"
+                            TextWrapping="Wrap" />
+                        <Button
+                            Margin="0,8,0,0"
+                            Command="{Binding RecoverHistoryCommand}"
+                            Content="{loc:Loc FolderProject.History.Recovery.Action}"
+                            Style="{StaticResource AeButton.Primary}" />
+                    </StackPanel>
+                </Border>
 
                 <TextBlock
                     Style="{StaticResource AeText.SectionTitle}"

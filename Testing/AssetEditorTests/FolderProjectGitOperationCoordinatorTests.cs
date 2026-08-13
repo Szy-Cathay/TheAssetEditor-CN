@@ -46,7 +46,7 @@ public class FolderProjectGitOperationCoordinatorTests
                 Is.EqualTo(new PackFileContainer[] { project }));
         });
         versionControl.Verify(
-            item => item.GetMergeState(Normalize(projectRoot.Path)),
+            item => item.GetStatus(Normalize(projectRoot.Path), false),
             Times.Never);
     }
 
@@ -77,8 +77,8 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
-            .Returns(MergeState(FolderProjectMergePhase.None));
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
+            .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
             factory.Object,
@@ -141,9 +141,9 @@ public class FolderProjectGitOperationCoordinatorTests
         var versionControl = new Mock<IFolderProjectVersionControlService>(
             MockBehavior.Strict);
         versionControl.SetupSequence(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
-            .Returns(MergeState(FolderProjectMergePhase.Conflicts))
-            .Returns(MergeState(FolderProjectMergePhase.None));
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
+            .Returns(RepositoryStatus(isSafe: false))
+            .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
             factory.Object,
@@ -953,7 +953,7 @@ public class FolderProjectGitOperationCoordinatorTests
             item => item.Open(It.IsAny<string>()),
             Times.Never);
         versionControl.Verify(
-            item => item.GetMergeState(It.IsAny<string>()),
+            item => item.GetStatus(It.IsAny<string>(), false),
             Times.Never);
     }
 
@@ -1016,7 +1016,7 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
             .Throws(new FolderProjectVersionControlException(
                 FolderProjectVersionControlError.RepositoryNotInitialized,
                 "Repository is not initialized."));
@@ -1067,7 +1067,7 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
             .Throws(new FolderProjectVersionControlException(
                 FolderProjectVersionControlError.RepositoryNotInitialized,
                 "Repository is not initialized."));
@@ -1151,8 +1151,8 @@ public class FolderProjectGitOperationCoordinatorTests
         var packFileService = CreatePackFileServiceMock([]);
         var versionControl = new Mock<IFolderProjectVersionControlService>();
         versionControl.Setup(
-                item => item.GetMergeState(It.IsAny<string>()))
-            .Returns(MergeState(FolderProjectMergePhase.None));
+                item => item.GetStatus(It.IsAny<string>(), false))
+            .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService.Object,
             Mock.Of<IFolderProjectFactory>(),
@@ -1333,23 +1333,24 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot)))
-            .Returns(MergeState(phase));
+                item => item.GetStatus(Normalize(projectRoot), false))
+            .Returns(RepositoryStatus(
+                phase == FolderProjectMergePhase.None));
         return versionControl;
     }
 
-    private static FolderProjectMergeState MergeState(
-        FolderProjectMergePhase phase)
+    private static FolderProjectRepositoryStatus RepositoryStatus(
+        bool isSafe)
     {
-        return new FolderProjectMergeState(
-            phase,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            null);
+        return new FolderProjectRepositoryStatus(
+            true,
+            "main",
+            "head",
+            false,
+            isSafe
+                ? FolderProjectRepositoryOperationState.None
+                : FolderProjectRepositoryOperationState.Merge,
+            []);
     }
 
     private static PackFileContainer CreatePack(string name)

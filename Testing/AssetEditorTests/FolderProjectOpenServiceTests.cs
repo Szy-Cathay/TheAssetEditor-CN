@@ -11,32 +11,11 @@ namespace AssetEditorTests;
 
 public class FolderProjectOpenServiceTests
 {
-    [TestCase(FolderProjectMergePhase.ReadyToCommit)]
-    [TestCase(FolderProjectMergePhase.Conflicts)]
-    [TestCase(FolderProjectMergePhase.RecoveryRequired)]
-    public void Open_PendingMerge_ShowsRecoveryBeforeFactoryOpen(
-        FolderProjectMergePhase phase)
+    [Test]
+    public void Open_RecoveryRequired_ShowsHistoryRecoveryBeforeFactoryOpen()
     {
         using var project = new TemporaryFolderProject();
         var calls = new List<string>();
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
-                MockBehavior.Strict);
-        versionControl.Setup(
-                item => item.GetMergeState(project.Path))
-            .Callback(() => calls.Add("merge-state"))
-            .Returns(
-                new FolderProjectMergeState(
-                    phase,
-                    "main",
-                    "feature",
-                    new string('1', 40),
-                    new string('2', 40),
-                    "合并 feature",
-                    [],
-                    phase == FolderProjectMergePhase.RecoveryRequired
-                        ? "recovery"
-                        : null));
         var history = new Mock<IFolderProjectHistoryService>();
         history.Setup(item => item.GetStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
@@ -46,19 +25,17 @@ public class FolderProjectOpenServiceTests
         var factory = new Mock<IFolderProjectFactory>(
             MockBehavior.Strict);
         var window =
-            new Mock<IFolderProjectVersionControlWindowService>(
+            new Mock<IFolderProjectHistoryWindowService>(
                 MockBehavior.Strict);
         window.Setup(
-                item => item.ShowDialog(
+                item => item.ShowRecoveryDialog(
                     project.Path,
-                    project.Name,
-                    true))
+                    project.Name))
             .Callback(() => calls.Add("window"));
         var service = new FolderProjectOpenService(
             Mock.Of<IPackFileService>(),
             factory.Object,
             history.Object,
-            versionControl.Object,
             window.Object,
             new ApplicationSettingsService(),
             Mock.Of<IStandardDialogs>(),
@@ -67,7 +44,7 @@ public class FolderProjectOpenServiceTests
         service.Open(project.Path);
 
         NUnit.Framework.Assert.That(calls, Is.EqualTo(
-            new[] { "merge-state", "window" }));
+            new[] { "window" }));
         factory.Verify(
             item => item.Open(It.IsAny<string>()),
             Times.Never);
@@ -78,9 +55,6 @@ public class FolderProjectOpenServiceTests
     {
         using var project = new TemporaryFolderProject();
         var calls = new List<string>();
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
-                MockBehavior.Strict);
         var history = new Mock<IFolderProjectHistoryService>();
         history.Setup(item => item.GetStatus(project.Path))
             .Callback(() => calls.Add("history-status"))
@@ -106,8 +80,7 @@ public class FolderProjectOpenServiceTests
             packFiles.Object,
             factory.Object,
             history.Object,
-            versionControl.Object,
-            Mock.Of<IFolderProjectVersionControlWindowService>(),
+            Mock.Of<IFolderProjectHistoryWindowService>(),
             new ApplicationSettingsService(
                 GameTypeEnum.Warhammer3),
             Mock.Of<IStandardDialogs>(),
@@ -126,9 +99,6 @@ public class FolderProjectOpenServiceTests
     {
         using var project = new TemporaryFolderProject();
         using var container = FolderProjectContainer.Open(project.Path);
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
-                MockBehavior.Strict);
         var history = new Mock<IFolderProjectHistoryService>();
         history.Setup(item => item.GetStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
@@ -143,8 +113,7 @@ public class FolderProjectOpenServiceTests
             packFiles.Object,
             factory.Object,
             history.Object,
-            versionControl.Object,
-            Mock.Of<IFolderProjectVersionControlWindowService>(),
+            Mock.Of<IFolderProjectHistoryWindowService>(),
             new ApplicationSettingsService(GameTypeEnum.Warhammer3),
             Mock.Of<IStandardDialogs>(),
             new LocalizationManager());
@@ -163,7 +132,6 @@ public class FolderProjectOpenServiceTests
     public void Open_UninitializedProject_RequiresInitializationBeforeOpening()
     {
         using var project = new TemporaryFolderProject();
-        var versionControl = new Mock<IFolderProjectVersionControlService>();
         var history = new Mock<IFolderProjectHistoryService>();
         history.Setup(item => item.GetStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
@@ -171,13 +139,12 @@ public class FolderProjectOpenServiceTests
                 null,
                 []));
         var factory = new Mock<IFolderProjectFactory>();
-        var window = new Mock<IFolderProjectVersionControlWindowService>();
+        var window = new Mock<IFolderProjectHistoryWindowService>();
         var dialogs = new Mock<IStandardDialogs>();
         var service = new FolderProjectOpenService(
             Mock.Of<IPackFileService>(),
             factory.Object,
             history.Object,
-            versionControl.Object,
             window.Object,
             new ApplicationSettingsService(),
             dialogs.Object,
@@ -189,18 +156,15 @@ public class FolderProjectOpenServiceTests
         dialogs.Verify(item => item.ShowDialogBox(
             "必须先建立工程历史，才能打开并修改这个文件夹工程。",
             "文件夹工程错误"), Times.Once);
-        window.Verify(item => item.ShowDialog(
+        window.Verify(item => item.ShowRecoveryDialog(
             It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<bool>()), Times.Never);
+            It.IsAny<string>()), Times.Never);
     }
 
     [Test]
     public void Open_FactoryFails_RemovesRecentAndShowsGenericPrompt()
     {
         using var project = new TemporaryFolderProject();
-        var versionControl =
-            new Mock<IFolderProjectVersionControlService>();
         var history = new Mock<IFolderProjectHistoryService>();
         history.Setup(item => item.GetStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
@@ -220,8 +184,7 @@ public class FolderProjectOpenServiceTests
             Mock.Of<IPackFileService>(),
             factory.Object,
             history.Object,
-            versionControl.Object,
-            Mock.Of<IFolderProjectVersionControlWindowService>(),
+            Mock.Of<IFolderProjectHistoryWindowService>(),
             settings,
             dialogs.Object,
             localization);

@@ -19,6 +19,8 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         IReadOnlyList<string> relativePaths);
 
+    FolderProjectRepositoryStatus RecoverToSafeState(string projectRoot);
+
     FolderProjectCommitSummary Initialize(
         string projectRoot,
         FolderProjectGitIdentity identity,
@@ -321,6 +323,31 @@ internal class FolderProjectVersionControlPlatform
         repository.Reset(ResetMode.Hard, commit, options);
     }
 
+    public virtual void ResetMixed(
+        Repository repository,
+        Commit commit)
+    {
+        repository.Reset(ResetMode.Mixed, commit);
+    }
+
+    public virtual Branch CreateBranch(
+        Repository repository,
+        string name,
+        Commit commit)
+    {
+        return repository.CreateBranch(name, commit);
+    }
+
+    public virtual void AttachHead(
+        Repository repository,
+        string branchReference)
+    {
+        repository.Refs.UpdateTarget(
+            "HEAD",
+            branchReference,
+            "asseteditor: Recover folder project history");
+    }
+
     public virtual void DeleteFile(string path)
     {
         File.Delete(path);
@@ -525,7 +552,15 @@ public sealed partial class FolderProjectVersionControlService :
                     head.Tip?.Sha,
                     repository.Info.IsHeadDetached,
                     GetOperationState(repository.Info.CurrentOperation),
-                    changes);
+                    changes)
+                {
+                    IsBusy = File.Exists(Path.Combine(
+                        repository.Info.Path,
+                        "index.lock")),
+                    HasPendingEditorOperation = File.Exists(Path.Combine(
+                        repository.Info.Path,
+                        FolderProjectMergeSessionStore.FileName)),
+                };
             });
     }
 

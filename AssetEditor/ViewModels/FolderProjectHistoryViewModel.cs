@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,6 +27,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private readonly LocalizationManager _localization;
     private readonly SynchronizationContext? _synchronizationContext;
     private FolderProjectContainer? _project;
+    private string? _projectRoot;
+    private bool _closeAfterRecovery;
     private string? _currentRestorePointId;
     private int _selectedRestorePointRequestVersion;
     private int _activeOperationCount;
@@ -35,11 +38,14 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     [ObservableProperty] private bool _hasUnrecordedChanges;
     [ObservableProperty] private bool _hasRestorePoints;
     [ObservableProperty] private bool _hasSelectedRestorePointChanges;
+    [ObservableProperty] private bool _isRecoveryRequired;
+    [ObservableProperty] private bool _canRecover;
     [ObservableProperty] private string _projectName = "";
     [ObservableProperty] private string _restorePointDescription = "";
     [ObservableProperty] private string _unrecordedSummaryText = "";
     [ObservableProperty] private string _historySummaryText = "";
     [ObservableProperty] private string _availabilityText = "";
+    [ObservableProperty] private string _recoveryText = "";
     [ObservableProperty] private string _operationStatusText = "";
     [ObservableProperty] private string _operationDetailText = "";
     [ObservableProperty] private double _operationProgressValue;
@@ -60,6 +66,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         SelectedRestorePointChanges { get; } = [];
     public Task SelectedChangesLoadTask { get; private set; } =
         Task.CompletedTask;
+    public event EventHandler? RecoveryCompleted;
 
     public FolderProjectHistoryViewModel(
         IFolderProjectHistoryService historyService,
@@ -84,7 +91,24 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     public void OpenProject(FolderProjectContainer? project)
     {
         _project = project;
+        _projectRoot = project?.ProjectRoot;
+        _closeAfterRecovery = false;
         ProjectName = project?.ProjectSettings.Name ?? "";
+        RestorePointDescription = _localization.Get(
+            "FolderProject.History.DefaultDescription");
+        ClearDisplayedState();
+        NotifyCommands();
+    }
+
+    public void OpenRecoveryProject(
+        string projectRoot,
+        string projectName)
+    {
+        _project = null;
+        _projectRoot = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(projectRoot));
+        _closeAfterRecovery = true;
+        ProjectName = projectName;
         RestorePointDescription = _localization.Get(
             "FolderProject.History.DefaultDescription");
         ClearDisplayedState();
@@ -94,13 +118,39 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRefresh))]
     private async Task Refresh()
     {
-        var project = _project;
-        if (project == null)
+        var projectRoot = _projectRoot;
+        if (projectRoot == null)
             return;
 
         await RunOperation(
-            () => LoadSnapshot(project.ProjectRoot),
+            () => LoadSnapshot(projectRoot),
             ApplySnapshot);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRecoverHistory))]
+    private async Task RecoverHistory()
+    {
+        var projectRoot = _projectRoot;
+        if (projectRoot == null || !Confirm("RecoverHistory"))
+            return;
+
+        await RunOperation(
+            async () =>
+            {
+                await _coordinator.ExecuteAsync(
+                    projectRoot,
+                    () => _historyService.RecoverToSafeState(
+                        projectRoot,
+                        ReportProgress),
+                    openWhenComplete: true);
+                return LoadSnapshot(projectRoot);
+            },
+            snapshot =>
+            {
+                ApplySnapshot(snapshot);
+                if (_closeAfterRecovery)
+                    RecoveryCompleted?.Invoke(this, EventArgs.Empty);
+            });
     }
 
     [RelayCommand(CanExecute = nameof(CanCreateRestorePoint))]
@@ -377,14 +427,14 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         SelectedRestorePointChange = null;
         var requestVersion = ++_selectedRestorePointRequestVersion;
         if (value == null ||
-            _project == null)
+            _projectRoot == null)
         {
             SelectedChangesLoadTask = Task.CompletedTask;
             return;
         }
 
         SelectedChangesLoadTask = LoadSelectedRestorePointChanges(
-            _project.ProjectRoot,
+            _projectRoot,
             value,
             requestVersion);
     }
@@ -454,9 +504,17 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     {
         IsReady = snapshot.Status.Availability ==
                   FolderProjectHistoryAvailability.Ready;
+        IsRecoveryRequired = snapshot.Status.Availability ==
+                             FolderProjectHistoryAvailability
+                                 .RecoveryRequired;
+        CanRecover = snapshot.Status.CanRecover;
         _currentRestorePointId = snapshot.Status.CurrentRestorePointId;
         AvailabilityText = _localization.Get(
             $"FolderProject.History.Availability.{snapshot.Status.Availability}");
+        RecoveryText = IsRecoveryRequired
+            ? _localization.Get(
+                $"FolderProject.History.Recovery.{snapshot.Status.RecoveryReason}")
+            : "";
         ReplaceCollection(
             UnrecordedChanges,
             snapshot.Status.UnrecordedChanges);
@@ -557,8 +615,11 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private void ClearDisplayedState()
     {
         IsReady = false;
+        IsRecoveryRequired = false;
+        CanRecover = false;
         _currentRestorePointId = null;
         AvailabilityText = "";
+        RecoveryText = "";
         UnrecordedChanges.Clear();
         RestorePoints.Clear();
         SelectedRestorePointChanges.Clear();
@@ -574,7 +635,10 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             "FolderProject.History.NoRestorePoints");
     }
 
-    private bool CanRefresh() => _project != null && !IsBusy;
+    private bool CanRefresh() => _projectRoot != null && !IsBusy;
+
+    private bool CanRecoverHistory() =>
+        _projectRoot != null && CanRecover && !IsBusy;
 
     private bool CanCreateRestorePoint() =>
         _project != null &&
@@ -605,6 +669,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private void NotifyCommands()
     {
         RefreshCommand.NotifyCanExecuteChanged();
+        RecoverHistoryCommand.NotifyCanExecuteChanged();
         CreateRestorePointCommand.NotifyCanExecuteChanged();
         RestoreProjectCommand.NotifyCanExecuteChanged();
         RestoreFileCommand.NotifyCanExecuteChanged();

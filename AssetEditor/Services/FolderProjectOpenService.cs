@@ -19,8 +19,7 @@ public sealed class FolderProjectOpenService(
     IPackFileService packFileService,
     IFolderProjectFactory folderProjectFactory,
     IFolderProjectHistoryService historyService,
-    IFolderProjectVersionControlService versionControlService,
-    IFolderProjectVersionControlWindowService versionControlWindowService,
+    IFolderProjectHistoryWindowService historyWindowService,
     ApplicationSettingsService settingsService,
     IStandardDialogs dialogs,
     LocalizationManager localizationManager) : IFolderProjectOpenService
@@ -68,16 +67,10 @@ public sealed class FolderProjectOpenService(
             if (historyStatus.Availability ==
                 FolderProjectHistoryAvailability.RecoveryRequired)
             {
-                var mergeState = versionControlService.GetMergeState(root);
-                if (mergeState != null &&
-                    mergeState.Phase != FolderProjectMergePhase.None)
-                {
-                    versionControlWindowService.ShowDialog(
-                        root,
-                        GetProjectName(root),
-                        true);
-                    return;
-                }
+                historyWindowService.ShowRecoveryDialog(
+                    root,
+                    GetProjectName(root));
+                return;
             }
 
             if (packFileService.TryActivateFolderProject(root))

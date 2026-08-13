@@ -3,6 +3,7 @@ using AssetEditor.Services.Settings;
 using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
 using AssetEditor.Views;
+using AssetEditor.Views.FolderProjectHistory;
 using AssetEditor.Views.FolderProjectVersionControl;
 using AssetEditor.Views.Settings;
 using AssetEditor.Views.Updater;
@@ -59,6 +60,8 @@ namespace AssetEditor
             serviceCollection.AddTransient<
                 FolderProjectVersionControlWindow>();
             serviceCollection.AddTransient<
+                FolderProjectHistoryWindow>();
+            serviceCollection.AddTransient<
                 FolderProjectVersionControlViewModel>();
             serviceCollection.AddScoped<FolderProjectHistoryViewModel>();
             serviceCollection.AddScoped<
@@ -79,6 +82,9 @@ namespace AssetEditor
             serviceCollection.AddScoped<
                 IFolderProjectVersionControlWindowService,
                 FolderProjectVersionControlWindowService>();
+            serviceCollection.AddScoped<
+                IFolderProjectHistoryWindowService,
+                FolderProjectHistoryWindowService>();
             serviceCollection.AddScoped<
                 IFolderProjectCloseGuard,
                 FolderProjectCloseGuard>();

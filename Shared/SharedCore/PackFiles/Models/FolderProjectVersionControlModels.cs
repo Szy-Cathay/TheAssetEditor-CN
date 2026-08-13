@@ -294,4 +294,6 @@ public sealed record FolderProjectRepositoryStatus(
     IReadOnlyList<FolderProjectWorkingChange> Changes)
 {
     public bool IsClean => Changes.Count == 0;
+    public bool IsBusy { get; init; }
+    public bool HasPendingEditorOperation { get; init; }
 }
