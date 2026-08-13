@@ -341,6 +341,11 @@ public sealed class FolderProjectHistoryServiceTests
         versionControl.Verify(item => item.GetCommitChanges(
             It.IsAny<string>(),
             It.IsAny<string>()), Times.Never);
+        versionControl.Verify(item => item.GetCommitChanges(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+            Times.Never);
     }
 
     [Test]
@@ -381,6 +386,11 @@ public sealed class FolderProjectHistoryServiceTests
         versionControl.Verify(item => item.GetCommitChanges(
             It.IsAny<string>(),
             It.IsAny<string>()), Times.Never);
+        versionControl.Verify(item => item.GetCommitChanges(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+            Times.Never);
     }
 
     private sealed class TemporaryProject : IDisposable
