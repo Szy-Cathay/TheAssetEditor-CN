@@ -37,7 +37,7 @@ receive a response; the server then accepts the next client.
 - `action` (required): currently only `"open"`
 - `path` (required): pack-internal file path to open
 - `bringToFront` (optional, default `true`): bring AssetEditor window to front
-- `packPathOnDisk` (optional): disk path to a `.pack` to load first if needed
+- `packPathOnDisk` (optional): disk path to a `.pack`; AssetEditor shows the same Chinese purpose choice used by startup/file-association arguments before opening `path`
 - `openInExistingKitbashTab` (optional, default `false`): if `true`, and a Kitbash tab exists, import supported files into that tab instead of opening a new tab
 
 ## Open Behavior by File Type
@@ -50,10 +50,13 @@ receive a response; the server then accepts the next client.
 - Repeated backslashes are collapsed
 - Absolute paths are accepted if they contain a known pack root such as `variantmeshes\`; AssetEditor extracts the pack-relative suffix
 
-## Pack Loading Behavior
-- If `packPathOnDisk` is supplied, AssetEditor attempts to ensure that pack is available before opening `path`
-- If the pack is already loaded as a standalone pack, it is not loaded again
-- If the pack is already represented inside the merged `All Game Packs` container, it is not loaded again
+## External Pack Choice
+- If `packPathOnDisk` is supplied, AssetEditor asks the user to choose `作为参考打开` (read-only reference) or `导入为工程` (folder project). There is no silent editable-Pack mode and no role boolean in the IPC protocol.
+- Reference mode adds only a read-only reference and does not replace the current folder-project workspace.
+- Import mode reuses the normal folder-project setup, path-safety, progress, rollback, and local-Git initialization flow.
+- Canceling either dialog or failing the selected operation stops the request before resource lookup/opening. The current workspace and loaded containers remain unchanged.
+- The disk path is normalized using Windows case-insensitive path semantics. Repeating a path in the same role reuses the existing container; requesting another role produces a Chinese conflict message and stops safely.
+- Only the single `packPathOnDisk` value is processed, and the named-pipe server retains the bounded request/read/write behavior and `AssetEditor.CN.Ipc` identity described above.
 
 ## Response Format
 AssetEditor returns one JSON response line and closes the connection.
@@ -74,7 +77,7 @@ Open from already-loaded packs:
 {"action":"open","path":"variantmeshes/wh_variantmodels/bi1/cth/cth_great_moon_bird/cth_great_moon_bird_body_01.rigid_model_v2"}
 ```
 
-Open from a mod pack on disk (auto-load if needed):
+Open from a mod pack on disk (the user chooses reference or project import):
 ```json
 {"action":"open","path":"variantmeshes/wh_variantmodels/el1/arb/arb_new_elephants/arb_base_elephant/arb_base_elephant.rigid_model_v2","packPathOnDisk":"k:/SteamLibrary/steamapps/common/Total War WARHAMMER III/data/ovn_araby.pack"}
 ```

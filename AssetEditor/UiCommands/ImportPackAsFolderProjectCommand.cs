@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -9,6 +10,13 @@ using Shared.Core.Settings;
 using Shared.Ui.Common.OperationProgress;
 
 namespace AssetEditor.UiCommands;
+
+public enum FolderProjectImportOutcome
+{
+    Imported,
+    Cancelled,
+    Failed,
+}
 
 public sealed class ImportPackAsFolderProjectCommand(
     IPackFileService packFileService,
@@ -46,13 +54,30 @@ public sealed class ImportPackAsFolderProjectCommand(
         if (sourcePath == null)
             return;
 
+        Execute(sourcePath);
+    }
+
+    public FolderProjectImportOutcome Execute(string sourcePath)
+    {
+        return Execute(sourcePath, CancellationToken.None);
+    }
+
+    public FolderProjectImportOutcome Execute(
+        string sourcePath,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath))
+            return FolderProjectImportOutcome.Failed;
+        if (cancellationToken.IsCancellationRequested)
+            return FolderProjectImportOutcome.Cancelled;
+
         var setupTitle =
             localizationManager.Get("FolderProject.Import.SetupTitle");
         var setup = _setupDialogs.ShowSetup(
             setupTitle,
             localizationManager.Get("FolderProject.Import.SetupDescription"));
         if (setup == null)
-            return;
+            return FolderProjectImportOutcome.Cancelled;
 
         var projectRoot = setup.ProjectFolder;
         var isEmptyTarget = false;
@@ -71,7 +96,7 @@ public sealed class ImportPackAsFolderProjectCommand(
                 localizationManager.Get(
                     "FolderProject.Import.TargetNotEmpty"),
                 localizationManager.Get("FolderProject.ErrorTitle"));
-            return;
+            return FolderProjectImportOutcome.Failed;
         }
 
         var projectName = Path.GetFileName(
@@ -83,11 +108,12 @@ public sealed class ImportPackAsFolderProjectCommand(
         FolderProjectContainer? project = null;
         try
         {
-            project = _progressRunner.Run(
+            var progressResult = _progressRunner.RunCancelable(
                 setupTitle,
                 localizationManager.Get(
                     "FolderProject.Import.Progress"),
-                reportProgress =>
+                cancellationToken,
+                (reportProgress, operationCancellationToken) =>
                 {
                     FolderProjectContainer? importedProject = null;
                     try
@@ -100,7 +126,10 @@ public sealed class ImportPackAsFolderProjectCommand(
                         var source = packFileContainerLoader.Load(
                             sourcePath);
                         if (source == null)
-                            return null;
+                        {
+                            throw new InvalidDataException(
+                                "The source Pack could not be loaded.");
+                        }
 
                         var game = GameInformationDatabase.GetGameById(
                             settingsService.CurrentSettings.CurrentGame);
@@ -110,6 +139,7 @@ public sealed class ImportPackAsFolderProjectCommand(
                             new FolderProjectSettings
                             {
                                 Name = projectName,
+                                SourcePackPath = Path.GetFullPath(sourcePath),
                                 OutputPackPath = outputPath,
                                 GameVersion = game.Type,
                                 PackFileVersion = source.Header.Version,
@@ -125,8 +155,10 @@ public sealed class ImportPackAsFolderProjectCommand(
                                             : "FolderProject.Progress.WriteFile"),
                                     progress.RelativePath,
                                     progress.CurrentIndex,
-                                    progress.Total)));
-
+                                    progress.Total)),
+                            operationCancellationToken);
+                        operationCancellationToken
+                            .ThrowIfCancellationRequested();
                         reportProgress(
                             new OperationProgressUpdate(
                                 localizationManager.Get(
@@ -141,11 +173,18 @@ public sealed class ImportPackAsFolderProjectCommand(
                                 localizationManager.Get(
                                     "FolderProject.VersionControl.DefaultIdentityEmail")),
                             setup.PrimaryBranchName,
-                            progress => reportProgress(
-                                FolderProjectVersionControlProgressAdapter
-                                    .ToOperationProgress(
-                                        progress,
-                                        localizationManager)));
+                            progress =>
+                            {
+                                operationCancellationToken
+                                    .ThrowIfCancellationRequested();
+                                reportProgress(
+                                    FolderProjectVersionControlProgressAdapter
+                                        .ToOperationProgress(
+                                            progress,
+                                            localizationManager));
+                            });
+                        operationCancellationToken
+                            .ThrowIfCancellationRequested();
                         reportProgress(
                             new OperationProgressUpdate(
                                 localizationManager.Get(
@@ -153,27 +192,98 @@ public sealed class ImportPackAsFolderProjectCommand(
                                 projectRoot));
                         return importedProject;
                     }
-                    catch
+                    catch (Exception failure)
                     {
                         importedProject?.Dispose();
+                        try
+                        {
+                            RollbackImportTarget(projectRoot);
+                        }
+                        catch (Exception rollbackFailure)
+                        {
+                            throw new AggregateException(
+                                "Folder-project import failed and rollback was incomplete.",
+                                failure,
+                                rollbackFailure);
+                        }
                         throw;
                     }
                 });
+            project = progressResult.Project;
+
+            if (progressResult.Cancelled)
+                return FolderProjectImportOutcome.Cancelled;
 
             if (project == null)
-                return;
+            {
+                dialogs.ShowDialogBox(
+                    localizationManager.Get(
+                        "FolderProject.Import.Failed"),
+                    localizationManager.Get(
+                        "FolderProject.ErrorTitle"));
+                return FolderProjectImportOutcome.Failed;
+            }
 
             if (packFileService.AddEditableFolderProject(project) == null)
+            {
                 project.Dispose();
+                RollbackImportTarget(projectRoot);
+                dialogs.ShowDialogBox(
+                    localizationManager.Get(
+                        "FolderProject.Import.Failed"),
+                    localizationManager.Get(
+                        "FolderProject.ErrorTitle"));
+                return FolderProjectImportOutcome.Failed;
+            }
+
+            return FolderProjectImportOutcome.Imported;
         }
         catch (Exception exception)
         {
             project?.Dispose();
+            Exception failure = exception;
+            if (project != null)
+            {
+                try
+                {
+                    RollbackImportTarget(projectRoot);
+                }
+                catch (Exception rollbackFailure)
+                {
+                    failure = new AggregateException(
+                        "Folder-project import failed and rollback was incomplete.",
+                        exception,
+                        rollbackFailure);
+                }
+            }
             dialogs.ShowExceptionWindow(
-                exception,
+                failure,
                 localizationManager.Get(
                     "FolderProject.Import.Failed"));
+            return FolderProjectImportOutcome.Failed;
         }
+    }
+
+    private static void RollbackImportTarget(string projectRoot)
+    {
+        var root = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(projectRoot));
+        if (!File.Exists(Path.Combine(
+                root,
+                FolderProjectSettings.CnFileName)))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(
+                     root,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+        Directory.Delete(root, true);
+        Directory.CreateDirectory(root);
     }
 
 }

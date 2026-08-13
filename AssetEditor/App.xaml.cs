@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -81,7 +83,7 @@ namespace AssetEditor
                 return;
             }
 
-            FinishStartup(devConfigManager);
+            FinishStartup(devConfigManager, e.Args);
         }
 
         private bool LoadCAPackFiles(
@@ -114,14 +116,30 @@ namespace AssetEditor
             return loadingWindow.Run();
         }
 
-        private void FinishStartup(DevelopmentConfigurationManager devConfigManager)
+        private void FinishStartup(
+            DevelopmentConfigurationManager devConfigManager,
+            IReadOnlyList<string> startupArguments)
         {
             devConfigManager.CreateTestPackFiles();
             devConfigManager.OpenFileOnLoad();
 
             _ipcServer = _serviceProvider.GetRequiredService<AssetEditorIpcServer>();
             _ipcServer.Start();
+            OpenStartupPack(startupArguments);
             _ = CheckVersion(_serviceProvider.GetRequiredService<IUiCommandFactory>());
+        }
+
+        private void OpenStartupPack(
+            IReadOnlyList<string> startupArguments)
+        {
+            var packPath = ExternalPackStartupArgumentParser.FindPackPath(
+                startupArguments);
+            if (packPath == null)
+                return;
+
+            var workflow = _serviceProvider
+                .GetRequiredService<IExternalPackOpenWorkflow>();
+            _ = workflow.OpenAsync(packPath, CancellationToken.None);
         }
 
         private static void HandleFirstTimeSettings(IUiCommandFactory uiCommandFactory, ApplicationSettingsService settingsService)

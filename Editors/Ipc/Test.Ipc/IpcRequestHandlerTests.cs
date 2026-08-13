@@ -8,7 +8,7 @@ namespace Test.Ipc
         [Test]
         public async Task HandleAsync_ReturnsUnsupportedAction_ForUnknownAction()
         {
-            var packLoader = new FakePackLoader();
+            var packLoader = new FakeExternalPackWorkflow();
             var lookup = new FakeLookup();
             var opener = new FakeOpenExecutor();
             var notifier = new FakeNotifier();
@@ -26,7 +26,7 @@ namespace Test.Ipc
         [Test]
         public async Task HandleAsync_ReturnsError_ForEmptyPath()
         {
-            var sut = new IpcRequestHandler(new FakePackLoader(), new FakeLookup(), new FakeOpenExecutor(), new FakeNotifier());
+            var sut = new IpcRequestHandler(new FakeExternalPackWorkflow(), new FakeLookup(), new FakeOpenExecutor(), new FakeNotifier());
 
             var result = await sut.HandleAsync(new IpcRequest { Action = "open", Path = "   " }, CancellationToken.None);
 
@@ -37,7 +37,7 @@ namespace Test.Ipc
         [Test]
         public async Task HandleAsync_ReturnsNotFound_AndShowsDialog_WhenLookupFails()
         {
-            var packLoader = new FakePackLoader();
+            var packLoader = new FakeExternalPackWorkflow();
             var lookup = new FakeLookup();
             var opener = new FakeOpenExecutor();
             var notifier = new FakeNotifier();
@@ -63,7 +63,7 @@ namespace Test.Ipc
         public async Task HandleAsync_OpensFile_AndReturnsOk_WhenLookupSucceeds()
         {
             var packFile = PackFile.CreateFromBytes("bird.rigid_model_v2", []);
-            var packLoader = new FakePackLoader();
+            var packLoader = new FakeExternalPackWorkflow();
             var lookup = new FakeLookup { Result = packFile };
             var opener = new FakeOpenExecutor();
             var notifier = new FakeNotifier();
@@ -88,7 +88,7 @@ namespace Test.Ipc
         public async Task HandleAsync_DoesNotBringToFront_WhenBringToFrontFalse()
         {
             var packFile = PackFile.CreateFromBytes("bird.rigid_model_v2", []);
-            var packLoader = new FakePackLoader();
+            var packLoader = new FakeExternalPackWorkflow();
             var lookup = new FakeLookup { Result = packFile };
             var opener = new FakeOpenExecutor();
             var sut = new IpcRequestHandler(packLoader, lookup, opener, new FakeNotifier());
@@ -108,10 +108,10 @@ namespace Test.Ipc
         }
 
         [Test]
-        public async Task HandleAsync_LoadsPackFromDisk_WhenPackPathProvided()
+        public async Task HandleAsync_UsesExternalPackWorkflow_WhenPackPathProvided()
         {
             var packFile = PackFile.CreateFromBytes("arb_base_elephant.rigid_model_v2", []);
-            var packLoader = new FakePackLoader();
+            var packLoader = new FakeExternalPackWorkflow();
             var lookup = new FakeLookup { Result = packFile };
             var opener = new FakeOpenExecutor();
             var sut = new IpcRequestHandler(packLoader, lookup, opener, new FakeNotifier());
@@ -133,9 +133,11 @@ namespace Test.Ipc
         [Test]
         public async Task HandleAsync_ReturnsFailure_WhenPackLoadFails()
         {
-            var packLoader = new FakePackLoader
+            var packLoader = new FakeExternalPackWorkflow
             {
-                Result = PackLoadResult.Fail("Pack file load failed")
+                Result = new ExternalPackOpenResult(
+                    ExternalPackOpenStatus.Failed,
+                    "Pack file load failed")
             };
             var lookup = new FakeLookup();
             var opener = new FakeOpenExecutor();
@@ -157,10 +159,40 @@ namespace Test.Ipc
         }
 
         [Test]
+        public async Task HandleAsync_DoesNotOpenFile_WhenPackChoiceCanceled()
+        {
+            var workflow = new FakeExternalPackWorkflow
+            {
+                Result = new ExternalPackOpenResult(
+                    ExternalPackOpenStatus.Cancelled)
+            };
+            var lookup = new FakeLookup();
+            var opener = new FakeOpenExecutor();
+            var sut = new IpcRequestHandler(
+                workflow,
+                lookup,
+                opener,
+                new FakeNotifier());
+
+            var result = await sut.HandleAsync(new IpcRequest
+            {
+                Action = "open",
+                Path = @"db\example",
+                PackPathOnDisk = @"D:\mods\example.pack"
+            }, CancellationToken.None);
+
+            Assert.That(result.Ok, Is.False);
+            Assert.That(result.Error, Is.EqualTo(
+                "External Pack open canceled"));
+            Assert.That(lookup.LastRequestedPath, Is.Null);
+            Assert.That(opener.OpenCallCount, Is.Zero);
+        }
+
+        [Test]
         public async Task HandleAsync_PassesOpenInExistingKitbashTabFlag_ToExecutor()
         {
             var packFile = PackFile.CreateFromBytes("arb_base_elephant_1.wsmodel", []);
-            var packLoader = new FakePackLoader();
+            var packLoader = new FakeExternalPackWorkflow();
             var lookup = new FakeLookup { Result = packFile };
             var opener = new FakeOpenExecutor();
             var sut = new IpcRequestHandler(packLoader, lookup, opener, new FakeNotifier());
@@ -189,13 +221,17 @@ namespace Test.Ipc
             }
         }
 
-        private class FakePackLoader : IExternalPackLoader
+        private class FakeExternalPackWorkflow :
+            IExternalPackOpenWorkflow
         {
             public int CallCount { get; private set; }
             public string? LastPackPath { get; private set; }
-            public PackLoadResult Result { get; set; } = PackLoadResult.Ok();
+            public ExternalPackOpenResult Result { get; set; } =
+                new(ExternalPackOpenStatus.OpenedAsReference);
 
-            public Task<PackLoadResult> EnsureLoadedAsync(string packPathOnDisk, CancellationToken cancellationToken)
+            public Task<ExternalPackOpenResult> OpenAsync(
+                string packPathOnDisk,
+                CancellationToken cancellationToken)
             {
                 CallCount++;
                 LastPackPath = packPathOnDisk;

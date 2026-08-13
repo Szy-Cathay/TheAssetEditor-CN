@@ -146,6 +146,38 @@ public class FolderProjectFactoryTests
     }
 
     [Test]
+    public void ImportPack_CancelledExtraction_LeavesTargetEmpty()
+    {
+        using var target = new TemporaryDirectory();
+        var source = new PackFileContainer("source")
+        {
+            Header = new PFHeader("PFH5", PackFileCAType.MOD),
+        };
+        source.FileList["first.bin"] =
+            PackFile.CreateFromBytes("first.bin", [1]);
+        source.FileList["second.bin"] =
+            PackFile.CreateFromBytes("second.bin", [2]);
+        using var cancellation = new CancellationTokenSource();
+        var factory = new FolderProjectFactory();
+
+        Assert.That(
+            () => factory.ImportPack(
+                source,
+                target.Path,
+                new FolderProjectSettings { Name = "取消测试" },
+                progress =>
+                {
+                    if (progress.CurrentIndex == 1)
+                        cancellation.Cancel();
+                },
+                cancellation.Token),
+            Throws.TypeOf<OperationCanceledException>());
+        Assert.That(
+            Directory.EnumerateFileSystemEntries(target.Path),
+            Is.Empty);
+    }
+
+    [Test]
     public void ImportPack_InvalidPath_DoesNotLeavePartialProject()
     {
         using var target = new TemporaryDirectory();

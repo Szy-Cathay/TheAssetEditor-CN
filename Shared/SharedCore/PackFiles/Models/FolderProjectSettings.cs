@@ -19,6 +19,7 @@ public sealed class FolderProjectSettings
     };
 
     public string Name { get; set; } = "";
+    public string? SourcePackPath { get; set; }
     public string? OutputPackPath { get; set; }
     public GameTypeEnum? GameVersion { get; set; }
     public bool EnablePackFileCorruptionDetection { get; set; }
@@ -134,6 +135,7 @@ public sealed class FolderProjectSettings
     private bool Normalize()
     {
         var previousDependantFiles = DependantFiles?.ToArray();
+        var previousSourcePackPath = SourcePackPath;
         var previousIgnoredPaths = IgnoredPaths?.ToArray();
         var previousEmptyDirectories = EmptyDirectories?.ToArray();
         var normalizedDependantFiles = (DependantFiles ?? [])
@@ -141,6 +143,7 @@ public sealed class FolderProjectSettings
             .Select(path => path.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        SourcePackPath = NormalizeAbsolutePath(SourcePackPath);
         var normalizedIgnoredPaths = NormalizePaths(
             IgnoredPaths,
             directories: false);
@@ -148,6 +151,10 @@ public sealed class FolderProjectSettings
             EmptyDirectories,
             directories: true);
         var changed =
+            !string.Equals(
+                previousSourcePackPath,
+                SourcePackPath,
+                StringComparison.Ordinal) ||
             !SequenceEquals(
                 previousDependantFiles,
                 normalizedDependantFiles) ||
@@ -162,6 +169,23 @@ public sealed class FolderProjectSettings
         IgnoredPaths = normalizedIgnoredPaths;
         EmptyDirectories = normalizedEmptyDirectories;
         return changed;
+    }
+
+    private static string? NormalizeAbsolutePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        try
+        {
+            return Path.GetFullPath(path.Trim());
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or
+                  NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static bool SequenceEquals(

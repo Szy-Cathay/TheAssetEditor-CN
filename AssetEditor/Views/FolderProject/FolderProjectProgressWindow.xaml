@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     Title=""
     Width="700"
     MinHeight="170"
@@ -15,8 +16,26 @@
     FontWeight="{DynamicResource AppFontWeight}"
     Background="{DynamicResource AeBrush.Canvas}"
     WindowStartupLocation="CenterOwner">
-    <progress:OperationProgressView
-        x:Name="FolderProjectOperationProgress"
-        Margin="20"
-        UseDeferredVisibility="False" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <progress:OperationProgressView
+            x:Name="FolderProjectOperationProgress"
+            Margin="24"
+            UseDeferredVisibility="False" />
+        <Border
+            x:Name="CancelFooter"
+            Grid.Row="1"
+            Style="{StaticResource AeWorkflow.DialogFooter}"
+            Visibility="Collapsed">
+            <Button
+                Width="88"
+                HorizontalAlignment="Right"
+                Click="Cancel_Click"
+                Content="{loc:Loc General.Cancel}"
+                Style="{StaticResource AeButton.Secondary}" />
+        </Border>
+    </Grid>
 </Window>

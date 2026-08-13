@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Xml.Linq;
@@ -313,7 +313,8 @@ public class StartupPackLoadingWindowTests
                     "!devConfigManager.HasActiveConfiguration"));
             Assert.That(
                 appSource,
-                Does.Contain("FinishStartup(devConfigManager)"));
+                Does.Contain(
+                    "FinishStartup(devConfigManager, e.Args)"));
         });
     }
 

@@ -23,6 +23,11 @@ namespace AssetEditor.UiCommands
             if (packPath == null)
                 return;
 
+            Execute(packPath);
+        }
+
+        public bool Execute(string packPath)
+        {
             var referencePack = packFileContainerLoader.Load(packPath);
             if (referencePack == null)
             {
@@ -31,10 +36,10 @@ namespace AssetEditor.UiCommands
                         "Msg.UnableToLoadPackfiles",
                         packPath),
                     localizationManager.Get("Msg.GeneralError"));
-                return;
+                return false;
             }
 
-            packFileService.AddReferencePack(referencePack);
+            return packFileService.AddReferencePack(referencePack) != null;
         }
 
         private static string? SelectPack(

@@ -1,0 +1,76 @@
+<Window
+    x:Class="AssetEditor.Views.ExternalPack.ExternalPackOpenChoiceWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    Title="{loc:Loc ExternalPack.Open.Title}"
+    Width="620"
+    Height="280"
+    Background="{DynamicResource AeBrush.Canvas}"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
+    ResizeMode="NoResize"
+    Style="{StaticResource CustomWindowStyle}"
+    WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Margin="16,16,16,12"
+            Padding="16"
+            Style="{StaticResource AeSurface.Panel}">
+            <StackPanel>
+                <TextBlock
+                    Style="{StaticResource AeText.SectionTitle}"
+                    Text="{loc:Loc ExternalPack.Open.Heading}" />
+                <TextBlock
+                    Margin="0,8,0,16"
+                    Text="{loc:Loc ExternalPack.Open.Description}"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    Margin="0,0,0,8"
+                    Foreground="{DynamicResource AeBrush.TextSecondary}"
+                    Style="{StaticResource AeText.Caption}"
+                    Text="{loc:Loc ExternalPack.Open.PathLabel}" />
+                <TextBox
+                    x:Name="PackPathTextBox"
+                    Height="30"
+                    IsReadOnly="True"
+                    Style="{StaticResource AeInput.TextBox}"
+                    VerticalContentAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <Border
+            Grid.Row="1"
+            Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel
+                HorizontalAlignment="Right"
+                Orientation="Horizontal">
+                <Button
+                    MinWidth="112"
+                    Margin="0,0,8,0"
+                    Click="OpenAsReference_Click"
+                    Content="{loc:Loc ExternalPack.Open.AsReference}"
+                    IsDefault="True"
+                    Style="{StaticResource AeButton.Primary}" />
+                <Button
+                    MinWidth="112"
+                    Margin="0,0,8,0"
+                    Click="ImportAsProject_Click"
+                    Content="{loc:Loc ExternalPack.Open.ImportAsProject}"
+                    Style="{StaticResource AeButton.Secondary}" />
+                <Button
+                    MinWidth="88"
+                    Click="Cancel_Click"
+                    Content="{loc:Loc General.Cancel}"
+                    IsCancel="True"
+                    Style="{StaticResource AeButton.Quiet}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
