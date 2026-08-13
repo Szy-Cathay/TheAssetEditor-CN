@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Windows;
+using Editors.Shared.Core.Common.BaseControl;
 using Shared.Core.Misc;
 using GameAnimationPlayer = GameWorld.Core.Animation.AnimationPlayer;
 
@@ -10,6 +11,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         readonly List<SceneObject> _assetList = new();
         float _playbackPositionSeconds;
         bool _isUpdatingPlaybackPosition;
+        IEditorViewModelTypeProvider? _timelineAnnotationContent;
 
         public NotifyAttr<float> SelectedAnimationCurrentTime { get; private set; } = new();
         public NotifyAttr<float> SelectedAnimationMaxTime { get; private set; } = new();
@@ -19,6 +21,13 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         public NotifyAttr<bool> IsEnabled { get; set; } = new();
         public NotifyAttr<bool> IsPlaying { get; private set; } = new();
         public NotifyAttr<bool> LoopAnimation { get; set; } = new(true);
+        public IEditorViewModelTypeProvider? TimelineAnnotationContent
+        {
+            get => _timelineAnnotationContent;
+            set => SetAndNotifyWhenChanged(
+                ref _timelineAnnotationContent,
+                value);
+        }
         public float PlaybackPositionSeconds
         {
             get => _playbackPositionSeconds;

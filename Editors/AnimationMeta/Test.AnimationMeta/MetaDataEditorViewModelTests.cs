@@ -10,6 +10,7 @@ using Microsoft.Xna.Framework;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.Misc;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
 using Shared.GameFormats.AnimationMeta.Definitions;
@@ -1555,6 +1556,220 @@ namespace Test.AnimationMeta
             {
                 superView.Close();
             }
+        }
+
+        [Test]
+        public void SuperView_TimelineMarkerNavigation_PreservesOwnerIdentityAndSeeksStart()
+        {
+            const string animationPath =
+                @"animations\battle\codex\timeline_animation.anm.meta";
+            const string persistentPath =
+                @"animations\battle\codex\timeline_persistent.anm.meta";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateOutputPack();
+            var editorCreator =
+                runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)editorCreator.Create(
+                EditorEnums.SuperView_Editor);
+
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<
+                    MetaDataFileParser>();
+                var fileSaveService =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        IFileSaveService>();
+                var sceneObjectEditor =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        SceneObjectEditor>();
+                var animationFile = SaveTimedMetaFile(
+                    fileSaveService,
+                    parser,
+                    animationPath);
+                var persistentFile = SaveTimedMetaFile(
+                    fileSaveService,
+                    parser,
+                    persistentPath);
+                var sceneObject = superView.SceneObjects.Single();
+                sceneObject.FragAndSlotSelection.MetaDataName = animationPath;
+                sceneObject.FragAndSlotSelection.MetaDataPersistName =
+                    persistentPath;
+                sceneObjectEditor.SetMetaFile(
+                    sceneObject.Data,
+                    animationFile,
+                    persistentFile);
+                superView.Player.SelectedAnimationMaxTime.Value = 5;
+                var originalPreviews = sceneObject.Data.MetaDataItems.ToArray();
+
+                var persistentMarker = superView.MetaDataTimeline.Markers.Single(
+                    marker => marker.Item.Owner ==
+                        MetaDataDocumentOwner.Persistent);
+                var animationMarker = superView.MetaDataTimeline.Markers.Single(
+                    marker => marker.Item.Owner ==
+                        MetaDataDocumentOwner.Animation);
+                superView.Player.IsEnabled.Value = true;
+                Assert.That(superView.Player.IsPlaying.Value, Is.True);
+                persistentMarker.SelectCommand.Execute(null);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(superView.SelectedTabControllerIndex, Is.Zero);
+                    Assert.That(
+                        superView.PersistentMetaEditor.SelectedAttribute,
+                        Is.SameAs(persistentMarker.Item.Source));
+                    Assert.That(
+                        sceneObject.Data.Player.GetTimeUs(),
+                        Is.EqualTo(1_000_000));
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems,
+                        Is.EqualTo(originalPreviews));
+                    Assert.That(superView.Player.IsPlaying.Value, Is.True);
+                    Assert.That(
+                        superView.PersistentMetaEditor.HasUnsavedChanges,
+                        Is.False);
+                    Assert.That(
+                        superView.MetaEditor.HasUnsavedChanges,
+                        Is.False);
+                });
+
+                animationMarker.SelectCommand.Execute(null);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        superView.SelectedTabControllerIndex,
+                        Is.EqualTo(1));
+                    Assert.That(
+                        superView.MetaEditor.SelectedAttribute,
+                        Is.SameAs(animationMarker.Item.Source));
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems,
+                        Is.EqualTo(originalPreviews));
+                });
+
+                var persistentEndTime = superView.PersistentMetaEditor.Tags
+                    .Single().Variables.Single(variable =>
+                        variable.PropertyName == "EndTime");
+                persistentEndTime.ValueAsString = "1.5";
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        superView.PersistentMetaEditor.HasUnsavedChanges,
+                        Is.True);
+                    Assert.That(
+                        superView.MetaEditor.HasUnsavedChanges,
+                        Is.False);
+                    Assert.That(
+                        superView.MetaDataInspectionIndex.Items.Select(item =>
+                            item.Owner),
+                        Is.EquivalentTo(new[]
+                        {
+                            MetaDataDocumentOwner.Persistent,
+                            MetaDataDocumentOwner.Animation,
+                        }));
+                });
+            }
+            finally
+            {
+                superView.Close();
+            }
+        }
+
+        [Test]
+        public void SuperView_InvalidField_RefreshesIndexWithoutRebuildingPreview()
+        {
+            const string metaPath =
+                @"animations\battle\codex\timeline_validation.anm.meta";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateOutputPack();
+            var editorCreator =
+                runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)editorCreator.Create(
+                EditorEnums.SuperView_Editor);
+
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<
+                    MetaDataFileParser>();
+                var fileSaveService =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        IFileSaveService>();
+                var sceneObjectEditor =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        SceneObjectEditor>();
+                var metaFile = SaveTimedMetaFile(
+                    fileSaveService,
+                    parser,
+                    metaPath);
+                var sceneObject = superView.SceneObjects.Single();
+                sceneObject.FragAndSlotSelection.MetaDataName = metaPath;
+                sceneObjectEditor.SetMetaFile(sceneObject.Data, metaFile, null);
+                superView.Player.SelectedAnimationMaxTime.Value = 5;
+                var originalPreview = sceneObject.Data.MetaDataItems.Single();
+                var tag = superView.MetaEditor.Tags.Single();
+                var startTime = tag.Variables.Single(variable =>
+                    variable.PropertyName == "StartTime");
+
+                startTime.ValueAsString = "invalid";
+
+                var item = superView.MetaDataInspectionIndex.Items.Single();
+                Assert.Multiple(() =>
+                {
+                    Assert.That(item.AreFieldsValid, Is.False);
+                    Assert.That(item.TimelineMarkerKind, Is.Null);
+                    Assert.That(superView.MetaDataTimeline.Markers, Is.Empty);
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems.Single(),
+                        Is.SameAs(originalPreview));
+                });
+
+                startTime.ValueAsString = "1";
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        superView.MetaDataInspectionIndex.Items.Single()
+                            .AreFieldsValid,
+                        Is.True);
+                    Assert.That(
+                        superView.MetaDataTimeline.Markers,
+                        Has.Count.EqualTo(1));
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems.Single(),
+                        Is.SameAs(originalPreview));
+                });
+            }
+            finally
+            {
+                superView.Close();
+            }
+        }
+
+        private static PackFile SaveTimedMetaFile(
+            IFileSaveService fileSaveService,
+            MetaDataFileParser parser,
+            string path)
+        {
+            var metadata = new ParsedMetadataFile
+            {
+                Version = 2,
+                Attributes =
+                [
+                    new FirePos_v10
+                    {
+                        Name = "FIRE_POS",
+                        Version = 10,
+                        StartTime = 1,
+                        EndTime = 2,
+                        Position = new Vector3(1, 2, 3),
+                    },
+                ],
+            };
+            return fileSaveService.Save(
+                path,
+                parser.GenerateBytes(metadata.Version, metadata),
+                false)!;
         }
     }
 }

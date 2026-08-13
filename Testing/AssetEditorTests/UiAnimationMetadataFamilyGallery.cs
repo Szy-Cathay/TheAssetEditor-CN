@@ -6,6 +6,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetEditor.Services.Settings;
+using Editors.AnimationMeta.SuperView.Inspection;
+using Editors.AnimationMeta.SuperView.Visualisation;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Shared.Core.Services;
@@ -80,6 +82,8 @@ public class UiAnimationMetadataFamilyGallery
         "metadata-super-editor-loaded",
         "metadata-super-editor-loaded-narrow",
         "shared-animation-player",
+        "shared-animation-player-timeline",
+        "shared-animation-player-timeline-empty",
         "shared-editor-host",
         "shared-scene-object",
         "shared-bone-metadata",
@@ -325,6 +329,22 @@ public class UiAnimationMetadataFamilyGallery
             },
             980,
             320),
+        "shared-animation-player-timeline" => Host(
+            new SharedAnimationPlayerView
+            {
+                DataContext = CreateAnimationPlayerModel(
+                    CreateTimelineModel(populated: true)),
+            },
+            980,
+            340),
+        "shared-animation-player-timeline-empty" => Host(
+            new SharedAnimationPlayerView
+            {
+                DataContext = CreateAnimationPlayerModel(
+                    CreateTimelineModel(populated: false)),
+            },
+            980,
+            340),
         "shared-editor-host" => Host(
             new EditorHostView { DataContext = CreateEditorHostModel() },
             1180,
@@ -681,7 +701,8 @@ public class UiAnimationMetadataFamilyGallery
         };
     }
 
-    private static GalleryModel CreateAnimationPlayerModel() => new()
+    private static GalleryModel CreateAnimationPlayerModel(
+        MetaDataTimelineViewModel? timeline = null) => new()
     {
         IsEnabled = new GalleryModel { Value = true },
         PlayerControlsVisibility = new GalleryModel { Value = Visibility.Visible },
@@ -697,6 +718,7 @@ public class UiAnimationMetadataFamilyGallery
         SelectedAnimationCurrentTime = new GalleryModel { Value = 0.6 },
         SelectedAnimationMaxTime = new GalleryModel { Value = 2.0 },
         LoopAnimation = new GalleryModel { Value = true },
+        TimelineAnnotationContent = timeline,
         PlayerItems = new[]
         {
             new GalleryModel
@@ -707,6 +729,109 @@ public class UiAnimationMetadataFamilyGallery
             },
         },
     };
+
+    private static MetaDataTimelineViewModel CreateTimelineModel(
+        bool populated)
+    {
+        var timeline = new MetaDataTimelineViewModel(_ => { });
+        if (!populated)
+            return timeline;
+
+        var instant = new Shared.GameFormats.AnimationMeta.Definitions.FirePos_v10
+        {
+            Name = "FIRE_POS",
+            Version = 10,
+            StartTime = 0.35f,
+            EndTime = 0.35f,
+        };
+        var range = new Shared.GameFormats.AnimationMeta.Definitions.TargetPos_10
+        {
+            Name = "TARGET_POS",
+            Version = 10,
+            StartTime = 0.7f,
+            EndTime = 1.15f,
+        };
+        var whole = new Shared.GameFormats.AnimationMeta.Definitions.Prop_v10
+        {
+            Name = "PROP",
+            Version = 10,
+            StartTime = 0,
+            EndTime = 0,
+        };
+        var impact = new Shared.GameFormats.AnimationMeta.Definitions.ImpactPosition_v10
+        {
+            Name = "IMPACT_POS",
+            Version = 10,
+            StartTime = 1.3f,
+            EndTime = 1.5f,
+        };
+        var splash = new Shared.GameFormats.AnimationMeta.Definitions.SplashAttack_v10
+        {
+            Name = "SPLASH_ATTACK",
+            Version = 10,
+            StartTime = 1.6f,
+            EndTime = 1.9f,
+        };
+        AddTimelineMarker(
+            timeline,
+            instant,
+            new MetaDataTimeRange(0.35f, 0.35f),
+            MetaDataTimelineMarkerKind.Instant,
+            CombatMetaDataPreviewCategory.Fire);
+        AddTimelineMarker(
+            timeline,
+            range,
+            new MetaDataTimeRange(0.7f, 1.15f),
+            MetaDataTimelineMarkerKind.Range,
+            CombatMetaDataPreviewCategory.Target);
+        AddTimelineMarker(
+            timeline,
+            whole,
+            new MetaDataTimeRange(
+                0,
+                0,
+                MetaDataZeroRangeBehavior.WholeAnimation),
+            MetaDataTimelineMarkerKind.WholeAnimation,
+            null);
+        AddTimelineMarker(
+            timeline,
+            impact,
+            new MetaDataTimeRange(1.3f, 1.5f),
+            MetaDataTimelineMarkerKind.Range,
+            CombatMetaDataPreviewCategory.Impact);
+        AddTimelineMarker(
+            timeline,
+            splash,
+            new MetaDataTimeRange(1.6f, 1.9f),
+            MetaDataTimelineMarkerKind.Range,
+            CombatMetaDataPreviewCategory.Splash);
+        timeline.UpdateSelection(MetaDataDocumentOwner.Animation, instant);
+        return timeline;
+    }
+
+    private static void AddTimelineMarker(
+        MetaDataTimelineViewModel timeline,
+        Shared.GameFormats.AnimationMeta.Parsing.ParsedMetadataAttribute source,
+        MetaDataTimeRange timeRange,
+        MetaDataTimelineMarkerKind markerKind,
+        CombatMetaDataPreviewCategory? category)
+    {
+        var item = new MetaDataInspectionItem(
+            source,
+            MetaDataDocumentOwner.Animation,
+            true,
+            timeRange,
+            MetaDataAuthoredTimeStatus.Valid,
+            markerKind,
+            MetaDataPreviewCapability.Available,
+            category,
+            null,
+            []);
+        timeline.Markers.Add(new MetaDataTimelineMarkerViewModel(
+            item,
+            2,
+            _ => { }));
+    }
 
     private static GalleryModel CreateEditorHostModel() => new()
     {
@@ -818,6 +943,101 @@ public class UiAnimationMetadataFamilyGallery
                 FindVisualDescendants<System.Windows.Shapes.Path>(window)
                     .Count(),
                 Is.GreaterThanOrEqualTo(5));
+        }
+
+        if (variant == "shared-animation-player-timeline")
+        {
+            var timeline = FindVisualDescendants<MetaDataTimelineView>(window)
+                .Single();
+            var markerButtons = FindVisualDescendants<Button>(timeline)
+                .Where(button => button.DataContext is
+                    MetaDataTimelineMarkerViewModel)
+                .ToArray();
+            var markers = markerButtons.Select(button => new
+            {
+                Button = button,
+                ViewModel = (MetaDataTimelineMarkerViewModel)
+                    button.DataContext,
+                Visual = FindVisualDescendants<Border>(button)
+                    .Single(border => border.Name == "Marker"),
+            }).ToArray();
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(timeline.ActualHeight, Is.GreaterThan(0));
+                NUnitAssert.That(markerButtons, Has.Length.EqualTo(5));
+                NUnitAssert.That(
+                    markerButtons.Select(
+                        System.Windows.Automation.AutomationProperties.GetName),
+                    Has.All.Not.Empty);
+                NUnitAssert.That(
+                    markers.Select(marker => marker.ViewModel)
+                        .Count(marker => marker.IsSelected),
+                    Is.EqualTo(1));
+                NUnitAssert.That(
+                    markerButtons.Select(button => button.ToolTip as string),
+                    Has.All.Contains("类型："));
+                NUnitAssert.That(
+                    markerButtons.Select(button => button.ToolTip as string),
+                    Has.All.Contains("归属：动画元数据"));
+                NUnitAssert.That(
+                    markerButtons.Select(button => button.ToolTip as string),
+                    Has.All.Contains("时间："));
+                NUnitAssert.That(
+                    markers.Single(marker => marker.ViewModel.IsSelected)
+                        .Visual.BorderThickness,
+                    Is.EqualTo(new Thickness(2)));
+                NUnitAssert.That(
+                    markers.Single(marker => marker.ViewModel.IsSelected)
+                        .Visual.ActualHeight,
+                    Is.EqualTo(14));
+                NUnitAssert.That(
+                    markers.Where(marker => !marker.ViewModel.IsSelected)
+                        .Select(marker => marker.Visual.BorderThickness),
+                    Has.All.EqualTo(new Thickness(0)));
+                NUnitAssert.That(
+                    markers.Single(marker => marker.ViewModel.Item.PreviewCategory ==
+                        CombatMetaDataPreviewCategory.Impact).Visual.Background,
+                    Is.SameAs(FindBrush("AeBrush.Warning")));
+                NUnitAssert.That(
+                    markers.Single(marker => marker.ViewModel.Item.PreviewCategory ==
+                        CombatMetaDataPreviewCategory.Target).Visual.Background,
+                    Is.SameAs(FindBrush("AeBrush.Accent")));
+                NUnitAssert.That(
+                    markers.Single(marker => marker.ViewModel.Item.PreviewCategory ==
+                        CombatMetaDataPreviewCategory.Fire).Visual.Background,
+                    Is.SameAs(FindBrush("AeBrush.Danger")));
+                NUnitAssert.That(
+                    markers.Single(marker => marker.ViewModel.Item.PreviewCategory ==
+                        CombatMetaDataPreviewCategory.Splash).Visual.Background,
+                    Is.SameAs(MetaDataTimelineBrushes.Splash));
+                NUnitAssert.That(
+                    markerButtons.All(button => ReferenceEquals(
+                        button.Style.BasedOn,
+                        Application.Current.FindResource("AeButton.Base"))),
+                    Is.True);
+                NUnitAssert.That(
+                    markerButtons.SelectMany(button => button.Style.Triggers
+                        .OfType<Trigger>())
+                        .Any(trigger => trigger.Property ==
+                            UIElement.IsMouseOverProperty),
+                    Is.True);
+                NUnitAssert.That(
+                    markerButtons.SelectMany(button => button.Style.Triggers
+                        .OfType<Trigger>())
+                        .Any(trigger => trigger.Property ==
+                            ButtonBase.IsPressedProperty),
+                    Is.True);
+            });
+        }
+
+        if (variant == "shared-animation-player-timeline-empty")
+        {
+            var timeline = FindVisualDescendants<MetaDataTimelineView>(window)
+                .Single();
+            var emptyText = FindVisualDescendants<TextBlock>(timeline)
+                .Single(text => text.IsVisible &&
+                    text.Text == "当前动画没有可显示的 META 时间标记");
+            NUnitAssert.That(emptyText.ActualWidth, Is.GreaterThan(0));
         }
 
         if (variant.StartsWith(
@@ -1248,6 +1468,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? Tags { get; set; }
         public object? Text { get; set; }
         public object? TextValue { get; set; }
+        public object? TimelineAnnotationContent { get; set; }
         public object? Translation { get; set; }
         public object? UpdateAnimationCommand { get; set; }
         public object? Value { get; set; }
