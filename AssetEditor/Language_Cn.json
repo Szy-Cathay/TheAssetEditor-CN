@@ -124,7 +124,7 @@
   "FolderProject.History.NoRestorePoints": "当前没有可用还原点",
   "FolderProject.History.SelectedChanges": "还原点内容",
   "FolderProject.History.SelectRestorePointHint": "选择一个还原点后读取它记录的修改。",
-  "FolderProject.History.ChangeSummaryPrefix": "记录修改：",
+  "FolderProject.History.ChangeSummaryPrefix": "记录修改",
   "FolderProject.History.OperationTitle": "正在处理工程历史",
   "FolderProject.History.Availability.NotInitialized": "尚未建立工程历史。",
   "FolderProject.History.Availability.Ready": "工程历史可用。",
