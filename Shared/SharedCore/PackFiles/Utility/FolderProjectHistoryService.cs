@@ -11,6 +11,20 @@ public interface IFolderProjectHistoryService
         string projectRoot,
         Action<FolderProjectHistoryProgress> reportProgress);
 
+    FolderProjectHistoryStatus RecoverToSafeState(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress);
+
+    FolderProjectRecoveryOperation BeginRecoverToSafeState(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress);
+
+    void CompleteRecoverToSafeState(
+        FolderProjectRecoveryOperation operation);
+
+    void RollbackRecoverToSafeState(
+        FolderProjectRecoveryOperation operation);
+
     FolderProjectRestorePoint Initialize(string projectRoot);
 
     FolderProjectRestorePoint Initialize(
@@ -115,16 +129,68 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 projectRoot,
                 progress => reportProgress(MapProgress(progress)),
                 scanUnreadableEntries: true);
-            var availability = !status.IsInitialized
-                ? FolderProjectHistoryAvailability.NotInitialized
-                : status.IsDetached ||
-                  status.OperationState != FolderProjectRepositoryOperationState.None
-                    ? FolderProjectHistoryAvailability.RecoveryRequired
-                    : FolderProjectHistoryAvailability.Ready;
-            return new FolderProjectHistoryStatus(
-                availability,
-                status.HeadCommitId,
-                status.Changes.Select(MapUnrecordedChange).ToList());
+            return MapStatus(status);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectHistoryStatus RecoverToSafeState(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        reportProgress(new FolderProjectHistoryProgress(
+            FolderProjectHistoryProgressStage.RecoveringHistory));
+        try
+        {
+            return MapStatus(
+                _versionControl.RecoverToSafeState(projectRoot));
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectRecoveryOperation BeginRecoverToSafeState(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        reportProgress(new FolderProjectHistoryProgress(
+            FolderProjectHistoryProgressStage.RecoveringHistory));
+        try
+        {
+            var transaction = _versionControl.BeginRecoverToSafeState(
+                projectRoot);
+            return new FolderProjectRecoveryOperation(
+                MapStatus(transaction.Status),
+                transaction);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public void CompleteRecoverToSafeState(
+        FolderProjectRecoveryOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        _versionControl.CompleteRecoverToSafeState(operation.Transaction);
+    }
+
+    public void RollbackRecoverToSafeState(
+        FolderProjectRecoveryOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        try
+        {
+            _versionControl.RollbackRecoverToSafeState(
+                operation.Transaction);
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -457,6 +523,44 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             change.PreviousRepositoryPath);
     }
 
+    private static FolderProjectHistoryStatus MapStatus(
+        FolderProjectRepositoryStatus status)
+    {
+        var hasConflicts = status.Changes.Any(change =>
+            change.Kind.HasFlag(FolderProjectWorkingChangeKind.Conflicted));
+        var hasUnreadableFiles = status.Changes.Any(change =>
+            change.Kind.HasFlag(FolderProjectWorkingChangeKind.Unreadable));
+        var recoveryReason = status.IsBusy
+            ? FolderProjectHistoryRecoveryReason.RepositoryBusy
+            : hasUnreadableFiles
+                ? FolderProjectHistoryRecoveryReason.UnreadableFiles
+                : status.OperationState !=
+                      FolderProjectRepositoryOperationState.None ||
+                  hasConflicts ||
+                  status.HasPendingEditorOperation
+                    ? FolderProjectHistoryRecoveryReason.UnfinishedOperation
+                    : status.IsDetached
+                        ? FolderProjectHistoryRecoveryReason.DetachedHistory
+                        : FolderProjectHistoryRecoveryReason.None;
+        var availability = !status.IsInitialized
+            ? FolderProjectHistoryAvailability.NotInitialized
+            : recoveryReason != FolderProjectHistoryRecoveryReason.None
+                ? FolderProjectHistoryAvailability.RecoveryRequired
+                : FolderProjectHistoryAvailability.Ready;
+        return new FolderProjectHistoryStatus(
+            availability,
+            status.HeadCommitId,
+            status.Changes.Select(MapUnrecordedChange).ToList())
+        {
+            RecoveryReason = recoveryReason,
+            CanRecover = availability ==
+                         FolderProjectHistoryAvailability.RecoveryRequired &&
+                         !status.IsBusy &&
+                         !hasUnreadableFiles &&
+                         status.HeadCommitId != null,
+        };
+    }
+
     private FolderProjectRestorePoint MapRestorePoint(
         FolderProjectCommitSummary summary,
         FolderProjectRestorePointChangeSummary changeSummary)
@@ -555,6 +659,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                     FolderProjectHistoryError.RestorePointNotFound,
                 FolderProjectVersionControlError.RepositoryBusy or
                 FolderProjectVersionControlError.UnsupportedOperationState or
+                FolderProjectVersionControlError.WorkingTreeNotClean or
                 FolderProjectVersionControlError.MergeRecoveryRequired or
                 FolderProjectVersionControlError.UnresolvedMergeConflicts =>
                     FolderProjectHistoryError.RecoveryRequired,

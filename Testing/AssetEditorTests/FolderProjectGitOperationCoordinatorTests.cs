@@ -46,7 +46,7 @@ public class FolderProjectGitOperationCoordinatorTests
                 Is.EqualTo(new PackFileContainer[] { project }));
         });
         versionControl.Verify(
-            item => item.GetMergeState(Normalize(projectRoot.Path)),
+            item => item.GetStatus(Normalize(projectRoot.Path), false),
             Times.Never);
     }
 
@@ -77,8 +77,8 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
-            .Returns(MergeState(FolderProjectMergePhase.None));
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
+            .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
             factory.Object,
@@ -141,9 +141,9 @@ public class FolderProjectGitOperationCoordinatorTests
         var versionControl = new Mock<IFolderProjectVersionControlService>(
             MockBehavior.Strict);
         versionControl.SetupSequence(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
-            .Returns(MergeState(FolderProjectMergePhase.Conflicts))
-            .Returns(MergeState(FolderProjectMergePhase.None));
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
+            .Returns(RepositoryStatus(isSafe: false))
+            .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
             factory.Object,
@@ -211,9 +211,15 @@ public class FolderProjectGitOperationCoordinatorTests
 
         try
         {
-            NUnitAssert.That(
-                packFileService.GetAllPackfileContainers(),
-                Is.EqualTo(new PackFileContainer[] { opened! }));
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    packFileService.GetAllPackfileContainers(),
+                    Is.EqualTo(new PackFileContainer[] { opened! }));
+                NUnitAssert.That(
+                    packFileService.GetEditablePack(),
+                    Is.SameAs(opened));
+            });
         }
         finally
         {
@@ -953,7 +959,7 @@ public class FolderProjectGitOperationCoordinatorTests
             item => item.Open(It.IsAny<string>()),
             Times.Never);
         versionControl.Verify(
-            item => item.GetMergeState(It.IsAny<string>()),
+            item => item.GetStatus(It.IsAny<string>(), false),
             Times.Never);
     }
 
@@ -1016,7 +1022,7 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
             .Throws(new FolderProjectVersionControlException(
                 FolderProjectVersionControlError.RepositoryNotInitialized,
                 "Repository is not initialized."));
@@ -1067,7 +1073,7 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot.Path)))
+                item => item.GetStatus(Normalize(projectRoot.Path), false))
             .Throws(new FolderProjectVersionControlException(
                 FolderProjectVersionControlError.RepositoryNotInitialized,
                 "Repository is not initialized."));
@@ -1151,8 +1157,8 @@ public class FolderProjectGitOperationCoordinatorTests
         var packFileService = CreatePackFileServiceMock([]);
         var versionControl = new Mock<IFolderProjectVersionControlService>();
         versionControl.Setup(
-                item => item.GetMergeState(It.IsAny<string>()))
-            .Returns(MergeState(FolderProjectMergePhase.None));
+                item => item.GetStatus(It.IsAny<string>(), false))
+            .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService.Object,
             Mock.Of<IFolderProjectFactory>(),
@@ -1333,23 +1339,71 @@ public class FolderProjectGitOperationCoordinatorTests
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetMergeState(Normalize(projectRoot)))
-            .Returns(MergeState(phase));
+                item => item.GetStatus(Normalize(projectRoot), false))
+            .Returns(RepositoryStatus(
+                phase == FolderProjectMergePhase.None));
         return versionControl;
     }
 
-    private static FolderProjectMergeState MergeState(
-        FolderProjectMergePhase phase)
+    [Test]
+    public void ExecuteTransactionalAsync_WhenInitiallyUnloadedReopenFails_PreservesExistingEmptyDirectory()
     {
-        return new FolderProjectMergeState(
-            phase,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            null);
+        using var projectRoot = new TemporaryDirectory();
+        var emptyPath = Path.Combine(projectRoot.Path, "existing-empty");
+        Directory.CreateDirectory(emptyPath);
+        var settingsPath = Path.Combine(
+            projectRoot.Path,
+            FolderProjectSettings.CnFileName);
+        File.WriteAllText(
+            settingsPath,
+            "{\r\n  \"Name\": \"旧工程\",\r\n  " +
+            "\"EmptyDirectories\": [ \"existing-empty\", " +
+            "\".git\\\\objects\" ]\r\n}\r\n");
+        var settingsBytes = File.ReadAllBytes(settingsPath);
+        var packFileService = CreateRealPackFileService();
+        var factory = new Mock<IFolderProjectFactory>();
+        factory.Setup(item => item.Open(Normalize(projectRoot.Path)))
+            .Throws(new IOException("Injected reopen failure."));
+        var recovered = true;
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(item => item.GetStatus(
+                Normalize(projectRoot.Path),
+                false))
+            .Returns(() => RepositoryStatus(isSafe: recovered));
+        var coordinator = new FolderProjectGitOperationCoordinator(
+            packFileService,
+            factory.Object,
+            versionControl.Object);
+
+        NUnitAssert.ThrowsAsync<FolderProjectGitHostException>(
+            async () => await coordinator.ExecuteTransactionalAsync(
+                projectRoot.Path,
+                () => 42,
+                _ => { },
+                _ => recovered = false,
+                openWhenComplete: true));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(Directory.Exists(emptyPath), Is.True);
+            NUnitAssert.That(
+                File.ReadAllBytes(settingsPath),
+                Is.EqualTo(settingsBytes));
+        });
+    }
+
+    private static FolderProjectRepositoryStatus RepositoryStatus(
+        bool isSafe)
+    {
+        return new FolderProjectRepositoryStatus(
+            true,
+            "main",
+            "head",
+            false,
+            isSafe
+                ? FolderProjectRepositoryOperationState.None
+                : FolderProjectRepositoryOperationState.Merge,
+            []);
     }
 
     private static PackFileContainer CreatePack(string name)

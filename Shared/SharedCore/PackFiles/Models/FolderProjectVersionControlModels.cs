@@ -199,6 +199,35 @@ public sealed record FolderProjectIndexSnapshot(
     byte[] Bytes,
     FileAttributes Attributes);
 
+public sealed class FolderProjectRecoveryTransaction
+{
+    private Action? _rollback;
+
+    public FolderProjectRepositoryStatus Status { get; }
+    internal string ProjectRoot { get; }
+
+    internal FolderProjectRecoveryTransaction(
+        string projectRoot,
+        FolderProjectRepositoryStatus status,
+        Action rollback)
+    {
+        ProjectRoot = projectRoot;
+        Status = status;
+        _rollback = rollback;
+    }
+
+    internal void Complete() =>
+        Interlocked.Exchange(ref _rollback, null);
+
+    internal void Rollback()
+    {
+        var rollback = Interlocked.Exchange(ref _rollback, null) ??
+                       throw new InvalidOperationException(
+                           "The recovery transaction is already closed.");
+        rollback();
+    }
+}
+
 public sealed record FolderProjectDiscardBackup(
     string OriginalPath,
     string StagedPath);
@@ -294,4 +323,6 @@ public sealed record FolderProjectRepositoryStatus(
     IReadOnlyList<FolderProjectWorkingChange> Changes)
 {
     public bool IsClean => Changes.Count == 0;
+    public bool IsBusy { get; init; }
+    public bool HasPendingEditorOperation { get; init; }
 }

@@ -7,6 +7,15 @@ public enum FolderProjectHistoryAvailability
     RecoveryRequired,
 }
 
+public enum FolderProjectHistoryRecoveryReason
+{
+    None,
+    DetachedHistory,
+    UnfinishedOperation,
+    RepositoryBusy,
+    UnreadableFiles,
+}
+
 [Flags]
 public enum FolderProjectUnrecordedChangeKind
 {
@@ -31,6 +40,8 @@ public sealed record FolderProjectHistoryStatus(
     IReadOnlyList<FolderProjectUnrecordedChange> UnrecordedChanges)
 {
     public bool IsClean => UnrecordedChanges.Count == 0;
+    public FolderProjectHistoryRecoveryReason RecoveryReason { get; init; }
+    public bool CanRecover { get; init; }
 }
 
 public enum FolderProjectRestorePointChangeKind
@@ -82,6 +93,7 @@ public enum FolderProjectHistoryProgressStage
     WritingProjectFiles,
     ReconcilingProject,
     RefreshingInterface,
+    RecoveringHistory,
 }
 
 public sealed record FolderProjectHistoryProgress(
@@ -99,6 +111,10 @@ public sealed record FolderProjectRestoreResult(
 
 public sealed record FolderProjectDiscardResult(
     FolderProjectDiscardRollback Rollback);
+
+public sealed record FolderProjectRecoveryOperation(
+    FolderProjectHistoryStatus Status,
+    FolderProjectRecoveryTransaction Transaction);
 
 public sealed record FolderProjectFileRestoreOperation(
     FolderProjectFileRestoreResult Result,
