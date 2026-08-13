@@ -504,6 +504,61 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
+    public async Task RestoreFile_RollbackFailure_UsesCoordinatorIsolation()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("target", "目标状态");
+        var change = new FolderProjectRestorePointChange(
+            "changed.bin",
+            null,
+            FolderProjectRestorePointChangeKind.Modified,
+            true);
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([change]);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+                false))
+            .ThrowsAsync(new FolderProjectGitHostException(
+                "rollback failed",
+                new IOException("rollback failed")));
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePointChange = change;
+
+        await viewModel.RestoreFileCommand.ExecuteAsync(null);
+
+        coordinator.Verify(item => item.ExecuteTransactionalAsync(
+            project.ProjectRoot,
+            It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
+            It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+            It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+            false), Times.Once);
+        dialogs.Verify(item => item.ShowExceptionWindow(
+            It.IsAny<FolderProjectGitHostException>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Test]
     public async Task DiscardSelected_ReconcileFailureRollsBackBeforeCleanup()
     {
         using var directory = new TemporaryDirectory();
@@ -533,9 +588,28 @@ public class FolderProjectHistoryViewModelTests
                 It.IsAny<string>(),
                 It.IsAny<string>()))
             .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                false))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>, bool>(
+                (_, operation, _, rollback, _) =>
+                {
+                    var result = operation();
+                    rollback(result);
+                    throw new FolderProjectGitHostException(
+                        "reopen failed",
+                        new DirectoryNotFoundException());
+                });
         var viewModel = CreateViewModel(
             history.Object,
-            dialogs: dialogs.Object);
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
         viewModel.OpenProject(project);
         await viewModel.RefreshCommand.ExecuteAsync(null);
         viewModel.SelectedUnrecordedChange =
@@ -816,9 +890,56 @@ public class FolderProjectHistoryViewModelTests
             history,
             unsaved ?? Mock.Of<IFolderProjectUnsavedChangesService>(),
             prompt ?? Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
-            coordinator ?? Mock.Of<IFolderProjectGitOperationCoordinator>(),
+            coordinator ?? CreateImmediateCoordinator(),
             dialogs ?? Mock.Of<IStandardDialogs>(),
             LocalizationManager.Instance);
+
+    private static IFolderProjectGitOperationCoordinator
+        CreateImmediateCoordinator()
+    {
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
+                false))
+            .Returns<string, Func<FolderProjectFileRestoreOperation>,
+                Action<FolderProjectFileRestoreOperation>,
+                Action<FolderProjectFileRestoreOperation>, bool>(
+                (_, operation, complete, rollback, _) =>
+                    ExecuteImmediate(operation, complete, rollback));
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                false))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>, bool>(
+                (_, operation, complete, rollback, _) =>
+                    ExecuteImmediate(operation, complete, rollback));
+        return coordinator.Object;
+
+        static Task<T> ExecuteImmediate<T>(
+            Func<T> operation,
+            Action<T> complete,
+            Action<T> rollback)
+        {
+            var result = operation();
+            try
+            {
+                complete(result);
+            }
+            catch
+            {
+                rollback(result);
+                throw;
+            }
+            return Task.FromResult(result);
+        }
+    }
 
     private static Mock<IFolderProjectHistoryService> CreateHistoryService(
         string projectRoot,

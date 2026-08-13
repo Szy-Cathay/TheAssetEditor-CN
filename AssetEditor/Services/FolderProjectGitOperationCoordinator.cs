@@ -82,6 +82,11 @@ internal class FolderProjectGitOperationPlatform
     public virtual void DeleteDirectory(string path) =>
         Directory.Delete(path, false);
 
+    public virtual void DeleteConfiguredEmptyDirectories(
+        string projectRoot,
+        Action deleteCore) =>
+        deleteCore();
+
     public virtual void CreateDirectory(string path) =>
         Directory.CreateDirectory(path);
 }
@@ -316,14 +321,18 @@ public sealed class FolderProjectGitOperationCoordinator :
         bool openWhenComplete)
     {
         var failures = new List<Exception>();
+        var preparationSucceeded = true;
         var rollbackSucceeded = false;
         try
         {
-            RemoveAllConfiguredEmptyDirectories(projectRoot);
+            _platform.DeleteConfiguredEmptyDirectories(
+                projectRoot,
+                () => RemoveAllConfiguredEmptyDirectories(projectRoot));
         }
         catch (Exception exception)
         {
             failures.Add(exception);
+            preparationSucceeded = false;
         }
         try
         {
@@ -334,7 +343,7 @@ public sealed class FolderProjectGitOperationCoordinator :
         {
             failures.Add(exception);
         }
-        if (rollbackSucceeded)
+        if (preparationSucceeded && rollbackSucceeded)
         {
             try
             {

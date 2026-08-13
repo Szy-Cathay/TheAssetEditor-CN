@@ -478,6 +478,44 @@ public class FolderProjectGitOperationCoordinatorTests
     }
 
     [Test]
+    public async Task ExecuteTransactionalAsync_WhenRollbackPreparationFails_RemainsDetached()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        var packFileService = CreateRealPackFileService();
+        var original = CreateProject(projectRoot.Path);
+        packFileService.AddContainer(original);
+        var factory = new Mock<IFolderProjectFactory>();
+        factory.Setup(item => item.Open(Normalize(projectRoot.Path)))
+            .Returns(() => FolderProjectContainer.Open(projectRoot.Path));
+        var versionControl = CreateVersionControlMock(
+            projectRoot.Path,
+            FolderProjectMergePhase.None);
+        var coordinator = new FolderProjectGitOperationCoordinator(
+            packFileService,
+            factory.Object,
+            versionControl.Object,
+            new FailRollbackPreparationPlatform());
+        var rollbackCalls = 0;
+
+        var exception = NUnitAssert.ThrowsAsync<FolderProjectGitHostException>(
+            async () => await coordinator.ExecuteTransactionalAsync(
+                projectRoot.Path,
+                () => 42,
+                _ => throw new IOException("history refresh failed"),
+                _ => rollbackCalls++));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(exception!.HostException,
+                Is.TypeOf<IOException>());
+            NUnitAssert.That(rollbackCalls, Is.EqualTo(1));
+            NUnitAssert.That(
+                packFileService.GetAllPackfileContainers(),
+                Is.Empty);
+        });
+    }
+
+    [Test]
     public void Execute_OnlyTemporarilyRemovesSafeRegisteredEmptyDirectories()
     {
         using var projectRoot = new TemporaryDirectory();
@@ -1209,6 +1247,15 @@ public class FolderProjectGitOperationCoordinatorTests
                 ? attributes | FileAttributes.ReparsePoint
                 : attributes;
         }
+    }
+
+    private sealed class FailRollbackPreparationPlatform :
+        FolderProjectGitOperationPlatform
+    {
+        public override void DeleteConfiguredEmptyDirectories(
+            string projectRoot,
+            Action deleteCore) =>
+            throw new IOException("empty directory cleanup failed");
     }
 
     private sealed class TestPackFileService : IPackFileService

@@ -210,7 +210,7 @@ public sealed partial class FolderProjectVersionControlService
                 transaction.TargetPath,
                 overwrite: true);
         }
-        TryDeleteFinalizedStagingDirectory(transaction.StagingPath);
+        TryFinalizeStagingDirectory(transaction.StagingPath);
     }
 
     public FolderProjectProjectRestoreResult RestoreProject(

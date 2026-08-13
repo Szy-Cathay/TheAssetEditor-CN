@@ -378,13 +378,37 @@ public sealed partial class FolderProjectVersionControlService :
         try
         {
             if (Directory.Exists(stagingPath))
+            {
+                foreach (var file in Directory.EnumerateFiles(
+                             stagingPath,
+                             "*",
+                             SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                }
                 _platform.DeleteDirectory(stagingPath);
+            }
         }
         catch (Exception exception)
         {
             s_logger.Warning(
                 exception,
                 "Could not remove finalized folder project transaction data at {StagingPath}",
+                stagingPath);
+        }
+    }
+
+    private void TryFinalizeStagingDirectory(string stagingPath)
+    {
+        try
+        {
+            FinalizeStagingDirectory(stagingPath);
+        }
+        catch (Exception exception)
+        {
+            s_logger.Warning(
+                exception,
+                "Could not finalize folder project transaction data at {StagingPath}",
                 stagingPath);
         }
     }
@@ -399,6 +423,18 @@ public sealed partial class FolderProjectVersionControlService :
                          SearchOption.TopDirectoryOnly))
             {
                 TryDeleteFinalizedStagingDirectory(path);
+            }
+            foreach (var path in Directory.EnumerateDirectories(
+                         repositoryPath,
+                         "ae-*-*",
+                         SearchOption.TopDirectoryOnly)
+                     .Where(path =>
+                         !Path.GetFileName(path).StartsWith(
+                             "ae-cleanup-",
+                             StringComparison.Ordinal) &&
+                         !Directory.EnumerateFileSystemEntries(path).Any()))
+            {
+                TryFinalizeStagingDirectory(path);
             }
         }
         catch (Exception exception)

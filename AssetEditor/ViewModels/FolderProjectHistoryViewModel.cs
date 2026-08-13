@@ -228,21 +228,17 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             return;
 
         await RunOperation(
-            () =>
-            {
-                var operation = _historyService.BeginRestoreFile(
+            () => ExecuteWorkspaceFileOperation(
+                project,
+                () => _historyService.BeginRestoreFile(
                     project.ProjectRoot,
                     change.Kind == FolderProjectRestorePointChangeKind.Deleted
                         ? restorePoint.PreviousRestorePointId!
                         : restorePoint.Id,
                     change.Path,
-                    overwrite);
-                return CompleteWorkspaceFileOperation(
-                    project,
-                    operation,
-                    _historyService.CompleteRestoreFile,
-                    _historyService.RollbackRestoreFile);
-            },
+                    overwrite),
+                _historyService.CompleteRestoreFile,
+                _historyService.RollbackRestoreFile),
             ApplySnapshot);
     }
 
@@ -257,20 +253,16 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             return;
 
         await RunOperation(
-            () =>
-            {
-                var result = _historyService.BeginDiscardChanges(
+            () => ExecuteWorkspaceFileOperation(
+                project,
+                () => _historyService.BeginDiscardChanges(
                     project.ProjectRoot,
                     [change.Path],
-                    ReportProgress);
-                return CompleteWorkspaceFileOperation(
-                    project,
-                    result,
-                    _historyService.CompleteDiscardChanges,
-                    operation => _historyService.RollbackDiscardChanges(
-                        project.ProjectRoot,
-                        operation));
-            },
+                    ReportProgress),
+                _historyService.CompleteDiscardChanges,
+                operation => _historyService.RollbackDiscardChanges(
+                    project.ProjectRoot,
+                    operation)),
             ApplySnapshot);
     }
 
@@ -349,49 +341,33 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             ApplySnapshot);
     }
 
-    private HistorySnapshot CompleteWorkspaceFileOperation<T>(
+    private async Task<HistorySnapshot> ExecuteWorkspaceFileOperation<T>(
         FolderProjectContainer project,
-        T operation,
+        Func<T> operation,
         Action<T> complete,
         Action<T> rollback)
     {
-        try
-        {
-            ReportProgress(new FolderProjectHistoryProgress(
-                FolderProjectHistoryProgressStage.ReconcilingProject));
-            project.RefreshFromDisk();
-            ReportProgress(new FolderProjectHistoryProgress(
-                FolderProjectHistoryProgressStage.RefreshingInterface));
-            var snapshot = LoadSnapshot(project.ProjectRoot);
-            complete(operation);
-            return snapshot;
-        }
-        catch (Exception failure)
-        {
-            try
+        HistorySnapshot? snapshot = null;
+        ReportProgress(new FolderProjectHistoryProgress(
+            FolderProjectHistoryProgressStage.PreparingEditors));
+        await _coordinator.ExecuteTransactionalAsync(
+            project.ProjectRoot,
+            () =>
             {
-                rollback(operation);
-            }
-            catch (Exception exception)
+                var result = operation();
+                ReportProgress(new FolderProjectHistoryProgress(
+                    FolderProjectHistoryProgressStage.ReconcilingProject));
+                return result;
+            },
+            result =>
             {
-                throw new AggregateException(
-                    "The operation failed and rollback was incomplete.",
-                    failure,
-                    exception);
-            }
-            try
-            {
-                project.RefreshFromDisk();
-            }
-            catch (Exception exception)
-            {
-                throw new AggregateException(
-                    "The operation failed and project reconciliation was incomplete.",
-                    failure,
-                    exception);
-            }
-            throw;
-        }
+                ReportProgress(new FolderProjectHistoryProgress(
+                    FolderProjectHistoryProgressStage.RefreshingInterface));
+                snapshot = LoadSnapshot(project.ProjectRoot);
+                complete(result);
+            },
+            rollback);
+        return snapshot!;
     }
 
     partial void OnSelectedRestorePointChanged(

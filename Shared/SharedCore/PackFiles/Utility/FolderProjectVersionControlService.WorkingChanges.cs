@@ -297,7 +297,10 @@ public sealed partial class FolderProjectVersionControlService
                     ? rollbackFailures
                     : [failure, .. rollbackFailures]);
         }
-        TryDeleteFinalizedStagingDirectory(rollback.StagingPath);
+        PrepareDiscardStagingForCleanup(
+            rollback.StagingPath,
+            rollback.Backups);
+        TryFinalizeStagingDirectory(rollback.StagingPath);
         if (failure != null)
             ExceptionDispatchInfo.Capture(failure).Throw();
     }
