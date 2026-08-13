@@ -1296,6 +1296,12 @@
   "SuperView.Time.JumpEnd": "跳到结束",
   "SuperView.Time.JumpStartTip": "暂停动画并跳到所选 META 的开始时间",
   "SuperView.Time.JumpEndTip": "暂停动画并跳到所选 META 的结束时间",
+  "SuperView.Diagnostics.MissingModel": "找不到预览模型",
+  "SuperView.Diagnostics.MissingAnimation": "找不到预览动画",
+  "SuperView.Diagnostics.MissingBone": "找不到预览所需骨骼",
+  "SuperView.Diagnostics.MissingEffect": "找不到预览特效",
+  "SuperView.Diagnostics.PreviewUnavailable": "无法建立三维预览",
+  "SuperView.Diagnostics.RuleUnavailable": "无法建立动画预览规则",
 
   "MetaData.TagDesc.TIME": "通用时间标记",
   "MetaData.TagDesc.DISABLE_PERSISTENT": "禁用持久动画元数据",

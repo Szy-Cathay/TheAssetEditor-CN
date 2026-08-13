@@ -17,7 +17,7 @@ namespace Test.AnimationMeta
     public class MetaDataBuilderMissingResourceTests
     {
         [Test]
-        public void Create_MissingAnimatedPropModel_UsesSpatialMarkerFallback()
+        public void Build_MissingAnimatedPropModel_UsesSpatialMarkerFallback()
         {
             const string missingModel =
                 @"variantmeshes\missing\codex_missing_model.rigid_model_v2";
@@ -57,14 +57,14 @@ namespace Test.AnimationMeta
             var skeleton = new Mock<ISkeletonProvider>();
             skeleton.SetupGet(value => value.Skeleton).Returns(
                 CreateSkeleton("root"));
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 new GroupNode("root"),
                 skeleton.Object,
                 new AnimationPlayer(),
-                null!);
+                null!).Instances;
 
             Assert.That(
                 instances.OfType<ISpatialMetaDataPreview>().Count(),
@@ -78,7 +78,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_MissingOrdinaryPropModel_UsesSpatialMarkerFallback()
+        public void Build_MissingOrdinaryPropModel_UsesSpatialMarkerFallback()
         {
             const string missingModel =
                 @"variantmeshes\missing\ordinary_prop.rigid_model_v2";
@@ -108,14 +108,14 @@ namespace Test.AnimationMeta
             var skeleton = new Mock<ISkeletonProvider>();
             skeleton.SetupGet(value => value.Skeleton).Returns(
                 CreateSkeleton("root"));
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 new GroupNode("root"),
                 skeleton.Object,
                 new AnimationPlayer(),
-                null!);
+                null!).Instances;
 
             Assert.That(
                 instances.OfType<ISpatialMetaDataPreview>().Count(),
@@ -126,7 +126,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_MissingDockAnimation_SkipsOnlyDockRule()
+        public void Build_MissingDockAnimation_SkipsOnlyDockRule()
         {
             const string missingAnimation =
                 @"animations\missing\dock_equipment.anim";
@@ -163,22 +163,23 @@ namespace Test.AnimationMeta
             skeleton.SetupGet(value => value.Skeleton).Returns(
                 CreateSkeleton("root"));
 
-            Assert.DoesNotThrow(() => builder.Create(
+            var result = builder.Build(
                 null,
                 metadata,
                 null,
                 new GroupNode("root"),
                 skeleton.Object,
                 rootPlayer,
-                fragment.Object));
+                fragment.Object);
             Assert.That(rootPlayer.AnimationRules, Is.Empty);
+            Assert.That(result.AnimationRules, Is.Empty);
             packFileService.Verify(
                 service => service.FindFile(missingAnimation, null),
                 Times.Once);
         }
 
         [Test]
-        public void Create_InvalidSplashAttack_PreservesValidLocatorPreview()
+        public void Build_InvalidSplashAttack_PreservesValidLocatorPreview()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -209,20 +210,20 @@ namespace Test.AnimationMeta
                 ]
             };
 
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 new GroupNode("root"),
                 null!,
                 new AnimationPlayer(),
-                null!);
+                null!).Instances;
 
             Assert.That(instances, Has.Count.EqualTo(1));
         }
 
         [Test]
-        public void Create_TimedCombatLocators_AreVisibleOnlyDuringGameplayWindow()
+        public void Build_TimedCombatLocators_AreVisibleOnlyDuringGameplayWindow()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -274,14 +275,14 @@ namespace Test.AnimationMeta
             };
             var root = new GroupNode("root");
 
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 root,
                 null!,
                 new AnimationPlayer(),
-                null);
+                null).Instances;
             Assert.Multiple(() =>
             {
                 Assert.That(instances, Has.Count.EqualTo(4));
@@ -302,7 +303,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_InstantCombatLocators_AreVisibleForOneAnimationFrame()
+        public void Build_InstantCombatLocators_AreVisibleForOneAnimationFrame()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -360,14 +361,14 @@ namespace Test.AnimationMeta
             clip.PlayTimeInSec = 1;
             player.SetAnimation(clip, null!);
 
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 root,
                 null!,
                 player,
-                null);
+                null).Instances;
 
             foreach (var instance in instances)
                 instance.Update(0.49f);
@@ -391,7 +392,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_LegacyCombatLocators_CreatesEverySupportedPreview()
+        public void Build_LegacyCombatLocators_CreatesEverySupportedPreview()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -441,14 +442,14 @@ namespace Test.AnimationMeta
             };
             var root = new GroupNode("root");
 
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 root,
                 null!,
                 new AnimationPlayer(),
-                null);
+                null).Instances;
 
             Assert.Multiple(() =>
             {
@@ -468,7 +469,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_CombatLocators_ExposeIndependentVisibilityAndFocusPositions()
+        public void Build_CombatLocators_ExposeIndependentVisibilityAndFocusPositions()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -518,14 +519,14 @@ namespace Test.AnimationMeta
             };
             var root = new GroupNode("root");
 
-            var instances = builder.Create(
+            var instances = builder.Build(
                 null,
                 metadata,
                 null,
                 root,
                 null!,
                 new AnimationPlayer(),
-                null);
+                null).Instances;
             var previews = instances.Cast<ICombatMetaDataPreview>().ToList();
             var impact = previews.Single(
                 preview => preview.Category == CombatMetaDataPreviewCategory.Impact);
@@ -579,7 +580,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_SplashAttack_UsesOneLiveCoordinateSpace()
+        public void Build_SplashAttack_UsesOneLiveCoordinateSpace()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -597,7 +598,7 @@ namespace Test.AnimationMeta
                 WidthForCorridor = 1,
             };
             var root = new GroupNode("root");
-            var instance = builder.Create(
+            var instance = builder.Build(
                     null,
                     new ParsedMetadataFile
                     {
@@ -608,7 +609,7 @@ namespace Test.AnimationMeta
                     root,
                     null!,
                     new AnimationPlayer(),
-                    null)
+                    null).Instances
                 .Single();
             var preview = (ICombatMetaDataPreview)instance;
             var node = root.Children.Single();
@@ -636,7 +637,7 @@ namespace Test.AnimationMeta
         }
 
         [Test]
-        public void Create_TrackedEffect_UsesLiveBoneRelativeLocatorPosition()
+        public void Build_TrackedEffect_UsesLiveBoneRelativeLocatorPosition()
         {
             var builder = new MetaDataBuilder(
                 null!,
@@ -665,14 +666,14 @@ namespace Test.AnimationMeta
             skeleton.SetupGet(value => value.Skeleton).Returns(
                 CreateSkeleton("effect_bone", boneTranslation));
 
-            var preview = builder.Create(
+            var preview = builder.Build(
                     null,
                     metadata,
                     effect,
                     new GroupNode("root"),
                     skeleton.Object,
                     new AnimationPlayer(),
-                    null)
+                    null).Instances
                 .OfType<ISpatialMetaDataPreview>()
                 .Single();
 

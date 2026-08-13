@@ -79,7 +79,10 @@
 | `SceneObjectViewModel` | 单个参考资产的 UI 状态 | 模型路径、动画选择、阵营/相机等共享预览状态 |
 | `SceneObjectEditor` | 加载模型、骨架、动画和 meta，并发布更新事件 | 当前运行时 `SceneObject` |
 | `SceneObject` | 场景根、主播放器、metadata instances | 每帧调用实例 `Update` |
-| `MetaDataBuilder` | 把两份已解析元数据建立为预览实例与动画规则 | 一次构建结果，不持有文档 dirty |
+| `MetaDataBuilder` | 组合预览实例、动画规则和结构化诊断 | 一次构建结果，不持有文档 dirty |
+| `MetaDataPreviewBuilder` | 分派并建立已支持的预览实例族 | 单条预览的失败隔离与 marker fallback |
+| `MetaDataRuleBuilder` | 建立 Dock Equipment 和 Transform 动画规则 | 规则列表，不直接写主播放器 |
+| `MetaDataResourceResolver` | 查找模型、动画和 Effect XML | 统一资源缺失诊断，不伪造资源 |
 | `CombatMetaDataEditSession` | 空间元数据预览事务、撤销/重做、每文档历史 | 以文档 owner 区分的编辑历史 |
 | `CombatMetaDataGizmoComponent` | 3D 手势与 Gizmo/鼠标生命周期 | 当前空间目标和活动 gesture |
 | `SpatialMetaDataCatalog` | 已验证空间标签到可写字段的适配 | 类型能力定义，不持有运行时选择 |
@@ -137,8 +140,8 @@
 2. 各自加载 persistent 与 animation metadata 编辑器；
 3. 清理旧的预览实例和动画规则；
 4. 清除已不属于当前源对象的用户预览覆盖设置；
-5. 调用 `MetaDataBuilder.Create(...)`；
-6. 把结果放入 `SceneObject.MetaDataItems`；
+5. 调用 `MetaDataBuilder.Build(...)`，一次取得实例、规则和诊断；
+6. 把实例放入 `SceneObject.MetaDataItems`，把规则安装到主播放器，并替换当前诊断快照；
 7. 刷新播放器和选择状态，并保持所有参考模型节点不可选择。
 
 构建参数包含两份解析文档、当前选中属性、场景根、骨架、主播放器和 Fragment 上下文。任何缓存都必须以这些实际输入为准，不能只按 tag 名复用。
@@ -153,17 +156,19 @@
 
 ### 7.1 合并顺序
 
-`MetaDataBuilder.Create` 先应用 persistent metadata，再应用当前 animation metadata。若 animation metadata 包含格式定义中的 `DisablePersistant_v10`，则跳过 persistent 部分。保留代码中的格式拼写，不要为了文字正确而重命名二进制定义。
+`MetaDataBuilder.Build` 先应用 persistent metadata，再应用当前 animation metadata。若 animation metadata 包含格式定义中的 `DisablePersistant_v10`，则跳过 persistent 部分。保留代码中的格式拼写，不要为了文字正确而重命名二进制定义。
 
 两层来源的预览仍保留各自 `ParsedMetadataAttribute` 引用。后续选中、增量替换、批量显隐和保存都依赖对象身份，不应按字段值或 tag 文本猜来源。
 
 ### 7.2 支持的输出
 
-构建器可产生三类运行时结果：
+`MetaDataBuildResult` 一次返回三类运行时结果：
 
 1. 场景实例：普通 Prop、Animated Prop、Effect、战斗定位器和通用空间标记；
-2. 动画规则：Dock Equipment、Transform Bone、根变换复制等；
-3. 预览描述：来源、分类、世界变换、参考变换、焦点位置、时间范围、选中和显隐。
+2. 根播放器动画规则：Dock Equipment 和 Transform Bone；Animated Prop 的根变换复制仍由其附属播放器持有并随实例清理；
+3. 结构化诊断：原始 `ParsedMetadataAttribute` 引用、`Persistent`/`Animation` owner、严重程度、本地化原因键，以及可用的时间范围、空间位置、资源路径或骨骼上下文。
+
+构建器不直接把根规则写入 `AnimationPlayer`。调用者只消费完整结果，不参与 META 类型分派。`MetaDataBuildDiagnostic.ReasonKey` 必须对应中文本地化资源；诊断只描述预览问题，不改变字段校验、dirty 或保存门禁。
 
 战斗预览分类为 `Impact`、`Target`、`Fire`、`Splash`。每个实例都有独立显隐，不应通过隐藏整个模型实现分类筛选。
 
@@ -177,11 +182,11 @@
 - 未知或不支持的 tag 保留在解析文档中，不因无法预览而删除或改写；
 - 不能凭空生成一个“看起来合理”的资源或坐标掩盖数据缺失。
 
-资源失败策略的目标是保留可编辑文档与其余预览，而不是把整个构建标记为成功无误。UI/日志仍应让用户知道缺失项。
+资源失败策略的目标是保留可编辑文档与其余预览，而不是把整个构建标记为成功无误。资源查找失败、资源服务异常和单项建立异常都只追加该源对象的诊断；若失败发生在节点挂载之后，必须移除该项产生的半成品节点。诊断快照由 `SuperViewViewModel.MetaDataDiagnostics` 提供给后续检查索引和问题列表。
 
 ### 7.4 增量刷新
 
-字段编辑后，超级视图优先尝试只重建受影响的一个预览：
+字段编辑后，超级视图优先通过 `BuildPreview` 只重建受影响的一个预览：
 
 - 构建器能为该源创建替代实例时，保留其他实例和它们的 UI 状态；
 - 不支持增量创建、结构变更或影响动画规则时，回退到完整重建；
@@ -324,7 +329,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 - `DockEquipmentRule`：在活动时间内，把装备槽骨骼对齐到目标骨骼；
 - `TransformBoneRule`：在活动时间内对指定骨骼应用 authored 位置/方向增量。
 
-这些规则改变预览 pose，不直接改写原始动画文件。规则创建失败应只隔离单条规则；旧规则在 rebuild 时必须从播放器移除，不能累计执行。
+这些规则改变预览 pose，不直接改写原始动画文件。完整构建只返回根规则，由 `SuperViewViewModel` 在清除旧规则后统一安装。规则创建失败应只产生该源对象的诊断并隔离单条规则；旧规则在 rebuild 时必须从播放器移除，不能累计执行。
 
 修改规则时同时检查：局部/世界空间接口、时间单位、骨骼索引、父子层级、循环/暂停刷新和错误后的停用行为。不能把预览规则的结果烘焙回模型或动画资源，除非另有明确功能授权。
 
@@ -389,7 +394,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 | 时间显示不对 | `MetaDataTimeRange` | 秒/微秒换算、零范围策略、播放器 seek |
 | Gizmo 移动方向/保存坐标错误 | `CombatMetaDataEditSession` | `ReferenceWorldTransform`、局部/世界转换、骨骼 frame |
 | Undo/dirty 串到另一页签 | owner 历史映射 | 子编辑器 dirty、saved state、引用身份 |
-| 修改后全部预览闪烁/重建 | 增量 `TryCreateMetaDataPreview` | 结构/规则 fallback、旧实例清理 |
+| 修改后全部预览闪烁/重建 | 增量 `BuildPreview` | 结构/规则 fallback、旧实例和该源诊断清理 |
 | 缺失 Prop 导致整个视图失败 | 构建器资源隔离 | 通用 marker fallback、日志、其他实例保留 |
 | 超级视图按钮出现在直接 Meta Editor | `MetaDataAttributeView.xaml` 祖先绑定 | Visibility 条件、控件测试 |
 | 模型能被点选或编辑 | 场景节点 `IsSelectable` | 是否误插入共享/Kitbash 选择组件 |
@@ -401,7 +406,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 | --- | --- | --- |
 | 双文档、保存、dirty | `MetaDataEditorViewModelTests`、`MetaDataEditorMultiSelectTests` | 两页签修改、部分缺失、保存/重开 |
 | 空间 Gizmo | `CombatMetaDataEditSessionTests`、`SpatialMetaDataCatalogTests` | 根/骨骼附着、平移/旋转、取消/撤销/重做 |
-| 预览构建/资源失败 | `MetaDataBuilderMissingResourceTests` | 真实 Fragment、模型、动画和日志表现 |
+| 预览构建/资源失败 | `MetaDataBuildResultTests`、`MetaDataBuilderMissingResourceTests` | 真实 Fragment、模型、动画、Effect 和诊断表现 |
 | 时间与同步 | `MetaDataPreviewTimeTests` | 播放/暂停/seek/循环、瞬时 tag 与整段 tag |
 | 字段 UI/批量控制 | `MetaDataAttributeControlTests` | 两页签、直接 Meta Editor、中文 UI 和焦点 |
 | 格式解析 | `MetaDataFileParserTests` 及格式项目测试 | 真实文件 round trip、未知 payload |

@@ -1300,6 +1300,125 @@ namespace Test.AnimationMeta
         }
 
         [Test]
+        public void SuperView_FullRebuild_ReplacesInstancesRulesAndDiagnostics()
+        {
+            const string firstPath =
+                @"animations\battle\codex\preview_lifecycle_first.anm.meta";
+            const string secondPath =
+                @"animations\battle\codex\preview_lifecycle_second.anm.meta";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateOutputPack();
+            var editorCreator =
+                runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)editorCreator.Create(
+                EditorEnums.SuperView_Editor);
+
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<
+                    MetaDataFileParser>();
+                var fileSaveService =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        IFileSaveService>();
+                var sceneObjectEditor =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        SceneObjectEditor>();
+                var first = new ParsedMetadataFile
+                {
+                    Version = 2,
+                    Attributes =
+                    [
+                        new Effect_v2
+                        {
+                            Name = "EFFECT",
+                            Version = 2,
+                            VfxName = "codex_missing_lifecycle_effect",
+                            Position = new Vector3(1, 2, 3),
+                            Orientation = new Vector4(0, 0, 0, 1),
+                            NodeIndex = -1,
+                        },
+                        new Transform_v10
+                        {
+                            Name = "TRANSFORM",
+                            Version = 10,
+                        },
+                    ],
+                };
+                var second = new ParsedMetadataFile
+                {
+                    Version = 2,
+                    Attributes =
+                    [
+                        new TargetPos_10
+                        {
+                            Name = "TARGET_POS",
+                            Version = 10,
+                            Position = new Vector3(7, 8, 9),
+                        },
+                    ],
+                };
+                var firstFile = fileSaveService.Save(
+                    firstPath,
+                    parser.GenerateBytes(first.Version, first),
+                    false);
+                var secondFile = fileSaveService.Save(
+                    secondPath,
+                    parser.GenerateBytes(second.Version, second),
+                    false);
+                var sceneObject = superView.SceneObjects.Single();
+
+                sceneObjectEditor.SetMetaFile(
+                    sceneObject.Data,
+                    firstFile,
+                    null);
+                var oldInstances = sceneObject.Data.MetaDataItems.ToList();
+                Assert.Multiple(() =>
+                {
+                    Assert.That(oldInstances, Has.Count.EqualTo(1));
+                    Assert.That(
+                        sceneObject.Data.Player.AnimationRules,
+                        Has.Count.EqualTo(1));
+                    Assert.That(
+                        superView.MetaDataDiagnostics,
+                        Has.Count.EqualTo(2));
+                });
+
+                sceneObjectEditor.SetMetaFile(
+                    sceneObject.Data,
+                    secondFile,
+                    null);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems,
+                        Has.Count.EqualTo(1));
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems,
+                        Has.None.Matches<object>(item =>
+                            oldInstances.Contains(item)));
+                    Assert.That(
+                        sceneObject.Data.Player.AnimationRules,
+                        Is.Empty);
+                    Assert.That(superView.MetaDataDiagnostics, Is.Empty);
+                    Assert.That(
+                        sceneObject.Data.MainNode.Children.Select(node =>
+                            node.Name),
+                        Has.None.EqualTo(
+                            "Effect:codex_missing_lifecycle_effect"));
+                    Assert.That(
+                        sceneObject.Data.MainNode.Children.Select(node =>
+                            node.Name),
+                        Has.None.EqualTo("TRANSFORM"));
+                });
+            }
+            finally
+            {
+                superView.Close();
+            }
+        }
+
+        [Test]
         public void SuperView_SelectingAndEditingEffect_LeavesOtherPreviewsIntact()
         {
             const string metaPath =
