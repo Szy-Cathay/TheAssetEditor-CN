@@ -159,7 +159,7 @@ public class GltfMaterialModeImportTests
     }
 
     [Test]
-    public void Import_BlendMaterials_ListsEveryMaterialAndLeavesPackUnchanged()
+    public void Import_BlendMaterials_SkipsAllMaterialsAndKeepsMeshImport()
     {
         var fixtureDirectory = CreateFixtureDirectory();
         try
@@ -183,15 +183,24 @@ public class GltfMaterialModeImportTests
 
             var result = CreateImporter().Import(CreateSettings(glbPath, destination));
 
+            var rmvPath = @"models\blend.rigid_model_v2";
+            var imported = result.Succeeded
+                ? ModelFactory.Create().Load(
+                    destination.FileList[rmvPath].DataSource.ReadData())
+                : null;
             Assert.Multiple(() =>
             {
-                Assert.That(result.Succeeded, Is.False);
-                Assert.That(result.Errors, Has.Count.EqualTo(1));
-                Assert.That(result.Errors[0], Does.Contain("eye_glass"));
-                Assert.That(result.Errors[0], Does.Contain("aura_film"));
-                Assert.That(result.Errors[0], Does.Contain("BLEND"));
+                Assert.That(result.Succeeded, Is.True, GetFailure(result));
+                Assert.That(result.Errors, Is.Empty);
+                Assert.That(result.Warnings, Has.Some.Contains("eye_glass"));
+                Assert.That(result.Warnings, Has.Some.Contains("aura_film"));
+                Assert.That(result.Warnings, Has.Some.Contains("BLEND"));
+                Assert.That(result.OutputPaths, Does.Contain(rmvPath));
                 Assert.That(destination.FileList.Keys,
-                    Is.EqualTo(new[] { @"existing\keep.bin" }));
+                    Has.None.EndsWith(".dds").IgnoreCase);
+                Assert.That(imported?.ModelList[0]
+                    .SelectMany(model => model.Material.GetAllTextures()),
+                    Is.Empty);
                 Assert.That(destination.FileList[@"existing\keep.bin"].DataSource.ReadData(),
                     Is.EqualTo(existingBytes));
             });

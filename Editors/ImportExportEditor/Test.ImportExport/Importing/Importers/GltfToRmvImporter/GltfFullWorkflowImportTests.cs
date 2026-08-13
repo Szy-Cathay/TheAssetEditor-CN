@@ -241,6 +241,88 @@ public class GltfFullWorkflowImportTests
         });
     }
 
+    [Test]
+    public void Import_BlendMaterial_SkipsMaterialsAndKeepsMeshSkeletonAndAnimations()
+    {
+        var fixtureDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"asseteditor-gltf-blend-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(fixtureDirectory);
+        try
+        {
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.TestDirectory,
+                "TestData",
+                "Gltf",
+                "external_full_workflow.glb");
+            var glbPath = Path.Combine(fixtureDirectory, "blend-full-workflow.glb");
+            var modelRoot = ModelRoot.Load(sourcePath);
+            var blendMaterial = modelRoot.LogicalMaterials[0];
+            blendMaterial.Alpha = SharpGLTF.Schema2.AlphaMode.BLEND;
+            modelRoot.SaveGLB(glbPath);
+            var destination = new PackFileContainer("test");
+
+            var result = CreateImporter(destination).Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                ImportMeshes: true,
+                ImportMaterials: true,
+                ConvertMaterialFromBlenderType: true,
+                ConvertNormalTextureFromBlueToOrangeType: true,
+                ImportAnimations: true,
+                AnimationKeysPerSecond: 24,
+                MirrorMesh: true,
+                AutoDetectAnimationKeysPerSecond: true,
+                AutoScaleHumanoid: true));
+
+            const string rmvPath = @"models\blend-full-workflow.rigid_model_v2";
+            const string skeletonPath =
+                @"animations\skeletons\externalworkflowarmature.anim";
+            var animationPaths = new[]
+            {
+                @"models\blend-full-workflow_move.anim",
+                @"models\blend-full-workflow_nod.anim",
+            };
+            var rmv = result.Succeeded
+                ? ModelFactory.Create().Load(
+                    destination.FileList[rmvPath].DataSource.ReadData())
+                : null;
+            var message = ImportWindow.BuildResultMessage(result);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.True,
+                    string.Join(Environment.NewLine, result.Errors));
+                Assert.That(result.OutputPaths, Does.Contain(rmvPath));
+                Assert.That(result.OutputPaths, Does.Contain(skeletonPath));
+                Assert.That(result.OutputPaths, Is.SupersetOf(animationPaths));
+                Assert.That(destination.FileList.Keys,
+                    Has.None.EndsWith(".dds").IgnoreCase);
+                Assert.That(
+                    rmv?.ModelList[0]
+                        .SelectMany(model => model.Material.GetAllTextures()),
+                    Is.Empty);
+                Assert.That(result.MaterialSummary, Is.Null);
+                Assert.That(result.Warnings, Has.Some.Contains("BLEND"));
+                Assert.That(result.Warnings,
+                    Has.Some.Contains(blendMaterial.Name));
+                Assert.That(result.Warnings,
+                    Has.Some.Contains("材质和贴图"));
+                Assert.That(result.Warnings,
+                    Has.Some.Contains("模型、骨架和动画"));
+                Assert.That(message, Does.Contain("警告"));
+                Assert.That(message, Does.Contain(blendMaterial.Name));
+                Assert.That(message, Does.Contain("材质和贴图"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(fixtureDirectory, recursive: true);
+        }
+    }
+
     [TestCase(
         GltfSourceForwardDirection.PositiveX,
         MathF.PI / 2,

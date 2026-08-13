@@ -49,21 +49,14 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv.Helper
     }
     public class RmvMaterialBuilder
     {
-        internal static void ValidateMaterialModes(ModelRoot modelRoot)
-        {
-            var blendMaterials = modelRoot.LogicalMaterials
+        internal static IReadOnlyList<string> GetBlendMaterialNames(
+            ModelRoot modelRoot) =>
+            modelRoot.LogicalMaterials
                 .Where(material => material.Alpha == SharpGLTF.Schema2.AlphaMode.BLEND)
                 .Select(GetMaterialName)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToList();
-            if (blendMaterials.Count == 0)
-                return;
-
-            throw new InvalidDataException(LocalizationManager.Instance.GetFormat(
-                "GltfImporter.Error.BlendMaterials",
-                string.Join("、", blendMaterials)));
-        }
 
         internal RmvMaterialBuildResult BuildRmvFileMaterials(
             GltfImporterSettings settings,
