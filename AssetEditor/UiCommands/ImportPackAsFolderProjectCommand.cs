@@ -40,7 +40,8 @@ public sealed class ImportPackAsFolderProjectCommand(
     private readonly Func<string, bool> _isEmptyTarget =
         isEmptyTarget ?? FolderProjectImportTargetValidator.IsEmptyTarget;
     private readonly IFolderProjectHistoryService _historyService =
-        historyService ?? new FolderProjectHistoryService();
+        historyService ?? new FolderProjectHistoryService(
+            localizationManager);
     private readonly IFolderProjectProgressRunner _progressRunner =
         progressRunner ?? new FolderProjectProgressRunner();
 

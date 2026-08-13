@@ -59,3 +59,31 @@ public sealed class HistoryChangeKindConverter : IValueConverter
         return nameof(FolderProjectUnrecordedChangeKind.Modified);
     }
 }
+
+public sealed class RestorePointSummaryConverter : IValueConverter
+{
+    public object Convert(
+        object value,
+        Type targetType,
+        object parameter,
+        CultureInfo culture)
+    {
+        if (value is not FolderProjectRestorePoint restorePoint ||
+            restorePoint.ChangeSummary == null)
+        {
+            return LocalizationManager.Instance.Get(
+                "FolderProject.History.ChangeSummaryPending");
+        }
+
+        return LocalizationManager.Instance.GetFormat(
+            "FolderProject.History.ChangeSummary",
+            restorePoint.ChangeSummary.Total);
+    }
+
+    public object ConvertBack(
+        object value,
+        Type targetType,
+        object parameter,
+        CultureInfo culture) =>
+        Binding.DoNothing;
+}

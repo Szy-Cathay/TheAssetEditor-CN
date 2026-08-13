@@ -25,7 +25,8 @@ public sealed class CreateFolderProjectCommand(
             localizationManager,
             dialogs);
     private readonly IFolderProjectHistoryService _historyService =
-        historyService ?? new FolderProjectHistoryService();
+        historyService ?? new FolderProjectHistoryService(
+            localizationManager);
     private readonly IFolderProjectProgressRunner _progressRunner =
         progressRunner ?? new FolderProjectProgressRunner();
 

@@ -249,6 +249,73 @@ public class FolderProjectHistoryViewModelTests
             project.ProjectRoot,
             point.Id,
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+        NUnitAssert.That(
+            viewModel.SelectedRestorePoint?.ChangeSummary?.Modified,
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task SelectingRestorePoints_OutOfOrderCompletionKeepsLatest()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var first = RestorePoint("first", "第一项");
+        var second = RestorePoint("second", "第二项");
+        var firstStarted = new ManualResetEventSlim();
+        var releaseFirst = new ManualResetEventSlim();
+        var history = CreateHistoryService(
+            project.ProjectRoot,
+            [first, second]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                first.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(() =>
+            {
+                firstStarted.Set();
+                releaseFirst.Wait();
+                return
+                [
+                    new FolderProjectRestorePointChange(
+                        "first.bin",
+                        null,
+                        FolderProjectRestorePointChangeKind.Modified,
+                        true),
+                ];
+            });
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                second.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([
+                new FolderProjectRestorePointChange(
+                    "second.bin",
+                    null,
+                    FolderProjectRestorePointChangeKind.Added,
+                    true),
+            ]);
+        var viewModel = CreateViewModel(history.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        viewModel.SelectedRestorePoint = first;
+        var firstLoad = viewModel.SelectedChangesLoadTask;
+        NUnitAssert.That(firstStarted.Wait(TimeSpan.FromSeconds(5)), Is.True);
+        viewModel.SelectedRestorePoint = second;
+        var secondLoad = viewModel.SelectedChangesLoadTask;
+        await secondLoad;
+        releaseFirst.Set();
+        await firstLoad;
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                viewModel.SelectedRestorePoint?.Id,
+                Is.EqualTo(second.Id));
+            NUnitAssert.That(
+                viewModel.SelectedRestorePointChanges.Single().Path,
+                Is.EqualTo("second.bin"));
+        });
     }
 
     [Test]
@@ -410,7 +477,7 @@ public class FolderProjectHistoryViewModelTests
             id,
             description,
             DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
-            new FolderProjectRestorePointChangeSummary(1, 0, 0, 0, 0),
+            null,
             initial);
 
     private static string FindSolutionRoot()

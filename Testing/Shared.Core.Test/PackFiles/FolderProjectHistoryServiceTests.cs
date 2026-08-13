@@ -2,6 +2,7 @@ using LibGit2Sharp;
 using Moq;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
+using Shared.Core.Services;
 
 namespace Test.Shared.Core.PackFiles;
 
@@ -49,7 +50,7 @@ public sealed class FolderProjectHistoryServiceTests
         File.WriteAllBytes(
             Path.Combine(project.Root, "db", "entry.bin"),
             [1, 2, 3]);
-        var service = new FolderProjectHistoryService();
+        var service = CreateService();
 
         var initial = service.Initialize(project.Root);
         var status = service.GetStatus(project.Root);
@@ -83,7 +84,7 @@ public sealed class FolderProjectHistoryServiceTests
         using var project = new TemporaryProject();
         var path = Path.Combine(project.Root, "db", "mixed.bin");
         File.WriteAllBytes(path, [1]);
-        var service = new FolderProjectHistoryService();
+        var service = CreateService();
         service.Initialize(project.Root);
 
         File.WriteAllBytes(path, [2]);
@@ -113,7 +114,7 @@ public sealed class FolderProjectHistoryServiceTests
         var renamedPath = Path.Combine(project.Root, "db", "before.bin");
         File.WriteAllBytes(deletedPath, [1]);
         File.WriteAllBytes(renamedPath, [2]);
-        var service = new FolderProjectHistoryService();
+        var service = CreateService();
         service.Initialize(project.Root);
 
         File.Delete(deletedPath);
@@ -173,7 +174,8 @@ public sealed class FolderProjectHistoryServiceTests
                         FolderProjectWorkingChangeKind.Staged),
                 ]));
         var service = new FolderProjectHistoryService(
-            versionControl.Object);
+            versionControl.Object,
+            LoadLocalization());
 
         var status = service.GetStatus("project");
 
@@ -192,7 +194,7 @@ public sealed class FolderProjectHistoryServiceTests
         using var project = new TemporaryProject();
         var trackedPath = Path.Combine(project.Root, "db", "tracked.bin");
         File.WriteAllBytes(trackedPath, [1]);
-        var service = new FolderProjectHistoryService();
+        var service = CreateService();
         service.Initialize(project.Root);
 
         File.WriteAllBytes(trackedPath, [2]);
@@ -210,6 +212,10 @@ public sealed class FolderProjectHistoryServiceTests
             project.Root,
             restorePoint.Id);
         var reopenedSettings = FolderProjectSettings.Load(project.Root);
+        using var committedRepository = new Repository(project.Root);
+        var committedBytes = ReadBlobBytes(
+            committedRepository.Head.Tip!,
+            "db/tracked.bin");
 
         Assert.Multiple(() =>
         {
@@ -229,6 +235,7 @@ public sealed class FolderProjectHistoryServiceTests
             Assert.That(
                 reopenedSettings.EmptyDirectories,
                 Does.Contain("empty\\nested"));
+            Assert.That(committedBytes, Is.EqualTo(new byte[] { 3 }));
         });
     }
 
@@ -236,7 +243,7 @@ public sealed class FolderProjectHistoryServiceTests
     public void CreateRestorePoint_WithoutDiskChanges_DoesNotAddHistory()
     {
         using var project = new TemporaryProject();
-        var service = new FolderProjectHistoryService();
+        var service = CreateService();
         service.Initialize(project.Root);
         var originalHistory = service.GetRestorePoints(project.Root);
 
@@ -282,5 +289,24 @@ public sealed class FolderProjectHistoryServiceTests
             }
             Directory.Delete(Root, true);
         }
+    }
+
+    private static FolderProjectHistoryService CreateService() =>
+        new(LoadLocalization());
+
+    private static LocalizationManager LoadLocalization()
+    {
+        var localization = new LocalizationManager();
+        localization.LoadLanguage();
+        return localization;
+    }
+
+    private static byte[] ReadBlobBytes(Commit commit, string path)
+    {
+        var blob = (Blob)commit[path].Target;
+        using var content = blob.GetContentStream();
+        using var memory = new MemoryStream();
+        content.CopyTo(memory);
+        return memory.ToArray();
     }
 }

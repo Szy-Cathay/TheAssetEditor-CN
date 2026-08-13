@@ -1,4 +1,5 @@
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 
 namespace Shared.Core.PackFiles.Utility;
 
@@ -46,21 +47,23 @@ public interface IFolderProjectHistoryService
 
 public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
 {
-    private const string DefaultDescription = "记录工程当前状态";
     private static readonly FolderProjectGitIdentity s_localIdentity = new(
         "AssetEditor.CN 本地用户",
         "local@asseteditor.cn");
     private readonly IFolderProjectVersionControlService _versionControl;
+    private readonly LocalizationManager _localization;
 
-    public FolderProjectHistoryService()
-        : this(new FolderProjectVersionControlService())
+    public FolderProjectHistoryService(LocalizationManager localization)
+        : this(new FolderProjectVersionControlService(), localization)
     {
     }
 
-    internal FolderProjectHistoryService(
-        IFolderProjectVersionControlService versionControl)
+    public FolderProjectHistoryService(
+        IFolderProjectVersionControlService versionControl,
+        LocalizationManager localization)
     {
         _versionControl = versionControl;
+        _localization = localization;
     }
 
     public FolderProjectHistoryStatus GetStatus(string projectRoot) =>
@@ -132,7 +135,8 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
     {
         ArgumentNullException.ThrowIfNull(reportProgress);
         var normalizedDescription = string.IsNullOrWhiteSpace(description)
-            ? DefaultDescription
+            ? _localization.Get(
+                "FolderProject.History.DefaultDescription")
             : description.Trim();
         reportProgress(new FolderProjectHistoryProgress(
             FolderProjectHistoryProgressStage.CreatingRestorePoint));
@@ -168,21 +172,8 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             reportProgress(new FolderProjectHistoryProgress(
                 FolderProjectHistoryProgressStage.ReadingHistory));
             var history = _versionControl.GetHistory(projectRoot, maxCount);
-            var result = new List<FolderProjectRestorePoint>(history.Count);
-            for (var index = 0; index < history.Count; index++)
-            {
-                var summary = history[index];
-                var changes = _versionControl.GetCommitChanges(
-                    projectRoot,
-                    summary.Id);
-                result.Add(MapRestorePoint(summary, changes));
-                reportProgress(new FolderProjectHistoryProgress(
-                    FolderProjectHistoryProgressStage.ReadingHistory,
-                    summary.Message,
-                    index + 1,
-                    history.Count));
-            }
-            return result;
+            return history.Select(summary => MapRestorePoint(summary, null))
+                .ToList();
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -246,16 +237,19 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             change.PreviousRepositoryPath);
     }
 
-    private static FolderProjectRestorePoint MapRestorePoint(
+    private FolderProjectRestorePoint MapRestorePoint(
         FolderProjectCommitSummary summary,
-        IReadOnlyList<FolderProjectCommitChange> changes)
+        IReadOnlyList<FolderProjectCommitChange>? changes)
     {
         var initial = summary.ParentIds.Count == 0;
         return new FolderProjectRestorePoint(
             summary.Id,
-            initial ? "初始还原点" : summary.Message,
+            initial
+                ? _localization.Get(
+                    "FolderProject.History.InitialRestorePoint")
+                : summary.Message,
             summary.CommittedAt,
-            Summarize(changes),
+            changes == null ? null : Summarize(changes),
             initial);
     }
 

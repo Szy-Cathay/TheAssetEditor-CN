@@ -158,7 +158,7 @@ public sealed class FolderProjectUnsavedChangesPrompt(
         }
         var content = new StackPanel
         {
-            Margin = new Thickness(18),
+            Margin = new Thickness(16),
             MaxWidth = 560,
         };
         if (operation == FolderProjectUnsavedChangesOperation
