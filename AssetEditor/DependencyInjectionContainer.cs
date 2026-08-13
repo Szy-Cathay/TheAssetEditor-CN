@@ -60,6 +60,7 @@ namespace AssetEditor
                 FolderProjectVersionControlWindow>();
             serviceCollection.AddTransient<
                 FolderProjectVersionControlViewModel>();
+            serviceCollection.AddScoped<FolderProjectHistoryViewModel>();
             serviceCollection.AddScoped<
                 FolderProjectGitWorkspaceViewModel>();
             serviceCollection.AddTransient<

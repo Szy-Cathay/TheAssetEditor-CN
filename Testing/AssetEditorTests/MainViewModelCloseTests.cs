@@ -342,7 +342,7 @@ public class MainViewModelCloseTests
                 NUnit.Framework.Assert.That(
                     viewModel.LoadingStatusText,
                     NUnit.Framework.Is.EqualTo(
-                        "正在扫描本地文件和 Git 索引…"));
+                        "正在扫描工程文件的未记录修改…"));
                 NUnit.Framework.Assert.That(
                     viewModel.LoadingProgressValue,
                     NUnit.Framework.Is.EqualTo(2));

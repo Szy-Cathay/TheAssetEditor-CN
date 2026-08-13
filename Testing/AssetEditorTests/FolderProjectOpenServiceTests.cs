@@ -37,6 +37,12 @@ public class FolderProjectOpenServiceTests
                     phase == FolderProjectMergePhase.RecoveryRequired
                         ? "recovery"
                         : null));
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.RecoveryRequired,
+                "head",
+                []));
         var factory = new Mock<IFolderProjectFactory>(
             MockBehavior.Strict);
         var window =
@@ -51,6 +57,7 @@ public class FolderProjectOpenServiceTests
         var service = new FolderProjectOpenService(
             Mock.Of<IPackFileService>(),
             factory.Object,
+            history.Object,
             versionControl.Object,
             window.Object,
             new ApplicationSettingsService(),
@@ -74,19 +81,13 @@ public class FolderProjectOpenServiceTests
         var versionControl =
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
-        versionControl.Setup(
-                item => item.GetMergeState(project.Path))
-            .Callback(() => calls.Add("merge-state"))
-            .Returns(
-                new FolderProjectMergeState(
-                    FolderProjectMergePhase.None,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    [],
-                    null));
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Callback(() => calls.Add("history-status"))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
         using var container =
             FolderProjectContainer.Open(project.Path);
         var factory = new Mock<IFolderProjectFactory>(
@@ -104,6 +105,7 @@ public class FolderProjectOpenServiceTests
         var service = new FolderProjectOpenService(
             packFiles.Object,
             factory.Object,
+            history.Object,
             versionControl.Object,
             Mock.Of<IFolderProjectVersionControlWindowService>(),
             new ApplicationSettingsService(
@@ -116,7 +118,7 @@ public class FolderProjectOpenServiceTests
         NUnit.Framework.Assert.That(
             calls,
             Is.EqualTo(
-                new[] { "merge-state", "factory-open", "add" }));
+                new[] { "history-status", "factory-open", "add" }));
     }
 
     [Test]
@@ -127,16 +129,12 @@ public class FolderProjectOpenServiceTests
         var versionControl =
             new Mock<IFolderProjectVersionControlService>(
                 MockBehavior.Strict);
-        versionControl.Setup(item => item.GetMergeState(project.Path))
-            .Returns(new FolderProjectMergeState(
-                FolderProjectMergePhase.None,
-                null,
-                null,
-                null,
-                null,
-                null,
-                [],
-                null));
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
         var packFiles = new Mock<IPackFileService>(MockBehavior.Strict);
         packFiles.Setup(item => item.TryActivateFolderProject(project.Path))
             .Returns(true);
@@ -144,6 +142,7 @@ public class FolderProjectOpenServiceTests
         var service = new FolderProjectOpenService(
             packFiles.Object,
             factory.Object,
+            history.Object,
             versionControl.Object,
             Mock.Of<IFolderProjectVersionControlWindowService>(),
             new ApplicationSettingsService(GameTypeEnum.Warhammer3),
@@ -165,16 +164,19 @@ public class FolderProjectOpenServiceTests
     {
         using var project = new TemporaryFolderProject();
         var versionControl = new Mock<IFolderProjectVersionControlService>();
-        versionControl.Setup(item => item.GetMergeState(project.Path))
-            .Throws(new FolderProjectVersionControlException(
-                FolderProjectVersionControlError.RepositoryNotInitialized,
-                "not initialized"));
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.NotInitialized,
+                null,
+                []));
         var factory = new Mock<IFolderProjectFactory>();
         var window = new Mock<IFolderProjectVersionControlWindowService>();
         var dialogs = new Mock<IStandardDialogs>();
         var service = new FolderProjectOpenService(
             Mock.Of<IPackFileService>(),
             factory.Object,
+            history.Object,
             versionControl.Object,
             window.Object,
             new ApplicationSettingsService(),
@@ -185,7 +187,7 @@ public class FolderProjectOpenServiceTests
 
         factory.Verify(item => item.Open(It.IsAny<string>()), Times.Never);
         dialogs.Verify(item => item.ShowDialogBox(
-            "必须先初始化本地 Git 管理，才能打开并修改这个文件夹工程。",
+            "必须先建立工程历史，才能打开并修改这个文件夹工程。",
             "文件夹工程错误"), Times.Once);
         window.Verify(item => item.ShowDialog(
             It.IsAny<string>(),
@@ -199,18 +201,12 @@ public class FolderProjectOpenServiceTests
         using var project = new TemporaryFolderProject();
         var versionControl =
             new Mock<IFolderProjectVersionControlService>();
-        versionControl.Setup(
-                item => item.GetMergeState(project.Path))
-            .Returns(
-                new FolderProjectMergeState(
-                    FolderProjectMergePhase.None,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    [],
-                    null));
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
         var factory = new Mock<IFolderProjectFactory>();
         factory.Setup(item => item.Open(project.Path))
             .Throws(new InvalidDataException("SECRET RAW FAILURE"));
@@ -223,6 +219,7 @@ public class FolderProjectOpenServiceTests
         var service = new FolderProjectOpenService(
             Mock.Of<IPackFileService>(),
             factory.Object,
+            history.Object,
             versionControl.Object,
             Mock.Of<IFolderProjectVersionControlWindowService>(),
             settings,

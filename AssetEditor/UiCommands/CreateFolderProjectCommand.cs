@@ -17,16 +17,16 @@ public sealed class CreateFolderProjectCommand(
     IStandardDialogs dialogs,
     LocalizationManager localizationManager,
     IFolderProjectSetupDialogs? setupDialogs = null,
-    IFolderProjectVersionControlService? versionControlService = null,
+    IFolderProjectHistoryService? historyService = null,
     IFolderProjectProgressRunner? progressRunner = null) : IUiCommand
 {
     private readonly IFolderProjectSetupDialogs _setupDialogs =
         setupDialogs ?? new FolderProjectSetupDialogs(
             localizationManager,
             dialogs);
-    private readonly IFolderProjectVersionControlService
-        _versionControlService =
-            versionControlService ?? new FolderProjectVersionControlService();
+    private readonly IFolderProjectHistoryService _historyService =
+        historyService ?? new FolderProjectHistoryService(
+            localizationManager);
     private readonly IFolderProjectProgressRunner _progressRunner =
         progressRunner ?? new FolderProjectProgressRunner();
 
@@ -91,19 +91,13 @@ public sealed class CreateFolderProjectCommand(
                         reportProgress(
                             new OperationProgressUpdate(
                                 localizationManager.Get(
-                                    "FolderProject.Progress.InitializeGit"),
+                                    "FolderProject.Progress.InitializeHistory"),
                                 localizationManager.Get(
-                                    "FolderProject.Progress.InitializeGitDetail")));
-                        _versionControlService.Initialize(
+                                    "FolderProject.Progress.InitializeHistoryDetail")));
+                        _historyService.Initialize(
                             root,
-                            new FolderProjectGitIdentity(
-                                localizationManager.Get(
-                                    "FolderProject.VersionControl.DefaultIdentityName"),
-                                localizationManager.Get(
-                                    "FolderProject.VersionControl.DefaultIdentityEmail")),
-                            setup.PrimaryBranchName,
                             progress => reportProgress(
-                                FolderProjectVersionControlProgressAdapter
+                                FolderProjectHistoryProgressAdapter
                                     .ToOperationProgress(
                                         progress,
                                         localizationManager)));

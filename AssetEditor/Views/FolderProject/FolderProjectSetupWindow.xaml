@@ -5,7 +5,7 @@
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     Title=""
     Width="700"
-    Height="390"
+    Height="340"
     Background="{DynamicResource AeBrush.Canvas}"
     FontFamily="{DynamicResource AppFontFamily}"
     FontWeight="{DynamicResource AppFontWeight}"
@@ -15,7 +15,6 @@
     WindowStartupLocation="CenterOwner">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -31,7 +30,7 @@
         </Grid.ColumnDefinitions>
 
         <Border
-            Grid.RowSpan="7"
+            Grid.RowSpan="6"
             Grid.ColumnSpan="3"
             Margin="18,16,18,10"
             Padding="16"
@@ -112,30 +111,15 @@
 
         <TextBlock
             Grid.Row="4"
-            Margin="34,0,8,8"
-            VerticalAlignment="Center"
-            Text="{loc:Loc FolderProject.Setup.PrimaryBranch}" />
-        <TextBox
-            x:Name="PrimaryBranchNameTextBox"
-            Grid.Row="4"
-            Grid.Column="1"
-            Grid.ColumnSpan="2"
-            Height="24"
-            Margin="0,0,34,8"
-            VerticalContentAlignment="Center"
-            Style="{StaticResource AeInput.TextBox}" />
-
-        <TextBlock
-            Grid.Row="5"
             Grid.ColumnSpan="3"
             Margin="34,2,34,10"
             Foreground="{DynamicResource AeBrush.Accent}"
             Style="{StaticResource AeText.Caption}"
-            Text="{loc:Loc FolderProject.Setup.VersionControlRequired}"
+            Text="{loc:Loc FolderProject.Setup.HistoryRequired}"
             TextWrapping="Wrap" />
 
         <Border
-            Grid.Row="7"
+            Grid.Row="6"
             Grid.ColumnSpan="3"
             Style="{StaticResource AeWorkflow.DialogFooter}">
             <StackPanel

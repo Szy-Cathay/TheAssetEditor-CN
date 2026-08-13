@@ -28,7 +28,7 @@ public sealed class ImportPackAsFolderProjectCommand(
     IFolderProjectImportDialogs? importDialogs = null,
     IFolderProjectSetupDialogs? setupDialogs = null,
     Func<string, bool>? isEmptyTarget = null,
-    IFolderProjectVersionControlService? versionControlService = null,
+    IFolderProjectHistoryService? historyService = null,
     IFolderProjectProgressRunner? progressRunner = null) : IUiCommand
 {
     private readonly IFolderProjectImportDialogs _importDialogs =
@@ -39,9 +39,9 @@ public sealed class ImportPackAsFolderProjectCommand(
             dialogs);
     private readonly Func<string, bool> _isEmptyTarget =
         isEmptyTarget ?? FolderProjectImportTargetValidator.IsEmptyTarget;
-    private readonly IFolderProjectVersionControlService
-        _versionControlService =
-            versionControlService ?? new FolderProjectVersionControlService();
+    private readonly IFolderProjectHistoryService _historyService =
+        historyService ?? new FolderProjectHistoryService(
+            localizationManager);
     private readonly IFolderProjectProgressRunner _progressRunner =
         progressRunner ?? new FolderProjectProgressRunner();
 
@@ -162,23 +162,17 @@ public sealed class ImportPackAsFolderProjectCommand(
                         reportProgress(
                             new OperationProgressUpdate(
                                 localizationManager.Get(
-                                    "FolderProject.Progress.InitializeGit"),
+                                    "FolderProject.Progress.InitializeHistory"),
                                 localizationManager.Get(
-                                    "FolderProject.Progress.InitializeGitDetail")));
-                        _versionControlService.Initialize(
+                                    "FolderProject.Progress.InitializeHistoryDetail")));
+                        _historyService.Initialize(
                             projectRoot,
-                            new FolderProjectGitIdentity(
-                                localizationManager.Get(
-                                    "FolderProject.VersionControl.DefaultIdentityName"),
-                                localizationManager.Get(
-                                    "FolderProject.VersionControl.DefaultIdentityEmail")),
-                            setup.PrimaryBranchName,
                             progress =>
                             {
                                 operationCancellationToken
                                     .ThrowIfCancellationRequested();
                                 reportProgress(
-                                    FolderProjectVersionControlProgressAdapter
+                                    FolderProjectHistoryProgressAdapter
                                         .ToOperationProgress(
                                             progress,
                                             localizationManager));

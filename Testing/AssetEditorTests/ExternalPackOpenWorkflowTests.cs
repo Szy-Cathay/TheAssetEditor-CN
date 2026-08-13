@@ -217,8 +217,8 @@ namespace AssetEditorTests
                     projectRoot.Path,
                     outputRoot.Path,
                     false));
-            var versionControl =
-                new Mock<IFolderProjectVersionControlService>();
+            var history =
+                new Mock<IFolderProjectHistoryService>();
             var progressRunner = new Mock<IFolderProjectProgressRunner>();
             progressRunner.Setup(item => item.RunCancelable(
                     It.IsAny<string>(),
@@ -248,7 +248,7 @@ namespace AssetEditorTests
                 Mock.Of<IFolderProjectImportDialogs>(),
                 setupDialogs.Object,
                 null,
-                versionControl.Object,
+                history.Object,
                 progressRunner.Object);
             var commandFactory = new Mock<IUiCommandFactory>(
                 MockBehavior.Strict);
@@ -403,7 +403,7 @@ namespace AssetEditorTests
                 Mock.Of<IFolderProjectImportDialogs>(),
                 setupDialogs.Object,
                 null,
-                Mock.Of<IFolderProjectVersionControlService>(),
+                Mock.Of<IFolderProjectHistoryService>(),
                 progressRunner.Object);
             var commandFactory = new Mock<IUiCommandFactory>(
                 MockBehavior.Strict);

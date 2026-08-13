@@ -20,19 +20,16 @@ public class FolderProjectCloseGuardTests
     public async Task CanCloseAsync_DirtyProjectReview_OpensGitPanel()
     {
         using var project = CreateInitializedProject();
-        var service = new Mock<IFolderProjectVersionControlService>();
+        var service = new Mock<IFolderProjectHistoryService>();
         service.Setup(item => item.GetStatus(project.ProjectRoot))
             .Returns(
-                new FolderProjectRepositoryStatus(
-                    true,
-                    "master",
+                new FolderProjectHistoryStatus(
+                    FolderProjectHistoryAvailability.Ready,
                     "1111111111111111111111111111111111111111",
-                    false,
-                    FolderProjectRepositoryOperationState.None,
                     [
-                        new FolderProjectWorkingChange(
+                        new FolderProjectUnrecordedChange(
                             "db/test.tsv",
-                            FolderProjectWorkingChangeKind.Modified),
+                            FolderProjectUnrecordedChangeKind.Modified),
                     ]));
         var eventHub = new TestEventHub();
         OpenFolderProjectGitPanelEvent? published = null;
@@ -54,15 +51,12 @@ public class FolderProjectCloseGuardTests
     public async Task CanCloseAsync_CleanProject_DoesNotPrompt()
     {
         using var project = CreateInitializedProject();
-        var service = new Mock<IFolderProjectVersionControlService>();
+        var service = new Mock<IFolderProjectHistoryService>();
         service.Setup(item => item.GetStatus(project.ProjectRoot))
             .Returns(
-                new FolderProjectRepositoryStatus(
-                    true,
-                    "master",
+                new FolderProjectHistoryStatus(
+                    FolderProjectHistoryAvailability.Ready,
                     "1111111111111111111111111111111111111111",
-                    false,
-                    FolderProjectRepositoryOperationState.None,
                     []));
         var promptCalls = 0;
         var guard = new FolderProjectCloseGuard(
@@ -87,22 +81,19 @@ public class FolderProjectCloseGuardTests
     public async Task CanCloseAsync_ReportsCloseCheckStagesAndChangeCount()
     {
         using var project = CreateInitializedProject();
-        var service = new Mock<IFolderProjectVersionControlService>();
+        var service = new Mock<IFolderProjectHistoryService>();
         service.Setup(item => item.GetStatus(project.ProjectRoot))
             .Returns(
-                new FolderProjectRepositoryStatus(
-                    true,
-                    "master",
+                new FolderProjectHistoryStatus(
+                    FolderProjectHistoryAvailability.Ready,
                     "1111111111111111111111111111111111111111",
-                    false,
-                    FolderProjectRepositoryOperationState.None,
                     [
-                        new FolderProjectWorkingChange(
+                        new FolderProjectUnrecordedChange(
                             "audio/voice.wem",
-                            FolderProjectWorkingChangeKind.Modified),
-                        new FolderProjectWorkingChange(
+                            FolderProjectUnrecordedChangeKind.Modified),
+                        new FolderProjectUnrecordedChange(
                             "audio/voice.wav",
-                            FolderProjectWorkingChangeKind.Added),
+                            FolderProjectUnrecordedChangeKind.Added),
                     ]));
         var progress = new List<FolderProjectCloseProgress>();
         var guard = new FolderProjectCloseGuard(
@@ -136,18 +127,15 @@ public class FolderProjectCloseGuardTests
     public async Task CanCloseAsync_DirtyProject_ClosesProgressBeforePrompt()
     {
         using var project = CreateInitializedProject();
-        var service = new Mock<IFolderProjectVersionControlService>();
+        var service = new Mock<IFolderProjectHistoryService>();
         service.Setup(item => item.GetStatus(project.ProjectRoot))
-            .Returns(new FolderProjectRepositoryStatus(
-                true,
-                "master",
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
                 "1111111111111111111111111111111111111111",
-                false,
-                FolderProjectRepositoryOperationState.None,
                 [
-                    new FolderProjectWorkingChange(
+                    new FolderProjectUnrecordedChange(
                         "db/test.tsv",
-                        FolderProjectWorkingChangeKind.Modified),
+                        FolderProjectUnrecordedChangeKind.Modified),
                 ]));
         var order = new List<string>();
         var guard = new FolderProjectCloseGuard(

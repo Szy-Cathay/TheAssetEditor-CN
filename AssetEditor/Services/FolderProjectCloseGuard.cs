@@ -34,8 +34,7 @@ public sealed record FolderProjectCloseProgress(
 public sealed class FolderProjectCloseGuard :
     IFolderProjectCloseGuard
 {
-    private readonly IFolderProjectVersionControlService
-        _versionControlService;
+    private readonly IFolderProjectHistoryService _historyService;
     private readonly IEventHub _eventHub;
     private readonly Func<
         string,
@@ -44,17 +43,17 @@ public sealed class FolderProjectCloseGuard :
         MessageBoxResult> _showMessage;
 
     public FolderProjectCloseGuard(
-        IFolderProjectVersionControlService versionControlService,
+        IFolderProjectHistoryService historyService,
         IEventHub eventHub)
         : this(
-            versionControlService,
+            historyService,
             eventHub,
             MessageBox.Show)
     {
     }
 
     internal FolderProjectCloseGuard(
-        IFolderProjectVersionControlService versionControlService,
+        IFolderProjectHistoryService historyService,
         IEventHub eventHub,
         Func<
             string,
@@ -62,7 +61,7 @@ public sealed class FolderProjectCloseGuard :
             MessageBoxButton,
             MessageBoxResult> showMessage)
     {
-        _versionControlService = versionControlService;
+        _historyService = historyService;
         _eventHub = eventHub;
         _showMessage = showMessage;
     }
@@ -88,11 +87,11 @@ public sealed class FolderProjectCloseGuard :
                 FolderProjectCloseProgressStage.ReadingRepositoryStatus,
                 2,
                 3));
-        FolderProjectRepositoryStatus status;
+        FolderProjectHistoryStatus status;
         try
         {
             status = await Task.Run(
-                () => _versionControlService.GetStatus(
+                () => _historyService.GetStatus(
                     project.ProjectRoot));
         }
         catch
@@ -113,7 +112,7 @@ public sealed class FolderProjectCloseGuard :
                 FolderProjectCloseProgressStage.SummarizingChanges,
                 3,
                 3,
-                status.Changes.Count));
+                status.UnrecordedChanges.Count));
 
         if (status.IsClean)
             return true;
@@ -124,7 +123,7 @@ public sealed class FolderProjectCloseGuard :
             LocalizationManager.Instance.GetFormat(
                 "FolderProject.Close.UncommittedChanges",
                 project.ProjectSettings.Name,
-                status.Changes.Count),
+                status.UnrecordedChanges.Count),
             LocalizationManager.Instance.Get(
                 "FolderProject.Close.Title"),
             MessageBoxButton.YesNoCancel);

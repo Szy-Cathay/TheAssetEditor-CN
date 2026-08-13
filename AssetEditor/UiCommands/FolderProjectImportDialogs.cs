@@ -18,8 +18,7 @@ public interface IFolderProjectImportDialogs
 public sealed record FolderProjectSetupDialogResult(
     string ProjectFolder,
     string OutputFolder,
-    bool EnablePackFileCorruptionDetection,
-    string PrimaryBranchName = "master");
+    bool EnablePackFileCorruptionDetection);
 
 public interface IFolderProjectSetupDialogs
 {
@@ -49,15 +48,15 @@ public sealed record FolderProjectProgressResult(
     FolderProjectContainer? Project,
     bool Cancelled);
 
-internal static class FolderProjectVersionControlProgressAdapter
+internal static class FolderProjectHistoryProgressAdapter
 {
     public static OperationProgressUpdate ToOperationProgress(
-        FolderProjectVersionControlProgress progress,
+        FolderProjectHistoryProgress progress,
         LocalizationManager localizationManager)
     {
         return new OperationProgressUpdate(
             localizationManager.Get(
-                $"FolderProject.VersionControl.Progress.{progress.Stage}"),
+                $"FolderProject.History.Progress.{progress.Stage}"),
             progress.Detail,
             progress.Completed,
             progress.Total);
@@ -98,8 +97,7 @@ public sealed class FolderProjectSetupDialogs(
             ? new FolderProjectSetupDialogResult(
                 window.ProjectFolder,
                 window.OutputFolder,
-                window.EnablePackFileCorruptionDetection,
-                window.PrimaryBranchName)
+                window.EnablePackFileCorruptionDetection)
             : null;
     }
 }
