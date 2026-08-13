@@ -21,7 +21,7 @@ namespace AssetEditor
         {
             serviceCollection.AddScoped<MainWindow>();
             serviceCollection.AddScoped<MainViewModel>();
-            serviceCollection.AddSingleton<IEditorCreator>( x=> x.GetRequiredService<IEditorManager>());
+            serviceCollection.AddSingleton<IEditorCreator>(x => x.GetRequiredService<IEditorManager>());
             serviceCollection.AddSingleton<IEditorManager, EditorManager>();
             serviceCollection.AddSingleton<
                 IFolderProjectUnsavedChangesService,
@@ -31,7 +31,7 @@ namespace AssetEditor
                 FolderProjectUnsavedChangesPrompt>();
 
             serviceCollection.AddTransient<OpenGamePackCommand>();
-            serviceCollection.AddTransient<OpenPackFileCommand>();
+            serviceCollection.AddTransient<OpenReferencePackCommand>();
             serviceCollection.AddTransient<CreateFolderProjectCommand>();
             serviceCollection.AddTransient<OpenFolderProjectCommand>();
             serviceCollection.AddTransient<

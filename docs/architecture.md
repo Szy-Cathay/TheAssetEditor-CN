@@ -39,8 +39,10 @@
 
 ### Pack 与编辑器文件身份
 
-- `Shared/SharedCore/PackFiles/PackFileService.cs` 管理已加载容器和当前可编辑容器。
-- CA Pack 只读；普通用户 Pack 在内存中修改并以临时文件替换方式保存；`FolderProjectContainer` 的资源修改直接落盘。
+- `Shared/SharedCore/PackFiles/PackFileService.cs` 管理已加载容器，并通过角色明确的入口区分当前文件夹工程与参考 Pack；产品调用方不能用布尔参数决定普通 Pack 是否可编辑。
+- 文件夹工程是唯一面向用户的可编辑工作区，资源修改直接落盘。参考 Pack 与 CA Pack 只读；普通 `PackFileContainer` 的解析、序列化和内部短生命周期写入能力只服务格式、生成、测试与开发装配。
+- 主工作流只公开新建 Mod 工程、从 Pack 导入工程、打开工程、打开参考 Pack 和生成 Pack。最近工程与最近参考 Pack 分别恢复原角色；再次打开已加载工程时直接将该文件夹工程切回当前工作区，参考 Pack 不能替换当前工程或获得直接保存入口。
+- 生成 Pack 从文件夹工程当前磁盘快照写出工程外的输出 Pack，不保存编辑器内存、不创建 Git 历史；编辑器保存只负责把内存修改写入工程磁盘。
 - `PackFile` 的身份必须结合所属容器和资源路径解析。跨容器查找、保存或错误报告不能只按文件名猜测；先检查 `GetPackFileContainer` 与 `GetFullPath`。
 - 文件夹工程的内存、磁盘、Git 与输出 Pack 语义见 [`folder-project-version-control.md`](folder-project-version-control.md)。
 

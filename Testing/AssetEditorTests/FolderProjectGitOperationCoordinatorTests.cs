@@ -1,4 +1,4 @@
-using System.Windows.Threading;
+﻿using System.Windows.Threading;
 using AssetEditor.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -1048,16 +1048,54 @@ public class FolderProjectGitOperationCoordinatorTests
         public int? AddContainerThreadId { get; private set; }
         public int AddContainerCallCount { get; private set; }
 
+        public FolderProjectContainer? AddEditableFolderProject(
+            FolderProjectContainer project) =>
+            AddContainer(
+                project,
+                _containers.Count,
+                true,
+                PackFileContainerAddedReason.UserOpen) as
+                FolderProjectContainer;
+
+        public bool TryActivateFolderProject(string projectRoot)
+        {
+            var project = _containers
+                .OfType<FolderProjectContainer>()
+                .FirstOrDefault(candidate => string.Equals(
+                    candidate.SystemFilePath,
+                    projectRoot,
+                    StringComparison.OrdinalIgnoreCase));
+            if (project == null)
+                return false;
+
+            _editable = project;
+            return true;
+        }
+
+        public PackFileContainer? AddReferencePack(
+            PackFileContainer referencePack) =>
+            AddContainer(referencePack);
+
         public PackFileContainer? AddContainer(
-            PackFileContainer container,
-            bool setToMainPackIfFirst = false)
+            PackFileContainer container)
         {
             return AddContainer(
                 container,
                 _containers.Count,
-                setToMainPackIfFirst,
+                false,
                 PackFileContainerAddedReason.UserOpen);
         }
+
+        public FolderProjectContainer? ReattachFolderProject(
+            FolderProjectContainer project,
+            int insertionIndex,
+            FolderProjectReattachMode mode) =>
+            AddContainer(
+                project,
+                insertionIndex,
+                mode == FolderProjectReattachMode.Editable,
+                PackFileContainerAddedReason.InternalReattach) as
+                FolderProjectContainer;
 
         public PackFileContainer? AddContainer(
             PackFileContainer container,
@@ -1147,8 +1185,7 @@ public class FolderProjectGitOperationCoordinatorTests
         public PackFileContainer CreateNewPackFileContainer(
             string name,
             PackFileVersion packFileVersion,
-            PackFileCAType type,
-            bool setEditablePack = false) =>
+            PackFileCAType type) =>
             throw new NotSupportedException();
 
         public void CreateFolder(

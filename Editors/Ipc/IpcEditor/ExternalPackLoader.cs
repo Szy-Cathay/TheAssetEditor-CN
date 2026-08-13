@@ -63,9 +63,10 @@ namespace Editors.Ipc
         {
             var app = Application.Current;
             if (app?.Dispatcher == null || app.Dispatcher.CheckAccess())
-                return _packFileService.AddContainer(container, false);
+                return _packFileService.AddContainer(container);
 
-            return app.Dispatcher.Invoke(() => _packFileService.AddContainer(container, false));
+            return app.Dispatcher.Invoke(() =>
+                _packFileService.AddContainer(container));
         }
 
         private static string NormalizeDiskPath(string input)

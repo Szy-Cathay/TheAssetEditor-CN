@@ -4,17 +4,27 @@ using Shared.Core.Settings;
 
 namespace Shared.Core.PackFiles
 {
+    public enum FolderProjectReattachMode
+    {
+        Inactive,
+        Editable,
+    }
+
     public interface IPackFileService
     {
         bool EnableFileLookUpEvents { get; set; }
         bool EnforceGameFilesMustBeLoaded { get; set; }
 
-        PackFileContainer? AddContainer(PackFileContainer container, bool setToMainPackIfFirst = false);
-        PackFileContainer? AddContainer(
-            PackFileContainer container,
+        FolderProjectContainer? AddEditableFolderProject(
+            FolderProjectContainer project);
+        bool TryActivateFolderProject(string projectRoot);
+        PackFileContainer? AddReferencePack(
+            PackFileContainer referencePack);
+        PackFileContainer? AddContainer(PackFileContainer container);
+        FolderProjectContainer? ReattachFolderProject(
+            FolderProjectContainer project,
             int insertionIndex,
-            bool setEditablePack,
-            PackFileContainerAddedReason reason);
+            FolderProjectReattachMode mode);
         void AddFilesToPack(
             PackFileContainer container,
             List<NewPackFileEntry> newFiles,
@@ -23,7 +33,10 @@ namespace Shared.Core.PackFiles
             PackFileContainer container,
             IReadOnlyCollection<PackFileWrite> writes);
         void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target);
-        PackFileContainer CreateNewPackFileContainer(string name, PackFileVersion packFileVersion, PackFileCAType type, bool setEditablePack = false);
+        PackFileContainer CreateNewPackFileContainer(
+            string name,
+            PackFileVersion packFileVersion,
+            PackFileCAType type);
         void CreateFolder(PackFileContainer container, string folder);
         void DeleteFile(PackFileContainer pf, PackFile file);
         void DeleteFolder(PackFileContainer pf, string folder);

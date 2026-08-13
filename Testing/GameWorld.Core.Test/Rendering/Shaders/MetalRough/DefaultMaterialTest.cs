@@ -27,7 +27,11 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             var appSettings = new ApplicationSettingsService(selectedGame);
             _pfs = new PackFileService(null);
             _pfs.EnforceGameFilesMustBeLoaded = false;
-            var _ = _pfs.CreateNewPackFileContainer("output", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+            var output = _pfs.CreateNewPackFileContainer(
+                "output",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            _pfs.SetEditablePack(output);
         }
 
         CapabilityMaterialFactory GetMaterialFactory(GameTypeEnum gameTypeEnum)
@@ -75,7 +79,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             var bloodCap = material.GetCapability<BloodCapability>();
             Assert.That(bloodCap.BloodMask.TexturePath, Is.EqualTo($"texturePath/wsmodel/{TextureType.Blood}.dds"));
             Assert.That(bloodCap.UseBlood, Is.EqualTo(true));
-            Assert.That(bloodCap.UvScale, Is.EqualTo(new Vector2(1,2)));
+            Assert.That(bloodCap.UvScale, Is.EqualTo(new Vector2(1, 2)));
         }
 
         [Test]
@@ -96,7 +100,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             // Assert
             Assert.That(generatedMaterial.VertexType, Is.EqualTo(UiVertexFormat.Cinematic));
             Assert.That(generatedMaterial.Alpha, Is.EqualTo(true));
-           
+
             Assert.That(generatedMaterial.ShaderPath, Is.EqualTo("shaders/weighted4_character_alpha.xml.shader"));
             Assert.That(generatedMaterial.Name, Is.EqualTo("mymesh_weighted4_alpha_on.xml"));
 
@@ -157,7 +161,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders.MetalRough
             // Arrange
             var materialA = GetMaterialFactory(GameTypeEnum.Warhammer3).CreateMaterial(CapabilityMaterialsEnum.MetalRoughPbr_Default);
             var materialB = GetMaterialFactory(GameTypeEnum.Warhammer3).CreateMaterial(CapabilityMaterialsEnum.MetalRoughPbr_Default);
-            
+
             // Act
             var (result, message) = materialA.AreEqual(materialB);
 

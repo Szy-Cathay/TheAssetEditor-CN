@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
@@ -163,7 +163,7 @@ public sealed class ImportPackAsFolderProjectCommand(
             if (project == null)
                 return;
 
-            if (packFileService.AddContainer(project, true) == null)
+            if (packFileService.AddEditableFolderProject(project) == null)
                 project.Dispose();
         }
         catch (Exception exception)

@@ -35,7 +35,98 @@ namespace Shared.Core.PackFiles
 
         public List<PackFileContainer> GetAllPackfileContainers() => _packFileContainers.ToList(); // Return a list of the list to avoid bugs!
 
-        public PackFileContainer? AddContainer(PackFileContainer container, bool setToMainPackIfFirst = false)
+        public FolderProjectContainer? AddEditableFolderProject(
+            FolderProjectContainer project)
+        {
+            var previousRole = project.Role;
+            project.Role = PackFileContainerRole.ProjectWorkspace;
+            try
+            {
+                var result = AddContainer(project, true);
+                if (result == null)
+                    project.Role = previousRole;
+                return result as FolderProjectContainer;
+            }
+            catch
+            {
+                project.Role = previousRole;
+                throw;
+            }
+        }
+
+        public bool TryActivateFolderProject(string projectRoot)
+        {
+            var normalizedRoot = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(projectRoot));
+            var project = _packFileContainers
+                .OfType<FolderProjectContainer>()
+                .FirstOrDefault(candidate => string.Equals(
+                    Path.TrimEndingDirectorySeparator(
+                        Path.GetFullPath(candidate.SystemFilePath)),
+                    normalizedRoot,
+                    StringComparison.OrdinalIgnoreCase));
+            if (project == null)
+                return false;
+
+            var previousEditable = GetEditablePack();
+            var previousRole = project.Role;
+            try
+            {
+                project.Role = PackFileContainerRole.ProjectWorkspace;
+                SetEditablePack(project);
+                return true;
+            }
+            catch
+            {
+                project.Role = previousRole;
+                RestoreEditablePackAfterFailure(previousEditable);
+                throw;
+            }
+        }
+
+        public PackFileContainer? AddReferencePack(
+            PackFileContainer referencePack)
+        {
+            if (referencePack is FolderProjectContainer)
+            {
+                throw new ArgumentException(
+                    "A folder project cannot be loaded as a reference pack.",
+                    nameof(referencePack));
+            }
+
+            var previousRole = referencePack.Role;
+            referencePack.Role = PackFileContainerRole.Reference;
+            try
+            {
+                var result = AddContainer(referencePack);
+                if (result == null)
+                    referencePack.Role = previousRole;
+                return result;
+            }
+            catch
+            {
+                referencePack.Role = previousRole;
+                throw;
+            }
+        }
+
+        private static void EnsureWritable(
+            PackFileContainer container)
+        {
+            if (container.Role == PackFileContainerRole.Reference)
+            {
+                throw new InvalidOperationException(
+                    "Reference packs are read-only.");
+            }
+        }
+
+        public PackFileContainer? AddContainer(
+            PackFileContainer container) =>
+            AddContainer(container, false);
+
+        internal PackFileContainer? AddContainer(
+            PackFileContainer container,
+            bool setToMainPackIfFirst)
         {
             return AddContainer(
                 container,
@@ -44,7 +135,7 @@ namespace Shared.Core.PackFiles
                 PackFileContainerAddedReason.UserOpen);
         }
 
-        public PackFileContainer? AddContainer(
+        internal PackFileContainer? AddContainer(
             PackFileContainer container,
             int insertionIndex,
             bool setEditablePack,
@@ -97,33 +188,38 @@ namespace Shared.Core.PackFiles
             }
         }
 
+        public FolderProjectContainer? ReattachFolderProject(
+            FolderProjectContainer project,
+            int insertionIndex,
+            FolderProjectReattachMode mode)
+        {
+            var previousRole = project.Role;
+            project.Role = PackFileContainerRole.ProjectWorkspace;
+            try
+            {
+                var result = AddContainer(
+                    project,
+                    insertionIndex,
+                    mode == FolderProjectReattachMode.Editable,
+                    PackFileContainerAddedReason.InternalReattach) as
+                    FolderProjectContainer;
+                if (result == null)
+                    project.Role = previousRole;
+                return result;
+            }
+            catch
+            {
+                project.Role = previousRole;
+                throw;
+            }
+        }
+
         private void RollbackFailedAdd(
             PackFileContainer container,
             PackFileContainer? previousEditable)
         {
             var removed = _packFileContainers.Remove(container);
-            bool editableChanged;
-            lock (s_saveGate)
-            {
-                editableChanged = !ReferenceEquals(
-                    _packFileContainerSelectedForEdit,
-                    previousEditable);
-                _packFileContainerSelectedForEdit = previousEditable;
-            }
-
-            if (editableChanged)
-            {
-                try
-                {
-                    _globalEventHub?.PublishGlobalEvent(
-                        new PackFileContainerSetAsMainEditableEvent(
-                            previousEditable));
-                }
-                catch
-                {
-                    // Preserve the original add failure.
-                }
-            }
+            RestoreEditablePackAfterFailure(previousEditable);
 
             if (removed)
             {
@@ -153,6 +249,33 @@ namespace Shared.Core.PackFiles
             }
         }
 
+        private void RestoreEditablePackAfterFailure(
+            PackFileContainer? previousEditable)
+        {
+            bool editableChanged;
+            lock (s_saveGate)
+            {
+                editableChanged = !ReferenceEquals(
+                    _packFileContainerSelectedForEdit,
+                    previousEditable);
+                _packFileContainerSelectedForEdit = previousEditable;
+            }
+
+            if (editableChanged)
+            {
+                try
+                {
+                    _globalEventHub?.PublishGlobalEvent(
+                        new PackFileContainerSetAsMainEditableEvent(
+                            previousEditable));
+                }
+                catch
+                {
+                    // Preserve the original add failure.
+                }
+            }
+        }
+
         void AddContainerInternal(
             PackFileContainer container,
             int insertionIndex,
@@ -172,7 +295,21 @@ namespace Shared.Core.PackFiles
                 SetEditablePack(container);
         }
 
-        public PackFileContainer CreateNewPackFileContainer(string name, PackFileVersion packFileVersion, PackFileCAType type, bool setEditablePack = false)
+        public PackFileContainer CreateNewPackFileContainer(
+            string name,
+            PackFileVersion packFileVersion,
+            PackFileCAType type) =>
+            CreateNewPackFileContainer(
+                name,
+                packFileVersion,
+                type,
+                false);
+
+        internal PackFileContainer CreateNewPackFileContainer(
+            string name,
+            PackFileVersion packFileVersion,
+            PackFileCAType type,
+            bool setEditablePack)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new Exception("Name can not be empty");
@@ -197,6 +334,7 @@ namespace Shared.Core.PackFiles
             List<NewPackFileEntry> newFiles,
             bool overwriteExisting = true)
         {
+            EnsureWritable(container);
             if (container.IsCaPackFile)
                 throw new Exception("Can not add files to ca pack file");
 
@@ -259,6 +397,7 @@ namespace Shared.Core.PackFiles
             PackFileContainer container,
             IReadOnlyCollection<PackFileWrite> writes)
         {
+            EnsureWritable(container);
             if (container.IsCaPackFile)
                 throw new Exception("Can not add files to ca pack file");
 
@@ -337,6 +476,7 @@ namespace Shared.Core.PackFiles
 
         public void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target)
         {
+            EnsureWritable(target);
             var lowerPath = path.Replace('/', '\\').ToLower().Trim();
             var newFile = source is FolderProjectContainer sourceProject
                 ? sourceProject.ExecuteSynchronized(
@@ -378,6 +518,7 @@ namespace Shared.Core.PackFiles
             PackFileContainer container,
             string folder)
         {
+            EnsureWritable(container);
             if (container.IsCaPackFile)
                 throw new Exception("Can not create folders inside CA pack file");
 
@@ -402,6 +543,11 @@ namespace Shared.Core.PackFiles
 
         public void SetEditablePack(PackFileContainer? pf)
         {
+            if (pf?.Role == PackFileContainerRole.Reference)
+            {
+                throw new InvalidOperationException(
+                    "A reference pack cannot become the editable workspace.");
+            }
             if (pf != null && pf.IsCaPackFile)
                 throw new Exception("Trying to set CA packfile container to be editable - this is not legal!");
 
@@ -474,6 +620,7 @@ namespace Shared.Core.PackFiles
 
         public void DeleteFolder(PackFileContainer pf, string folder)
         {
+            EnsureWritable(pf);
             if (pf.IsCaPackFile)
                 throw new Exception("Can not delete folder inside CA pack file");
 
@@ -508,7 +655,7 @@ namespace Shared.Core.PackFiles
 
             var filesToDelete = new List<string>();
             foreach (var file in pf.FileList)
-            { 
+            {
                 var directory = Path.GetDirectoryName(file.Key);
                 if (directory == null)
                     continue;
@@ -528,6 +675,7 @@ namespace Shared.Core.PackFiles
 
         public void DeleteFile(PackFileContainer pf, PackFile file)
         {
+            EnsureWritable(pf);
             if (pf.IsCaPackFile)
                 throw new Exception("Can not delete files inside CA pack file");
 
@@ -558,6 +706,7 @@ namespace Shared.Core.PackFiles
 
         public void MoveFile(PackFileContainer pf, PackFile file, string newFolderPath)
         {
+            EnsureWritable(pf);
             if (pf.IsCaPackFile)
                 throw new Exception("Can not move files inside CA pack file");
 
@@ -597,6 +746,7 @@ namespace Shared.Core.PackFiles
 
         public void RenameDirectory(PackFileContainer pf, string currentNodeName, string newName)
         {
+            EnsureWritable(pf);
             if (pf.IsCaPackFile)
                 throw new Exception("Can not rename in ca pack file");
 
@@ -658,6 +808,7 @@ namespace Shared.Core.PackFiles
 
         public void RenameFile(PackFileContainer pf, PackFile file, string newName)
         {
+            EnsureWritable(pf);
             if (pf.IsCaPackFile)
                 throw new Exception("Can not rename file in ca pack file");
 
@@ -729,6 +880,7 @@ namespace Shared.Core.PackFiles
 
         public void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation)
         {
+            EnsureWritable(pf);
             lock (s_saveGate)
             {
                 if (pf is FolderProjectContainer folderProject)
@@ -748,6 +900,8 @@ namespace Shared.Core.PackFiles
 
         public bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation)
         {
+            if (pf.Role == PackFileContainerRole.Reference)
+                return false;
             if (pf is FolderProjectContainer)
                 return false;
 

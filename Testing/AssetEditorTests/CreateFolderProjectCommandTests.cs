@@ -1,4 +1,4 @@
-using AssetEditor.UiCommands;
+﻿using AssetEditor.UiCommands;
 
 using Moq;
 
@@ -138,8 +138,15 @@ public class CreateFolderProjectCommandTests
                         1,
                         2));
                 });
+        FolderProjectContainer? createdProject = null;
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(item => item.AddEditableFolderProject(
+                It.IsAny<FolderProjectContainer>()))
+            .Callback<FolderProjectContainer>(container =>
+                createdProject = container)
+            .Returns<FolderProjectContainer>(container => container);
         var command = new CreateFolderProjectCommand(
-            Mock.Of<IPackFileService>(),
+            packFileService.Object,
             new FolderProjectFactory(),
             new ApplicationSettingsService(GameTypeEnum.Warhammer3),
             Mock.Of<IStandardDialogs>(),
@@ -148,42 +155,53 @@ public class CreateFolderProjectCommandTests
             versionControl.Object,
             progressRunner.Object);
 
-        command.Execute();
-
-        var settings = FolderProjectSettings.Load(project.Path);
-        NUnitAssert.Multiple(() =>
+        try
         {
-            NUnitAssert.That(
-                settings.OutputPackPath,
-                Is.EqualTo(
-                    Path.Combine(
-                        output.Path,
-                        Path.GetFileName(project.Path) + ".pack")));
-            NUnitAssert.That(
-                settings.EnablePackFileCorruptionDetection,
-                Is.True);
-            NUnitAssert.That(initializedWhileProgressVisible, Is.True);
-            NUnitAssert.That(
-                progressUpdates.Any(update =>
-                    update.Status == "正在登记工程文件" &&
-                    update.Detail == "audio/voice.wem" &&
-                    update.Completed == 1 &&
-                    update.Total == 2),
-                Is.True);
-        });
-        progressRunner.Verify(item => item.Run(
-            It.IsAny<string>(),
+            command.Execute();
+
+            var settings = FolderProjectSettings.Load(project.Path);
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    settings.OutputPackPath,
+                    Is.EqualTo(
+                        Path.Combine(
+                            output.Path,
+                            Path.GetFileName(project.Path) + ".pack")));
+                NUnitAssert.That(
+                    settings.EnablePackFileCorruptionDetection,
+                    Is.True);
+                NUnitAssert.That(initializedWhileProgressVisible, Is.True);
+                NUnitAssert.That(
+                    progressUpdates.Any(update =>
+                        update.Status == "正在登记工程文件" &&
+                        update.Detail == "audio/voice.wem" &&
+                        update.Completed == 1 &&
+                        update.Total == 2),
+                    Is.True);
+            });
+            progressRunner.Verify(item => item.Run(
+                It.IsAny<string>(),
                 It.Is<string>(message =>
                     message.Contains("首次", StringComparison.Ordinal)),
-            It.IsAny<Func<
-                Action<OperationProgressUpdate>,
-                FolderProjectContainer?>>()), Times.Once);
-        versionControl.Verify(item => item.Initialize(
-            project.Path,
-            It.IsAny<FolderProjectGitIdentity>(),
-            "main",
-            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
-            Times.Once);
+                It.IsAny<Func<
+                    Action<OperationProgressUpdate>,
+                    FolderProjectContainer?>>()), Times.Once);
+            versionControl.Verify(item => item.Initialize(
+                project.Path,
+                It.IsAny<FolderProjectGitIdentity>(),
+                "main",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+                Times.Once);
+            packFileService.Verify(item =>
+                item.AddEditableFolderProject(
+                    It.IsAny<FolderProjectContainer>()),
+                Times.Once);
+        }
+        finally
+        {
+            createdProject?.Dispose();
+        }
     }
 
     [Test]

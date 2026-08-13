@@ -80,6 +80,9 @@ public sealed class FolderProjectOpenService(
                 return;
             }
 
+            if (packFileService.TryActivateFolderProject(root))
+                return;
+
             project = folderProjectFactory.Open(root);
             if (project.ProjectSettings.GameVersion == null)
             {
@@ -96,7 +99,7 @@ public sealed class FolderProjectOpenService(
             }
             project.SaveSettings();
 
-            if (packFileService.AddContainer(project, true) == null)
+            if (packFileService.AddEditableFolderProject(project) == null)
                 project.Dispose();
         }
         catch (Exception exception)

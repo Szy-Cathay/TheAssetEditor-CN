@@ -38,16 +38,13 @@ namespace AssetEditor.ViewModels
         private readonly IFolderProjectOpenService _folderProjectOpenService;
         private readonly IStandardDialogs _standardDialogs;
 
-        public ObservableCollection<RecentPackFileItem> RecentPackFiles { get; set; } = [];
+        public ObservableCollection<RecentPackFileItem> RecentReferencePacks { get; set; } = [];
         public ObservableCollection<RecentPackFileItem> RecentFolderProjects { get; set; } = [];
         public ObservableCollection<EditorShortcutViewModel> Editors { get; set; } = [];
-        public bool IsSaveActivePackVisible =>
-            _packfileService.GetEditablePack() is not
-                FolderProjectContainer;
 
-        public MenuBarViewModel(IPackFileService packfileService, 
-            ApplicationSettingsService settingsService, 
-            IEditorDatabase editorDatabase, 
+        public MenuBarViewModel(IPackFileService packfileService,
+            ApplicationSettingsService settingsService,
+            IEditorDatabase editorDatabase,
             IUiCommandFactory uiCommandFactory,
             TouchedFilesRecorder touchedFilesRecorder,
             IPackFileContainerLoader packFileContainerLoader,
@@ -64,10 +61,11 @@ namespace AssetEditor.ViewModels
             _folderProjectOpenService = folderProjectOpenService;
             _standardDialogs = standardDialogs;
             var settings = settingsService.CurrentSettings;
-            settings.RecentPackFilePaths.CollectionChanged += (sender, args) => CreateRecentPackFilesItems();
+            settings.RecentPackFilePaths.CollectionChanged +=
+                (sender, args) => CreateRecentReferencePackItems();
             settings.RecentFolderProjectPaths.CollectionChanged +=
                 (sender, args) => CreateRecentFolderProjectItems();
-            CreateRecentPackFilesItems();
+            CreateRecentReferencePackItems();
             CreateRecentFolderProjectItems();
             CreateTools();
             eventHub.Register<PackFileContainerSetAsMainEditableEvent>(
@@ -77,13 +75,14 @@ namespace AssetEditor.ViewModels
                     OpenFolderProjectVersionControlCommand
                         .NotifyCanExecuteChanged();
                     GeneratePackCommand.NotifyCanExecuteChanged();
-                    SaveActivePackCommand.NotifyCanExecuteChanged();
-                    OnPropertyChanged(nameof(IsSaveActivePackVisible));
+                    CreateAnimPackWarhammer3Command
+                        .NotifyCanExecuteChanged();
+                    CreateAnimPack3kCommand.NotifyCanExecuteChanged();
                 });
         }
 
         [RelayCommand] private void OpenSettingsWindow() => _uiCommandFactory.Create<OpenSettingsDialogCommand>().Execute();
-        [RelayCommand] private void OpenPackFile() => _uiCommandFactory.Create<OpenPackFileCommand>().Execute();
+        [RelayCommand] private void OpenReferencePack() => _uiCommandFactory.Create<OpenReferencePackCommand>().Execute();
         [RelayCommand] private void CreateFolderProject() => _uiCommandFactory.Create<CreateFolderProjectCommand>().Execute();
         [RelayCommand] private void OpenFolderProject() => _uiCommandFactory.Create<OpenFolderProjectCommand>().Execute();
         [RelayCommand] private void ImportPackAsFolderProject() => _uiCommandFactory.Create<ImportPackAsFolderProjectCommand>().Execute();
@@ -95,52 +94,20 @@ namespace AssetEditor.ViewModels
                 .Execute();
 
         private bool CanOpenFolderProjectVersionControl() =>
-            _packfileService.GetEditablePack() is
-                FolderProjectContainer;
-        [RelayCommand] private void CreateNewPackFile()
-        {
-            var input = _standardDialogs.ShowTextInputDialog(
-                "New Pack Name",
-                "");
-            if (input.Result)
-            {
-                if (string.IsNullOrWhiteSpace(input.Text))
-                {
-                    _standardDialogs.ShowDialogBox($"'{input.Text}' is not a valid packfile name", "Error");
-                    return;
-                }
+            CanEditFolderProject();
 
-                var currentGame = _settingsService.CurrentSettings.CurrentGame;
-                var pfsVersion = GameInformationDatabase.Games[currentGame].PackFileVersion; 
-
-                var newPackFile = _packfileService.CreateNewPackFileContainer(input.Text.Trim(), pfsVersion, PackFileCAType.MOD);
-                _packfileService.SetEditablePack(newPackFile);
-            }
-        }
-        
-        [RelayCommand] private void CreateAnimPackWarhammer3() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDbWarhammer3();
-        [RelayCommand] private void CreateAnimPack3k() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDb3k();
-        [RelayCommand(CanExecute = nameof(CanSaveActivePack))]
-        private void SaveActivePack()
-        {
-            if (!CanSaveActivePack())
-                return;
-
-            _uiCommandFactory
-                .Create<SavePackFileContainerCommand>()
-                .Execute();
-        }
-
-        private bool CanSaveActivePack() =>
-            _packfileService.GetEditablePack() is not
-                FolderProjectContainer;
+        [RelayCommand(CanExecute = nameof(CanEditFolderProject))]
+        private void CreateAnimPackWarhammer3() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDbWarhammer3();
+        [RelayCommand(CanExecute = nameof(CanEditFolderProject))]
+        private void CreateAnimPack3k() => _uiCommandFactory.Create<CreateExampleAnimationDbCommand>().CreateAnimationDb3k();
 
         [RelayCommand(CanExecute = nameof(CanGeneratePack))]
         private void GeneratePack() => _uiCommandFactory
             .Create<SavePackFileContainerCommand>()
             .Execute();
 
-        private bool CanGeneratePack() =>
+        private bool CanGeneratePack() => CanEditFolderProject();
+        private bool CanEditFolderProject() =>
             _packfileService.GetEditablePack() is FolderProjectContainer;
         [RelayCommand] private void OpenWh2AnimpackUpdater() => new AnimPackUpdaterService(_packfileService).Process();
         [RelayCommand] private void GenerateRmv2Report() => _uiCommandFactory.Create<Rmv2ReportCommand>().Execute();
@@ -184,18 +151,19 @@ namespace AssetEditor.ViewModels
 
         [RelayCommand] private static void OpenAssetEditorFolder() => Process.Start("explorer.exe", DirectoryHelper.ApplicationDirectory);
 
-        [RelayCommand] private static void ClearAssetEditorFolder()
+        [RelayCommand]
+        private static void ClearAssetEditorFolder()
         {
             try { Directory.Delete(DirectoryHelper.ApplicationDirectory, true); } catch { }
         }
 
         [RelayCommand] private void TogglePackFileExplorer() => _uiCommandFactory.Create<TogglePackFileExplorerCommand>().Execute();
 
-        void CreateRecentPackFilesItems()
+        void CreateRecentReferencePackItems()
         {
             var settings = _settingsService.CurrentSettings;
 
-            RecentPackFiles.Clear();
+            RecentReferencePacks.Clear();
             var menuItemViewModels = settings.RecentPackFilePaths.Select(path => new RecentPackFileItem(
                 path,
                 () =>
@@ -207,13 +175,13 @@ namespace AssetEditor.ViewModels
                         return;
                     }
 
-                    _packfileService.AddContainer(container, true);
-                        
+                    _packfileService.AddReferencePack(container);
+
                 }
             ));
             foreach (var menuItem in menuItemViewModels.Reverse())
             {
-                RecentPackFiles.Add(menuItem);
+                RecentReferencePacks.Add(menuItem);
             }
         }
 
@@ -235,8 +203,8 @@ namespace AssetEditor.ViewModels
         {
             var infos = _editorDatabase
                 .GetEditorInfos()
-                .OrderBy(x=>x.ToolbarName)
-                .Where(x=>x.AddToolbarButton)
+                .OrderBy(x => x.ToolbarName)
+                .Where(x => x.AddToolbarButton)
                 .ToList();
 
             foreach (var item in infos)

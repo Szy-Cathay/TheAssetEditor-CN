@@ -23,7 +23,11 @@ namespace GameWorld.Core.Test.Rendering.Shaders.SpecGloss
         {
             _pfs = new PackFileService(null);
             _pfs.EnforceGameFilesMustBeLoaded = false;
-            var _ = _pfs.CreateNewPackFileContainer("output", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+            var output = _pfs.CreateNewPackFileContainer(
+                "output",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            _pfs.SetEditablePack(output);
         }
 
         CapabilityMaterialFactory GetMaterialFactory(GameTypeEnum gameTypeEnum)
@@ -115,7 +119,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders.SpecGloss
             Assert.That(generatedMaterial.Name, Is.EqualTo("mymesh_weighted4_alpha_off.xml"));
 
             Assert.That(generatedMaterial.Textures[TextureType.Specular], Is.EqualTo($"texturePath/wsmodel/{TextureType.Specular}.dds"));
-            if(gameType != GameTypeEnum.Pharaoh)
+            if (gameType != GameTypeEnum.Pharaoh)
                 Assert.That(generatedMaterial.Textures[TextureType.Gloss], Is.EqualTo($"texturePath/wsmodel/{TextureType.Gloss}.dds"));
             Assert.That(generatedMaterial.Textures[TextureType.Diffuse], Is.EqualTo($"texturePath/wsmodel/{TextureType.Diffuse}.dds"));
             Assert.That(generatedMaterial.Textures[TextureType.Normal], Is.EqualTo($"texturePath/wsmodel/{TextureType.Normal}.dds"));

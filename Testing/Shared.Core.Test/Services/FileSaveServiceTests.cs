@@ -27,7 +27,11 @@ namespace Test.Shared.Core.Services
             container.IsCaPackFile = true;
 
             _pfs.AddContainer(container);
-            _container = _pfs.CreateNewPackFileContainer("Output", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+            _container = _pfs.CreateNewPackFileContainer(
+                "Output",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            _pfs.SetEditablePack(_container);
 
             List<NewPackFileEntry> files = [
                 new NewPackFileEntry("folder\\subfolder", PackFile.CreateFromBytes("File0.test", [0])),
@@ -92,7 +96,7 @@ namespace Test.Shared.Core.Services
             Assert.That(result!.DataSource.ReadData(), Is.EqualTo(new byte[] { 3 }));
 
             _eventHub.Verify(x => x.PublishGlobalEvent(It.IsAny<PackFileContainerFilesAddedEvent>()), Times.Once);
-            _uiProvider.Verify(x=>x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()), Times.Never);
+            _uiProvider.Verify(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()), Times.Never);
         }
 
         [Test]

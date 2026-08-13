@@ -18,7 +18,11 @@ namespace Test.Shared.Core.PackFiles.Utility
         {
             var eventHub = new Mock<IGlobalEventHub>();
             _packFileService = new PackFileService(eventHub.Object);
-            _container = _packFileService.CreateNewPackFileContainer("EncryptedOutput", PackFileVersion.PFH5, PackFileCAType.MOD, true);
+            _container = _packFileService.CreateNewPackFileContainer(
+                "EncryptedOutput",
+                PackFileVersion.PFH5,
+                PackFileCAType.MOD);
+            _packFileService.SetEditablePack(_container);
 
             // Add files to the container
             List<NewPackFileEntry> files = [

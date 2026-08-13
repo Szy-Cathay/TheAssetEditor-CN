@@ -62,15 +62,23 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
         }
 
 
-        protected void Add<T>(TreeNode? node, ContextMenuItem2 parent) where T : IContextMenuCommand
+        protected void Add<T>(
+            TreeNode? node,
+            ContextMenuItem2 parent,
+            bool includeWhenDisabled = false)
+            where T : IContextMenuCommand
         {
             var instance = _commandFactory.Create<T>();
+            var isEnabled = instance.IsEnabled(node);
 
-            if (instance.IsEnabled(node) == false)
+            if (!isEnabled && !includeWhenDisabled)
                 return;
 
             var name = instance.GetDisplayName(node);
-            var item = new ContextMenuItem2(name, () => instance.Execute(node));
+            var item = new ContextMenuItem2(
+                name,
+                () => instance.Execute(node),
+                isEnabled);
             parent.ContextMenu.Add(item);
         }
 

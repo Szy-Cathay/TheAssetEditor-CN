@@ -8,7 +8,8 @@
 
 ## 硬约束
 
-- 文件夹工程是磁盘支持的可编辑 Pack，不是临时解压目录。
+- 文件夹工程是磁盘支持的 Mod 工程，也是唯一面向用户的可编辑工作区；普通 Pack 不能成为用户工作区。
+- 普通 Pack 只作为导入来源、只读参考或工程生成的输出。参考 Pack 的复制目标始终是当前文件夹工程，没有活动工程时写入类操作必须禁用并给出中文原因。
 - 工程必须拥有普通目录形式的本地 `.git`；不支持 linked worktree、submodule、bare repository 或远端协作。
 - 当前配置文件是 `aeproject.cn.json`。可读取 `aeproject.json` 与 `project_ignore.json` 以迁移，但只写回国区版配置。
 - 输出 Pack 必须位于工程根目录之外。
@@ -50,6 +51,9 @@
 
 | 责任 | 当前入口 |
 | --- | --- |
+| 新建、导入、打开工程与打开参考 Pack | `AssetEditor/UiCommands/*FolderProjectCommand.cs`、`OpenReferencePackCommand.cs` |
+| 当前工程、参考 Pack 角色与只读门禁 | `Shared/SharedCore/PackFiles/IPackFileService.cs`、`PackFileService.cs` |
+| 最近工程与最近参考 Pack | `AssetEditor/Services/RecentFilesTracker.cs`、`AssetEditor/ViewModels/MenuBarViewModel.cs` |
 | 磁盘资源树、空目录、watcher、指纹与对账 | `Shared/SharedCore/PackFiles/Models/FolderProjectContainer.cs` |
 | 配置读取、旧配置迁移与规范化 | `Shared/SharedCore/PackFiles/Models/FolderProjectSettings.cs` |
 | 路径、元数据、重解析点和输出位置安全 | `Shared/SharedCore/PackFiles/Utility/FolderProjectPathPolicy.cs` |
@@ -62,6 +66,8 @@
 | 退出前未提交状态保护 | `AssetEditor/Services/FolderProjectCloseGuard.cs` |
 
 ViewModel 不应直接拼接批量文件系统操作或调用 `LibGit2Sharp.Commands`，否则会绕过路径策略、回滚、进度、容器重载和测试替身。
+
+从最近工程再次打开一个已经加载的文件夹工程时，不重复创建容器，而是将原容器重新激活为当前工作区。最近参考 Pack 始终按只读参考角色重新加载，不能走这条激活路径。
 
 ## watcher、刷新与批量操作
 
@@ -104,6 +110,12 @@ ViewModel 不应直接拼接批量文件系统操作或调用 `LibGit2Sharp.Comm
 
 应用协调、内存边界和 UI 状态：
 
+- `Testing/AssetEditorTests/CreateFolderProjectCommandTests.cs`
+- `Testing/AssetEditorTests/ImportPackAsFolderProjectCommandTests.cs`
+- `Testing/AssetEditorTests/OpenFolderProjectCommandTests.cs`
+- `Testing/AssetEditorTests/OpenReferencePackCommandTests.cs`
+- `Testing/AssetEditorTests/MenuBarFolderProjectRecentTests.cs`
+- `Testing/AssetEditorTests/RecentFilesTrackerTests.cs`
 - `Testing/AssetEditorTests/FolderProjectUnsavedChangesServiceTests.cs`
 - `Testing/AssetEditorTests/FolderProjectGitOperationCoordinatorTests.cs`
 - `Testing/AssetEditorTests/FolderProjectGitWorkspaceViewModelTests.cs`

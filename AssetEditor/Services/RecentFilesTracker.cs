@@ -53,10 +53,15 @@ namespace AssetEditor.Services
                     .AddRecentlyOpenedFolderProject(
                         e.Container.SystemFilePath);
             }
-            else
+            else if (e.Container.Role ==
+                     PackFileContainerRole.Reference)
             {
                 _applicationSettingsService.AddRecentlyOpenedPackFile(
                     e.Container.SystemFilePath);
+            }
+            else
+            {
+                return;
             }
             _saveSettings();
         }

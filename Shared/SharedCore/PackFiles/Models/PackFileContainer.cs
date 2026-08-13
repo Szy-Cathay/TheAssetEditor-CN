@@ -1,5 +1,12 @@
 ﻿namespace Shared.Core.PackFiles.Models
 {
+    public enum PackFileContainerRole
+    {
+        Internal,
+        ProjectWorkspace,
+        Reference,
+    }
+
     public class PackFileContainer
     {
         public string Name { get; set; }
@@ -8,6 +15,8 @@
         public string SystemFilePath { get; set; }
         public long OriginalLoadByteSize { get; set; } = -1;
         public HashSet<string> SourcePackFilePaths { get; set; } = [];
+        public PackFileContainerRole Role { get; internal set; } =
+            PackFileContainerRole.Internal;
 
         public Dictionary<string, PackFile> FileList { get; set; } = [];
 
