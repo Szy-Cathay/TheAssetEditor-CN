@@ -112,10 +112,10 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                     "local@asseteditor.cn"),
                 "master",
                 progress => reportProgress(MapProgress(progress)));
-            var changes = _versionControl.GetCommitChanges(
+            var changeSummary = _versionControl.GetCommitChangeSummary(
                 projectRoot,
                 summary.Id);
-            return MapRestorePoint(summary, Summarize(changes));
+            return MapRestorePoint(summary, MapSummary(changeSummary));
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -145,10 +145,10 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             var summary = _versionControl.CommitAll(
                 projectRoot,
                 normalizedDescription);
-            var changes = _versionControl.GetCommitChanges(
+            var changeSummary = _versionControl.GetCommitChangeSummary(
                 projectRoot,
                 summary.Id);
-            return MapRestorePoint(summary, Summarize(changes));
+            return MapRestorePoint(summary, MapSummary(changeSummary));
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -256,20 +256,6 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             changeSummary,
             initial);
     }
-
-    private static FolderProjectRestorePointChangeSummary Summarize(
-        IReadOnlyList<FolderProjectCommitChange> changes) =>
-        new(
-            changes.Count(change =>
-                change.Kind == FolderProjectCommitChangeKind.Added),
-            changes.Count(change =>
-                change.Kind == FolderProjectCommitChangeKind.Modified),
-            changes.Count(change =>
-                change.Kind == FolderProjectCommitChangeKind.Deleted),
-            changes.Count(change =>
-                change.Kind == FolderProjectCommitChangeKind.Renamed),
-            changes.Count(change =>
-                change.Kind == FolderProjectCommitChangeKind.TypeChanged));
 
     private static FolderProjectRestorePointChangeSummary MapSummary(
         FolderProjectCommitChangeSummary summary) =>

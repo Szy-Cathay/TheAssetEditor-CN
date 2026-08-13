@@ -303,6 +303,86 @@ public sealed class FolderProjectHistoryServiceTests
             Times.Never);
     }
 
+    [Test]
+    public void Initialize_IncludesSummaryWithoutReadingDetailedChanges()
+    {
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "Initial folder project commit",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            []);
+        versionControl.Setup(item => item.Initialize(
+                "project",
+                It.IsAny<FolderProjectGitIdentity>(),
+                "master",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(commit);
+        versionControl.Setup(item => item.GetCommitChangeSummary(
+                "project",
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(1, 2, 3, 4, 5));
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var restorePoint = service.Initialize("project");
+
+        Assert.That(
+            restorePoint.ChangeSummary,
+            Is.EqualTo(new FolderProjectRestorePointChangeSummary(
+                1,
+                2,
+                3,
+                4,
+                5)));
+        versionControl.Verify(item => item.GetCommitChanges(
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Never);
+    }
+
+    [Test]
+    public void CreateRestorePoint_IncludesSummaryWithoutReadingDetailedChanges()
+    {
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "记录当前状态",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            [new string('0', 40)]);
+        versionControl.Setup(item => item.CommitAll(
+                "project",
+                "记录当前状态"))
+            .Returns(commit);
+        versionControl.Setup(item => item.GetCommitChangeSummary(
+                "project",
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(1, 2, 3, 4, 5));
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var restorePoint = service.CreateRestorePoint(
+            "project",
+            "记录当前状态");
+
+        Assert.That(
+            restorePoint.ChangeSummary,
+            Is.EqualTo(new FolderProjectRestorePointChangeSummary(
+                1,
+                2,
+                3,
+                4,
+                5)));
+        versionControl.Verify(item => item.GetCommitChanges(
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Never);
+    }
+
     private sealed class TemporaryProject : IDisposable
     {
         public string Root { get; } = Path.Combine(
