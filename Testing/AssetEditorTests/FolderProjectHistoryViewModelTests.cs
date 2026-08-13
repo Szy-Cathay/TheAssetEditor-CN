@@ -521,12 +521,11 @@ public class FolderProjectHistoryViewModelTests
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns([change]);
         var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
-        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
                 project.ProjectRoot,
                 It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
                 It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
-                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
-                false))
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>()))
             .ThrowsAsync(new FolderProjectGitHostException(
                 "rollback failed",
                 new IOException("rollback failed")));
@@ -547,12 +546,11 @@ public class FolderProjectHistoryViewModelTests
 
         await viewModel.RestoreFileCommand.ExecuteAsync(null);
 
-        coordinator.Verify(item => item.ExecuteTransactionalAsync(
+        coordinator.Verify(item => item.ExecuteInPlaceTransactionalAsync(
             project.ProjectRoot,
             It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
             It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
-            It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
-            false), Times.Once);
+            It.IsAny<Action<FolderProjectFileRestoreOperation>>()), Times.Once);
         dialogs.Verify(item => item.ShowExceptionWindow(
             It.IsAny<FolderProjectGitHostException>(),
             It.IsAny<string>()), Times.Once);
@@ -589,16 +587,15 @@ public class FolderProjectHistoryViewModelTests
                 It.IsAny<string>()))
             .Returns(ShowMessageBoxResult.OK);
         var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
-        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
                 project.ProjectRoot,
                 It.IsAny<Func<FolderProjectDiscardResult>>(),
                 It.IsAny<Action<FolderProjectDiscardResult>>(),
-                It.IsAny<Action<FolderProjectDiscardResult>>(),
-                false))
+                It.IsAny<Action<FolderProjectDiscardResult>>()))
             .Returns<string, Func<FolderProjectDiscardResult>,
                 Action<FolderProjectDiscardResult>,
-                Action<FolderProjectDiscardResult>, bool>(
-                (_, operation, _, rollback, _) =>
+                Action<FolderProjectDiscardResult>>(
+                (_, operation, _, rollback) =>
                 {
                     var result = operation();
                     rollback(result);
@@ -898,27 +895,25 @@ public class FolderProjectHistoryViewModelTests
         CreateImmediateCoordinator()
     {
         var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
-        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
                 It.IsAny<string>(),
                 It.IsAny<Func<FolderProjectFileRestoreOperation>>(),
                 It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
-                It.IsAny<Action<FolderProjectFileRestoreOperation>>(),
-                false))
+                It.IsAny<Action<FolderProjectFileRestoreOperation>>()))
             .Returns<string, Func<FolderProjectFileRestoreOperation>,
                 Action<FolderProjectFileRestoreOperation>,
-                Action<FolderProjectFileRestoreOperation>, bool>(
-                (_, operation, complete, rollback, _) =>
+                Action<FolderProjectFileRestoreOperation>>(
+                (_, operation, complete, rollback) =>
                     ExecuteImmediate(operation, complete, rollback));
-        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
                 It.IsAny<string>(),
                 It.IsAny<Func<FolderProjectDiscardResult>>(),
                 It.IsAny<Action<FolderProjectDiscardResult>>(),
-                It.IsAny<Action<FolderProjectDiscardResult>>(),
-                false))
+                It.IsAny<Action<FolderProjectDiscardResult>>()))
             .Returns<string, Func<FolderProjectDiscardResult>,
                 Action<FolderProjectDiscardResult>,
-                Action<FolderProjectDiscardResult>, bool>(
-                (_, operation, complete, rollback, _) =>
+                Action<FolderProjectDiscardResult>>(
+                (_, operation, complete, rollback) =>
                     ExecuteImmediate(operation, complete, rollback));
         return coordinator.Object;
 

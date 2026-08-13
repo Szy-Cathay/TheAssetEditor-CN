@@ -348,9 +348,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         Action<T> rollback)
     {
         HistorySnapshot? snapshot = null;
-        ReportProgress(new FolderProjectHistoryProgress(
-            FolderProjectHistoryProgressStage.PreparingEditors));
-        await _coordinator.ExecuteTransactionalAsync(
+        await _coordinator.ExecuteInPlaceTransactionalAsync(
             project.ProjectRoot,
             () =>
             {
@@ -361,6 +359,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             },
             result =>
             {
+                project.RefreshFromDisk();
                 ReportProgress(new FolderProjectHistoryProgress(
                     FolderProjectHistoryProgressStage.RefreshingInterface));
                 snapshot = LoadSnapshot(project.ProjectRoot);

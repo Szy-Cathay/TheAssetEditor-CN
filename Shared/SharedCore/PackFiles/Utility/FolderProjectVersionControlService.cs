@@ -413,7 +413,7 @@ public sealed partial class FolderProjectVersionControlService :
         }
     }
 
-    private void TryDeleteFinalizedStagingDirectories(string repositoryPath)
+    private void RetryTransactionStagingCleanup(string repositoryPath)
     {
         try
         {
@@ -1296,7 +1296,7 @@ public sealed partial class FolderProjectVersionControlService :
         }
 
         var repository = new Repository(Path.GetFullPath(projectRoot));
-        TryDeleteFinalizedStagingDirectories(repository.Info.Path);
+        RetryTransactionStagingCleanup(repository.Info.Path);
         return repository;
     }
 

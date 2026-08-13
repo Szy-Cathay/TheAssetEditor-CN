@@ -2684,6 +2684,17 @@ public class FolderProjectGitWorkspaceViewModelTests
             completeOperation(result);
             return Task.FromResult(result);
         }
+
+        public Task<T> ExecuteInPlaceTransactionalAsync<T>(
+            string projectRoot,
+            Func<T> operation,
+            Action<T> completeOperation,
+            Action<T> rollbackOperation)
+        {
+            var result = operation();
+            completeOperation(result);
+            return Task.FromResult(result);
+        }
     }
 
     private sealed class GitTemporaryDirectory : IDisposable

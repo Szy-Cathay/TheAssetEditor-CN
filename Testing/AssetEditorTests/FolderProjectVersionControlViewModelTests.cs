@@ -4220,6 +4220,18 @@ public class FolderProjectVersionControlViewModelTests
             completeOperation(result);
             return result;
         }
+
+        public async Task<T> ExecuteInPlaceTransactionalAsync<T>(
+            string projectRoot,
+            Func<T> operation,
+            Action<T> completeOperation,
+            Action<T> rollbackOperation)
+        {
+            Calls.Add((projectRoot, false));
+            var result = await Task.Run(operation);
+            completeOperation(result);
+            return result;
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable
@@ -4272,6 +4284,13 @@ public class FolderProjectVersionControlViewModelTests
             Action<T> completeOperation,
             Action<T> rollbackOperation,
             bool openWhenComplete = false) =>
+            Task.FromException<T>(exception);
+
+        public Task<T> ExecuteInPlaceTransactionalAsync<T>(
+            string projectRoot,
+            Func<T> operation,
+            Action<T> completeOperation,
+            Action<T> rollbackOperation) =>
             Task.FromException<T>(exception);
     }
 }

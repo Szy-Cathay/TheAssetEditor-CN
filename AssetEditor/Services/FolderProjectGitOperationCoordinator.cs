@@ -31,6 +31,12 @@ public interface IFolderProjectGitOperationCoordinator
         Action<T> completeOperation,
         Action<T> rollbackOperation,
         bool openWhenComplete = false);
+
+    Task<T> ExecuteInPlaceTransactionalAsync<T>(
+        string projectRoot,
+        Func<T> operation,
+        Action<T> completeOperation,
+        Action<T> rollbackOperation);
 }
 
 public sealed class FolderProjectGitOperationCanceledException :
@@ -310,6 +316,88 @@ public sealed class FolderProjectGitOperationCoordinator :
         finally
         {
             rootGate.Release();
+        }
+    }
+
+    public async Task<T> ExecuteInPlaceTransactionalAsync<T>(
+        string projectRoot,
+        Func<T> operation,
+        Action<T> completeOperation,
+        Action<T> rollbackOperation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(completeOperation);
+        ArgumentNullException.ThrowIfNull(rollbackOperation);
+        var normalizedRoot = NormalizeProjectRoot(projectRoot);
+        var rootGate = _rootGates.GetOrAdd(
+            normalizedRoot,
+            _ => new SemaphoreSlim(1, 1));
+
+        await rootGate.WaitAsync();
+        try
+        {
+            var result = await Task.Run(operation);
+            try
+            {
+                await Task.Run(() => completeOperation(result));
+                return result;
+            }
+            catch (Exception operationFailure)
+            {
+                try
+                {
+                    await Task.Run(() => rollbackOperation(result));
+                    var loadedProject = FindLoadedProject(normalizedRoot);
+                    if (loadedProject != null)
+                        await Task.Run(loadedProject.RefreshFromDisk);
+                }
+                catch (Exception recoveryFailure)
+                {
+                    var isolationFailure = IsolateLoadedProject(
+                        normalizedRoot);
+                    throw new FolderProjectGitHostException(
+                        "The folder project was isolated after rollback failed.",
+                        isolationFailure == null
+                            ? recoveryFailure
+                            : new AggregateException(
+                                recoveryFailure,
+                                isolationFailure),
+                        operationFailure);
+                }
+
+                ExceptionDispatchInfo.Capture(operationFailure).Throw();
+                throw new InvalidOperationException();
+            }
+        }
+        finally
+        {
+            rootGate.Release();
+        }
+    }
+
+    private Exception? IsolateLoadedProject(string projectRoot)
+    {
+        var loadedProject = FindLoadedProject(projectRoot);
+        if (loadedProject == null)
+            return null;
+
+        try
+        {
+            _pendingReattach.TryRemove(projectRoot, out _);
+            if (ReferenceEquals(
+                    _packFileService.GetEditablePack(),
+                    loadedProject))
+            {
+                _packFileService.SetEditablePack(null);
+            }
+            if (!_packFileService.TryUnloadPackContainer(loadedProject))
+                throw new FolderProjectGitOperationCanceledException();
+            _pendingReattach.TryRemove(projectRoot, out _);
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
         }
     }
 
