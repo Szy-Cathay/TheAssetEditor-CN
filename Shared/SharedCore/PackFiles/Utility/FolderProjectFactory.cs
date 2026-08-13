@@ -48,7 +48,7 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
     {
         return FolderProjectContainer.Open(
             projectRoot,
-            saveNormalizedSettings: false);
+            mutateDisk: false);
     }
 
     public FolderProjectContainer ImportPack(

@@ -112,6 +112,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         RestorePointDescription = _localization.Get(
             "FolderProject.History.DefaultDescription");
         ClearDisplayedState();
+        IsRecoveryRequired = true;
         NotifyCommands();
     }
 

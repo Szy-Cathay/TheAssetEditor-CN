@@ -52,6 +52,7 @@ public sealed class FolderProjectContainer :
     private long _revision;
     private FolderProjectReconciledEventArgs?
         _pendingWatcherReconciliation;
+    private readonly bool _normalizeDiskDuringReconciliation;
     private bool _disposed;
 
     internal Func<string, IEnumerable<string>> EnumerateFileSystemEntries
@@ -92,9 +93,12 @@ public sealed class FolderProjectContainer :
 
     private FolderProjectContainer(
         string projectRoot,
-        FolderProjectSettings settings)
+        FolderProjectSettings settings,
+        bool normalizeDiskDuringReconciliation)
         : base(GetProjectName(projectRoot, settings))
     {
+        _normalizeDiskDuringReconciliation =
+            normalizeDiskDuringReconciliation;
         SystemFilePath = Path.TrimEndingDirectorySeparator(
             Path.GetFullPath(projectRoot));
         ProjectSettings = settings;
@@ -124,19 +128,20 @@ public sealed class FolderProjectContainer :
 
         var container = new FolderProjectContainer(
             projectRoot,
-            settings);
+            settings,
+            normalizeDiskDuringReconciliation: true);
         container.RefreshFromDisk();
         return container;
     }
 
     public static FolderProjectContainer Open(string projectRoot)
     {
-        return Open(projectRoot, saveNormalizedSettings: true);
+        return Open(projectRoot, mutateDisk: true);
     }
 
     internal static FolderProjectContainer Open(
         string projectRoot,
-        bool saveNormalizedSettings)
+        bool mutateDisk)
     {
         ValidateRoot(projectRoot);
         var settings = FolderProjectSettings.Load(
@@ -148,18 +153,22 @@ public sealed class FolderProjectContainer :
             previousName,
             settings.Name,
             StringComparison.Ordinal);
-        requiresSave |= RecreateConfiguredEmptyDirectories(
-            projectRoot,
-            settings);
+        if (mutateDisk)
+        {
+            requiresSave |= RecreateConfiguredEmptyDirectories(
+                projectRoot,
+                settings);
+        }
 
         var container = new FolderProjectContainer(
             projectRoot,
-            settings);
+            settings,
+            normalizeDiskDuringReconciliation: mutateDisk);
         container.EmptyDirectories.UnionWith(
             settings.EmptyDirectories);
         var eventArgs = container.RefreshFromDiskDetailed();
         requiresSave |= eventArgs.DirectoriesChanged;
-        if (requiresSave && saveNormalizedSettings)
+        if (requiresSave && mutateDisk)
             settings.Save(container.ProjectRoot);
 
         return container;
@@ -178,8 +187,11 @@ public sealed class FolderProjectContainer :
         return ExecuteSerializedMutation(
             () =>
             {
-                ExecuteSynchronized(
-                    VirtualizeMaterializedCorruptionDetectionFiles);
+                if (_normalizeDiskDuringReconciliation)
+                {
+                    ExecuteSynchronized(
+                        VirtualizeMaterializedCorruptionDetectionFiles);
+                }
 
             var scannedFiles =
                 new Dictionary<string, PackFile>(

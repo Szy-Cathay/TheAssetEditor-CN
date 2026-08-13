@@ -462,9 +462,12 @@ public sealed class FolderProjectGitOperationCoordinator :
         var rollbackSucceeded = false;
         try
         {
-            _platform.DeleteConfiguredEmptyDirectories(
-                projectRoot,
-                () => RemoveAllConfiguredEmptyDirectories(projectRoot));
+            if (loadedProject != null)
+            {
+                _platform.DeleteConfiguredEmptyDirectories(
+                    projectRoot,
+                    () => RemoveAllConfiguredEmptyDirectories(projectRoot));
+            }
         }
         catch (Exception exception)
         {
@@ -516,7 +519,8 @@ public sealed class FolderProjectGitOperationCoordinator :
         if (reattachState == null)
             return;
 
-        var project = await Task.Run(() => OpenForReattach(projectRoot));
+        var project = await Task.Run(
+            () => OpenForReattach(projectRoot, reattachState));
         Attach(projectRoot, reattachState, project);
     }
 
@@ -562,7 +566,8 @@ public sealed class FolderProjectGitOperationCoordinator :
                 ReferenceEquals(
                     _packFileService.GetEditablePack(),
                     loadedProject),
-                loadedProject.ProjectSettings.EmptyDirectories.ToArray());
+                loadedProject.ProjectSettings.EmptyDirectories.ToArray(),
+                PrepareProjectForOpen: true);
 
             try
             {
@@ -653,7 +658,7 @@ public sealed class FolderProjectGitOperationCoordinator :
             if (reattachState != null)
             {
                 var project = await Task.Run(
-                    () => OpenForReattach(projectRoot));
+                    () => OpenForReattach(projectRoot, reattachState));
                 Attach(projectRoot, reattachState, project);
             }
         }
@@ -721,20 +726,24 @@ public sealed class FolderProjectGitOperationCoordinator :
         return new ReattachState(
             _packFileService.GetAllPackfileContainers().Count,
             true,
-            []);
+            [],
+            PrepareProjectForOpen: false);
     }
 
     private void Reattach(
         string projectRoot,
         ReattachState reattachState)
     {
-        var project = OpenForReattach(projectRoot);
+        var project = OpenForReattach(projectRoot, reattachState);
         Attach(projectRoot, reattachState, project);
     }
 
-    private FolderProjectContainer OpenForReattach(string projectRoot)
+    private FolderProjectContainer OpenForReattach(
+        string projectRoot,
+        ReattachState reattachState)
     {
-        PrepareProjectForOpen(projectRoot);
+        if (reattachState.PrepareProjectForOpen)
+            PrepareProjectForOpen(projectRoot);
         return _folderProjectFactory.Open(projectRoot);
     }
 
@@ -937,7 +946,8 @@ public sealed class FolderProjectGitOperationCoordinator :
     private sealed record ReattachState(
         int InsertionIndex,
         bool WasEditable,
-        IReadOnlyCollection<string> EmptyDirectories);
+        IReadOnlyCollection<string> EmptyDirectories,
+        bool PrepareProjectForOpen);
 
     private sealed record OperationPreparation(
         FolderProjectContainer? LoadedProject,

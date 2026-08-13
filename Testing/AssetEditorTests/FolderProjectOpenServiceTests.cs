@@ -143,6 +143,65 @@ public class FolderProjectOpenServiceTests
     }
 
     [Test]
+    public void Open_LegacyCorruptionDetectionFiles_DoesNotChangeDisk()
+    {
+        using var project = new TemporaryFolderProject();
+        var placeholderPath = Path.Combine(
+            project.Path,
+            "!!!packfile_corruction_detection",
+            "packfile_corruction_detection_1.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(placeholderPath)!);
+        File.WriteAllBytes(placeholderPath, [1, 2, 3]);
+        var settingsPath = Path.Combine(
+            project.Path,
+            FolderProjectSettings.CnFileName);
+        var settingsBytes = File.ReadAllBytes(settingsPath);
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
+        FolderProjectContainer? opened = null;
+        var packFiles = new Mock<IPackFileService>();
+        packFiles.Setup(item => item.TryActivateFolderProject(project.Path))
+            .Returns(false);
+        packFiles.Setup(item => item.AddEditableFolderProject(
+                It.IsAny<FolderProjectContainer>()))
+            .Callback<FolderProjectContainer>(container => opened = container)
+            .Returns<FolderProjectContainer>(container => container);
+        var service = new FolderProjectOpenService(
+            packFiles.Object,
+            new FolderProjectFactory(),
+            history.Object,
+            Mock.Of<IFolderProjectHistoryWindowService>(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            new LocalizationManager());
+
+        try
+        {
+            service.Open(project.Path);
+            opened!.StartWatching();
+            Thread.Sleep(500);
+
+            NUnit.Framework.Assert.Multiple(() =>
+            {
+                NUnit.Framework.Assert.That(
+                    File.ReadAllBytes(placeholderPath),
+                    Is.EqualTo(new byte[] { 1, 2, 3 }));
+                NUnit.Framework.Assert.That(
+                    File.ReadAllBytes(settingsPath),
+                    Is.EqualTo(settingsBytes));
+            });
+        }
+        finally
+        {
+            opened?.Dispose();
+        }
+    }
+
+    [Test]
     public void Open_AlreadyLoadedProject_ActivatesWithoutOpeningAgain()
     {
         using var project = new TemporaryFolderProject();

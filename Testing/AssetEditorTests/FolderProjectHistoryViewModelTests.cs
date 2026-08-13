@@ -167,6 +167,26 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
+    public void OpenRecoveryProject_ImmediatelyHidesNormalHistoryActions()
+    {
+        var viewModel = CreateViewModel(
+            Mock.Of<IFolderProjectHistoryService>());
+
+        viewModel.OpenRecoveryProject(
+            Path.GetFullPath("legacy-project"),
+            "旧工程");
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.IsRecoveryRequired, Is.True);
+            NUnitAssert.That(viewModel.CanRecover, Is.False);
+            NUnitAssert.That(
+                viewModel.RecoverHistoryCommand.CanExecute(null),
+                Is.False);
+        });
+    }
+
+    [Test]
     public async Task RecoverHistory_CancelLeavesRecoveryStateUntouched()
     {
         var projectRoot = Path.GetFullPath("legacy-project");
