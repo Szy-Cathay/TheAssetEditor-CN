@@ -920,7 +920,7 @@
   "GltfImporter.Error.MissingVertexWeights": "蒙皮网格包含没有有效骨骼权重的顶点，已停止导入以避免错误绑骨。",
   "GltfImporter.Error.InvalidTriangleVertex": "模型分段“{0}”的三角形引用了不存在的顶点 {1}，导入已停止。",
   "GltfImporter.Error.UnsupportedPrimitiveType": "模型分段“{0}”使用 RMV2 不支持的 glTF 图元类型 {1}；仅支持三角形、三角形条带和三角扇。",
-  "GltfImporter.Error.BlendMaterials": "以下 glTF BLEND 真半透明材质无法安全转换为 WH3 镂空材质，导入已停止且未写入 Pack：{0}",
+  "GltfImporter.Warning.BlendMaterialsSkipped": "以下 glTF BLEND 真半透明材质无法安全转换；已跳过本次全部材质和贴图，模型、骨架和动画等其他已选内容将继续导入：{0}",
   "GltfImporter.Error.UnsupportedRmvMaterialForAlpha": "目标 RMV2 材质不支持标准 glTF Alpha 模式，已停止导入。",
   "GltfImporter.Material.Unnamed": "未命名材质",
   "GltfImporter.MaterialSummary.Mask": "镂空材质“{0}”：已启用 WH3 Alpha 测试，BaseColour 裁切阈值：{1:0.###}。",

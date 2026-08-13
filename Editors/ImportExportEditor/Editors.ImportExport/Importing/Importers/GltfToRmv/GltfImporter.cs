@@ -203,8 +203,11 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     RmvMeshBuilder.GetMeshSources(modelRoot).Count,
                     modelRoot.LogicalMaterials.Count,
                     modelRoot.LogicalAnimations.Count)));
-            if (settings.ImportMeshes || settings.ImportMaterials)
-                RmvMaterialBuilder.ValidateMaterialModes(modelRoot);
+            var blendMaterialNames = settings.ImportMaterials
+                ? RmvMaterialBuilder.GetBlendMaterialNames(modelRoot)
+                : [];
+            var importMaterials = settings.ImportMaterials &&
+                                  blendMaterialNames.Count == 0;
 
             var skeletonData = GetSkeletonData(settings, modelRoot);
             var humanoidScale = GetHumanoidScale(settings, skeletonData);
@@ -218,7 +221,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
             RmvFile? rmv2File = null;
             var meshSummary = new RmvMeshImportSummary([]);
             IReadOnlyList<RmvMeshBuilder.MeshSource> modelSources = [];
-            if (settings.ImportMeshes || settings.ImportMaterials)
+            if (settings.ImportMeshes || importMaterials)
             {
                 var meshBuildResult = ImportMeshes(
                     settings,
@@ -233,7 +236,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 if (rmv2File == null)
                     throw new InvalidDataException("glTF 场景中没有可导入的网格。");
 
-                if (settings.ImportMaterials)
+                if (importMaterials)
                 {
                     var materialBuildResult = ImportMaterials(
                         settings,
@@ -322,9 +325,17 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                 validation.Files.Count,
                 validation.Files.Count));
 
+            var warnings = BuildMeshWarnings(meshSummary).ToList();
+            if (blendMaterialNames.Count != 0)
+            {
+                warnings.Add(LocalizationManager.Instance.GetFormat(
+                    "GltfImporter.Warning.BlendMaterialsSkipped",
+                    string.Join("、", blendMaterialNames)));
+            }
+
             return ImportResult.Success(
                 validation.Paths,
-                BuildMeshWarnings(meshSummary),
+                warnings,
                 humanoidScale,
                 materialSummary,
                 BuildSourceForwardSummary(settings.SourceForwardDirection));
