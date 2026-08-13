@@ -51,6 +51,16 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         IReadOnlyList<string> relativePaths);
 
+    FolderProjectDiscardRollback BeginDiscardChanges(
+        string projectRoot,
+        IReadOnlyList<string> relativePaths);
+
+    void CompleteDiscardChanges(FolderProjectDiscardRollback rollback);
+
+    void RollbackDiscardChanges(
+        string projectRoot,
+        FolderProjectDiscardRollback rollback);
+
     FolderProjectCommitSummary CommitStaged(
         string projectRoot,
         string message);
@@ -127,11 +137,36 @@ public interface IFolderProjectVersionControlService
         string projectRoot,
         string commitId);
 
+    int GetRestoreImpactCount(
+        string projectRoot,
+        string commitId);
+
     FolderProjectFileRestoreResult RestoreFile(
         string projectRoot,
         string commitId,
         string relativePath,
         bool overwriteWorkingChange = false);
+
+    FolderProjectFileRestoreTransaction BeginRestoreFile(
+        string projectRoot,
+        string commitId,
+        string relativePath,
+        bool overwriteWorkingChange = false);
+
+    void CompleteRestoreFile(FolderProjectFileRestoreTransaction transaction);
+
+    void RollbackRestoreFile(FolderProjectFileRestoreTransaction transaction);
+
+    FolderProjectProjectRestoreResult RestoreProject(
+        string projectRoot,
+        string commitId,
+        string safetyMessage,
+        string restoreMessage,
+        Action<FolderProjectVersionControlProgress> reportProgress);
+
+    void RollbackProjectRestore(
+        string projectRoot,
+        FolderProjectProjectRestoreRollback rollback);
 
     IReadOnlyList<FolderProjectBranchInfo> GetBranches(
         string projectRoot);

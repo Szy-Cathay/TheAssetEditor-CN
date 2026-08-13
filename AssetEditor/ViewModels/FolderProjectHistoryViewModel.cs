@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetEditor.Services;
@@ -20,10 +21,12 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         _unsavedChangesService;
     private readonly IFolderProjectUnsavedChangesPrompt
         _unsavedChangesPrompt;
+    private readonly IFolderProjectGitOperationCoordinator _coordinator;
     private readonly IStandardDialogs _dialogs;
     private readonly LocalizationManager _localization;
     private readonly SynchronizationContext? _synchronizationContext;
     private FolderProjectContainer? _project;
+    private string? _currentRestorePointId;
     private int _selectedRestorePointRequestVersion;
     private int _activeOperationCount;
 
@@ -44,6 +47,10 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     [ObservableProperty] private bool _isOperationProgressIndeterminate = true;
     [ObservableProperty] private FolderProjectRestorePoint?
         _selectedRestorePoint;
+    [ObservableProperty] private FolderProjectRestorePointChange?
+        _selectedRestorePointChange;
+    [ObservableProperty] private FolderProjectUnrecordedChange?
+        _selectedUnrecordedChange;
 
     public ObservableCollection<FolderProjectUnrecordedChange>
         UnrecordedChanges { get; } = [];
@@ -58,12 +65,14 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         IFolderProjectHistoryService historyService,
         IFolderProjectUnsavedChangesService unsavedChangesService,
         IFolderProjectUnsavedChangesPrompt unsavedChangesPrompt,
+        IFolderProjectGitOperationCoordinator coordinator,
         IStandardDialogs dialogs,
         LocalizationManager localization)
     {
         _historyService = historyService;
         _unsavedChangesService = unsavedChangesService;
         _unsavedChangesPrompt = unsavedChangesPrompt;
+        _coordinator = coordinator;
         _dialogs = dialogs;
         _localization = localization;
         _synchronizationContext = SynchronizationContext.Current;
@@ -141,11 +150,209 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             });
     }
 
+    [RelayCommand(CanExecute = nameof(CanRestoreProject))]
+    private async Task RestoreProject()
+    {
+        var project = _project;
+        var restorePoint = SelectedRestorePoint;
+        if (project == null || restorePoint == null)
+            return;
+        int impactCount;
+        try
+        {
+            impactCount = await Task.Run(() =>
+                _historyService.GetRestoreImpactCount(
+                    project.ProjectRoot,
+                    restorePoint.Id));
+        }
+        catch (FolderProjectHistoryException exception)
+        {
+            ShowHistoryError(exception);
+            return;
+        }
+        if (!Confirm(
+                "RestoreProject",
+                restorePoint.Description,
+                impactCount))
+        {
+            return;
+        }
+
+        await RunOperation(
+            async () =>
+            {
+                HistorySnapshot? snapshot = null;
+                ReportProgress(new FolderProjectHistoryProgress(
+                    FolderProjectHistoryProgressStage.PreparingEditors));
+                await _coordinator.ExecuteTransactionalAsync(
+                    project.ProjectRoot,
+                    () =>
+                    {
+                        var result = _historyService.RestoreProject(
+                            project.ProjectRoot,
+                            restorePoint,
+                            ReportProgress);
+                        ReportProgress(new FolderProjectHistoryProgress(
+                            FolderProjectHistoryProgressStage
+                                .ReconcilingProject));
+                        return result;
+                    },
+                    _ =>
+                    {
+                        ReportProgress(new FolderProjectHistoryProgress(
+                            FolderProjectHistoryProgressStage
+                                .RefreshingInterface));
+                        snapshot = LoadSnapshot(project.ProjectRoot);
+                    },
+                    result => _historyService.RollbackProjectRestore(
+                        project.ProjectRoot,
+                        result));
+                return snapshot!;
+            },
+            ApplySnapshot);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRestoreFile))]
+    private async Task RestoreFile()
+    {
+        var project = _project;
+        var restorePoint = SelectedRestorePoint;
+        var change = SelectedRestorePointChange;
+        if (project == null || restorePoint == null || change == null)
+            return;
+        if (!Confirm("RestoreFile", change.Path))
+            return;
+
+        var overwrite = HasUnrecordedChange(change.Path);
+        if (overwrite && !Confirm("RestoreFileOverwrite", change.Path))
+            return;
+
+        await RunOperation(
+            () =>
+            {
+                var operation = _historyService.BeginRestoreFile(
+                    project.ProjectRoot,
+                    change.Kind == FolderProjectRestorePointChangeKind.Deleted
+                        ? restorePoint.PreviousRestorePointId!
+                        : restorePoint.Id,
+                    change.Path,
+                    overwrite);
+                try
+                {
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage
+                            .ReconcilingProject));
+                    project.RefreshFromDisk();
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage
+                            .RefreshingInterface));
+                    var snapshot = LoadSnapshot(project.ProjectRoot);
+                    _historyService.CompleteRestoreFile(operation);
+                    return snapshot;
+                }
+                catch
+                {
+                    _historyService.RollbackRestoreFile(operation);
+                    project.RefreshFromDisk();
+                    throw;
+                }
+            },
+            ApplySnapshot);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardSelected))]
+    private async Task DiscardSelected()
+    {
+        var project = _project;
+        var change = SelectedUnrecordedChange;
+        if (project == null || change == null)
+            return;
+        if (!Confirm("DiscardSelected", change.Path))
+            return;
+
+        await RunOperation(
+            () =>
+            {
+                var result = _historyService.BeginDiscardChanges(
+                    project.ProjectRoot,
+                    [change.Path],
+                    ReportProgress);
+                try
+                {
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage
+                            .ReconcilingProject));
+                    project.RefreshFromDisk();
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage
+                            .RefreshingInterface));
+                    var snapshot = LoadSnapshot(project.ProjectRoot);
+                    _historyService.CompleteDiscardChanges(result);
+                    return snapshot;
+                }
+                catch
+                {
+                    _historyService.RollbackDiscardChanges(
+                        project.ProjectRoot,
+                        result);
+                    project.RefreshFromDisk();
+                    throw;
+                }
+            },
+            ApplySnapshot);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardAll))]
+    private async Task DiscardAll()
+    {
+        var project = _project;
+        if (project == null || UnrecordedChanges.Count == 0)
+            return;
+        if (!Confirm("DiscardAll", UnrecordedChanges.Count))
+            return;
+
+        var paths = UnrecordedChanges.Select(change => change.Path).ToArray();
+        await RunOperation(
+            async () =>
+            {
+                HistorySnapshot? snapshot = null;
+                ReportProgress(new FolderProjectHistoryProgress(
+                    FolderProjectHistoryProgressStage.PreparingEditors));
+                await _coordinator.ExecuteTransactionalAsync(
+                    project.ProjectRoot,
+                    () =>
+                    {
+                        var result = _historyService.BeginDiscardChanges(
+                            project.ProjectRoot,
+                            paths,
+                            ReportProgress);
+                        ReportProgress(new FolderProjectHistoryProgress(
+                            FolderProjectHistoryProgressStage
+                                .ReconcilingProject));
+                        return result;
+                    },
+                    result =>
+                    {
+                        ReportProgress(new FolderProjectHistoryProgress(
+                            FolderProjectHistoryProgressStage
+                                .RefreshingInterface));
+                        snapshot = LoadSnapshot(project.ProjectRoot);
+                        _historyService.CompleteDiscardChanges(result);
+                    },
+                    result => _historyService.RollbackDiscardChanges(
+                        project.ProjectRoot,
+                        result));
+                return snapshot!;
+            },
+            ApplySnapshot);
+    }
+
     partial void OnSelectedRestorePointChanged(
         FolderProjectRestorePoint? value)
     {
         SelectedRestorePointChanges.Clear();
         HasSelectedRestorePointChanges = false;
+        SelectedRestorePointChange = null;
         var requestVersion = ++_selectedRestorePointRequestVersion;
         if (value == null ||
             _project == null)
@@ -159,6 +366,14 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             value,
             requestVersion);
     }
+
+    partial void OnSelectedRestorePointChangeChanged(
+        FolderProjectRestorePointChange? value) =>
+        RestoreFileCommand.NotifyCanExecuteChanged();
+
+    partial void OnSelectedUnrecordedChangeChanged(
+        FolderProjectUnrecordedChange? value) =>
+        DiscardSelectedCommand.NotifyCanExecuteChanged();
 
     private async Task LoadSelectedRestorePointChanges(
         string projectRoot,
@@ -217,6 +432,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     {
         IsReady = snapshot.Status.Availability ==
                   FolderProjectHistoryAvailability.Ready;
+        _currentRestorePointId = snapshot.Status.CurrentRestorePointId;
         AvailabilityText = _localization.Get(
             $"FolderProject.History.Availability.{snapshot.Status.Availability}");
         ReplaceCollection(
@@ -267,6 +483,30 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         }
     }
 
+    private async Task RunOperation<T>(
+        Func<Task<T>> operation,
+        Action<T> applyResult)
+    {
+        BeginOperation();
+        try
+        {
+            var result = await operation();
+            applyResult(result);
+        }
+        catch (FolderProjectHistoryException exception)
+        {
+            ShowHistoryError(exception);
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception);
+        }
+        finally
+        {
+            EndOperation();
+        }
+    }
+
     private void ReportProgress(FolderProjectHistoryProgress progress)
     {
         void Apply()
@@ -295,11 +535,14 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private void ClearDisplayedState()
     {
         IsReady = false;
+        _currentRestorePointId = null;
         AvailabilityText = "";
         UnrecordedChanges.Clear();
         RestorePoints.Clear();
         SelectedRestorePointChanges.Clear();
         SelectedRestorePoint = null;
+        SelectedRestorePointChange = null;
+        SelectedUnrecordedChange = null;
         HasUnrecordedChanges = false;
         HasRestorePoints = false;
         HasSelectedRestorePointChanges = false;
@@ -316,10 +559,35 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         IsReady &&
         !IsBusy;
 
+    private bool CanRestoreProject() =>
+        _project != null && IsReady && !IsBusy &&
+        SelectedRestorePoint != null &&
+        SelectedRestorePoint.Id != _currentRestorePointId;
+
+    private bool CanRestoreFile() =>
+        _project != null && IsReady && !IsBusy &&
+        SelectedRestorePoint != null &&
+        SelectedRestorePointChange != null &&
+        (SelectedRestorePointChange.Kind !=
+             FolderProjectRestorePointChangeKind.Deleted ||
+         SelectedRestorePoint.PreviousRestorePointId != null);
+
+    private bool CanDiscardSelected() =>
+        _project != null && IsReady && !IsBusy &&
+        SelectedUnrecordedChange != null;
+
+    private bool CanDiscardAll() =>
+        _project != null && IsReady && !IsBusy &&
+        UnrecordedChanges.Count != 0;
+
     private void NotifyCommands()
     {
         RefreshCommand.NotifyCanExecuteChanged();
         CreateRestorePointCommand.NotifyCanExecuteChanged();
+        RestoreProjectCommand.NotifyCanExecuteChanged();
+        RestoreFileCommand.NotifyCanExecuteChanged();
+        DiscardSelectedCommand.NotifyCanExecuteChanged();
+        DiscardAllCommand.NotifyCanExecuteChanged();
     }
 
     private void BeginOperation()
@@ -350,6 +618,21 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             exception,
             _localization.Get("FolderProject.History.Error.Unexpected"));
     }
+
+    private bool Confirm(string operation, params object[] arguments) =>
+        _dialogs.ShowYesNoBox(
+            _localization.GetFormat(
+                $"FolderProject.History.Confirm.{operation}",
+                arguments),
+            _localization.Get("FolderProject.History.Confirm.Title")) ==
+        ShowMessageBoxResult.OK;
+
+    private bool HasUnrecordedChange(string path) =>
+        UnrecordedChanges.Any(change =>
+            change.Path.Equals(path, StringComparison.OrdinalIgnoreCase) ||
+            change.PreviousPath?.Equals(
+                path,
+                StringComparison.OrdinalIgnoreCase) == true);
 
     private static void ReplaceCollection<T>(
         ObservableCollection<T> target,

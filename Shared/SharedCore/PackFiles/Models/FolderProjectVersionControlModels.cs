@@ -167,6 +167,38 @@ public sealed record FolderProjectFileRestoreResult(
     string RepositoryPath,
     long Size);
 
+public sealed record FolderProjectFileRestoreTransaction(
+    FolderProjectFileRestoreResult Result,
+    string StagingPath,
+    string TargetPath,
+    string? BackupPath);
+
+public sealed record FolderProjectProjectRestoreResult(
+    FolderProjectCommitSummary RestoreCommit,
+    FolderProjectCommitSummary? SafetyCommit,
+    FolderProjectProjectRestoreRollback Rollback);
+
+public sealed record FolderProjectProjectRestoreRollback(
+    string OriginalCommitId,
+    string RestoreCommitId,
+    string? SafetyCommitId,
+    bool IndexExisted,
+    byte[] IndexBytes,
+    FileAttributes IndexAttributes);
+
+public sealed record FolderProjectDiscardRollback(
+    string StagingPath,
+    IReadOnlyList<FolderProjectDiscardBackup> Backups,
+    IReadOnlyList<string> AffectedPaths,
+    IReadOnlyList<string> CreatedDirectories,
+    bool IndexExisted,
+    byte[] IndexBytes,
+    FileAttributes IndexAttributes);
+
+public sealed record FolderProjectDiscardBackup(
+    string OriginalPath,
+    string StagedPath);
+
 public sealed record FolderProjectCommitEditSession(
     string OriginalCommitId,
     string ExpectedHeadCommitId,

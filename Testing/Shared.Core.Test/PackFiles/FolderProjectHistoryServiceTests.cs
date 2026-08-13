@@ -29,11 +29,20 @@ public sealed class FolderProjectHistoryServiceTests
                 methodNames,
                 Is.EqualTo(new[]
                 {
+                    "BeginDiscardChanges",
+                    "BeginRestoreFile",
+                    "CompleteDiscardChanges",
+                    "CompleteRestoreFile",
                     "CreateRestorePoint",
+                    "GetRestoreImpactCount",
                     "GetRestorePointChanges",
                     "GetRestorePoints",
                     "GetStatus",
                     "Initialize",
+                    "RestoreProject",
+                    "RollbackDiscardChanges",
+                    "RollbackProjectRestore",
+                    "RollbackRestoreFile",
                 }));
             Assert.That(publicContract, Does.Not.Contain("Identity"));
             Assert.That(publicContract, Does.Not.Contain("Branch"));
@@ -258,6 +267,278 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void GetRestoreImpactCount_IncludesHistoryAndUnrecordedDiskChanges()
+    {
+        using var project = new TemporaryProject();
+        var path = Path.Combine(project.Root, "db", "entry.bin");
+        File.WriteAllBytes(path, [1]);
+        var service = CreateService();
+        var target = service.Initialize(project.Root);
+        File.WriteAllBytes(path, [2]);
+        service.CreateRestorePoint(project.Root, "后续状态");
+        File.WriteAllBytes(
+            Path.Combine(project.Root, "db", "unrecorded.bin"),
+            [3]);
+
+        var count = service.GetRestoreImpactCount(project.Root, target.Id);
+
+        Assert.That(count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void RestoreProject_PreservesHistoryAndRecordsSafetyAndRestorePoints()
+    {
+        using var project = new TemporaryProject();
+        var modifiedPath = Path.Combine(project.Root, "db", "modified.bin");
+        var deletedPath = Path.Combine(project.Root, "db", "deleted.bin");
+        var renamedPath = Path.Combine(project.Root, "db", "before.bin");
+        File.WriteAllBytes(modifiedPath, [1]);
+        File.WriteAllBytes(deletedPath, [2]);
+        File.WriteAllBytes(renamedPath, [3]);
+        project.Container.CreateDirectoryOnDisk("empty\\original");
+        var service = CreateService();
+        var target = service.Initialize(project.Root);
+
+        File.WriteAllBytes(modifiedPath, [4]);
+        File.Delete(deletedPath);
+        File.Move(
+            renamedPath,
+            Path.Combine(project.Root, "db", "after.bin"));
+        File.WriteAllBytes(
+            Path.Combine(project.Root, "db", "added.bin"),
+            [5]);
+        Directory.Delete(Path.Combine(project.Root, "empty", "original"));
+        project.Container.EmptyDirectories.Remove("empty\\original");
+        project.Container.ProjectSettings.EmptyDirectories.Remove(
+            "empty\\original");
+        project.Container.SaveSettings();
+        project.Container.CreateDirectoryOnDisk("empty\\later");
+        var later = service.CreateRestorePoint(project.Root, "后续状态");
+
+        File.WriteAllBytes(modifiedPath, [6]);
+        File.WriteAllBytes(
+            Path.Combine(project.Root, "db", "unrecorded.bin"),
+            [7]);
+
+        var result = service.RestoreProject(project.Root, target.Id);
+        var history = service.GetRestorePoints(project.Root);
+        var status = service.GetStatus(project.Root);
+        var settings = FolderProjectSettings.Load(project.Root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.SafetyRestorePoint, Is.Not.Null);
+            Assert.That(
+                result.SafetyRestorePoint!.Description,
+                Does.Contain("恢复前"));
+            Assert.That(result.RestorePoint.Description, Does.Contain("初始还原点"));
+            Assert.That(File.ReadAllBytes(modifiedPath), Is.EqualTo(new byte[] { 1 }));
+            Assert.That(File.ReadAllBytes(deletedPath), Is.EqualTo(new byte[] { 2 }));
+            Assert.That(File.ReadAllBytes(renamedPath), Is.EqualTo(new byte[] { 3 }));
+            Assert.That(
+                File.Exists(Path.Combine(project.Root, "db", "after.bin")),
+                Is.False);
+            Assert.That(
+                File.Exists(Path.Combine(project.Root, "db", "added.bin")),
+                Is.False);
+            Assert.That(
+                File.Exists(Path.Combine(project.Root, "db", "unrecorded.bin")),
+                Is.False);
+            Assert.That(settings.EmptyDirectories, Does.Contain("empty\\original"));
+            Assert.That(settings.EmptyDirectories, Does.Not.Contain("empty\\later"));
+            Assert.That(status.IsClean, Is.True);
+            Assert.That(history[0].Id, Is.EqualTo(result.RestorePoint.Id));
+            Assert.That(history.Select(item => item.Id), Does.Contain(target.Id));
+            Assert.That(history.Select(item => item.Id), Does.Contain(later.Id));
+            Assert.That(later.PreviousRestorePointId, Is.EqualTo(target.Id));
+            Assert.That(
+                history.Select(item => item.Id),
+                Does.Contain(result.SafetyRestorePoint.Id));
+        });
+    }
+
+    [Test]
+    public void RestoreProject_WriteFailureRollsBackDiskHistoryAndIndex()
+    {
+        using var project = new TemporaryProject();
+        var path = Path.Combine(project.Root, "db", "entry.bin");
+        File.WriteAllBytes(path, [1]);
+        var setup = CreateService();
+        var target = setup.Initialize(project.Root);
+        File.WriteAllBytes(path, [2]);
+        setup.CreateRestorePoint(project.Root, "后续状态");
+        File.WriteAllBytes(path, [3]);
+        using (var repository = new Repository(project.Root))
+            Commands.Stage(repository, "db/entry.bin");
+        File.WriteAllBytes(path, [4]);
+        string originalHead;
+        using (var repository = new Repository(project.Root))
+            originalHead = repository.Head.Tip!.Sha;
+        var originalHistory = setup.GetRestorePoints(project.Root)
+            .Select(item => item.Id)
+            .ToArray();
+        var service = new FolderProjectHistoryService(
+            new FolderProjectVersionControlService(
+                new FailFirstRestoreResetPlatform()),
+            LoadLocalization());
+
+        Assert.That(
+            () => service.RestoreProject(project.Root, target.Id),
+            Throws.TypeOf<FolderProjectHistoryException>());
+
+        using var restoredRepository = new Repository(project.Root);
+        var status = restoredRepository.RetrieveStatus();
+        Assert.Multiple(() =>
+        {
+            Assert.That(restoredRepository.Head.Tip!.Sha, Is.EqualTo(originalHead));
+            Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 4 }));
+            Assert.That(
+                status["db/entry.bin"].State.HasFlag(
+                    FileStatus.ModifiedInIndex),
+                Is.True);
+            Assert.That(
+                status["db/entry.bin"].State.HasFlag(
+                    FileStatus.ModifiedInWorkdir),
+                Is.True);
+            Assert.That(
+                service.GetRestorePoints(project.Root).Select(item => item.Id),
+                Is.EqualTo(originalHistory));
+        });
+    }
+
+    [Test]
+    public void RestoreProject_ExplicitRollbackRestoresDirtyDiskHistoryAndIndex()
+    {
+        using var project = new TemporaryProject();
+        var path = Path.Combine(project.Root, "db", "entry.bin");
+        File.WriteAllBytes(path, [1]);
+        var service = CreateService();
+        var target = service.Initialize(project.Root);
+        File.WriteAllBytes(path, [2]);
+        service.CreateRestorePoint(project.Root, "后续状态");
+        File.WriteAllBytes(path, [3]);
+        using (var repository = new Repository(project.Root))
+            Commands.Stage(repository, "db/entry.bin");
+        File.WriteAllBytes(path, [4]);
+        string originalHead;
+        using (var repository = new Repository(project.Root))
+            originalHead = repository.Head.Tip!.Sha;
+
+        var result = service.RestoreProject(project.Root, target.Id);
+        service.RollbackProjectRestore(project.Root, result);
+
+        using var restoredRepository = new Repository(project.Root);
+        var status = restoredRepository.RetrieveStatus();
+        Assert.Multiple(() =>
+        {
+            Assert.That(restoredRepository.Head.Tip!.Sha, Is.EqualTo(originalHead));
+            Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 4 }));
+            Assert.That(status["db/entry.bin"].State.HasFlag(
+                FileStatus.ModifiedInIndex), Is.True);
+            Assert.That(status["db/entry.bin"].State.HasFlag(
+                FileStatus.ModifiedInWorkdir), Is.True);
+        });
+    }
+
+    [Test]
+    public void RestoreFile_FromInitialPointLeavesUnrecordedDiskChange()
+    {
+        using var project = new TemporaryProject();
+        var path = Path.Combine(project.Root, "db", "deleted.bin");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        var service = CreateService();
+        var initial = service.Initialize(project.Root);
+        File.Delete(path);
+        service.CreateRestorePoint(project.Root, "删除文件");
+
+        var operation = service.BeginRestoreFile(
+            project.Root,
+            initial.Id,
+            "db/deleted.bin");
+        service.CompleteRestoreFile(operation);
+
+        var history = service.GetRestorePoints(project.Root);
+        var status = service.GetStatus(project.Root);
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 1, 2, 3 }));
+            Assert.That(history, Has.Count.EqualTo(2));
+            Assert.That(
+                status.UnrecordedChanges,
+                Has.Some.Matches<FolderProjectUnrecordedChange>(change =>
+                    change.Path == "db/deleted.bin" &&
+                    change.Kind.HasFlag(
+                        FolderProjectUnrecordedChangeKind.Added)));
+        });
+    }
+
+    [Test]
+    public void DiscardChanges_RestoresTrackedAndRemovesSelectedUntrackedFile()
+    {
+        using var project = new TemporaryProject();
+        var trackedPath = Path.Combine(project.Root, "db", "tracked.bin");
+        var addedPath = Path.Combine(project.Root, "db", "added.bin");
+        var keptPath = Path.Combine(project.Root, "db", "kept.bin");
+        File.WriteAllBytes(trackedPath, [1]);
+        var service = CreateService();
+        service.Initialize(project.Root);
+        File.WriteAllBytes(trackedPath, [2]);
+        File.WriteAllBytes(addedPath, [3]);
+        File.WriteAllBytes(keptPath, [4]);
+
+        var result = service.BeginDiscardChanges(
+            project.Root,
+            ["db/tracked.bin", "db/added.bin"],
+            _ => { });
+        service.CompleteDiscardChanges(result);
+
+        var status = service.GetStatus(project.Root);
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllBytes(trackedPath), Is.EqualTo(new byte[] { 1 }));
+            Assert.That(File.Exists(addedPath), Is.False);
+            Assert.That(File.ReadAllBytes(keptPath), Is.EqualTo(new byte[] { 4 }));
+            Assert.That(
+                status.UnrecordedChanges.Select(change => change.Path),
+                Is.EqualTo(new[] { "db/kept.bin" }));
+        });
+    }
+
+    [Test]
+    public void DiscardChanges_ExplicitRollbackRestoresFilesAndIndex()
+    {
+        using var project = new TemporaryProject();
+        var trackedPath = Path.Combine(project.Root, "db", "tracked.bin");
+        var addedPath = Path.Combine(project.Root, "db", "added.bin");
+        File.WriteAllBytes(trackedPath, [1]);
+        var service = CreateService();
+        service.Initialize(project.Root);
+        File.WriteAllBytes(trackedPath, [2]);
+        using (var repository = new Repository(project.Root))
+            Commands.Stage(repository, "db/tracked.bin");
+        File.WriteAllBytes(trackedPath, [3]);
+        File.WriteAllBytes(addedPath, [4]);
+
+        var result = service.BeginDiscardChanges(
+            project.Root,
+            ["db/tracked.bin", "db/added.bin"],
+            _ => { });
+        service.RollbackDiscardChanges(project.Root, result);
+
+        using var restoredRepository = new Repository(project.Root);
+        var status = restoredRepository.RetrieveStatus();
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllBytes(trackedPath), Is.EqualTo(new byte[] { 3 }));
+            Assert.That(File.ReadAllBytes(addedPath), Is.EqualTo(new byte[] { 4 }));
+            Assert.That(status["db/tracked.bin"].State.HasFlag(
+                FileStatus.ModifiedInIndex), Is.True);
+            Assert.That(status["db/tracked.bin"].State.HasFlag(
+                FileStatus.ModifiedInWorkdir), Is.True);
+        });
+    }
+
+    [Test]
     public void GetRestorePoints_IncludesSummaryWithoutReadingDetailedChanges()
     {
         var versionControl = new Mock<IFolderProjectVersionControlService>();
@@ -444,5 +725,25 @@ public sealed class FolderProjectHistoryServiceTests
         using var memory = new MemoryStream();
         content.CopyTo(memory);
         return memory.ToArray();
+    }
+
+    private sealed class FailFirstRestoreResetPlatform :
+        FolderProjectVersionControlPlatform
+    {
+        private bool _failed;
+
+        public override void Reset(
+            Repository repository,
+            Commit commit,
+            CheckoutOptions options)
+        {
+            if (!_failed)
+            {
+                _failed = true;
+                throw new IOException("Injected restore write failure.");
+            }
+
+            base.Reset(repository, commit, options);
+        }
     }
 }

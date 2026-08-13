@@ -1,4 +1,5 @@
 ﻿using LibGit2Sharp;
+using System.Runtime.ExceptionServices;
 using Shared.Core.PackFiles.Models;
 
 namespace Shared.Core.PackFiles.Utility;
@@ -12,7 +13,72 @@ public sealed partial class FolderProjectVersionControlService
         Mode.ExecutableFile,
     ];
 
+    public int GetRestoreImpactCount(
+        string projectRoot,
+        string commitId)
+    {
+        var objectId = ParseFullCommitId(commitId);
+        return Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureRestoreStateSupported(repository);
+                var target = LookupCommit(repository, objectId);
+                var current = repository.Head.Tip ??
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitNotFound,
+                        "The repository has no current commit.");
+                var paths = GetTreeChangePaths(
+                    repository,
+                    current.Tree,
+                    target.Tree);
+                foreach (var entry in RetrieveWorkingStatus(repository))
+                {
+                    foreach (var path in GetStatusPaths(entry))
+                        paths.Add(path);
+                }
+                return paths.Count;
+            });
+    }
+
+    private static HashSet<string> GetTreeChangePaths(
+        Repository repository,
+        Tree? oldTree,
+        Tree newTree)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var change in repository.Diff.Compare<TreeChanges>(
+            oldTree!,
+            newTree,
+            new CompareOptions
+            {
+                Similarity = SimilarityOptions.Renames,
+            }).Where(change => change.Status != ChangeKind.Unmodified))
+        {
+            if (!string.IsNullOrWhiteSpace(change.Path))
+                result.Add(change.Path);
+            if (!string.IsNullOrWhiteSpace(change.OldPath))
+                result.Add(change.OldPath);
+        }
+        return result;
+    }
+
     public FolderProjectFileRestoreResult RestoreFile(
+        string projectRoot,
+        string commitId,
+        string relativePath,
+        bool overwriteWorkingChange = false)
+    {
+        var transaction = BeginRestoreFile(
+            projectRoot,
+            commitId,
+            relativePath,
+            overwriteWorkingChange);
+        CompleteRestoreFile(transaction);
+        return transaction.Result;
+    }
+
+    public FolderProjectFileRestoreTransaction BeginRestoreFile(
         string projectRoot,
         string commitId,
         string relativePath,
@@ -30,12 +96,6 @@ public sealed partial class FolderProjectVersionControlService
                 using var repository = OpenRepository(root);
                 EnsureRestoreStateSupported(repository);
                 var commit = LookupCommit(repository, objectId);
-                if (!commit.Parents.Any())
-                {
-                    throw new FolderProjectVersionControlException(
-                        FolderProjectVersionControlError.CommitCannotBeUndone,
-                        "The initial folder project commit is immutable.");
-                }
                 var entry = commit.Tree[repositoryPath];
                 if (entry == null)
                 {
@@ -58,12 +118,304 @@ public sealed partial class FolderProjectVersionControlService
                     repositoryPath,
                     targetPath,
                     overwriteWorkingChange);
-                WriteBlobAtomically(blob, root, repositoryPath, targetPath);
-                return new FolderProjectFileRestoreResult(
-                    commit.Sha,
-                    repositoryPath,
-                    blob.Size);
+                var stagingPath = Path.Combine(
+                    repository.Info.Path,
+                    $"ae-file-restore-{Guid.NewGuid():N}");
+                string? backupPath = null;
+                try
+                {
+                    if (File.Exists(targetPath))
+                    {
+                        Directory.CreateDirectory(stagingPath);
+                        backupPath = Path.Combine(stagingPath, "original.bin");
+                        File.Move(
+                            targetPath,
+                            backupPath,
+                            false);
+                    }
+                    WriteBlobAtomically(
+                        blob,
+                        root,
+                        repositoryPath,
+                        targetPath);
+                }
+                catch (Exception failure)
+                {
+                    var transaction = new FolderProjectFileRestoreTransaction(
+                        new FolderProjectFileRestoreResult(
+                            commit.Sha,
+                            repositoryPath,
+                            blob.Size),
+                        stagingPath,
+                        targetPath,
+                        backupPath);
+                    try
+                    {
+                        if (backupPath != null && File.Exists(backupPath))
+                            RollbackRestoreFile(transaction);
+                        else
+                            CompleteRestoreFile(transaction);
+                    }
+                    catch (Exception rollbackFailure)
+                    {
+                        throw new AggregateException(
+                            "File restore failed and rollback was incomplete.",
+                            failure,
+                            rollbackFailure);
+                    }
+                    throw;
+                }
+                return new FolderProjectFileRestoreTransaction(
+                    new FolderProjectFileRestoreResult(
+                        commit.Sha,
+                        repositoryPath,
+                        blob.Size),
+                    stagingPath,
+                    targetPath,
+                    backupPath);
             });
+    }
+
+    public void CompleteRestoreFile(
+        FolderProjectFileRestoreTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        if (Directory.Exists(transaction.StagingPath))
+            Directory.Delete(transaction.StagingPath, recursive: true);
+    }
+
+    public void RollbackRestoreFile(
+        FolderProjectFileRestoreTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        if (File.Exists(transaction.TargetPath))
+        {
+            File.SetAttributes(transaction.TargetPath, FileAttributes.Normal);
+            _platform.DeleteFile(transaction.TargetPath);
+        }
+        if (transaction.BackupPath != null &&
+            File.Exists(transaction.BackupPath))
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(transaction.TargetPath)!);
+            File.Move(
+                transaction.BackupPath,
+                transaction.TargetPath,
+                overwrite: true);
+        }
+        if (Directory.Exists(transaction.StagingPath))
+            Directory.Delete(transaction.StagingPath, recursive: true);
+    }
+
+    public FolderProjectProjectRestoreResult RestoreProject(
+        string projectRoot,
+        string commitId,
+        string safetyMessage,
+        string restoreMessage,
+        Action<FolderProjectVersionControlProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        if (string.IsNullOrWhiteSpace(safetyMessage) ||
+            string.IsNullOrWhiteSpace(restoreMessage))
+        {
+            throw new FolderProjectVersionControlException(
+                FolderProjectVersionControlError.EmptyCommitMessage,
+                "Restore messages are required.");
+        }
+
+        var objectId = ParseFullCommitId(commitId);
+        return Execute(
+            () =>
+            {
+                var root = Path.GetFullPath(projectRoot);
+                using var repository = OpenRepository(root);
+                EnsureCommitStateSupported(repository);
+                var originalHead = repository.Head.Tip ??
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitNotFound,
+                        "The repository has no current commit.");
+                var target = LookupCommit(repository, objectId);
+                if (!IsAncestor(repository, target, originalHead))
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "The restore point is not in the current project history.");
+                }
+
+                reportProgress(new FolderProjectVersionControlProgress(
+                    FolderProjectVersionControlProgressStage.ReadingHistory));
+                var identity = ReadLocalIdentity(repository);
+                ValidateIdentity(identity);
+                var signature = CreateSignature(identity);
+                var indexSnapshot = GitIndexSnapshot.Capture(
+                    Path.Combine(repository.Info.Path, "index"));
+                Commit? safetyCommit = null;
+                Commit? restoreCommit = null;
+                try
+                {
+                    var status = RetrieveWorkingStatus(repository);
+                    if (status.Any())
+                    {
+                        reportProgress(new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage.IndexingFiles));
+                        Commands.Stage(repository, "*");
+                        safetyCommit = _platform.Commit(
+                            repository,
+                            safetyMessage.Trim(),
+                            signature);
+                    }
+                    else if (target.Id == originalHead.Id)
+                    {
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError.CommitCannotBeUndone,
+                            "The selected restore point is already current.");
+                    }
+
+                    var parent = repository.Head.Tip!;
+                    restoreCommit = repository.ObjectDatabase.CreateCommit(
+                        signature,
+                        signature,
+                        restoreMessage.Trim(),
+                        target.Tree,
+                        [parent],
+                        prettifyMessage: false);
+                    repository.Refs.UpdateTarget(
+                        repository.Refs[repository.Head.CanonicalName],
+                        restoreCommit.Sha);
+                    reportProgress(new FolderProjectVersionControlProgress(
+                        FolderProjectVersionControlProgressStage
+                            .ProcessingWorkingChanges));
+                    _platform.Reset(
+                        repository,
+                        restoreCommit,
+                        new CheckoutOptions
+                        {
+                            CheckoutModifiers = CheckoutModifiers.Force,
+                        });
+                }
+                catch (Exception failure)
+                {
+                    RollBackProjectRestore(
+                        repository,
+                        originalHead,
+                        safetyCommit,
+                        indexSnapshot,
+                        failure);
+                }
+
+                return new FolderProjectProjectRestoreResult(
+                    ToSummary(restoreCommit!),
+                    safetyCommit == null ? null : ToSummary(safetyCommit),
+                    new FolderProjectProjectRestoreRollback(
+                        originalHead.Sha,
+                        restoreCommit!.Sha,
+                        safetyCommit?.Sha,
+                        indexSnapshot.Exists,
+                        indexSnapshot.Bytes,
+                        indexSnapshot.Attributes));
+            });
+    }
+
+    public void RollbackProjectRestore(
+        string projectRoot,
+        FolderProjectProjectRestoreRollback rollback)
+    {
+        ArgumentNullException.ThrowIfNull(rollback);
+        Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureCommitStateSupported(repository);
+                if (repository.Head.Tip?.Sha != rollback.RestoreCommitId)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitCannotBeUndone,
+                        "The completed restore is no longer current.");
+                }
+
+                var original = LookupCommit(
+                    repository,
+                    ParseFullCommitId(rollback.OriginalCommitId));
+                var diskSnapshot = rollback.SafetyCommitId == null
+                    ? original
+                    : LookupCommit(
+                        repository,
+                        ParseFullCommitId(rollback.SafetyCommitId));
+                _platform.Reset(
+                    repository,
+                    diskSnapshot,
+                    new CheckoutOptions
+                    {
+                        CheckoutModifiers = CheckoutModifiers.Force,
+                    });
+                if (diskSnapshot.Id != original.Id)
+                {
+                    repository.Refs.UpdateTarget(
+                        repository.Refs[repository.Head.CanonicalName],
+                        original.Sha);
+                }
+
+                new GitIndexSnapshot(
+                        Path.Combine(repository.Info.Path, "index"),
+                        rollback.IndexExisted,
+                        rollback.IndexBytes,
+                        rollback.IndexAttributes)
+                    .Restore(_platform);
+                return true;
+            });
+    }
+
+    private void RollBackProjectRestore(
+        Repository repository,
+        Commit originalHead,
+        Commit? safetyCommit,
+        GitIndexSnapshot indexSnapshot,
+        Exception failure)
+    {
+        var rollbackFailures = new List<Exception>();
+        if (safetyCommit != null ||
+            repository.Head.Tip?.Sha != originalHead.Sha)
+        {
+            try
+            {
+                var diskSnapshot = safetyCommit ?? originalHead;
+                _platform.Reset(
+                    repository,
+                    diskSnapshot,
+                    new CheckoutOptions
+                    {
+                        CheckoutModifiers = CheckoutModifiers.Force,
+                    });
+                if (diskSnapshot.Id != originalHead.Id)
+                {
+                    repository.Refs.UpdateTarget(
+                        repository.Refs[repository.Head.CanonicalName],
+                        originalHead.Sha);
+                }
+            }
+            catch (Exception exception)
+            {
+                rollbackFailures.Add(exception);
+            }
+        }
+
+        try
+        {
+            indexSnapshot.Restore(_platform);
+        }
+        catch (Exception exception)
+        {
+            rollbackFailures.Add(exception);
+        }
+
+        if (rollbackFailures.Count != 0)
+        {
+            throw new AggregateException(
+                "Project restore failed and rollback was incomplete.",
+                [failure, .. rollbackFailures]);
+        }
+
+        ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     public IReadOnlyList<FolderProjectBranchInfo> GetBranches(
