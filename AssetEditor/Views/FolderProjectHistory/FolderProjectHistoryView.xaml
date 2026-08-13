@@ -4,9 +4,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:AssetEditor.Views.FolderProjectHistory"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui">
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
+    xmlns:valueConverters="clr-namespace:Shared.Ui.Common.ValueConverters;assembly=Shared.Ui">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToCollapsedConverter" />
+        <valueConverters:BoolToVisibilityConverter
+            x:Key="RecoveryHiddenConverter"
+            TrueValue="Collapsed"
+            FalseValue="Visible" />
         <local:HistoryChangeKindConverter x:Key="HistoryChangeKindConverter" />
     </UserControl.Resources>
 
@@ -34,12 +39,14 @@
                         Margin="8,0,0,0"
                         Command="{Binding RefreshCommand}"
                         Content="{loc:Loc FolderProject.History.Refresh}"
-                        Style="{StaticResource AeButton.Quiet}" />
+                        Style="{StaticResource AeButton.Quiet}"
+                        Visibility="{Binding IsRecoveryRequired, Converter={StaticResource RecoveryHiddenConverter}}" />
                 </Grid>
 
                 <Border
                     Margin="0,0,0,12"
-                    Style="{StaticResource AeFeedback.Notice}">
+                    Style="{StaticResource AeFeedback.Notice}"
+                    Visibility="{Binding IsRecoveryRequired, Converter={StaticResource RecoveryHiddenConverter}}">
                     <TextBlock
                         Text="{loc:Loc FolderProject.History.SameDiskNotice}"
                         TextWrapping="Wrap" />
@@ -67,9 +74,11 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock
-                    Style="{StaticResource AeText.SectionTitle}"
-                    Text="{loc:Loc FolderProject.History.UnrecordedChanges}" />
+                <StackPanel
+                    Visibility="{Binding IsRecoveryRequired, Converter={StaticResource RecoveryHiddenConverter}}">
+                    <TextBlock
+                        Style="{StaticResource AeText.SectionTitle}"
+                        Text="{loc:Loc FolderProject.History.UnrecordedChanges}" />
                 <TextBlock
                     Margin="0,4,0,8"
                     Style="{StaticResource AeText.Caption}"
@@ -199,7 +208,7 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-                <Grid Margin="0,8,0,0">
+                    <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -214,7 +223,8 @@
                         Command="{Binding RestoreProjectCommand}"
                         Content="{loc:Loc FolderProject.History.RestoreProject}"
                         Style="{StaticResource AeButton.Danger}" />
-                </Grid>
+                    </Grid>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
 

@@ -90,8 +90,6 @@ public sealed class FolderProjectOpenService(
                 project.ProjectSettings.PackFileVersion =
                     game.PackFileVersion;
             }
-            project.SaveSettings();
-
             if (packFileService.AddEditableFolderProject(project) == null)
                 project.Dispose();
         }

@@ -95,6 +95,54 @@ public class FolderProjectOpenServiceTests
     }
 
     [Test]
+    public void Open_LegacyCnSettings_DoesNotRewriteSettingsFile()
+    {
+        using var project = new TemporaryFolderProject();
+        var settingsPath = Path.Combine(
+            project.Path,
+            FolderProjectSettings.CnFileName);
+        File.WriteAllText(
+            settingsPath,
+            "{\r\n  \"Name\": \"旧工程\"\r\n}\r\n");
+        var originalBytes = File.ReadAllBytes(settingsPath);
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
+        FolderProjectContainer? opened = null;
+        var packFiles = new Mock<IPackFileService>();
+        packFiles.Setup(item => item.TryActivateFolderProject(project.Path))
+            .Returns(false);
+        packFiles.Setup(item => item.AddEditableFolderProject(
+                It.IsAny<FolderProjectContainer>()))
+            .Callback<FolderProjectContainer>(container => opened = container)
+            .Returns<FolderProjectContainer>(container => container);
+        var service = new FolderProjectOpenService(
+            packFiles.Object,
+            new FolderProjectFactory(),
+            history.Object,
+            Mock.Of<IFolderProjectHistoryWindowService>(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(),
+            new LocalizationManager());
+
+        try
+        {
+            service.Open(project.Path);
+
+            NUnit.Framework.Assert.That(
+                File.ReadAllBytes(settingsPath),
+                Is.EqualTo(originalBytes));
+        }
+        finally
+        {
+            opened?.Dispose();
+        }
+    }
+
+    [Test]
     public void Open_AlreadyLoadedProject_ActivatesWithoutOpeningAgain()
     {
         using var project = new TemporaryFolderProject();

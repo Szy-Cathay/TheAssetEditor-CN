@@ -720,7 +720,7 @@ public sealed class FolderProjectGitOperationCoordinator :
 
         return new ReattachState(
             _packFileService.GetAllPackfileContainers().Count,
-            false,
+            true,
             []);
     }
 

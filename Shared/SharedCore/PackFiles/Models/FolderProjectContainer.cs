@@ -131,6 +131,13 @@ public sealed class FolderProjectContainer :
 
     public static FolderProjectContainer Open(string projectRoot)
     {
+        return Open(projectRoot, saveNormalizedSettings: true);
+    }
+
+    internal static FolderProjectContainer Open(
+        string projectRoot,
+        bool saveNormalizedSettings)
+    {
         ValidateRoot(projectRoot);
         var settings = FolderProjectSettings.Load(
             projectRoot,
@@ -152,7 +159,7 @@ public sealed class FolderProjectContainer :
             settings.EmptyDirectories);
         var eventArgs = container.RefreshFromDiskDetailed();
         requiresSave |= eventArgs.DirectoriesChanged;
-        if (requiresSave)
+        if (requiresSave && saveNormalizedSettings)
             settings.Save(container.ProjectRoot);
 
         return container;

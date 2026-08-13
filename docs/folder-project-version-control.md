@@ -11,7 +11,7 @@
 - 文件夹工程是磁盘支持的 Mod 工程，也是唯一面向用户的可编辑工作区；普通 Pack 不能成为用户工作区。
 - 普通 Pack 只作为导入来源、只读参考或工程生成的输出。参考 Pack 的复制目标始终是当前文件夹工程，没有活动工程时写入类操作必须禁用并给出中文原因。
 - 工程必须拥有普通目录形式的本地 `.git` 作为工程历史的当前存储实现；不支持 linked worktree、submodule、bare repository 或远端协作。普通用户界面不得要求用户理解或配置 Git。
-- 当前配置文件是 `aeproject.cn.json`。可读取 `aeproject.json` 与 `project_ignore.json` 以迁移，但只写回国区版配置。
+- 当前配置文件是 `aeproject.cn.json`。可只读加载 `aeproject.json` 与 `project_ignore.json`；配置迁移必须是另一个明确获准的写入动作，且只能写回国区版配置。
 - 输出 Pack 必须位于工程根目录之外。
 - 工程资源只接受 `FolderProjectPathPolicy` 验证后的相对路径；控制文件、Git 元数据、重解析点逃逸、Windows 保留名和尾随点/空格不是资源。
 - 底层仓库不跟踪空目录；空目录由 `aeproject.cn.json` 的 `EmptyDirectories` 保存和恢复，并随还原点记录配置文件。
@@ -61,7 +61,7 @@
 
 同一路径可以同时存在 staged 与 unstaged 底层差异；工程历史状态必须合并成一项“未记录修改”，创建还原点时必须记录两段合并后的最终磁盘内容，不能因隐藏 index 而漏记。
 
-旧版 AE-CN 建立的普通本地仓库可以直接打开。打开、刷新、查看和退出只读取当前历史状态，不切换当前历史线，也不改写额外历史线、储藏、标签或其他引用；当前历史线名称不是 `master` 时仍按它原本的位置继续记录。未完成操作、冲突、游离历史、占用锁和不可读文件都必须阻止创建还原点、恢复和放弃修改。工程历史界面只显示中文原因和单一的“保留当前文件并恢复工程”入口，不暴露高级对象。
+旧版 AE-CN 建立的普通本地仓库可以直接打开。打开、刷新、查看和退出只读取当前配置与历史状态，不规范化写回配置，不切换当前历史线，也不改写额外历史线、储藏、标签或其他引用；当前历史线名称不是 `master` 时仍按它原本的位置继续记录。未完成操作、冲突、游离历史、占用锁和不可读文件都必须阻止创建还原点、恢复和放弃修改。工程历史界面只显示中文原因和单一的“保留当前文件并恢复工程”入口，不暴露高级对象。
 
 异常恢复支持保留外部合并或其他未完成操作留下的磁盘内容，并清理可安全退出的底层操作状态；游离历史会优先接回指向同一还原点的现有本地历史线，没有时创建一条内部恢复线。占用锁和不可读文件必须先由用户解除，linked worktree、submodule 和 bare repository 仍不支持。底层操作若不能被安全退出，恢复必须回滚 index、HEAD 和操作标记并继续保持门禁，不能假装恢复成功。
 
@@ -73,7 +73,7 @@
 | 当前工程、参考 Pack 角色与只读门禁 | `Shared/SharedCore/PackFiles/IPackFileService.cs`、`PackFileService.cs` |
 | 最近工程与最近参考 Pack | `AssetEditor/Services/RecentFilesTracker.cs`、`AssetEditor/ViewModels/MenuBarViewModel.cs` |
 | 磁盘资源树、空目录、watcher、指纹与对账 | `Shared/SharedCore/PackFiles/Models/FolderProjectContainer.cs` |
-| 配置读取、旧配置迁移与规范化 | `Shared/SharedCore/PackFiles/Models/FolderProjectSettings.cs` |
+| 配置读取、显式迁移与规范化 | `Shared/SharedCore/PackFiles/Models/FolderProjectSettings.cs` |
 | 路径、元数据、重解析点和输出位置安全 | `Shared/SharedCore/PackFiles/Utility/FolderProjectPathPolicy.cs` |
 | 仓库初始化、二进制属性与临时文件忽略 | `Shared/SharedCore/PackFiles/Utility/FolderProjectGitRepository.cs` |
 | 普通工程历史窄接口、状态与还原点映射 | `Shared/SharedCore/PackFiles/Utility/FolderProjectHistoryService.cs`、`FolderProjectHistoryModels.cs` |

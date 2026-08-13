@@ -282,6 +282,42 @@ public sealed class FolderProjectLegacyRepositoryRecoveryTests
     }
 
     [Test]
+    public void RecoveryTransaction_RollbackRestoresMergeMetadataAndIndex()
+    {
+        using var project = new TemporaryDirectory(
+            "legacy-recovery-host-failure");
+        var service = new FolderProjectVersionControlService();
+        var trackedPath = Path.Combine(project.Path, "tracked.txt");
+        File.WriteAllText(trackedPath, "one");
+        var initial = service.Initialize(project.Path, s_identity);
+        File.WriteAllText(trackedPath, "staged");
+        service.StageChanges(project.Path, ["tracked.txt"]);
+        File.WriteAllText(trackedPath, "working");
+        var mergeHeadPath = Path.Combine(project.Path, ".git", "MERGE_HEAD");
+        File.WriteAllText(mergeHeadPath, initial.Id + "\n");
+        var indexPath = Path.Combine(project.Path, ".git", "index");
+        var indexBytes = File.ReadAllBytes(indexPath);
+
+        var transaction = service.BeginRecoverToSafeState(project.Path);
+        service.RollbackRecoverToSafeState(transaction);
+
+        using var reopened = new Repository(project.Path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                reopened.Info.CurrentOperation,
+                Is.EqualTo(CurrentOperation.Merge));
+            Assert.That(
+                File.ReadAllText(mergeHeadPath),
+                Is.EqualTo(initial.Id + "\n"));
+            Assert.That(
+                File.ReadAllBytes(indexPath),
+                Is.EqualTo(indexBytes));
+            Assert.That(File.ReadAllText(trackedPath), Is.EqualTo("working"));
+        });
+    }
+
+    [Test]
     public void RecoverToSafeState_WhenBranchCreationFails_RemovesCreatedReference()
     {
         using var project = new TemporaryDirectory(

@@ -46,7 +46,9 @@ public sealed class FolderProjectFactory : IFolderProjectFactory
 
     public FolderProjectContainer Open(string projectRoot)
     {
-        return FolderProjectContainer.Open(projectRoot);
+        return FolderProjectContainer.Open(
+            projectRoot,
+            saveNormalizedSettings: false);
     }
 
     public FolderProjectContainer ImportPack(

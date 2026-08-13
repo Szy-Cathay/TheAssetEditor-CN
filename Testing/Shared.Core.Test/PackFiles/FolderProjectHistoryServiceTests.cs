@@ -30,8 +30,10 @@ public sealed class FolderProjectHistoryServiceTests
                 Is.EqualTo(new[]
                 {
                     "BeginDiscardChanges",
+                    "BeginRecoverToSafeState",
                     "BeginRestoreFile",
                     "CompleteDiscardChanges",
+                    "CompleteRecoverToSafeState",
                     "CompleteRestoreFile",
                     "CreateRestorePoint",
                     "GetRestoreImpactCount",
@@ -43,6 +45,7 @@ public sealed class FolderProjectHistoryServiceTests
                     "RestoreProject",
                     "RollbackDiscardChanges",
                     "RollbackProjectRestore",
+                    "RollbackRecoverToSafeState",
                     "RollbackRestoreFile",
                 }));
             Assert.That(publicContract, Does.Not.Contain("Identity"));

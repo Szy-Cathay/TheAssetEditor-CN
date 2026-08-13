@@ -112,6 +112,10 @@ public sealed record FolderProjectRestoreResult(
 public sealed record FolderProjectDiscardResult(
     FolderProjectDiscardRollback Rollback);
 
+public sealed record FolderProjectRecoveryOperation(
+    FolderProjectHistoryStatus Status,
+    FolderProjectRecoveryTransaction Transaction);
+
 public sealed record FolderProjectFileRestoreOperation(
     FolderProjectFileRestoreResult Result,
     FolderProjectFileRestoreTransaction Transaction);

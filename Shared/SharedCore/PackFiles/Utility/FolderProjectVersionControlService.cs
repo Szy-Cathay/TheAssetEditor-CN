@@ -21,6 +21,15 @@ public interface IFolderProjectVersionControlService
 
     FolderProjectRepositoryStatus RecoverToSafeState(string projectRoot);
 
+    FolderProjectRecoveryTransaction BeginRecoverToSafeState(
+        string projectRoot);
+
+    void CompleteRecoverToSafeState(
+        FolderProjectRecoveryTransaction transaction);
+
+    void RollbackRecoverToSafeState(
+        FolderProjectRecoveryTransaction transaction);
+
     FolderProjectCommitSummary Initialize(
         string projectRoot,
         FolderProjectGitIdentity identity,

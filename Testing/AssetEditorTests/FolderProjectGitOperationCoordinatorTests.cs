@@ -211,9 +211,15 @@ public class FolderProjectGitOperationCoordinatorTests
 
         try
         {
-            NUnitAssert.That(
-                packFileService.GetAllPackfileContainers(),
-                Is.EqualTo(new PackFileContainer[] { opened! }));
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    packFileService.GetAllPackfileContainers(),
+                    Is.EqualTo(new PackFileContainer[] { opened! }));
+                NUnitAssert.That(
+                    packFileService.GetEditablePack(),
+                    Is.SameAs(opened));
+            });
         }
         finally
         {

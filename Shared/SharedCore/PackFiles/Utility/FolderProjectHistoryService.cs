@@ -15,6 +15,16 @@ public interface IFolderProjectHistoryService
         string projectRoot,
         Action<FolderProjectHistoryProgress> reportProgress);
 
+    FolderProjectRecoveryOperation BeginRecoverToSafeState(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress);
+
+    void CompleteRecoverToSafeState(
+        FolderProjectRecoveryOperation operation);
+
+    void RollbackRecoverToSafeState(
+        FolderProjectRecoveryOperation operation);
+
     FolderProjectRestorePoint Initialize(string projectRoot);
 
     FolderProjectRestorePoint Initialize(
@@ -138,6 +148,49 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
         {
             return MapStatus(
                 _versionControl.RecoverToSafeState(projectRoot));
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectRecoveryOperation BeginRecoverToSafeState(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        reportProgress(new FolderProjectHistoryProgress(
+            FolderProjectHistoryProgressStage.RecoveringHistory));
+        try
+        {
+            var transaction = _versionControl.BeginRecoverToSafeState(
+                projectRoot);
+            return new FolderProjectRecoveryOperation(
+                MapStatus(transaction.Status),
+                transaction);
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public void CompleteRecoverToSafeState(
+        FolderProjectRecoveryOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        _versionControl.CompleteRecoverToSafeState(operation.Transaction);
+    }
+
+    public void RollbackRecoverToSafeState(
+        FolderProjectRecoveryOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        try
+        {
+            _versionControl.RollbackRecoverToSafeState(
+                operation.Transaction);
         }
         catch (FolderProjectVersionControlException exception)
         {

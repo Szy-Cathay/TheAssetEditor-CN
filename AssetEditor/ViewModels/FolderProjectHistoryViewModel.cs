@@ -137,11 +137,13 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         await RunOperation(
             async () =>
             {
-                await _coordinator.ExecuteAsync(
+                await _coordinator.ExecuteTransactionalAsync(
                     projectRoot,
-                    () => _historyService.RecoverToSafeState(
+                    () => _historyService.BeginRecoverToSafeState(
                         projectRoot,
                         ReportProgress),
+                    _historyService.CompleteRecoverToSafeState,
+                    _historyService.RollbackRecoverToSafeState,
                     openWhenComplete: true);
                 return LoadSnapshot(projectRoot);
             },

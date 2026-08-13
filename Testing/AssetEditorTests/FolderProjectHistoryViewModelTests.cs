@@ -101,10 +101,13 @@ public class FolderProjectHistoryViewModelTests
                 100,
                 It.IsAny<Action<FolderProjectHistoryProgress>>() ))
             .Returns([]);
-        history.Setup(item => item.RecoverToSafeState(
+        var recoveryOperation = new FolderProjectRecoveryOperation(
+            readyStatus,
+            null!);
+        history.Setup(item => item.BeginRecoverToSafeState(
                 projectRoot,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
-            .Returns(readyStatus);
+            .Returns(recoveryOperation);
         var dialogs = new Mock<IStandardDialogs>();
         dialogs.Setup(item => item.ShowYesNoBox(
                 It.Is<string>(message => message.Contains("保留当前磁盘文件")),
@@ -112,12 +115,21 @@ public class FolderProjectHistoryViewModelTests
             .Returns(ShowMessageBoxResult.OK);
         var coordinator = new Mock<
             IFolderProjectGitOperationCoordinator>();
-        coordinator.Setup(item => item.ExecuteAsync(
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
                 projectRoot,
-                It.IsAny<Func<FolderProjectHistoryStatus>>(),
+                It.IsAny<Func<FolderProjectRecoveryOperation>>(),
+                It.IsAny<Action<FolderProjectRecoveryOperation>>(),
+                It.IsAny<Action<FolderProjectRecoveryOperation>>(),
                 true))
-            .Returns<string, Func<FolderProjectHistoryStatus>, bool>(
-                (_, operation, _) => Task.FromResult(operation()));
+            .Returns<string, Func<FolderProjectRecoveryOperation>,
+                Action<FolderProjectRecoveryOperation>,
+                Action<FolderProjectRecoveryOperation>, bool>(
+                (_, begin, complete, _, _) =>
+                {
+                    var operation = begin();
+                    complete(operation);
+                    return Task.FromResult(operation);
+                });
         var viewModel = CreateViewModel(
             history.Object,
             dialogs: dialogs.Object,
@@ -149,7 +161,7 @@ public class FolderProjectHistoryViewModelTests
                 Has.One.Property("Path").EqualTo("conflict.txt"));
             NUnitAssert.That(completed, Is.EqualTo(1));
         });
-        history.Verify(item => item.RecoverToSafeState(
+        history.Verify(item => item.BeginRecoverToSafeState(
             projectRoot,
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
     }
@@ -193,9 +205,85 @@ public class FolderProjectHistoryViewModelTests
         await viewModel.RecoverHistoryCommand.ExecuteAsync(null);
 
         NUnitAssert.That(viewModel.IsRecoveryRequired, Is.True);
-        history.Verify(item => item.RecoverToSafeState(
+        history.Verify(item => item.BeginRecoverToSafeState(
             It.IsAny<string>(),
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Never);
+    }
+
+    [Test]
+    public async Task RecoverHistory_ReloadFailureRollsBackAndKeepsRecoveryOpen()
+    {
+        var projectRoot = Path.GetFullPath("legacy-project");
+        var recoveryStatus = new FolderProjectHistoryStatus(
+            FolderProjectHistoryAvailability.RecoveryRequired,
+            "head",
+            [])
+        {
+            RecoveryReason =
+                FolderProjectHistoryRecoveryReason.UnfinishedOperation,
+            CanRecover = true,
+        };
+        var recoveryOperation = new FolderProjectRecoveryOperation(
+            recoveryStatus,
+            null!);
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetStatus(
+                projectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(recoveryStatus);
+        history.Setup(item => item.GetRestorePoints(
+                projectRoot,
+                100,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([]);
+        history.Setup(item => item.BeginRecoverToSafeState(
+                projectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(recoveryOperation);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                projectRoot,
+                It.IsAny<Func<FolderProjectRecoveryOperation>>(),
+                It.IsAny<Action<FolderProjectRecoveryOperation>>(),
+                It.IsAny<Action<FolderProjectRecoveryOperation>>(),
+                true))
+            .Returns<string, Func<FolderProjectRecoveryOperation>,
+                Action<FolderProjectRecoveryOperation>,
+                Action<FolderProjectRecoveryOperation>, bool>(
+                (_, begin, _, rollback, _) =>
+                {
+                    var operation = begin();
+                    rollback(operation);
+                    throw new IOException("Injected reload failure.");
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        var completed = 0;
+        viewModel.RecoveryCompleted += (_, _) => completed++;
+        viewModel.OpenRecoveryProject(projectRoot, "旧工程");
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.RecoverHistoryCommand.ExecuteAsync(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.IsRecoveryRequired, Is.True);
+            NUnitAssert.That(completed, Is.Zero);
+        });
+        history.Verify(item => item.RollbackRecoverToSafeState(
+            recoveryOperation), Times.Once);
+        history.Verify(item => item.CompleteRecoverToSafeState(
+            It.IsAny<FolderProjectRecoveryOperation>()), Times.Never);
+        dialogs.Verify(item => item.ShowExceptionWindow(
+            It.IsAny<IOException>(),
+            It.IsAny<string>()), Times.Once);
     }
 
     [Test]
@@ -1045,8 +1133,12 @@ public class FolderProjectHistoryViewModelTests
                     {
                         NUnitAssert.That(
                             FindDescendants<Button>(view)
+                                .Where(button => button.IsVisible)
                                 .Select(button => button.Content?.ToString()),
-                            Does.Contain("保留当前文件并恢复工程"));
+                            Is.EqualTo(new[]
+                            {
+                                "保留当前文件并恢复工程",
+                            }));
                         NUnitAssert.That(
                             FindDescendants<TextBlock>(view)
                                 .Select(text => text.Text),

@@ -31,12 +31,55 @@ public sealed partial class FolderProjectVersionControlService
     public FolderProjectRepositoryStatus RecoverToSafeState(
         string projectRoot)
     {
+        var transaction = BeginRecoverToSafeState(projectRoot);
+        CompleteRecoverToSafeState(transaction);
+        return transaction.Status;
+    }
+
+    public FolderProjectRecoveryTransaction BeginRecoverToSafeState(
+        string projectRoot)
+    {
         return ExecuteMergeLocked(
             projectRoot,
             RecoverToSafeStateCore);
     }
 
-    private FolderProjectRepositoryStatus RecoverToSafeStateCore(
+    public void CompleteRecoverToSafeState(
+        FolderProjectRecoveryTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        transaction.Complete();
+    }
+
+    public void RollbackRecoverToSafeState(
+        FolderProjectRecoveryTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ExecuteMergeLocked(
+            transaction.ProjectRoot,
+            _ =>
+            {
+                try
+                {
+                    transaction.Rollback();
+                }
+                catch (FolderProjectVersionControlException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.RepositoryFailure,
+                        "The repository recovery could not be rolled back.",
+                        exception,
+                        isRollbackIncomplete: true);
+                }
+                return true;
+            });
+    }
+
+    private FolderProjectRecoveryTransaction RecoverToSafeStateCore(
         string projectRoot)
     {
         RepositoryRecoverySnapshot? snapshot = null;
@@ -85,7 +128,13 @@ public sealed partial class FolderProjectVersionControlService
                 if (!repository.Info.IsHeadDetached &&
                     !needsOperationRecovery)
                 {
-                    return GetStatus(projectRoot, scanUnreadableEntries: true);
+                    var unchangedStatus = GetStatus(
+                        projectRoot,
+                        scanUnreadableEntries: true);
+                    return new FolderProjectRecoveryTransaction(
+                        projectRoot,
+                        unchangedStatus,
+                        () => { });
                 }
 
                 snapshot = RepositoryRecoverySnapshot.Capture(repository);
@@ -135,7 +184,15 @@ public sealed partial class FolderProjectVersionControlService
                 }
             }
 
-            return GetStatus(projectRoot, scanUnreadableEntries: true);
+            var status = GetStatus(projectRoot, scanUnreadableEntries: true);
+            return new FolderProjectRecoveryTransaction(
+                projectRoot,
+                status,
+                () => RestoreRecoverySnapshot(
+                    projectRoot,
+                    snapshot!,
+                    createdBranchReference,
+                    createdBranchTip));
         }
         catch (Exception failure)
         {
@@ -144,9 +201,9 @@ public sealed partial class FolderProjectVersionControlService
 
             try
             {
-                snapshot.Restore(_platform);
-                RemoveCreatedRecoveryBranch(
+                RestoreRecoverySnapshot(
                     projectRoot,
+                    snapshot,
                     createdBranchReference,
                     createdBranchTip);
             }
@@ -161,6 +218,19 @@ public sealed partial class FolderProjectVersionControlService
 
             throw MapRecoveryFailure(failure);
         }
+    }
+
+    private void RestoreRecoverySnapshot(
+        string projectRoot,
+        RepositoryRecoverySnapshot snapshot,
+        string? createdBranchReference,
+        string? createdBranchTip)
+    {
+        snapshot.Restore(_platform);
+        RemoveCreatedRecoveryBranch(
+            projectRoot,
+            createdBranchReference,
+            createdBranchTip);
     }
 
     private Branch CreateRecoveryBranch(
