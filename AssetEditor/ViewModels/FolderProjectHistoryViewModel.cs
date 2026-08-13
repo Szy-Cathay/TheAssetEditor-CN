@@ -237,25 +237,11 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                         : restorePoint.Id,
                     change.Path,
                     overwrite);
-                try
-                {
-                    ReportProgress(new FolderProjectHistoryProgress(
-                        FolderProjectHistoryProgressStage
-                            .ReconcilingProject));
-                    project.RefreshFromDisk();
-                    ReportProgress(new FolderProjectHistoryProgress(
-                        FolderProjectHistoryProgressStage
-                            .RefreshingInterface));
-                    var snapshot = LoadSnapshot(project.ProjectRoot);
-                    _historyService.CompleteRestoreFile(operation);
-                    return snapshot;
-                }
-                catch
-                {
-                    _historyService.RollbackRestoreFile(operation);
-                    project.RefreshFromDisk();
-                    throw;
-                }
+                return CompleteWorkspaceFileOperation(
+                    project,
+                    operation,
+                    _historyService.CompleteRestoreFile,
+                    _historyService.RollbackRestoreFile);
             },
             ApplySnapshot);
     }
@@ -277,27 +263,13 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                     project.ProjectRoot,
                     [change.Path],
                     ReportProgress);
-                try
-                {
-                    ReportProgress(new FolderProjectHistoryProgress(
-                        FolderProjectHistoryProgressStage
-                            .ReconcilingProject));
-                    project.RefreshFromDisk();
-                    ReportProgress(new FolderProjectHistoryProgress(
-                        FolderProjectHistoryProgressStage
-                            .RefreshingInterface));
-                    var snapshot = LoadSnapshot(project.ProjectRoot);
-                    _historyService.CompleteDiscardChanges(result);
-                    return snapshot;
-                }
-                catch
-                {
-                    _historyService.RollbackDiscardChanges(
+                return CompleteWorkspaceFileOperation(
+                    project,
+                    result,
+                    _historyService.CompleteDiscardChanges,
+                    operation => _historyService.RollbackDiscardChanges(
                         project.ProjectRoot,
-                        result);
-                    project.RefreshFromDisk();
-                    throw;
-                }
+                        operation));
             },
             ApplySnapshot);
     }
@@ -311,7 +283,6 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         if (!Confirm("DiscardAll", UnrecordedChanges.Count))
             return;
 
-        var paths = UnrecordedChanges.Select(change => change.Path).ToArray();
         await RunOperation(
             async () =>
             {
@@ -322,6 +293,12 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                     project.ProjectRoot,
                     () =>
                     {
+                        var paths = _historyService.GetStatus(
+                                project.ProjectRoot,
+                                ReportProgress)
+                            .UnrecordedChanges
+                            .Select(change => change.Path)
+                            .ToArray();
                         var result = _historyService.BeginDiscardChanges(
                             project.ProjectRoot,
                             paths,
@@ -345,6 +322,31 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 return snapshot!;
             },
             ApplySnapshot);
+    }
+
+    private HistorySnapshot CompleteWorkspaceFileOperation<T>(
+        FolderProjectContainer project,
+        T operation,
+        Action<T> complete,
+        Action<T> rollback)
+    {
+        try
+        {
+            ReportProgress(new FolderProjectHistoryProgress(
+                FolderProjectHistoryProgressStage.ReconcilingProject));
+            project.RefreshFromDisk();
+            ReportProgress(new FolderProjectHistoryProgress(
+                FolderProjectHistoryProgressStage.RefreshingInterface));
+            var snapshot = LoadSnapshot(project.ProjectRoot);
+            complete(operation);
+            return snapshot;
+        }
+        catch
+        {
+            rollback(operation);
+            project.RefreshFromDisk();
+            throw;
+        }
     }
 
     partial void OnSelectedRestorePointChanged(

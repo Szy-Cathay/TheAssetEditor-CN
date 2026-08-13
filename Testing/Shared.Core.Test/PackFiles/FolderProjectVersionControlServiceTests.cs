@@ -934,6 +934,25 @@ public class FolderProjectVersionControlServiceTests
     }
 
     [Test]
+    public void DiscardChanges_WhenRollbackCleanupFails_RestoresFileAndReportsFailure()
+    {
+        using var project = new TemporaryDirectory(
+            "discard-cleanup-failure");
+        var addedPath = Path.Combine(project.Path, "added.txt");
+        var setupService = new FolderProjectVersionControlService();
+        setupService.Initialize(project.Path, s_identity);
+        File.WriteAllText(addedPath, "new");
+        var service = new FolderProjectVersionControlService(
+            new FailDiscardCleanupPlatform());
+
+        Assert.That(
+            () => service.DiscardChanges(project.Path, ["added.txt"]),
+            Throws.TypeOf<FolderProjectVersionControlException>()
+                .With.InnerException.TypeOf<IOException>());
+        Assert.That(File.ReadAllText(addedPath), Is.EqualTo("new"));
+    }
+
+    [Test]
     public void DiscardChanges_WhenTrackedRestoreMoveFails_RollsBackFilesAndIndex()
     {
         using var project = new TemporaryDirectory(
@@ -3211,6 +3230,13 @@ public class FolderProjectVersionControlServiceTests
 
             base.MoveFile(sourcePath, destinationPath, overwrite);
         }
+    }
+
+    private sealed class FailDiscardCleanupPlatform :
+        FolderProjectVersionControlPlatform
+    {
+        public override void DeleteDirectory(string path) =>
+            throw new IOException("Injected rollback cleanup failure.");
     }
 
     private sealed class PostInitializeUnsafeStatePlatform :

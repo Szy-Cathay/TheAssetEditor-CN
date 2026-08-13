@@ -394,13 +394,13 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
         ArgumentNullException.ThrowIfNull(reportProgress);
         reportProgress(new FolderProjectHistoryProgress(
             FolderProjectHistoryProgressStage.UpdatingHistory));
+        reportProgress(new FolderProjectHistoryProgress(
+            FolderProjectHistoryProgressStage.WritingProjectFiles));
         try
         {
             var rollback = _versionControl.BeginDiscardChanges(
                 projectRoot,
                 relativePaths);
-            reportProgress(new FolderProjectHistoryProgress(
-                FolderProjectHistoryProgressStage.WritingProjectFiles));
             return new FolderProjectDiscardResult(rollback);
         }
         catch (FolderProjectVersionControlException exception)

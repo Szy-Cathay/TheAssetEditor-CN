@@ -74,7 +74,15 @@ public sealed partial class FolderProjectVersionControlService
             commitId,
             relativePath,
             overwriteWorkingChange);
-        CompleteRestoreFile(transaction);
+        try
+        {
+            CompleteRestoreFile(transaction);
+        }
+        catch
+        {
+            RollbackRestoreFile(transaction);
+            throw;
+        }
         return transaction.Result;
     }
 
@@ -181,7 +189,7 @@ public sealed partial class FolderProjectVersionControlService
     {
         ArgumentNullException.ThrowIfNull(transaction);
         if (Directory.Exists(transaction.StagingPath))
-            Directory.Delete(transaction.StagingPath, recursive: true);
+            _platform.DeleteDirectory(transaction.StagingPath);
     }
 
     public void RollbackRestoreFile(
@@ -204,7 +212,7 @@ public sealed partial class FolderProjectVersionControlService
                 overwrite: true);
         }
         if (Directory.Exists(transaction.StagingPath))
-            Directory.Delete(transaction.StagingPath, recursive: true);
+            _platform.DeleteDirectory(transaction.StagingPath);
     }
 
     public FolderProjectProjectRestoreResult RestoreProject(
@@ -295,7 +303,7 @@ public sealed partial class FolderProjectVersionControlService
                 }
                 catch (Exception failure)
                 {
-                    RollBackProjectRestore(
+                    RollbackFailedProjectRestore(
                         repository,
                         originalHead,
                         safetyCommit,
@@ -333,27 +341,10 @@ public sealed partial class FolderProjectVersionControlService
                         "The completed restore is no longer current.");
                 }
 
-                var original = LookupCommit(
+                RestoreProjectState(
                     repository,
-                    ParseFullCommitId(rollback.OriginalCommitId));
-                var diskSnapshot = rollback.SafetyCommitId == null
-                    ? original
-                    : LookupCommit(
-                        repository,
-                        ParseFullCommitId(rollback.SafetyCommitId));
-                _platform.Reset(
-                    repository,
-                    diskSnapshot,
-                    new CheckoutOptions
-                    {
-                        CheckoutModifiers = CheckoutModifiers.Force,
-                    });
-                if (diskSnapshot.Id != original.Id)
-                {
-                    repository.Refs.UpdateTarget(
-                        repository.Refs[repository.Head.CanonicalName],
-                        original.Sha);
-                }
+                    rollback.OriginalCommitId,
+                    rollback.SafetyCommitId);
 
                 new GitIndexSnapshot(
                         Path.Combine(repository.Info.Path, "index"),
@@ -365,7 +356,7 @@ public sealed partial class FolderProjectVersionControlService
             });
     }
 
-    private void RollBackProjectRestore(
+    private void RollbackFailedProjectRestore(
         Repository repository,
         Commit originalHead,
         Commit? safetyCommit,
@@ -378,20 +369,10 @@ public sealed partial class FolderProjectVersionControlService
         {
             try
             {
-                var diskSnapshot = safetyCommit ?? originalHead;
-                _platform.Reset(
+                RestoreProjectState(
                     repository,
-                    diskSnapshot,
-                    new CheckoutOptions
-                    {
-                        CheckoutModifiers = CheckoutModifiers.Force,
-                    });
-                if (diskSnapshot.Id != originalHead.Id)
-                {
-                    repository.Refs.UpdateTarget(
-                        repository.Refs[repository.Head.CanonicalName],
-                        originalHead.Sha);
-                }
+                    originalHead.Sha,
+                    safetyCommit?.Sha);
             }
             catch (Exception exception)
             {
@@ -416,6 +397,34 @@ public sealed partial class FolderProjectVersionControlService
         }
 
         ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private void RestoreProjectState(
+        Repository repository,
+        string originalCommitId,
+        string? diskSnapshotCommitId)
+    {
+        var original = LookupCommit(
+            repository,
+            ParseFullCommitId(originalCommitId));
+        var diskSnapshot = diskSnapshotCommitId == null
+            ? original
+            : LookupCommit(
+                repository,
+                ParseFullCommitId(diskSnapshotCommitId));
+        _platform.Reset(
+            repository,
+            diskSnapshot,
+            new CheckoutOptions
+            {
+                CheckoutModifiers = CheckoutModifiers.Force,
+            });
+        if (diskSnapshot.Id != original.Id)
+        {
+            repository.Refs.UpdateTarget(
+                repository.Refs[repository.Head.CanonicalName],
+                original.Sha);
+        }
     }
 
     public IReadOnlyList<FolderProjectBranchInfo> GetBranches(

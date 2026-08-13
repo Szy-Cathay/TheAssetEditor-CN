@@ -26,7 +26,15 @@ public sealed partial class FolderProjectVersionControlService
         IReadOnlyList<string> relativePaths)
     {
         var rollback = BeginDiscardChanges(projectRoot, relativePaths);
-        CompleteDiscardChanges(rollback);
+        try
+        {
+            CompleteDiscardChanges(rollback);
+        }
+        catch
+        {
+            RollbackDiscardChanges(projectRoot, rollback);
+            throw;
+        }
     }
 
     public FolderProjectDiscardRollback BeginDiscardChanges(
@@ -176,7 +184,7 @@ public sealed partial class FolderProjectVersionControlService
     public void CompleteDiscardChanges(FolderProjectDiscardRollback rollback)
     {
         ArgumentNullException.ThrowIfNull(rollback);
-        TryDeleteDiscardStaging(rollback.StagingPath, rollback.Backups);
+        DeleteDiscardStaging(rollback.StagingPath, rollback.Backups);
     }
 
     public void RollbackDiscardChanges(
@@ -276,37 +284,42 @@ public sealed partial class FolderProjectVersionControlService
                     ? rollbackFailures
                     : [failure, .. rollbackFailures]);
         }
-        TryDeleteDiscardStaging(rollback.StagingPath, rollback.Backups);
+        try
+        {
+            DeleteDiscardStaging(rollback.StagingPath, rollback.Backups);
+        }
+        catch (Exception exception)
+        {
+            if (failure != null)
+            {
+                throw new AggregateException(
+                    "Discard failed and rollback cleanup was incomplete.",
+                    failure,
+                    exception);
+            }
+            throw;
+        }
         if (failure != null)
             ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    private static void TryDeleteDiscardStaging(
+    private void DeleteDiscardStaging(
         string stagingPath,
         IReadOnlyList<FolderProjectDiscardBackup> backups)
     {
         if (!Directory.Exists(stagingPath))
             return;
 
-        try
+        foreach (var backup in backups)
         {
-            foreach (var backup in backups)
+            if (File.Exists(backup.StagedPath))
             {
-                if (File.Exists(backup.StagedPath))
-                {
-                    File.SetAttributes(
-                        backup.StagedPath,
-                        FileAttributes.Normal);
-                }
+                File.SetAttributes(
+                    backup.StagedPath,
+                    FileAttributes.Normal);
             }
-            Directory.Delete(stagingPath, recursive: true);
         }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
+        _platform.DeleteDirectory(stagingPath);
     }
 
     private void RestoreTrackedFilesInParallel(

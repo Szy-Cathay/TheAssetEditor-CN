@@ -15,7 +15,7 @@
 - 输出 Pack 必须位于工程根目录之外。
 - 工程资源只接受 `FolderProjectPathPolicy` 验证后的相对路径；控制文件、Git 元数据、重解析点逃逸、Windows 保留名和尾随点/空格不是资源。
 - 底层仓库不跟踪空目录；空目录由 `aeproject.cn.json` 的 `EmptyDirectories` 保存和恢复，并随还原点记录配置文件。
-- 面向普通流程的 `IFolderProjectHistoryService` 只提供状态、初始化、创建还原点、历史和还原点内容；不提供身份、分支、暂存区、储藏、合并或远端能力。
+- 面向普通流程的 `IFolderProjectHistoryService` 只提供状态、初始化、创建还原点、历史、还原点内容、恢复和放弃未记录修改；不提供身份、分支、暂存区、储藏、合并或远端能力。
 - `IFolderProjectVersionControlService` 的高级能力当前只为后续迁移和异常仓库恢复保留，不能重新接回普通工程历史界面。
 - 工程历史和工程资源位于同一磁盘；它能处理本地误改，但不是云备份，不能抵御磁盘损坏或工程目录整体丢失。
 

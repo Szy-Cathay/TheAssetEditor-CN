@@ -316,6 +316,11 @@ internal class FolderProjectVersionControlPlatform
     {
         File.Delete(path);
     }
+
+    public virtual void DeleteDirectory(string path)
+    {
+        Directory.Delete(path, recursive: true);
+    }
 }
 
 public sealed partial class FolderProjectVersionControlService :

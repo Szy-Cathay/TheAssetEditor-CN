@@ -608,6 +608,82 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
+    public async Task DiscardAll_UsesFreshDiskStatusInsideCoordinator()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var history = CreateHistoryService(project.ProjectRoot);
+        history.SetupSequence(item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                [
+                    new FolderProjectUnrecordedChange(
+                        "cached.bin",
+                        FolderProjectUnrecordedChangeKind.Modified),
+                ]))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                [
+                    new FolderProjectUnrecordedChange(
+                        "cached.bin",
+                        FolderProjectUnrecordedChangeKind.Modified),
+                    new FolderProjectUnrecordedChange(
+                        "late.bin",
+                        FolderProjectUnrecordedChangeKind.Added),
+                ]))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
+        var discard = new FolderProjectDiscardResult(
+            new FolderProjectDiscardRollback("staging", [], [], [], false, [],
+                FileAttributes.Normal));
+        history.Setup(item => item.BeginDiscardChanges(
+                project.ProjectRoot,
+                new[] { "cached.bin", "late.bin" },
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(discard);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                It.IsAny<Action<FolderProjectDiscardResult>>(),
+                false))
+            .Returns<string, Func<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>,
+                Action<FolderProjectDiscardResult>, bool>(
+                (_, operation, complete, _, _) =>
+                {
+                    var result = operation();
+                    complete(result);
+                    return Task.FromResult(result);
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.DiscardAllCommand.ExecuteAsync(null);
+
+        history.Verify(item => item.BeginDiscardChanges(
+            project.ProjectRoot,
+            new[] { "cached.bin", "late.bin" },
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+    }
+
+    [Test]
     public void HistoryView_UsesSharedComponentsAndHidesAdvancedGitConcepts()
     {
         var path = Path.Combine(
