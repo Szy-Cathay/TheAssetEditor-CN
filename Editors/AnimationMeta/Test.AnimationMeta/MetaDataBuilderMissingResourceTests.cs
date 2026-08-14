@@ -612,6 +612,7 @@ namespace Test.AnimationMeta
                     null).Instances
                 .Single();
             var preview = (ICombatMetaDataPreview)instance;
+            var markerPreview = (IMetaDataMarkerPreview)instance;
             var node = root.Children.Single();
 
             instance.Update(0);
@@ -620,6 +621,19 @@ namespace Test.AnimationMeta
                 Assert.That(
                     preview.FocusPosition,
                     Is.EqualTo(new Vector3(1, 2, 5)));
+                Assert.That(
+                    markerPreview.HitTargets,
+                    Is.EqualTo(new[]
+                    {
+                        new MetaDataMarkerHitTarget(
+                            splash.StartPosition,
+                            MetaDataMarkerPoint.SplashStart,
+                            0.5f),
+                        new MetaDataMarkerHitTarget(
+                            splash.EndPosition,
+                            MetaDataMarkerPoint.SplashEnd,
+                            0.5f),
+                    }));
                 Assert.That(node.ModelMatrix, Is.EqualTo(Matrix.Identity));
             });
 
@@ -632,7 +646,39 @@ namespace Test.AnimationMeta
                 Assert.That(
                     preview.FocusPosition,
                     Is.EqualTo(new Vector3(4, 5, 8)));
+                Assert.That(
+                    markerPreview.HitTargets.Select(target => target.Position),
+                    Is.EqualTo(new[]
+                    {
+                        splash.StartPosition,
+                        splash.EndPosition,
+                    }));
                 Assert.That(node.ModelMatrix, Is.EqualTo(Matrix.Identity));
+            });
+        }
+
+        [Test]
+        public void SplashAttackMarker_UsesOnlyEndpointRingsAndPlanarArrow()
+        {
+            var marker = MetaDataPreviewBuilder.CreateSplashAttackMarker(
+                Vector3.Zero,
+                new Vector3(0, 0, 4),
+                endpointRadius: 0.15f,
+                color: Color.Red,
+                edgeWidth: 1);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(marker.Triangles, Is.Empty);
+                Assert.That(marker.Edges, Has.Length.EqualTo(51));
+                Assert.That(marker.Edges[^3].P0, Is.EqualTo(Vector3.Zero));
+                Assert.That(
+                    marker.Edges[^3].P1,
+                    Is.EqualTo(new Vector3(0, 0, 4)));
+                Assert.That(
+                    marker.Edges.TakeLast(3)
+                        .SelectMany(edge => new[] { edge.P0.Y, edge.P1.Y }),
+                    Has.All.EqualTo(0));
             });
         }
 

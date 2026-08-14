@@ -8,17 +8,22 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 {
     public sealed class CombatMetaDataInstance :
         IMetaDataInstance,
-        ICombatMetaDataPreview
+        ICombatMetaDataPreview,
+        IMetaDataMarkerPreview
     {
         private readonly SceneNode _node;
         private readonly Action<bool> _selectionChanged;
         private readonly MetaDataTimeRange? _activeTimeRange;
         private readonly Func<Vector3> _localFocusPositionProvider;
+        private readonly Func<IReadOnlyList<MetaDataMarkerHitTarget>>
+            _localHitTargetsProvider;
         private readonly Func<Matrix> _referenceLocalTransform;
         private readonly Func<Matrix> _nodeLocalTransformProvider;
         private readonly Action? _refreshVisual;
         private readonly int? _highlightedBoneIndex;
         private bool _isEnabled = true;
+        private bool _isCleaned;
+        private bool _isHovered;
         private bool _isSelected;
         private bool _showForEntireAnimation;
         private float _currentTimeSeconds;
@@ -48,8 +53,38 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             set
             {
                 _isSelected = value;
-                _selectionChanged(value);
+                _selectionChanged(_isSelected || _isHovered);
                 ApplyVisibility();
+            }
+        }
+        public bool IsHitTestVisible =>
+            !_isCleaned && _node.IsVisible;
+        public bool IsHovered
+        {
+            get => _isHovered;
+            set
+            {
+                if (_isHovered == value)
+                    return;
+
+                _isHovered = value;
+                _selectionChanged(_isSelected || _isHovered);
+            }
+        }
+        public float HitTestRadius => 0.3f;
+        public IReadOnlyList<MetaDataMarkerHitTarget> HitTargets
+        {
+            get
+            {
+                var referenceWorldTransform = ReferenceWorldTransform;
+                return _localHitTargetsProvider()
+                    .Select(target => new MetaDataMarkerHitTarget(
+                        Vector3.Transform(
+                            target.Position,
+                            referenceWorldTransform),
+                        target.Point,
+                        target.HitTestRadius))
+                    .ToArray();
             }
         }
         public bool ShowForEntireAnimation
@@ -74,7 +109,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             Func<Matrix>? referenceLocalTransform = null,
             int? highlightedBoneIndex = null,
             Func<Matrix>? nodeLocalTransformProvider = null,
-            Action? refreshVisual = null)
+            Action? refreshVisual = null,
+            Func<IReadOnlyList<MetaDataMarkerHitTarget>>?
+                localHitTargetsProvider = null)
             : this(
                 source,
                 category,
@@ -87,7 +124,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
                 referenceLocalTransform,
                 highlightedBoneIndex,
                 nodeLocalTransformProvider,
-                refreshVisual)
+                refreshVisual,
+                localHitTargetsProvider)
         {
         }
 
@@ -103,11 +141,20 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             Func<Matrix>? referenceLocalTransform = null,
             int? highlightedBoneIndex = null,
             Func<Matrix>? nodeLocalTransformProvider = null,
-            Action? refreshVisual = null)
+            Action? refreshVisual = null,
+            Func<IReadOnlyList<MetaDataMarkerHitTarget>>?
+                localHitTargetsProvider = null)
         {
             Source = source;
             Category = category;
             _localFocusPositionProvider = focusPositionProvider;
+            _localHitTargetsProvider = localHitTargetsProvider ??
+                (() =>
+                [
+                    new MetaDataMarkerHitTarget(
+                        _localFocusPositionProvider(),
+                        MetaDataMarkerPoint.Default),
+                ]);
             _node = node;
             _selectionChanged = selectionChanged;
             Player = player;
@@ -135,6 +182,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         public void CleanUp()
         {
+            _isCleaned = true;
+            _isHovered = false;
             if (_node.Parent != null)
                 _node.Parent.RemoveObject(_node);
         }

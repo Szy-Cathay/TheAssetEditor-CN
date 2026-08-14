@@ -1677,6 +1677,99 @@ namespace Test.AnimationMeta
         }
 
         [Test]
+        public void SuperView_MarkerSelection_UsesCurrentIndexOwnerWithoutSeeking()
+        {
+            const string animationPath =
+                @"animations\battle\codex\marker_animation.anm.meta";
+            const string persistentPath =
+                @"animations\battle\codex\marker_persistent.anm.meta";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateOutputPack();
+            var editorCreator =
+                runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)editorCreator.Create(
+                EditorEnums.SuperView_Editor);
+
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<
+                    MetaDataFileParser>();
+                var fileSaveService =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        IFileSaveService>();
+                var sceneObjectEditor =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        SceneObjectEditor>();
+                var animationFile = SaveTimedMetaFile(
+                    fileSaveService,
+                    parser,
+                    animationPath);
+                var persistentFile = SaveTimedMetaFile(
+                    fileSaveService,
+                    parser,
+                    persistentPath);
+                var sceneObject = superView.SceneObjects.Single();
+                sceneObject.FragAndSlotSelection.MetaDataName = animationPath;
+                sceneObject.FragAndSlotSelection.MetaDataPersistName =
+                    persistentPath;
+                sceneObjectEditor.SetMetaFile(
+                    sceneObject.Data,
+                    animationFile,
+                    persistentFile);
+                superView.Player.SelectedAnimationMaxTime.Value = 5;
+                superView.SelectedTabControllerIndex = 1;
+                foreach (var preview in sceneObject.Data.MetaDataItems)
+                    preview.Update(1);
+                var persistentItem = superView.MetaDataInspectionIndex.Items
+                    .Single(item => item.Owner ==
+                        MetaDataDocumentOwner.Persistent);
+
+                superView.SelectMetaDataMarker(persistentItem);
+
+                var selectedTimelineMarker = superView.MetaDataTimeline.Markers
+                    .Single(marker => ReferenceEquals(
+                        marker.Item.Source,
+                        persistentItem.Source));
+                Assert.Multiple(() =>
+                {
+                    Assert.That(superView.SelectedTabControllerIndex, Is.Zero);
+                    Assert.That(
+                        superView.PersistentMetaEditor.SelectedAttribute,
+                        Is.SameAs(persistentItem.Source));
+                    Assert.That(
+                        sceneObject.Data.Player.GetTimeUs(),
+                        Is.Zero);
+                    Assert.That(selectedTimelineMarker.IsSelected, Is.True);
+                    Assert.That(superView.CanEditSelectedMetaData3D, Is.True);
+                    Assert.That(
+                        superView.GetMetaDataMarkerCandidates(),
+                        Has.Count.EqualTo(2));
+                    Assert.That(superView.HasUnsavedChanges, Is.False);
+                });
+
+                superView.ClearMetaDataMarkerSelection();
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        superView.PersistentMetaEditor.SelectedAttribute,
+                        Is.Null);
+                    Assert.That(
+                        superView.MetaDataTimeline.Markers,
+                        Has.None.Property("IsSelected").True);
+                    Assert.That(
+                        superView.CanEditSelectedMetaData3D,
+                        Is.False);
+                    Assert.That(superView.HasUnsavedChanges, Is.False);
+                });
+            }
+            finally
+            {
+                superView.Close();
+            }
+        }
+
+        [Test]
         public void SuperView_InvalidField_RefreshesIndexWithoutRebuildingPreview()
         {
             const string metaPath =

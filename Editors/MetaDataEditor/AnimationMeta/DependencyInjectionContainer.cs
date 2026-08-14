@@ -4,6 +4,7 @@ using Editors.AnimationMeta.Presentation;
 using Editors.AnimationMeta.Presentation.View;
 using Editors.AnimationMeta.SuperView;
 using Editors.AnimationMeta.SuperView.Editing;
+using Editors.AnimationMeta.SuperView.Inspection;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Editors.Shared.Core.Common.BaseControl;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,7 @@ namespace Editors.AnimationMeta
             serviceCollection.AddScoped<SuperViewViewModel>();
             serviceCollection.AddScoped<CombatMetaDataEditSession>();
             serviceCollection.AddScoped<CombatMetaDataGizmoComponent>();
+            serviceCollection.AddScoped<MetaDataMarkerPickerComponent>();
 
             serviceCollection.AddScoped<IMetaDataBuilder, MetaDataBuilder>(); // Needs heavy refactorying!
 

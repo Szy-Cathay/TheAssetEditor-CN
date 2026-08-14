@@ -11,15 +11,18 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 {
     public class DrawableMetaInstance :
         IMetaDataInstance,
-        ISpatialMetaDataPreview
+        IMetaDataMarkerPreview
     {
         private readonly ILogger _logger = Logging.Create<MetaDataBuilder>();
         private bool _hasError = false;
+        private bool _isCleaned;
 
         private readonly SceneNode _node;
         private readonly MetaDataTimeRange? _activeTimeRange;
         private readonly Action<bool>? _selectionChanged;
         private bool _isEnabled = true;
+        private readonly bool _isHitTestEnabled;
+        private bool _isHovered;
         private bool _isSelected;
         private bool _showForEntireAnimation;
         private float _currentTimeSeconds;
@@ -46,9 +49,28 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
                     return;
 
                 _isSelected = value;
-                _selectionChanged?.Invoke(value);
+                RefreshSelectionVisual();
             }
         }
+        public bool IsHitTestVisible =>
+            !_isCleaned && _isHitTestEnabled && _node.IsVisible;
+        public bool IsHovered
+        {
+            get => _isHovered;
+            set
+            {
+                if (_isHovered == value)
+                    return;
+
+                _isHovered = value;
+                RefreshSelectionVisual();
+            }
+        }
+        public float HitTestRadius => 0.3f;
+        public IReadOnlyList<MetaDataMarkerHitTarget> HitTargets =>
+        [
+            new(FocusPosition, MetaDataMarkerPoint.Default),
+        ];
         public bool ShowForEntireAnimation
         {
             get => _showForEntireAnimation;
@@ -74,9 +96,12 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         private SkeletonBoneAnimationResolver? _animationResolver;
 
-        public DrawableMetaInstance(SceneNode node)
+        public DrawableMetaInstance(
+            SceneNode node,
+            bool isHitTestEnabled = true)
         {
             _node = node;
+            _isHitTestEnabled = isHitTestEnabled;
         }
 
         public DrawableMetaInstance(float startTime, float endTime, SceneNode node)
@@ -112,8 +137,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             bool isSelected,
             Action<bool> selectionChanged,
             Func<Vector3> positionProvider,
-            Func<Quaternion> orientationProvider)
-            : this(node)
+            Func<Quaternion> orientationProvider,
+            bool isHitTestEnabled = true)
+            : this(node, isHitTestEnabled)
         {
             _activeTimeRange = activeTimeRange;
             Source = source;
@@ -162,8 +188,14 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         public void CleanUp()
         {
-            _node.Parent.RemoveObject(_node);
+            _isCleaned = true;
+            _isHovered = false;
+            if (_node.Parent != null)
+                _node.Parent.RemoveObject(_node);
         }
+
+        private void RefreshSelectionVisual() =>
+            _selectionChanged?.Invoke(_isSelected || _isHovered);
 
         private Matrix GetLocalTransform()
         {

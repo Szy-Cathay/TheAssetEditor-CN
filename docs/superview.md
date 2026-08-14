@@ -65,9 +65,9 @@
 
 ### 3.3 View3D 组成
 
-`SuperViewViewModel` 继承 `EditorHostBase`。基类建立共享 `IWpfGame`、核心 View3D 组件、参考模型 VM、动画播放器和场景对象集合；超级视图构造时再显式加入 scoped 的 `CombatMetaDataGizmoComponent`。
+`SuperViewViewModel` 继承 `EditorHostBase`。基类建立共享 `IWpfGame`、核心 View3D 组件、参考模型 VM、动画播放器和场景对象集合；超级视图构造时再显式加入 scoped 的 `CombatMetaDataGizmoComponent` 与 `MetaDataMarkerPickerComponent`。
 
-超级视图不插入 `KitbashSceneComponentSet`。其专属 Gizmo 使用共享 `Gizmo` 原语，但编辑目标是 `ParsedMetadataAttribute`，不是 `SelectionManager` 中的模型选择。
+超级视图不插入 `KitbashSceneComponentSet`。其专属 Gizmo 使用共享 `Gizmo` 原语，但编辑目标是 `ParsedMetadataAttribute`，不是 `SelectionManager` 中的模型选择。专属 marker picker 只消费当前 `MetaDataInspectionIndex` 与当前可见 marker 预览，同样不进入共享模型选择。
 
 ## 4. 对象与状态所有权
 
@@ -87,6 +87,7 @@
 | `MetaDataTimelineViewModel` | 把索引中的有效时间范围投影成播放器标记并执行导航 | 只属于 SuperView，不解释或修改 META 字段 |
 | `CombatMetaDataEditSession` | 空间元数据预览事务、撤销/重做、每文档历史 | 以文档 owner 区分的编辑历史 |
 | `CombatMetaDataGizmoComponent` | 3D 手势与 Gizmo/鼠标生命周期 | 当前空间目标和活动 gesture |
+| `MetaDataMarkerPickerComponent` | 当前 marker 的射线命中、悬停、单击选择和双击聚焦 | 只持有瞬时指针状态，不缓存文档或模型选择 |
 | `SpatialMetaDataCatalog` | 已验证空间标签到可写字段的适配 | 类型能力定义，不持有运行时选择 |
 
 必须区分：
@@ -241,7 +242,7 @@
 
 时间轴紧邻共享播放滑块，只投影三种只读标记：普通同一时刻为瞬时刻线，合法 start/end 为区间条，明确 allowlist 的 `(0,0)` 为全程条。Impact、Target、Fire、Splash 沿用三维预览分类颜色；其他类型使用主题语义色。所选项还必须通过轮廓、厚度或形状变化表达，不能只换颜色；tooltip 和 `AutomationProperties.Name` 需用中文说明类型、owner 和时间。
 
-点击标记只做导航：切换到对应 owner 页签，按引用身份选择同一个源对象，并把共享播放器 seek 到 authored start。它不提供拖动、时间编辑、缩放、裁剪或区间调整。共享 `AnimationPlayerView` 只暴露通用的可选注释内容槽；所有 META 索引、标记、颜色和点击语义仍留在 `AnimationMeta/SuperView`，不得向共享播放器加入 `IsSuperView`、META 类型判断或业务分发。
+点击标记只做导航：切换到对应 owner 页签，按引用身份选择同一个源对象，并把共享播放器 seek 到 authored start。它不提供拖动、时间编辑、缩放、裁剪或区间调整。时间范围横向相交的标记分配到不同的紧凑轨道，不相交的标记复用轨道；轨道数量增加时注释区域按需增高，不能把多个标记完全覆盖成一条。共享 `AnimationPlayerView` 只暴露通用的可选注释内容槽；所有 META 索引、标记、颜色、轨道布局和点击语义仍留在 `AnimationMeta/SuperView`，不得向共享播放器加入 `IsSuperView`、META 类型判断或业务分发。
 
 ## 10. 空间元数据能力目录
 
@@ -309,6 +310,12 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 
 参考模型节点和 Prop 节点保持 `IsSelectable=false`。选中预览可使用专用 preview outline，但不得写入共享 `SelectionManager` 或触发 Kitbash 整体选择语义。
 
+3D marker 选取只注册实现 `IMetaDataMarkerPreview`、仍属于当前检查索引且当前实际可见的预览。普通/Animated Prop、参考模型、网格、面、边、顶点、骨骼和无可视几何的骨骼占位预览不实现该命中契约。命中按到相机射线的距离、沿射线深度和检查索引顺序依次稳定排序；透视视图保留小角度容差，使远处可见 marker 仍可点选。Splash 保留半透明攻击范围面，线框只显示首尾端面圆环和位于同一平面的方向箭头；走廊端面圆环的显示与命中半径都必须使用 `WidthForCorridor / 2`，不能替换成固定尺寸的小定位环。首尾圆环分别作为 start/end 命中点，不能退化为只命中中心点。
+
+单击 marker 通过检查索引中的 owner 与源对象引用切换页签并选择原始 `ParsedMetadataAttribute`，不跳播放时间、不改字段；点击未命中 marker 的空白位置清除当前 META 选择，但不能转而选中参考模型或 Prop。Splash 的首尾命中还必须同步切换对应 Gizmo 控制点。双击同一 marker 同一控制点的第二次点击只调用现有 META 聚焦，不重复选择；连续点击 Splash 的不同控制点仍是两次单击选择。没有有效焦点位置时保留单击选择且不移动相机。活动 Gizmo gesture 或相机等其他组件持有鼠标时 picker 必须清空本次点击并让路；它不得抢占鼠标所有权。
+
+悬停复用 marker 已有的选中轮廓/加粗反馈，不新增共享 View3D 覆盖层。owner 切换立即清除旧悬停；预览替换、完整重建、Fragment/Slot 切换和关闭还必须清除待完成点击与双击状态。清理后的实例即使仍有旧对象引用也不得再次命中。
+
 批量显示覆盖只应用于当前 animation metadata 来源的对应分类，不应修改 persistent metadata 的预览。用户覆盖按源对象身份跟踪；完整重建后应剔除已不存在的源，保留仍存在源的设置。
 
 ## 13. 保存与文件所有权
@@ -354,6 +361,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 - `CombatMetaDataEditSession` 事件；
 - EventHub 注册；
 - 当前 Gizmo gesture 与鼠标所有权；
+- marker picker 的悬停、待完成点击、双击序列和宿主回调；
 - 所有 metadata instances、附属 players、场景节点和动画规则。
 
 重新构建预览是高频生命周期，不等于关闭编辑器。每次 rebuild 都必须先有序清理旧结果，同时保留真正属于文档或用户覆盖的状态。不要依赖 GC 清理场景节点、GPU 资源或事件订阅。
@@ -423,7 +431,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 | 检查索引/时间轴 | `MetaDataInspectionIndexTests`、`MetaDataEditorViewModelTests`、`UiAnimationMetadataFamilyGallery` | 双文档同值项、无效范围、点击导航、四主题/高对比度、空状态和缩放 |
 | 字段 UI/批量控制 | `MetaDataAttributeControlTests` | 两页签、直接 Meta Editor、中文 UI 和焦点 |
 | 格式解析 | `MetaDataFileParserTests` 及格式项目测试 | 真实文件 round trip、未知 payload |
-| View3D 隔离 | `View3DComponentIsolationTests` | 确认模型不可选择、无 Kitbash 编辑工具泄漏 |
+| View3D 隔离与 marker 选取 | `MetaDataMarkerPickingTests`、`View3DComponentIsolationTests` | 单/双击、重叠/远距、播放可见性、Gizmo/相机让路，并确认模型、Prop、骨骼不可选择且无 Kitbash 编辑工具泄漏 |
 | XAML/视觉 | 受影响项目构建和布局/本地化测试 | 实际 WPF 主题、缩放、marker、Gizmo 和遮挡 |
 
 若修改共享动画播放器、SceneObject、Gizmo、RenderEngine 或格式层，必须补跑所有受影响调用者的测试。自动测试不能替代本地 WPF/GPU 视觉检查。

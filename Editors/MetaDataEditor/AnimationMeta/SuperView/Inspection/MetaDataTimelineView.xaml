@@ -13,8 +13,8 @@
                TargetType="Button"
                BasedOn="{StaticResource AeButton.Base}">
             <Setter Property="MinWidth" Value="0" />
-            <Setter Property="MinHeight" Value="18" />
-            <Setter Property="Height" Value="18" />
+            <Setter Property="MinHeight" Value="10" />
+            <Setter Property="Height" Value="10" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -58,7 +58,7 @@
                 <DataTrigger Binding="{Binding Item.TimelineMarkerKind}"
                              Value="{x:Static inspection:MetaDataTimelineMarkerKind.Instant}">
                     <Setter Property="Width" Value="4" />
-                    <Setter Property="Height" Value="14" />
+                    <Setter Property="Height" Value="10" />
                     <Setter Property="HorizontalAlignment" Value="Center" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Item.TimelineMarkerKind}"
@@ -83,7 +83,7 @@
                                    Value="True" />
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Width" Value="6" />
-                    <Setter Property="Height" Value="16" />
+                    <Setter Property="Height" Value="10" />
                 </MultiDataTrigger>
                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
                     <Setter Property="Height" Value="9" />
@@ -97,14 +97,14 @@
                         <Condition Binding="{Binding IsSelected}" Value="True" />
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Width" Value="6" />
-                    <Setter Property="Height" Value="16" />
+                    <Setter Property="Height" Value="10" />
                 </MultiDataTrigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
     <Grid>
-        <Border Height="18"
+        <Border MinHeight="18"
                 Background="{DynamicResource AeBrush.Surface1}"
                 BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="1"
