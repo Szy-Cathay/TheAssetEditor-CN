@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -713,10 +714,10 @@ public class UiAnimationMetadataFamilyGallery
             SelectedItem = "stand_idle",
         },
         SelectedAnimationCurrentFrame = new GalleryModel { Value = 18 },
-        SelectedAnimationFrameCount = new GalleryModel { Value = 60 },
+        SelectedAnimationFrameCount = new GalleryModel { Value = 120 },
         SelectedAnimationFps = new GalleryModel { Value = 30 },
         SelectedAnimationCurrentTime = new GalleryModel { Value = 0.6 },
-        SelectedAnimationMaxTime = new GalleryModel { Value = 2.0 },
+        SelectedAnimationMaxTime = new GalleryModel { Value = 120.0 },
         LoopAnimation = new GalleryModel { Value = true },
         TimelineAnnotationContent = timeline,
         PlayerItems = new[]
@@ -748,7 +749,7 @@ public class UiAnimationMetadataFamilyGallery
         {
             Name = "TARGET_POS",
             Version = 10,
-            StartTime = 0.7f,
+            StartTime = 0.35f,
             EndTime = 1.15f,
         };
         var whole = new Shared.GameFormats.AnimationMeta.Definitions.Prop_v10
@@ -772,6 +773,35 @@ public class UiAnimationMetadataFamilyGallery
             StartTime = 1.6f,
             EndTime = 1.9f,
         };
+        var effect = new Shared.GameFormats.AnimationMeta.Definitions.Effect_v2
+        {
+            Name = "EFFECT",
+            Version = 2,
+            StartTime = 0.95f,
+            EndTime = 1.05f,
+        };
+        var prop = new Shared.GameFormats.AnimationMeta.Definitions.Prop_v2
+        {
+            Name = "PROP",
+            Version = 2,
+            StartTime = 0.1f,
+            EndTime = 0.2f,
+        };
+        var animatedProp = new
+            Shared.GameFormats.AnimationMeta.Definitions.AnimatedProp_v2
+        {
+            Name = "ANIMATED_PROP",
+            Version = 2,
+            StartTime = 0.45f,
+            EndTime = 0.55f,
+        };
+        var blood = new Shared.GameFormats.AnimationMeta.Definitions.Blood_v5
+        {
+            Name = "BLOOD",
+            Version = 5,
+            StartTime = 1.2f,
+            EndTime = 1.3f,
+        };
         AddTimelineMarker(
             timeline,
             instant,
@@ -781,7 +811,7 @@ public class UiAnimationMetadataFamilyGallery
         AddTimelineMarker(
             timeline,
             range,
-            new MetaDataTimeRange(0.7f, 1.15f),
+            new MetaDataTimeRange(0.35f, 1.15f),
             MetaDataTimelineMarkerKind.Range,
             CombatMetaDataPreviewCategory.Target);
         AddTimelineMarker(
@@ -805,7 +835,31 @@ public class UiAnimationMetadataFamilyGallery
             new MetaDataTimeRange(1.6f, 1.9f),
             MetaDataTimelineMarkerKind.Range,
             CombatMetaDataPreviewCategory.Splash);
-        timeline.UpdateSelection(MetaDataDocumentOwner.Animation, instant);
+        AddTimelineMarker(
+            timeline,
+            effect,
+            new MetaDataTimeRange(0.95f, 1.05f),
+            MetaDataTimelineMarkerKind.Range,
+            null);
+        AddTimelineMarker(
+            timeline,
+            prop,
+            new MetaDataTimeRange(0.1f, 0.2f),
+            MetaDataTimelineMarkerKind.Range,
+            null);
+        AddTimelineMarker(
+            timeline,
+            animatedProp,
+            new MetaDataTimeRange(0.45f, 0.55f),
+            MetaDataTimelineMarkerKind.Range,
+            null);
+        AddTimelineMarker(
+            timeline,
+            blood,
+            new MetaDataTimeRange(1.2f, 1.3f),
+            MetaDataTimelineMarkerKind.Range,
+            null);
+        timeline.UpdateSelection(MetaDataDocumentOwner.Animation, range);
         return timeline;
     }
 
@@ -961,10 +1015,40 @@ public class UiAnimationMetadataFamilyGallery
                 Visual = FindVisualDescendants<Border>(button)
                     .Single(border => border.Name == "Marker"),
             }).ToArray();
+            var genericTypeColors = markers
+                .Where(marker => marker.ViewModel.Item.PreviewCategory == null)
+                .Select(marker => new
+                {
+                    marker.ViewModel.Item.Source.Name,
+                    Color = ((SolidColorBrush)marker.Visual.Background).Color,
+                })
+                .ToArray();
+            var knownTypeNames = typeof(
+                    Shared.GameFormats.AnimationMeta.Parsing
+                        .ParsedMetadataAttribute)
+                .Assembly.GetTypes()
+                .SelectMany(type => type.GetCustomAttributes(
+                    typeof(Shared.GameFormats.AnimationMeta.Parsing
+                        .MetaDataAttribute),
+                    true))
+                .Cast<Shared.GameFormats.AnimationMeta.Parsing
+                    .MetaDataAttribute>()
+                .Select(attribute => attribute.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var typeBrushConverter = new
+                MetaDataTimelineTypeBrushConverter();
+            var knownTypeColors = knownTypeNames.Select(typeName =>
+                ((SolidColorBrush)typeBrushConverter.Convert(
+                    [typeName, FindBrush("AeBrush.TextPrimary")],
+                    typeof(Brush),
+                    string.Empty,
+                    System.Globalization.CultureInfo.InvariantCulture)).Color)
+                .ToArray();
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(timeline.ActualHeight, Is.GreaterThan(0));
-                NUnitAssert.That(markerButtons, Has.Length.EqualTo(5));
+                NUnitAssert.That(markerButtons, Has.Length.EqualTo(9));
                 NUnitAssert.That(
                     markerButtons.Select(
                         System.Windows.Automation.AutomationProperties.GetName),
@@ -989,7 +1073,7 @@ public class UiAnimationMetadataFamilyGallery
                 NUnitAssert.That(
                     markers.Single(marker => marker.ViewModel.IsSelected)
                         .Visual.ActualHeight,
-                    Is.EqualTo(14));
+                    Is.EqualTo(9));
                 NUnitAssert.That(
                     markers.Where(marker => !marker.ViewModel.IsSelected)
                         .Select(marker => marker.Visual.BorderThickness),
@@ -1011,22 +1095,81 @@ public class UiAnimationMetadataFamilyGallery
                         CombatMetaDataPreviewCategory.Splash).Visual.Background,
                     Is.SameAs(MetaDataTimelineBrushes.Splash));
                 NUnitAssert.That(
+                    genericTypeColors.GroupBy(entry => entry.Name)
+                        .All(group => group.Select(entry => entry.Color)
+                            .Distinct()
+                            .Count() == 1),
+                    Is.True);
+                NUnitAssert.That(
+                    genericTypeColors.Select(entry => entry.Color)
+                        .Distinct()
+                        .Count(),
+                    Is.EqualTo(genericTypeColors.Select(entry => entry.Name)
+                        .Distinct()
+                        .Count()));
+                NUnitAssert.That(
+                    knownTypeColors.Distinct().Count(),
+                    Is.EqualTo(knownTypeNames.Length));
+                NUnitAssert.That(
                     markerButtons.All(button => ReferenceEquals(
                         button.Style.BasedOn,
                         Application.Current.FindResource("AeButton.Base"))),
                     Is.True);
                 NUnitAssert.That(
-                    markerButtons.SelectMany(button => button.Style.Triggers
-                        .OfType<Trigger>())
-                        .Any(trigger => trigger.Property ==
-                            UIElement.IsMouseOverProperty),
+                    markerButtons.All(button =>
+                        button.Background is SolidColorBrush brush &&
+                        brush.Color.A == 0),
                     Is.True);
                 NUnitAssert.That(
-                    markerButtons.SelectMany(button => button.Style.Triggers
-                        .OfType<Trigger>())
-                        .Any(trigger => trigger.Property ==
-                            ButtonBase.IsPressedProperty),
+                    markerButtons.All(button => button.Style.Triggers.Count == 0),
                     Is.True);
+            });
+
+            var instantButton = markers.Single(marker =>
+                marker.ViewModel.Item.TimelineMarkerKind ==
+                    MetaDataTimelineMarkerKind.Instant).Button;
+            var instantCenter = instantButton.TransformToAncestor(timeline)
+                .Transform(new Point(
+                    instantButton.ActualWidth / 2,
+                    instantButton.ActualHeight / 2));
+            var hit = timeline.InputHitTest(instantCenter) as DependencyObject;
+            NUnitAssert.That(
+                FindVisualAncestor<Button>(hit),
+                Is.SameAs(instantButton));
+
+            var slider = FindVisualDescendants<Slider>(window).Single();
+            var playbackRow = FindVisualDescendants<Grid>(window)
+                .Single(grid => grid.Name == "PlaybackTimelineRow");
+            var initialSliderWidth = slider.ActualWidth;
+            var initialTimelineWidth = timeline.ActualWidth;
+            var initialColumnWidths = playbackRow.ColumnDefinitions
+                .Select(column => column.ActualWidth)
+                .ToArray();
+            var timeText = FindVisualDescendants<TextBlock>(window)
+                .Single(text => text.Text.Contains("0.60") &&
+                    text.Text.Contains("120.00"));
+            var frameText = FindVisualDescendants<TextBlock>(window)
+                .Single(text => text.Text.Contains("18") &&
+                    text.Text.Contains("120"));
+            timeText.Inlines.OfType<Run>().ElementAt(1).Text = "99.99";
+            frameText.Inlines.OfType<Run>().ElementAt(1).Text = "99";
+            window.UpdateLayout();
+            var finalColumnWidths = playbackRow.ColumnDefinitions
+                .Select(column => column.ActualWidth)
+                .ToArray();
+            var columnWidthMessage =
+                $"Columns: {string.Join(", ", initialColumnWidths)} -> " +
+                string.Join(", ", finalColumnWidths);
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    slider.ActualWidth,
+                    Is.EqualTo(initialSliderWidth).Within(0.01),
+                    columnWidthMessage);
+                NUnitAssert.That(
+                    timeline.ActualWidth,
+                    Is.EqualTo(initialTimelineWidth).Within(0.01),
+                    columnWidthMessage);
             });
         }
 
@@ -1195,6 +1338,19 @@ public class UiAnimationMetadataFamilyGallery
             foreach (var descendant in FindVisualDescendants<T>(child))
                 yield return descendant;
         }
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject? child)
+        where T : DependencyObject
+    {
+        while (child != null)
+        {
+            if (child is T match)
+                return match;
+            child = VisualTreeHelper.GetParent(child);
+        }
+
+        return null;
     }
 
     private sealed class GalleryCommand : ICommand

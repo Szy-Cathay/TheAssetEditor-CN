@@ -7,6 +7,8 @@
              FontWeight="{DynamicResource AppFontWeight}"
              Foreground="{DynamicResource AeBrush.TextPrimary}">
     <UserControl.Resources>
+        <inspection:MetaDataTimelineTypeBrushConverter
+            x:Key="TimelineTypeBrushConverter" />
         <Style x:Key="TimelineMarkerButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource AeButton.Base}">
@@ -19,20 +21,20 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
-                </Trigger>
-            </Style.Triggers>
         </Style>
         <Style x:Key="TimelineMarkerStyle" TargetType="Border">
             <Setter Property="Height" Value="5" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Background" Value="{DynamicResource AeBrush.TextSecondary}" />
+            <Setter Property="Background">
+                <Setter.Value>
+                    <MultiBinding Converter="{StaticResource TimelineTypeBrushConverter}">
+                        <Binding Path="Item.Source.Name" />
+                        <Binding Path="Foreground"
+                                 RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                    </MultiBinding>
+                </Setter.Value>
+            </Setter>
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="{StaticResource AeRadius.Compact}" />
@@ -55,8 +57,8 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Item.TimelineMarkerKind}"
                              Value="{x:Static inspection:MetaDataTimelineMarkerKind.Instant}">
-                    <Setter Property="Width" Value="2" />
-                    <Setter Property="Height" Value="12" />
+                    <Setter Property="Width" Value="4" />
+                    <Setter Property="Height" Value="14" />
                     <Setter Property="HorizontalAlignment" Value="Center" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Item.TimelineMarkerKind}"
@@ -67,6 +69,22 @@
                              Value="{x:Static inspection:MetaDataTimelineMarkerKind.WholeAnimation}">
                     <Setter Property="CornerRadius" Value="0" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=IsMouseOver}"
+                             Value="True">
+                    <Setter Property="Height" Value="7" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
+                    <Setter Property="BorderThickness" Value="1" />
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Item.TimelineMarkerKind}"
+                                   Value="{x:Static inspection:MetaDataTimelineMarkerKind.Instant}" />
+                        <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=IsMouseOver}"
+                                   Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Width" Value="6" />
+                    <Setter Property="Height" Value="16" />
+                </MultiDataTrigger>
                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
                     <Setter Property="Height" Value="9" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
@@ -78,8 +96,8 @@
                                    Value="{x:Static inspection:MetaDataTimelineMarkerKind.Instant}" />
                         <Condition Binding="{Binding IsSelected}" Value="True" />
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Width" Value="5" />
-                    <Setter Property="Height" Value="14" />
+                    <Setter Property="Width" Value="6" />
+                    <Setter Property="Height" Value="16" />
                 </MultiDataTrigger>
             </Style.Triggers>
         </Style>

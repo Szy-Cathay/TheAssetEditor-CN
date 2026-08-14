@@ -158,13 +158,15 @@
                 Margin="0,6,0,0"
                 Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" MinWidth="200" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" MinWidth="110" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Margin="0,0,10,0" VerticalAlignment="Center">
+                <TextBlock Margin="0,0,10,0"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource AeText.Technical}">
                     <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
                     <Run Text="{Binding SelectedAnimationCurrentTime.Value, StringFormat=N2}" />
                     <Run Text=" / " />
@@ -185,7 +187,10 @@
                         Content="{Binding TimelineAnnotationContent, Mode=OneWay}"
                         ContentTemplateSelector="{StaticResource TimelineAnnotationSelector}" />
                 </Grid>
-                <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
+                <TextBlock Grid.Column="2"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource AeText.Technical}">
                     <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
                     <Run Text="{Binding SelectedAnimationCurrentFrame.Value}" />
                     <Run Text=" / " />

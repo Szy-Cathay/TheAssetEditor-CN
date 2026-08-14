@@ -486,7 +486,10 @@ public class UiAnimationMetadataFamilyTests
                 Does.Contain("BasedOn=\"{StaticResource AeButton.Base}\""));
             NUnitAssert.That(
                 timeline,
-                Does.Contain("Property=\"IsMouseOver\""));
+                Does.Contain("AncestorType=Button"));
+            NUnitAssert.That(
+                timeline,
+                Does.Not.Contain("AeBrush.SurfaceHover"));
             NUnitAssert.That(
                 timeline,
                 Does.Not.Contain("Property=\"IsKeyboardFocused\""));

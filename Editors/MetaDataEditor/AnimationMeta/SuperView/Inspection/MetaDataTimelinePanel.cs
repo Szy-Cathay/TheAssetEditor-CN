@@ -46,7 +46,13 @@ namespace Editors.AnimationMeta.SuperView.Inspection
                     left -= width / 2;
                 left = Math.Clamp(left, 0, Math.Max(0, finalSize.Width - width));
                 width = Math.Min(width, finalSize.Width);
-                SetZIndex(child, marker.IsSelected ? 1 : 0);
+                var markerLayer = marker.Item.TimelineMarkerKind switch
+                {
+                    MetaDataTimelineMarkerKind.Instant => 20,
+                    MetaDataTimelineMarkerKind.Range => 10,
+                    _ => 0,
+                };
+                SetZIndex(child, markerLayer + (marker.IsSelected ? 1 : 0));
                 child.Arrange(new Rect(left, 0, width, finalSize.Height));
             }
 
