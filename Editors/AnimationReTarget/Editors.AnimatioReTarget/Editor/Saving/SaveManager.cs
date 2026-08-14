@@ -55,7 +55,8 @@ namespace Editors.AnimatioReTarget.Editor.Saving
         {
             if (_generated?.AnimationClip == null)
             {
-                _standardDialogs.ShowDialogBox("Generated skeleton not set, or animation not created");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("AnimReTarget.Error.GeneratedAnimationRequired"));
                 return;
             }
 

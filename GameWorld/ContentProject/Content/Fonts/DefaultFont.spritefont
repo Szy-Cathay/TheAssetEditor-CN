@@ -11,7 +11,7 @@ with.
     <!--
     Modify this string to change the font that will be imported.
     -->
-    <FontName>Arial</FontName>
+    <FontName>../../../../AssetEditor/Fonts/HarmonyOS_Sans_SC_Regular.ttf</FontName>
 
     <!--
     Size is a float value, measured in points. Modify this value to change
@@ -54,6 +54,34 @@ with.
       <CharacterRegion>
         <Start>&#32;</Start>
         <End>&#126;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#25104;</Start>
+        <End>&#25104;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#26524;</Start>
+        <End>&#26524;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#26631;</Start>
+        <End>&#26631;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#28304;</Start>
+        <End>&#28304;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#29983;</Start>
+        <End>&#29983;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#30446;</Start>
+        <End>&#30446;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#32467;</Start>
+        <End>&#32467;</End>
       </CharacterRegion>
     </CharacterRegions>
   </Asset>

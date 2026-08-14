@@ -5,6 +5,7 @@ using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.RenderItems;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
+using Shared.Core.Services;
 
 namespace Editors.AnimatioReTarget.Editor.Settings
 {
@@ -91,9 +92,9 @@ namespace Editors.AnimatioReTarget.Editor.Settings
             var p0Text = p0 + new Vector3(0, 0, _radius);
             var p1Text = p1 + new Vector3(0, 0, _radius);
             var p2Text = p2 + new Vector3(0, 0, _radius);
-            var renderText0 = new WorldTextRenderItem(_renderEngineComponent, "Source", p0Text);
-            var renderText1 = new WorldTextRenderItem(_renderEngineComponent, "Generated", p1Text);
-            var renderText2 = new WorldTextRenderItem(_renderEngineComponent, "Target", p2Text);
+            var renderText0 = new WorldTextRenderItem(_renderEngineComponent, LocalizationManager.Instance.Get("AnimReTarget.Scene.Source"), p0Text);
+            var renderText1 = new WorldTextRenderItem(_renderEngineComponent, LocalizationManager.Instance.Get("AnimReTarget.Scene.Generated"), p1Text);
+            var renderText2 = new WorldTextRenderItem(_renderEngineComponent, LocalizationManager.Instance.Get("AnimReTarget.Scene.Target"), p2Text);
             _renderEngineComponent.AddRenderItem(RenderBuckedId.Font, renderText0);
             _renderEngineComponent.AddRenderItem(RenderBuckedId.Font, renderText1);
             _renderEngineComponent.AddRenderItem(RenderBuckedId.Font, renderText2);

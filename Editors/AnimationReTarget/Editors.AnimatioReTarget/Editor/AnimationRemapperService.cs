@@ -19,8 +19,15 @@ namespace Editors.AnimatioReTarget.Editor
 
         public AnimationClip ReMapAnimation(GameSkeleton copyFromSkeleton, GameSkeleton copyToSkeleton, AnimationClip animationToCopy)
         {
-            var newFrameCount = (int)(_settings.AnimationSpeedMult * animationToCopy.DynamicFrames.Count);
-            var newPlayTime = (float)_settings.AnimationSpeedMult * animationToCopy.PlayTimeInSec;
+            var speedMultiplier = _settings.AnimationSpeedMult;
+            if (!float.IsFinite(speedMultiplier) || speedMultiplier <= 0)
+                throw new ArgumentOutOfRangeException(nameof(_settings.AnimationSpeedMult), "Animation speed multiplier must be greater than zero.");
+
+            var originalFrameCount = animationToCopy.DynamicFrames.Count;
+            var newFrameCount = originalFrameCount <= 1
+                ? originalFrameCount
+                : Math.Max(2, (int)MathF.Round((originalFrameCount - 1) / speedMultiplier) + 1);
+            var newPlayTime = animationToCopy.PlayTimeInSec / speedMultiplier;
 
             //animationToCopy.RemoveOptimizations(copyFromSkeleton);
             var resampledAnimationToCopy = GameWorld.Core.Animation.AnimationEditor.ReSample(copyFromSkeleton, animationToCopy, newFrameCount, newPlayTime);
@@ -238,11 +245,14 @@ namespace Editors.AnimatioReTarget.Editor
 
                     var boneIndexAttachmentPointSource = mappedIndex.Value;
                     var mappedIndexRef = BoneHelper_new.GetMappedIndex(_bones, boneIndexHandSelf);
-                    var boneIndexHandSource = mappedIndexRef;
+                    if (mappedIndexRef == null)
+                        continue;
+
+                    var boneIndexHandSource = mappedIndexRef.Value;
 
 
                     var self = copyFromFrame.GetSkeletonAnimatedWorld(copyFromSkeleton, boneIndexAttachmentPointSource);
-                    var hand = copyFromFrame.GetSkeletonAnimatedWorld(copyFromSkeleton, boneIndexHandSource.Value);
+                    var hand = copyFromFrame.GetSkeletonAnimatedWorld(copyFromSkeleton, boneIndexHandSource);
 
                     self.Decompose(out var _, out var _, out var bone0);
                     hand.Decompose(out var _, out var _, out var bone1);
@@ -314,13 +324,22 @@ namespace Editors.AnimatioReTarget.Editor
                     if (mappedIndex != null)
                     {
                         var boneSettings = BoneHelper_new.GetBoneFromId(_bones, i);
+                        if (boneSettings == null)
+                            continue;
+
                         if (boneSettings.FreezeTranslation)
                             animation.DynamicFrames[frameIndex].Position[i] = Vector3.Zero;
 
                         if (boneSettings.FreezeRotation)
                             animation.DynamicFrames[frameIndex].Rotation[i] = Quaternion.Identity;
                         if (boneSettings.FreezeRotationZ)
-                            animation.DynamicFrames[frameIndex].Rotation[i] = new Quaternion(0, 0, animation.DynamicFrames[0].Rotation[i].Z, animation.DynamicFrames[0].Rotation[i].W);
+                        {
+                            var currentRotation = Quaternion.Normalize(animation.DynamicFrames[frameIndex].Rotation[i]);
+                            var currentTwist = ExtractTwistAroundZ(currentRotation);
+                            var currentSwing = currentRotation * Quaternion.Inverse(currentTwist);
+                            var firstFrameTwist = ExtractTwistAroundZ(animation.DynamicFrames[0].Rotation[i]);
+                            animation.DynamicFrames[frameIndex].Rotation[i] = Quaternion.Normalize(currentSwing * firstFrameTwist);
+                        }
                     }
                     else
                     {
@@ -334,6 +353,16 @@ namespace Editors.AnimatioReTarget.Editor
 
                 }
             }
+        }
+
+        static Quaternion ExtractTwistAroundZ(Quaternion rotation)
+        {
+            var lengthSquared = rotation.Z * rotation.Z + rotation.W * rotation.W;
+            if (lengthSquared <= float.Epsilon)
+                return Quaternion.Identity;
+
+            var inverseLength = 1.0f / MathF.Sqrt(lengthSquared);
+            return new Quaternion(0, 0, rotation.Z * inverseLength, rotation.W * inverseLength);
         }
 
 

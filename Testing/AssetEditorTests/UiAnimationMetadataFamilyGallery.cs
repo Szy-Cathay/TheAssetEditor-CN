@@ -995,8 +995,8 @@ public class UiAnimationMetadataFamilyGallery
                 window.Height = 680;
                 break;
             case "retarget-save-window":
-                window.Width = 820;
-                window.Height = 480;
+                window.Width = 560;
+                window.Height = 260;
                 break;
             case "metadata-new-entry-window":
                 window.Width = 460;
