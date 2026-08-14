@@ -1,5 +1,6 @@
 using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.AnimationPlayer;
+using Editors.Shared.Core.Common.BaseControl;
 using GameWorld.Core.Animation;
 using Microsoft.Xna.Framework;
 using Shared.GameFormats.Animation;
@@ -85,6 +86,29 @@ public class AnimationPlayerViewModelTests
         });
     }
 
+    [Test]
+    public void TimelineAnnotationContent_NotifiesWithoutKnowingFeatureType()
+    {
+        var viewModel = new AnimationPlayerViewModel();
+        var content = new TestAnnotationContent();
+        var notifications = new List<string?>();
+        viewModel.PropertyChanged += (_, args) =>
+            notifications.Add(args.PropertyName);
+
+        viewModel.TimelineAnnotationContent = content;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                viewModel.TimelineAnnotationContent,
+                Is.SameAs(content));
+            Assert.That(
+                notifications,
+                Does.Contain(nameof(
+                    AnimationPlayerViewModel.TimelineAnnotationContent)));
+        });
+    }
+
     private static SceneObject CreateSceneObject(
         string id,
         int frameCount,
@@ -156,5 +180,10 @@ public class AnimationPlayerViewModelTests
         public void Update(float currentTime)
         {
         }
+    }
+
+    private sealed class TestAnnotationContent : IEditorViewModelTypeProvider
+    {
+        public Type EditorViewModelType => typeof(object);
     }
 }

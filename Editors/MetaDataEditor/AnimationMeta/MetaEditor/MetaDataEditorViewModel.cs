@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationMeta.MetaEditor.Commands;
 using Shared.Core.Events;
@@ -15,8 +16,10 @@ namespace Editors.AnimationMeta.Presentation
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly MetaDataFileParser _metaDataFileParser;
         private readonly IEventHub _eventHub;
+        private readonly List<AttributeViewModel> _observedVariables = [];
         private bool _hasStructuralChanges;
         public event Action<MetaDataEditorViewModel>? StructureChanged;
+        public event Action<MetaDataEditorViewModel>? FieldValidityChanged;
         public ParsedMetadataFile? ParsedFile { get; private set; }
         public ParsedMetadataAttribute? SelectedAttribute { get; private set; }
 
@@ -84,7 +87,7 @@ namespace Editors.AnimationMeta.Presentation
         public bool CreateNewFile(string path) =>
             _uiCommandFactory.Create<CreateEmptyMetaDataFileCommand>()
                 .Execute(this, path);
-        public void Close() { }
+        public void Close() => DetachFieldValidityObservers();
 
         public void LoadFile(PackFile? file)
         {
@@ -119,6 +122,7 @@ namespace Editors.AnimationMeta.Presentation
                 Tags.Select(tag => tag._input)
                     .SequenceEqual(ParsedFile.Attributes) == false;
 
+            DetachFieldValidityObservers();
             Tags.Clear();
             if (ParsedFile == null)
                 return;
@@ -142,6 +146,8 @@ namespace Editors.AnimationMeta.Presentation
 
             if (structureChanged)
                 MarkStructureChanged();
+
+            AttachFieldValidityObservers();
         }
 
         public void RefreshAttributeValues(ParsedMetadataAttribute attribute)
@@ -163,6 +169,30 @@ namespace Editors.AnimationMeta.Presentation
 
             _hasStructuralChanges = true;
             OnPropertyChanged(nameof(HasUnsavedChanges));
+        }
+
+        private void AttachFieldValidityObservers()
+        {
+            foreach (var variable in Tags.SelectMany(tag => tag.Variables))
+            {
+                variable.PropertyChanged += OnVariablePropertyChanged;
+                _observedVariables.Add(variable);
+            }
+        }
+
+        private void DetachFieldValidityObservers()
+        {
+            foreach (var variable in _observedVariables)
+                variable.PropertyChanged -= OnVariablePropertyChanged;
+            _observedVariables.Clear();
+        }
+
+        private void OnVariablePropertyChanged(
+            object? sender,
+            PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(AttributeViewModel.IsValid))
+                FieldValidityChanged?.Invoke(this);
         }
 
         [RelayCommand] void MoveUpAction() => _uiCommandFactory.Create<MoveEntryCommand>().ExecuteUp(this);

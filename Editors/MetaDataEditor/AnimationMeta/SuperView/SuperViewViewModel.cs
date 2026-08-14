@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using System.Windows.Controls;
 using Editors.AnimationMeta.Presentation;
 using Editors.AnimationMeta.SuperView.Editing;
+using Editors.AnimationMeta.SuperView.Inspection;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
@@ -46,6 +47,8 @@ namespace Editors.AnimationMeta.SuperView
             _threeDimensionalEditingSources = new(
                 ReferenceEqualityComparer.Instance);
         private List<MetaDataBuildDiagnostic> _metaDataDiagnostics = [];
+        private MetaDataInspectionIndex _metaDataInspectionIndex =
+            Inspection.MetaDataInspectionIndex.Create([], [], [], 0);
 
         [ObservableProperty] MetaDataEditorViewModel _persistentMetaEditor = null!;
         [ObservableProperty] MetaDataEditorViewModel _metaEditor = null!;
@@ -234,6 +237,9 @@ namespace Editors.AnimationMeta.SuperView
                 : MetaEditor.SelectedAttribute;
         public IReadOnlyList<MetaDataBuildDiagnostic> MetaDataDiagnostics =>
             _metaDataDiagnostics;
+        public MetaDataInspectionIndex MetaDataInspectionIndex =>
+            _metaDataInspectionIndex;
+        public MetaDataTimelineViewModel MetaDataTimeline { get; }
         public bool CanFocusSelectedMetaData =>
             GetSelectedSpatialPreview() != null;
         public bool CanEditSelectedCombatMetaData =>
@@ -390,6 +396,11 @@ namespace Editors.AnimationMeta.SuperView
             _metaDataFactory = metaDataFactory;
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
+            MetaDataTimeline = new MetaDataTimelineViewModel(
+                SelectMetaDataInspectionItem);
+            Player.TimelineAnnotationContent = MetaDataTimeline;
+            Player.SelectedAnimationMaxTime.PropertyChanged +=
+                OnSelectedAnimationMaxTimeChanged;
             GameWorld!.AddComponent(combatGizmo);
             _combatEditSession.ValueChanged += OnCombatMetaDataValueChanged;
             _combatEditSession.HistoryChanged += OnCombatHistoryChanged;
@@ -406,6 +417,7 @@ namespace Editors.AnimationMeta.SuperView
             ApplySelectedMetaDataPreview();
             UpdateCombatEditTarget();
             NotifySelectedMetaDataContextChanged();
+            UpdateMetaDataTimelineSelection();
         }
         partial void OnSelectedTabControllerIndexChanged(int value)
         {
@@ -414,6 +426,7 @@ namespace Editors.AnimationMeta.SuperView
             UpdateCombatEditTarget();
             NotifySelectedMetaDataContextChanged();
             OnPropertyChanged(nameof(IsAnimationMetaTabSelected));
+            UpdateMetaDataTimelineSelection();
         }
         partial void OnShowImpactPositionsChanged(bool value) =>
             OnCombatCategoryVisibilityChanged();
@@ -457,6 +470,9 @@ namespace Editors.AnimationMeta.SuperView
             MetaEditor.PropertyChanged += OnMetaEditorPropertyChanged;
             PersistentMetaEditor.StructureChanged += OnMetaEditorStructureChanged;
             MetaEditor.StructureChanged += OnMetaEditorStructureChanged;
+            PersistentMetaEditor.FieldValidityChanged +=
+                OnMetaEditorFieldValidityChanged;
+            MetaEditor.FieldValidityChanged += OnMetaEditorFieldValidityChanged;
 
             var assetViewModel = _sceneObjectViewModelBuilder.CreateAsset("SuperViewRoot", true, "Root", Color.Black, null);
             SceneObjects.Add(assetViewModel);
@@ -497,6 +513,18 @@ namespace Editors.AnimationMeta.SuperView
             UpdateCombatEditTarget();
         }
 
+        private void OnMetaEditorFieldValidityChanged(
+            MetaDataEditorViewModel editor) =>
+            RebuildMetaDataInspectionIndex();
+
+        private void OnSelectedAnimationMaxTimeChanged(
+            object? sender,
+            PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Player.SelectedAnimationMaxTime.Value))
+                RebuildMetaDataInspectionIndex();
+        }
+
 
 
         void RecreateMetaDataInformation()
@@ -535,6 +563,7 @@ namespace Editors.AnimationMeta.SuperView
                 buildResult.AnimationRules);
             _metaDataDiagnostics = buildResult.Diagnostics.ToList();
             OnPropertyChanged(nameof(MetaDataDiagnostics));
+            RebuildMetaDataInspectionIndex();
             _appliedSelectedPreviewAttribute = SelectedPreviewAttribute;
             ApplyCombatPreviewVisibility();
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
@@ -612,11 +641,88 @@ namespace Editors.AnimationMeta.SuperView
                 ReferenceEquals(diagnostic.Source, attribute));
             _metaDataDiagnostics.AddRange(buildResult.Diagnostics);
             OnPropertyChanged(nameof(MetaDataDiagnostics));
+            RebuildMetaDataInspectionIndex();
 
             ApplyCombatPreviewVisibility();
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
             OnPropertyChanged(nameof(CanConfigureSelectedMetaDataDisplayTime));
             return true;
+        }
+
+        private void RebuildMetaDataInspectionIndex()
+        {
+            var sources = GetMetaDataInspectionSources(
+                    PersistentMetaEditor,
+                    MetaDataDocumentOwner.Persistent)
+                .Concat(GetMetaDataInspectionSources(
+                    MetaEditor,
+                    MetaDataDocumentOwner.Animation));
+            var clipDurationSeconds =
+                Player.SelectedAnimationMaxTime.Value;
+            _metaDataInspectionIndex = Inspection.MetaDataInspectionIndex.Create(
+                sources,
+                _asset.Data.MetaDataItems,
+                _metaDataDiagnostics,
+                clipDurationSeconds);
+            OnPropertyChanged(nameof(MetaDataInspectionIndex));
+            MetaDataTimeline.Update(
+                _metaDataInspectionIndex,
+                clipDurationSeconds);
+            UpdateMetaDataTimelineSelection();
+        }
+
+        private static IEnumerable<MetaDataInspectionSource>
+            GetMetaDataInspectionSources(
+                MetaDataEditorViewModel editor,
+                MetaDataDocumentOwner owner)
+        {
+            if (editor.ParsedFile == null)
+                yield break;
+
+            foreach (var source in editor.ParsedFile.Attributes)
+            {
+                var entry = editor.Tags.FirstOrDefault(tag =>
+                    ReferenceEquals(tag._input, source));
+                var areFieldsValid = entry?.IsDecodedCorrectly == true &&
+                    entry.Variables.All(variable => variable.IsValid);
+                yield return new MetaDataInspectionSource(
+                    source,
+                    owner,
+                    areFieldsValid);
+            }
+        }
+
+        private void SelectMetaDataInspectionItem(
+            MetaDataInspectionItem item)
+        {
+            if (item.AuthoredTimeStatus !=
+                    MetaDataAuthoredTimeStatus.Valid ||
+                item.AuthoredTimeRange is not MetaDataTimeRange timeRange)
+            {
+                return;
+            }
+
+            var editor = item.Owner == MetaDataDocumentOwner.Persistent
+                ? PersistentMetaEditor
+                : MetaEditor;
+            var tag = editor.Tags.FirstOrDefault(candidate =>
+                ReferenceEquals(candidate._input, item.Source));
+            if (tag == null)
+                return;
+
+            SelectedTabControllerIndex = item.Owner ==
+                MetaDataDocumentOwner.Persistent ? 0 : 1;
+            editor.SelectedTag = tag;
+            Player.PlaybackPositionSeconds = timeRange.StartTime;
+            NotifySelectedMetaDataContextChanged();
+        }
+
+        private void UpdateMetaDataTimelineSelection()
+        {
+            var owner = SelectedTabControllerIndex == 0
+                ? MetaDataDocumentOwner.Persistent
+                : MetaDataDocumentOwner.Animation;
+            MetaDataTimeline.UpdateSelection(owner, SelectedPreviewAttribute);
         }
 
         private bool TryGetDocumentOwner(
@@ -905,6 +1011,7 @@ namespace Editors.AnimationMeta.SuperView
                         item is IMetaDataPreview preview &&
                         ReferenceEquals(preview.Source, change.Source))
                     ?.Update(currentTimeSeconds);
+                RebuildMetaDataInspectionIndex();
                 return;
             }
 
@@ -1010,6 +1117,19 @@ namespace Editors.AnimationMeta.SuperView
             MetaEditor.PropertyChanged -= OnMetaEditorPropertyChanged;
             PersistentMetaEditor.StructureChanged -= OnMetaEditorStructureChanged;
             MetaEditor.StructureChanged -= OnMetaEditorStructureChanged;
+            PersistentMetaEditor.FieldValidityChanged -=
+                OnMetaEditorFieldValidityChanged;
+            MetaEditor.FieldValidityChanged -= OnMetaEditorFieldValidityChanged;
+            Player.SelectedAnimationMaxTime.PropertyChanged -=
+                OnSelectedAnimationMaxTimeChanged;
+            if (ReferenceEquals(
+                Player.TimelineAnnotationContent,
+                MetaDataTimeline))
+            {
+                Player.TimelineAnnotationContent = null;
+            }
+            PersistentMetaEditor.Close();
+            MetaEditor.Close();
             _combatEditSession.ValueChanged -= OnCombatMetaDataValueChanged;
             _combatEditSession.HistoryChanged -= OnCombatHistoryChanged;
             _eventHub?.UnRegister(this);

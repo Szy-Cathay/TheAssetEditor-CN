@@ -33,6 +33,7 @@ public class UiAnimationMetadataFamilyTests
         "Editors/MetaDataEditor/AnimationMeta/MetaEditor/View/MetaDataEntryView.xaml",
         "Editors/MetaDataEditor/AnimationMeta/MetaEditor/View/NewMetaDataEntryWindow.xaml",
         "Editors/MetaDataEditor/AnimationMeta/SuperView/EditorView.xaml",
+        "Editors/MetaDataEditor/AnimationMeta/SuperView/Inspection/MetaDataTimelineView.xaml",
         "Editors/Shared/Editors.Shared.Core/Common/AnimationPlayer/AnimationPlayerView.xaml",
         "Editors/Shared/Editors.Shared.Core/Common/BaseControl/EditorHostView.xaml",
         "Editors/Shared/Editors.Shared.Core/Common/ReferenceModel/SceneObjectView.xaml",
@@ -58,7 +59,7 @@ public class UiAnimationMetadataFamilyTests
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(sources.Count, Is.EqualTo(31));
+            NUnitAssert.That(sources.Count, Is.EqualTo(32));
             NUnitAssert.That(combined, Does.Contain("AeBrush."));
             NUnitAssert.That(combined, Does.Contain("AppFontFamily"));
             NUnitAssert.That(combined, Does.Contain("AppFontWeight"));
@@ -444,6 +445,66 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 attributeView,
                 Does.Contain("EditEffectOrientation"));
+        });
+    }
+
+    [Test]
+    public void MetadataSuperView_TimelineAnnotationUsesGenericPlayerSlot()
+    {
+        var root = FindSolutionRoot();
+        var player = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Shared",
+            "Editors.Shared.Core",
+            "Common",
+            "AnimationPlayer",
+            "AnimationPlayerView.xaml"));
+        var timeline = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "SuperView",
+            "Inspection",
+            "MetaDataTimelineView.xaml"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                player,
+                Does.Contain("TimelineAnnotationContent"));
+            NUnitAssert.That(player, Does.Not.Contain("IsSuperView"));
+            NUnitAssert.That(player, Does.Not.Contain("MetaDataTimeline"));
+            NUnitAssert.That(timeline, Does.Contain("SelectCommand"));
+            NUnitAssert.That(
+                timeline,
+                Does.Contain("AutomationProperties.Name"));
+            NUnitAssert.That(timeline, Does.Contain("ToolTipText"));
+            NUnitAssert.That(
+                timeline,
+                Does.Contain("BasedOn=\"{StaticResource AeButton.Base}\""));
+            NUnitAssert.That(
+                timeline,
+                Does.Contain("AncestorType=Button"));
+            NUnitAssert.That(
+                timeline,
+                Does.Not.Contain("AeBrush.SurfaceHover"));
+            NUnitAssert.That(
+                timeline,
+                Does.Not.Contain("Property=\"IsKeyboardFocused\""));
+            NUnitAssert.That(
+                timeline,
+                Does.Not.Contain("Property=\"Opacity\""));
+            NUnitAssert.That(
+                timeline,
+                Does.Contain("MetaDataTimelineMarkerKind.Instant"));
+            NUnitAssert.That(
+                timeline,
+                Does.Contain("MetaDataTimelineMarkerKind.Range"));
+            NUnitAssert.That(
+                timeline,
+                Does.Contain("MetaDataTimelineMarkerKind.WholeAnimation"));
         });
     }
 

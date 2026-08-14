@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AnimationEditor.Common.AnimationPlayer"
+             xmlns:basecontrol="clr-namespace:Editors.Shared.Core.Common.BaseControl"
               xmlns:s="http://schemas.singulink.com/xaml"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
@@ -13,6 +14,7 @@
              FontWeight="{DynamicResource AppFontWeight}">
     <UserControl.Resources>
         <ResourceDictionary>
+            <basecontrol:HostTemplateSelector x:Key="TimelineAnnotationSelector" />
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
@@ -156,25 +158,39 @@
                 Margin="0,6,0,0"
                 Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" MinWidth="200" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" MinWidth="110" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Margin="0,0,10,0" VerticalAlignment="Center">
+                <TextBlock Margin="0,0,10,0"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource AeText.Technical}">
                     <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
                     <Run Text="{Binding SelectedAnimationCurrentTime.Value, StringFormat=N2}" />
                     <Run Text=" / " />
                     <Run Text="{Binding SelectedAnimationMaxTime.Value, StringFormat=N2}" />
                     <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
                 </TextBlock>
-                <Slider
-                    Grid.Column="1"
-                    Maximum="{Binding SelectedAnimationMaxTime.Value, Mode=OneWay}"
-                    Style="{StaticResource AeEditor.PlaybackSlider}"
-                    Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Slider
+                        Maximum="{Binding SelectedAnimationMaxTime.Value, Mode=OneWay}"
+                        Style="{StaticResource AeEditor.PlaybackSlider}"
+                        Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ContentControl
+                        Grid.Row="1"
+                        Content="{Binding TimelineAnnotationContent, Mode=OneWay}"
+                        ContentTemplateSelector="{StaticResource TimelineAnnotationSelector}" />
+                </Grid>
+                <TextBlock Grid.Column="2"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource AeText.Technical}">
                     <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
                     <Run Text="{Binding SelectedAnimationCurrentFrame.Value}" />
                     <Run Text=" / " />

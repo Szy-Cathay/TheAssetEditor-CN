@@ -83,6 +83,8 @@
 | `MetaDataPreviewBuilder` | 分派并建立已支持的预览实例族 | 单条预览的失败隔离与 marker fallback |
 | `MetaDataRuleBuilder` | 建立 Dock Equipment 和 Transform 动画规则 | 规则列表，不直接写主播放器 |
 | `MetaDataResourceResolver` | 查找模型、动画和 Effect XML | 统一资源缺失诊断，不伪造资源 |
+| `MetaDataInspectionIndex` | 汇总双文档 META 的检查身份、字段/时间状态、预览能力、空间焦点和诊断 | 以 owner 与源对象引用组成身份，不持有编辑状态 |
+| `MetaDataTimelineViewModel` | 把索引中的有效时间范围投影成播放器标记并执行导航 | 只属于 SuperView，不解释或修改 META 字段 |
 | `CombatMetaDataEditSession` | 空间元数据预览事务、撤销/重做、每文档历史 | 以文档 owner 区分的编辑历史 |
 | `CombatMetaDataGizmoComponent` | 3D 手势与 Gizmo/鼠标生命周期 | 当前空间目标和活动 gesture |
 | `SpatialMetaDataCatalog` | 已验证空间标签到可写字段的适配 | 类型能力定义，不持有运行时选择 |
@@ -230,6 +232,16 @@
 不要建立“所有 `(0,0)` 都显示整段”的通用规则。这会让瞬时战斗事件错误地整段显示。新增 tag 时必须根据格式/游戏证据选择零范围语义并补测试。
 
 跳转到开始/结束、选中时间范围显示和实例更新必须使用同一秒数定义。播放条 seek 后既要更新主 pose，也要更新附属 Prop pose和时间可见性。
+
+### 9.1 统一检查索引与时间轴标记
+
+`MetaDataInspectionIndex` 是 SuperView 内部的只读适配层。每项保留原始 `ParsedMetadataAttribute` 引用和 `Persistent`/`Animation` owner；即使两份文档中 tag 名称、版本和字段值完全相同，也必须是两个独立项。索引同时汇总字段有效性、原始 authored range、结构化时间状态、预览能力、可选战斗分类/空间焦点和该 owner 的构建诊断，不能反向成为保存数据源。
+
+索引在文档加载、结构变化、字段有效性或值变化、单项/完整预览结果变化和动画 clip 时长变化后重建。活动页签或列表选择只更新时间轴的选择投影，不得因此完整重建预览。字段文本无效、时间为负数、start 大于 end、范围超出当前 clip 或没有可用 clip 时，索引保留原因状态，但不生成虚假标记或 seek 目标。
+
+时间轴紧邻共享播放滑块，只投影三种只读标记：普通同一时刻为瞬时刻线，合法 start/end 为区间条，明确 allowlist 的 `(0,0)` 为全程条。Impact、Target、Fire、Splash 沿用三维预览分类颜色；其他类型使用主题语义色。所选项还必须通过轮廓、厚度或形状变化表达，不能只换颜色；tooltip 和 `AutomationProperties.Name` 需用中文说明类型、owner 和时间。
+
+点击标记只做导航：切换到对应 owner 页签，按引用身份选择同一个源对象，并把共享播放器 seek 到 authored start。它不提供拖动、时间编辑、缩放、裁剪或区间调整。共享 `AnimationPlayerView` 只暴露通用的可选注释内容槽；所有 META 索引、标记、颜色和点击语义仍留在 `AnimationMeta/SuperView`，不得向共享播放器加入 `IsSuperView`、META 类型判断或业务分发。
 
 ## 10. 空间元数据能力目录
 
@@ -408,6 +420,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 | 空间 Gizmo | `CombatMetaDataEditSessionTests`、`SpatialMetaDataCatalogTests` | 根/骨骼附着、平移/旋转、取消/撤销/重做 |
 | 预览构建/资源失败 | `MetaDataBuildResultTests`、`MetaDataBuilderMissingResourceTests` | 真实 Fragment、模型、动画、Effect 和诊断表现 |
 | 时间与同步 | `MetaDataPreviewTimeTests` | 播放/暂停/seek/循环、瞬时 tag 与整段 tag |
+| 检查索引/时间轴 | `MetaDataInspectionIndexTests`、`MetaDataEditorViewModelTests`、`UiAnimationMetadataFamilyGallery` | 双文档同值项、无效范围、点击导航、四主题/高对比度、空状态和缩放 |
 | 字段 UI/批量控制 | `MetaDataAttributeControlTests` | 两页签、直接 Meta Editor、中文 UI 和焦点 |
 | 格式解析 | `MetaDataFileParserTests` 及格式项目测试 | 真实文件 round trip、未知 payload |
 | View3D 隔离 | `View3DComponentIsolationTests` | 确认模型不可选择、无 Kitbash 编辑工具泄漏 |
