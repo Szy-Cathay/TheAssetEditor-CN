@@ -1,0 +1,133 @@
+<UserControl x:Class="Editors.AnimationMeta.SuperView.Inspection.MetaDataProblemListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+             AutomationProperties.Name="{loc:Loc SuperView.Problems.ListAutomationName}">
+    <Border
+        Margin="4"
+        Padding="8"
+        Style="{StaticResource AeSurface.Panel}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Margin="0,0,0,4"
+                Style="{StaticResource AeText.SectionTitle}"
+                Text="{Binding HeaderText}" />
+
+            <ListBox
+                x:Name="ProblemList"
+                Grid.Row="1"
+                MaxHeight="176"
+                AutomationProperties.Name="{loc:Loc SuperView.Problems.ListAutomationName}"
+                ItemsSource="{Binding Problems}"
+                ScrollViewer.CanContentScroll="True"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                SelectedItem="{Binding SelectedProblem, Mode=TwoWay}"
+                VirtualizingPanel.IsVirtualizing="True"
+                VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListBox.Style>
+                    <Style
+                        TargetType="ListBox"
+                        BasedOn="{StaticResource AeList.View}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasProblems}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.Style>
+                <ListBox.ItemContainerStyle>
+                    <Style
+                        TargetType="ListBoxItem"
+                        BasedOn="{StaticResource AeList.Item}">
+                        <Setter
+                            Property="AutomationProperties.Name"
+                            Value="{Binding AutomationName}" />
+                        <Setter Property="ToolTip" Value="{Binding ToolTipText}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsError}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.Warning}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="4,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border>
+                                <Border.Style>
+                                    <Style
+                                        TargetType="Border"
+                                        BasedOn="{StaticResource AeFeedback.Icon}">
+                                        <Setter Property="Margin" Value="0,0,8,0" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsError}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource AeBrush.Danger}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource AeBrush.Warning}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock
+                                        Margin="0,0,8,0"
+                                        DockPanel.Dock="Left"
+                                        Style="{StaticResource AeText.Label}"
+                                        Text="{Binding SeverityText}" />
+                                    <TextBlock
+                                        Style="{StaticResource AeText.Body}"
+                                        Text="{Binding ReasonText}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
+                                <TextBlock
+                                    Foreground="{DynamicResource AeBrush.TextMuted}"
+                                    Style="{StaticResource AeText.Caption}"
+                                    Text="{Binding ContextText}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Border Grid.Row="1" MinHeight="56">
+                <Border.Style>
+                    <Style
+                        TargetType="Border"
+                        BasedOn="{StaticResource AeEmptyState.Panel}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasProblems}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock
+                        Style="{StaticResource AeEmptyState.Title}"
+                        Text="{Binding EmptyTitle}" />
+                    <TextBlock
+                        Style="{StaticResource AeEmptyState.Description}"
+                        Text="{Binding EmptyDescription}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

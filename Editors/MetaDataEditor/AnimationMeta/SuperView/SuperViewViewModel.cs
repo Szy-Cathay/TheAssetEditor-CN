@@ -241,6 +241,7 @@ namespace Editors.AnimationMeta.SuperView
         public MetaDataInspectionIndex MetaDataInspectionIndex =>
             _metaDataInspectionIndex;
         public MetaDataTimelineViewModel MetaDataTimeline { get; }
+        public MetaDataProblemListViewModel MetaDataProblems { get; }
         public bool CanFocusSelectedMetaData =>
             GetSelectedSpatialPreview() != null;
         public bool CanEditSelectedCombatMetaData =>
@@ -401,6 +402,8 @@ namespace Editors.AnimationMeta.SuperView
             _markerPicker = markerPicker;
             MetaDataTimeline = new MetaDataTimelineViewModel(
                 SelectMetaDataInspectionItem);
+            MetaDataProblems = new MetaDataProblemListViewModel(
+                NavigateToMetaDataProblem);
             Player.TimelineAnnotationContent = MetaDataTimeline;
             Player.SelectedAnimationMaxTime.PropertyChanged +=
                 OnSelectedAnimationMaxTimeChanged;
@@ -427,6 +430,7 @@ namespace Editors.AnimationMeta.SuperView
             UpdateCombatEditTarget();
             NotifySelectedMetaDataContextChanged();
             UpdateMetaDataTimelineSelection();
+            UpdateMetaDataProblemSelection();
         }
         partial void OnSelectedTabControllerIndexChanged(int value)
         {
@@ -437,6 +441,7 @@ namespace Editors.AnimationMeta.SuperView
             NotifySelectedMetaDataContextChanged();
             OnPropertyChanged(nameof(IsAnimationMetaTabSelected));
             UpdateMetaDataTimelineSelection();
+            UpdateMetaDataProblemSelection();
         }
         partial void OnShowImpactPositionsChanged(bool value) =>
             OnCombatCategoryVisibilityChanged();
@@ -680,7 +685,9 @@ namespace Editors.AnimationMeta.SuperView
             MetaDataTimeline.Update(
                 _metaDataInspectionIndex,
                 clipDurationSeconds);
+            MetaDataProblems.Update(_metaDataInspectionIndex);
             UpdateMetaDataTimelineSelection();
+            UpdateMetaDataProblemSelection();
         }
 
         private static IEnumerable<MetaDataInspectionSource>
@@ -697,11 +704,37 @@ namespace Editors.AnimationMeta.SuperView
                     ReferenceEquals(tag._input, source));
                 var areFieldsValid = entry?.IsDecodedCorrectly == true &&
                     entry.Variables.All(variable => variable.IsValid);
+                var invalidFieldNames = entry?.Variables
+                    .Where(variable => !variable.IsValid)
+                    .Select(variable => variable.FieldName)
+                    .ToArray() ?? [];
                 yield return new MetaDataInspectionSource(
                     source,
                     owner,
-                    areFieldsValid);
+                    areFieldsValid,
+                    invalidFieldNames);
             }
+        }
+
+        internal void NavigateToMetaDataProblem(
+            MetaDataInspectionProblem problem)
+        {
+            if (!SelectMetaDataItem(problem.Item))
+                return;
+
+            if (problem.TimeRange is MetaDataTimeRange timeRange &&
+                float.IsFinite(timeRange.StartTime) &&
+                timeRange.StartTime >= 0 &&
+                timeRange.StartTime <= Player.SelectedAnimationMaxTime.Value)
+            {
+                Player.PlaybackPositionSeconds = timeRange.StartTime;
+            }
+
+            if (problem.Item.FocusPosition is Vector3 focusPosition)
+                FocusService.LookAt(focusPosition);
+
+            MetaDataProblems.UpdateSelection(problem);
+            NotifySelectedMetaDataContextChanged();
         }
 
         private void SelectMetaDataInspectionItem(
@@ -806,6 +839,14 @@ namespace Editors.AnimationMeta.SuperView
                 ? MetaDataDocumentOwner.Persistent
                 : MetaDataDocumentOwner.Animation;
             MetaDataTimeline.UpdateSelection(owner, SelectedPreviewAttribute);
+        }
+
+        private void UpdateMetaDataProblemSelection()
+        {
+            var owner = SelectedTabControllerIndex == 0
+                ? MetaDataDocumentOwner.Persistent
+                : MetaDataDocumentOwner.Animation;
+            MetaDataProblems.UpdateSelection(owner, SelectedPreviewAttribute);
         }
 
         private bool TryGetDocumentOwner(

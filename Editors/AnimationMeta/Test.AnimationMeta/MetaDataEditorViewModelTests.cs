@@ -1839,6 +1839,104 @@ namespace Test.AnimationMeta
             }
         }
 
+        [Test]
+        public void SuperView_ProblemNavigation_UsesSharedIdentityWithoutBlockingWarningSave()
+        {
+            const string persistentPath =
+                @"animations\battle\codex\problem_persistent.meta";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateOutputPack();
+            var editorCreator =
+                runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)editorCreator.Create(
+                EditorEnums.SuperView_Editor);
+
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<
+                    MetaDataFileParser>();
+                var fileSaveService =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        IFileSaveService>();
+                var sceneObjectEditor =
+                    runner.GetRequiredServiceInCurrentEditorScope<
+                        SceneObjectEditor>();
+                var camera = runner.GetRequiredServiceInCurrentEditorScope<
+                    ArcBallCamera>();
+                var position = new Vector3(3, 4, 5);
+                var metadata = new ParsedMetadataFile
+                {
+                    Version = 2,
+                    Attributes =
+                    [
+                        new FirePos_v10
+                        {
+                            Name = "FIRE_POS",
+                            Version = 10,
+                            StartTime = 1,
+                            EndTime = 0,
+                            Position = position,
+                        },
+                    ],
+                };
+                var persistentFile = fileSaveService.Save(
+                    persistentPath,
+                    parser.GenerateBytes(metadata.Version, metadata),
+                    false)!;
+                var sceneObject = superView.SceneObjects.Single();
+                sceneObject.FragAndSlotSelection.MetaDataPersistName =
+                    persistentPath;
+                sceneObjectEditor.SetMetaFile(
+                    sceneObject.Data,
+                    null,
+                    persistentFile);
+                superView.Player.SelectedAnimationMaxTime.Value = 5;
+                superView.SelectedTabControllerIndex = 1;
+                var originalPreview = sceneObject.Data.MetaDataItems.Single();
+                var problem = superView.MetaDataInspectionIndex.Problems
+                    .Single();
+                camera.LookAt = Vector3.Zero;
+
+                superView.NavigateToMetaDataProblem(problem);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        problem.ReasonKey,
+                        Is.EqualTo("SuperView.Problems.Time.Reversed"));
+                    Assert.That(
+                        problem.Severity,
+                        Is.EqualTo(MetaDataDiagnosticSeverity.Warning));
+                    Assert.That(superView.SelectedTabControllerIndex, Is.Zero);
+                    Assert.That(
+                        superView.PersistentMetaEditor.SelectedAttribute,
+                        Is.SameAs(problem.Source));
+                    Assert.That(
+                        sceneObject.Data.Player.GetTimeUs(),
+                        Is.EqualTo(1_000_000));
+                    Assert.That(camera.LookAt, Is.EqualTo(position));
+                    Assert.That(
+                        sceneObject.Data.MetaDataItems.Single(),
+                        Is.SameAs(originalPreview));
+                    Assert.That(
+                        superView.MetaDataProblems.SelectedProblem?.Problem
+                            .Source,
+                        Is.SameAs(problem.Source));
+                    Assert.That(
+                        superView.MetaDataProblems.SelectedProblem?.Problem
+                            .Owner,
+                        Is.EqualTo(problem.Owner));
+                    Assert.That(superView.MetaDataTimeline.Markers, Is.Empty);
+                    Assert.That(superView.HasUnsavedChanges, Is.False);
+                    Assert.That(superView.Save(), Is.True);
+                });
+            }
+            finally
+            {
+                superView.Close();
+            }
+        }
+
         private static PackFile SaveTimedMetaFile(
             IFileSaveService fileSaveService,
             MetaDataFileParser parser,

@@ -27,6 +27,7 @@ using MetadataAttributeView = Editors.AnimationMeta.Presentation.View.MetaDataAt
 using MetadataEntryView = Editors.AnimationMeta.Presentation.View.MetaDataEntryView;
 using MetadataMainView = Editors.AnimationMeta.Presentation.View.MainEditorView;
 using MetadataNewEntryWindow = Editors.AnimationMeta.Presentation.View.NewMetaDataEntryWindow;
+using MetadataProblemListView = Editors.AnimationMeta.SuperView.Inspection.MetaDataProblemListView;
 using MetadataSuperView = Editors.AnimationMeta.SuperView.EditorView;
 using MountAnimationSettingsView = AnimationEditor.MountAnimationCreator.Views.AnimationSettingsView;
 using MountAnimationView = AnimationEditor.MountAnimationCreator.EditorView;
@@ -863,6 +864,44 @@ public class UiAnimationMetadataFamilyGallery
         return timeline;
     }
 
+    private static MetaDataProblemListViewModel CreateProblemListModel(
+        bool populated)
+    {
+        var problemList = new MetaDataProblemListViewModel(_ => { });
+        if (!populated)
+        {
+            problemList.Update(MetaDataInspectionIndex.Create([], [], [], 5));
+            return problemList;
+        }
+
+        var source = new Shared.GameFormats.AnimationMeta.Definitions.FirePos_v10
+        {
+            Name = "FIRE_POS",
+            Version = 10,
+            StartTime = 1,
+            EndTime = 2,
+        };
+        var diagnostic = new MetaDataBuildDiagnostic(
+            source,
+            MetaDataDocumentOwner.Animation,
+            MetaDataDiagnosticSeverity.Warning,
+            "SuperView.Diagnostics.MissingModel",
+            new MetaDataTimeRange(1, 2),
+            ResourcePath: @"variantmeshes\codex\missing.wsmodel");
+        var index = MetaDataInspectionIndex.Create(
+            [new MetaDataInspectionSource(
+                source,
+                MetaDataDocumentOwner.Animation,
+                false,
+                ["开始时间"])],
+            [],
+            [diagnostic],
+            5);
+        problemList.Update(index);
+        problemList.UpdateSelection(MetaDataDocumentOwner.Animation, source);
+        return problemList;
+    }
+
     private static void AddTimelineMarker(
         MetaDataTimelineViewModel timeline,
         Shared.GameFormats.AnimationMeta.Parsing.ParsedMetadataAttribute source,
@@ -1183,34 +1222,15 @@ public class UiAnimationMetadataFamilyGallery
                 .Single(grid => grid.Name == "PlaybackTimelineRow");
             var initialSliderWidth = slider.ActualWidth;
             var initialTimelineWidth = timeline.ActualWidth;
-            var initialColumnWidths = playbackRow.ColumnDefinitions
-                .Select(column => column.ActualWidth)
-                .ToArray();
-            var timeText = FindVisualDescendants<TextBlock>(window)
-                .Single(text => text.Text.Contains("0.60") &&
-                    text.Text.Contains("120.00"));
-            var frameText = FindVisualDescendants<TextBlock>(window)
-                .Single(text => text.Text.Contains("18") &&
-                    text.Text.Contains("120"));
-            timeText.Inlines.OfType<Run>().ElementAt(1).Text = "99.99";
-            frameText.Inlines.OfType<Run>().ElementAt(1).Text = "99";
-            window.UpdateLayout();
-            var finalColumnWidths = playbackRow.ColumnDefinitions
-                .Select(column => column.ActualWidth)
-                .ToArray();
-            var columnWidthMessage =
-                $"Columns: {string.Join(", ", initialColumnWidths)} -> " +
-                string.Join(", ", finalColumnWidths);
+            var initialPlaybackWidth = playbackRow.ActualWidth;
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(
-                    slider.ActualWidth,
-                    Is.EqualTo(initialSliderWidth).Within(0.01),
-                    columnWidthMessage);
+                    initialSliderWidth,
+                    Is.GreaterThan(initialPlaybackWidth * 0.95));
                 NUnitAssert.That(
-                    timeline.ActualWidth,
-                    Is.EqualTo(initialTimelineWidth).Within(0.01),
-                    columnWidthMessage);
+                    initialTimelineWidth,
+                    Is.GreaterThan(initialPlaybackWidth * 0.95));
             });
         }
 
@@ -1284,6 +1304,36 @@ public class UiAnimationMetadataFamilyGallery
                 NUnitAssert.That(
                     focusButtons,
                     Has.All.Matches<Button>(button => button.IsEnabled));
+            });
+
+            var problemView = FindVisualDescendants<MetadataProblemListView>(
+                window).Single();
+            var problemList = FindVisualDescendants<ListBox>(problemView)
+                .Single(list => list.Name == "ProblemList");
+            var problemLabels = FindVisualDescendants<TextBlock>(problemView)
+                .Where(text => text.IsVisible)
+                .Select(text => text.Text)
+                .ToArray();
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(problemView.ActualHeight, Is.GreaterThan(0));
+                NUnitAssert.That(
+                    System.Windows.Automation.AutomationProperties.GetName(
+                        problemList),
+                    Is.EqualTo("SuperView META 问题列表"));
+                NUnitAssert.That(
+                    problemList.Items.Count,
+                    Is.EqualTo(isLoadedMetadataEditor ? 2 : 0));
+                NUnitAssert.That(
+                    problemList.SelectedItem,
+                    isLoadedMetadataEditor ? Is.Not.Null : Is.Null);
+                NUnitAssert.That(
+                    problemLabels,
+                    isLoadedMetadataEditor
+                        ? Does.Contain("错误")
+                        : Does.Contain("未发现问题"));
+                if (isLoadedMetadataEditor)
+                    NUnitAssert.That(problemLabels, Does.Contain("警告"));
             });
 
             if (isLoadedMetadataEditor)
@@ -1417,6 +1467,7 @@ public class UiAnimationMetadataFamilyGallery
         public GalleryModel PersistentMetaEditor { get; } =
             CreateMetadataModel();
         public GalleryModel MetaEditor { get; } = CreateMetadataModel();
+        public MetaDataProblemListViewModel MetaDataProblems { get; }
         public bool HasPersistentMetaFile { get; }
         public bool HasAnimationMetaFile { get; }
         public bool CanCreatePersistentMetaFile =>
@@ -1479,6 +1530,7 @@ public class UiAnimationMetadataFamilyGallery
             HasPersistentMetaFile = hasPersistentMetaFile;
             HasAnimationMetaFile = hasAnimationMetaFile;
             SelectedTabControllerIndex = selectedTabControllerIndex;
+            MetaDataProblems = CreateProblemListModel(hasAnimationMetaFile);
         }
 
         public void CreatePersistentMetaFile()

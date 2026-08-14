@@ -244,6 +244,10 @@
 
 点击标记只做导航：切换到对应 owner 页签，按引用身份选择同一个源对象，并把共享播放器 seek 到 authored start。它不提供拖动、时间编辑、缩放、裁剪或区间调整。时间范围横向相交的标记分配到不同的紧凑轨道，不相交的标记复用轨道；轨道数量增加时注释区域按需增高，不能把多个标记完全覆盖成一条。共享 `AnimationPlayerView` 只暴露通用的可选注释内容槽；所有 META 索引、标记、颜色、轨道布局和点击语义仍留在 `AnimationMeta/SuperView`，不得向共享播放器加入 `IsSuperView`、META 类型判断或业务分发。
 
+问题列表是同一检查索引的另一个只读投影：字段输入无效显示为保存前必须修正的“错误”；负时间、倒置/超出 clip 范围、资源缺失、规则创建失败或显式的预览不可用诊断显示为不阻塞保存的“警告”。单纯没有预览实例不会自动变成问题，未知或未支持 payload 仍按原有语义保留；预览警告不得改动字段校验或保存门禁。
+
+点击问题项只导航到其 owner 和同一个源对象；若 authored start 在当前 clip 内则跳转，若已建立可用的三维焦点则同时定位，否则保留选择且不移动时间或相机。问题列表、META 列表、时间轴和 3D 预览都以 `owner + ParsedMetadataAttribute` 引用身份对齐，选择同步不能触发完整预览重建，导航不能自动修改文档。
+
 ## 10. 空间元数据能力目录
 
 `SpatialMetaDataCatalog` 是“哪些字段可由 3D Gizmo 安全编辑”的白名单适配层。当前覆盖 Effect、Prop、Blood、CameraShake、CrewLocation、SoundTrigger、SoundBuilding、Transform 等已验证类型，并为每类提供：

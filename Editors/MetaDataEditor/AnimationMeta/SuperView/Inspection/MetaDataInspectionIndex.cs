@@ -34,7 +34,8 @@ namespace Editors.AnimationMeta.SuperView.Inspection
     public sealed record MetaDataInspectionSource(
         ParsedMetadataAttribute Source,
         MetaDataDocumentOwner Owner,
-        bool AreFieldsValid);
+        bool AreFieldsValid,
+        IReadOnlyList<string>? InvalidFieldNames = null);
 
     public sealed record MetaDataInspectionItem(
         ParsedMetadataAttribute Source,
@@ -46,18 +47,37 @@ namespace Editors.AnimationMeta.SuperView.Inspection
         MetaDataPreviewCapability PreviewCapability,
         CombatMetaDataPreviewCategory? PreviewCategory,
         Vector3? FocusPosition,
-        IReadOnlyList<MetaDataBuildDiagnostic> Diagnostics);
+        IReadOnlyList<MetaDataBuildDiagnostic> Diagnostics)
+    {
+        public IReadOnlyList<string> InvalidFieldNames { get; init; } = [];
+    }
+
+    public sealed record MetaDataInspectionProblem(
+        MetaDataInspectionItem Item,
+        MetaDataDiagnosticSeverity Severity,
+        string ReasonKey,
+        string? FieldName = null,
+        MetaDataTimeRange? TimeRange = null,
+        Vector3? Position = null,
+        string? ResourcePath = null,
+        string? BoneName = null)
+    {
+        public ParsedMetadataAttribute Source => Item.Source;
+        public MetaDataDocumentOwner Owner => Item.Owner;
+    }
 
     public sealed class MetaDataInspectionIndex
     {
         private const float BoundaryToleranceSeconds = 0.000001f;
 
         public IReadOnlyList<MetaDataInspectionItem> Items { get; }
+        public IReadOnlyList<MetaDataInspectionProblem> Problems { get; }
 
         private MetaDataInspectionIndex(
             IReadOnlyList<MetaDataInspectionItem> items)
         {
             Items = items.ToArray();
+            Problems = Items.SelectMany(CreateProblems).ToArray();
         }
 
         public static MetaDataInspectionIndex Create(
@@ -116,8 +136,85 @@ namespace Editors.AnimationMeta.SuperView.Inspection
                 previewCapability,
                 GetPreviewCategory(source.Source, preview),
                 TryGetFocusPosition(preview),
-                itemDiagnostics);
+                itemDiagnostics)
+            {
+                InvalidFieldNames = source.InvalidFieldNames?.ToArray() ?? [],
+            };
         }
+
+        private static IEnumerable<MetaDataInspectionProblem> CreateProblems(
+            MetaDataInspectionItem item)
+        {
+            if (!item.AreFieldsValid)
+            {
+                if (item.InvalidFieldNames.Count == 0)
+                {
+                    yield return CreateProblem(
+                        item,
+                        MetaDataDiagnosticSeverity.Error,
+                        "SuperView.Problems.InvalidFields");
+                }
+                else
+                {
+                    foreach (var fieldName in item.InvalidFieldNames)
+                    {
+                        yield return CreateProblem(
+                            item,
+                            MetaDataDiagnosticSeverity.Error,
+                            "SuperView.Problems.InvalidField",
+                            fieldName);
+                    }
+                }
+            }
+            else if (GetTimeProblemReasonKey(item.AuthoredTimeStatus) is
+                     string timeReasonKey)
+            {
+                yield return CreateProblem(
+                    item,
+                    MetaDataDiagnosticSeverity.Warning,
+                    timeReasonKey);
+            }
+
+            foreach (var diagnostic in item.Diagnostics)
+            {
+                yield return new MetaDataInspectionProblem(
+                    item,
+                    diagnostic.Severity,
+                    diagnostic.ReasonKey,
+                    TimeRange: diagnostic.TimeRange,
+                    Position: diagnostic.Position,
+                    ResourcePath: diagnostic.ResourcePath,
+                    BoneName: diagnostic.BoneName);
+            }
+        }
+
+        private static MetaDataInspectionProblem CreateProblem(
+            MetaDataInspectionItem item,
+            MetaDataDiagnosticSeverity severity,
+            string reasonKey,
+            string? fieldName = null) => new(
+                item,
+                severity,
+                reasonKey,
+                fieldName,
+                item.AuthoredTimeRange,
+                item.FocusPosition);
+
+        private static string? GetTimeProblemReasonKey(
+            MetaDataAuthoredTimeStatus status) => status switch
+            {
+                MetaDataAuthoredTimeStatus.NonFinite =>
+                    "SuperView.Problems.Time.NonFinite",
+                MetaDataAuthoredTimeStatus.Negative =>
+                    "SuperView.Problems.Time.Negative",
+                MetaDataAuthoredTimeStatus.Reversed =>
+                    "SuperView.Problems.Time.Reversed",
+                MetaDataAuthoredTimeStatus.OutsideClip =>
+                    "SuperView.Problems.Time.OutsideClip",
+                MetaDataAuthoredTimeStatus.ClipUnavailable =>
+                    "SuperView.Problems.Time.ClipUnavailable",
+                _ => null,
+            };
 
         private static CombatMetaDataPreviewCategory? GetPreviewCategory(
             ParsedMetadataAttribute source,
