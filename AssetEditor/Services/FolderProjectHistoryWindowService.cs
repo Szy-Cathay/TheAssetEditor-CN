@@ -27,9 +27,9 @@ public sealed class FolderProjectHistoryWindowService(
         viewModel.RecoveryCompleted += OnRecoveryCompleted;
         window.DataContext = viewModel;
         viewModel.RefreshCommand.Execute(null);
-        FolderProjectVersionControlWindowService.SetOwner(
-            window,
-            Application.Current?.MainWindow);
+        var owner = Application.Current?.MainWindow;
+        if (owner != null && !ReferenceEquals(window, owner))
+            window.Owner = owner;
         try
         {
             window.ShowDialog();

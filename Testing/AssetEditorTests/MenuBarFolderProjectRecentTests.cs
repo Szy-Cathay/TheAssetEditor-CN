@@ -266,12 +266,12 @@ public class MenuBarFolderProjectRecentTests
             Mock.Of<IFolderProjectOpenService>(),
             eventHub);
         var canExecuteChangedCount = 0;
-        viewModel.OpenFolderProjectVersionControlCommand
+        viewModel.OpenFolderProjectHistoryCommand
             .CanExecuteChanged +=
                 (_, _) => canExecuteChangedCount++;
 
         NUnitAssert.That(
-            viewModel.OpenFolderProjectVersionControlCommand
+            viewModel.OpenFolderProjectHistoryCommand
                 .CanExecute(null),
             Is.False);
 
@@ -282,7 +282,7 @@ public class MenuBarFolderProjectRecentTests
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(
-                viewModel.OpenFolderProjectVersionControlCommand
+                viewModel.OpenFolderProjectHistoryCommand
                     .CanExecute(null),
                 Is.True);
             NUnitAssert.That(canExecuteChangedCount, Is.EqualTo(1));
@@ -295,7 +295,7 @@ public class MenuBarFolderProjectRecentTests
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(
-                viewModel.OpenFolderProjectVersionControlCommand
+                viewModel.OpenFolderProjectHistoryCommand
                     .CanExecute(null),
                 Is.False);
             NUnitAssert.That(canExecuteChangedCount, Is.EqualTo(2));
@@ -303,7 +303,7 @@ public class MenuBarFolderProjectRecentTests
     }
 
     [Test]
-    public void VersionControlMenuCommand_OpensEmbeddedGitPanel()
+    public void HistoryMenuCommand_OpensEmbeddedHistoryPanel()
     {
         using var directory = new TemporaryDirectory();
         using var project = FolderProjectContainer.Create(
@@ -314,14 +314,14 @@ public class MenuBarFolderProjectRecentTests
             .Setup(service => service.GetEditablePack())
             .Returns(project);
         var eventHub = new TestEventHub();
-        OpenFolderProjectGitPanelEvent? published = null;
-        eventHub.Register<OpenFolderProjectGitPanelEvent>(
+        OpenFolderProjectHistoryPanelEvent? published = null;
+        eventHub.Register<OpenFolderProjectHistoryPanelEvent>(
             this,
             item => published = item);
         var services = new ServiceCollection();
         services.AddSingleton(packFileService.Object);
         services.AddSingleton<IEventHub>(eventHub);
-        services.AddTransient<OpenFolderProjectVersionControlCommand>();
+        services.AddTransient<OpenFolderProjectHistoryCommand>();
         using var provider = services.BuildServiceProvider();
         var viewModel = CreateViewModel(
             packFileService.Object,
@@ -330,7 +330,7 @@ public class MenuBarFolderProjectRecentTests
             Mock.Of<IFolderProjectOpenService>(),
             eventHub);
 
-        viewModel.OpenFolderProjectVersionControlCommand.Execute(null);
+        viewModel.OpenFolderProjectHistoryCommand.Execute(null);
 
         NUnitAssert.That(published, Is.Not.Null);
     }

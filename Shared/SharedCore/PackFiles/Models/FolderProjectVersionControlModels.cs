@@ -1,6 +1,6 @@
 ﻿namespace Shared.Core.PackFiles.Models;
 
-public enum FolderProjectVersionControlError
+internal enum FolderProjectVersionControlError
 {
     RepositoryNotInitialized,
     UnsupportedRepository,
@@ -34,7 +34,7 @@ public enum FolderProjectVersionControlError
     RepositoryFailure,
 }
 
-public sealed class FolderProjectVersionControlException :
+internal sealed class FolderProjectVersionControlException :
     InvalidOperationException
 {
     public FolderProjectVersionControlError Code { get; }
@@ -52,11 +52,11 @@ public sealed class FolderProjectVersionControlException :
     }
 }
 
-public sealed record FolderProjectGitIdentity(
+internal sealed record FolderProjectGitIdentity(
     string Name,
     string Email);
 
-public enum FolderProjectRepositoryOperationState
+internal enum FolderProjectRepositoryOperationState
 {
     None,
     Merge,
@@ -64,7 +64,7 @@ public enum FolderProjectRepositoryOperationState
 }
 
 [Flags]
-public enum FolderProjectWorkingChangeKind
+internal enum FolderProjectWorkingChangeKind
 {
     None = 0,
     Added = 1 << 0,
@@ -79,12 +79,12 @@ public enum FolderProjectWorkingChangeKind
     Unreadable = 1 << 9,
 }
 
-public sealed record FolderProjectWorkingChange(
+internal sealed record FolderProjectWorkingChange(
     string RepositoryPath,
     FolderProjectWorkingChangeKind Kind,
     string? PreviousRepositoryPath = null);
 
-public enum FolderProjectVersionControlProgressStage
+internal enum FolderProjectVersionControlProgressStage
 {
     PreparingRepository,
     ScanningWorkingTree,
@@ -103,26 +103,26 @@ public enum FolderProjectVersionControlProgressStage
     VerifyingMerge,
 }
 
-public sealed record FolderProjectVersionControlProgress(
+internal sealed record FolderProjectVersionControlProgress(
     FolderProjectVersionControlProgressStage Stage,
     string? Detail = null,
     long Completed = 0,
     long Total = 0);
 
-public enum FolderProjectCommitUndoMode
+internal enum FolderProjectCommitUndoMode
 {
     KeepChanges,
     DiscardChanges,
 }
 
-public enum FolderProjectCommitChangeEditMode
+internal enum FolderProjectCommitChangeEditMode
 {
     Discard,
     StageForEdit,
     KeepChanges,
 }
 
-public sealed record FolderProjectCommitSummary(
+internal sealed record FolderProjectCommitSummary(
     string Id,
     string Message,
     string AuthorName,
@@ -136,14 +136,14 @@ public sealed record FolderProjectCommitSummary(
     public FolderProjectCommitMergeStatus MergeStatus { get; init; }
 }
 
-public enum FolderProjectCommitMergeStatus
+internal enum FolderProjectCommitMergeStatus
 {
     Unknown,
     NotMerged,
     Merged,
 }
 
-public enum FolderProjectCommitChangeKind
+internal enum FolderProjectCommitChangeKind
 {
     Added,
     Modified,
@@ -152,54 +152,54 @@ public enum FolderProjectCommitChangeKind
     TypeChanged,
 }
 
-public sealed record FolderProjectCommitChange(
+internal sealed record FolderProjectCommitChange(
     string RepositoryPath,
     string? PreviousRepositoryPath,
     FolderProjectCommitChangeKind Kind,
     bool IsBinary);
 
-public sealed record FolderProjectCommitChangeSummary(
+internal sealed record FolderProjectCommitChangeSummary(
     int Added,
     int Modified,
     int Deleted,
     int Renamed,
     int TypeChanged);
 
-public sealed record FolderProjectFileRestoreResult(
+internal sealed record FolderProjectFileRestoreResult(
     string CommitId,
     string RepositoryPath,
     long Size);
 
-public sealed record FolderProjectFileRestoreTransaction(
+internal sealed record FolderProjectFileRestoreTransaction(
     FolderProjectFileRestoreResult Result,
     string StagingPath,
     string TargetPath,
     string? BackupPath);
 
-public sealed record FolderProjectProjectRestoreResult(
+internal sealed record FolderProjectProjectRestoreResult(
     FolderProjectCommitSummary RestoreCommit,
     FolderProjectCommitSummary? SafetyCommit,
     FolderProjectProjectRestoreRollback Rollback);
 
-public sealed record FolderProjectProjectRestoreRollback(
+internal sealed record FolderProjectProjectRestoreRollback(
     string OriginalCommitId,
     string RestoreCommitId,
     string? SafetyCommitId,
     FolderProjectIndexSnapshot Index);
 
-public sealed record FolderProjectDiscardRollback(
+internal sealed record FolderProjectDiscardRollback(
     string StagingPath,
     IReadOnlyList<FolderProjectDiscardBackup> Backups,
     IReadOnlyList<string> AffectedPaths,
     IReadOnlyList<string> CreatedDirectories,
     FolderProjectIndexSnapshot Index);
 
-public sealed record FolderProjectIndexSnapshot(
+internal sealed record FolderProjectIndexSnapshot(
     bool Existed,
     byte[] Bytes,
     FileAttributes Attributes);
 
-public sealed class FolderProjectRecoveryTransaction
+internal sealed class FolderProjectRecoveryTransaction
 {
     private Action? _rollback;
 
@@ -228,36 +228,36 @@ public sealed class FolderProjectRecoveryTransaction
     }
 }
 
-public sealed record FolderProjectDiscardBackup(
+internal sealed record FolderProjectDiscardBackup(
     string OriginalPath,
     string StagedPath);
 
-public sealed record FolderProjectCommitEditSession(
+internal sealed record FolderProjectCommitEditSession(
     string OriginalCommitId,
     string ExpectedHeadCommitId,
     IReadOnlyList<string> RepositoryPaths,
     bool CanReturnToOriginalCommit);
 
-public sealed record FolderProjectBranchInfo(
+internal sealed record FolderProjectBranchInfo(
     string Name,
     string TipCommitId,
     bool IsCurrent,
     bool IsPrimary = false);
 
-public sealed record FolderProjectStashInfo(
+internal sealed record FolderProjectStashInfo(
     int Index,
     string Message,
     DateTimeOffset StashedAt,
     IReadOnlyList<string> Paths);
 
-public enum FolderProjectBranchSwitchMode
+internal enum FolderProjectBranchSwitchMode
 {
     CarryChanges,
     StashChanges,
     DiscardChanges,
 }
 
-public enum FolderProjectMergePhase
+internal enum FolderProjectMergePhase
 {
     None,
     ReadyToCommit,
@@ -265,7 +265,7 @@ public enum FolderProjectMergePhase
     RecoveryRequired,
 }
 
-public enum FolderProjectMergeOutcome
+internal enum FolderProjectMergeOutcome
 {
     UpToDate,
     FastForwarded,
@@ -273,33 +273,33 @@ public enum FolderProjectMergeOutcome
     Conflicts,
 }
 
-public enum FolderProjectMergeChoice
+internal enum FolderProjectMergeChoice
 {
     Current,
     Incoming,
 }
 
-public enum FolderProjectGitFileMode
+internal enum FolderProjectGitFileMode
 {
     NonExecutable,
     NonExecutableGroupWritable,
     Executable,
 }
 
-public sealed record FolderProjectMergeSide(
+internal sealed record FolderProjectMergeSide(
     string RepositoryPath,
     string BlobId,
     FolderProjectGitFileMode Mode,
     long Size,
     bool IsBinary);
 
-public sealed record FolderProjectMergeConflict(
+internal sealed record FolderProjectMergeConflict(
     string Id,
     FolderProjectMergeSide? Ancestor,
     FolderProjectMergeSide? Current,
     FolderProjectMergeSide? Incoming);
 
-public sealed record FolderProjectMergeState(
+internal sealed record FolderProjectMergeState(
     FolderProjectMergePhase Phase,
     string? CurrentBranch,
     string? SourceBranch,
@@ -309,12 +309,12 @@ public sealed record FolderProjectMergeState(
     IReadOnlyList<FolderProjectMergeConflict> Conflicts,
     string? RecoveryReason);
 
-public sealed record FolderProjectMergeStartResult(
+internal sealed record FolderProjectMergeStartResult(
     FolderProjectMergeOutcome Outcome,
     FolderProjectCommitSummary? Commit,
     FolderProjectMergeState State);
 
-public sealed record FolderProjectRepositoryStatus(
+internal sealed record FolderProjectRepositoryStatus(
     bool IsInitialized,
     string? CurrentBranch,
     string? HeadCommitId,

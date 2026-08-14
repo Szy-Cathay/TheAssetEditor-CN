@@ -422,7 +422,7 @@ public class UiMainShellGallery
                         viewModel.EditorManager.SelectedEditorIndex,
                         Is.EqualTo(1));
                     NUnitAssert.That(
-                        viewModel.GitWorkspace.SelectedSidebarTabIndex,
+                        viewModel.HistoryWorkspace.SelectedSidebarTabIndex,
                         Is.EqualTo(1));
                     NUnitAssert.That(
                         workspaceSidebar.SelectedIndex,
@@ -532,7 +532,7 @@ public class UiMainShellGallery
             new(310, GridUnitType.Pixel);
         public object? FileTree { get; }
         public object MenuBar { get; } = new();
-        public ShellPreviewGitWorkspace GitWorkspace { get; }
+        public ShellPreviewHistoryWorkspace HistoryWorkspace { get; }
         public ShellPreviewEditorManager EditorManager { get; }
         public IEditorDatabase ToolsFactory { get; }
         public ICommand CloseToolCommand { get; }
@@ -551,7 +551,7 @@ public class UiMainShellGallery
             bool gitEnabled)
         {
             ToolsFactory = editorDatabase;
-            GitWorkspace = new ShellPreviewGitWorkspace(gitEnabled);
+            HistoryWorkspace = new ShellPreviewHistoryWorkspace(gitEnabled);
             EditorManager = new ShellPreviewEditorManager();
             CloseToolCommand = new ShellPreviewCommand(editor =>
                 EditorManager.CurrentEditorsList.Remove(editor));
@@ -570,12 +570,12 @@ public class UiMainShellGallery
         }
     }
 
-    private sealed class ShellPreviewGitWorkspace
+    private sealed class ShellPreviewHistoryWorkspace
     {
         public int SelectedSidebarTabIndex { get; set; }
         public bool IsEnabled { get; }
 
-        public ShellPreviewGitWorkspace(bool isEnabled) =>
+        public ShellPreviewHistoryWorkspace(bool isEnabled) =>
             IsEnabled = isEnabled;
     }
 

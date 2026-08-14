@@ -62,7 +62,7 @@ public class FolderProjectHistoryViewModelTests
             NUnitAssert.That(viewModel.RestorePoints, Has.Count.EqualTo(2));
             NUnitAssert.That(
                 viewModel.RestorePointDescription,
-                Is.EqualTo("记录工程当前状态"));
+                Is.Empty);
             NUnitAssert.That(
                 viewModel.CreateRestorePointCommand.CanExecute(null),
                 Is.True);
@@ -322,8 +322,7 @@ public class FolderProjectHistoryViewModelTests
                 null))
             .Returns(true);
         var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
-        prompt.Setup(item => item.Show(
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint))
+        prompt.Setup(item => item.Show())
             .Returns(FolderProjectUnsavedChangesChoice.Save);
         var viewModel = CreateViewModel(
             history.Object,
@@ -366,8 +365,7 @@ public class FolderProjectHistoryViewModelTests
                 null))
             .Returns(true);
         var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
-        prompt.Setup(item => item.Show(
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint))
+        prompt.Setup(item => item.Show())
             .Returns(FolderProjectUnsavedChangesChoice.Save);
         var viewModel = CreateViewModel(
             history.Object,
@@ -403,8 +401,7 @@ public class FolderProjectHistoryViewModelTests
                 null))
             .Returns(true);
         var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
-        prompt.Setup(item => item.Show(
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint))
+        prompt.Setup(item => item.Show())
             .Returns(FolderProjectUnsavedChangesChoice.DontSave);
         var viewModel = CreateViewModel(
             history.Object,
@@ -436,8 +433,7 @@ public class FolderProjectHistoryViewModelTests
                 null))
             .Returns(true);
         var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
-        prompt.Setup(item => item.Show(
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint))
+        prompt.Setup(item => item.Show())
             .Returns(FolderProjectUnsavedChangesChoice.Cancel);
         var viewModel = CreateViewModel(
             history.Object,
@@ -485,6 +481,38 @@ public class FolderProjectHistoryViewModelTests
         history.Verify(item => item.GetRestorePointChanges(
             project.ProjectRoot,
             point.Id,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+    }
+
+    [Test]
+    public async Task SelectingRestorePoint_ReusesPreviouslyLoadedChanges()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var initial = RestorePoint("initial", "初始还原点", true);
+        var later = RestorePoint("later", "后续还原点");
+        var history = CreateHistoryService(
+            project.ProjectRoot,
+            [later, initial]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot,
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([]);
+        var viewModel = CreateViewModel(history.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        viewModel.SelectedRestorePoint = initial;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePoint = later;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePoint = initial;
+        await viewModel.SelectedChangesLoadTask;
+
+        history.Verify(item => item.GetRestorePointChanges(
+            project.ProjectRoot,
+            initial.Id,
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
     }
 
@@ -1011,6 +1039,11 @@ public class FolderProjectHistoryViewModelTests
             "FolderProjectHistoryView.xaml");
         var document = XDocument.Load(path);
         var source = File.ReadAllText(path);
+        var mainWindowSource = File.ReadAllText(Path.Combine(
+            FindSolutionRoot(),
+            "AssetEditor",
+            "Views",
+            "MainWindow.xaml"));
 
         NUnitAssert.Multiple(() =>
         {
@@ -1023,10 +1056,29 @@ public class FolderProjectHistoryViewModelTests
             NUnitAssert.That(source, Does.Contain("AeButton.Secondary"));
             NUnitAssert.That(source, Does.Contain("AeButton.Danger"));
             NUnitAssert.That(source, Does.Contain("AeInput.TextBox"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("x:Name=\"RestorePointDescriptionHint\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("Foreground=\"{DynamicResource AeBrush.TextMuted}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("FolderProject.History.DefaultDescription"));
             NUnitAssert.That(source, Does.Contain("AeList.View"));
             NUnitAssert.That(
                 source,
-                Does.Contain("FolderProject.History.SameDiskNotice"));
+                Does.Contain("LoadedProjectText"));
+            NUnitAssert.That(
+                source,
+                Does.Not.Contain("FolderProject.History.Title"));
+            NUnitAssert.That(
+                source,
+                Does.Not.Contain("FolderProject.History.SameDiskNotice"));
+            NUnitAssert.That(
+                mainWindowSource,
+                Does.Contain(
+                    "ToolTip=\"{loc:Loc FolderProject.History.SameDiskNotice}\""));
             foreach (var forbidden in new[]
                      {
                          "Git", "Stage", "Commit", "Branch", "Identity",
@@ -1104,7 +1156,7 @@ public class FolderProjectHistoryViewModelTests
                         NUnitAssert.That(
                             FindDescendants<TextBlock>(view)
                                 .Select(text => text.Text),
-                            Does.Contain("工程历史"));
+                            Does.Contain("当前加载工程："));
                     });
                 }
                 finally

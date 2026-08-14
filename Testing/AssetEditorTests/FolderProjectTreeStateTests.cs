@@ -83,37 +83,33 @@ public class FolderProjectTreeStateTests
     }
 
     [Test]
-    public async Task LoadedFolderProject_MarksGitChangesAndAncestorsChangedOffUiThread()
+    public async Task LoadedFolderProject_MarksHistoryChangesAndAncestorsChangedOffUiThread()
     {
         using var projectRoot = new TemporaryDirectory();
         projectRoot.Write(@"folder\child\changed.bin", [1]);
         using var project = FolderProjectContainer.Create(
             projectRoot.Path,
             new FolderProjectSettings { Name = "工程" });
-        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var history = new Mock<IFolderProjectHistoryService>();
         var callingThreadId = Environment.CurrentManagedThreadId;
         var statusThreadId = callingThreadId;
-        versionControl.Setup(service => service.GetStatus(projectRoot.Path))
+        history.Setup(service => service.GetStatus(projectRoot.Path))
             .Callback(() =>
                 statusThreadId = Environment.CurrentManagedThreadId)
             .Returns(
-                new FolderProjectRepositoryStatus(
-                    true,
-                    "main",
+                new FolderProjectHistoryStatus(
+                    FolderProjectHistoryAvailability.Ready,
                     new string('1', 40),
-                    false,
-                    FolderProjectRepositoryOperationState.None,
                     [
-                        new FolderProjectWorkingChange(
+                        new FolderProjectUnrecordedChange(
                             "folder/child/changed.bin",
-                            FolderProjectWorkingChangeKind.Modified |
-                            FolderProjectWorkingChangeKind.Unstaged),
+                            FolderProjectUnrecordedChangeKind.Modified),
                     ]));
 
-        using var harness = CreateViewModelWithVersionControl(
-            versionControl.Object,
+        using var harness = CreateViewModelWithHistory(
+            history.Object,
             project);
-        await harness.ViewModel.GitStatusRefreshTask;
+        await harness.ViewModel.HistoryStatusRefreshTask;
 
         var root = harness.ViewModel.Files.Single();
         NUnitAssert.Multiple(() =>
@@ -140,25 +136,21 @@ public class FolderProjectTreeStateTests
         using var original = FolderProjectContainer.Create(
             projectRoot.Path,
             new FolderProjectSettings { Name = "工程" });
-        var status = new FolderProjectRepositoryStatus(
-            true,
-            "main",
+        var status = new FolderProjectHistoryStatus(
+            FolderProjectHistoryAvailability.Ready,
             new string('1', 40),
-            false,
-            FolderProjectRepositoryOperationState.None,
             [
-                new FolderProjectWorkingChange(
+                new FolderProjectUnrecordedChange(
                     "folder/changed.bin",
-                    FolderProjectWorkingChangeKind.Modified |
-                    FolderProjectWorkingChangeKind.Unstaged),
+                    FolderProjectUnrecordedChangeKind.Modified),
             ]);
-        var versionControl = new Mock<IFolderProjectVersionControlService>();
-        versionControl.Setup(service => service.GetStatus(projectRoot.Path))
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(service => service.GetStatus(projectRoot.Path))
             .Returns(() => status);
-        using var harness = CreateViewModelWithVersionControl(
-            versionControl.Object,
+        using var harness = CreateViewModelWithHistory(
+            history.Object,
             original);
-        await harness.ViewModel.GitStatusRefreshTask;
+        await harness.ViewModel.HistoryStatusRefreshTask;
         NUnitAssert.That(
             FindNode(
                 harness.ViewModel.Files.Single(),
@@ -166,12 +158,12 @@ public class FolderProjectTreeStateTests
             Is.True);
 
         harness.EventHub.Publish(new PackFileContainerRemovedEvent(original));
-        status = status with { Changes = [] };
+        status = status with { UnrecordedChanges = [] };
         using var reattached = FolderProjectContainer.Open(projectRoot.Path);
         harness.EventHub.Publish(new PackFileContainerAddedEvent(
             reattached,
             PackFileContainerAddedReason.InternalReattach));
-        await harness.ViewModel.GitStatusRefreshTask;
+        await harness.ViewModel.HistoryStatusRefreshTask;
 
         var root = harness.ViewModel.Files.Single();
         NUnitAssert.Multiple(() =>
@@ -904,18 +896,18 @@ public class FolderProjectTreeStateTests
             null);
     }
 
-    private static TreeHarness CreateViewModelWithVersionControl(
-        IFolderProjectVersionControlService versionControl,
+    private static TreeHarness CreateViewModelWithHistory(
+        IFolderProjectHistoryService history,
         params PackFileContainer[] containers)
     {
         return CreateViewModelWithContainerList(
             containers.ToList(),
-            versionControl);
+            history);
     }
 
     private static TreeHarness CreateViewModelWithContainerList(
         List<PackFileContainer> containers,
-        IFolderProjectVersionControlService? versionControl = null,
+        IFolderProjectHistoryService? history = null,
         ApplicationSettingsService? settings = null)
     {
         var service = new Mock<IPackFileService>();
@@ -944,7 +936,7 @@ public class FolderProjectTreeStateTests
                 eventHub,
                 true,
                 false,
-                versionControl));
+                history));
     }
 
     private sealed record TreeHarness(

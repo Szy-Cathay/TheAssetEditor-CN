@@ -5,7 +5,7 @@ using Shared.Core.PackFiles.Models;
 
 namespace AssetEditor.UiCommands;
 
-public sealed class OpenFolderProjectVersionControlCommand(
+public sealed class OpenFolderProjectHistoryCommand(
     IPackFileService packFileService,
     IEventHub eventHub) : IUiCommand
 {
@@ -14,6 +14,6 @@ public sealed class OpenFolderProjectVersionControlCommand(
         if (packFileService.GetEditablePack() is not FolderProjectContainer)
             return;
 
-        eventHub.Publish(new OpenFolderProjectGitPanelEvent());
+        eventHub.Publish(new OpenFolderProjectHistoryPanelEvent());
     }
 }

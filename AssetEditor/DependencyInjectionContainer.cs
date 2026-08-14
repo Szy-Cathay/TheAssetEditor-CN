@@ -4,7 +4,6 @@ using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
 using AssetEditor.Views;
 using AssetEditor.Views.FolderProjectHistory;
-using AssetEditor.Views.FolderProjectVersionControl;
 using AssetEditor.Views.Settings;
 using AssetEditor.Views.Updater;
 using Editors.Ipc;
@@ -42,8 +41,7 @@ namespace AssetEditor
             serviceCollection.AddTransient<OpenReferencePackCommand>();
             serviceCollection.AddTransient<CreateFolderProjectCommand>();
             serviceCollection.AddTransient<OpenFolderProjectCommand>();
-            serviceCollection.AddTransient<
-                OpenFolderProjectVersionControlCommand>();
+            serviceCollection.AddTransient<OpenFolderProjectHistoryCommand>();
             serviceCollection.AddTransient<ImportPackAsFolderProjectCommand>();
             serviceCollection.AddTransient<OpenSettingsDialogCommand>();
             serviceCollection.AddTransient<OpenUpdaterWindowCommand>();
@@ -58,16 +56,10 @@ namespace AssetEditor
             serviceCollection.AddTransient<UpdaterWindow>();
             serviceCollection.AddTransient<UpdaterViewModel>();
             serviceCollection.AddTransient<
-                FolderProjectVersionControlWindow>();
-            serviceCollection.AddTransient<
                 FolderProjectHistoryWindow>();
-            serviceCollection.AddTransient<
-                FolderProjectVersionControlViewModel>();
             serviceCollection.AddScoped<FolderProjectHistoryViewModel>();
             serviceCollection.AddScoped<
-                FolderProjectGitWorkspaceViewModel>();
-            serviceCollection.AddTransient<
-                FolderProjectGitRepositoryViewModel>();
+                FolderProjectHistoryWorkspaceViewModel>();
             serviceCollection.AddScoped<MenuBarViewModel>();
 
             serviceCollection.AddScoped<MainWindow>();
@@ -80,9 +72,6 @@ namespace AssetEditor
                 IFolderProjectOpenService,
                 FolderProjectOpenService>();
             serviceCollection.AddScoped<
-                IFolderProjectVersionControlWindowService,
-                FolderProjectVersionControlWindowService>();
-            serviceCollection.AddScoped<
                 IFolderProjectHistoryWindowService,
                 FolderProjectHistoryWindowService>();
             serviceCollection.AddScoped<
@@ -92,16 +81,6 @@ namespace AssetEditor
             serviceCollection.AddScoped<IExceptionInformationProvider, CurrentEditorExceptionInfoProvider>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
-        }
-
-        public override void RegisterTools(IEditorDatabase factory)
-        {
-            EditorInfoBuilder
-                .Create<
-                    FolderProjectGitRepositoryViewModel,
-                    FolderProjectGitRepositoryView>(
-                    EditorEnums.FolderProjectGitRepository)
-                .Build(factory);
         }
     }
 }

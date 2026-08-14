@@ -22,7 +22,6 @@
         Audio_Editor,
         Twui_Editor,
         Csc_Editor,
-        FolderProjectGitRepository,
         None,
     }
 }

@@ -599,9 +599,6 @@ public class UiCommonControlResourceTests
                 var optionalRadioStyles = Load(
                     "Shared.Ui",
                     "BaseDialogs/OptionalRadioButtonStyle.xaml");
-                var gitStyles = Load(
-                    "Views/FolderProjectVersionControl/FolderProjectGitStyles.xaml");
-
                 var controls = new (string Name, ButtonBase Control)[]
                 {
                     ("design button", new Button
@@ -672,12 +669,6 @@ public class UiCommonControlResourceTests
                         Style = (Style)optionalRadioStyles[
                             "OptionalRadioButtonStyle"],
                     }),
-                    ("git split button", new Button
-                    {
-                        Content = "Test",
-                        Style = (Style)gitStyles[
-                            "GitCommitSplitButtonPartStyle"],
-                    }),
                 };
 
                 foreach (var (name, control) in controls)
@@ -701,7 +692,6 @@ public class UiCommonControlResourceTests
             "AssetEditor/Themes/DesignSystem/Controls/Inputs.xaml",
             "Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml",
             "Shared/SharedUI/BaseDialogs/OptionalRadioButtonStyle.xaml",
-            "AssetEditor/Views/FolderProjectVersionControl/FolderProjectGitStyles.xaml",
             "Editors/Kitbashing/KitbasherEditor/KitbashUiStyles.xaml",
         };
 

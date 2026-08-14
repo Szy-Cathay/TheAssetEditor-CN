@@ -102,7 +102,7 @@ public sealed class FolderProjectGitOperationCoordinator :
 {
     private readonly IPackFileService _packFileService;
     private readonly IFolderProjectFactory _folderProjectFactory;
-    private readonly IFolderProjectVersionControlService _versionControl;
+    private readonly IFolderProjectHistoryService _historyService;
     private readonly FolderProjectGitOperationPlatform _platform;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _rootGates =
         new(StringComparer.OrdinalIgnoreCase);
@@ -113,11 +113,11 @@ public sealed class FolderProjectGitOperationCoordinator :
     public FolderProjectGitOperationCoordinator(
         IPackFileService packFileService,
         IFolderProjectFactory folderProjectFactory,
-        IFolderProjectVersionControlService versionControl)
+        IFolderProjectHistoryService historyService)
         : this(
             packFileService,
             folderProjectFactory,
-            versionControl,
+            historyService,
             new FolderProjectGitOperationPlatform())
     {
     }
@@ -125,12 +125,12 @@ public sealed class FolderProjectGitOperationCoordinator :
     internal FolderProjectGitOperationCoordinator(
         IPackFileService packFileService,
         IFolderProjectFactory folderProjectFactory,
-        IFolderProjectVersionControlService versionControl,
+        IFolderProjectHistoryService historyService,
         FolderProjectGitOperationPlatform platform)
     {
         _packFileService = packFileService;
         _folderProjectFactory = folderProjectFactory;
-        _versionControl = versionControl;
+        _historyService = historyService;
         _platform = platform;
     }
 
@@ -690,24 +690,18 @@ public sealed class FolderProjectGitOperationCoordinator :
         bool shouldReattach;
         try
         {
-            var status = _versionControl.GetStatus(projectRoot);
-            shouldReattach = !status.IsInitialized
+            var status = _historyService.GetStatus(projectRoot);
+            shouldReattach = status.Availability ==
+                    FolderProjectHistoryAvailability.NotInitialized
                 ? operationException != null &&
                   _pendingReattach.ContainsKey(projectRoot)
-                : !status.IsDetached &&
-                  status.OperationState ==
-                  FolderProjectRepositoryOperationState.None &&
-                  !status.IsBusy &&
-                  !status.HasPendingEditorOperation &&
-                  status.Changes.All(change =>
-                      !change.Kind.HasFlag(
-                          FolderProjectWorkingChangeKind.Conflicted));
+                : status.Availability ==
+                  FolderProjectHistoryAvailability.Ready;
         }
-        catch (FolderProjectVersionControlException exception)
+        catch (FolderProjectHistoryException exception)
             when (operationException != null &&
                   exception.Code ==
-                      FolderProjectVersionControlError
-                          .RepositoryNotInitialized)
+                      FolderProjectHistoryError.NotInitialized)
         {
             shouldReattach = _pendingReattach.ContainsKey(projectRoot);
         }

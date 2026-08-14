@@ -72,7 +72,7 @@ namespace AssetEditor.ViewModels
                 this,
                 _ =>
                 {
-                    OpenFolderProjectVersionControlCommand
+                    OpenFolderProjectHistoryCommand
                         .NotifyCanExecuteChanged();
                     GeneratePackCommand.NotifyCanExecuteChanged();
                     CreateAnimPackWarhammer3Command
@@ -86,14 +86,13 @@ namespace AssetEditor.ViewModels
         [RelayCommand] private void CreateFolderProject() => _uiCommandFactory.Create<CreateFolderProjectCommand>().Execute();
         [RelayCommand] private void OpenFolderProject() => _uiCommandFactory.Create<OpenFolderProjectCommand>().Execute();
         [RelayCommand] private void ImportPackAsFolderProject() => _uiCommandFactory.Create<ImportPackAsFolderProjectCommand>().Execute();
-        [RelayCommand(CanExecute =
-            nameof(CanOpenFolderProjectVersionControl))]
-        private void OpenFolderProjectVersionControl() =>
+        [RelayCommand(CanExecute = nameof(CanOpenFolderProjectHistory))]
+        private void OpenFolderProjectHistory() =>
             _uiCommandFactory
-                .Create<OpenFolderProjectVersionControlCommand>()
+                .Create<OpenFolderProjectHistoryCommand>()
                 .Execute();
 
-        private bool CanOpenFolderProjectVersionControl() =>
+        private bool CanOpenFolderProjectHistory() =>
             CanEditFolderProject();
 
         [RelayCommand(CanExecute = nameof(CanEditFolderProject))]

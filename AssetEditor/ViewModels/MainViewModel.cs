@@ -30,7 +30,7 @@ namespace AssetEditor.ViewModels
         public PackFileBrowserViewModel FileTree { get; private set; }
         public MenuBarViewModel MenuBar { get; set; }
         public IEditorDatabase ToolsFactory { get; set; }
-        public FolderProjectGitWorkspaceViewModel? GitWorkspace { get; }
+        public FolderProjectHistoryWorkspaceViewModel? HistoryWorkspace { get; }
 
         [ObservableProperty] public partial IEditorManager EditorManager { get; set; }
         [ObservableProperty] public partial bool IsClosingWithoutPrompt { get; set; }
@@ -57,7 +57,7 @@ namespace AssetEditor.ViewModels
                 IEventHub eventHub,
                 ApplicationSettingsService applicationSettingsService,
                 IFolderProjectCloseGuard folderProjectCloseGuard,
-                FolderProjectGitWorkspaceViewModel? gitWorkspace = null)
+                FolderProjectHistoryWorkspaceViewModel? historyWorkspace = null)
         {
             MenuBar = menuViewModel;
 
@@ -65,12 +65,12 @@ namespace AssetEditor.ViewModels
             _uiCommandFactory = uiCommandFactory;
             _packFileService = packfileService;
             _folderProjectCloseGuard = folderProjectCloseGuard;
-            GitWorkspace = gitWorkspace;
+            HistoryWorkspace = historyWorkspace;
 
             eventHub.Register<PackFileContainerSetAsMainEditableEvent>(this, SetStatusBarEditablePackFile);
-            eventHub.Register<OpenFolderProjectGitPanelEvent>(
+            eventHub.Register<OpenFolderProjectHistoryPanelEvent>(
                 this,
-                _ => GitWorkspace?.ShowGitManagement());
+                _ => HistoryWorkspace?.ShowHistory());
 
             FileTree = packFileBrowserBuilder.Create(ContextMenuType.MainApplication, showCaFiles: true, showFoldersOnly: false);
             FileTree.FileOpen += OpenFile;
@@ -213,7 +213,7 @@ namespace AssetEditor.ViewModels
         private void SetStatusBarEditablePackFile(PackFileContainerSetAsMainEditableEvent e)
         {
             EditablePackFile = e.Container != null ? LocalizationManager.Instance.GetFormat("Title.EditablePack", e.Container.Name) : LocalizationManager.Instance.Get("Title.EditablePackNone");
-            GitWorkspace?.SetEditableContainer(e.Container);
+            HistoryWorkspace?.SetEditableContainer(e.Container);
         }
     }
 }

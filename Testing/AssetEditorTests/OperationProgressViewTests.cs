@@ -20,10 +20,7 @@ public class OperationProgressViewTests
 {
     private static readonly (string[] Path, int HostCount)[] IndependentProgressHostSurfaces =
     [
-        (["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitPanelView.xaml"], 1),
         (["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"], 1),
-        (["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitRepositoryView.xaml"], 1),
-        (["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectVersionControlWindow.xaml"], 1),
         (["AssetEditor", "Views", "MainWindow.xaml"], 1),
         (["Editors", "Audio", "AudioEditor", "Presentation", "NewAudioProject", "NewAudioProjectWindow.xaml"], 1),
         (["Editors", "Audio", "AudioProjectConverter", "AudioProjectConverterWindow.xaml"], 1),
@@ -34,12 +31,6 @@ public class OperationProgressViewTests
     [
         (["Editors", "Audio", "AudioEditor", "Presentation", "AudioEditorView.xaml"], 2),
         (["Editors", "Audio", "AudioExplorer", "AudioExplorerView.xaml"], 3),
-    ];
-    private static readonly string[][] GitLoadingSurfacePaths =
-    [
-        ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitPanelView.xaml"],
-        ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectGitRepositoryView.xaml"],
-        ["AssetEditor", "Views", "FolderProjectVersionControl", "FolderProjectVersionControlWindow.xaml"],
     ];
     private static readonly string[][] LoadingWindowPaths =
     [
@@ -622,45 +613,6 @@ public class OperationProgressViewTests
                 ThemesController.SetTheme(previousTheme);
             }
         });
-    }
-
-    [Test]
-    public void GitLoadingSurfaces_BindRealStageDetailAndCounts()
-    {
-        var solutionRoot = FindSolutionRoot();
-        var missingBindings = new List<string>();
-
-        foreach (var parts in GitLoadingSurfacePaths)
-        {
-            var progressView = XDocument
-                .Load(Path.Combine([solutionRoot, .. parts]))
-                .Descendants()
-                .Single(element =>
-                    element.Name.LocalName ==
-                    nameof(OperationProgressWindowHost));
-            var attributes = progressView.Attributes().ToDictionary(
-                attribute => attribute.Name.LocalName,
-                attribute => attribute.Value);
-            foreach (var expected in new[]
-                     {
-                         "LoadingProgressStatusText",
-                         "LoadingProgressDetailText",
-                         "LoadingProgressValue",
-                         "LoadingProgressMaximum",
-                         "LoadingProgressIsIndeterminate",
-                     })
-            {
-                if (!attributes.Values.Any(value => value.Contains(
-                        expected,
-                        StringComparison.Ordinal)))
-                {
-                    missingBindings.Add(
-                        $"{string.Join('/', parts)}: {expected}");
-                }
-            }
-        }
-
-        Assert.That(missingBindings, Is.Empty);
     }
 
     [Test]

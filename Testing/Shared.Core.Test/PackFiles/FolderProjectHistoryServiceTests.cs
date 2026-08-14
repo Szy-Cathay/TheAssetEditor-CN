@@ -53,6 +53,15 @@ public sealed class FolderProjectHistoryServiceTests
             Assert.That(publicContract, Does.Not.Contain("Stage"));
             Assert.That(publicContract, Does.Not.Contain("Stash"));
             Assert.That(publicContract, Does.Not.Contain("Merge"));
+            Assert.That(
+                typeof(IFolderProjectVersionControlService).IsPublic,
+                Is.False);
+            Assert.That(
+                typeof(FolderProjectVersionControlService).IsPublic,
+                Is.False);
+            Assert.That(
+                typeof(FolderProjectGitRepository).IsPublic,
+                Is.False);
         });
     }
 

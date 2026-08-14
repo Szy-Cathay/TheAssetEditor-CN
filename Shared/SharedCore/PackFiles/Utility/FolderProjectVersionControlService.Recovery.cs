@@ -3,7 +3,7 @@ using Shared.Core.PackFiles.Models;
 
 namespace Shared.Core.PackFiles.Utility;
 
-public sealed partial class FolderProjectVersionControlService
+internal sealed partial class FolderProjectVersionControlService
 {
     private static readonly string[] s_recoveryMetadataNames =
     [

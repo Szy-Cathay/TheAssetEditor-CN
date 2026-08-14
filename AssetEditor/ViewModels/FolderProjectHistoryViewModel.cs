@@ -26,6 +26,9 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private readonly IStandardDialogs _dialogs;
     private readonly LocalizationManager _localization;
     private readonly SynchronizationContext? _synchronizationContext;
+    private readonly Dictionary<string,
+        IReadOnlyList<FolderProjectRestorePointChange>>
+        _restorePointChangesCache = new(StringComparer.Ordinal);
     private FolderProjectContainer? _project;
     private string? _projectRoot;
     private bool _closeAfterRecovery;
@@ -41,6 +44,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     [ObservableProperty] private bool _isRecoveryRequired;
     [ObservableProperty] private bool _canRecover;
     [ObservableProperty] private string _projectName = "";
+    [ObservableProperty] private string _loadedProjectText = "";
     [ObservableProperty] private string _restorePointDescription = "";
     [ObservableProperty] private string _unrecordedSummaryText = "";
     [ObservableProperty] private string _historySummaryText = "";
@@ -83,19 +87,30 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         _dialogs = dialogs;
         _localization = localization;
         _synchronizationContext = SynchronizationContext.Current;
-        RestorePointDescription = _localization.Get(
-            "FolderProject.History.DefaultDescription");
+        LoadedProjectText = _localization.GetFormat(
+            "FolderProject.History.CurrentProject",
+            "");
         ClearDisplayedState();
     }
 
     public void OpenProject(FolderProjectContainer? project)
     {
         _project = project;
-        _projectRoot = project?.ProjectRoot;
+        var projectRoot = project?.ProjectRoot;
+        if (!string.Equals(
+                _projectRoot,
+                projectRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _restorePointChangesCache.Clear();
+        }
+        _projectRoot = projectRoot;
         _closeAfterRecovery = false;
         ProjectName = project?.ProjectSettings.Name ?? "";
-        RestorePointDescription = _localization.Get(
-            "FolderProject.History.DefaultDescription");
+        LoadedProjectText = _localization.GetFormat(
+            "FolderProject.History.CurrentProject",
+            ProjectName);
+        RestorePointDescription = "";
         ClearDisplayedState();
         NotifyCommands();
     }
@@ -105,12 +120,22 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         string projectName)
     {
         _project = null;
-        _projectRoot = Path.TrimEndingDirectorySeparator(
+        var normalizedProjectRoot = Path.TrimEndingDirectorySeparator(
             Path.GetFullPath(projectRoot));
+        if (!string.Equals(
+                _projectRoot,
+                normalizedProjectRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _restorePointChangesCache.Clear();
+        }
+        _projectRoot = normalizedProjectRoot;
         _closeAfterRecovery = true;
         ProjectName = projectName;
-        RestorePointDescription = _localization.Get(
-            "FolderProject.History.DefaultDescription");
+        LoadedProjectText = _localization.GetFormat(
+            "FolderProject.History.CurrentProject",
+            ProjectName);
+        RestorePointDescription = "";
         ClearDisplayedState();
         IsRecoveryRequired = true;
         NotifyCommands();
@@ -167,8 +192,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 project.ProjectRoot,
                 null))
         {
-            var choice = _unsavedChangesPrompt.Show(
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint);
+            var choice = _unsavedChangesPrompt.Show();
             if (choice == FolderProjectUnsavedChangesChoice.Cancel)
                 return;
             if (choice == FolderProjectUnsavedChangesChoice.Save &&
@@ -198,8 +222,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             snapshot =>
             {
                 ApplySnapshot(snapshot);
-                RestorePointDescription = _localization.Get(
-                    "FolderProject.History.DefaultDescription");
+                RestorePointDescription = "";
             });
     }
 
@@ -436,6 +459,18 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             return;
         }
 
+        if (_restorePointChangesCache.TryGetValue(
+                value.Id,
+                out var cachedChanges))
+        {
+            ReplaceCollection(
+                SelectedRestorePointChanges,
+                cachedChanges);
+            HasSelectedRestorePointChanges = cachedChanges.Count != 0;
+            SelectedChangesLoadTask = Task.CompletedTask;
+            return;
+        }
+
         SelectedChangesLoadTask = LoadSelectedRestorePointChanges(
             _projectRoot,
             value,
@@ -463,6 +498,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 projectRoot,
                 restorePoint.Id,
                 ReportProgress));
+            _restorePointChangesCache[restorePoint.Id] = changes;
             if (requestVersion != _selectedRestorePointRequestVersion ||
                 SelectedRestorePoint?.Id != restorePoint.Id)
             {
