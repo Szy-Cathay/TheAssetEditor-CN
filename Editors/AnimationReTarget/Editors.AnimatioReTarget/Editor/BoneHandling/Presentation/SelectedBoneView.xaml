@@ -164,7 +164,7 @@
             </Grid.ColumnDefinitions>
             <ComboBox
                 Grid.Column="0"
-                DisplayMemberPath="BoneName.Value"
+                DisplayMemberPath="BoneName"
                 ItemsSource="{Binding BoneManager.FlatBoneList}"
                 SelectedItem="{Binding BoneManager.SelectedBone.SelectedRelativeBone, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
             <Button

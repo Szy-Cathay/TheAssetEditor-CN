@@ -1,19 +1,18 @@
-using CommonControls;
-﻿using System.Windows;
+using System.Windows;
+using WindowHandling;
 
 namespace Editors.AnimatioReTarget.Editor.Saving
 {
     /// <summary>
     /// Interaction logic for SaveWindow.xaml
     /// </summary>
-    public partial class SaveWindow : Window
+    public partial class SaveWindow : AssetEditorWindow
     {
-        SaveManager _saveManager;
+        SaveManager _saveManager = null!;
 
         public SaveWindow(SaveSettings viewModel)
         {
             InitializeComponent();
-            DarkTitleBarHelper.Enable(this);
             DataContext = viewModel;
         }
 

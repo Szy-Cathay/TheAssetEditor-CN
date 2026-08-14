@@ -90,9 +90,12 @@ namespace Editors.AnimatioReTarget.Editor
 
         void Initialize()
         {
-            var target = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Target, true, "Target", Color.Black, null);
-            var source = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Source, true, "Source", Color.Black, null);
-            var generated = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Generated, true, "Generated", Color.Black, null);
+            var targetLabel = LocalizationManager.Instance.Get("AnimReTarget.Scene.Target");
+            var sourceLabel = LocalizationManager.Instance.Get("AnimReTarget.Scene.Source");
+            var generatedLabel = LocalizationManager.Instance.Get("AnimReTarget.Scene.Generated");
+            var target = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Target, true, targetLabel, Color.Black, null);
+            var source = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Source, true, sourceLabel, Color.Black, null);
+            var generated = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Generated, true, generatedLabel, Color.Black, null);
             _target = target.Data;
             _source = source.Data;
             _generated = generated.Data;
@@ -141,7 +144,10 @@ namespace Editors.AnimatioReTarget.Editor
             }
 
             var newAnimationClip = UpdateAnimation(_source.AnimationClip);
-            _sceneObjectEditor.SetAnimationClip(_generated, newAnimationClip, "Generated");
+            _sceneObjectEditor.SetAnimationClip(
+                _generated,
+                newAnimationClip,
+                LocalizationManager.Instance.Get("AnimReTarget.Scene.Generated"));
             _player.SelectedMainAnimation = _player.PlayerItems.First(x => x.Asset == _generated);
             
         }
@@ -157,13 +163,19 @@ namespace Editors.AnimatioReTarget.Editor
         {
             if (_target.Skeleton == null || _source.Skeleton == null)
             {
-                errorText = "Missing a skeleton?";
+                errorText = LocalizationManager.Instance.Get("AnimReTarget.Error.MissingSkeleton");
                 return false;
             }
 
             if (_source.AnimationClip == null)
             {
-                errorText = "No animation to copy selected";
+                errorText = LocalizationManager.Instance.Get("AnimReTarget.Error.NoSourceAnimation");
+                return false;
+            }
+
+            if (!float.IsFinite(Settings.AnimationSpeedMult) || Settings.AnimationSpeedMult <= 0)
+            {
+                errorText = LocalizationManager.Instance.Get("AnimReTarget.Error.InvalidSpeedMultiplier");
                 return false;
             }
 

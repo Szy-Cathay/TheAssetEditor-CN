@@ -142,7 +142,9 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
         {
             if (_targetSkeleton == null || _sourceSkeleton == null)
             {
-                _standardDialogs.ShowDialogBox("Source or target skeleton not selected", "Error");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("AnimReTarget.Error.SkeletonSelectionRequired"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
                 return;
             }
 
@@ -179,7 +181,24 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
 
         [RelayCommand] void ResetSelectedBone()
         {
-            _standardDialogs.ShowDialogBox("Button pressed");
+            if (SelectedBone == null)
+                return;
+
+            SelectedBone.IsLocalOffset = false;
+            SelectedBone.BoneLengthMult = 1;
+            SelectedBone.RotationOffset.X.Value = 0;
+            SelectedBone.RotationOffset.Y.Value = 0;
+            SelectedBone.RotationOffset.Z.Value = 0;
+            SelectedBone.TranslationOffset.X.Value = 0;
+            SelectedBone.TranslationOffset.Y.Value = 0;
+            SelectedBone.TranslationOffset.Z.Value = 0;
+            SelectedBone.ForceSnapToWorld = false;
+            SelectedBone.FreezeTranslation = false;
+            SelectedBone.FreezeRotation = false;
+            SelectedBone.FreezeRotationZ = false;
+            SelectedBone.ApplyTranslation = true;
+            SelectedBone.ApplyRotation = true;
+            SelectedBone.SelectedRelativeBone = null;
         }
 
         [RelayCommand] void ClearRelativeSelectedBone()

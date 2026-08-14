@@ -103,7 +103,9 @@
                     Margin="0,2"
                     Text="{Binding Settings.AnimationSpeedMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}">
                     <b:Interaction.Behaviors>
-                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                        <behaviors:TextBoxInputBehavior
+                            InputMode="DecimalInput"
+                            JustPositivDecimalInput="True" />
                     </b:Interaction.Behaviors>
                 </TextBox>
 

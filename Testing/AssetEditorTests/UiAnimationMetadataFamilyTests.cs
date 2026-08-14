@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -108,6 +109,171 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(combined, Does.Contain("AvalonEditBehaviour"));
             NUnitAssert.That(combined, Does.Contain("MouseDoubleClick"));
             NUnitAssert.That(combined, Does.Contain("BindableSelectedItemBehavior"));
+        });
+    }
+
+    [Test]
+    public void AnimationRetargetEditor_UsesValidBindingsAndSharedWindowContract()
+    {
+        var root = FindSolutionRoot();
+        var editorRoot = Path.Combine(
+            root,
+            "Editors",
+            "AnimationReTarget",
+            "Editors.AnimatioReTarget",
+            "Editor");
+        var selectedBoneView = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "BoneHandling",
+            "Presentation",
+            "SelectedBoneView.xaml"));
+        var settingsView = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "Settings",
+            "SettingsView.xaml"));
+        var saveWindow = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "Saving",
+            "SaveWindow.xaml"));
+        var saveWindowCode = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "Saving",
+            "SaveWindow.xaml.cs"));
+        var saveSettings = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "Saving",
+            "SaveSettings.cs"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                selectedBoneView,
+                Does.Contain("DisplayMemberPath=\"BoneName\""));
+            NUnitAssert.That(
+                selectedBoneView,
+                Does.Not.Contain("DisplayMemberPath=\"BoneName.Value\""));
+            NUnitAssert.That(
+                settingsView,
+                Does.Contain("JustPositivDecimalInput=\"True\""));
+            NUnitAssert.That(
+                saveSettings,
+                Does.Match("PossibleAnimationFormats\\s*\\{\\s*get;"));
+            NUnitAssert.That(
+                saveWindow,
+                Does.Contain("<common:AssetEditorWindow"));
+            NUnitAssert.That(
+                saveWindow,
+                Does.Contain("IsChecked=\"{Binding UseGeneratedSkeleton"));
+            NUnitAssert.That(
+                saveWindow,
+                Does.Not.Contain("UseScaledSkeletonName"));
+            NUnitAssert.That(
+                saveWindowCode,
+                Does.Contain("SaveWindow : AssetEditorWindow"));
+        });
+    }
+
+    [Test]
+    public void AnimationRetargetEditor_UsesChineseUserFacingMessages()
+    {
+        var root = FindSolutionRoot();
+        var editorRoot = Path.Combine(
+            root,
+            "Editors",
+            "AnimationReTarget",
+            "Editors.AnimatioReTarget",
+            "Editor");
+        var editorSource = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "AnimationRetargetEditor.cs"));
+        var boneManagerSource = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "BoneHandling",
+            "BoneManager.cs"));
+        var renderingSource = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "Settings",
+            "AnimationReTargetRenderingComponent.cs"));
+        var saveManagerSource = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "Saving",
+            "SaveManager.cs"));
+        using var language = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "AssetEditor",
+            "Language_Cn.json")));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                editorSource,
+                Does.Contain("AnimReTarget.Error.InvalidSpeedMultiplier"));
+            NUnitAssert.That(
+                boneManagerSource,
+                Does.Contain("AnimReTarget.Error.SkeletonSelectionRequired"));
+            NUnitAssert.That(
+                renderingSource,
+                Does.Contain("AnimReTarget.Scene.Generated"));
+            NUnitAssert.That(
+                saveManagerSource,
+                Does.Contain("AnimReTarget.Error.GeneratedAnimationRequired"));
+            NUnitAssert.That(
+                language.RootElement
+                    .GetProperty("AnimReTarget.Scene.Generated")
+                    .GetString(),
+                Is.EqualTo("生成结果"));
+            NUnitAssert.That(
+                language.RootElement
+                    .GetProperty("AnimReTarget.Error.InvalidSpeedMultiplier")
+                    .GetString(),
+                Is.EqualTo("动画速度倍率必须大于 0。"));
+        });
+    }
+
+    [Test]
+    public void AnimationRetargetWorldLabels_AreCoveredByWorldTextFont()
+    {
+        var root = FindSolutionRoot();
+        using var language = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "AssetEditor",
+            "Language_Cn.json")));
+        var labels = new[]
+        {
+            "AnimReTarget.Scene.Target",
+            "AnimReTarget.Scene.Source",
+            "AnimReTarget.Scene.Generated",
+        }
+            .Select(key => language.RootElement.GetProperty(key).GetString()!)
+            .ToArray();
+        var font = XDocument.Load(
+            Path.Combine(
+                root,
+                "GameWorld",
+                "ContentProject",
+                "Content",
+                "Fonts",
+                "DefaultFont.spritefont"),
+            LoadOptions.PreserveWhitespace);
+        var ranges = font
+            .Descendants("CharacterRegion")
+            .Select(region => (
+                Start: region.Element("Start")!.Value.Single(),
+                End: region.Element("End")!.Value.Single()))
+            .ToArray();
+        var missingCharacters = labels
+            .SelectMany(label => label)
+            .Distinct()
+            .Where(character => ranges.All(range =>
+                character < range.Start || character > range.End))
+            .ToArray();
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                font.Descendants("FontName").Single().Value,
+                Does.EndWith("HarmonyOS_Sans_SC_Regular.ttf"));
+            NUnitAssert.That(missingCharacters, Is.Empty);
         });
     }
 
