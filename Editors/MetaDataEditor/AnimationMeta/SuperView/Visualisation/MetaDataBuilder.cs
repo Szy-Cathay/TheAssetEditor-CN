@@ -1245,7 +1245,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 player,
                 GetActiveTimeRange(splashAttack.Source),
                 nodeLocalTransformProvider: () => Matrix.Identity,
-                refreshVisual: RefreshVisual);
+                refreshVisual: RefreshVisual,
+                localHitTargetsProvider: () =>
+                    CreateSplashHitTargets(currentSplashAttack));
             root.AddObject(node);
             return instance;
         }
@@ -1261,6 +1263,26 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 _ => throw new InvalidOperationException(
                     $"Unsupported splash attack type {source.GetType().Name}")
             };
+
+        private static IReadOnlyList<MetaDataMarkerHitTarget>
+            CreateSplashHitTargets(SplashPreviewData splashAttack)
+        {
+            var hitRadius = splashAttack.AoeShape == 1 &&
+                splashAttack.WidthForCorridor > 0
+                    ? splashAttack.WidthForCorridor / 2
+                    : 0.3f;
+            return
+            [
+                new MetaDataMarkerHitTarget(
+                    splashAttack.StartPosition,
+                    MetaDataMarkerPoint.SplashStart,
+                    hitRadius),
+                new MetaDataMarkerHitTarget(
+                    splashAttack.EndPosition,
+                    MetaDataMarkerPoint.SplashEnd,
+                    hitRadius),
+            ];
+        }
 
         private static MetaDataTimeRange? GetActiveTimeRange(
             ParsedMetadataAttribute attribute) =>
@@ -1286,11 +1308,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             var textPos = (splashAttack.EndPosition + splashAttack.StartPosition) / 2;
 
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, "StartPos", splashAttack.StartPosition, edgeColor));
-            node.AddItem(LineHelper.AddLocator(splashAttack.StartPosition, scale, edgeColor));
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, "EndPos", splashAttack.EndPosition, edgeColor));
-            node.AddItem(LineHelper.AddLocator(splashAttack.EndPosition, scale, edgeColor));
             node.AddItem(new WorldTextRenderItem(_resourceLibrary, displayName, textPos, edgeColor));
-
+            PreviewShape? filledArea = null;
             if (splashAttack.AoeShape == 0)
             {
                 if (MathUtil.CompareEqualFloats(
@@ -1301,15 +1321,15 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         $"{displayName}: the half-angle {splashAttack.AngleForCone / 2} of the cone is close to 0");
                 }
 
-                node.AddItem(PreviewShapeGeometry.CreateSplashCone(
+                filledArea = PreviewShapeGeometry.CreateSplashCone(
                     splashAttack.StartPosition,
                     splashAttack.EndPosition,
                     splashAttack.AngleForCone,
                     fillColor,
                     edgeColor,
-                    edgeWidth));
+                    edgeWidth);
             }
-            if (splashAttack.AoeShape == 1)
+            else if (splashAttack.AoeShape == 1)
             {
                 if (MathUtil.CompareEqualFloats(
                     splashAttack.WidthForCorridor,
@@ -1319,15 +1339,85 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         $"{displayName}: the WidthForCorridor {splashAttack.WidthForCorridor} of the corridor is close to 0");
                 }
 
-                node.AddItem(PreviewShapeGeometry.CreateSplashCorridor(
+                filledArea = PreviewShapeGeometry.CreateSplashCorridor(
                     splashAttack.StartPosition,
                     splashAttack.EndPosition,
                     splashAttack.WidthForCorridor / 2,
                     fillColor,
                     edgeColor,
-                    edgeWidth));
+                    edgeWidth);
             }
 
+            var endpointRadius = splashAttack.AoeShape == 1
+                ? splashAttack.WidthForCorridor / 2
+                : scale / 2;
+            var marker = CreateSplashAttackMarker(
+                splashAttack.StartPosition,
+                splashAttack.EndPosition,
+                endpointRadius,
+                edgeColor,
+                edgeWidth,
+                PreviewShapeGeometry.SmoothSegments);
+            node.AddItem(filledArea == null
+                ? marker
+                : new PreviewShape(filledArea.Triangles, marker.Edges));
+        }
+
+        internal static PreviewShape CreateSplashAttackMarker(
+            Vector3 start,
+            Vector3 end,
+            float endpointRadius,
+            Color color,
+            float edgeWidth,
+            int segments = 24)
+        {
+            var direction = Vector3.Normalize(end - start);
+            var side = Vector3.Cross(direction, Vector3.Up);
+            if (side.LengthSquared() < 0.000001f)
+                side = Vector3.Cross(direction, Vector3.Forward);
+            side.Normalize();
+            var up = Vector3.Normalize(Vector3.Cross(side, direction));
+            var edges = new List<EdgeData>(segments * 2 + 3);
+
+            AddRing(start);
+            AddRing(end);
+            AddEdge(start, end);
+
+            var distance = Vector3.Distance(start, end);
+            var arrowLength = MathF.Min(distance * 0.18f, 0.35f);
+            var arrowHalfWidth = arrowLength * 0.45f;
+            var arrowBase = end - direction * arrowLength;
+            AddEdge(end, arrowBase + side * arrowHalfWidth);
+            AddEdge(end, arrowBase - side * arrowHalfWidth);
+
+            return new PreviewShape([], edges.ToArray());
+
+            void AddRing(Vector3 center)
+            {
+                for (var index = 0; index < segments; index++)
+                {
+                    var angle = MathHelper.TwoPi * index / segments;
+                    var nextAngle = MathHelper.TwoPi *
+                        ((index + 1) % segments) / segments;
+                    AddEdge(
+                        center + side * (MathF.Cos(angle) * endpointRadius) +
+                            up * (MathF.Sin(angle) * endpointRadius),
+                        center + side * (MathF.Cos(nextAngle) * endpointRadius) +
+                            up * (MathF.Sin(nextAngle) * endpointRadius));
+                }
+            }
+
+            void AddEdge(Vector3 edgeStart, Vector3 edgeEnd)
+            {
+                edges.Add(new EdgeData
+                {
+                    P0 = edgeStart,
+                    P1 = edgeEnd,
+                    C0 = color.ToVector3(),
+                    C1 = color.ToVector3(),
+                    Width = edgeWidth,
+                });
+            }
         }
 
         private static Color GetCombatPreviewColor(
@@ -1444,7 +1534,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 ReferenceEquals(source, selectedAttribute),
                 _ => PopulateBoneOnlyMarkerNode(node),
                 () => Vector3.Zero,
-                () => Quaternion.Identity);
+                () => Quaternion.Identity,
+                isHitTestEnabled: false);
             root.AddObject(node);
             instance.FollowBone(skeleton, boneIndex);
             preview = instance;

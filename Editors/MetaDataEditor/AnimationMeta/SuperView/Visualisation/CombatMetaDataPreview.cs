@@ -11,6 +11,18 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         Splash
     }
 
+    public enum MetaDataMarkerPoint
+    {
+        Default,
+        SplashStart,
+        SplashEnd
+    }
+
+    public readonly record struct MetaDataMarkerHitTarget(
+        Vector3 Position,
+        MetaDataMarkerPoint Point,
+        float? HitTestRadius = null);
+
     public interface IMetaDataPreview
     {
         ParsedMetadataAttribute Source { get; }
@@ -34,5 +46,13 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         Matrix ReferenceWorldTransform { get; }
         Matrix WorldTransform { get; }
         int? HighlightedBoneIndex { get; }
+    }
+
+    public interface IMetaDataMarkerPreview : ISpatialMetaDataPreview
+    {
+        bool IsHitTestVisible { get; }
+        bool IsHovered { get; set; }
+        float HitTestRadius { get; }
+        IReadOnlyList<MetaDataMarkerHitTarget> HitTargets { get; }
     }
 }

@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
 using AssetEditor.Services;
+using Editors.AnimationMeta.SuperView.Editing;
+using Editors.AnimationMeta.SuperView.Inspection;
 using Editors.KitbasherEditor.Components;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
@@ -98,6 +100,30 @@ public class View3DComponentIsolationTests
         {
             (provider as IDisposable)?.Dispose();
         }
+    }
+
+    [TestMethod]
+    public void SuperViewMarkerPicker_DoesNotDependOnSharedModelSelection()
+    {
+        var dependencies = typeof(MetaDataMarkerPickerComponent)
+            .GetConstructors()
+            .Single()
+            .GetParameters()
+            .Select(parameter => parameter.ParameterType)
+            .ToArray();
+
+        CollectionAssert.AreEquivalent(
+            new[]
+            {
+                typeof(ArcBallCamera),
+                typeof(IMouseComponent),
+                typeof(CombatMetaDataGizmoComponent),
+            },
+            dependencies);
+        Assert.IsFalse(dependencies.Contains(typeof(SelectionManager)));
+        Assert.IsFalse(dependencies.Any(type =>
+            type.Namespace?.Contains("Kitbasher", StringComparison.Ordinal) ==
+                true));
     }
 
     private static View3DCoreComponentSet CreateCoreComponentSet()

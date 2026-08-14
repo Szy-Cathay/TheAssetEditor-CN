@@ -33,6 +33,7 @@ namespace Editors.AnimationMeta.SuperView
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly CombatMetaDataEditSession _combatEditSession;
         private readonly CombatMetaDataGizmoComponent _combatGizmo;
+        private readonly MetaDataMarkerPickerComponent _markerPicker;
         private CombatMetaDataPoint _selectedSplashPoint =
             CombatMetaDataPoint.SplashStart;
         private CombatMetaDataTransformMode _selectedTransformMode =
@@ -382,7 +383,8 @@ namespace Editors.AnimationMeta.SuperView
             MetaDataFileParser metaDataFileParser,
             IMetaDataBuilder metaDataFactory,
             CombatMetaDataEditSession combatEditSession,
-            CombatMetaDataGizmoComponent combatGizmo)
+            CombatMetaDataGizmoComponent combatGizmo,
+            MetaDataMarkerPickerComponent markerPicker)
             : base(editorHostParameters)
         {
             EditorContentVerticalScrollBarVisibility =
@@ -396,12 +398,19 @@ namespace Editors.AnimationMeta.SuperView
             _metaDataFactory = metaDataFactory;
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
+            _markerPicker = markerPicker;
             MetaDataTimeline = new MetaDataTimelineViewModel(
                 SelectMetaDataInspectionItem);
             Player.TimelineAnnotationContent = MetaDataTimeline;
             Player.SelectedAnimationMaxTime.PropertyChanged +=
                 OnSelectedAnimationMaxTimeChanged;
             GameWorld!.AddComponent(combatGizmo);
+            markerPicker.Connect(
+                GetMetaDataMarkerCandidates,
+                SelectMetaDataMarker,
+                FocusMetaDataMarker,
+                ClearMetaDataMarkerSelection);
+            GameWorld.AddComponent(markerPicker);
             _combatEditSession.ValueChanged += OnCombatMetaDataValueChanged;
             _combatEditSession.HistoryChanged += OnCombatHistoryChanged;
             Initialize();
@@ -421,6 +430,7 @@ namespace Editors.AnimationMeta.SuperView
         }
         partial void OnSelectedTabControllerIndexChanged(int value)
         {
+            _markerPicker.ClearHover();
             Set3DTransformMode(CombatMetaDataTransformMode.Translate);
             ApplySelectedMetaDataPreview();
             UpdateCombatEditTarget();
@@ -529,6 +539,7 @@ namespace Editors.AnimationMeta.SuperView
 
         void RecreateMetaDataInformation()
         {
+            _markerPicker.ClearInteractionState();
             foreach (var item in SceneObjects)
             {
                 foreach (var t in item.Data.MetaDataItems)
@@ -603,6 +614,7 @@ namespace Editors.AnimationMeta.SuperView
         private bool RefreshMetaDataPreview(
             ParsedMetadataAttribute attribute)
         {
+            _markerPicker.ClearInteractionState();
             if (!TryGetDocumentOwner(attribute, out var owner))
                 return false;
 
@@ -702,19 +714,90 @@ namespace Editors.AnimationMeta.SuperView
                 return;
             }
 
+            if (!SelectMetaDataItem(item))
+                return;
+
+            Player.PlaybackPositionSeconds = timeRange.StartTime;
+            NotifySelectedMetaDataContextChanged();
+        }
+
+        private bool SelectMetaDataItem(MetaDataInspectionItem item)
+        {
             var editor = item.Owner == MetaDataDocumentOwner.Persistent
                 ? PersistentMetaEditor
                 : MetaEditor;
             var tag = editor.Tags.FirstOrDefault(candidate =>
                 ReferenceEquals(candidate._input, item.Source));
             if (tag == null)
-                return;
+                return false;
 
             SelectedTabControllerIndex = item.Owner ==
                 MetaDataDocumentOwner.Persistent ? 0 : 1;
             editor.SelectedTag = tag;
-            Player.PlaybackPositionSeconds = timeRange.StartTime;
+            return true;
+        }
+
+        internal void SelectMetaDataMarker(
+            MetaDataInspectionItem item,
+            MetaDataMarkerPoint point = MetaDataMarkerPoint.Default)
+        {
+            if (!SelectMetaDataItem(item))
+                return;
+
+            if (point == MetaDataMarkerPoint.SplashStart)
+                SetSplashPoint(CombatMetaDataPoint.SplashStart);
+            else if (point == MetaDataMarkerPoint.SplashEnd)
+                SetSplashPoint(CombatMetaDataPoint.SplashEnd);
+
             NotifySelectedMetaDataContextChanged();
+        }
+
+        internal void ClearMetaDataMarkerSelection()
+        {
+            var editor = SelectedTabControllerIndex == 0
+                ? PersistentMetaEditor
+                : MetaEditor;
+            editor.SelectedTag = null;
+        }
+
+        private void FocusMetaDataMarker(MetaDataInspectionItem item)
+        {
+            if (!ReferenceEquals(SelectedPreviewAttribute, item.Source) ||
+                item.FocusPosition == null)
+            {
+                return;
+            }
+
+            FocusSelectedMetaDataAction();
+        }
+
+        internal IReadOnlyList<MetaDataMarkerPickCandidate>
+            GetMetaDataMarkerCandidates()
+        {
+            if (_asset == null)
+                return [];
+
+            var previews = _asset.Data.MetaDataItems
+                .OfType<IMetaDataMarkerPreview>()
+                .ToArray();
+            var candidates = new List<MetaDataMarkerPickCandidate>();
+            for (var index = 0;
+                index < _metaDataInspectionIndex.Items.Count;
+                index++)
+            {
+                var item = _metaDataInspectionIndex.Items[index];
+                var preview = previews.FirstOrDefault(candidate =>
+                    ReferenceEquals(candidate.Source, item.Source));
+                if (preview?.IsHitTestVisible == true)
+                {
+                    candidates.Add(new MetaDataMarkerPickCandidate(
+                        item,
+                        preview,
+                        index));
+                }
+            }
+
+            return candidates;
         }
 
         private void UpdateMetaDataTimelineSelection()
@@ -1110,6 +1193,7 @@ namespace Editors.AnimationMeta.SuperView
 
         public override void Close()
         {
+            _markerPicker.Disconnect();
             _asset.FragAndSlotSelection.PropertyChanged -=
                 OnFragmentSelectionPropertyChanged;
             _asset.Data.Player.OnFrameChanged -= OnAnimationFrameChanged;

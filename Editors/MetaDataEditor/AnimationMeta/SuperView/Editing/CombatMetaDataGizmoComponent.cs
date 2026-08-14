@@ -23,6 +23,8 @@ public sealed class CombatMetaDataGizmoComponent : BaseComponent, IDisposable
     private bool _isEnabled;
     private CombatMetaDataTransformMode _transformMode;
 
+    public bool IsGestureActive => _dragActive;
+
     public bool IsEnabled
     {
         get => _isEnabled;

@@ -1015,6 +1015,20 @@ public class UiAnimationMetadataFamilyGallery
                 Visual = FindVisualDescendants<Border>(button)
                     .Single(border => border.Name == "Marker"),
             }).ToArray();
+            var markerBounds = markers.Select(marker =>
+            {
+                var origin = marker.Button.TransformToAncestor(timeline)
+                    .Transform(new Point());
+                return new
+                {
+                    marker.ViewModel,
+                    Bounds = new Rect(
+                        origin,
+                        new Size(
+                            marker.Button.ActualWidth,
+                            marker.Button.ActualHeight)),
+                };
+            }).ToArray();
             var genericTypeColors = markers
                 .Where(marker => marker.ViewModel.Item.PreviewCategory == null)
                 .Select(marker => new
@@ -1124,6 +1138,33 @@ public class UiAnimationMetadataFamilyGallery
                     markerButtons.All(button => button.Style.Triggers.Count == 0),
                     Is.True);
             });
+
+            for (var firstIndex = 0;
+                 firstIndex < markerBounds.Length;
+                 firstIndex++)
+            {
+                for (var secondIndex = firstIndex + 1;
+                     secondIndex < markerBounds.Length;
+                     secondIndex++)
+                {
+                    var first = markerBounds[firstIndex];
+                    var second = markerBounds[secondIndex];
+                    var horizontalOverlap =
+                        first.ViewModel.StartFraction <=
+                            second.ViewModel.EndFraction &&
+                        second.ViewModel.StartFraction <=
+                            first.ViewModel.EndFraction;
+                    if (!horizontalOverlap)
+                        continue;
+
+                    NUnitAssert.That(
+                        second.Bounds.Top,
+                        Is.Not.EqualTo(first.Bounds.Top).Within(0.5),
+                        $"Overlapping timeline markers share a lane: " +
+                        $"{first.ViewModel.Item.Source.Name} and " +
+                        second.ViewModel.Item.Source.Name);
+                }
+            }
 
             var instantButton = markers.Single(marker =>
                 marker.ViewModel.Item.TimelineMarkerKind ==
