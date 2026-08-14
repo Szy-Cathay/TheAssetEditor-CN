@@ -33,6 +33,7 @@ public class UiAnimationMetadataFamilyTests
         "Editors/MetaDataEditor/AnimationMeta/MetaEditor/View/MetaDataEntryView.xaml",
         "Editors/MetaDataEditor/AnimationMeta/MetaEditor/View/NewMetaDataEntryWindow.xaml",
         "Editors/MetaDataEditor/AnimationMeta/SuperView/EditorView.xaml",
+        "Editors/MetaDataEditor/AnimationMeta/SuperView/Inspection/MetaDataProblemListView.xaml",
         "Editors/MetaDataEditor/AnimationMeta/SuperView/Inspection/MetaDataTimelineView.xaml",
         "Editors/Shared/Editors.Shared.Core/Common/AnimationPlayer/AnimationPlayerView.xaml",
         "Editors/Shared/Editors.Shared.Core/Common/BaseControl/EditorHostView.xaml",
@@ -59,7 +60,7 @@ public class UiAnimationMetadataFamilyTests
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(sources.Count, Is.EqualTo(32));
+            NUnitAssert.That(sources.Count, Is.EqualTo(33));
             NUnitAssert.That(combined, Does.Contain("AeBrush."));
             NUnitAssert.That(combined, Does.Contain("AppFontFamily"));
             NUnitAssert.That(combined, Does.Contain("AppFontWeight"));
@@ -165,7 +166,12 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 sharedPlayer,
                 Does.Contain("x:Name=\"PlaybackTimelineRow\""));
-            NUnitAssert.That(sharedPlayer, Does.Contain("<ItemsControl"));
+            NUnitAssert.That(sharedPlayer, Does.Not.Contain("<ItemsControl"));
+            NUnitAssert.That(sharedPlayer, Does.Not.Contain("<ComboBox"));
+            NUnitAssert.That(
+                sharedPlayer,
+                Does.Not.Contain("SelectedMainAnimation"));
+            NUnitAssert.That(sharedPlayer, Does.Not.Contain("PlayerItems"));
             NUnitAssert.That(sharedPlayer, Does.Not.Contain("<ListBox"));
             NUnitAssert.That(sharedPlayer, Does.Not.Contain("Width=\".1*\""));
             NUnitAssert.That(sharedPlayer, Does.Not.Contain("Width=\".3*\""));
@@ -505,6 +511,33 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 timeline,
                 Does.Contain("MetaDataTimelineMarkerKind.WholeAnimation"));
+        });
+    }
+
+    [Test]
+    public void MetadataSuperView_ProblemListReusesSharedFeedbackAndListStates()
+    {
+        var root = FindSolutionRoot();
+        var problemList = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "MetaDataEditor",
+            "AnimationMeta",
+            "SuperView",
+            "Inspection",
+            "MetaDataProblemListView.xaml"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(problemList, Does.Contain("AeList.View"));
+            NUnitAssert.That(problemList, Does.Contain("AeList.Item"));
+            NUnitAssert.That(problemList, Does.Contain("AeFeedback.Icon"));
+            NUnitAssert.That(problemList, Does.Contain("AeEmptyState.Panel"));
+            NUnitAssert.That(problemList, Does.Contain("SelectedProblem"));
+            NUnitAssert.That(
+                problemList,
+                Does.Contain("AutomationProperties.Name"));
+            NUnitAssert.That(problemList, Does.Contain("ToolTipText"));
         });
     }
 

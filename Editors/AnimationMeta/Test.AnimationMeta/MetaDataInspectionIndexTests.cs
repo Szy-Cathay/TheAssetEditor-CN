@@ -205,6 +205,136 @@ namespace Test.AnimationMeta
             });
         }
 
+        [Test]
+        public void Create_ProjectsFieldTimeAndPreviewProblemsWithSharedIdentity()
+        {
+            var invalidField = CreateFirePosition(1, 2);
+            var negativeTime = CreateFirePosition(-1, 0);
+            var reversedTime = CreateFirePosition(2, 1);
+            var outsideClip = CreateFirePosition(0, 6);
+            var previewFailure = CreateFirePosition(1, 2);
+            var diagnosticPosition = new Vector3(7, 8, 9);
+            var diagnosticReasons = new[]
+            {
+                "SuperView.Diagnostics.MissingBone",
+                "SuperView.Diagnostics.MissingModel",
+                "SuperView.Diagnostics.MissingAnimation",
+                "SuperView.Diagnostics.MissingEffect",
+                "SuperView.Diagnostics.RuleUnavailable",
+                "SuperView.Diagnostics.PreviewUnavailable",
+            };
+            var diagnostics = diagnosticReasons.Select(reason =>
+                new MetaDataBuildDiagnostic(
+                    previewFailure,
+                    MetaDataDocumentOwner.Persistent,
+                    MetaDataDiagnosticSeverity.Warning,
+                    reason,
+                    new MetaDataTimeRange(1, 2),
+                    diagnosticPosition,
+                    "resource/path",
+                    "weapon_bone")).ToArray();
+
+            var index = MetaDataInspectionIndex.Create(
+                [
+                    new MetaDataInspectionSource(
+                        invalidField,
+                        MetaDataDocumentOwner.Animation,
+                        false,
+                        ["开始时间"]),
+                    new MetaDataInspectionSource(
+                        negativeTime,
+                        MetaDataDocumentOwner.Animation,
+                        true),
+                    new MetaDataInspectionSource(
+                        reversedTime,
+                        MetaDataDocumentOwner.Animation,
+                        true),
+                    new MetaDataInspectionSource(
+                        outsideClip,
+                        MetaDataDocumentOwner.Animation,
+                        true),
+                    new MetaDataInspectionSource(
+                        previewFailure,
+                        MetaDataDocumentOwner.Persistent,
+                        true),
+                ],
+                [],
+                diagnostics,
+                5);
+
+            var invalidFieldProblem = index.Problems.Single(problem =>
+                ReferenceEquals(problem.Source, invalidField));
+            var previewProblems = index.Problems.Where(problem =>
+                ReferenceEquals(problem.Source, previewFailure)).ToArray();
+            Assert.Multiple(() =>
+            {
+                Assert.That(index.Problems, Has.Count.EqualTo(10));
+                Assert.That(
+                    invalidFieldProblem.Owner,
+                    Is.EqualTo(MetaDataDocumentOwner.Animation));
+                Assert.That(
+                    invalidFieldProblem.Severity,
+                    Is.EqualTo(MetaDataDiagnosticSeverity.Error));
+                Assert.That(
+                    invalidFieldProblem.ReasonKey,
+                    Is.EqualTo("SuperView.Problems.InvalidField"));
+                Assert.That(invalidFieldProblem.FieldName, Is.EqualTo("开始时间"));
+                Assert.That(
+                    invalidFieldProblem.Item,
+                    Is.SameAs(index.Items.Single(item =>
+                        ReferenceEquals(item.Source, invalidField))));
+                Assert.That(
+                    index.Problems.Single(problem =>
+                        ReferenceEquals(problem.Source, negativeTime)).ReasonKey,
+                    Is.EqualTo("SuperView.Problems.Time.Negative"));
+                Assert.That(
+                    index.Problems.Single(problem =>
+                        ReferenceEquals(problem.Source, reversedTime)).ReasonKey,
+                    Is.EqualTo("SuperView.Problems.Time.Reversed"));
+                Assert.That(
+                    index.Problems.Single(problem =>
+                        ReferenceEquals(problem.Source, outsideClip)).ReasonKey,
+                    Is.EqualTo("SuperView.Problems.Time.OutsideClip"));
+                Assert.That(
+                    index.Problems.Where(problem => problem.Severity ==
+                        MetaDataDiagnosticSeverity.Warning).ToArray(),
+                    Has.Length.EqualTo(9));
+                Assert.That(
+                    previewProblems.Select(problem => problem.ReasonKey),
+                    Is.EqualTo(diagnosticReasons));
+                Assert.That(
+                    previewProblems,
+                    Has.All.Property(nameof(MetaDataInspectionProblem.Owner))
+                        .EqualTo(MetaDataDocumentOwner.Persistent));
+                Assert.That(
+                    previewProblems,
+                    Has.All.Property(nameof(MetaDataInspectionProblem.TimeRange))
+                        .EqualTo(new MetaDataTimeRange(1, 2)));
+                Assert.That(
+                    previewProblems,
+                    Has.All.Property(nameof(MetaDataInspectionProblem.Position))
+                        .EqualTo(diagnosticPosition));
+                Assert.That(
+                    previewProblems,
+                    Has.All.Property(nameof(MetaDataInspectionProblem.ResourcePath))
+                        .EqualTo("resource/path"));
+                Assert.That(
+                    previewProblems,
+                    Has.All.Property(nameof(MetaDataInspectionProblem.BoneName))
+                        .EqualTo("weapon_bone"));
+            });
+
+            var resolved = MetaDataInspectionIndex.Create(
+                [new MetaDataInspectionSource(
+                    invalidField,
+                    MetaDataDocumentOwner.Animation,
+                    true)],
+                [],
+                [],
+                5);
+            Assert.That(resolved.Problems, Is.Empty);
+        }
+
         private static FirePos_v10 CreateFirePosition(
             float startTime,
             float endTime) => new()
