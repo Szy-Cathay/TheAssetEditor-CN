@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -260,7 +260,8 @@ public class UiAnimationMetadataFamilyGallery
             760),
         "retarget-save-window" =>
             new RetargetSaveWindow(
-                new Editors.AnimatioReTarget.Editor.Saving.SaveSettings()),
+                new Editors.AnimatioReTarget.Editor.Saving.SaveSettings(),
+                Moq.Mock.Of<IStandardDialogs>()),
         "retarget-settings" => Host(
             new RetargetSettingsView { DataContext = CreateBoneModel() },
             760,
@@ -995,8 +996,8 @@ public class UiAnimationMetadataFamilyGallery
                 window.Height = 680;
                 break;
             case "retarget-save-window":
-                window.Width = 560;
-                window.Height = 260;
+                window.Width = 680;
+                window.Height = 520;
                 break;
             case "metadata-new-entry-window":
                 window.Width = 460;
@@ -1029,6 +1030,36 @@ public class UiAnimationMetadataFamilyGallery
                     element.ActualWidth < 0 ||
                     element.ActualHeight < 0));
         });
+
+        if (variant == "retarget-save-window")
+        {
+            var buttonContents = buttons
+                .Select(button => button.Content?.ToString())
+                .ToArray();
+            var radioContents = FindVisualDescendants<RadioButton>(window)
+                .Select(radioButton => radioButton.Content?.ToString())
+                .ToArray();
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    buttonContents,
+                    Does.Contain("批量动画重定向"));
+                NUnitAssert.That(
+                    buttonContents,
+                    Does.Contain("保存当前动画"));
+                NUnitAssert.That(
+                    radioContents,
+                    Does.Contain("按单动画路径规则保存"));
+                NUnitAssert.That(
+                    radioContents,
+                    Does.Contain("保存到所选目录"));
+                NUnitAssert.That(
+                    FindVisualDescendants<
+                        Shared.Ui.Common.OperationProgress
+                            .OperationProgressWindowHost>(window),
+                    Has.Exactly(1).Items);
+            });
+        }
 
         if (variant == "shared-animation-player")
         {

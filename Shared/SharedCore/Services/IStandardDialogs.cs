@@ -8,7 +8,8 @@ namespace Shared.Core.Services
     {
         SaveDialogResult DisplaySaveDialog(IPackFileService pfs, List<string> extensions);
         BrowseDialogResultFile DisplayBrowseDialog(List<string> extensions);
-        BrowseDialogResultFolder DisplayBrowseFolderDialog();
+        BrowseDialogResultFolder DisplayBrowseFolderDialog(
+            PackFileContainer? container = null);
 
         void ShowExceptionWindow(Exception e, string userInfo = "");
         void ShowErrorViewDialog(string title, ErrorList errorItems, bool modal = true);

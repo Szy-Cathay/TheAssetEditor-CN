@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -170,6 +170,22 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 saveWindowCode,
                 Does.Contain("SaveWindow : AssetEditorWindow"));
+            NUnitAssert.That(
+                saveWindow,
+                Does.Contain("AnimReTarget.Batch.Path.SelectedFolderHint"));
+            NUnitAssert.That(
+                saveWindowCode,
+                Does.Contain("!SaveManager.IsTechAnimation(animation)"));
+            NUnitAssert.That(
+                saveWindowCode,
+                Does.Contain("_saveManager.GetEditableFolderProject()"));
+            NUnitAssert.That(
+                saveWindowCode,
+                Does.Match("DisplayBrowseFolderDialog\\(\\s*outputProject\\)"));
+            NUnitAssert.That(
+                saveWindowCode,
+                Does.Contain("AnimReTarget.Batch.Result.Path"));
+            NUnitAssert.That(saveWindowCode, Does.Not.Contain(" → "));
         });
     }
 
@@ -227,6 +243,18 @@ public class UiAnimationMetadataFamilyTests
                     .GetProperty("AnimReTarget.Error.InvalidSpeedMultiplier")
                     .GetString(),
                 Is.EqualTo("动画速度倍率必须大于 0。"));
+            NUnitAssert.That(
+                language.RootElement
+                    .GetProperty(
+                        "AnimReTarget.Batch.Path.SelectedFolderHint")
+                    .GetString(),
+                Is.EqualTo(
+                    "输出时只保留每个 .anim 所在的直接父文件夹，不判断文件夹名称，也不限制原路径层级。"));
+            NUnitAssert.That(
+                language.RootElement
+                    .GetProperty("AnimReTarget.Batch.Result.Path")
+                    .GetString(),
+                Is.EqualTo("{0} 到 {1}"));
         });
     }
 

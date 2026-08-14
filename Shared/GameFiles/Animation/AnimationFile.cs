@@ -421,7 +421,7 @@ namespace Shared.GameFormats.Animation
             for (var i = 0; i < input.Header.SkeletonName.Length; i++)
                 writer.Write(input.Header.SkeletonName[i]);
 
-            if (input.Header.Version == 7 || input.Header.Version == 6)
+            if (input.Header.Version == 7)
             {
                 writer.Write(input.Header.FlagCount);
                 foreach (var flag in input.Header.FlagVariables)

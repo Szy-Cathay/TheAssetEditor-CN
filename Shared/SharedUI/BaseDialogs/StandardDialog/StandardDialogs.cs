@@ -8,6 +8,7 @@ using Shared.Core.ErrorHandling;
 using Shared.Core.ErrorHandling.Exceptions;
 using Shared.Core.Events;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.BaseDialogs.StandardDialog.PackFile;
@@ -56,9 +57,24 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
             return output;
         }
 
-        public BrowseDialogResultFolder DisplayBrowseFolderDialog()
+        public BrowseDialogResultFolder DisplayBrowseFolderDialog(
+            PackFileContainer? container = null)
         {
             using var browser = new PackFileBrowserWindow(_packFileBrowserBuilder, null, showCaFiles: false, showFoldersOnly: true);
+            if (container != null)
+            {
+                for (var index = browser.ViewModel.Files.Count - 1;
+                     index >= 0;
+                     index--)
+                {
+                    if (!ReferenceEquals(
+                            browser.ViewModel.Files[index].FileOwner,
+                            container))
+                    {
+                        browser.ViewModel.Files.RemoveAt(index);
+                    }
+                }
+            }
             ApplyOwner(browser);
 
             var saveResult = browser.ShowDialog();
