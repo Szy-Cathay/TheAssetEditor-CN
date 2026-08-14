@@ -6,9 +6,10 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     Title="{loc:Loc AnimReTarget.SaveWindowTitle}"
-    Width="560"
-    Height="260"
+    Width="680"
+    Height="520"
     Background="{DynamicResource AeBrush.Canvas}"
     FontFamily="{DynamicResource AppFontFamily}"
     FontWeight="{DynamicResource AppFontWeight}"
@@ -22,66 +23,151 @@
         </ResourceDictionary>
     </common:AssetEditorWindow.Resources>
 
-    <StackPanel Margin="16">
-        <DockPanel>
-            <Label
-                Width="140"
-                Content="{loc:Loc AnimReTarget.SavePrefix}"
-                DockPanel.Dock="Left"
-                Style="{StaticResource AeForm.Label}" />
-            <ComboBox
-                Width="60"
-                Margin="2"
-                DockPanel.Dock="Right"
-                ItemsSource="{Binding PossibleAnimationFormats}"
-                SelectedItem="{Binding AnimationFormat, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-            <Label
-                Content="{loc:Loc AnimReTarget.Format}"
-                DockPanel.Dock="Right"
-                Style="{StaticResource AeForm.Label}" />
-            <TextBox
-                VerticalAlignment="Center"
-                DockPanel.Dock="Left"
-                Text="{Binding SavePrefix, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-        </DockPanel>
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <DockPanel Margin="0,8,0,0" IsEnabled="False">
-            <Label
-                Width="140"
-                Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}"
-                Style="{StaticResource AeForm.Label}" />
-            <CheckBox
-                VerticalContentAlignment="Center"
-                IsChecked="{Binding UseGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-            <Button
-                Margin="2"
-                Command="{Binding ExportScaledMesh}"
-                Content="{loc:Loc AnimReTarget.ExportMeshSkeletonAtScale}"
-                DockPanel.Dock="Right" />
-            <TextBox
-                VerticalAlignment="Center"
-                Text="{Binding ScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-        </DockPanel>
+        <StackPanel x:Name="OptionsPanel">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="88" />
+                </Grid.ColumnDefinitions>
+                <Label
+                    Grid.Column="0"
+                    Content="{loc:Loc AnimReTarget.SavePrefix}"
+                    Style="{StaticResource AeForm.Label}" />
+                <TextBox
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource AeInput.TextBox}"
+                    Text="{Binding SavePrefix, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+                <Label
+                    Grid.Column="2"
+                    Margin="12,0,8,0"
+                    Content="{loc:Loc AnimReTarget.Format}"
+                    Style="{StaticResource AeForm.Label}" />
+                <ComboBox
+                    Grid.Column="3"
+                    ItemsSource="{Binding PossibleAnimationFormats}"
+                    SelectedItem="{Binding AnimationFormat, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                    Style="{StaticResource AeInput.ComboBox}" />
+            </Grid>
 
-        <DockPanel Margin="0,8,0,0" IsEnabled="False">
-            <Button Content="{loc:Loc AnimReTarget.BatchExport}" />
-        </DockPanel>
+            <DockPanel Margin="0,8,0,0" IsEnabled="False">
+                <Label
+                    Width="140"
+                    Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}"
+                    Style="{StaticResource AeForm.Label}" />
+                <CheckBox
+                    VerticalContentAlignment="Center"
+                    IsChecked="{Binding UseGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                    Style="{StaticResource AeInput.CheckBox}" />
+                <Button
+                    Margin="8,0,0,0"
+                    Command="{Binding ExportScaledMesh}"
+                    Content="{loc:Loc AnimReTarget.ExportMeshSkeletonAtScale}"
+                    DockPanel.Dock="Right"
+                    Style="{StaticResource AeButton.Secondary}" />
+                <TextBox
+                    VerticalAlignment="Center"
+                    Style="{StaticResource AeInput.TextBox}"
+                    Text="{Binding ScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+            </DockPanel>
+
+            <Border
+                Margin="0,16,0,0"
+                Padding="12"
+                Style="{StaticResource AeSurface.Panel}">
+                <StackPanel>
+                    <TextBlock
+                        Style="{StaticResource AeText.SectionTitle}"
+                        Text="{loc:Loc AnimReTarget.Batch.Title}" />
+                    <TextBlock
+                        Margin="0,4,0,12"
+                        Foreground="{DynamicResource AeBrush.TextSecondary}"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{loc:Loc AnimReTarget.Batch.Description}"
+                        TextWrapping="Wrap" />
+
+                    <RadioButton
+                        Content="{loc:Loc AnimReTarget.Batch.Path.Source}"
+                        IsChecked="{Binding BatchUseSourcePath, Mode=TwoWay}"
+                        Style="{StaticResource AeInput.RadioButton}" />
+                    <RadioButton
+                        Margin="0,8,0,0"
+                        Content="{loc:Loc AnimReTarget.Batch.Path.SelectedFolder}"
+                        IsChecked="{Binding BatchUseSelectedFolder, Mode=TwoWay}"
+                        Style="{StaticResource AeInput.RadioButton}" />
+
+                    <Grid Margin="24,8,0,0" IsEnabled="{Binding BatchUseSelectedFolder}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="88" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            Grid.Column="0"
+                            IsReadOnly="True"
+                            Style="{StaticResource AeInput.TextBox}"
+                            Text="{Binding BatchTargetFolder}" />
+                        <Button
+                            x:Name="BrowseButton"
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Click="BrowseButtonClick"
+                            Content="{loc:Loc General.Browse}"
+                            Style="{StaticResource AeButton.Secondary}" />
+                    </Grid>
+                    <TextBlock
+                        Margin="24,4,0,0"
+                        Foreground="{DynamicResource AeBrush.TextMuted}"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{loc:Loc AnimReTarget.Batch.Path.SelectedFolderHint}"
+                        TextWrapping="Wrap" />
+
+                    <CheckBox
+                        Margin="0,12,0,0"
+                        Content="{loc:Loc AnimReTarget.Batch.OverwriteExisting}"
+                        IsChecked="{Binding BatchOverwriteExisting, Mode=TwoWay}"
+                        Style="{StaticResource AeInput.CheckBox}" />
+                    <Button
+                        x:Name="BatchButton"
+                        Margin="0,16,0,0"
+                        HorizontalAlignment="Right"
+                        Click="BatchButtonClick"
+                        Content="{loc:Loc AnimReTarget.Batch.Start}"
+                        Style="{StaticResource AeButton.Primary}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <StackPanel
+            Grid.Row="1"
             Margin="0,16,0,0"
             HorizontalAlignment="Right"
             Orientation="Horizontal">
             <Button
-                Width="80"
+                x:Name="CloseButton"
+                Width="88"
                 Margin="0,0,8,0"
                 Click="CloseButtonClick"
                 Content="{loc:Loc General.Close}"
                 Style="{StaticResource AeButton.Quiet}" />
             <Button
-                Width="80"
+                x:Name="SaveButton"
+                MinWidth="112"
                 Click="SaveButtonClick"
-                Content="{loc:Loc General.Save}"
-                Style="{StaticResource AeButton.Primary}" />
+                Content="{loc:Loc AnimReTarget.SaveCurrentAnimation}"
+                Style="{StaticResource AeButton.Secondary}" />
         </StackPanel>
-    </StackPanel>
+
+        <progress:OperationProgressWindowHost
+            Grid.RowSpan="2"
+            CancelText="{loc:Loc General.Cancel}"
+            WindowTitle="{loc:Loc AnimReTarget.Batch.ProgressTitle}" />
+    </Grid>
 </common:AssetEditorWindow>
