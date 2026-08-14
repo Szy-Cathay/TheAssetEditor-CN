@@ -12,6 +12,8 @@
             x:Key="RecoveryHiddenConverter"
             TrueValue="Collapsed"
             FalseValue="Visible" />
+        <valueConverters:NullVisibilityConverter
+            x:Key="NullToCollapsedConverter" />
         <local:HistoryChangeKindConverter x:Key="HistoryChangeKindConverter" />
     </UserControl.Resources>
 
@@ -19,21 +21,17 @@
         <ScrollViewer
             HorizontalScrollBarVisibility="Disabled"
             VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12">
-                <Grid Margin="0,0,0,8">
+            <StackPanel Margin="8">
+                <Grid Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock
-                            Style="{StaticResource AeText.SectionTitle}"
-                            Text="{loc:Loc FolderProject.History.Title}" />
-                        <TextBlock
-                            Margin="0,4,0,0"
-                            Style="{StaticResource AeText.Caption}"
-                            Text="{Binding ProjectName}" />
-                    </StackPanel>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{Binding LoadedProjectText}"
+                        TextTrimming="CharacterEllipsis" />
                     <Button
                         Grid.Column="1"
                         Margin="8,0,0,0"
@@ -43,23 +41,14 @@
                         Visibility="{Binding IsRecoveryRequired, Converter={StaticResource RecoveryHiddenConverter}}" />
                 </Grid>
 
-                <Border
-                    Margin="0,0,0,12"
-                    Style="{StaticResource AeFeedback.Notice}"
-                    Visibility="{Binding IsRecoveryRequired, Converter={StaticResource RecoveryHiddenConverter}}">
-                    <TextBlock
-                        Text="{loc:Loc FolderProject.History.SameDiskNotice}"
-                        TextWrapping="Wrap" />
-                </Border>
-
                 <TextBlock
-                    Margin="4,0,4,8"
+                    Margin="0,0,0,8"
                     Style="{StaticResource AeText.Caption}"
                     Text="{Binding AvailabilityText}"
                     TextWrapping="Wrap" />
 
                 <Border
-                    Margin="0,0,0,12"
+                    Margin="0,0,0,8"
                     Style="{StaticResource AeFeedback.Notice}"
                     Visibility="{Binding IsRecoveryRequired, Converter={StaticResource BoolToCollapsedConverter}}">
                     <StackPanel>
@@ -76,153 +65,237 @@
 
                 <StackPanel
                     Visibility="{Binding IsRecoveryRequired, Converter={StaticResource RecoveryHiddenConverter}}">
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc FolderProject.History.UnrecordedChanges}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Style="{StaticResource AeText.Caption}"
+                            Text="{Binding UnrecordedSummaryText}"
+                            TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                    <ListView
+                        MaxHeight="144"
+                        Margin="0,0,0,4"
+                        ItemsSource="{Binding UnrecordedChanges}"
+                        SelectedItem="{Binding SelectedUnrecordedChange, Mode=TwoWay}"
+                        Style="{StaticResource AeList.View}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock
+                                            Text="{Binding Path}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            Foreground="{DynamicResource AeBrush.TextMuted}"
+                                            Text="{Binding PreviousPath}"
+                                            TextTrimming="CharacterEllipsis"
+                                            Visibility="{Binding PreviousPath, Converter={StaticResource NullToCollapsedConverter}}" />
+                                    </StackPanel>
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Margin="8,0,0,0"
+                                        Foreground="{DynamicResource AeBrush.TextMuted}"
+                                        Text="{Binding Kind, Converter={StaticResource HistoryChangeKindConverter}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            Command="{Binding DiscardSelectedCommand}"
+                            Content="{loc:Loc FolderProject.History.DiscardSelected}"
+                            Style="{StaticResource AeButton.Danger}" />
+                        <Button
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Command="{Binding DiscardAllCommand}"
+                            Content="{loc:Loc FolderProject.History.DiscardAll}"
+                            Style="{StaticResource AeButton.Danger}" />
+                    </Grid>
+
                     <TextBlock
+                        Margin="0,0,0,4"
                         Style="{StaticResource AeText.SectionTitle}"
-                        Text="{loc:Loc FolderProject.History.UnrecordedChanges}" />
-                <TextBlock
-                    Margin="0,4,0,8"
-                    Style="{StaticResource AeText.Caption}"
-                    Text="{Binding UnrecordedSummaryText}" />
-                <ListView
-                    MaxHeight="190"
-                    Margin="0,0,0,8"
-                    ItemsSource="{Binding UnrecordedChanges}"
-                    SelectedItem="{Binding SelectedUnrecordedChange, Mode=TwoWay}"
-                    Style="{StaticResource AeList.View}">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                        Text="{loc:Loc FolderProject.History.Description}" />
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid>
+                            <TextBox
+                                x:Name="RestorePointDescriptionInput"
+                                Style="{StaticResource AeInput.TextBox}"
+                                Text="{Binding RestorePointDescription, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                x:Name="RestorePointDescriptionHint"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource AeBrush.TextMuted}"
+                                IsHitTestVisible="False"
+                                Text="{loc:Loc FolderProject.History.DefaultDescription}">
+                                <TextBlock.Style>
+                                    <Style
+                                        BasedOn="{StaticResource AeText.Body}"
+                                        TargetType="{x:Type TextBlock}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition
+                                                        Binding="{Binding Text, ElementName=RestorePointDescriptionInput}"
+                                                        Value="" />
+                                                    <Condition
+                                                        Binding="{Binding IsKeyboardFocused, ElementName=RestorePointDescriptionInput}"
+                                                        Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <Button
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Command="{Binding CreateRestorePointCommand}"
+                            Content="{loc:Loc FolderProject.History.CreateRestorePoint}"
+                            Style="{StaticResource AeButton.Primary}" />
+                    </Grid>
+
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc FolderProject.History.RestorePoints}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Style="{StaticResource AeText.Caption}"
+                            Text="{Binding HistorySummaryText}"
+                            TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                    <ListView
+                        MaxHeight="176"
+                        Margin="0,0,0,12"
+                        ItemsSource="{Binding RestorePoints}"
+                        SelectedItem="{Binding SelectedRestorePoint, Mode=TwoWay}"
+                        Style="{StaticResource AeList.View}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4,2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
                                     <TextBlock
-                                        Foreground="{DynamicResource AeBrush.TextMuted}"
-                                        Text="{Binding PreviousPath}"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding Description}"
                                         TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                                <TextBlock
-                                    Grid.Column="1"
-                                    Margin="8,0,0,0"
-                                    Foreground="{DynamicResource AeBrush.TextMuted}"
-                                    Text="{Binding Kind, Converter={StaticResource HistoryChangeKindConverter}}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        Command="{Binding DiscardSelectedCommand}"
-                        Content="{loc:Loc FolderProject.History.DiscardSelected}"
-                        Style="{StaticResource AeButton.Danger}" />
-                    <Button
-                        Grid.Column="1"
-                        Margin="8,0,0,0"
-                        Command="{Binding DiscardAllCommand}"
-                        Content="{loc:Loc FolderProject.History.DiscardAll}"
-                        Style="{StaticResource AeButton.Danger}" />
-                </Grid>
+                                    <Grid Grid.Row="1" Margin="0,2,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            Foreground="{DynamicResource AeBrush.TextMuted}"
+                                            Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Margin="8,0,0,0"
+                                            Foreground="{DynamicResource AeBrush.TextMuted}">
+                                            <Run Text="{loc:Loc FolderProject.History.ChangeSummaryPrefix}" />
+                                            <Run Text="{Binding ChangeSummary.Total, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </Grid>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
 
-                <TextBlock
-                    Margin="0,4,0,4"
-                    Style="{StaticResource AeText.Label}"
-                    Text="{loc:Loc FolderProject.History.Description}" />
-                <TextBox
-                    Margin="0,0,0,8"
-                    Style="{StaticResource AeInput.TextBox}"
-                    Text="{Binding RestorePointDescription, UpdateSourceTrigger=PropertyChanged}" />
-                <Button
-                    Margin="0,0,0,16"
-                    Command="{Binding CreateRestorePointCommand}"
-                    Content="{loc:Loc FolderProject.History.CreateRestorePoint}"
-                    Style="{StaticResource AeButton.Primary}" />
-
-                <TextBlock
-                    Style="{StaticResource AeText.SectionTitle}"
-                    Text="{loc:Loc FolderProject.History.RestorePoints}" />
-                <TextBlock
-                    Margin="0,4,0,8"
-                    Style="{StaticResource AeText.Caption}"
-                    Text="{Binding HistorySummaryText}" />
-                <ListView
-                    MaxHeight="220"
-                    Margin="0,0,0,12"
-                    ItemsSource="{Binding RestorePoints}"
-                    SelectedItem="{Binding SelectedRestorePoint, Mode=TwoWay}"
-                    Style="{StaticResource AeList.View}">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="4">
-                                <TextBlock FontWeight="SemiBold" Text="{Binding Description}" TextWrapping="Wrap" />
-                                <TextBlock
-                                    Margin="0,4,0,0"
-                                    Foreground="{DynamicResource AeBrush.TextMuted}"
-                                    Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
-                                <TextBlock Foreground="{DynamicResource AeBrush.TextMuted}">
-                                    <Run Text="{loc:Loc FolderProject.History.ChangeSummaryPrefix}" />
-                                    <Run Text="{Binding ChangeSummary.Total, Mode=OneWay}" />
-                                </TextBlock>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-
-                <TextBlock
-                    Style="{StaticResource AeText.SectionTitle}"
-                    Text="{loc:Loc FolderProject.History.SelectedChanges}" />
-                <TextBlock
-                    Margin="0,4,0,8"
-                    Style="{StaticResource AeText.Caption}"
-                    Text="{loc:Loc FolderProject.History.SelectRestorePointHint}" />
-                <ListView
-                    MaxHeight="220"
-                    ItemsSource="{Binding SelectedRestorePointChanges}"
-                    SelectedItem="{Binding SelectedRestorePointChange, Mode=TwoWay}"
-                    Style="{StaticResource AeList.View}">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc FolderProject.History.SelectedChanges}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource AeText.Caption}"
+                            Text="{loc:Loc FolderProject.History.SelectRestorePointHint}"
+                            TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                    <ListView
+                        MaxHeight="168"
+                        Margin="0,0,0,4"
+                        ItemsSource="{Binding SelectedRestorePointChanges}"
+                        SelectedItem="{Binding SelectedRestorePointChange, Mode=TwoWay}"
+                        Style="{StaticResource AeList.View}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock
+                                            Text="{Binding Path}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            Foreground="{DynamicResource AeBrush.TextMuted}"
+                                            Text="{Binding PreviousPath}"
+                                            TextTrimming="CharacterEllipsis"
+                                            Visibility="{Binding PreviousPath, Converter={StaticResource NullToCollapsedConverter}}" />
+                                    </StackPanel>
                                     <TextBlock
+                                        Grid.Column="1"
+                                        Margin="8,0,0,0"
                                         Foreground="{DynamicResource AeBrush.TextMuted}"
-                                        Text="{Binding PreviousPath}"
-                                        TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                                <TextBlock
-                                    Grid.Column="1"
-                                    Margin="8,0,0,0"
-                                    Foreground="{DynamicResource AeBrush.TextMuted}"
-                                    Text="{Binding Kind, Converter={StaticResource HistoryChangeKindConverter}}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-                    <Grid Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        Command="{Binding RestoreFileCommand}"
-                        Content="{loc:Loc FolderProject.History.RestoreFile}"
-                        Style="{StaticResource AeButton.Secondary}" />
-                    <Button
-                        Grid.Column="1"
-                        Margin="8,0,0,0"
-                        Command="{Binding RestoreProjectCommand}"
-                        Content="{loc:Loc FolderProject.History.RestoreProject}"
-                        Style="{StaticResource AeButton.Danger}" />
+                                        Text="{Binding Kind, Converter={StaticResource HistoryChangeKindConverter}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            Command="{Binding RestoreFileCommand}"
+                            Content="{loc:Loc FolderProject.History.RestoreFile}"
+                            Style="{StaticResource AeButton.Secondary}" />
+                        <Button
+                            Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Command="{Binding RestoreProjectCommand}"
+                            Content="{loc:Loc FolderProject.History.RestoreProject}"
+                            Style="{StaticResource AeButton.Danger}" />
                     </Grid>
                 </StackPanel>
             </StackPanel>

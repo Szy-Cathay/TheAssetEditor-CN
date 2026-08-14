@@ -107,7 +107,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
     {
     }
 
-    public FolderProjectHistoryService(
+    internal FolderProjectHistoryService(
         IFolderProjectVersionControlService versionControl,
         LocalizationManager localization)
     {

@@ -77,7 +77,7 @@ public class UiMainShellTests
                 Does.Contain("Style=\"{StaticResource AeShell.ActivityBar}\""));
             NUnitAssert.That(
                 mainWindow.Split(
-                    "GitWorkspace.SelectedSidebarTabIndex",
+                    "HistoryWorkspace.SelectedSidebarTabIndex",
                     StringSplitOptions.None),
                 Has.Length.EqualTo(3),
                 "Activity bar and workspace content must share the same selection.");
@@ -119,7 +119,9 @@ public class UiMainShellTests
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(language, Does.Contain("MainWindow.Activity.Resources"));
-            NUnitAssert.That(language, Does.Contain("MainWindow.Activity.Git"));
+            NUnitAssert.That(
+                language,
+                Does.Contain("MainWindow.Activity.History"));
             NUnitAssert.That(language, Does.Contain("MainWindow.EmptyEditor.Title"));
             NUnitAssert.That(language, Does.Contain("MainWindow.EmptyEditor.Description"));
         });

@@ -60,7 +60,7 @@
                     x:Name="ActivityBar"
                     Grid.Column="0"
                     Style="{StaticResource AeShell.ActivityBar}"
-                    SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}">
+                    SelectedIndex="{Binding HistoryWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}">
                     <ListBoxItem
                         AutomationProperties.Name="{loc:Loc MainWindow.Activity.Resources}"
                         ToolTip="{loc:Loc MainWindow.Activity.Resources}">
@@ -70,9 +70,9 @@
                             Kind="FolderOutline" />
                     </ListBoxItem>
                     <ListBoxItem
-                        AutomationProperties.Name="{loc:Loc MainWindow.Activity.Git}"
-                        IsEnabled="{Binding DataContext.GitWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}"
-                        ToolTip="{loc:Loc MainWindow.Activity.Git}">
+                        AutomationProperties.Name="{loc:Loc MainWindow.Activity.History}"
+                        IsEnabled="{Binding DataContext.HistoryWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}"
+                        ToolTip="{loc:Loc MainWindow.Activity.History}">
                         <materialIcons:MaterialIcon
                             Width="17"
                             Height="17"
@@ -84,7 +84,7 @@
                     x:Name="WorkspaceSidebar"
                     Grid.Column="1"
                     Style="{StaticResource AeShell.WorkspaceSidebar}"
-                    SelectedIndex="{Binding GitWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}">
+                    SelectedIndex="{Binding HistoryWorkspace.SelectedSidebarTabIndex, Mode=TwoWay}">
                     <TabItem>
                         <Grid>
                             <Grid.RowDefinitions>
@@ -107,7 +107,7 @@
                         </Grid>
                     </TabItem>
                     <TabItem
-                        IsEnabled="{Binding DataContext.GitWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}">
+                        IsEnabled="{Binding DataContext.HistoryWorkspace.IsEnabled, RelativeSource={RelativeSource AncestorType=Window}}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="{StaticResource AeSize.TabGridLength}" />
@@ -119,11 +119,12 @@
                                 BorderThickness="0,0,0,1">
                                 <TextBlock
                                     Style="{StaticResource AeShell.SidebarHeader}"
-                                    Text="{loc:Loc MainWindow.Activity.Git}" />
+                                    Text="{loc:Loc MainWindow.Activity.History}"
+                                    ToolTip="{loc:Loc FolderProject.History.SameDiskNotice}" />
                             </Border>
                             <historyViews:FolderProjectHistoryView
                                 Grid.Row="1"
-                                DataContext="{Binding DataContext.GitWorkspace.History, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                DataContext="{Binding DataContext.HistoryWorkspace.History, RelativeSource={RelativeSource AncestorType=Window}}" />
                         </Grid>
                     </TabItem>
                 </TabControl>

@@ -32,8 +32,8 @@ public class FolderProjectCloseGuardTests
                             FolderProjectUnrecordedChangeKind.Modified),
                     ]));
         var eventHub = new TestEventHub();
-        OpenFolderProjectGitPanelEvent? published = null;
-        eventHub.Register<OpenFolderProjectGitPanelEvent>(
+        OpenFolderProjectHistoryPanelEvent? published = null;
+        eventHub.Register<OpenFolderProjectHistoryPanelEvent>(
             this,
             item => published = item);
         var guard = new FolderProjectCloseGuard(

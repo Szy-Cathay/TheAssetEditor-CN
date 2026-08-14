@@ -27,23 +27,22 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private readonly IEventHub? _eventHub;
         private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly IContextMenuBuilder _contextMenuBuilder;
-        private readonly IFolderProjectVersionControlService?
-            _versionControlService;
+        private readonly IFolderProjectHistoryService? _historyService;
         private readonly bool _showCaFiles;
         private readonly Dictionary<string, FolderProjectTreeState>
             _detachedFolderProjectStates =
                 new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, FolderProjectRepositoryStatus>
-            _folderProjectGitStatusCache =
+        private readonly Dictionary<string, FolderProjectHistoryStatus>
+            _folderProjectHistoryStatusCache =
                 new(StringComparer.OrdinalIgnoreCase);
-        private int _gitStatusRequestId;
+        private int _historyStatusRequestId;
 
         public event FileSelectedDelegate FileOpen;
         public event NodeSelectedDelegate NodeSelected;
 
         public ObservableCollection<TreeNode> Files { get; set; } = [];
         public SearchFilter Filter { get; private set; }
-        public Task GitStatusRefreshTask { get; private set; } =
+        public Task HistoryStatusRefreshTask { get; private set; } =
             Task.CompletedTask;
         public Task CaWemRefreshTask { get; private set; } =
             Task.CompletedTask;
@@ -58,13 +57,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         public bool ShowFoldersOnly { get; }
 
-        public PackFileBrowserViewModel(ApplicationSettingsService applicationSettingsService, IContextMenuBuilder contextMenuBuilder, IPackFileService packFileService, IEventHub? eventHub, bool showCaFiles, bool showFoldersOnly, IFolderProjectVersionControlService? versionControlService = null)
+        public PackFileBrowserViewModel(ApplicationSettingsService applicationSettingsService, IContextMenuBuilder contextMenuBuilder, IPackFileService packFileService, IEventHub? eventHub, bool showCaFiles, bool showFoldersOnly, IFolderProjectHistoryService? historyService = null)
         {
             _packFileService = packFileService;
             _eventHub = eventHub;
             _applicationSettingsService = applicationSettingsService;
             _contextMenuBuilder = contextMenuBuilder;
-            _versionControlService = versionControlService;
+            _historyService = historyService;
             _showCaFiles = showCaFiles;
 
             ShowFoldersOnly = showFoldersOnly;
@@ -885,48 +884,48 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             Filter.Refresh();
             RestoreTreeState(container, root, state);
             if (container is FolderProjectContainer project)
-                QueueFolderProjectGitStatusRefresh(project, root);
+                QueueFolderProjectHistoryStatusRefresh(project, root);
         }
 
-        private void QueueFolderProjectGitStatusRefresh(
+        private void QueueFolderProjectHistoryStatusRefresh(
             FolderProjectContainer project,
             TreeNode root)
         {
-            if (_versionControlService == null)
+            if (_historyService == null)
                 return;
 
-            if (_folderProjectGitStatusCache.TryGetValue(
+            if (_folderProjectHistoryStatusCache.TryGetValue(
                     project.ProjectRoot,
                     out var cachedStatus))
             {
-                MarkFolderProjectGitChanges(cachedStatus, root);
+                MarkFolderProjectHistoryChanges(cachedStatus, root);
             }
 
-            var requestId = ++_gitStatusRequestId;
-            GitStatusRefreshTask = RefreshFolderProjectGitStatusAsync(
+            var requestId = ++_historyStatusRequestId;
+            HistoryStatusRefreshTask = RefreshFolderProjectHistoryStatusAsync(
                 project,
                 root,
                 requestId);
         }
 
-        private async Task RefreshFolderProjectGitStatusAsync(
+        private async Task RefreshFolderProjectHistoryStatusAsync(
             FolderProjectContainer project,
             TreeNode root,
             int requestId)
         {
-            FolderProjectRepositoryStatus status;
+            FolderProjectHistoryStatus status;
             try
             {
                 status = await Task.Run(
-                    () => _versionControlService!.GetStatus(
+                    () => _historyService!.GetStatus(
                         project.ProjectRoot));
             }
-            catch (FolderProjectVersionControlException)
+            catch (FolderProjectHistoryException)
             {
                 return;
             }
 
-            if (requestId != _gitStatusRequestId ||
+            if (requestId != _historyStatusRequestId ||
                 !ReferenceEquals(
                     GetPackFileCollectionRootNode(project),
                     root))
@@ -934,19 +933,19 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                 return;
             }
 
-            _folderProjectGitStatusCache[project.ProjectRoot] = status;
+            _folderProjectHistoryStatusCache[project.ProjectRoot] = status;
             root.UnsavedChanged = false;
             root.ForeachNode(node => node.UnsavedChanged = false);
-            MarkFolderProjectGitChanges(status, root);
+            MarkFolderProjectHistoryChanges(status, root);
         }
 
-        private static void MarkFolderProjectGitChanges(
-            FolderProjectRepositoryStatus status,
+        private static void MarkFolderProjectHistoryChanges(
+            FolderProjectHistoryStatus status,
             TreeNode root)
         {
-            foreach (var change in status.Changes)
+            foreach (var change in status.UnrecordedChanges)
             {
-                var path = change.RepositoryPath.Replace(
+                var path = change.Path.Replace(
                     Path.AltDirectorySeparatorChar,
                     Path.DirectorySeparatorChar);
                 TreeNode? node = null;
@@ -1142,7 +1141,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         public void Dispose()
         {
-            _gitStatusRequestId++;
+            _historyStatusRequestId++;
             _eventHub?.UnRegister(this);
         }
 

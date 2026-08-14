@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace Shared.Core.PackFiles.Utility;
 
-public sealed partial class FolderProjectVersionControlService
+internal sealed partial class FolderProjectVersionControlService
 {
     private static readonly ConcurrentDictionary<string, object> s_mergeGates =
         new(StringComparer.OrdinalIgnoreCase);

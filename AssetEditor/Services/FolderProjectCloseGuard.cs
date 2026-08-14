@@ -132,7 +132,7 @@ public sealed class FolderProjectCloseGuard :
         if (result != MessageBoxResult.No)
             return false;
 
-        _eventHub.Publish(new OpenFolderProjectGitPanelEvent());
+        _eventHub.Publish(new OpenFolderProjectHistoryPanelEvent());
         return false;
     }
 

@@ -102,23 +102,58 @@ public sealed record FolderProjectHistoryProgress(
     long Completed = 0,
     long Total = 0);
 
-public sealed record FolderProjectRestoreResult(
-    FolderProjectRestorePoint RestorePoint,
-    FolderProjectRestorePoint? SafetyRestorePoint)
+public sealed class FolderProjectRestoreResult
 {
-    public FolderProjectProjectRestoreRollback? Rollback { get; init; }
+    public FolderProjectRestorePoint RestorePoint { get; }
+    public FolderProjectRestorePoint? SafetyRestorePoint { get; }
+    internal FolderProjectProjectRestoreRollback? Rollback { get; init; }
+
+    public FolderProjectRestoreResult(
+        FolderProjectRestorePoint restorePoint,
+        FolderProjectRestorePoint? safetyRestorePoint)
+    {
+        RestorePoint = restorePoint;
+        SafetyRestorePoint = safetyRestorePoint;
+    }
 }
 
-public sealed record FolderProjectDiscardResult(
-    FolderProjectDiscardRollback Rollback);
+public sealed class FolderProjectDiscardResult
+{
+    internal FolderProjectDiscardRollback Rollback { get; }
 
-public sealed record FolderProjectRecoveryOperation(
-    FolderProjectHistoryStatus Status,
-    FolderProjectRecoveryTransaction Transaction);
+    internal FolderProjectDiscardResult(FolderProjectDiscardRollback rollback)
+    {
+        Rollback = rollback;
+    }
+}
 
-public sealed record FolderProjectFileRestoreOperation(
-    FolderProjectFileRestoreResult Result,
-    FolderProjectFileRestoreTransaction Transaction);
+public sealed class FolderProjectRecoveryOperation
+{
+    public FolderProjectHistoryStatus Status { get; }
+    internal FolderProjectRecoveryTransaction Transaction { get; }
+
+    internal FolderProjectRecoveryOperation(
+        FolderProjectHistoryStatus status,
+        FolderProjectRecoveryTransaction transaction)
+    {
+        Status = status;
+        Transaction = transaction;
+    }
+}
+
+public sealed class FolderProjectFileRestoreOperation
+{
+    internal FolderProjectFileRestoreResult Result { get; }
+    internal FolderProjectFileRestoreTransaction Transaction { get; }
+
+    internal FolderProjectFileRestoreOperation(
+        FolderProjectFileRestoreResult result,
+        FolderProjectFileRestoreTransaction transaction)
+    {
+        Result = result;
+        Transaction = transaction;
+    }
+}
 
 public enum FolderProjectHistoryError
 {

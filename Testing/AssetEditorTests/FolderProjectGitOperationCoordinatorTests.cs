@@ -25,7 +25,7 @@ public class FolderProjectGitOperationCoordinatorTests
                 service => service.TryUnloadPackContainer(project))
             .Returns(false);
         var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
+            new Mock<IFolderProjectHistoryService>(
                 MockBehavior.Strict);
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService.Object,
@@ -46,7 +46,7 @@ public class FolderProjectGitOperationCoordinatorTests
                 Is.EqualTo(new PackFileContainer[] { project }));
         });
         versionControl.Verify(
-            item => item.GetStatus(Normalize(projectRoot.Path), false),
+            item => item.GetStatus(Normalize(projectRoot.Path)),
             Times.Never);
     }
 
@@ -74,10 +74,10 @@ public class FolderProjectGitOperationCoordinatorTests
                 return reattached;
             });
         var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
+            new Mock<IFolderProjectHistoryService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetStatus(Normalize(projectRoot.Path), false))
+                item => item.GetStatus(Normalize(projectRoot.Path)))
             .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
@@ -138,10 +138,10 @@ public class FolderProjectGitOperationCoordinatorTests
                 reattached = FolderProjectContainer.Open(projectRoot.Path);
                 return reattached;
             });
-        var versionControl = new Mock<IFolderProjectVersionControlService>(
+        var versionControl = new Mock<IFolderProjectHistoryService>(
             MockBehavior.Strict);
         versionControl.SetupSequence(
-                item => item.GetStatus(Normalize(projectRoot.Path), false))
+                item => item.GetStatus(Normalize(projectRoot.Path)))
             .Returns(RepositoryStatus(isSafe: false))
             .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
@@ -959,7 +959,7 @@ public class FolderProjectGitOperationCoordinatorTests
             item => item.Open(It.IsAny<string>()),
             Times.Never);
         versionControl.Verify(
-            item => item.GetStatus(It.IsAny<string>(), false),
+            item => item.GetStatus(It.IsAny<string>()),
             Times.Never);
     }
 
@@ -1019,12 +1019,12 @@ public class FolderProjectGitOperationCoordinatorTests
                 return reattached;
             });
         var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
+            new Mock<IFolderProjectHistoryService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetStatus(Normalize(projectRoot.Path), false))
-            .Throws(new FolderProjectVersionControlException(
-                FolderProjectVersionControlError.RepositoryNotInitialized,
+                item => item.GetStatus(Normalize(projectRoot.Path)))
+            .Throws(new FolderProjectHistoryException(
+                FolderProjectHistoryError.NotInitialized,
                 "Repository is not initialized."));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
@@ -1070,12 +1070,12 @@ public class FolderProjectGitOperationCoordinatorTests
         var factory = new Mock<IFolderProjectFactory>(
             MockBehavior.Strict);
         var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
+            new Mock<IFolderProjectHistoryService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetStatus(Normalize(projectRoot.Path), false))
-            .Throws(new FolderProjectVersionControlException(
-                FolderProjectVersionControlError.RepositoryNotInitialized,
+                item => item.GetStatus(Normalize(projectRoot.Path)))
+            .Throws(new FolderProjectHistoryException(
+                FolderProjectHistoryError.NotInitialized,
                 "Repository is not initialized."));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService.Object,
@@ -1155,9 +1155,9 @@ public class FolderProjectGitOperationCoordinatorTests
         }
 
         var packFileService = CreatePackFileServiceMock([]);
-        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var versionControl = new Mock<IFolderProjectHistoryService>();
         versionControl.Setup(
-                item => item.GetStatus(It.IsAny<string>(), false))
+                item => item.GetStatus(It.IsAny<string>()))
             .Returns(RepositoryStatus(isSafe: true));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService.Object,
@@ -1330,16 +1330,16 @@ public class FolderProjectGitOperationCoordinatorTests
         return new TestPackFileService();
     }
 
-    private static Mock<IFolderProjectVersionControlService>
+    private static Mock<IFolderProjectHistoryService>
         CreateVersionControlMock(
             string projectRoot,
             FolderProjectMergePhase phase)
     {
         var versionControl =
-            new Mock<IFolderProjectVersionControlService>(
+            new Mock<IFolderProjectHistoryService>(
                 MockBehavior.Strict);
         versionControl.Setup(
-                item => item.GetStatus(Normalize(projectRoot), false))
+                item => item.GetStatus(Normalize(projectRoot)))
             .Returns(RepositoryStatus(
                 phase == FolderProjectMergePhase.None));
         return versionControl;
@@ -1365,10 +1365,9 @@ public class FolderProjectGitOperationCoordinatorTests
         factory.Setup(item => item.Open(Normalize(projectRoot.Path)))
             .Throws(new IOException("Injected reopen failure."));
         var recovered = true;
-        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        var versionControl = new Mock<IFolderProjectHistoryService>();
         versionControl.Setup(item => item.GetStatus(
-                Normalize(projectRoot.Path),
-                false))
+                Normalize(projectRoot.Path)))
             .Returns(() => RepositoryStatus(isSafe: recovered));
         var coordinator = new FolderProjectGitOperationCoordinator(
             packFileService,
@@ -1392,17 +1391,14 @@ public class FolderProjectGitOperationCoordinatorTests
         });
     }
 
-    private static FolderProjectRepositoryStatus RepositoryStatus(
+    private static FolderProjectHistoryStatus RepositoryStatus(
         bool isSafe)
     {
-        return new FolderProjectRepositoryStatus(
-            true,
-            "main",
-            "head",
-            false,
+        return new FolderProjectHistoryStatus(
             isSafe
-                ? FolderProjectRepositoryOperationState.None
-                : FolderProjectRepositoryOperationState.Merge,
+                ? FolderProjectHistoryAvailability.Ready
+                : FolderProjectHistoryAvailability.RecoveryRequired,
+            "head",
             []);
     }
 

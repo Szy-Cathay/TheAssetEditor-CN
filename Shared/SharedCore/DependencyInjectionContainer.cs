@@ -45,9 +45,6 @@ namespace Shared.Core
             services.AddSingleton<IPackFileContainerLoader, PackFileContainerLoader>();
             services.AddSingleton<IFolderProjectFactory, FolderProjectFactory>();
             services.AddSingleton<
-                IFolderProjectVersionControlService,
-                FolderProjectVersionControlService>();
-            services.AddSingleton<
                 IFolderProjectHistoryService,
                 FolderProjectHistoryService>();
             services.AddSingleton<PackAutoSaveService>();

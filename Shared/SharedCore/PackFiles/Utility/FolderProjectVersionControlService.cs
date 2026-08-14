@@ -4,7 +4,7 @@ using Shared.Core.PackFiles.Models;
 
 namespace Shared.Core.PackFiles.Utility;
 
-public interface IFolderProjectVersionControlService
+internal interface IFolderProjectVersionControlService
 {
     FolderProjectRepositoryStatus GetStatus(
         string projectRoot,
@@ -368,7 +368,7 @@ internal class FolderProjectVersionControlPlatform
     }
 }
 
-public sealed partial class FolderProjectVersionControlService :
+internal sealed partial class FolderProjectVersionControlService :
     IFolderProjectVersionControlService
 {
     private const string PrimaryBranchConfigKey =

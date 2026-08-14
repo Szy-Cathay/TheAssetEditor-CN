@@ -3,7 +3,7 @@ using LibGit2Sharp;
 
 namespace Shared.Core.PackFiles.Utility;
 
-public static class FolderProjectGitRepository
+internal static class FolderProjectGitRepository
 {
     private const string BinaryAttributeRule = "* -text";
     private static readonly string s_atomicGuidPattern =

@@ -55,7 +55,7 @@
                 <Separator/>
                 <MenuItem Header="{loc:Loc MenuBar.File.ImportPackAsFolderProject}" Command="{Binding MenuBar.ImportPackAsFolderProjectCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenFolderProject}" Command="{Binding MenuBar.OpenFolderProjectCommand}"/>
-                <MenuItem Header="{loc:Loc MenuBar.File.FolderProjectVersionControl}" Command="{Binding MenuBar.OpenFolderProjectVersionControlCommand}"/>
+                <MenuItem Header="{loc:Loc MenuBar.File.FolderProjectHistory}" Command="{Binding MenuBar.OpenFolderProjectHistoryCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.GeneratePack}" Command="{Binding MenuBar.GeneratePackCommand}"/>
                 <MenuItem Header="{loc:Loc MenuBar.File.OpenRecentFolderProjects}" ItemsSource="{Binding MenuBar.RecentFolderProjects}">
                     <MenuItem.Style>

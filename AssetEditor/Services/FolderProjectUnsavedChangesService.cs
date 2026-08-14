@@ -11,13 +11,6 @@ using Shared.Core.ToolCreation;
 
 namespace AssetEditor.Services;
 
-public enum FolderProjectUnsavedChangesOperation
-{
-    Stage,
-    CommitAll,
-    CreateRestorePoint,
-}
-
 public enum FolderProjectUnsavedChangesChoice
 {
     Save,
@@ -38,8 +31,7 @@ public interface IFolderProjectUnsavedChangesService
 
 public interface IFolderProjectUnsavedChangesPrompt
 {
-    FolderProjectUnsavedChangesChoice Show(
-        FolderProjectUnsavedChangesOperation operation);
+    FolderProjectUnsavedChangesChoice Show();
 }
 
 public sealed class FolderProjectUnsavedChangesService(
@@ -128,8 +120,7 @@ public sealed class FolderProjectUnsavedChangesPrompt(
     LocalizationManager localization) :
     IFolderProjectUnsavedChangesPrompt
 {
-    public FolderProjectUnsavedChangesChoice Show(
-        FolderProjectUnsavedChangesOperation operation)
+    public FolderProjectUnsavedChangesChoice Show()
     {
         var choice = FolderProjectUnsavedChangesChoice.Cancel;
         var owner = Application.Current?.Windows
@@ -139,10 +130,7 @@ public sealed class FolderProjectUnsavedChangesPrompt(
         var window = new Window
         {
             Title = localization.Get(
-                operation == FolderProjectUnsavedChangesOperation
-                    .CreateRestorePoint
-                    ? "FolderProject.History.Unsaved.Title"
-                    : "FolderProject.VersionControl.Unsaved.Title"),
+                "FolderProject.History.Unsaved.Title"),
             Owner = owner,
             WindowStartupLocation = owner == null
                 ? WindowStartupLocation.CenterScreen
@@ -161,52 +149,31 @@ public sealed class FolderProjectUnsavedChangesPrompt(
             Margin = new Thickness(16),
             MaxWidth = 560,
         };
-        if (operation == FolderProjectUnsavedChangesOperation
-                .CreateRestorePoint)
+        content.Children.Add(new TextBlock
         {
-            content.Children.Add(new TextBlock
-            {
-                Text = localization.Get(
-                    "FolderProject.History.Unsaved.Message"),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 16),
-            });
-        }
+            Text = localization.Get(
+                "FolderProject.History.Unsaved.Message"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 16),
+        });
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
         };
         buttons.Children.Add(CreateButton(
-            operation switch
-            {
-                FolderProjectUnsavedChangesOperation.CommitAll =>
-                    "FolderProject.VersionControl.Unsaved.SaveAndCommit",
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint =>
-                    "FolderProject.History.Unsaved.SaveAndCreate",
-                _ => "FolderProject.VersionControl.Unsaved.Save",
-            },
+            "FolderProject.History.Unsaved.SaveAndCreate",
             true,
             value => choice = value,
             FolderProjectUnsavedChangesChoice.Save,
             window));
         buttons.Children.Add(CreateButton(
-            operation switch
-            {
-                FolderProjectUnsavedChangesOperation.CommitAll =>
-                    "FolderProject.VersionControl.Unsaved.DontSaveAndCommit",
-                FolderProjectUnsavedChangesOperation.CreateRestorePoint =>
-                    "FolderProject.History.Unsaved.DiskOnly",
-                _ => "FolderProject.VersionControl.Unsaved.DontSave",
-            },
+            "FolderProject.History.Unsaved.DiskOnly",
             false,
             value => choice = value,
             FolderProjectUnsavedChangesChoice.DontSave,
             window));
         buttons.Children.Add(CreateButton(
-            operation == FolderProjectUnsavedChangesOperation
-                .CreateRestorePoint
-                ? "FolderProject.History.Unsaved.Cancel"
-                : "FolderProject.VersionControl.Unsaved.Cancel",
+            "FolderProject.History.Unsaved.Cancel",
             false,
             value => choice = value,
             FolderProjectUnsavedChangesChoice.Cancel,
