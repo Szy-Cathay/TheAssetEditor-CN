@@ -93,7 +93,7 @@ public class FolderProjectTreeStateTests
         var history = new Mock<IFolderProjectHistoryService>();
         var callingThreadId = Environment.CurrentManagedThreadId;
         var statusThreadId = callingThreadId;
-        history.Setup(service => service.GetStatus(projectRoot.Path))
+        history.Setup(service => service.GetDisplayStatus(projectRoot.Path))
             .Callback(() =>
                 statusThreadId = Environment.CurrentManagedThreadId)
             .Returns(
@@ -126,6 +126,8 @@ public class FolderProjectTreeStateTests
                 FindNode(root, @"folder\child\changed.bin").UnsavedChanged,
                 Is.True);
         });
+        history.Verify(service => service.GetStatus(
+            It.IsAny<string>()), Times.Never);
     }
 
     [Test]
@@ -145,7 +147,7 @@ public class FolderProjectTreeStateTests
                     FolderProjectUnrecordedChangeKind.Modified),
             ]);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(service => service.GetStatus(projectRoot.Path))
+        history.Setup(service => service.GetDisplayStatus(projectRoot.Path))
             .Returns(() => status);
         using var harness = CreateViewModelWithHistory(
             history.Object,

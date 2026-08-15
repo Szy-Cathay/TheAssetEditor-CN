@@ -5,6 +5,8 @@ namespace Shared.Core.PackFiles.Utility;
 
 public interface IFolderProjectHistoryService
 {
+    FolderProjectHistoryStatus GetDisplayStatus(string projectRoot);
+
     FolderProjectHistoryStatus GetStatus(string projectRoot);
 
     FolderProjectHistoryStatus GetStatus(
@@ -118,9 +120,18 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
     public FolderProjectHistoryStatus GetStatus(string projectRoot) =>
         GetStatus(projectRoot, _ => { });
 
+    public FolderProjectHistoryStatus GetDisplayStatus(string projectRoot) =>
+        GetStatusCore(projectRoot, _ => { }, scanUnreadableEntries: false);
+
     public FolderProjectHistoryStatus GetStatus(
         string projectRoot,
-        Action<FolderProjectHistoryProgress> reportProgress)
+        Action<FolderProjectHistoryProgress> reportProgress) =>
+        GetStatusCore(projectRoot, reportProgress, scanUnreadableEntries: true);
+
+    private FolderProjectHistoryStatus GetStatusCore(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress,
+        bool scanUnreadableEntries)
     {
         ArgumentNullException.ThrowIfNull(reportProgress);
         try
@@ -128,7 +139,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             var status = _versionControl.GetStatus(
                 projectRoot,
                 progress => reportProgress(MapProgress(progress)),
-                scanUnreadableEntries: true);
+                scanUnreadableEntries);
             return MapStatus(status);
         }
         catch (FolderProjectVersionControlException exception)

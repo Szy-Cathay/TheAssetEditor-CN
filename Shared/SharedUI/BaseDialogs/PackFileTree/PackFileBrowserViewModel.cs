@@ -917,7 +917,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             try
             {
                 status = await Task.Run(
-                    () => _historyService!.GetStatus(
+                    () => _historyService!.GetDisplayStatus(
                         project.ProjectRoot));
             }
             catch (FolderProjectHistoryException)

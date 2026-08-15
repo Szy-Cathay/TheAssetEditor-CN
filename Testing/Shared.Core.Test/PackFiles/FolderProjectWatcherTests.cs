@@ -16,8 +16,8 @@ public class FolderProjectWatcherTests
             new FolderProjectSettings { Name = "工程" });
         var callerThreadId = Environment.CurrentManagedThreadId;
         var scanThreadId = 0;
-        var enumerate = container.EnumerateFileSystemEntries;
-        container.EnumerateFileSystemEntries = path =>
+        var enumerate = container.EnumerateFileSystemInfos;
+        container.EnumerateFileSystemInfos = path =>
         {
             Interlocked.CompareExchange(
                 ref scanThreadId,
@@ -43,8 +43,8 @@ public class FolderProjectWatcherTests
         container.StartWatching();
         Thread.Sleep(500);
         var scanCount = 0;
-        var enumerate = container.EnumerateFileSystemEntries;
-        container.EnumerateFileSystemEntries = path =>
+        var enumerate = container.EnumerateFileSystemInfos;
+        container.EnumerateFileSystemInfos = path =>
         {
             Interlocked.Increment(ref scanCount);
             return enumerate(path);
@@ -496,8 +496,8 @@ public class FolderProjectWatcherTests
             new FolderProjectSettings { Name = "工程" });
         var existingFile = container.FileList[@"db\existing.bin"];
         project.Write(@"db\added.bin", [2]);
-        var enumerate = container.EnumerateFileSystemEntries;
-        container.EnumerateFileSystemEntries =
+        var enumerate = container.EnumerateFileSystemInfos;
+        container.EnumerateFileSystemInfos =
             path => path.EndsWith(
                 $"{Path.DirectorySeparatorChar}db",
                 StringComparison.OrdinalIgnoreCase)
@@ -517,7 +517,7 @@ public class FolderProjectWatcherTests
                 Is.SameAs(existingFile));
         });
 
-        container.EnumerateFileSystemEntries = enumerate;
+        container.EnumerateFileSystemInfos = enumerate;
         container.ReconcileAfterWatcherEvent();
 
         Assert.That(
@@ -527,7 +527,7 @@ public class FolderProjectWatcherTests
     }
 
     [Test]
-    public void WatcherScan_UnauthorizedAttributes_PreservesStateAndRecovers()
+    public void WatcherScan_UnauthorizedRootAttributes_PreservesStateAndRecovers()
     {
         using var project = new TemporaryDirectory();
         project.Write(@"db\existing.bin", [1]);
@@ -538,8 +538,8 @@ public class FolderProjectWatcherTests
         project.Write(@"db\added.bin", [2]);
         var getAttributes = container.GetFileAttributes;
         container.GetFileAttributes =
-            path => path.EndsWith(
-                $"{Path.DirectorySeparatorChar}db",
+            path => path.Equals(
+                Path.GetFullPath(project.Path),
                 StringComparison.OrdinalIgnoreCase)
                 ? throw new UnauthorizedAccessException("denied")
                 : getAttributes(path);

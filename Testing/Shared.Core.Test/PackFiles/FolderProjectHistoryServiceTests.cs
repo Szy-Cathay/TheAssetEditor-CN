@@ -36,6 +36,7 @@ public sealed class FolderProjectHistoryServiceTests
                     "CompleteRecoverToSafeState",
                     "CompleteRestoreFile",
                     "CreateRestorePoint",
+                    "GetDisplayStatus",
                     "GetRestoreImpactCount",
                     "GetRestorePointChanges",
                     "GetRestorePoints",
@@ -208,6 +209,40 @@ public sealed class FolderProjectHistoryServiceTests
             "project",
             It.IsAny<Action<FolderProjectVersionControlProgress>>(),
             true), Times.Once);
+    }
+
+    [Test]
+    public void GetDisplayStatus_SkipsUnreadableScan()
+    {
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(item => item.GetStatus(
+                "project",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+                false))
+            .Returns(new FolderProjectRepositoryStatus(
+                true,
+                "master",
+                "head",
+                false,
+                FolderProjectRepositoryOperationState.None,
+                [
+                    new FolderProjectWorkingChange(
+                        "db/changed.bin",
+                        FolderProjectWorkingChangeKind.Modified),
+                ]));
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var status = service.GetDisplayStatus("project");
+
+        Assert.That(
+            status.UnrecordedChanges.Single().Path,
+            Is.EqualTo("db/changed.bin"));
+        versionControl.Verify(item => item.GetStatus(
+            "project",
+            It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+            false), Times.Once);
     }
 
     [Test]
