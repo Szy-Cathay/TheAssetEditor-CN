@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
@@ -98,6 +98,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 // We don't generate the Dialogue Events in this .bnk, we keep them in the merging SoundBank instead
                 var sourceHircsFromDialogue = GenerateSourceHircsFromDialogueEvents(soundBank);
                 hircItems.AddRange(sourceHircsFromDialogue);
+                AddBattleVoiceActorMixer(soundBank, sourceHircsFromDialogue, hircItems);
             }
 
             SortHircs(hircItems);
@@ -430,6 +431,52 @@ namespace Editors.Audio.Shared.Wwise.Generators
             return hircItems;
         }
 
+        private void AddBattleVoiceActorMixer(
+            SoundBank soundBank,
+            List<HircItem> sourceHircs,
+            List<HircItem> hircItems)
+        {
+            var actorMixerId = soundBank.GameSoundBank switch
+            {
+                Wh3SoundBank.BattleVO => Wh3ActorMixerInformation.BattleVOOrders,
+                Wh3SoundBank.BattleVOConversational => Wh3ActorMixerInformation.BattleVOConversational,
+                _ => 0u
+            };
+
+            if (actorMixerId == 0)
+                return;
+
+            var childIds = sourceHircs
+                .Where(hircItem => hircItem.IsTarget)
+                .Select(hircItem => hircItem.Id)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+            if (childIds.Count == 0)
+                return;
+
+            var template = _audioRepository.GetHircs(actorMixerId)
+                .OfType<CAkActorMixer_V136>()
+                .FirstOrDefault(hircItem => hircItem.IsCAHircItem);
+            if (template == null)
+            {
+                throw new InvalidOperationException(
+                    $"Could not find the vanilla ActorMixer {actorMixerId} required to compile spatial battle dialogue audio.");
+            }
+
+            var actorMixer = new CAkActorMixer_V136
+            {
+                HircType = AkBkHircType.ActorMixer,
+                Id = actorMixerId,
+                LanguageId = soundBank.LanguageId,
+                BnkFilePath = soundBank.FilePath,
+                NodeBaseParams = template.NodeBaseParams,
+                Children = new Children_V136 { ChildIds = childIds }
+            };
+            actorMixer.UpdateSectionSize();
+            hircItems.Add(actorMixer);
+        }
+
         private List<HircItem> GenerateRandomSequenceContainerTargetHircs(SoundBank soundBank, RandomSequenceContainer randomSequenceContainer)
         {
             var hircItems = new List<HircItem>();
@@ -532,6 +579,10 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 .Where(hircItem => hircItem.HircType == AkBkHircType.Event || hircItem.HircType == AkBkHircType.Dialogue_Event)
                 .ToList();
 
+            var actorMixerHircs = hircItems
+                .Where(hircItem => hircItem.HircType == AkBkHircType.ActorMixer)
+                .ToList();
+
             var sortedHircItems = new List<HircItem>();
 
             foreach (var targetHirc in targetHircs.OrderBy(sourceHirc => sourceHirc.Id))
@@ -545,6 +596,8 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 else
                     sortedHircItems.Add(targetHirc);
             }
+
+            sortedHircItems.AddRange(actorMixerHircs.OrderBy(hircItem => hircItem.Id));
 
             foreach (var eventHirc in eventHircs.OrderBy(eventHirc => eventHirc.Id))
             {

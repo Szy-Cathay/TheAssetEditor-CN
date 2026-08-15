@@ -1,4 +1,4 @@
-﻿using Shared.ByteParsing;
+using Shared.ByteParsing;
 
 namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
 {
@@ -45,22 +45,28 @@ namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
 
         public byte[] WriteData()
         {
-            if (BitsPositioning == 0x03 && Bits3D == 0x08)
-                return [0x03, 0x08];
-            else if (BitsPositioning == 0x00)
-                return [0x00];
-            else
-                throw new NotSupportedException("Users probably don't need this complexity.");
+            var hasPositioning = (BitsPositioning & 1) != 0;
+            var has3D = (BitsPositioning & 2) != 0;
+            var positionType = BitsPositioning >> 5 & 3;
+
+            if (positionType != 0)
+                throw new NotSupportedException("Automated 3D positioning is not supported.");
+
+            return hasPositioning && has3D
+                ? [BitsPositioning, Bits3D]
+                : [BitsPositioning];
         }
 
         public uint GetSize()
         {
-            if (BitsPositioning == 0x03 && Bits3D == 0x08)
-                return 2;
-            else if (BitsPositioning == 0x00)
-                return 1;
-            else
-                throw new NotSupportedException("Users probably don't need this complexity.");
+            var hasPositioning = (BitsPositioning & 1) != 0;
+            var has3D = (BitsPositioning & 2) != 0;
+            var positionType = BitsPositioning >> 5 & 3;
+
+            if (positionType != 0)
+                throw new NotSupportedException("Automated 3D positioning is not supported.");
+
+            return hasPositioning && has3D ? 2u : 1u;
         }
 
         public class AkPathVertex_V136

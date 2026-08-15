@@ -1,4 +1,4 @@
-﻿using Shared.ByteParsing;
+using Shared.ByteParsing;
 
 namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
 {
@@ -21,18 +21,15 @@ namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
         public uint GetSize()
         {
             var numRtpcSize = ByteHelper.GetPropertyTypeSize(NumRtpc);
-            if (RtpcList.Count != 0)
-                throw new NotSupportedException("Users probably don't need this complexity.");
-            return numRtpcSize;
+            return numRtpcSize + (uint)RtpcList.Sum(rtpc => rtpc.GetSize());
         }
 
         public byte[] WriteData()
         {
-            if (RtpcList.Count != 0)
-                throw new NotSupportedException("Users probably don't need this complexity.");
-
             using var memStream = new MemoryStream();
             memStream.Write(ByteParsers.UShort.EncodeValue((ushort)RtpcList.Count, out _));
+            foreach (var rtpc in RtpcList)
+                memStream.Write(rtpc.WriteData());
             return memStream.ToArray();
         }
 
@@ -58,6 +55,34 @@ namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
                 Size = chunk.ReadUShort();
                 for (var i = 0; i < Size; i++)
                     RtpcMgr.Add(AkRtpcGraphPoint_V136.ReadData(chunk));
+            }
+
+            public byte[] WriteData()
+            {
+                using var memStream = new MemoryStream();
+                memStream.Write(ByteParsers.UInt32.EncodeValue(RtpcId, out _));
+                memStream.Write(ByteParsers.Byte.EncodeValue(RtpcType, out _));
+                memStream.Write(ByteParsers.Byte.EncodeValue(RtpcAccum, out _));
+                memStream.Write(ByteParsers.Byte.EncodeValue(ParamId, out _));
+                memStream.Write(ByteParsers.UInt32.EncodeValue(RtpcCurveId, out _));
+                memStream.Write(ByteParsers.Byte.EncodeValue(Scaling, out _));
+                memStream.Write(ByteParsers.UShort.EncodeValue((ushort)RtpcMgr.Count, out _));
+                foreach (var point in RtpcMgr)
+                    memStream.Write(point.WriteData());
+                return memStream.ToArray();
+            }
+
+            public uint GetSize()
+            {
+                var fixedSize =
+                    ByteHelper.GetPropertyTypeSize(RtpcId) +
+                    ByteHelper.GetPropertyTypeSize(RtpcType) +
+                    ByteHelper.GetPropertyTypeSize(RtpcAccum) +
+                    ByteHelper.GetPropertyTypeSize(ParamId) +
+                    ByteHelper.GetPropertyTypeSize(RtpcCurveId) +
+                    ByteHelper.GetPropertyTypeSize(Scaling) +
+                    ByteHelper.GetPropertyTypeSize(Size);
+                return fixedSize + (uint)RtpcMgr.Sum(point => point.GetSize());
             }
         }
     }
