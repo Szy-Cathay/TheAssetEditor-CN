@@ -56,9 +56,10 @@ public partial class FolderProjectHistoryWorkspaceViewModel : ObservableObject
         if (!projectChanged)
             return;
 
+        _refreshPending = true;
         History.OpenProject(project);
         if (SelectedSidebarTabIndex == 1)
-            StartRefresh(true);
+            StartRefresh(false);
     }
 
     [RelayCommand]
@@ -71,7 +72,7 @@ public partial class FolderProjectHistoryWorkspaceViewModel : ObservableObject
     partial void OnSelectedSidebarTabIndexChanged(int value)
     {
         if (value == 1 && IsEnabled)
-            StartRefresh(true);
+            StartRefresh(false);
     }
 
     private void OnFolderProjectChanged(FolderProjectChangedEvent e)

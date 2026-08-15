@@ -3,6 +3,7 @@ using AssetEditor.ViewModels;
 using Moq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
+using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
@@ -41,9 +42,10 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             Mock.Of<IFolderProjectGitOperationCoordinator>(),
             Mock.Of<IStandardDialogs>(),
             LocalizationManager.Instance);
+        var eventHub = new TestEventHub();
         var workspace = new FolderProjectHistoryWorkspaceViewModel(
             history,
-            new TestEventHub());
+            eventHub);
 
         workspace.SetEditableContainer(project);
         workspace.ShowHistory();
@@ -56,6 +58,26 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             NUnitAssert.That(history.ProjectName, Is.EqualTo("测试工程"));
             NUnitAssert.That(history.IsReady, Is.True);
         });
+
+        workspace.SelectedSidebarTabIndex = 0;
+        workspace.SelectedSidebarTabIndex = 1;
+        await history.RefreshCommand.ExecutionTask!;
+
+        historyService.Verify(item => item.GetStatus(
+            project.ProjectRoot,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+
+        workspace.SelectedSidebarTabIndex = 0;
+        eventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(1, [])));
+        workspace.SelectedSidebarTabIndex = 1;
+        await history.RefreshCommand.ExecutionTask!;
+
+        historyService.Verify(item => item.GetStatus(
+            project.ProjectRoot,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()),
+            Times.Exactly(2));
 
         workspace.SetEditableContainer(new PackFileContainer("普通.pack"));
 
