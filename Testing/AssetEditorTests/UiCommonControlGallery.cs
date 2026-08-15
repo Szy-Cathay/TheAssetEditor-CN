@@ -107,9 +107,9 @@ public class UiCommonControlGallery
         Grid.SetColumnSpan(heading, 5);
         layout.Children.Add(heading);
 
-        Add(layout, Card("操作与输入", CreateInputs()), 0);
-        Add(layout, Card("导航与集合", CreateCollections()), 2);
-        Add(layout, Card("菜单与反馈", CreateFeedback()), 4);
+        Add(layout, Section("操作与输入", CreateInputs()), 0);
+        Add(layout, Section("导航与集合", CreateCollections()), 2);
+        Add(layout, Section("菜单与反馈", CreateFeedback()), 4);
         root.Child = layout;
         return root;
     }
@@ -289,12 +289,11 @@ public class UiCommonControlGallery
         return stack;
     }
 
-    private static Border Card(string title, FrameworkElement content)
+    private static Border Section(string title, FrameworkElement content)
     {
         var border = new Border
         {
-            Padding = new Thickness(16),
-            Style = Style("AeSurface.Panel"),
+            Padding = new Thickness(8, 0, 8, 0),
         };
         var stack = VerticalStack();
         stack.Children.Add(Text(title, "AeText.SectionTitle", new Thickness(0, 0, 0, 12)));

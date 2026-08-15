@@ -127,6 +127,57 @@ public class UiCommonWorkflowTests
     }
 
     [Test]
+    public void DialogContent_DoesNotUseDecorativePanelCards()
+    {
+        var root = FindSolutionRoot();
+        var paths = new[]
+        {
+            Path.Combine(
+                "AssetEditor",
+                "Views",
+                "FolderProject",
+                "FolderProjectSetupWindow.xaml"),
+            Path.Combine(
+                "AssetEditor",
+                "Views",
+                "ExternalPack",
+                "ExternalPackOpenChoiceWindow.xaml"),
+            Path.Combine(
+                "Shared",
+                "SharedUI",
+                "BaseDialogs",
+                "StandardDialog",
+                "ErrorDialog",
+                "ErrorListWindow.xaml"),
+            Path.Combine(
+                "Shared",
+                "SharedUI",
+                "BaseDialogs",
+                "StandardDialog",
+                "ExceptionHandling",
+                "CustomExceptionWindow.xaml"),
+            Path.Combine(
+                "Shared",
+                "SharedUI",
+                "BaseDialogs",
+                "StandardDialog",
+                "PackFile",
+                "SavePackFileWindow.xaml"),
+            Path.Combine(
+                "Editors",
+                "AnimationReTarget",
+                "Editors.AnimatioReTarget",
+                "Editor",
+                "Saving",
+                "SaveWindow.xaml"),
+        };
+
+        NUnitAssert.That(
+            paths.Select(path => File.ReadAllText(Path.Combine(root, path))),
+            Has.None.Contains("AeSurface.Panel"));
+    }
+
+    [Test]
     public void LoadingAndProgressSurfaces_UseSemanticFeedbackStyles()
     {
         var root = FindSolutionRoot();

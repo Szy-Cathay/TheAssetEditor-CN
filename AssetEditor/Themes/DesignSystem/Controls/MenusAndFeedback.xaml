@@ -212,7 +212,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template" Value="{StaticResource AeMenu.SubmenuItemTemplate}" />
         <Style.Triggers>
             <Trigger Property="Role" Value="TopLevelHeader">
@@ -225,10 +225,6 @@
                 <Setter Property="StaysOpenOnClick" Value="True" />
             </Trigger>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-            </Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                 <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">

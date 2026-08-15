@@ -160,7 +160,7 @@ public class UiThemeCompletionGallery
 
     private static FrameworkElement CreateOptionalRadios()
     {
-        var card = Card();
+        var card = Section();
         var stack = new StackPanel();
         stack.Children.Add(Text("可取消单选按钮", "AeText.SectionTitle"));
         stack.Children.Add(Text(
@@ -177,7 +177,7 @@ public class UiThemeCompletionGallery
 
     private static FrameworkElement CreateSplitters()
     {
-        var card = Card();
+        var card = Section();
         var grid = new Grid { Height = 420 };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
@@ -221,7 +221,7 @@ public class UiThemeCompletionGallery
 
     private static FrameworkElement CreateDenseChinese()
     {
-        var card = Card();
+        var card = Section();
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(280) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
@@ -271,7 +271,7 @@ public class UiThemeCompletionGallery
 
     private static FrameworkElement CreateWindowFont()
     {
-        var card = Card();
+        var card = Section();
         var stack = new StackPanel();
         stack.Children.Add(Text("窗口字体资源已贯通", "AeText.SectionTitle"));
         stack.Children.Add(Text(
@@ -294,10 +294,9 @@ public class UiThemeCompletionGallery
         return card;
     }
 
-    private static Border Card() => new()
+    private static Border Section() => new()
     {
-        Padding = new Thickness(18),
-        Style = Style("AeSurface.Panel"),
+        Padding = new Thickness(8, 0, 8, 0),
     };
 
     private static OptionalRadioButton Optional(

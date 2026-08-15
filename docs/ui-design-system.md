@@ -98,7 +98,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - `AeSurface.Control`：`Surface2`、1 DIP `BorderStrong`、4 DIP 圆角。
 - `AeSurface.Overlay`：`Surface2`、1 DIP `BorderStrong`、7 DIP 圆角。
 
-不得在同一层级重复套用面板、卡片和边框。独立窗口已经提供窗口边界时，内部只保留业务所需的一层内容结构。
+`AeSurface.Panel` 只用于需要明确边界的独立工作区、预览区或数据区，不用于普通标题分区、表单分组或对话框内容外壳。普通分区优先使用留白和必要的单条分隔线。不得在同一层级重复套用面板、卡片和边框；独立窗口已经提供窗口边界时，内部只保留业务所需的一层内容结构。
 
 ## 4. 公共控件契约
 
@@ -125,7 +125,8 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - 鼠标松开：立即回弹到 `1.0`，120 ms，`EaseOut`。
 - 不等待长按，不在松开后才开始完整按压动画。
 - 不创建半透明复制层、残影、光晕或持续状态覆盖层。
-- 所有按钮 `FocusVisualStyle` 为 `null`，不得显示聚焦框、蓝色描边或按下后残留边框；键盘命令、访问键和自动化名称仍必须保留。
+- 所有可聚焦控件复用 `AeFocus.Keyboard`。该视觉只能由 WPF 键盘导航触发；鼠标点击、鼠标选中和按下回弹不得显示或残留蓝紫色聚焦边框。
+- 键盘焦点使用 1 DIP 语义强调描边，不使用光晕、双层描边或持续状态覆盖层；键盘命令、访问键和自动化名称必须保留。
 - 禁用状态降低层级但保持文字可读；危险按钮使用 `Danger`，不能只靠红色表达风险。
 
 播放器播放期间，播放按钮背景持续保持选中高亮，播放图标使用 `AeBrush.Danger`；停止或暂停后恢复普通状态。播放器复用 `AeEditor.PlaybackToggle` 和可拖动的 `AeEditor.PlaybackSlider`，不单独制造另一套按钮或时间轴。
@@ -136,7 +137,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - ComboBox 点击整个控件都能展开，不能只让箭头区域响应。
 - 下拉、展开和折叠箭头使用固定尺寸矢量图标；不得使用 Unicode 字符、Emoji 或依赖字体基线的符号。
 - 所有编辑器中的下拉箭头都不使用圆形卡片或独立背景。悬停只高亮箭头本身，不高亮圆形/方形背景。
-- 输入焦点、校验错误、禁用和只读状态必须可区分；输入控件可以使用语义焦点边框，但按钮不得出现聚焦框。
+- 输入焦点、校验错误、禁用和只读状态必须可区分；焦点描边同样只在键盘导航时出现，鼠标点击后不保留。
 
 ### 4.4 图标
 
@@ -229,7 +230,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 | 输入与表单 | `AssetEditor/Themes/DesignSystem/Controls/Inputs.xaml` | `AeInput.TextBox`、`AeInput.ComboBox`、`AeInput.CheckBox`、`AeInput.RadioButton`、`AeInput.Switch`、`AeInput.ExpandableField`、`AeForm.Label`、`AeForm.TextLabel`、`AeValidation.Message` |
 | 集合控件 | `AssetEditor/Themes/DesignSystem/Controls/Collections.xaml` | `AeTab.Item`、`AeTag.Container`、`AeTag.Text`、`AeTree.View`、`AeTree.Item`、`AeList.View`、`AeList.Item`、`AeTable.Grid`、`AeTable.Header`、`AeTable.Row`、`AeTable.Cell` |
 | 菜单与反馈 | `AssetEditor/Themes/DesignSystem/Controls/MenusAndFeedback.xaml` | `AeMenu.Bar`、`AeMenu.Item`、`AeMenu.Context`、`AeToolTip`、`AeFeedback.Notice`、`AeFeedback.Icon`、`AeFeedback.SuccessIcon`、`AeFeedback.WarningIcon`、`AeFeedback.DangerIcon`、`AeEmptyState.Panel`、`AeEmptyState.Title`、`AeEmptyState.Description`、`AeProgress.Bar`、`AeScrollBar.Compact` |
-| 变量、文字与表面 | `AssetEditor/Themes/DesignSystem/DesignTokens.xaml`、`Typography.xaml`、`SurfaceStyles.xaml` | `AeSpace.*`、`AeSize.*`、`AeRadius.*`、`AeMotion.*`、`AeText.*`、`AeSurface.*` |
+| 变量、文字、表面与焦点 | `AssetEditor/Themes/DesignSystem/DesignTokens.xaml`、`Typography.xaml`、`SurfaceStyles.xaml` | `AeSpace.*`、`AeSize.*`、`AeRadius.*`、`AeMotion.*`、`AeText.*`、`AeSurface.*`、`AeFocus.Keyboard` |
 | 主窗口工作区 | `AssetEditor/Themes/DesignSystem/Shell.xaml` | `AeShell.*` |
 | 设置与标准工作流 | `AssetEditor/Themes/DesignSystem/Workflows.xaml` | `AeWorkflow.*` |
 | 编辑器按钮与播放器 | `Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml` | `AeEditor.ToggleIcon`、`AeEditor.PlaybackToggle`、`AeEditor.PlaybackSlider` |
@@ -305,7 +306,7 @@ rg -n '<(Button|ToggleButton|TextBox|ComboBox|TreeView|DataGrid|ProgressBar)\b' 
 
 - 禁止新增固定主题色、固定字体族、任意字号、任意行高和未登记的间距尺度。
 - 禁止用字体字符或 Emoji 代替图标。
-- 禁止下拉箭头圆卡片、按钮聚焦框、按钮悬停放大、松开后才播放按压动画、残影和半透明复制层。
+- 禁止下拉箭头圆卡片、鼠标点击后出现或残留聚焦框、按钮悬停放大、松开后才播放按压动画、残影和半透明复制层；键盘导航必须保留 `AeFocus.Keyboard`。
 - 禁止控件过高而文字过小，禁止依靠冒号对齐表单。
 - 禁止子分组伪装成父分组，禁止无意义横线和层层嵌套卡片。
 - 禁止嵌入式加载界面、重复加载状态、假进度、假详情和无效取消按钮。

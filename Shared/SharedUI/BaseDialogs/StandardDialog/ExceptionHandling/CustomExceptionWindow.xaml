@@ -19,50 +19,46 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
-            <Grid Margin="14">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock
-                    Text="{loc:Loc Shared.CustomException.ErrorMessageLabel}"
-                    Style="{StaticResource AeText.SectionTitle}" />
+        <Grid Margin="26,20,26,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock
+                Text="{loc:Loc Shared.CustomException.ErrorMessageLabel}"
+                Style="{StaticResource AeText.SectionTitle}" />
+            <TextBox
+                x:Name="ErrorTextHandle"
+                Grid.Row="1"
+                Margin="0,8,0,0"
+                IsReadOnly="True"
+                TextWrapping="Wrap"
+                VerticalScrollBarVisibility="Auto"
+                Style="{StaticResource AeInput.TextBox}" />
+            <Expander
+                Grid.Row="2"
+                Margin="0,10,0,0"
+                Header="{loc:Loc Shared.CustomException.ExtraInfoHeader}"
+                IsExpanded="False">
                 <TextBox
-                    x:Name="ErrorTextHandle"
-                    Grid.Row="1"
+                    x:Name="ExtraInfoHandle"
+                    MinHeight="110"
                     Margin="0,8,0,0"
                     IsReadOnly="True"
-                    TextWrapping="Wrap"
+                    TextWrapping="NoWrap"
+                    HorizontalScrollBarVisibility="Auto"
                     VerticalScrollBarVisibility="Auto"
                     Style="{StaticResource AeInput.TextBox}" />
-                <Expander
-                    Grid.Row="2"
-                    Margin="0,10,0,0"
-                    Header="{loc:Loc Shared.CustomException.ExtraInfoHeader}"
-                    IsExpanded="False">
-                    <TextBox
-                        x:Name="ExtraInfoHandle"
-                        MinHeight="110"
-                        Margin="0,8,0,0"
-                        IsReadOnly="True"
-                        TextWrapping="NoWrap"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Auto"
-                        Style="{StaticResource AeInput.TextBox}" />
-                </Expander>
-            </Grid>
-        </Border>
+            </Expander>
+        </Grid>
 
         <Border
             Grid.Row="1"
-            Margin="12,0,12,12"
-            Padding="12"
-            Background="{DynamicResource AeBrush.Surface1}"
+            Margin="26,0,26,12"
+            Padding="0,10,0,0"
             BorderBrush="{DynamicResource AeBrush.Border}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource AeRadius.Control}">
+            BorderThickness="0,1,0,0">
             <TextBlock
                 Text="{loc:Loc Shared.CustomException.InfoText}"
                 Style="{StaticResource AeText.Caption}"

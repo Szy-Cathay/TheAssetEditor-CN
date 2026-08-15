@@ -19,31 +19,26 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border
-            Margin="16,16,16,12"
-            Padding="16"
-            Style="{StaticResource AeSurface.Panel}">
-            <StackPanel>
-                <TextBlock
-                    Style="{StaticResource AeText.SectionTitle}"
-                    Text="{loc:Loc ExternalPack.Open.Heading}" />
-                <TextBlock
-                    Margin="0,8,0,16"
-                    Text="{loc:Loc ExternalPack.Open.Description}"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    Margin="0,0,0,8"
-                    Foreground="{DynamicResource AeBrush.TextSecondary}"
-                    Style="{StaticResource AeText.Caption}"
-                    Text="{loc:Loc ExternalPack.Open.PathLabel}" />
-                <TextBox
-                    x:Name="PackPathTextBox"
-                    Height="30"
-                    IsReadOnly="True"
-                    Style="{StaticResource AeInput.TextBox}"
-                    VerticalContentAlignment="Center" />
-            </StackPanel>
-        </Border>
+        <StackPanel Margin="32,32,32,16">
+            <TextBlock
+                Style="{StaticResource AeText.SectionTitle}"
+                Text="{loc:Loc ExternalPack.Open.Heading}" />
+            <TextBlock
+                Margin="0,8,0,16"
+                Text="{loc:Loc ExternalPack.Open.Description}"
+                TextWrapping="Wrap" />
+            <TextBlock
+                Margin="0,0,0,8"
+                Foreground="{DynamicResource AeBrush.TextSecondary}"
+                Style="{StaticResource AeText.Caption}"
+                Text="{loc:Loc ExternalPack.Open.PathLabel}" />
+            <TextBox
+                x:Name="PackPathTextBox"
+                Height="30"
+                IsReadOnly="True"
+                Style="{StaticResource AeInput.TextBox}"
+                VerticalContentAlignment="Center" />
+        </StackPanel>
 
         <Border
             Grid.Row="1"

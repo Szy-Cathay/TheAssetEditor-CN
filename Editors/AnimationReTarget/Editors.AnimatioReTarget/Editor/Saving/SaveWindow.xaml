@@ -81,8 +81,9 @@
 
             <Border
                 Margin="0,16,0,0"
-                Padding="12"
-                Style="{StaticResource AeSurface.Panel}">
+                Padding="0,12,0,0"
+                BorderBrush="{DynamicResource AeBrush.Border}"
+                BorderThickness="0,1,0,0">
                 <StackPanel>
                     <TextBlock
                         Style="{StaticResource AeText.SectionTitle}"

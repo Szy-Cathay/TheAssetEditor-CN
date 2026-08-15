@@ -29,13 +29,6 @@
             <ColumnDefinition Width="120" />
         </Grid.ColumnDefinitions>
 
-        <Border
-            Grid.RowSpan="6"
-            Grid.ColumnSpan="3"
-            Margin="18,16,18,10"
-            Padding="16"
-            Style="{StaticResource AeSurface.Panel}" />
-
         <TextBlock
             x:Name="DescriptionTextBlock"
             Grid.ColumnSpan="3"

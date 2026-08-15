@@ -372,6 +372,38 @@ public class UiDesignSystemResourceTests
     }
 
     [Test]
+    public void FoundationStyles_ExposeSharedKeyboardFocusVisual()
+    {
+        WpfTestApplicationHost.Invoke(_ =>
+        {
+            var tokens = Load("Themes/DesignSystem/DesignTokens.xaml");
+            Application.Current.Resources.MergedDictionaries.Add(tokens);
+
+            try
+            {
+                var dictionary = Load(
+                    "Themes/DesignSystem/SurfaceStyles.xaml");
+                var style = (Style)dictionary["AeFocus.Keyboard"];
+
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(
+                        style.TargetType,
+                        Is.EqualTo(typeof(Control)));
+                    NUnitAssert.That(
+                        dictionary.Contains(typeof(Control)),
+                        Is.False,
+                        "Foundation styles must not replace the implicit Control style.");
+                });
+            }
+            finally
+            {
+                Application.Current.Resources.MergedDictionaries.Remove(tokens);
+            }
+        });
+    }
+
+    [Test]
     public void CanonicalUiStandard_CatalogsEveryPublicControlStyle()
     {
         var solutionRoot = FindSolutionRoot();
@@ -388,7 +420,6 @@ public class UiDesignSystemResourceTests
         };
         var internalKeys = new HashSet<string>(StringComparer.Ordinal)
         {
-            "AeButton.KeyboardFocusVisual",
             "AeButton.Base",
             "AeMenu.TopLevelItemTemplate",
             "AeMenu.SubmenuItemTemplate",

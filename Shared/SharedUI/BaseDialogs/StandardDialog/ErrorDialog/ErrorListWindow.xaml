@@ -18,9 +18,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
-            <errorlistdialog:ErrorListView />
-        </Border>
+        <errorlistdialog:ErrorListView Margin="12" />
         <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                 <Button

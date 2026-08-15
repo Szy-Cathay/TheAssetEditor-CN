@@ -403,7 +403,7 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 styles,
                 Does.Contain(
-                    "<Setter Property=\"FocusVisualStyle\" Value=\"{x:Null}\" />"));
+                    "<Setter Property=\"FocusVisualStyle\" Value=\"{StaticResource AeFocus.Keyboard}\" />"));
             NUnitAssert.That(styles, Does.Not.Contain("To=\"1.015\""));
             NUnitAssert.That(styles, Does.Not.Contain("To=\"0.94\""));
             NUnitAssert.That(styles, Does.Not.Contain("ButtonBase.Click"));
