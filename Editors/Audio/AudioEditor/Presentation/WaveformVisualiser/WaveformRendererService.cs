@@ -22,6 +22,10 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
 
     public sealed class WaveformRendererService(IPackFileService packFileService) : IWaveformRendererService
     {
+        private static readonly Guid s_pcmSubFormat =
+            new("00000001-0000-0010-8000-00aa00389b71");
+        private static readonly Guid s_ieeeFloatSubFormat =
+            new("00000003-0000-0010-8000-00aa00389b71");
         private readonly IPackFileService _packFileService = packFileService;
 
         public static int DefaultPixelsPerPeak { get; set; } = 2;
@@ -67,7 +71,8 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             cancellationToken.ThrowIfCancellationRequested();
             using var memoryStream = new MemoryStream(data, writable: false);
             using var waveStream = new WaveFileReader(memoryStream);
-            using var alignedWaveStream = new BlockAlignReductionStream(waveStream);
+            using var alignedWaveStream = new BlockAlignReductionStream(
+                CreateCompatibleWaveformStream(waveStream));
 
             var waveFormRenderer = new WaveFormRenderer();
 
@@ -85,6 +90,40 @@ namespace Editors.Audio.AudioEditor.Presentation.WaveformVisualiser
             var pixelWidth = baseBitmap.PixelWidth;
 
             return new WaveformRenderResult(waveformVisualisation, totalTime, pixelWidth);
+        }
+
+        private static WaveStream CreateCompatibleWaveformStream(
+            WaveFileReader waveStream)
+        {
+            if (waveStream.WaveFormat.Encoding != WaveFormatEncoding.Extensible ||
+                waveStream.WaveFormat is not WaveFormatExtraData extensibleFormat ||
+                extensibleFormat.ExtraSize < 22)
+            {
+                return waveStream;
+            }
+
+            var subFormat = new Guid(
+                extensibleFormat.ExtraData.AsSpan(6, 16));
+            WaveFormat standardFormat;
+            if (subFormat == s_pcmSubFormat)
+            {
+                standardFormat = new WaveFormat(
+                    extensibleFormat.SampleRate,
+                    extensibleFormat.BitsPerSample,
+                    extensibleFormat.Channels);
+            }
+            else if (subFormat == s_ieeeFloatSubFormat)
+            {
+                standardFormat = WaveFormat.CreateIeeeFloatWaveFormat(
+                    extensibleFormat.SampleRate,
+                    extensibleFormat.Channels);
+            }
+            else
+            {
+                return waveStream;
+            }
+
+            return new RawSourceWaveStream(waveStream, standardFormat);
         }
 
         private static SoundCloudBlockWaveFormSettings CreateBaseWaveformSettings(int width)
