@@ -526,9 +526,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
     private HistorySnapshot LoadSnapshot(string projectRoot)
     {
-        var status = _historyService.GetStatus(
-            projectRoot,
-            ReportProgress);
+        var status = _historyService.GetDisplayStatus(projectRoot);
         var restorePoints = status.Availability ==
                             FolderProjectHistoryAvailability.NotInitialized
             ? []

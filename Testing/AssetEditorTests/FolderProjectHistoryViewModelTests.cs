@@ -25,14 +25,12 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
-    public async Task Refresh_ShowsUnrecordedChangesAndRestorePoints()
+    public async Task Refresh_UsesDisplayStatusAndShowsHistorySnapshot()
     {
         using var directory = new TemporaryDirectory();
         using var project = CreateProject(directory.Path);
         var history = CreateHistoryService(project.ProjectRoot);
-        history.Setup(item => item.GetStatus(
-                project.ProjectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        history.Setup(item => item.GetDisplayStatus(project.ProjectRoot))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -67,6 +65,9 @@ public class FolderProjectHistoryViewModelTests
                 viewModel.CreateRestorePointCommand.CanExecute(null),
                 Is.True);
         });
+        history.Verify(item => item.GetStatus(
+            project.ProjectRoot,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Never);
     }
 
     [Test]
@@ -91,9 +92,7 @@ public class FolderProjectHistoryViewModelTests
                     FolderProjectUnrecordedChangeKind.Modified),
             ]);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.SetupSequence(item => item.GetStatus(
-                projectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        history.SetupSequence(item => item.GetDisplayStatus(projectRoot))
             .Returns(recoveryStatus)
             .Returns(readyStatus);
         history.Setup(item => item.GetRestorePoints(
@@ -191,9 +190,7 @@ public class FolderProjectHistoryViewModelTests
     {
         var projectRoot = Path.GetFullPath("legacy-project");
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(
-                projectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        history.Setup(item => item.GetDisplayStatus(projectRoot))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.RecoveryRequired,
                 "head",
@@ -247,9 +244,7 @@ public class FolderProjectHistoryViewModelTests
             recoveryStatus,
             null!);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(
-                projectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        history.Setup(item => item.GetDisplayStatus(projectRoot))
             .Returns(recoveryStatus);
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
@@ -348,9 +343,7 @@ public class FolderProjectHistoryViewModelTests
         using var directory = new TemporaryDirectory();
         using var project = CreateProject(directory.Path);
         var history = CreateHistoryService(project.ProjectRoot);
-        history.Setup(item => item.GetStatus(
-                project.ProjectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        history.Setup(item => item.GetDisplayStatus(project.ProjectRoot))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -953,9 +946,7 @@ public class FolderProjectHistoryViewModelTests
         using var directory = new TemporaryDirectory();
         using var project = CreateProject(directory.Path);
         var history = CreateHistoryService(project.ProjectRoot);
-        history.SetupSequence(item => item.GetStatus(
-                project.ProjectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        history.SetupSequence(item => item.GetDisplayStatus(project.ProjectRoot))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -964,6 +955,13 @@ public class FolderProjectHistoryViewModelTests
                         "cached.bin",
                         FolderProjectUnrecordedChangeKind.Modified),
                 ]))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                "head",
+                []));
+        history.Setup(item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -974,11 +972,7 @@ public class FolderProjectHistoryViewModelTests
                     new FolderProjectUnrecordedChange(
                         "confirmed.bin",
                         FolderProjectUnrecordedChangeKind.Added),
-                ]))
-            .Returns(new FolderProjectHistoryStatus(
-                FolderProjectHistoryAvailability.Ready,
-                "head",
-                []));
+                ]));
         var discard = new FolderProjectDiscardResult(
             new FolderProjectDiscardRollback(
                 "staging", [], [], [],
@@ -1288,17 +1282,20 @@ public class FolderProjectHistoryViewModelTests
         IReadOnlyList<FolderProjectRestorePoint>? restorePoints = null)
     {
         var history = new Mock<IFolderProjectHistoryService>();
+        var status = new FolderProjectHistoryStatus(
+            FolderProjectHistoryAvailability.Ready,
+            "head",
+            [
+                new FolderProjectUnrecordedChange(
+                    "changed.bin",
+                    FolderProjectUnrecordedChangeKind.Modified),
+            ]);
+        history.Setup(item => item.GetDisplayStatus(projectRoot))
+            .Returns(status);
         history.Setup(item => item.GetStatus(
                 projectRoot,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
-            .Returns(new FolderProjectHistoryStatus(
-                FolderProjectHistoryAvailability.Ready,
-                "head",
-                [
-                    new FolderProjectUnrecordedChange(
-                        "changed.bin",
-                        FolderProjectUnrecordedChangeKind.Modified),
-                ]));
+            .Returns(status);
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
                 100,

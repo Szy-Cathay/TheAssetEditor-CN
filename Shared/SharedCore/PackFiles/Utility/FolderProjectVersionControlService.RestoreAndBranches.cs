@@ -52,7 +52,7 @@ internal sealed partial class FolderProjectVersionControlService
             newTree,
             new CompareOptions
             {
-                Similarity = SimilarityOptions.Renames,
+                Similarity = SimilarityOptions.Exact,
             }).Where(change => change.Status != ChangeKind.Unmodified))
         {
             if (!string.IsNullOrWhiteSpace(change.Path))

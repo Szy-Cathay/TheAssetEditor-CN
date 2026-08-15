@@ -23,9 +23,8 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             directory.Path,
             new FolderProjectSettings { Name = "测试工程" });
         var historyService = new Mock<IFolderProjectHistoryService>();
-        historyService.Setup(item => item.GetStatus(
-                project.ProjectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        historyService.Setup(item =>
+                item.GetDisplayStatus(project.ProjectRoot))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -63,9 +62,8 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
         workspace.SelectedSidebarTabIndex = 1;
         await history.RefreshCommand.ExecutionTask!;
 
-        historyService.Verify(item => item.GetStatus(
-            project.ProjectRoot,
-            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+        historyService.Verify(item =>
+            item.GetDisplayStatus(project.ProjectRoot), Times.Once);
 
         workspace.SelectedSidebarTabIndex = 0;
         eventHub.Publish(new FolderProjectChangedEvent(
@@ -74,9 +72,8 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
         workspace.SelectedSidebarTabIndex = 1;
         await history.RefreshCommand.ExecutionTask!;
 
-        historyService.Verify(item => item.GetStatus(
-            project.ProjectRoot,
-            It.IsAny<Action<FolderProjectHistoryProgress>>()),
+        historyService.Verify(item =>
+            item.GetDisplayStatus(project.ProjectRoot),
             Times.Exactly(2));
 
         workspace.SetEditableContainer(new PackFileContainer("普通.pack"));
