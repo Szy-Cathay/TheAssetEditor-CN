@@ -472,7 +472,9 @@ public class UiModelKitbashFamilyTests
             NUnitAssert.That(styles, Does.Contain("Margin=\"16,0,0,0\""));
             NUnitAssert.That(
                 styles,
-                Does.Contain("Property=\"IsKeyboardFocused\" Value=\"True\""));
+                Does.Contain(
+                    "Property=\"FocusVisualStyle\" Value=\"{StaticResource AeFocus.Keyboard}\""));
+            NUnitAssert.That(styles, Does.Not.Contain("IsKeyboardFocused"));
             NUnitAssert.That(styles, Does.Not.Contain("IsKeyboardFocusWithin"));
             NUnitAssert.That(styles, Does.Contain("x:Name=\"CheckMark\""));
             NUnitAssert.That(

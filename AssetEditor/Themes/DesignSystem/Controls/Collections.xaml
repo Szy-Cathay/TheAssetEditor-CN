@@ -8,7 +8,7 @@
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TabItem}">
@@ -26,13 +26,6 @@
                             VerticalAlignment="Bottom"
                             Background="{DynamicResource AeBrush.Accent}"
                             Visibility="Collapsed" />
-                        <Border
-                            x:Name="FocusRing"
-                            Margin="2"
-                            BorderBrush="{DynamicResource AeBrush.Accent}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource AeRadius.Compact}"
-                            Visibility="Collapsed" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -43,9 +36,6 @@
                             <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
                             <Setter TargetName="SelectionLine" Property="Visibility" Value="Visible" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />
@@ -76,7 +66,7 @@
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TreeViewItem}">
@@ -174,9 +164,6 @@
                             <Setter TargetName="Row" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
                         </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />
                         </Trigger>
@@ -204,7 +191,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ListBoxItem}">
@@ -227,9 +214,6 @@
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Row" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />
@@ -267,7 +251,7 @@
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness" Value="0,0,0,1" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
@@ -275,9 +259,6 @@
             <Trigger Property="IsSelected" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                 <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-            </Trigger>
-            <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -287,13 +268,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Style.Triggers>
-            <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                <Setter Property="BorderThickness" Value="1" />
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
     </Style>
 
     <Style x:Key="AeTable.Grid" TargetType="{x:Type DataGrid}">

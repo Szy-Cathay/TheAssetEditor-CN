@@ -40,7 +40,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CaretBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
@@ -56,7 +56,7 @@
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="ItemContainerStyle">
             <Setter.Value>
@@ -107,7 +107,7 @@
                             Content="{TemplateBinding Header}"
                             ContentTemplate="{TemplateBinding HeaderTemplate}"
                             ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"
-                            FocusVisualStyle="{x:Null}"
+                            FocusVisualStyle="{StaticResource AeFocus.Keyboard}"
                             HorizontalContentAlignment="Stretch"
                             IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                             <ToggleButton.Template>
@@ -194,7 +194,7 @@
         <Setter Property="MinHeight" Value="24" />
         <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type CheckBox}">
@@ -239,10 +239,6 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
                         </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Box" Property="BorderThickness" Value="2" />
-                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />
                         </Trigger>
@@ -255,7 +251,7 @@
     <Style x:Key="AeInput.RadioButton" TargetType="{x:Type RadioButton}">
         <Setter Property="MinHeight" Value="24" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type RadioButton}">
@@ -305,9 +301,6 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
                         </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Ring" Property="BorderThickness" Value="2" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />
                         </Trigger>
@@ -323,7 +316,7 @@
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface3}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">

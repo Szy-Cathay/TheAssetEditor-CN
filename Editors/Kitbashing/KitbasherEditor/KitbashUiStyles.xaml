@@ -29,7 +29,7 @@
         <Setter Property="Height" Value="{StaticResource AeSize.CompactRowHeight}" />
         <Setter Property="Margin" Value="0" />
         <Setter Property="Focusable" Value="True" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type basedialogs:OptionalRadioButton}">
@@ -303,9 +303,6 @@
                             <Setter TargetName="Row" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
                         </DataTrigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.48" />
                         </Trigger>
@@ -345,7 +342,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type RadioButton}">

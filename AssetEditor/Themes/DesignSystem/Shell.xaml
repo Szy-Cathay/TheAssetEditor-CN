@@ -10,7 +10,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ListBoxItem}">
@@ -27,14 +27,6 @@
                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                             SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                        <Border
-                            x:Name="FocusRing"
-                            Margin="3"
-                            BorderBrush="{DynamicResource AeBrush.Accent}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource AeRadius.Compact}"
-                            IsHitTestVisible="False"
-                            Visibility="Collapsed" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -45,9 +37,6 @@
                             <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.Accent}" />
                             <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Visible" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.42" />
@@ -227,15 +216,12 @@
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Cursor" Value="SizeWE" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="ResizeBehavior" Value="PreviousAndNext" />
         <Setter Property="ResizeDirection" Value="Columns" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
-            </Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
             </Trigger>
         </Style.Triggers>
     </Style>

@@ -17,9 +17,9 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
-        <Border Margin="12" Style="{StaticResource AeSurface.Panel}">
-            <packfiletree:PackFileBrowserView DataContext="{Binding ViewModel, Mode=OneTime}"/>
-        </Border>
+        <packfiletree:PackFileBrowserView
+            Margin="12"
+            DataContext="{Binding ViewModel, Mode=OneTime}"/>
 
         <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
             <Grid>

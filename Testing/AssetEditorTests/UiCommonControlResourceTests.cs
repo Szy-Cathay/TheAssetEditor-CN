@@ -508,7 +508,8 @@ public class UiCommonControlResourceTests
                             style,
                             FrameworkElement.FocusVisualStyleProperty)
                             ?.Value,
-                        Is.Null);
+                        Is.SameAs(Application.Current.FindResource(
+                            "AeFocus.Keyboard")));
                     NUnitAssert.That(
                         pressedVisual.Setters
                             .OfType<Setter>()
@@ -728,7 +729,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void Buttons_HighlightOnHoverAndAnimatePressWithoutFocusRings()
+    public void Buttons_HighlightOnHoverAndUseKeyboardOnlyFocusVisual()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -769,7 +770,10 @@ public class UiCommonControlResourceTests
                                 item.Property ==
                                 Control.BackgroundProperty),
                         Is.True);
-                    NUnitAssert.That(focusVisual, Is.Null);
+                    NUnitAssert.That(
+                        focusVisual,
+                        Is.SameAs(Application.Current.FindResource(
+                            "AeFocus.Keyboard")));
                     NUnitAssert.That(persistentFocusRings, Is.Empty);
                     NUnitAssert.That(translucentStateOverlays, Is.Empty);
                 });
@@ -778,7 +782,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void LegacyButtonBases_UsePressReleaseMotionWithoutFocusRings()
+    public void LegacyButtonBases_UsePressReleaseMotionWithKeyboardOnlyFocusVisual()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -816,7 +820,10 @@ public class UiCommonControlResourceTests
                                 .Where(item => item.Name == "StateOverlay"),
                             Is.Empty);
                         NUnitAssert.That(focusVisualSetter, Is.Not.Null);
-                        NUnitAssert.That(focusVisualSetter!.Value, Is.Null);
+                        NUnitAssert.That(
+                            focusVisualSetter!.Value,
+                            Is.SameAs(Application.Current.FindResource(
+                                "AeFocus.Keyboard")));
                         NUnitAssert.That(
                             template.Triggers
                                 .OfType<Trigger>()
@@ -908,7 +915,7 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void EditorToggleButtons_UsePressReleaseMotionWithoutFocusFrames()
+    public void EditorToggleButtons_UsePressReleaseMotionWithKeyboardOnlyFocusVisual()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -946,7 +953,8 @@ public class UiCommonControlResourceTests
                                 style,
                                 FrameworkElement.FocusVisualStyleProperty)
                                 ?.Value,
-                            Is.Null);
+                            Is.SameAs(Application.Current.FindResource(
+                                "AeFocus.Keyboard")));
                         NUnitAssert.That(
                             FindDescendants<Border>(root)
                                 .Where(item => item.Name == "FocusRing"),
@@ -955,6 +963,45 @@ public class UiCommonControlResourceTests
                     AssertPressReleaseMotion(template, name);
                 }
             });
+    }
+
+    [Test]
+    public void ControlTemplates_DoNotDrawFocusFromInputAgnosticFocusProperties()
+    {
+        var root = FindSolutionRoot();
+        var paths = new[]
+        {
+            "AssetEditor/Themes/Controls.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/Buttons.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/Inputs.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/Collections.xaml",
+            "AssetEditor/Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
+            "AssetEditor/Themes/DesignSystem/Shell.xaml",
+            "AssetEditor/Themes/DesignSystem/Workflows.xaml",
+            "Shared/SharedUI/Common/Styles/GridSplitterStyles.xaml",
+            "Shared/SharedUI/BaseDialogs/OptionalRadioButtonStyle.xaml",
+            "Editors/Kitbashing/KitbasherEditor/KitbashUiStyles.xaml",
+        };
+
+        foreach (var path in paths)
+        {
+            var source = File.ReadAllText(Path.Combine(
+                root,
+                path.Replace('/', Path.DirectorySeparatorChar)));
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    source,
+                    Does.Not.Contain(
+                        "<Trigger Property=\"IsKeyboardFocused\""),
+                    path);
+                NUnitAssert.That(
+                    source,
+                    Does.Not.Contain(
+                        "<Trigger Property=\"IsKeyboardFocusWithin\""),
+                    path);
+            });
+        }
     }
 
     [Test]
