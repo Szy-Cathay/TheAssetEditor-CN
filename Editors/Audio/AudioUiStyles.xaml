@@ -10,7 +10,13 @@
     <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}" />
     <Style TargetType="{x:Type ListBox}" BasedOn="{StaticResource AeList.View}" />
     <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource AeList.Item}" />
-    <Style TargetType="{x:Type ListView}" BasedOn="{StaticResource AeList.View}" />
+    <Style TargetType="{x:Type ListView}" BasedOn="{StaticResource {x:Type ListView}}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+    </Style>
     <Style TargetType="{x:Type DataGrid}" BasedOn="{StaticResource AeTable.Grid}" />
     <Style TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource AeTable.Row}" />
     <Style TargetType="{x:Type DataGridCell}" BasedOn="{StaticResource AeTable.Cell}" />

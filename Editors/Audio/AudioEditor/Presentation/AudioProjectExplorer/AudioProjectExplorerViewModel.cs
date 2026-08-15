@@ -63,6 +63,7 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
             ResetFilters();
 
             AudioProjectTree = _audioProjectTreeBuilder.BuildTree(_audioEditorStateService.AudioProject, ShowEditedItemsOnly);
+            InitialiseDialogueEventFilters();
 
             var audioProjectFileName = Path.GetFileNameWithoutExtension(_audioEditorStateService.AudioProjectFileName);
             AudioProjectExplorerLabel =
@@ -73,14 +74,8 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
         {
             _audioEditorStateService
                 .StoreSelectedAudioProjectExplorerNode(value);
-            IsDialogueEventFilterEnabled = false;
             _eventHub.Publish(
                 new AudioProjectExplorerNodeSelectedEvent(value));
-            if (value == null)
-                return;
-
-            if (value.IsDialogueEvents())
-                InitialiseDialogueEventFilters();
         }
 
         private void FilterAudioProjectTree()
@@ -94,25 +89,28 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
 
         partial void OnSelectedDialogueEventTypeChanged(Wh3DialogueEventType? value)
         {
-            if (SelectedNode == null)
-                return;
-
-            SelectedNode.DialogueEventTypeFilter = value ?? Wh3DialogueEventType.TypeShowAll;
-            SetDialogueEventFilterDisplayText();
+            foreach (var node in GetDialogueEventNodes())
+            {
+                node.DialogueEventTypeFilter = value ??
+                    Wh3DialogueEventType.TypeShowAll;
+                SetDialogueEventFilterDisplayText(node);
+            }
             FilterAudioProjectTree();
         }
 
         partial void OnSelectedDialogueEventProfileChanged(Wh3DialogueEventUnitProfile? value)
         {
-            if (SelectedNode == null)
-                return;
-
-            SelectedNode.DialogueEventProfileFilter = value ?? Wh3DialogueEventUnitProfile.ProfileShowAll;
-            SetDialogueEventFilterDisplayText();
+            foreach (var node in GetDialogueEventNodes())
+            {
+                node.DialogueEventProfileFilter = value ??
+                    Wh3DialogueEventUnitProfile.ProfileShowAll;
+                SetDialogueEventFilterDisplayText(node);
+            }
             FilterAudioProjectTree();
         }
 
-        private void SetDialogueEventFilterDisplayText()
+        private void SetDialogueEventFilterDisplayText(
+            AudioProjectTreeNode node)
         {
             var setTypeFilterText = SelectedDialogueEventType != null && SelectedDialogueEventType != Wh3DialogueEventType.TypeShowAll;
             var setProfileFilterText = SelectedDialogueEventProfile != null && SelectedDialogueEventProfile != Wh3DialogueEventUnitProfile.ProfileShowAll;
@@ -120,20 +118,20 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
             {
                 var typeFilterText = $"Type: {Wh3DialogueEventInformation.GetDialogueEventTypeDisplayName(SelectedDialogueEventType)}";
                 var profileFilterText = $"Profile: {Wh3DialogueEventInformation.GetDialogueEventProfileDisplayName(SelectedDialogueEventProfile)}";
-                SelectedNode.DialogueEventFilterDisplayText = $"({typeFilterText}, {profileFilterText})";
+                node.DialogueEventFilterDisplayText = $"({typeFilterText}, {profileFilterText})";
             }
             else if (setTypeFilterText)
             {
                 var typeFilterText = $"Type: {Wh3DialogueEventInformation.GetDialogueEventTypeDisplayName(SelectedDialogueEventType)}";
-                SelectedNode.DialogueEventFilterDisplayText = $"({typeFilterText})";
+                node.DialogueEventFilterDisplayText = $"({typeFilterText})";
             }
             else if (setProfileFilterText)
             {
                 var profileFilterText = $"Profile: {Wh3DialogueEventInformation.GetDialogueEventProfileDisplayName(SelectedDialogueEventProfile)}";
-                SelectedNode.DialogueEventFilterDisplayText = $"({profileFilterText})";
+                node.DialogueEventFilterDisplayText = $"({profileFilterText})";
             }
             else
-                SelectedNode.DialogueEventFilterDisplayText = null;
+                node.DialogueEventFilterDisplayText = null;
         }
 
         partial void OnSearchQueryChanged(string value) => DebounceFilterAudioProjectTreeForSearchQuery();
@@ -198,33 +196,35 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
 
         private void InitialiseDialogueEventFilters()
         {
-            var soundBankName = Wh3SoundBankInformation.GetName(SelectedNode.GameSoundBank);
-            var soundBank = Wh3SoundBankInformation.GetSoundBank(soundBankName);
+            var dialogueEventNodes = GetDialogueEventNodes();
+            var soundBanks = dialogueEventNodes
+                .Select(node => node.GameSoundBank)
+                .ToHashSet();
 
             DialogueEventTypes = new ObservableCollection<Wh3DialogueEventType>(Wh3DialogueEventInformation.Information
-                .Where(dialogueEventDefinition => dialogueEventDefinition.SoundBank == soundBank)
+                .Where(dialogueEventDefinition => soundBanks.Contains(
+                    dialogueEventDefinition.SoundBank))
                 .SelectMany(dialogueEventDefinition => dialogueEventDefinition.DialogueEventTypes)
                 .Distinct()
                 .OrderBy(type => (int)type)); //Order by enum order
 
             DialogueEventProfiles = new ObservableCollection<Wh3DialogueEventUnitProfile>(Wh3DialogueEventInformation.Information
-                .Where(dialogueEventDefinition => dialogueEventDefinition.SoundBank == soundBank)
+                .Where(dialogueEventDefinition => soundBanks.Contains(
+                    dialogueEventDefinition.SoundBank))
                 .SelectMany(dialogueEventDefinition => dialogueEventDefinition.UnitProfiles)
                 .Distinct()
                 .OrderBy(profile => (int)profile)); //Order by enum order
 
-            if (SelectedNode.DialogueEventTypeFilter != null && SelectedNode.DialogueEventTypeFilter != Wh3DialogueEventType.TypeShowAll)
-                SelectedDialogueEventType = SelectedNode.DialogueEventTypeFilter;
-            else
-                ResetDialogueEventTypeFilterComboBoxSelectedItem();
-
-            if (SelectedNode.DialogueEventProfileFilter != null && SelectedNode.DialogueEventProfileFilter != Wh3DialogueEventUnitProfile.ProfileShowAll)
-                SelectedDialogueEventProfile = SelectedNode.DialogueEventProfileFilter;
-            else
-                ResetDialogueEventProfileFilterComboBoxSelectedItem();
-
-            IsDialogueEventFilterEnabled = true;
+            ResetDialogueEventTypeFilterComboBoxSelectedItem();
+            ResetDialogueEventProfileFilterComboBoxSelectedItem();
+            IsDialogueEventFilterEnabled = dialogueEventNodes.Count > 0;
         }
+
+        private List<AudioProjectTreeNode> GetDialogueEventNodes() =>
+            FlattenAudioProjectTree(AudioProjectTree)
+                .Where(node => node.Type ==
+                    AudioProjectTreeNodeType.DialogueEvents)
+                .ToList();
 
         [RelayCommand] public void ResetFilters()
         {
@@ -242,6 +242,10 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
                 dialogueEventNode.DialogueEventProfileFilter = Wh3DialogueEventUnitProfile.ProfileShowAll;
                 dialogueEventNode.DialogueEventFilterDisplayText = null;
             }
+
+            ResetDialogueEventTypeFilterComboBoxSelectedItem();
+            ResetDialogueEventProfileFilterComboBoxSelectedItem();
+            FilterAudioProjectTree();
         }
 
         private static IEnumerable<AudioProjectTreeNode> FlattenAudioProjectTree(IEnumerable<AudioProjectTreeNode> nodes)

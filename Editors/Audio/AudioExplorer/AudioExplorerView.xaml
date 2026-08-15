@@ -204,7 +204,7 @@
                     CancelCommand="{Binding LoadAudioRepositoryForSelectedLanguagesCancelCommand}"
                     CancelText="{loc:Loc AudioExplorer.CancelLoading}"
                     CurrentDetailText="{Binding LoadProgressDetail}"
-                    IsOperationActive="{Binding IsLoading}"
+                    IsOperationActive="{Binding IsLoadProgressWindowActive}"
                     IsProgressIndeterminate="{Binding LoadProgressIsIndeterminate}"
                     ProgressMaximum="{Binding LoadProgressMaximum}"
                     ProgressValue="{Binding LoadProgressValue}"

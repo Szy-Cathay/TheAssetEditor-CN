@@ -131,7 +131,9 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer
                 var dialogueEventProfile = node.DialogueEventProfileFilter.Value;
 
                 var allowedDialogueEvents = Wh3DialogueEventInformation.Information
-                    .Where(item => item.SoundBank == node.GameSoundBank && item.DialogueEventTypes.Contains(dialogueEventType) && item.UnitProfiles.Contains(dialogueEventProfile))
+                    .Where(item => item.SoundBank == node.GameSoundBank &&
+                        (!hasTypeFilter || item.DialogueEventTypes.Contains(dialogueEventType)) &&
+                        (!hasProfileFilter || item.UnitProfiles.Contains(dialogueEventProfile)))
                     .Select(item => item.Name)
                     .ToHashSet();
 

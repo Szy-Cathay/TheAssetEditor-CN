@@ -319,6 +319,16 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
             IsAddRowButtonEnabled = false;
             _audioEditorStateService.StoreEditorRow(null);
 
+            if (PruneRemovedPendingEditedRows() && IsEditing)
+            {
+                ResetEditMode();
+                ResetTable();
+                LoadTable(
+                    _audioEditorStateService
+                        .SelectedAudioProjectExplorerNode.Type);
+                return;
+            }
+
             if (Table.Rows.Count == 0)
                 return;
 
@@ -345,6 +355,25 @@ namespace Editors.Audio.AudioEditor.Presentation.AudioProjectEditor
                 _audioEditorStateService.StoreEditorRow(Table.Rows[0]);
                 return;
             }
+        }
+
+        private bool PruneRemovedPendingEditedRows()
+        {
+            var pendingRows = _audioEditorStateService
+                .PendingEditedViewerRows;
+            if (pendingRows.Count == 0)
+                return false;
+
+            var availableRows = pendingRows
+                .Where(row => row.RowState is not DataRowState.Deleted
+                    and not DataRowState.Detached)
+                .ToList();
+            if (availableRows.Count == pendingRows.Count)
+                return false;
+
+            _audioEditorStateService.StorePendingEditedViewerRows(
+                availableRows);
+            return availableRows.Count == 0;
         }
 
         private bool AreAudioFilesSet()

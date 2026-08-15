@@ -273,6 +273,24 @@
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 Padding="0, 5, 0, 5">
 
+                <TreeView.ItemContainerStyle>
+                    <Style
+                        TargetType="{x:Type TreeViewItem}"
+                        BasedOn="{StaticResource AeTree.Item}">
+                        <Setter
+                            Property="IsExpanded"
+                            Value="{Binding IsExpanded, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+                        <Setter
+                            Property="Visibility">
+                            <Setter.Value>
+                                <Binding
+                                    Path="IsVisible"
+                                    Converter="{StaticResource BoolToVisibilityConverter}" />
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </TreeView.ItemContainerStyle>
+
                 <TreeView.Resources>
                     <HierarchicalDataTemplate 
                         DataType="{x:Type Models:AudioProjectTreeNode}" 
@@ -287,22 +305,6 @@
                             </TextBlock.Inlines>
                         </TextBlock>
                     </HierarchicalDataTemplate>
-
-                    <Style 
-                        TargetType="{x:Type TreeViewItem}" 
-                        BasedOn="{StaticResource {x:Type TreeViewItem}}">
-                        <Setter 
-                            Property="IsExpanded" 
-                            Value="{Binding IsExpanded, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-                        <Setter 
-                            Property="Visibility">
-                            <Setter.Value>
-                                <Binding 
-                                    Path="IsVisible" 
-                                    Converter="{StaticResource BoolToVisibilityConverter}" />
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
                 </TreeView.Resources>
             </TreeView>
         </Grid>
