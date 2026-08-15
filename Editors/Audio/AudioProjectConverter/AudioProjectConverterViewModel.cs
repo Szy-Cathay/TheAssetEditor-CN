@@ -35,6 +35,7 @@ namespace Editors.Audio.AudioProjectConverter
         private readonly IAudioPackOutputService _audioPackOutputService;
         private readonly IAudioRepository _audioRepository;
         private readonly IAudioEditorFileService _audioEditorFileService;
+        private readonly IAudioProjectFileService _audioProjectFileService;
         private readonly ApplicationSettingsService _applicationSettingsService;
         private readonly VgStreamWrapper _vgStreamWrapper;
 
@@ -48,6 +49,8 @@ namespace Editors.Audio.AudioProjectConverter
         [ObservableProperty] private string _vOActorSubstring;
         [ObservableProperty] private string _soundbanksInfoXmlPath;
         [ObservableProperty] private bool _isUsingWwiseProject;
+        [ObservableProperty] private bool _isAppendingToExistingProject;
+        [ObservableProperty] private string _existingAudioProjectPath;
 
         [ObservableProperty] private bool _isAudioProjectNameSet;
         [ObservableProperty] private bool _isOutputDirectoryPathSet;
@@ -55,6 +58,7 @@ namespace Editors.Audio.AudioProjectConverter
         [ObservableProperty] private bool _isBnksDirectoryPathSet;
         [ObservableProperty] private bool _isVOActorSubstringSet;
         [ObservableProperty] private bool _isSoundbanksInfoXmlSet;
+        [ObservableProperty] private bool _isExistingAudioProjectPathSet;
         [ObservableProperty] private bool _isOkButtonEnabled;
         [ObservableProperty] private bool _isLoading = true;
         [ObservableProperty] private bool _isProcessing;
@@ -76,6 +80,7 @@ namespace Editors.Audio.AudioProjectConverter
             IAudioPackOutputService audioPackOutputService,
             IAudioRepository audioRepository,
             IAudioEditorFileService audioEditorFileService,
+            IAudioProjectFileService audioProjectFileService,
             ApplicationSettingsService applicationSettingsService,
             VgStreamWrapper vgStreamWrapper)
         {
@@ -83,6 +88,7 @@ namespace Editors.Audio.AudioProjectConverter
             _audioPackOutputService = audioPackOutputService;
             _audioRepository = audioRepository;
             _audioEditorFileService = audioEditorFileService;
+            _audioProjectFileService = audioProjectFileService;
             _applicationSettingsService = applicationSettingsService;
             _vgStreamWrapper = vgStreamWrapper;
 
@@ -165,15 +171,45 @@ namespace Editors.Audio.AudioProjectConverter
                 return;
             }
 
-            if (!AudioProjectNameValidator.TryNormalize(
-                    AudioProjectName,
-                    out var normalizedName))
+            string normalizedName;
+            string fileName;
+            string filePath;
+            string outputDirectoryPath;
+            string existingAudioProjectPath = null;
+            if (IsAppendingToExistingProject)
+            {
+                if (!IsExistingAudioProjectPathSet)
+                {
+                    _standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.Get(
+                            "AudioProjectConverter.ExistingProjectRequired"),
+                        LocalizationManager.Instance.Get("Msg.GeneralError"));
+                    return;
+                }
+
+                existingAudioProjectPath = ExistingAudioProjectPath;
+                fileName = Path.GetFileName(existingAudioProjectPath);
+                normalizedName = Path.GetFileNameWithoutExtension(
+                    existingAudioProjectPath);
+                filePath = existingAudioProjectPath;
+                outputDirectoryPath = Path.GetDirectoryName(filePath) ??
+                    string.Empty;
+            }
+            else if (!AudioProjectNameValidator.TryNormalize(
+                         AudioProjectName,
+                         out normalizedName))
             {
                 _standardDialogs.ShowDialogBox(
                     LocalizationManager.Instance.Get(
                         "NewAudioProject.InvalidName"),
                     LocalizationManager.Instance.Get("Msg.GeneralError"));
                 return;
+            }
+            else
+            {
+                fileName = $"{normalizedName}.aproj";
+                filePath = $"{OutputDirectoryPath}\\{fileName}";
+                outputDirectoryPath = OutputDirectoryPath;
             }
 
             var voActorSubstrings = GetVOActorSubstrings(
@@ -207,8 +243,6 @@ namespace Editors.Audio.AudioProjectConverter
                 return;
             }
 
-            var fileName = $"{normalizedName}.aproj";
-            var filePath = $"{OutputDirectoryPath}\\{fileName}";
             var soundBankPaths = Directory
                 .GetFiles(
                     BnksDirectoryPath,
@@ -249,6 +283,8 @@ namespace Editors.Audio.AudioProjectConverter
                         normalizedName,
                         fileName,
                         filePath,
+                        outputDirectoryPath,
+                        existingAudioProjectPath,
                         soundBankPaths,
                         workspacePath,
                         voActorSubstrings,
@@ -304,16 +340,18 @@ namespace Editors.Audio.AudioProjectConverter
             string normalizedName,
             string fileName,
             string filePath,
+            string outputDirectoryPath,
+            string existingAudioProjectPath,
             List<string> soundBankPaths,
             string workspacePath,
             string[] voActorSubstrings,
             IProgress<AudioOperationProgress> progress,
             CancellationToken cancellationToken)
         {
-            const string language = "english(uk)";
-            var audioProject = AudioProjectFile.CreateNew(
-                language,
-                normalizedName);
+            var audioProject = CreateConversionProject(
+                normalizedName,
+                fileName,
+                existingAudioProjectPath);
             var statesLookupByStateGroupByStateId = new Dictionary<string, Dictionary<uint, string>>();
             var dialogueEventsLookupByWemId = new Dictionary<uint, List<string>>();
             var statePathsLookupByDialogueEvent = new Dictionary<string, List<StatePathInfo>>();
@@ -391,6 +429,7 @@ namespace Editors.Audio.AudioProjectConverter
                     usedSourceIds,
                     outputs,
                     workspacePath,
+                    outputDirectoryPath,
                     voActorSubstrings,
                     cancellationToken);
                 progress.Report(new AudioOperationProgress(
@@ -406,6 +445,32 @@ namespace Editors.Audio.AudioProjectConverter
                 fileName,
                 filePath));
             return outputs;
+        }
+
+        private AudioProjectFile CreateConversionProject(
+            string normalizedName,
+            string fileName,
+            string existingAudioProjectPath)
+        {
+            if (string.IsNullOrWhiteSpace(existingAudioProjectPath))
+            {
+                return AudioProjectFile.CreateNew(
+                    "english(uk)",
+                    normalizedName);
+            }
+
+            var existingAudioProject = _audioProjectFileService.Load(
+                fileName,
+                existingAudioProjectPath).AudioProject;
+            var audioProject = AudioProjectFile.CreateNew(
+                existingAudioProject.Language,
+                normalizedName);
+            AudioProjectFileMerger.Merge(
+                audioProject,
+                existingAudioProject,
+                normalizedName,
+                normalizedName);
+            return audioProject;
         }
 
         private void UpdateOperationProgress(AudioOperationProgress progress)
@@ -770,6 +835,7 @@ namespace Editors.Audio.AudioProjectConverter
             HashSet<uint> usedSourceIds,
             List<AudioPackOutput> outputs,
             string workspacePath,
+            string outputDirectoryPath,
             string[] voActorSubstrings,
             CancellationToken cancellationToken)
         {
@@ -817,6 +883,20 @@ namespace Editors.Audio.AudioProjectConverter
                 if (!voActorSubstrings.Any(substring => voActor.Contains(substring, StringComparison.CurrentCultureIgnoreCase)))
                     continue;
 
+                var statePathName = StatePath.BuildName(
+                    statePath.StatePathNodes);
+                if (audioProjectDialogueEvent.StatePaths.Any(
+                        existingStatePath => string.Equals(
+                            existingStatePath.Name,
+                            statePathName,
+                            StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new InvalidOperationException(
+                        LocalizationManager.Instance.GetFormat(
+                            "AudioProjectConverter.ExistingStatePath",
+                            statePathName));
+                }
+
                 ProcessWavFiles(
                     audioProject,
                     statePathWavs,
@@ -828,6 +908,7 @@ namespace Editors.Audio.AudioProjectConverter
                     usedSourceIds,
                     outputs,
                     workspacePath,
+                    outputDirectoryPath,
                     cancellationToken);
 
                 if (audioFiles.Count == 0)
@@ -900,6 +981,7 @@ namespace Editors.Audio.AudioProjectConverter
             HashSet<uint> usedSourceIds,
             List<AudioPackOutput> outputs,
             string workspacePath,
+            string outputDirectoryPath,
             CancellationToken cancellationToken)
         {
             const string voActorPrefix = "vo_actor_";
@@ -927,11 +1009,22 @@ namespace Editors.Audio.AudioProjectConverter
                 // Ensure unique numbering across events globally
                 if (!globalBaseNameUsage.TryGetValue(baseFileName, out var count))
                     count = 0;
-                count++;
-                globalBaseNameUsage[baseFileName] = count;
+                do
+                {
+                    count++;
+                    wavFile.FileName =
+                        $"{baseFileName}_{count}.wav".ToLower();
+                    var audioRelativePath =
+                        $"vo\\{voActorSegment}\\{wavFile.FileName}";
+                    wavFile.FilePath = string.IsNullOrWhiteSpace(
+                        outputDirectoryPath)
+                        ? audioRelativePath
+                        : $"{outputDirectoryPath.TrimEnd('\\')}\\{audioRelativePath}";
+                    wavFile.FilePath = wavFile.FilePath.ToLower();
+                }
+                while (audioProject.GetAudioFile(wavFile.FilePath) != null);
 
-                wavFile.FileName = $"{baseFileName}_{count}.wav".ToLower();
-                wavFile.FilePath = $"{OutputDirectoryPath}\\vo\\{voActorSegment}\\{wavFile.FileName}".ToLower();
+                globalBaseNameUsage[baseFileName] = count;
 
                 var audioFile = audioProject.GetAudioFile(wavFile.FilePath);
                 if (audioFile == null)
@@ -957,7 +1050,7 @@ namespace Editors.Audio.AudioProjectConverter
                 var wavTempFilePath = Path.Combine(
                     workspacePath,
                     wavFile.FileName);
-                var wavPackOutputPath = $"{OutputDirectoryPath}\\vo\\{voActorSegment}\\{wavFile.FileName}";
+                var wavPackOutputPath = wavFile.FilePath;
 
                 var conversionResult =
                     _vgStreamWrapper.ConvertFileUsingVgStream(
@@ -1086,6 +1179,18 @@ namespace Editors.Audio.AudioProjectConverter
             UpdateOkButtonIsEnabled();
         }
 
+        partial void OnIsAppendingToExistingProjectChanged(bool value)
+        {
+            UpdateOkButtonIsEnabled();
+        }
+
+        partial void OnExistingAudioProjectPathChanged(string value)
+        {
+            IsExistingAudioProjectPathSet =
+                !string.IsNullOrWhiteSpace(value);
+            UpdateOkButtonIsEnabled();
+        }
+
         partial void OnIsLoadingChanged(bool value)
         {
             OnPropertyChanged(nameof(IsBusy));
@@ -1102,8 +1207,9 @@ namespace Editors.Audio.AudioProjectConverter
         {
             IsOkButtonEnabled = _isRepositoryLoaded
                 && !IsBusy
-                && IsAudioProjectNameSet
-                && IsOutputDirectoryPathSet
+                && (IsAppendingToExistingProject
+                    ? IsExistingAudioProjectPathSet
+                    : IsAudioProjectNameSet && IsOutputDirectoryPathSet)
                 && IsWemsDirectoryPathSet
                 && IsBnksDirectoryPathSet
                 && IsVOActorSubstringSet
@@ -1131,6 +1237,24 @@ namespace Editors.Audio.AudioProjectConverter
                 var filePath = result.Folder;
                 OutputDirectoryPath = filePath;
                 _logger.Here().Information($"Audio Project directory set to: {filePath}");
+            }
+        }
+
+        [RelayCommand] public void SetExistingAudioProjectPath()
+        {
+            try
+            {
+                var result = _audioProjectFileService.LoadFromDialog();
+                if (result != null)
+                    ExistingAudioProjectPath = result.FilePath;
+            }
+            catch (Exception exception)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectConverter.InvalidExistingProject",
+                        exception.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
             }
         }
 

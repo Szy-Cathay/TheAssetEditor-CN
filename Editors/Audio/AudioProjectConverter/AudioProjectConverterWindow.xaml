@@ -55,6 +55,10 @@
                     Height="Auto"/>
                 <RowDefinition 
                     Height="Auto"/>
+                <RowDefinition
+                    Height="Auto"/>
+                <RowDefinition
+                    Height="Auto"/>
                 <RowDefinition 
                     Height="Auto"/>
                 <RowDefinition 
@@ -67,8 +71,52 @@
                     Height="Auto"/>
             </Grid.RowDefinitions>
 
+            <CheckBox
+                Grid.Row="0"
+                Content="{loc:Loc AudioProjectConverter.AppendToExistingProject}"
+                ToolTip="{loc:Loc AudioProjectConverter.AppendToExistingProject.ToolTip}"
+                Style="{StaticResource AeInput.CheckBox}"
+                IsChecked="{Binding IsAppendingToExistingProject, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <Grid
+                Grid.Row="1"
+                Margin="0, 5, 0, 0"
+                IsEnabled="{Binding IsAppendingToExistingProject}">
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition
+                        Width="130"/>
+                    <ColumnDefinition
+                        Width="*"/>
+                    <ColumnDefinition
+                        Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Label
+                    Grid.Column="0"
+                    Content="{loc:Loc AudioProjectConverter.ExistingAudioProject}"
+                    ToolTip="{loc:Loc AudioProjectConverter.ExistingAudioProject.ToolTip}"/>
+
+                <TextBox
+                    Grid.Column="1"
+                    Text="{Binding ExistingAudioProjectPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    IsReadOnly="True"
+                    Style="{StaticResource AeInput.TextBox}"/>
+
+                <Button
+                    Grid.Column="2"
+                    Content="..."
+                    Width="30"
+                    Margin="5, 0, 0, 0"
+                    Style="{StaticResource AeButton.Secondary}"
+                    ToolTip="{loc:Loc AudioProjectConverter.ExistingAudioProject.ToolTip}"
+                    AutomationProperties.Name="{loc:Loc AudioProjectConverter.SelectExistingAudioProject}"
+                    Command="{Binding SetExistingAudioProjectPathCommand}"/>
+            </Grid>
+
             <Grid 
-                Grid.Row="0">
+                Grid.Row="2"
+                IsEnabled="{Binding IsAppendingToExistingProject, Converter={StaticResource InvBoolConverter}}">
 
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition 
@@ -89,9 +137,10 @@
                     Padding="2, 0, 0, 0"/>
             </Grid>
 
-            <Grid 
-                Grid.Row="1" 
-                Margin="0, 5, 0, 0">
+            <Grid
+                Grid.Row="3"
+                Margin="0, 5, 0, 0"
+                IsEnabled="{Binding IsAppendingToExistingProject, Converter={StaticResource InvBoolConverter}}">
 
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition 
@@ -123,7 +172,7 @@
             </Grid>
 
             <Grid 
-                Grid.Row="2"
+                Grid.Row="4"
                 Margin="0, 5, 0, 0">
 
                 <Grid.ColumnDefinitions>
@@ -145,8 +194,8 @@
                     Padding="2, 0, 0, 0"/>
             </Grid>
 
-            <Grid 
-                Grid.Row="3" 
+            <Grid
+                Grid.Row="5"
                 Margin="0, 5, 0, 0">
 
                 <Grid.ColumnDefinitions>
@@ -179,7 +228,7 @@
             </Grid>
 
             <Grid 
-                Grid.Row="4"
+                Grid.Row="6"
                 Margin="0, 5, 0, 0">
 
                 <Grid.ColumnDefinitions>
@@ -211,8 +260,8 @@
                     Command="{Binding SetBnksDirectoryPathCommand}"/>
             </Grid>
 
-            <Grid 
-                Grid.Row="5" 
+            <Grid
+                Grid.Row="7"
                   Margin="0,5,0,0">
                 
                 <Grid.ColumnDefinitions>
@@ -233,8 +282,8 @@
                     VerticalAlignment="Center"/>
             </Grid>
 
-            <Grid 
-                Grid.Row="6" 
+            <Grid
+                Grid.Row="8"
                 Margin="0, 5, 0, 0"
                 IsEnabled="{Binding IsUsingWwiseProject}">
 
