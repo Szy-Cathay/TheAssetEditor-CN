@@ -18,12 +18,37 @@ using Shared.Core.Misc;
 
 namespace Editors.Audio.Shared.AudioProject.Compiler
 {
+    public readonly record struct AudioProjectCompileTarget
+    {
+        public static AudioProjectCompileTarget AllLanguages { get; } =
+            new(null);
+
+        public AudioProjectCompileTarget(Wh3Language? language)
+        {
+            if (language == Wh3Language.Sfx)
+            {
+                throw new ArgumentException(
+                    "Use AllLanguages for output directly under audio\\wwise.",
+                    nameof(language));
+            }
+
+            Language = language;
+        }
+
+        public Wh3Language? Language { get; }
+
+        public string OutputDirectory => Language.HasValue
+            ? $"audio\\wwise\\{Wh3LanguageInformation.GetLanguageAsString(Language.Value)}"
+            : "audio\\wwise";
+    }
+
     public interface IAudioProjectCompilerService
     {
         Task<bool> CompileAsync(
             AudioProjectFile audioProject,
             string audioProjectFileName,
             string audioProjectFilePath,
+            AudioProjectCompileTarget compileTarget,
             CancellationToken cancellationToken = default);
     }
 
@@ -33,6 +58,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             AudioProjectFile audioProject,
             string audioProjectFileName,
             string audioProjectFilePath,
+            AudioProjectCompileTarget compileTarget,
             IProgress<AudioOperationProgress> progress,
             CancellationToken cancellationToken = default);
     }
@@ -58,11 +84,13 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             AudioProjectFile audioProject,
             string audioProjectFileName,
             string audioProjectFilePath,
+            AudioProjectCompileTarget compileTarget,
             CancellationToken cancellationToken = default) =>
             CompileAsync(
                 audioProject,
                 audioProjectFileName,
                 audioProjectFilePath,
+                compileTarget,
                 null,
                 cancellationToken);
 
@@ -70,6 +98,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             AudioProjectFile audioProject,
             string audioProjectFileName,
             string audioProjectFilePath,
+            AudioProjectCompileTarget compileTarget,
             IProgress<AudioOperationProgress> progress,
             CancellationToken cancellationToken = default)
         {
@@ -118,6 +147,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                             audioProject,
                             audioProjectNameWithoutExtension,
                             workspacePath,
+                            compileTarget.OutputDirectory,
                             audioFiles,
                             sounds,
                             cancellationToken);
@@ -254,6 +284,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             AudioProjectFile audioProject,
             string audioProjectNameWithoutExtension,
             string workspacePath,
+            string outputDirectory,
             List<AudioFile> audioFiles,
             List<Sound> sounds,
             CancellationToken cancellationToken)
@@ -265,10 +296,8 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                 cancellationToken.ThrowIfCancellationRequested();
 
                 soundBank.FileName = $"{soundBank.Name}.bnk";
-                if (soundBank.Language == Wh3LanguageInformation.GetLanguageAsString(Wh3Language.Sfx))
-                    soundBank.FilePath = $"audio\\wwise\\{soundBank.FileName}";
-                else
-                    soundBank.FilePath = $"audio\\wwise\\{soundBank.Language}\\{soundBank.FileName}";
+                soundBank.FilePath =
+                    $"{outputDirectory}\\{soundBank.FileName}";
 
                 if (soundBank.DialogueEvents.Count != 0)
                 {
@@ -284,16 +313,10 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                     soundBank.TestingFileName = $"{soundBankNameBase}_1_{audioProjectNameWithoutExtension}_for_testing.bnk";
                     soundBank.MergingFileName = $"{soundBank.Name}_for_merging.bnk";
 
-                    if (soundBank.Language == Wh3LanguageInformation.GetLanguageAsString(Wh3Language.Sfx))
-                    {
-                        soundBank.TestingFilePath = $"audio\\wwise\\{soundBank.TestingFileName}";
-                        soundBank.MergingFilePath = $"audio\\wwise\\{soundBank.MergingFileName}";
-                    }
-                    else
-                    {
-                        soundBank.TestingFilePath = $"audio\\wwise\\{soundBank.Language}\\{soundBank.TestingFileName}";
-                        soundBank.MergingFilePath = $"audio\\wwise\\{soundBank.Language}\\{soundBank.MergingFileName}";
-                    }
+                    soundBank.TestingFilePath =
+                        $"{outputDirectory}\\{soundBank.TestingFileName}";
+                    soundBank.MergingFilePath =
+                        $"{outputDirectory}\\{soundBank.MergingFileName}";
 
                     soundBank.TestingId = WwiseHash.Compute(soundBank.TestingFileName.Replace(".bnk", string.Empty));
                     soundBank.MergingId = WwiseHash.Compute(soundBank.MergingFileName.Replace(".bnk", string.Empty));
@@ -306,6 +329,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                         sounds,
                         soundBank,
                         workspacePath,
+                        outputDirectory,
                         cancellationToken);
 
                 if (soundBank.DialogueEvents.Count != 0)
@@ -315,6 +339,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                         sounds,
                         soundBank,
                         workspacePath,
+                        outputDirectory,
                         cancellationToken);
             }
         }
@@ -325,6 +350,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             List<Sound> sounds,
             SoundBank soundBank,
             string workspacePath,
+            string outputDirectory,
             CancellationToken cancellationToken)
         {
             var playActionEvents = soundBank.GetPlayActionEvents();
@@ -341,7 +367,10 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                         var sound = soundBank.GetSound(playAction.TargetHircId);
                         var audioFile = audioProject.GetAudioFile(sound.SourceId);
 
-                        SetSoundData(audioFile, soundBank, workspacePath);
+                        SetSoundData(
+                            audioFile,
+                            workspacePath,
+                            outputDirectory);
 
                         audioFiles.Add(audioFile);
                         sounds.Add(sound);
@@ -355,6 +384,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                             randomSequenceContainer,
                             soundBank,
                             workspacePath,
+                            outputDirectory,
                             cancellationToken);
 
                         var randomSequenceContainerSounds = soundBank.GetSounds(randomSequenceContainer.Children);
@@ -371,6 +401,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             List<Sound> sounds,
             SoundBank soundBank,
             string workspacePath,
+            string outputDirectory,
             CancellationToken cancellationToken)
         {
             foreach (var dialogueEvent in soundBank.DialogueEvents)
@@ -386,7 +417,10 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                         var sound = soundBank.GetSound(statePath.TargetHircId);
                         var audioFile = audioProject.GetAudioFile(sound.SourceId);
 
-                        SetSoundData(audioFile, soundBank, workspacePath);
+                        SetSoundData(
+                            audioFile,
+                            workspacePath,
+                            outputDirectory);
 
                         audioFiles.Add(audioFile);
                         sounds.Add(sound);
@@ -400,6 +434,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                             randomSequenceContainer,
                             soundBank,
                             workspacePath,
+                            outputDirectory,
                             cancellationToken);
 
                         var randomSequenceContainerSounds = soundBank.GetSounds(randomSequenceContainer.Children);
@@ -415,6 +450,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             RandomSequenceContainer randomSequenceContainer,
             SoundBank soundBank,
             string workspacePath,
+            string outputDirectory,
             CancellationToken cancellationToken)
         {
             var sounds = soundBank.GetSounds(randomSequenceContainer.Children);
@@ -423,25 +459,26 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var audioFile = audioProject.GetAudioFile(sound.SourceId);
-                SetSoundData(audioFile, soundBank, workspacePath);
+                SetSoundData(
+                    audioFile,
+                    workspacePath,
+                    outputDirectory);
             }
             randomSequenceContainer.Children = randomSequenceContainer.Children.OrderBy(soundId => soundId).ToList();
         }
 
         private static void SetSoundData(
             AudioFile audioFile,
-            SoundBank soundBank,
-            string workspacePath)
+            string workspacePath,
+            string outputDirectory)
         {
             audioFile.WemPackFileName = $"{audioFile.Id}.wem";
             audioFile.WemDiskFilePath = Path.Combine(
                 workspacePath,
                 audioFile.WemPackFileName);
             
-            if (soundBank.Language == Wh3LanguageInformation.GetLanguageAsString(Wh3Language.Sfx))
-                audioFile.WemPackFilePath = $"audio\\wwise\\{audioFile.WemPackFileName}";
-            else
-                audioFile.WemPackFilePath = $"audio\\wwise\\{soundBank.Language}\\{audioFile.WemPackFileName}";
+            audioFile.WemPackFilePath =
+                $"{outputDirectory}\\{audioFile.WemPackFileName}";
         }
 
         private async Task<List<AudioPackOutput>> GenerateWemsAsync(

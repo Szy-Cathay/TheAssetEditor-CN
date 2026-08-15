@@ -165,6 +165,7 @@ namespace AssetEditorTests
                 project,
                 "test.aproj",
                 "audio\\test.aproj",
+                AudioProjectCompileTarget.AllLanguages,
                 progress);
 
             Assert.IsTrue(compileCompleted);
@@ -263,6 +264,7 @@ namespace AssetEditorTests
                 project,
                 "cancel.aproj",
                 "audio\\cancel.aproj",
+                AudioProjectCompileTarget.AllLanguages,
                 cancellation.Token);
 
             Assert.IsFalse(compileCompleted);
@@ -271,6 +273,144 @@ namespace AssetEditorTests
                     It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
                     It.IsAny<bool>()),
                 Times.Never);
+        }
+
+        [TestMethod]
+        public async Task Compile_SelectedLanguage_WritesBnkAndWemUnderThatLanguageDirectory()
+        {
+            var outputPaths = await CompileAndCaptureOutputPaths(
+                new AudioProjectCompileTarget(Wh3Language.Chinese));
+
+            CollectionAssert.Contains(
+                outputPaths,
+                "audio\\wwise\\chinese\\battle_individual_magic_target.bnk");
+            CollectionAssert.Contains(
+                outputPaths,
+                "audio\\wwise\\chinese\\771.wem");
+        }
+
+        [TestMethod]
+        public async Task Compile_AllLanguages_WritesBnkAndWemDirectlyUnderWwise()
+        {
+            var outputPaths = await CompileAndCaptureOutputPaths(
+                AudioProjectCompileTarget.AllLanguages);
+
+            CollectionAssert.Contains(
+                outputPaths,
+                "audio\\wwise\\battle_individual_magic_target.bnk");
+            CollectionAssert.Contains(
+                outputPaths,
+                "audio\\wwise\\771.wem");
+        }
+
+        private static async Task<List<string>> CompileAndCaptureOutputPaths(
+            AudioProjectCompileTarget compileTarget)
+        {
+            const uint sourceId = 771;
+            var audioFile = new AudioFile(
+                Guid.NewGuid(),
+                sourceId,
+                "target.wav",
+                "audio\\target.wav");
+            var sound = Sound.CreateTargetSound(
+                Guid.NewGuid(),
+                42,
+                0,
+                0,
+                sourceId,
+                "english(uk)",
+                Editors.Audio.Shared.AudioProject.Models.HircSettings
+                    .CreateDefaultSoundSettings());
+            var soundBank = new SoundBank(
+                "battle_individual_magic_target",
+                Wh3SoundBank.BattleIndividualMagic,
+                "english(uk)");
+            soundBank.Sounds.Add(sound);
+            soundBank.ActionEvents.Add(new ActionEvent(
+                44,
+                "target_event",
+                [AudioProjectAction.CreatePlay(
+                    43,
+                    AkBkHircType.Sound,
+                    sound.Id,
+                    soundBank.Id)],
+                Wh3ActionEventType.BattleAbilities));
+            var project = new AudioProjectFile
+            {
+                Language = "english(uk)",
+                AudioFiles = [audioFile],
+                SoundBanks = [soundBank]
+            };
+            var wemGenerator = new Mock<IWemGeneratorService>();
+            wemGenerator
+                .Setup(x => x.GenerateWemsAsync(
+                    It.IsAny<List<AudioFile>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns((
+                    List<AudioFile> audioFiles,
+                    string _,
+                    CancellationToken _) =>
+                {
+                    foreach (var item in audioFiles)
+                    {
+                        Directory.CreateDirectory(
+                            Path.GetDirectoryName(item.WemDiskFilePath)!);
+                        File.WriteAllBytes(item.WemDiskFilePath, [1]);
+                    }
+
+                    return Task.CompletedTask;
+                });
+            wemGenerator
+                .Setup(x => x.CreateWemOutputs(It.IsAny<List<AudioFile>>()))
+                .Returns((List<AudioFile> audioFiles) => audioFiles
+                    .Select(item => new AudioPackOutput(
+                        item.WemPackFileName,
+                        item.WemPackFilePath,
+                        [1]))
+                    .ToList());
+            var soundBankGenerator = new Mock<ISoundBankGeneratorService>();
+            soundBankGenerator
+                .Setup(x => x.GenerateSoundBankWithoutDialogueEvents(
+                    It.IsAny<SoundBank>()))
+                .Returns((SoundBank bank) => new AudioPackOutput(
+                    bank.FileName,
+                    bank.FilePath,
+                    [1]));
+            var savedOutputs = new List<AudioPackOutput>();
+            var outputService = new Mock<IAudioPackOutputService>();
+            outputService
+                .Setup(x => x.SaveBatch(
+                    It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
+                    It.IsAny<bool>()))
+                .Callback((
+                    IReadOnlyCollection<AudioPackOutput> outputs,
+                    bool _) => savedOutputs.AddRange(outputs))
+                .Returns(true);
+            var datGenerator = new Mock<IDatGeneratorService>();
+            datGenerator
+                .Setup(x => x.GenerateEventDatFile(
+                    It.IsAny<string>(),
+                    It.IsAny<List<ActionEvent>>(),
+                    It.IsAny<List<StateGroup>>()))
+                .Returns(new AudioPackOutput(
+                    "event_data__target.dat",
+                    "audio\\wwise\\event_data__target.dat",
+                    [1]));
+            var compiler = new AudioProjectCompilerService(
+                soundBankGenerator.Object,
+                wemGenerator.Object,
+                datGenerator.Object,
+                outputService.Object);
+
+            var compileCompleted = await compiler.CompileAsync(
+                project,
+                "target.aproj",
+                "audio\\target.aproj",
+                compileTarget);
+
+            Assert.IsTrue(compileCompleted);
+            return savedOutputs.Select(output => output.FilePath).ToList();
         }
 
         private sealed class RecordingProgress<T> : IProgress<T>

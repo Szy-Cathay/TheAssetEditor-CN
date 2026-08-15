@@ -210,17 +210,12 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 "FolderProject.History.DefaultDescription")
             : RestorePointDescription.Trim();
         await RunOperation(
-            () =>
-            {
-                project.RefreshFromDisk();
-                _historyService.CreateRestorePoint(
-                    project.ProjectRoot,
-                    description,
-                    ReportProgress);
-                return LoadSnapshot(project.ProjectRoot);
-            },
+            () => CreateRestorePointSnapshot(project, description),
             snapshot =>
             {
+                if (snapshot == null)
+                    return;
+
                 ApplySnapshot(snapshot);
                 RestorePointDescription = "";
             });
@@ -535,6 +530,36 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 MaxRestorePoints,
                 ReportProgress);
         return new HistorySnapshot(status, restorePoints);
+    }
+
+    private HistorySnapshot? CreateRestorePointSnapshot(
+        FolderProjectContainer project,
+        string description)
+    {
+        if (!ReferenceEquals(_project, project))
+            return null;
+
+        try
+        {
+            project.RefreshFromDisk();
+        }
+        catch (ObjectDisposedException exception) when (
+            string.Equals(
+                exception.ObjectName,
+                typeof(FolderProjectContainer).FullName,
+                StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (!ReferenceEquals(_project, project))
+            return null;
+
+        _historyService.CreateRestorePoint(
+            project.ProjectRoot,
+            description,
+            ReportProgress);
+        return LoadSnapshot(project.ProjectRoot);
     }
 
     private void ApplySnapshot(HistorySnapshot snapshot)

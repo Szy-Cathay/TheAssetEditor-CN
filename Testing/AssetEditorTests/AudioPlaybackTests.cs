@@ -289,6 +289,24 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public async Task WaveformRenderer_RendersExtensiblePcmWavData()
+        {
+            var renderer = new WaveformRendererService(
+                Mock.Of<IPackFileService>());
+
+            var result = await renderer.RenderAsync(
+                CreateSilentExtensiblePcmWav(TimeSpan.FromSeconds(1)),
+                320,
+                CancellationToken.None);
+
+            Assert.AreEqual(320, result.PixelWidth);
+            Assert.AreEqual(
+                TimeSpan.FromSeconds(1),
+                result.TotalTime);
+            Assert.IsTrue(result.Visualisation.PixelHeight > 0);
+        }
+
+        [TestMethod]
         public void Play_WhenTheSoundEngineFails_DoesNotReuseTheFailedLoad()
         {
             var directory = Path.Combine(
@@ -494,6 +512,22 @@ namespace AssetEditorTests
         {
             const int sampleRate = 8000;
             var waveFormat = new WaveFormat(sampleRate, 16, 1);
+            var sampleCount = (int)(sampleRate * duration.TotalSeconds);
+            var data = new byte[sampleCount * waveFormat.BlockAlign];
+            using var stream = new MemoryStream();
+            using (var writer = new WaveFileWriter(stream, waveFormat))
+            {
+                writer.Write(data, 0, data.Length);
+                writer.Flush();
+            }
+
+            return stream.ToArray();
+        }
+
+        private static byte[] CreateSilentExtensiblePcmWav(TimeSpan duration)
+        {
+            const int sampleRate = 48000;
+            var waveFormat = new WaveFormatExtensible(sampleRate, 24, 1);
             var sampleCount = (int)(sampleRate * duration.TotalSeconds);
             var data = new byte[sampleCount * waveFormat.BlockAlign];
             using var stream = new MemoryStream();

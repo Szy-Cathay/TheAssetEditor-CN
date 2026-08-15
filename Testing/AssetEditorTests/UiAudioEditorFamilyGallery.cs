@@ -188,7 +188,7 @@ public class UiAudioEditorFamilyGallery
         else if (variant == "converter")
         {
             window.Width = 760;
-            window.Height = 470;
+            window.Height = 540;
         }
         else if (variant == "project-merger")
         {
@@ -328,6 +328,21 @@ public class UiAudioEditorFamilyGallery
             IsSettingsBorderVisible = true,
             EmptyStateText = "打开或新建音频工程以开始编辑",
             CompileStatus = "工程已保存",
+            CompileTargets = new[]
+            {
+                new SampleModel
+                {
+                    DisplayName = @"所有语言（audio\wwise）",
+                    Target = "all",
+                    Command = SampleCommand.Instance,
+                },
+                new SampleModel
+                {
+                    DisplayName = @"中文（audio\wwise\chinese）",
+                    Target = "chinese",
+                    Command = SampleCommand.Instance,
+                },
+            },
             OperationDetail = @"D:\AudioProjects\empire_general_voice.aeaudio",
             OperationProgressIsIndeterminate = false,
             OperationProgressMaximum = 428d,
@@ -404,11 +419,14 @@ public class UiAudioEditorFamilyGallery
     private static SampleModel CreateConverter() => new()
     {
         AudioProjectName = "empire_general_voice",
+        ExistingAudioProjectPath =
+            @"audio\audio_projects\cathay_full_voice.aproj",
         SoundbanksInfoXmlPath = @"D:\Wwise\SoundbanksInfo.xml",
         BnksDirectoryPath = @"D:\Wwise\GeneratedSoundBanks",
         WemsDirectoryPath = @"D:\Wwise\.cache\Windows\SFX",
         OutputDirectoryPath = @"D:\Modding\AudioProjects",
         VOActorSubstring = "empire_general",
+        IsAppendingToExistingProject = true,
         IsUsingWwiseProject = true,
         IsBusy = false,
         IsOkButtonEnabled = true,
@@ -659,9 +677,11 @@ public class UiAudioEditorFamilyGallery
         public object? CollapseOrExpandTreeCommand { get; set; } = SampleCommand.Instance;
         public object? CommitButtonLabel { get; set; }
         public object? CommitButtonToolTip { get; set; }
+        public object? Command { get; set; }
         public object? CompileAudioProjectCancelCommand { get; set; } = SampleCommand.Instance;
         public object? CompileAudioProjectCommand { get; set; } = SampleCommand.Instance;
         public object? CompileStatus { get; set; }
+        public object? CompileTargets { get; set; }
         public object? ContainerType { get; set; }
         public object? ContainerTypes { get; set; }
         public object? CopyRowsCommand { get; set; } = SampleCommand.Instance;
@@ -676,6 +696,7 @@ public class UiAudioEditorFamilyGallery
         public object? EditorLabel { get; set; }
         public object? EmptyStateText { get; set; }
         public object? EnableRepetitionInterval { get; set; }
+        public object? ExistingAudioProjectPath { get; set; }
         public object? ExplorerFilter { get; set; }
         public object? ExplorerList { get; set; }
         public object? ExportAudioCancelCommand { get; set; } = SampleCommand.Instance;
@@ -700,6 +721,7 @@ public class UiAudioEditorFamilyGallery
         public object? IsAudioPlaybackVisible { get; set; }
         public object? IsAudioPreviewLoading { get; set; }
         public object? IsAudioProjectLoaded { get; set; }
+        public object? IsAppendingToExistingProject { get; set; }
         public object? IsBusy { get; set; }
         public object? IsChecked { get; set; }
         public object? IsCompiling { get; set; }
@@ -815,6 +837,7 @@ public class UiAudioEditorFamilyGallery
         public object? SelectNoneCommand { get; set; } = SampleCommand.Instance;
         public object? SetBaseAudioProjectPathCommand { get; set; } = SampleCommand.Instance;
         public object? SetBnksDirectoryPathCommand { get; set; } = SampleCommand.Instance;
+        public object? SetExistingAudioProjectPathCommand { get; set; } = SampleCommand.Instance;
         public object? SetMergingAudioProjectPathCommand { get; set; } = SampleCommand.Instance;
         public object? SetNewFileLocationCommand { get; set; } = SampleCommand.Instance;
         public object? SetOutputDirectoryPathCommand { get; set; } = SampleCommand.Instance;
@@ -837,6 +860,7 @@ public class UiAudioEditorFamilyGallery
         public object? Table { get; set; }
         public object? TotalPlaybackSeconds { get; set; }
         public object? TotalPlaybackTime { get; set; }
+        public object? Target { get; set; }
         public object? TransitionDuration { get; set; }
         public object? TransitionType { get; set; }
         public object? TransitionTypes { get; set; }

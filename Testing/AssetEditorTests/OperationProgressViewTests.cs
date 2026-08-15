@@ -716,7 +716,7 @@ public class OperationProgressViewTests
     }
 
     [Test]
-    public void AutomaticAudioPreloads_KeepPopupClosedUntilPrimaryActionStarts()
+    public void AudioProgressPopups_UseTheirCurrentOperationStates()
     {
         var solutionRoot = FindSolutionRoot();
         var converter = File.ReadAllText(Path.Combine(
@@ -750,11 +750,11 @@ public class OperationProgressViewTests
             Assert.That(
                 converter,
                 Does.Contain(
-                    "IsOperationActive=\"{Binding IsProcessing}\""));
+                    "IsOperationActive=\"{Binding IsBusy}\""));
             Assert.That(
                 converter,
                 Does.Contain(
-                    "Binding=\"{Binding IsProcessing}\" Value=\"True\""));
+                    "Binding=\"{Binding IsBusy}\" Value=\"True\""));
             Assert.That(
                 dialogueMerger,
                 Does.Contain(

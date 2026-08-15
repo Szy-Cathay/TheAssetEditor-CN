@@ -83,8 +83,26 @@
                         IsEnabled="{Binding CanEditAudioProject}"/>
                     <MenuItem 
                         Header="{loc:Loc AudioEditor.Menu.File.CompileAudioProject}"
-                        Command="{Binding CompileAudioProjectCommand}"
-                        IsEnabled="{Binding CanEditAudioProject}"/>
+                        ItemsSource="{Binding CompileTargets}"
+                        IsEnabled="{Binding CanEditAudioProject}">
+                        <MenuItem.ItemContainerStyle>
+                            <Style
+                                TargetType="{x:Type MenuItem}"
+                                BasedOn="{StaticResource {x:Type MenuItem}}">
+                                <Setter
+                                    Property="Command"
+                                    Value="{Binding Command}" />
+                                <Setter
+                                    Property="CommandParameter"
+                                    Value="{Binding Target}" />
+                            </Style>
+                        </MenuItem.ItemContainerStyle>
+                        <MenuItem.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </MenuItem.ItemTemplate>
+                    </MenuItem>
                     <MenuItem
                         Header="{loc:Loc AudioEditor.Menu.File.CancelCompile}"
                         Command="{Binding CompileAudioProjectCancelCommand}"

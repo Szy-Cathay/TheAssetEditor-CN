@@ -444,6 +444,42 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
+    public async Task CreateRestorePoint_ProjectClosedBeforeDiskRefreshDoesNotShowDisposedError()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var history = CreateHistoryService(project.ProjectRoot);
+        var unsaved = new Mock<IFolderProjectUnsavedChangesService>();
+        var dialogs = new Mock<IStandardDialogs>();
+        FolderProjectHistoryViewModel? viewModel = null;
+        unsaved.Setup(item => item.HasUnsavedChanges(
+                project.ProjectRoot,
+                null))
+            .Callback(() =>
+            {
+                viewModel!.OpenProject(null);
+                project.Dispose();
+            })
+            .Returns(false);
+        viewModel = CreateViewModel(
+            history.Object,
+            unsaved.Object,
+            dialogs: dialogs.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.CreateRestorePointCommand.ExecuteAsync(null);
+
+        dialogs.Verify(item => item.ShowExceptionWindow(
+            It.IsAny<ObjectDisposedException>(),
+            It.IsAny<string>()), Times.Never);
+        history.Verify(item => item.CreateRestorePoint(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Never);
+    }
+
+    [Test]
     public async Task SelectingRestorePoint_LoadsItsChangesOnDemand()
     {
         using var directory = new TemporaryDirectory();

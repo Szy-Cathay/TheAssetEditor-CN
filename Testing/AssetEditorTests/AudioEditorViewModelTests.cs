@@ -369,11 +369,13 @@ namespace AssetEditorTests
                     It.IsAny<AudioProjectFile>(),
                     state.AudioProjectFileName,
                     state.AudioProjectFilePath,
+                    It.IsAny<AudioProjectCompileTarget>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(async (
                     AudioProjectFile _,
                     string _,
                     string _,
+                    AudioProjectCompileTarget _,
                     CancellationToken cancellationToken) =>
                 {
                     compilerStarted.TrySetResult();
@@ -397,8 +399,11 @@ namespace AssetEditorTests
                 null!,
                 null!);
             eventHub.Publish(new AudioProjectLoadedEvent());
+            var selectedTarget = new AudioProjectCompileTarget(
+                Wh3Language.Chinese);
 
             var compileTask = viewModel.CompileAudioProject(
+                selectedTarget,
                 CancellationToken.None);
             await compilerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -409,6 +414,18 @@ namespace AssetEditorTests
             await compileTask;
 
             Assert.IsFalse(viewModel.IsCompiling);
+            Assert.AreEqual(9, viewModel.CompileTargets.Count);
+            Assert.AreEqual(
+                AudioProjectCompileTarget.AllLanguages,
+                viewModel.CompileTargets[0].Target);
+            Assert.IsFalse(viewModel.CompileTargets.Any(option =>
+                option.Target.Language == Wh3Language.Sfx));
+            compiler.Verify(x => x.CompileAsync(
+                It.IsAny<AudioProjectFile>(),
+                state.AudioProjectFileName,
+                state.AudioProjectFilePath,
+                selectedTarget,
+                It.IsAny<CancellationToken>()));
         }
 
         [TestMethod]
@@ -449,7 +466,9 @@ namespace AssetEditorTests
                 null!);
             eventHub.Publish(new AudioProjectLoadedEvent());
 
-            await viewModel.CompileAudioProject(CancellationToken.None);
+            await viewModel.CompileAudioProject(
+                AudioProjectCompileTarget.AllLanguages,
+                CancellationToken.None);
 
             Assert.AreEqual(
                 LocalizationManager.Instance.Get(
@@ -461,6 +480,7 @@ namespace AssetEditorTests
                     It.IsAny<AudioProjectFile>(),
                     It.IsAny<string>(),
                     It.IsAny<string>(),
+                    It.IsAny<AudioProjectCompileTarget>(),
                     It.IsAny<CancellationToken>()),
                 Times.Never);
             dialogs.Verify(
@@ -495,11 +515,13 @@ namespace AssetEditorTests
                     It.IsAny<AudioProjectFile>(),
                     state.AudioProjectFileName,
                     state.AudioProjectFilePath,
+                    It.IsAny<AudioProjectCompileTarget>(),
                     cancellation.Token))
                 .Returns((
                     AudioProjectFile _,
                     string _,
                     string _,
+                    AudioProjectCompileTarget _,
                     CancellationToken _) =>
                 {
                     cancellation.Cancel();
@@ -524,7 +546,9 @@ namespace AssetEditorTests
                 null!);
             eventHub.Publish(new AudioProjectLoadedEvent());
 
-            await viewModel.CompileAudioProject(cancellation.Token);
+            await viewModel.CompileAudioProject(
+                AudioProjectCompileTarget.AllLanguages,
+                cancellation.Token);
 
             Assert.AreEqual(
                 LocalizationManager.Instance.Get(

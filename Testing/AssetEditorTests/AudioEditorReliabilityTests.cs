@@ -1231,6 +1231,7 @@ namespace AssetEditorTests
                 Mock.Of<IAudioPackOutputService>(),
                 repository.Object,
                 Mock.Of<IAudioEditorFileService>(),
+                Mock.Of<IAudioProjectFileService>(),
                 new ApplicationSettingsService(GameTypeEnum.Warhammer3),
                 new Mock<VgStreamWrapper>().Object)
             {
@@ -1255,6 +1256,7 @@ namespace AssetEditorTests
                 Mock.Of<IAudioPackOutputService>(),
                 Mock.Of<IAudioRepository>(),
                 Mock.Of<IAudioEditorFileService>(),
+                Mock.Of<IAudioProjectFileService>(),
                 new ApplicationSettingsService(
                     GameTypeEnum.Warhammer3),
                 new Mock<VgStreamWrapper>().Object)
@@ -1274,6 +1276,53 @@ namespace AssetEditorTests
 
             viewModel.VOActorSubstring =
                 "vo_actor_empire, vo_actor_empire";
+            Assert.IsTrue(viewModel.IsOkButtonEnabled);
+        }
+
+        [TestMethod]
+        public async Task AudioProjectConverter_AppendMode_RequiresExistingProjectInsteadOfNewTarget()
+        {
+            var selectedProject = new AudioProjectFileServiceLoadResult(
+                new AudioProjectFile
+                {
+                    Language = "english(uk)"
+                },
+                "existing.aproj",
+                "audio\\audio_projects\\existing.aproj");
+            var audioProjectFileService =
+                new Mock<IAudioProjectFileService>();
+            audioProjectFileService
+                .Setup(x => x.LoadFromDialog())
+                .Returns(selectedProject);
+            var viewModel = new AudioProjectConverterViewModel(
+                Mock.Of<IStandardDialogs>(),
+                Mock.Of<IAudioPackOutputService>(),
+                Mock.Of<IAudioRepository>(),
+                Mock.Of<IAudioEditorFileService>(),
+                audioProjectFileService.Object,
+                new ApplicationSettingsService(
+                    GameTypeEnum.Warhammer3),
+                new Mock<VgStreamWrapper>().Object)
+            {
+                AudioProjectName = string.Empty,
+                OutputDirectoryPath = string.Empty,
+                WemsDirectoryPath = "C:\\wems",
+                BnksDirectoryPath = "C:\\bnks",
+                VOActorSubstring = "vo_actor_cathay",
+                IsUsingWwiseProject = false
+            };
+
+            await viewModel.InitializeAsync(
+                CancellationToken.None);
+
+            viewModel.IsAppendingToExistingProject = true;
+            Assert.IsFalse(viewModel.IsOkButtonEnabled);
+
+            viewModel.SetExistingAudioProjectPath();
+
+            Assert.AreEqual(
+                selectedProject.FilePath,
+                viewModel.ExistingAudioProjectPath);
             Assert.IsTrue(viewModel.IsOkButtonEnabled);
         }
 

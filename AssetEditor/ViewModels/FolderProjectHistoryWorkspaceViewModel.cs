@@ -12,7 +12,9 @@ namespace AssetEditor.ViewModels;
 public partial class FolderProjectHistoryWorkspaceViewModel : ObservableObject
 {
     private readonly SynchronizationContext? _synchronizationContext;
+    private FolderProjectContainer? _currentProject;
     private string? _currentProjectRoot;
+    private bool _detachPending;
     private bool _refreshPending;
 
     [ObservableProperty] private bool _isEnabled;
@@ -37,9 +39,14 @@ public partial class FolderProjectHistoryWorkspaceViewModel : ObservableObject
         if (container is not FolderProjectContainer project)
         {
             if (container == null && IsEnabled && History.IsBusy)
+            {
+                _detachPending = true;
                 return;
+            }
 
+            _currentProject = null;
             _currentProjectRoot = null;
+            _detachPending = false;
             _refreshPending = false;
             History.OpenProject(null);
             IsEnabled = false;
@@ -47,13 +54,18 @@ public partial class FolderProjectHistoryWorkspaceViewModel : ObservableObject
             return;
         }
 
+        var containerChanged = !ReferenceEquals(
+            _currentProject,
+            project);
         var projectChanged = !string.Equals(
             _currentProjectRoot,
             project.ProjectRoot,
             StringComparison.OrdinalIgnoreCase);
+        _currentProject = project;
         _currentProjectRoot = project.ProjectRoot;
+        _detachPending = false;
         IsEnabled = true;
-        if (!projectChanged)
+        if (!projectChanged && !containerChanged)
             return;
 
         _refreshPending = true;
@@ -99,12 +111,18 @@ public partial class FolderProjectHistoryWorkspaceViewModel : ObservableObject
         object? sender,
         PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(FolderProjectHistoryViewModel.IsBusy) &&
-            !History.IsBusy &&
-            SelectedSidebarTabIndex == 1)
+        if (e.PropertyName != nameof(FolderProjectHistoryViewModel.IsBusy) ||
+            History.IsBusy)
+            return;
+
+        if (_detachPending)
         {
-            StartRefresh(false);
+            SetEditableContainer(null);
+            return;
         }
+
+        if (SelectedSidebarTabIndex == 1)
+            StartRefresh(false);
     }
 
     private void StartRefresh(bool force)
