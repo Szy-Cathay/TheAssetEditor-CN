@@ -17,7 +17,7 @@ public class FolderProjectOpenServiceTests
         using var project = new TemporaryFolderProject();
         var calls = new List<string>();
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.RecoveryRequired,
                 "head",
@@ -56,7 +56,7 @@ public class FolderProjectOpenServiceTests
         using var project = new TemporaryFolderProject();
         var calls = new List<string>();
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Callback(() => calls.Add("history-status"))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
@@ -92,6 +92,8 @@ public class FolderProjectOpenServiceTests
             calls,
             Is.EqualTo(
                 new[] { "history-status", "factory-open", "add" }));
+        history.Verify(item => item.GetStatus(
+            It.IsAny<string>()), Times.Never);
     }
 
     [Test]
@@ -106,7 +108,7 @@ public class FolderProjectOpenServiceTests
             "{\r\n  \"Name\": \"旧工程\"\r\n}\r\n");
         var originalBytes = File.ReadAllBytes(settingsPath);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -157,7 +159,7 @@ public class FolderProjectOpenServiceTests
             FolderProjectSettings.CnFileName);
         var settingsBytes = File.ReadAllBytes(settingsPath);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -207,7 +209,7 @@ public class FolderProjectOpenServiceTests
         using var project = new TemporaryFolderProject();
         using var container = FolderProjectContainer.Open(project.Path);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -240,7 +242,7 @@ public class FolderProjectOpenServiceTests
     {
         using var project = new TemporaryFolderProject();
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.NotInitialized,
                 null,
@@ -273,7 +275,7 @@ public class FolderProjectOpenServiceTests
     {
         using var project = new TemporaryFolderProject();
         var history = new Mock<IFolderProjectHistoryService>();
-        history.Setup(item => item.GetStatus(project.Path))
+        history.Setup(item => item.GetDisplayStatus(project.Path))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",

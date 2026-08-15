@@ -54,7 +54,7 @@ public sealed class FolderProjectOpenService(
                 return;
             }
 
-            var historyStatus = historyService.GetStatus(root);
+            var historyStatus = historyService.GetDisplayStatus(root);
             if (historyStatus.Availability ==
                 FolderProjectHistoryAvailability.NotInitialized)
             {

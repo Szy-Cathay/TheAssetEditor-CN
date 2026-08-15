@@ -3,6 +3,7 @@ using AssetEditor.ViewModels;
 using Moq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
+using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
@@ -22,9 +23,8 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             directory.Path,
             new FolderProjectSettings { Name = "测试工程" });
         var historyService = new Mock<IFolderProjectHistoryService>();
-        historyService.Setup(item => item.GetStatus(
-                project.ProjectRoot,
-                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+        historyService.Setup(item =>
+                item.GetDisplayStatus(project.ProjectRoot))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -41,9 +41,10 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             Mock.Of<IFolderProjectGitOperationCoordinator>(),
             Mock.Of<IStandardDialogs>(),
             LocalizationManager.Instance);
+        var eventHub = new TestEventHub();
         var workspace = new FolderProjectHistoryWorkspaceViewModel(
             history,
-            new TestEventHub());
+            eventHub);
 
         workspace.SetEditableContainer(project);
         workspace.ShowHistory();
@@ -56,6 +57,24 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             NUnitAssert.That(history.ProjectName, Is.EqualTo("测试工程"));
             NUnitAssert.That(history.IsReady, Is.True);
         });
+
+        workspace.SelectedSidebarTabIndex = 0;
+        workspace.SelectedSidebarTabIndex = 1;
+        await history.RefreshCommand.ExecutionTask!;
+
+        historyService.Verify(item =>
+            item.GetDisplayStatus(project.ProjectRoot), Times.Once);
+
+        workspace.SelectedSidebarTabIndex = 0;
+        eventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(1, [])));
+        workspace.SelectedSidebarTabIndex = 1;
+        await history.RefreshCommand.ExecutionTask!;
+
+        historyService.Verify(item =>
+            item.GetDisplayStatus(project.ProjectRoot),
+            Times.Exactly(2));
 
         workspace.SetEditableContainer(new PackFileContainer("普通.pack"));
 

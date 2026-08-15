@@ -36,6 +36,7 @@ public sealed class FolderProjectHistoryServiceTests
                     "CompleteRecoverToSafeState",
                     "CompleteRestoreFile",
                     "CreateRestorePoint",
+                    "GetDisplayStatus",
                     "GetRestoreImpactCount",
                     "GetRestorePointChanges",
                     "GetRestorePoints",
@@ -211,6 +212,193 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void GetDisplayStatus_SkipsUnreadableScan()
+    {
+        var versionControl = new Mock<IFolderProjectVersionControlService>();
+        versionControl.Setup(item => item.GetStatus(
+                "project",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+                false))
+            .Returns(new FolderProjectRepositoryStatus(
+                true,
+                "master",
+                "head",
+                false,
+                FolderProjectRepositoryOperationState.None,
+                [
+                    new FolderProjectWorkingChange(
+                        "db/changed.bin",
+                        FolderProjectWorkingChangeKind.Modified),
+                ]));
+        var service = new FolderProjectHistoryService(
+            versionControl.Object,
+            LoadLocalization());
+
+        var status = service.GetDisplayStatus("project");
+
+        Assert.That(
+            status.UnrecordedChanges.Single().Path,
+            Is.EqualTo("db/changed.bin"));
+        versionControl.Verify(item => item.GetStatus(
+            "project",
+            It.IsAny<Action<FolderProjectVersionControlProgress>>(),
+            false), Times.Once);
+    }
+
+    [Test]
+    public void GetStatus_ReportsRealProgressAndKeepsUnreadableFilesVisible()
+    {
+        using var project = new TemporaryProject();
+        var expectedPath = Path.Combine(project.Root, "db", "entry.bin");
+        File.WriteAllBytes(expectedPath, [1, 2, 3]);
+        var platform = new UnreadableFilePlatform();
+        var service = new FolderProjectHistoryService(
+            new FolderProjectVersionControlService(platform),
+            LoadLocalization());
+        service.Initialize(project.Root);
+        File.WriteAllBytes(expectedPath, [1, 2, 3, 4]);
+        platform.UnreadablePath = expectedPath;
+        var progress = new List<FolderProjectHistoryProgress>();
+
+        var status = service.GetStatus(project.Root, progress.Add);
+
+        var fileProgress = progress.Where(item =>
+                item.Stage == FolderProjectHistoryProgressStage
+                    .ScanningUnrecordedChanges &&
+                item.Total > 0)
+            .ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(fileProgress, Is.Not.Empty);
+            Assert.That(fileProgress.Last().Completed,
+                Is.EqualTo(fileProgress.Last().Total));
+            Assert.That(fileProgress,
+                Has.Some.Property("Detail").EqualTo("db/entry.bin"));
+            Assert.That(status.UnrecordedChanges,
+                Has.Some.Matches<FolderProjectUnrecordedChange>(change =>
+                    change.Path == "db/entry.bin" &&
+                    change.Kind.HasFlag(
+                        FolderProjectUnrecordedChangeKind.Unreadable)));
+        });
+    }
+
+    [Test]
+    public void GetCommitChanges_ThrottlesProgressAndReportsExactFinalCount()
+    {
+        using var project = new TemporaryProject();
+        var audioDirectory = Path.Combine(project.Root, "audio");
+        Directory.CreateDirectory(audioDirectory);
+        for (var index = 0; index < 512; index++)
+        {
+            File.WriteAllBytes(
+                Path.Combine(audioDirectory, $"voice-{index:D4}.wem"),
+                [(byte)(index % 251)]);
+        }
+        var service = new FolderProjectVersionControlService();
+        var initial = service.Initialize(
+            project.Root,
+            new FolderProjectGitIdentity(
+                "AssetEditor.CN 本地用户",
+                "local@asseteditor.cn"));
+        var progress = new List<FolderProjectVersionControlProgress>();
+
+        var changes = service.GetCommitChanges(
+            project.Root,
+            initial.Id,
+            progress.Add);
+
+        var fileProgress = progress.Where(item => item.Stage ==
+                FolderProjectVersionControlProgressStage
+                    .ProcessingCommitChanges)
+            .ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(fileProgress, Is.Not.Empty);
+            Assert.That(fileProgress.Count, Is.LessThan(changes.Count));
+            Assert.That(fileProgress.Last().Completed, Is.EqualTo(changes.Count));
+            Assert.That(
+                fileProgress.Last().Total,
+                Is.EqualTo(changes.Count));
+        });
+    }
+
+    [TestCase("plain.txt", false)]
+    [TestCase("texture.dds", true)]
+    public void GetCommitChanges_ClassifiesWithoutReadingBlobContent(
+        string relativePath,
+        bool expectedBinary)
+    {
+        using var project = new TemporaryProject();
+        File.WriteAllBytes(
+            Path.Combine(project.Root, relativePath),
+            [0, 1, 2, 3]);
+        var service = new FolderProjectVersionControlService();
+        var initial = service.Initialize(
+            project.Root,
+            new FolderProjectGitIdentity(
+                "AssetEditor.CN 本地用户",
+                "local@asseteditor.cn"));
+        string blobObjectPath;
+        using (var repository = new Repository(project.Root))
+        {
+            var commit = repository.Lookup<Commit>(initial.Id)!;
+            var blobId = commit.Tree[relativePath].Target.Id.Sha;
+            blobObjectPath = Path.Combine(
+                repository.Info.Path,
+                "objects",
+                blobId[..2],
+                blobId[2..]);
+        }
+        File.SetAttributes(blobObjectPath, FileAttributes.Normal);
+        File.Delete(blobObjectPath);
+
+        var change = service.GetCommitChanges(project.Root, initial.Id)
+            .Single(item => item.RepositoryPath == relativePath);
+
+        Assert.That(change.IsBinary, Is.EqualTo(expectedBinary));
+    }
+
+    [Test]
+    public void GetStatus_AfterRestartOpensOnlyAddedAndModifiedFiles()
+    {
+        using var project = new TemporaryProject();
+        var stablePath = Path.Combine(project.Root, "db", "stable.bin");
+        var changedPath = Path.Combine(project.Root, "db", "changed.bin");
+        var deletedPath = Path.Combine(project.Root, "db", "deleted.bin");
+        File.WriteAllBytes(stablePath, [1]);
+        File.WriteAllBytes(changedPath, [2]);
+        File.WriteAllBytes(deletedPath, [3]);
+        CreateService().Initialize(project.Root);
+        File.WriteAllBytes(changedPath, [2, 4]);
+        var addedPath = Path.Combine(project.Root, "db", "added.bin");
+        File.WriteAllBytes(addedPath, [5]);
+        File.Delete(deletedPath);
+        var platform = new RecordingFileOpenPlatform(project.Root);
+        var restartedService = new FolderProjectHistoryService(
+            new FolderProjectVersionControlService(platform),
+            LoadLocalization());
+
+        var status = restartedService.GetStatus(project.Root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(platform.OpenedPaths,
+                Is.EquivalentTo(new[]
+                {
+                    "db/added.bin",
+                    "db/changed.bin",
+                }));
+            Assert.That(status.UnrecordedChanges.Select(change => change.Path),
+                Is.EquivalentTo(new[]
+                {
+                    "db/added.bin",
+                    "db/changed.bin",
+                    "db/deleted.bin",
+                }));
+        });
+    }
+
+    [Test]
     public void GetStatus_ClassifiesUnsafeLegacyStatesForRecovery()
     {
         var cases = new[]
@@ -361,6 +549,33 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void CreateRestorePoint_StillReportsExactRenames()
+    {
+        using var project = new TemporaryProject();
+        var originalPath = Path.Combine(project.Root, "db", "before.bin");
+        var renamedPath = Path.Combine(project.Root, "db", "after.bin");
+        File.WriteAllBytes(originalPath, [1, 2, 3]);
+        var service = CreateService();
+        service.Initialize(project.Root);
+        File.Move(originalPath, renamedPath);
+
+        var restorePoint = service.CreateRestorePoint(
+            project.Root,
+            "重命名资源");
+        var change = service.GetRestorePointChanges(
+                project.Root,
+                restorePoint.Id)
+            .Single(item => item.Kind ==
+                FolderProjectRestorePointChangeKind.Renamed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(change.Path, Is.EqualTo("db/after.bin"));
+            Assert.That(change.PreviousPath, Is.EqualTo("db/before.bin"));
+        });
+    }
+
+    [Test]
     public void CreateRestorePoint_WithoutDiskChanges_DoesNotAddHistory()
     {
         using var project = new TemporaryProject();
@@ -395,6 +610,34 @@ public sealed class FolderProjectHistoryServiceTests
         var count = service.GetRestoreImpactCount(project.Root, target.Id);
 
         Assert.That(count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void RestoreProject_DoesNotRewriteUnchangedFiles()
+    {
+        using var project = new TemporaryProject();
+        var unchangedPath = Path.Combine(project.Root, "db", "unchanged.bin");
+        var changedPath = Path.Combine(project.Root, "db", "changed.bin");
+        File.WriteAllBytes(unchangedPath, [1]);
+        File.WriteAllBytes(changedPath, [1]);
+        var service = CreateService();
+        var target = service.Initialize(project.Root);
+        File.WriteAllBytes(changedPath, [2]);
+        service.CreateRestorePoint(project.Root, "后续状态");
+        var unchangedWriteTime = DateTime.UtcNow.AddYears(-5);
+        File.SetLastWriteTimeUtc(unchangedPath, unchangedWriteTime);
+
+        service.RestoreProject(project.Root, target.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                File.ReadAllBytes(changedPath),
+                Is.EqualTo(new byte[] { 1 }));
+            Assert.That(
+                File.GetLastWriteTimeUtc(unchangedPath),
+                Is.EqualTo(unchangedWriteTime));
+        });
     }
 
     [Test]
@@ -731,7 +974,262 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
-    public void Initialize_IncludesSummaryWithoutReadingDetailedChanges()
+    public void Restart_ReusesPersistedRestorePointSummaryAndChanges()
+    {
+        using var project = new TemporaryProject();
+        Directory.CreateDirectory(Path.Combine(project.Root, ".git"));
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "调整单位数据",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            [new string('0', 40)]);
+        var summary = new FolderProjectCommitChangeSummary(1, 0, 0, 0, 0);
+        var change = new FolderProjectCommitChange(
+            "db/entry.bin",
+            null,
+            FolderProjectCommitChangeKind.Added,
+            true);
+        var firstVersionControl = new Mock<IFolderProjectVersionControlService>();
+        firstVersionControl.Setup(item => item.GetHistory(project.Root, 100))
+            .Returns([commit]);
+        firstVersionControl.Setup(item => item.GetCommitChangeSummary(
+                project.Root,
+                commit.Id))
+            .Returns(summary);
+        firstVersionControl.Setup(item => item.GetCommitChanges(
+                project.Root,
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns([change]);
+        var firstService = new FolderProjectHistoryService(
+            firstVersionControl.Object,
+            LoadLocalization());
+        firstService.GetRestorePoints(project.Root);
+        firstService.GetRestorePointChanges(project.Root, commit.Id);
+
+        var restartedVersionControl =
+            new Mock<IFolderProjectVersionControlService>();
+        restartedVersionControl.Setup(item => item.GetHistory(project.Root, 100))
+            .Returns([commit]);
+        restartedVersionControl.Setup(item => item.GetCommitChangeSummary(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Throws(new AssertionException(
+                "A persisted summary must not be recomputed after restart."));
+        restartedVersionControl.Setup(item => item.GetCommitChanges(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Throws(new AssertionException(
+                "Persisted changes must not be recomputed after restart."));
+        var restartedService = new FolderProjectHistoryService(
+            restartedVersionControl.Object,
+            LoadLocalization());
+
+        var history = restartedService.GetRestorePoints(project.Root);
+        var changes = restartedService.GetRestorePointChanges(
+            project.Root,
+            commit.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Single().ChangeSummary.Total, Is.EqualTo(1));
+            Assert.That(changes.Single().Path, Is.EqualTo("db/entry.bin"));
+        });
+    }
+
+    [Test]
+    public void CorruptPersistentCache_RecomputesWithoutChangingHistory()
+    {
+        using var project = new TemporaryProject();
+        Directory.CreateDirectory(Path.Combine(project.Root, ".git"));
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "调整单位数据",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            [new string('0', 40)]);
+        var change = new FolderProjectCommitChange(
+            "db/entry.bin",
+            null,
+            FolderProjectCommitChangeKind.Modified,
+            true);
+        var firstVersionControl = new Mock<IFolderProjectVersionControlService>();
+        firstVersionControl.Setup(item => item.GetHistory(project.Root, 100))
+            .Returns([commit]);
+        firstVersionControl.Setup(item => item.GetCommitChangeSummary(
+                project.Root,
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(0, 1, 0, 0, 0));
+        firstVersionControl.Setup(item => item.GetCommitChanges(
+                project.Root,
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns([change]);
+        var firstService = new FolderProjectHistoryService(
+            firstVersionControl.Object,
+            LoadLocalization());
+        firstService.GetRestorePoints(project.Root);
+        firstService.GetRestorePointChanges(project.Root, commit.Id);
+        foreach (var cachePath in Directory.EnumerateFiles(
+                     Path.Combine(project.Root, ".git"),
+                     $"{commit.Id}.*.json",
+                     SearchOption.AllDirectories))
+        {
+            File.WriteAllText(cachePath, "not json");
+        }
+
+        var recoveringVersionControl =
+            new Mock<IFolderProjectVersionControlService>();
+        recoveringVersionControl.Setup(item => item.GetHistory(
+                project.Root,
+                100))
+            .Returns([commit]);
+        recoveringVersionControl.Setup(item => item.GetCommitChangeSummary(
+                project.Root,
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(0, 1, 0, 0, 0));
+        recoveringVersionControl.Setup(item => item.GetCommitChanges(
+                project.Root,
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns([change]);
+        var recoveringService = new FolderProjectHistoryService(
+            recoveringVersionControl.Object,
+            LoadLocalization());
+
+        var history = recoveringService.GetRestorePoints(project.Root);
+        var changes = recoveringService.GetRestorePointChanges(
+            project.Root,
+            commit.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Single().Id, Is.EqualTo(commit.Id));
+            Assert.That(history.Single().ChangeSummary.Modified, Is.EqualTo(1));
+            Assert.That(changes.Single().Path, Is.EqualTo("db/entry.bin"));
+        });
+    }
+
+    [Test]
+    public void Initialize_PersistsChangesForFirstSelectionAfterRestart()
+    {
+        using var project = new TemporaryProject();
+        Directory.CreateDirectory(Path.Combine(project.Root, ".git"));
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "Initial folder project commit",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            []);
+        var change = new FolderProjectCommitChange(
+            "db/entry.bin",
+            null,
+            FolderProjectCommitChangeKind.Added,
+            true);
+        var firstVersionControl = new Mock<IFolderProjectVersionControlService>();
+        firstVersionControl.Setup(item => item.Initialize(
+                project.Root,
+                It.IsAny<FolderProjectGitIdentity>(),
+                "master",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(commit);
+        firstVersionControl.Setup(item => item.GetCommitChangeSummary(
+                project.Root,
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(1, 0, 0, 0, 0));
+        firstVersionControl.Setup(item => item.GetCommitChanges(
+                project.Root,
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns([change]);
+        var firstService = new FolderProjectHistoryService(
+            firstVersionControl.Object,
+            LoadLocalization());
+
+        firstService.Initialize(project.Root);
+
+        var restartedVersionControl =
+            new Mock<IFolderProjectVersionControlService>();
+        restartedVersionControl.Setup(item => item.GetCommitChanges(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Throws(new AssertionException(
+                "Initialization changes must already be persisted."));
+        var restartedService = new FolderProjectHistoryService(
+            restartedVersionControl.Object,
+            LoadLocalization());
+
+        var changes = restartedService.GetRestorePointChanges(
+            project.Root,
+            commit.Id);
+
+        Assert.That(changes.Single().Path, Is.EqualTo("db/entry.bin"));
+    }
+
+    [Test]
+    public void CreateRestorePoint_PersistsChangesForFirstSelectionAfterRestart()
+    {
+        using var project = new TemporaryProject();
+        Directory.CreateDirectory(Path.Combine(project.Root, ".git"));
+        var commit = new FolderProjectCommitSummary(
+            new string('1', 40),
+            "记录当前状态",
+            "AssetEditor.CN 本地用户",
+            "local@asseteditor.cn",
+            DateTimeOffset.Parse("2026-08-13T08:00:00+08:00"),
+            [new string('0', 40)]);
+        var change = new FolderProjectCommitChange(
+            "db/entry.bin",
+            null,
+            FolderProjectCommitChangeKind.Modified,
+            true);
+        var firstVersionControl = new Mock<IFolderProjectVersionControlService>();
+        firstVersionControl.Setup(item => item.CommitAll(
+                project.Root,
+                "记录当前状态"))
+            .Returns(commit);
+        firstVersionControl.Setup(item => item.GetCommitChangeSummary(
+                project.Root,
+                commit.Id))
+            .Returns(new FolderProjectCommitChangeSummary(0, 1, 0, 0, 0));
+        firstVersionControl.Setup(item => item.GetCommitChanges(
+                project.Root,
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns([change]);
+        var firstService = new FolderProjectHistoryService(
+            firstVersionControl.Object,
+            LoadLocalization());
+
+        firstService.CreateRestorePoint(project.Root, "记录当前状态");
+
+        var restartedVersionControl =
+            new Mock<IFolderProjectVersionControlService>();
+        restartedVersionControl.Setup(item => item.GetCommitChanges(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Throws(new AssertionException(
+                "New restore-point changes must already be persisted."));
+        var restartedService = new FolderProjectHistoryService(
+            restartedVersionControl.Object,
+            LoadLocalization());
+
+        var changes = restartedService.GetRestorePointChanges(
+            project.Root,
+            commit.Id);
+
+        Assert.That(changes.Single().Path, Is.EqualTo("db/entry.bin"));
+    }
+
+    [Test]
+    public void Initialize_IncludesSummaryAndPersistsDetailedChanges()
     {
         var versionControl = new Mock<IFolderProjectVersionControlService>();
         var commit = new FolderProjectCommitSummary(
@@ -747,10 +1245,18 @@ public sealed class FolderProjectHistoryServiceTests
                 "master",
                 It.IsAny<Action<FolderProjectVersionControlProgress>>()))
             .Returns(commit);
-        versionControl.Setup(item => item.GetCommitChangeSummary(
+        versionControl.Setup(item => item.GetCommitChanges(
                 "project",
-                commit.Id))
-            .Returns(new FolderProjectCommitChangeSummary(1, 2, 3, 4, 5));
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+            [
+                new FolderProjectCommitChange(
+                    "db/entry.bin",
+                    null,
+                    FolderProjectCommitChangeKind.Added,
+                    true),
+            ]);
         var service = new FolderProjectHistoryService(
             versionControl.Object,
             LoadLocalization());
@@ -761,22 +1267,22 @@ public sealed class FolderProjectHistoryServiceTests
             restorePoint.ChangeSummary,
             Is.EqualTo(new FolderProjectRestorePointChangeSummary(
                 1,
-                2,
-                3,
-                4,
-                5)));
+                0,
+                0,
+                0,
+                0)));
         versionControl.Verify(item => item.GetCommitChanges(
             It.IsAny<string>(),
             It.IsAny<string>()), Times.Never);
         versionControl.Verify(item => item.GetCommitChanges(
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
-            Times.Never);
+                "project",
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+            Times.Once);
     }
 
     [Test]
-    public void CreateRestorePoint_IncludesSummaryWithoutReadingDetailedChanges()
+    public void CreateRestorePoint_IncludesSummaryAndPersistsDetailedChanges()
     {
         var versionControl = new Mock<IFolderProjectVersionControlService>();
         var commit = new FolderProjectCommitSummary(
@@ -790,10 +1296,18 @@ public sealed class FolderProjectHistoryServiceTests
                 "project",
                 "记录当前状态"))
             .Returns(commit);
-        versionControl.Setup(item => item.GetCommitChangeSummary(
+        versionControl.Setup(item => item.GetCommitChanges(
                 "project",
-                commit.Id))
-            .Returns(new FolderProjectCommitChangeSummary(1, 2, 3, 4, 5));
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
+            .Returns(
+            [
+                new FolderProjectCommitChange(
+                    "db/entry.bin",
+                    null,
+                    FolderProjectCommitChangeKind.Modified,
+                    true),
+            ]);
         var service = new FolderProjectHistoryService(
             versionControl.Object,
             LoadLocalization());
@@ -805,19 +1319,19 @@ public sealed class FolderProjectHistoryServiceTests
         Assert.That(
             restorePoint.ChangeSummary,
             Is.EqualTo(new FolderProjectRestorePointChangeSummary(
+                0,
                 1,
-                2,
-                3,
-                4,
-                5)));
+                0,
+                0,
+                0)));
         versionControl.Verify(item => item.GetCommitChanges(
             It.IsAny<string>(),
             It.IsAny<string>()), Times.Never);
         versionControl.Verify(item => item.GetCommitChanges(
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<Action<FolderProjectVersionControlProgress>>()),
-            Times.Never);
+                "project",
+                commit.Id,
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()),
+            Times.Once);
     }
 
     private sealed class TemporaryProject : IDisposable
@@ -890,6 +1404,38 @@ public sealed class FolderProjectHistoryServiceTests
             }
 
             base.Reset(repository, commit, options);
+        }
+    }
+
+    private sealed class UnreadableFilePlatform :
+        FolderProjectVersionControlPlatform
+    {
+        public string? UnreadablePath { get; set; }
+
+        public override Stream OpenReadForStatus(string path)
+        {
+            if (string.Equals(
+                    Path.GetFullPath(path),
+                    UnreadablePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException(
+                    "Injected unreadable project file.");
+            }
+            return base.OpenReadForStatus(path);
+        }
+    }
+
+    private sealed class RecordingFileOpenPlatform(string projectRoot) :
+        FolderProjectVersionControlPlatform
+    {
+        public List<string> OpenedPaths { get; } = [];
+
+        public override Stream OpenReadForStatus(string path)
+        {
+            OpenedPaths.Add(Path.GetRelativePath(projectRoot, path)
+                .Replace('\\', '/'));
+            return base.OpenReadForStatus(path);
         }
     }
 }

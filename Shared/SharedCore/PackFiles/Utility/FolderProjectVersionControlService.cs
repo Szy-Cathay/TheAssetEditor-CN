@@ -272,12 +272,6 @@ internal class FolderProjectVersionControlPlatform
             signature);
     }
 
-    public virtual IReadOnlyList<string> GetFileSystemEntries(
-        string path)
-    {
-        return Directory.GetFileSystemEntries(path);
-    }
-
     public virtual FileAttributes GetAttributes(string path)
     {
         return File.GetAttributes(path);
@@ -375,12 +369,32 @@ internal sealed partial class FolderProjectVersionControlService :
         "asseteditor.primaryBranch";
     private const string InitialCommitConfigKey =
         "asseteditor.initialCommit";
-    private static readonly HashSet<string> s_knownBinaryAudioExtensions =
+    private static readonly HashSet<string> s_knownTextAssetExtensions =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ".bnk",
-            ".wav",
-            ".wem",
+            ".aproj",
+            ".cfg",
+            ".csv",
+            ".ini",
+            ".json",
+            ".lua",
+            ".material",
+            ".md",
+            ".rpfm_reserved",
+            ".shader",
+            ".tsv",
+            ".txt",
+            ".variantmeshdefinition",
+            ".wsmodel",
+            ".xml",
+            ".yaml",
+            ".yml",
+        };
+    private static readonly HashSet<string> s_knownTextAssetNames =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gitattributes",
+            ".gitignore",
         };
     private readonly FolderProjectVersionControlPlatform _platform;
     private static readonly ILogger s_logger =
@@ -580,9 +594,6 @@ internal sealed partial class FolderProjectVersionControlService :
         IReadOnlyList<string>? pathSpec = null,
         Action<FolderProjectVersionControlProgress>? reportProgress = null)
     {
-        var trackedPaths = scanUnreadableEntries
-            ? TrackedRepositoryPaths.Create(repository.Index)
-            : null;
         var changes = new Dictionary<
             string,
             FolderProjectWorkingChangeKind>(
@@ -617,11 +628,10 @@ internal sealed partial class FolderProjectVersionControlService :
         if (scanUnreadableEntries)
         {
             ScanUnreadableEntries(
-                repository,
                 projectRoot,
-                "",
-                trackedPaths!,
-                changes);
+                statusEntries,
+                changes,
+                reportProgress);
         }
         return changes
             .Where(change =>
@@ -643,147 +653,69 @@ internal sealed partial class FolderProjectVersionControlService :
     }
 
     private void ScanUnreadableEntries(
-        Repository repository,
         string projectRoot,
-        string relativeDirectory,
-        TrackedRepositoryPaths trackedPaths,
-        IDictionary<string, FolderProjectWorkingChangeKind> changes)
-    {
-        var directoryPath = relativeDirectory.Length == 0
-            ? projectRoot
-            : Path.Combine(
-                projectRoot,
-                relativeDirectory.Replace(
-                    '/',
-                    Path.DirectorySeparatorChar));
-        IReadOnlyList<string> entries;
-        try
-        {
-            entries = _platform.GetFileSystemEntries(directoryPath);
-        }
-        catch (FileNotFoundException)
-        {
-            return;
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            AddUnreadableDirectory(changes, relativeDirectory);
-            return;
-        }
-        catch (IOException)
-        {
-            AddUnreadableDirectory(changes, relativeDirectory);
-            return;
-        }
-
-        foreach (var entryPath in entries)
-        {
-            var repositoryPath = Path.GetRelativePath(
-                    projectRoot,
-                    entryPath)
-                .Replace('\\', '/');
-            var isTracked = trackedPaths.ExactPaths.Contains(repositoryPath);
-            var hasTrackedDescendant =
-                trackedPaths.ParentDirectories.Contains(repositoryPath);
-            if (FolderProjectPathPolicy.IsMetadataDirectoryPath(
-                    repositoryPath) ||
-                !isTracked &&
-                !hasTrackedDescendant &&
-                repository.Ignore.IsPathIgnored(repositoryPath))
-            {
-                continue;
-            }
-
-            FileAttributes attributes;
-            try
-            {
-                attributes = _platform.GetAttributes(entryPath);
-            }
-            catch (FileNotFoundException)
-            {
-                continue;
-            }
-            catch (DirectoryNotFoundException)
-            {
-                continue;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                MergeWorkingChange(
-                    changes,
-                    repositoryPath,
-                    FolderProjectWorkingChangeKind.Unreadable);
-                continue;
-            }
-            catch (IOException)
-            {
-                MergeWorkingChange(
-                    changes,
-                    repositoryPath,
-                    FolderProjectWorkingChangeKind.Unreadable);
-                continue;
-            }
-
-            if ((attributes & FileAttributes.ReparsePoint) != 0)
-                continue;
-            if ((attributes & FileAttributes.Directory) != 0)
-            {
-                if (!isTracked &&
-                    !hasTrackedDescendant &&
-                    repository.Ignore.IsPathIgnored(
-                        repositoryPath + "/"))
-                {
-                    continue;
-                }
-
-                ScanUnreadableEntries(
-                    repository,
-                    projectRoot,
-                    repositoryPath,
-                    trackedPaths,
-                    changes);
-                continue;
-            }
-
-            try
-            {
-                using var stream = _platform.OpenReadForStatus(entryPath);
-            }
-            catch (FileNotFoundException)
-            {
-            }
-            catch (DirectoryNotFoundException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-                MergeWorkingChange(
-                    changes,
-                    repositoryPath,
-                    FolderProjectWorkingChangeKind.Unreadable);
-            }
-            catch (IOException)
-            {
-                MergeWorkingChange(
-                    changes,
-                    repositoryPath,
-                    FolderProjectWorkingChangeKind.Unreadable);
-            }
-        }
-    }
-
-    private static void AddUnreadableDirectory(
+        IReadOnlyList<StatusEntry> statusEntries,
         IDictionary<string, FolderProjectWorkingChangeKind> changes,
-        string relativeDirectory)
+        Action<FolderProjectVersionControlProgress>? reportProgress)
     {
-        MergeWorkingChange(
-            changes,
-            relativeDirectory.Length == 0 ? "." : relativeDirectory,
-            FolderProjectWorkingChangeKind.Unreadable);
+        reportProgress?.Invoke(new FolderProjectVersionControlProgress(
+            FolderProjectVersionControlProgressStage.ScanningWorkingTree,
+            projectRoot,
+            0,
+            statusEntries.Count));
+        var progressTimer = reportProgress == null
+            ? null
+            : System.Diagnostics.Stopwatch.StartNew();
+        for (var index = 0; index < statusEntries.Count; index++)
+        {
+            var repositoryPath = statusEntries[index].FilePath
+                .Replace('\\', '/');
+            try
+            {
+                var fullPath = FolderProjectPathPolicy.ResolveFilePath(
+                    projectRoot,
+                    repositoryPath);
+                var attributes = _platform.GetAttributes(fullPath);
+                if ((attributes & (FileAttributes.Directory |
+                                   FileAttributes.ReparsePoint)) == 0)
+                {
+                    using var stream = _platform.OpenReadForStatus(fullPath);
+                }
+            }
+            catch (FileNotFoundException)
+            {
+            }
+            catch (DirectoryNotFoundException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MergeWorkingChange(
+                    changes,
+                    repositoryPath,
+                    FolderProjectWorkingChangeKind.Unreadable);
+            }
+            catch (IOException)
+            {
+                MergeWorkingChange(
+                    changes,
+                    repositoryPath,
+                    FolderProjectWorkingChangeKind.Unreadable);
+            }
+            var completed = index + 1;
+            if (reportProgress != null &&
+                (completed == statusEntries.Count ||
+                 progressTimer!.ElapsedMilliseconds >= 100))
+            {
+                reportProgress(new FolderProjectVersionControlProgress(
+                    FolderProjectVersionControlProgressStage
+                        .ScanningWorkingTree,
+                    repositoryPath,
+                    completed,
+                    statusEntries.Count));
+                progressTimer!.Restart();
+            }
+        }
     }
 
     private static void MergeWorkingChange(
@@ -1254,7 +1186,7 @@ internal sealed partial class FolderProjectVersionControlService :
                     commit.Tree,
                     new CompareOptions
                     {
-                        Similarity = SimilarityOptions.Renames,
+                        Similarity = SimilarityOptions.Exact,
                     });
                 var relevantChanges = changes
                     .Where(
@@ -1263,19 +1195,26 @@ internal sealed partial class FolderProjectVersionControlService :
                     .ToList();
                 var result = new List<FolderProjectCommitChange>(
                     relevantChanges.Count);
+                var progressTimer =
+                    System.Diagnostics.Stopwatch.StartNew();
                 for (var index = 0; index < relevantChanges.Count; index++)
                 {
                     var mappedChange = ToCommitChange(
-                        commit,
-                        parent,
                         relevantChanges[index]);
                     result.Add(mappedChange);
-                    reportProgress(new FolderProjectVersionControlProgress(
-                        FolderProjectVersionControlProgressStage
-                            .ProcessingCommitChanges,
-                        mappedChange.RepositoryPath,
-                        index + 1,
-                        relevantChanges.Count));
+                    var completed = index + 1;
+                    if (completed == relevantChanges.Count ||
+                        progressTimer.ElapsedMilliseconds >= 100)
+                    {
+                        reportProgress(
+                            new FolderProjectVersionControlProgress(
+                                FolderProjectVersionControlProgressStage
+                                    .ProcessingCommitChanges,
+                                mappedChange.RepositoryPath,
+                                completed,
+                                relevantChanges.Count));
+                        progressTimer.Restart();
+                    }
                 }
 
                 return result
@@ -1309,7 +1248,7 @@ internal sealed partial class FolderProjectVersionControlService :
                     commit.Tree,
                     new CompareOptions
                     {
-                        Similarity = SimilarityOptions.Renames,
+                        Similarity = SimilarityOptions.Exact,
                     });
                 return new FolderProjectCommitChangeSummary(
                     changes.Count(change =>
@@ -1547,8 +1486,6 @@ internal sealed partial class FolderProjectVersionControlService :
     }
 
     private static FolderProjectCommitChange ToCommitChange(
-        Commit commit,
-        Commit? parent,
         TreeEntryChanges change)
     {
         var kind = change.Status switch
@@ -1574,33 +1511,20 @@ internal sealed partial class FolderProjectVersionControlService :
             change.Path,
             previousPath,
             kind,
-            IsBinaryChange(commit, parent, change));
+            IsBinaryChange(change));
     }
 
-    private static bool IsBinaryChange(
-        Commit commit,
-        Commit? parent,
-        TreeEntryChanges change)
+    private static bool IsBinaryChange(TreeEntryChanges change)
     {
-        if (IsKnownBinaryAudioPath(change.Path) ||
-            change.OldExists && IsKnownBinaryAudioPath(change.OldPath))
-        {
-            return true;
-        }
-
-        TreeEntry? entry = null;
-        if (change.Exists)
-            entry = commit.Tree[change.Path];
-        else if (parent != null && change.OldExists)
-            entry = parent.Tree[change.OldPath];
-
-        return entry?.Target is Blob blob && blob.IsBinary;
+        return !IsKnownTextAssetPath(change.Path) ||
+               change.OldExists &&
+               !IsKnownTextAssetPath(change.OldPath);
     }
 
-    private static bool IsKnownBinaryAudioPath(string path)
+    private static bool IsKnownTextAssetPath(string path)
     {
-        return s_knownBinaryAudioExtensions.Contains(
-            Path.GetExtension(path));
+        return s_knownTextAssetNames.Contains(Path.GetFileName(path)) ||
+               s_knownTextAssetExtensions.Contains(Path.GetExtension(path));
     }
 
     private static FolderProjectCommitSummary ToSummary(
@@ -1829,38 +1753,6 @@ internal sealed partial class FolderProjectVersionControlService :
     private sealed record LocalConfigSnapshot(
         bool Exists,
         string? Value);
-
-    private sealed record TrackedRepositoryPaths(
-        IReadOnlySet<string> ExactPaths,
-        IReadOnlySet<string> ParentDirectories)
-    {
-        public static TrackedRepositoryPaths Create(
-            LibGit2Sharp.Index index)
-        {
-            var exactPaths = new HashSet<string>(
-                StringComparer.OrdinalIgnoreCase);
-            var parentDirectories = new HashSet<string>(
-                StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in index)
-            {
-                var repositoryPath = entry.Path.Replace('\\', '/');
-                exactPaths.Add(repositoryPath);
-                var separatorIndex = repositoryPath.IndexOf('/');
-                while (separatorIndex > 0)
-                {
-                    parentDirectories.Add(
-                        repositoryPath[..separatorIndex]);
-                    separatorIndex = repositoryPath.IndexOf(
-                        '/',
-                        separatorIndex + 1);
-                }
-            }
-
-            return new TrackedRepositoryPaths(
-                exactPaths,
-                parentDirectories);
-        }
-    }
 
     private sealed record PolicyFilesSnapshot(
         IReadOnlyList<PolicyFileSnapshot> Files)

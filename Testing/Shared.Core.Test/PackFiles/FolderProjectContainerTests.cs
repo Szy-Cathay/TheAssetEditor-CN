@@ -48,6 +48,28 @@ public class FolderProjectContainerTests
     }
 
     [Test]
+    public void RefreshFromDisk_UsesEnumeratedMetadataForChildEntries()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"db\units_tables\data.bin", [1, 2, 3]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var projectRoot = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(project.Path));
+        container.GetFileAttributes = path =>
+            path.Equals(projectRoot, StringComparison.OrdinalIgnoreCase)
+                ? File.GetAttributes(path)
+                : throw new InvalidOperationException(
+                    "Child metadata must come from directory enumeration.");
+
+        Assert.That(() => container.RefreshFromDisk(), Throws.Nothing);
+        Assert.That(
+            container.FileList.Keys,
+            Is.EquivalentTo(new[] { @"db\units_tables\data.bin" }));
+    }
+
+    [Test]
     public void Open_OriginalSettings_ImportsWithoutOverwritingOriginal()
     {
         using var project = new TemporaryDirectory();
@@ -931,7 +953,7 @@ public class FolderProjectContainerTests
         using var scanStarted = new ManualResetEventSlim(false);
         using var releaseScan = new ManualResetEventSlim(false);
         var blocked = 0;
-        container.EnumerateFileSystemEntries = directory =>
+        container.EnumerateFileSystemInfos = directory =>
         {
             if (Interlocked.Exchange(ref blocked, 1) == 0)
             {
@@ -939,7 +961,7 @@ public class FolderProjectContainerTests
                 if (!releaseScan.Wait(TimeSpan.FromSeconds(10)))
                     throw new TimeoutException("The test did not release the scan.");
             }
-            return Directory.EnumerateFileSystemEntries(directory);
+            return new DirectoryInfo(directory).EnumerateFileSystemInfos();
         };
 
         var refreshTask = Task.Run(container.RefreshFromDisk);

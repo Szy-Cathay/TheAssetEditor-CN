@@ -55,11 +55,12 @@ public sealed class FolderProjectContainer :
     private readonly bool _normalizeDiskDuringReconciliation;
     private bool _disposed;
 
-    internal Func<string, IEnumerable<string>> EnumerateFileSystemEntries
+    internal Func<string, IEnumerable<FileSystemInfo>> EnumerateFileSystemInfos
     {
         get;
         set;
-    } = Directory.EnumerateFileSystemEntries;
+    } = static directory =>
+        new DirectoryInfo(directory).EnumerateFileSystemInfos();
 
     internal Func<string, FileAttributes> GetFileAttributes
     {
@@ -989,25 +990,29 @@ public sealed class FolderProjectContainer :
         string directory,
         IDictionary<string, PackFile> files,
         ISet<string> emptyDirectories,
-        IDictionary<string, FileFingerprint> fingerprints)
+        IDictionary<string, FileFingerprint> fingerprints,
+        FileAttributes? directoryAttributes = null)
     {
-        if (IsReparsePoint(directory))
+        if (((directoryAttributes ?? GetFileAttributes(directory)) &
+             FileAttributes.ReparsePoint) != 0)
             return;
 
         var hasIncludedContent = false;
-        foreach (var entry in EnumerateFileSystemEntries(directory))
+        foreach (var entryInfo in EnumerateFileSystemInfos(directory))
         {
-            if (IsReparsePoint(entry))
+            var attributes = entryInfo.Attributes;
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
                 continue;
 
+            var entry = entryInfo.FullName;
             var relative = FolderProjectPathPolicy.NormalizeRelativePath(
                 Path.GetRelativePath(ProjectRoot, entry));
-            var isDirectory = Directory.Exists(entry);
-            var isFile = File.Exists(entry);
+            var isDirectory =
+                (attributes & FileAttributes.Directory) != 0;
             if ((isDirectory &&
                  FolderProjectPathPolicy.IsMetadataDirectoryPath(
                      relative)) ||
-                (isFile &&
+                (!isDirectory &&
                  (FolderProjectPathPolicy.IsMetadataPath(relative) ||
                   FolderProjectPathPolicy.IsControlFile(relative))))
                 continue;
@@ -1020,19 +1025,22 @@ public sealed class FolderProjectContainer :
                     entry,
                     files,
                     emptyDirectories,
-                    fingerprints);
+                    fingerprints,
+                    attributes);
                 if (files.Count != filesBefore ||
                     emptyDirectories.Count != directoriesBefore)
                 {
                     hasIncludedContent = true;
                 }
             }
-            else if (isFile)
+            else if (entryInfo is FileInfo fileInfo)
             {
                 var fileName = Path.GetFileName(entry);
                 files[relative.ToLowerInvariant()] =
-                    PackFile.CreateFromFileSystem(fileName, entry);
-                var fileInfo = new FileInfo(entry);
+                    PackFile.CreateFromFileSystem(
+                        fileName,
+                        entry,
+                        fileInfo.Length);
                 fingerprints[relative.ToLowerInvariant()] =
                     new FileFingerprint(
                         fileInfo.Length,

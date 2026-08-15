@@ -12,14 +12,17 @@ namespace Shared.Core.PackFiles.Models
         protected string _filepath;
 
         public FileSystemSource(string filepath)
-            : base()
+            : this(filepath, new FileInfo(filepath).Length)
         {
-            var size = new FileInfo(filepath).Length;
-            if (size > uint.MaxValue)
+        }
+
+        internal FileSystemSource(string filepath, long size)
+        {
+            if (size < 0 || size > uint.MaxValue)
                 throw new InvalidOperationException($"This file's size ({size:N0}) is too large. The maximum file size {uint.MaxValue:N0}.");
 
             Size = (uint)size;
-            this._filepath = filepath;
+            _filepath = filepath;
         }
         
 

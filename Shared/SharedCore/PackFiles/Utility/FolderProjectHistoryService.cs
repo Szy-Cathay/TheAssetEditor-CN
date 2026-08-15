@@ -5,6 +5,8 @@ namespace Shared.Core.PackFiles.Utility;
 
 public interface IFolderProjectHistoryService
 {
+    FolderProjectHistoryStatus GetDisplayStatus(string projectRoot);
+
     FolderProjectHistoryStatus GetStatus(string projectRoot);
 
     FolderProjectHistoryStatus GetStatus(
@@ -118,9 +120,18 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
     public FolderProjectHistoryStatus GetStatus(string projectRoot) =>
         GetStatus(projectRoot, _ => { });
 
+    public FolderProjectHistoryStatus GetDisplayStatus(string projectRoot) =>
+        GetStatusCore(projectRoot, _ => { }, scanUnreadableEntries: false);
+
     public FolderProjectHistoryStatus GetStatus(
         string projectRoot,
-        Action<FolderProjectHistoryProgress> reportProgress)
+        Action<FolderProjectHistoryProgress> reportProgress) =>
+        GetStatusCore(projectRoot, reportProgress, scanUnreadableEntries: true);
+
+    private FolderProjectHistoryStatus GetStatusCore(
+        string projectRoot,
+        Action<FolderProjectHistoryProgress> reportProgress,
+        bool scanUnreadableEntries)
     {
         ArgumentNullException.ThrowIfNull(reportProgress);
         try
@@ -128,7 +139,7 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             var status = _versionControl.GetStatus(
                 projectRoot,
                 progress => reportProgress(MapProgress(progress)),
-                scanUnreadableEntries: true);
+                scanUnreadableEntries);
             return MapStatus(status);
         }
         catch (FolderProjectVersionControlException exception)
@@ -216,10 +227,11 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                     "local@asseteditor.cn"),
                 "master",
                 progress => reportProgress(MapProgress(progress)));
-            var changeSummary = _versionControl.GetCommitChangeSummary(
+            var changes = LoadAndCacheRestorePointChanges(
                 projectRoot,
-                summary.Id);
-            return MapRestorePoint(summary, MapSummary(changeSummary));
+                summary.Id,
+                reportProgress);
+            return MapRestorePoint(summary, Summarize(changes));
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -249,10 +261,11 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             var summary = _versionControl.CommitAll(
                 projectRoot,
                 normalizedDescription);
-            var changeSummary = _versionControl.GetCommitChangeSummary(
+            var changes = LoadAndCacheRestorePointChanges(
                 projectRoot,
-                summary.Id);
-            return MapRestorePoint(summary, MapSummary(changeSummary));
+                summary.Id,
+                reportProgress);
+            return MapRestorePoint(summary, Summarize(changes));
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -276,12 +289,17 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             reportProgress(new FolderProjectHistoryProgress(
                 FolderProjectHistoryProgressStage.ReadingHistory));
             var history = _versionControl.GetHistory(projectRoot, maxCount);
-            return history.Select(summary => MapRestorePoint(
-                    summary,
-                    MapSummary(_versionControl.GetCommitChangeSummary(
-                        projectRoot,
-                        summary.Id))))
-                .ToList();
+            var cache = new FolderProjectHistoryCache(projectRoot);
+            var result = new List<FolderProjectRestorePoint>(history.Count);
+            foreach (var summary in history)
+            {
+                var changeSummary = LoadAndCacheRestorePointSummary(
+                    projectRoot,
+                    summary.Id,
+                    cache);
+                result.Add(MapRestorePoint(summary, changeSummary));
+            }
+            return result;
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -304,12 +322,10 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
         ArgumentNullException.ThrowIfNull(reportProgress);
         try
         {
-            return _versionControl.GetCommitChanges(
-                    projectRoot,
-                    restorePointId,
-                    progress => reportProgress(MapProgress(progress)))
-                .Select(MapRestorePointChange)
-                .ToList();
+            return LoadAndCacheRestorePointChanges(
+                projectRoot,
+                restorePointId,
+                reportProgress);
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -355,16 +371,16 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             return new FolderProjectRestoreResult(
                 MapRestorePoint(
                     result.RestoreCommit,
-                    MapSummary(_versionControl.GetCommitChangeSummary(
+                    LoadAndCacheRestorePointSummary(
                         projectRoot,
-                        result.RestoreCommit.Id))),
+                        result.RestoreCommit.Id)),
                 result.SafetyCommit == null
                     ? null
                     : MapRestorePoint(
                         result.SafetyCommit,
-                        MapSummary(_versionControl.GetCommitChangeSummary(
+                        LoadAndCacheRestorePointSummary(
                             projectRoot,
-                            result.SafetyCommit.Id))))
+                            result.SafetyCommit.Id)))
             {
                 Rollback = result.Rollback,
             };
@@ -588,6 +604,58 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
             summary.Deleted,
             summary.Renamed,
             summary.TypeChanged);
+
+    private IReadOnlyList<FolderProjectRestorePointChange>
+        LoadAndCacheRestorePointChanges(
+            string projectRoot,
+            string restorePointId,
+            Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        var cache = new FolderProjectHistoryCache(projectRoot);
+        if (cache.TryReadChanges(restorePointId, out var cachedChanges))
+            return cachedChanges;
+
+        var changes = _versionControl.GetCommitChanges(
+                projectRoot,
+                restorePointId,
+                progress => reportProgress(MapProgress(progress)))
+            .Select(MapRestorePointChange)
+            .ToList();
+        cache.WriteChanges(restorePointId, changes);
+        cache.WriteSummary(restorePointId, Summarize(changes));
+        return changes;
+    }
+
+    private FolderProjectRestorePointChangeSummary
+        LoadAndCacheRestorePointSummary(
+            string projectRoot,
+            string restorePointId,
+            FolderProjectHistoryCache? cache = null)
+    {
+        cache ??= new FolderProjectHistoryCache(projectRoot);
+        if (cache.TryReadSummary(restorePointId, out var cachedSummary))
+            return cachedSummary;
+
+        var summary = MapSummary(_versionControl.GetCommitChangeSummary(
+            projectRoot,
+            restorePointId));
+        cache.WriteSummary(restorePointId, summary);
+        return summary;
+    }
+
+    private static FolderProjectRestorePointChangeSummary Summarize(
+        IReadOnlyList<FolderProjectRestorePointChange> changes) =>
+        new(
+            changes.Count(change =>
+                change.Kind == FolderProjectRestorePointChangeKind.Added),
+            changes.Count(change =>
+                change.Kind == FolderProjectRestorePointChangeKind.Modified),
+            changes.Count(change =>
+                change.Kind == FolderProjectRestorePointChangeKind.Deleted),
+            changes.Count(change =>
+                change.Kind == FolderProjectRestorePointChangeKind.Renamed),
+            changes.Count(change =>
+                change.Kind == FolderProjectRestorePointChangeKind.TypeChanged));
 
     private static FolderProjectRestorePointChange MapRestorePointChange(
         FolderProjectCommitChange change) =>
