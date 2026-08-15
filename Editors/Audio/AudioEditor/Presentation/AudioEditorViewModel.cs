@@ -1,6 +1,8 @@
 ﻿using System.Windows.Input;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,6 +18,7 @@ using Editors.Audio.AudioEditor.Presentation.AudioProjectViewer;
 using Editors.Audio.AudioEditor.Presentation.Settings;
 using Editors.Audio.AudioEditor.Presentation.WaveformVisualiser;
 using Editors.Audio.Shared.AudioProject.Compiler;
+using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Editors.Audio.Shared.Storage;
 using Shared.Core.Events;
 using Shared.Core.Services;
@@ -24,6 +27,11 @@ using Shared.Core.ToolCreation;
 
 namespace Editors.Audio.AudioEditor.Presentation
 {
+    public sealed record AudioProjectCompileTargetOption(
+        AudioProjectCompileTarget Target,
+        string DisplayName,
+        ICommand Command);
+
     public partial class AudioEditorViewModel :
         ObservableObject,
         IEditorInterface,
@@ -90,6 +98,7 @@ namespace Editors.Audio.AudioEditor.Presentation
             AudioProjectViewerViewModel = audioProjectViewerViewModel;
             SettingsViewModel = settingsViewModel;
             WaveformVisualiserViewModel = waveformVisualiserViewModel;
+            CompileTargets = CreateCompileTargets();
 
             _eventHub.Register<AudioProjectLoadedEvent>(this, OnAudioProjectLoaded);
             _eventHub.Register<AudioProjectChangedEvent>(
@@ -104,6 +113,7 @@ namespace Editors.Audio.AudioEditor.Presentation
         public AudioProjectViewerViewModel AudioProjectViewerViewModel { get; }
         public SettingsViewModel SettingsViewModel { get; }
         public WaveformVisualiserViewModel WaveformVisualiserViewModel { get; }
+        public IReadOnlyList<AudioProjectCompileTargetOption> CompileTargets { get; }
 
         public string DisplayName { get; set; } = LocalizationManager.Instance.Get("DisplayName.AudioEditor");
 
@@ -261,6 +271,7 @@ namespace Editors.Audio.AudioEditor.Presentation
 
         [RelayCommand(IncludeCancelCommand = true)]
         public async Task CompileAudioProject(
+            AudioProjectCompileTarget compileTarget,
             CancellationToken cancellationToken = default)
         {
             if (!CanEditAudioProject)
@@ -296,12 +307,14 @@ namespace Editors.Audio.AudioEditor.Presentation
                         cleanAudioProject,
                         fileName,
                         filePath,
+                        compileTarget,
                         progress,
                         cancellationToken)
                     : await _audioProjectCompilerService.CompileAsync(
                         cleanAudioProject,
                         fileName,
                         filePath,
+                        compileTarget,
                         cancellationToken);
                 CompileStatus = LocalizationManager.Instance.Get(
                     compileCompleted
@@ -327,6 +340,34 @@ namespace Editors.Audio.AudioEditor.Presentation
             {
                 IsCompiling = false;
             }
+        }
+
+        private IReadOnlyList<AudioProjectCompileTargetOption>
+            CreateCompileTargets()
+        {
+            var targets = new List<AudioProjectCompileTargetOption>
+            {
+                new(
+                    AudioProjectCompileTarget.AllLanguages,
+                    LocalizationManager.Instance.Get(
+                        "AudioEditor.Compile.Target.AllLanguages"),
+                    CompileAudioProjectCommand)
+            };
+            targets.AddRange(Enum.GetValues<Wh3Language>()
+                .Where(language => language != Wh3Language.Sfx)
+                .Select(language =>
+                {
+                    var target = new AudioProjectCompileTarget(language);
+                    return new AudioProjectCompileTargetOption(
+                        target,
+                        LocalizationManager.Instance.GetFormat(
+                            "AudioEditor.Compile.Target.Language",
+                            LocalizationManager.Instance.Get(
+                                $"AudioExplorer.Language.{language}"),
+                            target.OutputDirectory),
+                        CompileAudioProjectCommand);
+                }));
+            return targets;
         }
 
         private void UpdateOperationProgress(AudioOperationProgress progress)

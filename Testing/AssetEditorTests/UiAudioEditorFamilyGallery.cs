@@ -328,6 +328,21 @@ public class UiAudioEditorFamilyGallery
             IsSettingsBorderVisible = true,
             EmptyStateText = "打开或新建音频工程以开始编辑",
             CompileStatus = "工程已保存",
+            CompileTargets = new[]
+            {
+                new SampleModel
+                {
+                    DisplayName = @"所有语言（audio\wwise）",
+                    Target = "all",
+                    Command = SampleCommand.Instance,
+                },
+                new SampleModel
+                {
+                    DisplayName = @"中文（audio\wwise\chinese）",
+                    Target = "chinese",
+                    Command = SampleCommand.Instance,
+                },
+            },
             OperationDetail = @"D:\AudioProjects\empire_general_voice.aeaudio",
             OperationProgressIsIndeterminate = false,
             OperationProgressMaximum = 428d,
@@ -662,9 +677,11 @@ public class UiAudioEditorFamilyGallery
         public object? CollapseOrExpandTreeCommand { get; set; } = SampleCommand.Instance;
         public object? CommitButtonLabel { get; set; }
         public object? CommitButtonToolTip { get; set; }
+        public object? Command { get; set; }
         public object? CompileAudioProjectCancelCommand { get; set; } = SampleCommand.Instance;
         public object? CompileAudioProjectCommand { get; set; } = SampleCommand.Instance;
         public object? CompileStatus { get; set; }
+        public object? CompileTargets { get; set; }
         public object? ContainerType { get; set; }
         public object? ContainerTypes { get; set; }
         public object? CopyRowsCommand { get; set; } = SampleCommand.Instance;
@@ -843,6 +860,7 @@ public class UiAudioEditorFamilyGallery
         public object? Table { get; set; }
         public object? TotalPlaybackSeconds { get; set; }
         public object? TotalPlaybackTime { get; set; }
+        public object? Target { get; set; }
         public object? TransitionDuration { get; set; }
         public object? TransitionType { get; set; }
         public object? TransitionTypes { get; set; }

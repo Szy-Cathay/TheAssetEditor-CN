@@ -398,7 +398,7 @@
   "AudioEditor.Menu.File.OpenAudioProject": "打开音频项目",
   "AudioEditor.Menu.File.CancelLoad": "取消加载",
   "AudioEditor.Menu.File.SaveAudioProject": "保存音频项目",
-  "AudioEditor.Menu.File.CompileAudioProject": "编译音频项目",
+  "AudioEditor.Menu.File.CompileAudioProject": "编译音频项目到",
   "AudioEditor.Menu.File.CancelCompile": "取消编译",
   "AudioEditor.Menu.File.RefreshSourceIds": "刷新源 ID",
   "AudioEditor.Menu.Tools": "工具",
@@ -420,6 +420,8 @@
   "AudioEditor.Compile.Completed": "编译完成",
   "AudioEditor.Compile.Cancelled": "已取消编译",
   "AudioEditor.Compile.Failed": "编译失败",
+  "AudioEditor.Compile.Target.AllLanguages": "所有语言（audio\\wwise）",
+  "AudioEditor.Compile.Target.Language": "{0}（{1}）",
 
   "AudioFilesExplorer.ToggleCollapseExpand": "折叠/展开树",
   "AudioFilesExplorer.ToggleCollapseExpand.ToolTip": "折叠或展开目录树。",

@@ -119,6 +119,26 @@ public class UiAudioEditorFamilyTests
         });
     }
 
+    [Test]
+    public void AudioEditor_CompileMenuProvidesExplicitOutputTargets()
+    {
+        var source = ReadAudioSources().Single(source =>
+            source.Contains("AudioEditor.Menu.File.CompileAudioProject"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                source,
+                Does.Contain("ItemsSource=\"{Binding CompileTargets}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("Value=\"{Binding Command}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("Value=\"{Binding Target}\""));
+        });
+    }
+
     private static IReadOnlyList<string> ReadAudioSources()
     {
         var root = FindSolutionRoot();
