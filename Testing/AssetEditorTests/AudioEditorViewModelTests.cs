@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Editors.Audio.AudioEditor.Commands.AudioProjectEditor;
 using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.AudioEditor.Events;
@@ -11,6 +12,7 @@ using Editors.Audio.AudioEditor.Events.Settings.Shortcuts;
 using Editors.Audio.AudioEditor.Presentation;
 using Editors.Audio.AudioEditor.Presentation.AudioProjectEditor;
 using Editors.Audio.AudioEditor.Presentation.AudioProjectEditor.Table;
+using Editors.Audio.AudioEditor.Presentation.AudioProjectExplorer;
 using Editors.Audio.AudioEditor.Presentation.AudioProjectViewer.Table;
 using Editors.Audio.AudioEditor.Presentation.Settings;
 using Editors.Audio.AudioEditor.Presentation.Shared.Models;
@@ -124,6 +126,137 @@ namespace AssetEditorTests
 
             Assert.IsFalse(viewModel.IsAddRowButtonEnabled);
             Assert.IsNull(state.EditorRow);
+        }
+
+        [TestMethod]
+        public void RemovedEditedViewerRow_EndsEditModeWithoutReadingDetachedData()
+        {
+            var originalTable = new DataTable();
+            originalTable.Columns.Add(TableInformation.ActionEventColumnName);
+            var originalRow = originalTable.Rows.Add("Play_original");
+            originalTable.Rows.Remove(originalRow);
+
+            var eventHub = new TestEventHub();
+            var state = new AudioEditorStateService
+            {
+                AudioProject = new AudioProjectFile(),
+                SelectedAudioProjectExplorerNode = AudioProjectTreeNode.CreateNode(
+                    Wh3ActionEventInformation.GetName(
+                        Wh3ActionEventType.BattleAbilities),
+                    AudioProjectTreeNodeType.ActionEventType),
+                AudioFiles =
+                [
+                    new AudioFile(
+                        Guid.NewGuid(),
+                        1,
+                        "test.wav",
+                        "audio\\test.wav")
+                ],
+                PendingEditedViewerRows = [originalRow]
+            };
+            var tableService = Mock.Of<IEditorTableService>();
+            var tableServiceFactory = new Mock<IEditorTableServiceFactory>();
+            tableServiceFactory
+                .Setup(x => x.GetService(
+                    AudioProjectTreeNodeType.ActionEventType))
+                .Returns(tableService);
+            var viewModel = new AudioProjectEditorViewModel(
+                Mock.Of<IUiCommandFactory>(),
+                eventHub,
+                state,
+                tableServiceFactory.Object,
+                Mock.Of<IAudioRepository>())
+            {
+                IsEditing = true
+            };
+            viewModel.Table.Columns.Add(
+                TableInformation.ActionEventColumnName);
+            viewModel.Table.Rows.Add("Play_replacement");
+
+            viewModel.OnEditorAddRowButtonEnablementUpdateRequested(
+                new EditorAddRowButtonEnablementUpdateRequestedEvent());
+
+            Assert.IsFalse(viewModel.IsEditing);
+            Assert.AreEqual(0, state.PendingEditedViewerRows.Count);
+            Assert.IsFalse(viewModel.IsAddRowButtonEnabled);
+        }
+
+        [TestMethod]
+        public void EditedItemsFilter_ShowsSavedActionEventTypesAfterProjectReload()
+        {
+            var eventHub = new TestEventHub();
+            var soundBank = new SoundBank(
+                "battle_individual_magic_test",
+                Wh3SoundBank.BattleIndividualMagic,
+                "sfx");
+            soundBank.ActionEvents.Add(new ActionEvent(
+                1,
+                "ability_event",
+                [
+                    Editors.Audio.Shared.AudioProject.Models.Action.CreatePlay(
+                        11,
+                        Shared.GameFormats.Wwise.Enums.AkBkHircType.Sound,
+                        101,
+                        201)
+                ],
+                Wh3ActionEventType.BattleAbilities));
+            soundBank.ActionEvents.Add(new ActionEvent(
+                2,
+                "magic_event",
+                [
+                    Editors.Audio.Shared.AudioProject.Models.Action.CreatePlay(
+                        12,
+                        Shared.GameFormats.Wwise.Enums.AkBkHircType.Sound,
+                        102,
+                        202)
+                ],
+                Wh3ActionEventType.BattleMagic));
+            var audioProject = new AudioProjectFile
+            {
+                Language = Wh3LanguageInformation.GetLanguageAsString(
+                    Wh3Language.EnglishUK),
+                SoundBanks = [soundBank]
+            };
+            var reopenedAudioProject =
+                JsonSerializer.Deserialize<AudioProjectFile>(
+                    JsonSerializer.Serialize(audioProject.Clean()));
+            Assert.IsNotNull(reopenedAudioProject);
+            var state = new AudioEditorStateService
+            {
+                AudioProject = reopenedAudioProject,
+                AudioProjectFileName = "test.aproj"
+            };
+            var treeBuilder = new AudioProjectTreeBuilderService(state);
+            var filter = new AudioProjectTreeFilterService(state);
+            var viewModel = new AudioProjectExplorerViewModel(
+                eventHub,
+                state,
+                treeBuilder,
+                filter);
+
+            eventHub.Publish(new AudioProjectLoadedEvent());
+            var actionEventTypes = viewModel.AudioProjectTree
+                .SelectMany(root => root.Children)
+                .SelectMany(soundBankNode => soundBankNode.Children)
+                .Single(node =>
+                    node.Type == AudioProjectTreeNodeType.ActionEvents)
+                .Children;
+            viewModel.ShowEditedItemsOnly = true;
+
+            var visibleTypeNames = actionEventTypes
+                .Where(node => node.IsVisible)
+                .Select(node => node.Name)
+                .ToArray();
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    Wh3ActionEventInformation.GetName(
+                        Wh3ActionEventType.BattleAbilities),
+                    Wh3ActionEventInformation.GetName(
+                        Wh3ActionEventType.BattleMagic)
+                },
+                visibleTypeNames);
+            viewModel.Dispose();
         }
 
         [TestMethod]
@@ -500,11 +633,14 @@ namespace AssetEditorTests
             fileService
                 .Setup(x => x.LoadFromDialogAsync(
                     It.IsAny<IProgress<AudioLoadProgress>>(),
-                    It.IsAny<CancellationToken>()))
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<System.Action>()))
                 .Returns(async (
                     IProgress<AudioLoadProgress> _,
-                    CancellationToken cancellationToken) =>
+                    CancellationToken cancellationToken,
+                    System.Action loadStarted) =>
                 {
+                    loadStarted();
                     await loadCanFinish.Task.WaitAsync(cancellationToken);
                     eventHub.Publish(new AudioProjectLoadedEvent());
                     return true;
@@ -545,6 +681,49 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public async Task LoadAudioProject_KeepsProgressPopupClosedWhileChoosingProject()
+        {
+            AudioEditorViewModel viewModel = null!;
+            bool? popupActiveWhenDialogOpened = null;
+            var fileService = new Mock<IAudioEditorFileService>();
+            fileService
+                .Setup(x => x.LoadFromDialogAsync(
+                    It.IsAny<IProgress<AudioLoadProgress>>(),
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<System.Action>()))
+                .Returns((
+                    IProgress<AudioLoadProgress> _,
+                    CancellationToken _,
+                    System.Action loadStarted) =>
+                {
+                    popupActiveWhenDialogOpened =
+                        viewModel.IsLoadProgressWindowActive;
+                    loadStarted();
+                    return Task.FromResult(false);
+                });
+            viewModel = new AudioEditorViewModel(
+                Mock.Of<IUiCommandFactory>(),
+                new TestEventHub(),
+                new AudioEditorStateService(),
+                fileService.Object,
+                Mock.Of<IAudioProjectCompilerService>(),
+                Mock.Of<IAudioEditorIntegrityService>(),
+                Mock.Of<IShortcutService>(),
+                Mock.Of<IStandardDialogs>(),
+                new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+                null!,
+                null!,
+                null!,
+                null!,
+                null!,
+                null!);
+
+            await viewModel.LoadAudioProject(CancellationToken.None);
+
+            Assert.IsFalse(popupActiveWhenDialogOpened);
+        }
+
+        [TestMethod]
         public async Task LoadAudioProject_WhenAsyncLoadFails_PreservesEditorAndShowsError()
         {
             var eventHub = new TestEventHub();
@@ -552,7 +731,8 @@ namespace AssetEditorTests
             fileService
                 .Setup(x => x.LoadFromDialogAsync(
                     It.IsAny<IProgress<AudioLoadProgress>>(),
-                    It.IsAny<CancellationToken>()))
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<System.Action>()))
                 .ThrowsAsync(new InvalidOperationException("load failed"));
             var dialogs = new Mock<IStandardDialogs>();
             var viewModel = new AudioEditorViewModel(

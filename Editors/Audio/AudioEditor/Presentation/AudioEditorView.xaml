@@ -120,7 +120,7 @@
                     CancelCommand="{Binding LoadAudioProjectCancelCommand}"
                     CancelText="{loc:Loc General.Cancel}"
                     CurrentDetailText="{Binding OperationDetail}"
-                    IsOperationActive="{Binding IsLoading}"
+                    IsOperationActive="{Binding IsLoadProgressWindowActive}"
                     IsProgressIndeterminate="{Binding OperationProgressIsIndeterminate}"
                     ProgressMaximum="{Binding OperationProgressMaximum}"
                     ProgressValue="{Binding OperationProgressValue}"

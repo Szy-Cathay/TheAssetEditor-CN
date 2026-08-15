@@ -86,6 +86,33 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public async Task LoadingPopup_StaysClosedForInitializationAndOpensForManualLoad()
+        {
+            var popupStates = new List<bool>();
+            AudioExplorerViewModel viewModel = null!;
+            var repository = CreateRepositoryMock();
+            repository
+                .Setup(x => x.Load(
+                    It.IsAny<List<string>>(),
+                    It.IsAny<IProgress<AudioLoadProgress>>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback(() =>
+                {
+                    popupStates.Add(
+                        viewModel.IsLoadProgressWindowActive);
+                });
+            viewModel = CreateViewModel(repository.Object);
+
+            await viewModel.InitializeAsync();
+            await viewModel.LoadAudioRepositoryForSelectedLanguagesAsync();
+
+            CollectionAssert.AreEqual(
+                new[] { false, true },
+                popupStates);
+            viewModel.Close();
+        }
+
+        [TestMethod]
         public async Task InitializeAsync_UnsupportedGameShowsMessageAndDoesNotLoad()
         {
             var repository = CreateRepositoryMock();

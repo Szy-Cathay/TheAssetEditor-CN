@@ -60,6 +60,7 @@ namespace Editors.Audio.AudioExplorer
         private readonly DispatcherTimer _playbackTimer;
         private readonly Serilog.ILogger _logger = Logging.Create<AudioExplorerViewModel>();
         private bool _isInitialized;
+        private bool _suppressAutomaticLoadProgressWindow;
         private bool _isUpdatingPlaybackPosition;
         private int _hiddenUnavailableReferenceCount;
         private int _playbackSelectionVersion;
@@ -95,6 +96,7 @@ namespace Editors.Audio.AudioExplorer
         [ObservableProperty] private double _playbackPositionSeconds = 0;
         [ObservableProperty] private double _totalPlaybackSeconds = 0;
         [ObservableProperty] private bool _isLoading = false;
+        [ObservableProperty] private bool _isLoadProgressWindowActive = false;
         [ObservableProperty] private int _loadProgress = 0;
         [ObservableProperty] private int _loadProgressValue = 0;
         [ObservableProperty] private int _loadProgressMaximum = 0;
@@ -462,7 +464,16 @@ namespace Editors.Audio.AudioExplorer
                 return;
 
             _isInitialized = true;
-            await LoadAudioRepositoryForSelectedLanguagesCommand.ExecuteAsync(null);
+            _suppressAutomaticLoadProgressWindow = true;
+            try
+            {
+                await LoadAudioRepositoryForSelectedLanguagesCommand
+                    .ExecuteAsync(null);
+            }
+            finally
+            {
+                _suppressAutomaticLoadProgressWindow = false;
+            }
         }
 
         [RelayCommand(IncludeCancelCommand = true)]
@@ -482,6 +493,8 @@ namespace Editors.Audio.AudioExplorer
             }
 
             IsLoading = true;
+            IsLoadProgressWindowActive =
+                !_suppressAutomaticLoadProgressWindow;
             LoadProgress = 0;
             LoadProgressValue = 0;
             LoadProgressMaximum = 0;
@@ -530,6 +543,7 @@ namespace Editors.Audio.AudioExplorer
             }
             finally
             {
+                IsLoadProgressWindowActive = false;
                 IsLoading = false;
             }
         }

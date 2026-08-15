@@ -40,7 +40,8 @@ namespace Editors.Audio.AudioEditor.Core
             CancellationToken cancellationToken = default);
         Task<bool> LoadFromDialogAsync(
             IProgress<AudioLoadProgress> progress = null,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default,
+            System.Action loadStarted = null);
     }
 
     public class AudioEditorFileService(
@@ -120,12 +121,14 @@ namespace Editors.Audio.AudioEditor.Core
 
         public async Task<bool> LoadFromDialogAsync(
             IProgress<AudioLoadProgress> progress = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            System.Action loadStarted = null)
         {
             var result = _audioProjectFileService.LoadFromDialog();
             if (result == null)
                 return false;
 
+            loadStarted?.Invoke();
             return await LoadAsync(
                 result.AudioProject,
                 result.FileName,

@@ -1,5 +1,8 @@
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
+using Editors.Audio.AudioEditor.Core;
+using Editors.Audio.AudioEditor.Presentation.Settings;
+using Editors.Audio.Shared.Storage;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Ui.Common.OperationProgress;
@@ -10,6 +13,9 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Moq;
+
+using AudioFile = Editors.Audio.Shared.AudioProject.Models.AudioFile;
 
 using Assert = NUnit.Framework.Assert;
 
@@ -22,9 +28,12 @@ public class OperationProgressViewTests
     [
         (["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"], 1),
         (["AssetEditor", "Views", "MainWindow.xaml"], 1),
+        (["Editors", "AnimationReTarget", "Editors.AnimatioReTarget", "Editor", "Saving", "SaveWindow.xaml"], 1),
         (["Editors", "Audio", "AudioEditor", "Presentation", "NewAudioProject", "NewAudioProjectWindow.xaml"], 1),
         (["Editors", "Audio", "AudioProjectConverter", "AudioProjectConverterWindow.xaml"], 1),
         (["Editors", "Audio", "DialogueEventMerger", "DialogueEventMergerWindow.xaml"], 1),
+        (["Editors", "ImportExportEditor", "Editors.ImportExport", "Exporting", "Presentation", "ExportWindow.xaml"], 1),
+        (["Editors", "ImportExportEditor", "Editors.ImportExport", "Importing", "Presentation", "ImportWindow.xaml"], 1),
         (["Shared", "SharedUI", "BaseDialogs", "PackFileTree", "PackFileBrowserView.xaml"], 1),
     ];
     private static readonly (string[] Path, int HostCount)[] AudioEditorProgressHostSurfaces =
@@ -204,6 +213,29 @@ public class OperationProgressViewTests
                 host.Close();
             }
         });
+    }
+
+    [Test]
+    public void AllOperationProgressWindowHosts_AreInventoried()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var expectedPaths = IndependentProgressHostSurfaces
+            .Concat(AudioEditorProgressHostSurfaces)
+            .Select(item => string.Join(Path.DirectorySeparatorChar, item.Path))
+            .ToArray();
+        var actualPaths = new[] { "AssetEditor", "Editors", "Shared" }
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(solutionRoot, root),
+                "*.xaml",
+                SearchOption.AllDirectories))
+            .Where(path => !path.Split(Path.DirectorySeparatorChar)
+                .Any(part => part is "bin" or "obj"))
+            .Where(path => File.ReadAllText(path)
+                .Contains(nameof(OperationProgressWindowHost), StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(solutionRoot, path))
+            .ToArray();
+
+        Assert.That(actualPaths, Is.EquivalentTo(expectedPaths));
     }
 
     [Test]
@@ -684,21 +716,124 @@ public class OperationProgressViewTests
     }
 
     [Test]
-    public void PopupLoadingWorkspaces_HideDuplicateInlineStatus()
+    public void AutomaticAudioPreloads_KeepPopupClosedUntilPrimaryActionStarts()
     {
         var solutionRoot = FindSolutionRoot();
+        var converter = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "Editors",
+            "Audio",
+            "AudioProjectConverter",
+            "AudioProjectConverterWindow.xaml"));
         var dialogueMerger = File.ReadAllText(Path.Combine(
             solutionRoot,
             "Editors",
             "Audio",
             "DialogueEventMerger",
             "DialogueEventMergerWindow.xaml"));
+        var audioEditor = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "Editors",
+            "Audio",
+            "AudioEditor",
+            "Presentation",
+            "AudioEditorView.xaml"));
+        var audioExplorer = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "Editors",
+            "Audio",
+            "AudioExplorer",
+            "AudioExplorerView.xaml"));
 
         Assert.Multiple(() =>
         {
             Assert.That(
+                converter,
+                Does.Contain(
+                    "IsOperationActive=\"{Binding IsProcessing}\""));
+            Assert.That(
+                converter,
+                Does.Contain(
+                    "Binding=\"{Binding IsProcessing}\" Value=\"True\""));
+            Assert.That(
                 dialogueMerger,
-                Does.Contain("Binding=\"{Binding IsBusy}\" Value=\"True\""));
+                Does.Contain(
+                    "IsOperationActive=\"{Binding IsGenerating}\""));
+            Assert.That(
+                dialogueMerger,
+                Does.Contain(
+                    "Binding=\"{Binding IsGenerating}\" Value=\"True\""));
+            Assert.That(
+                audioEditor,
+                Does.Contain(
+                    "IsOperationActive=\"{Binding IsLoadProgressWindowActive}\""));
+            Assert.That(
+                audioExplorer,
+                Does.Contain(
+                    "IsOperationActive=\"{Binding IsLoadProgressWindowActive}\""));
+        });
+    }
+
+    [Test]
+    public void AudioSettingsFileList_RendersFileNameAndPathColumns()
+    {
+        InvokeWithWpfApplication(() =>
+        {
+            var viewModel = new SettingsViewModel(
+                new TestEventHub(),
+                new AudioEditorStateService(),
+                Mock.Of<IAudioRepository>())
+            {
+                IsSettingsVisible = true,
+            };
+            viewModel.AudioFiles.Add(new AudioFile(
+                Guid.NewGuid(),
+                1,
+                "cathay_alchemist1_attack.wav",
+                @"audio\audio_wav\cathay_alchemist1_attack.wav"));
+            var view = new SettingsView
+            {
+                DataContext = viewModel,
+                Width = 900,
+                Height = 500,
+            };
+            var window = new Window
+            {
+                Content = view,
+                Width = 920,
+                Height = 520,
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.None,
+                Left = -10000,
+                Top = -10000,
+            };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                var renderedText = FindVisualDescendants<TextBlock>(view)
+                    .Select(textBlock => textBlock.Text)
+                    .ToArray();
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        renderedText,
+                        Does.Contain("cathay_alchemist1_attack.wav"));
+                    Assert.That(
+                        renderedText,
+                        Does.Contain(
+                            @"audio\audio_wav\cathay_alchemist1_attack.wav"));
+                    Assert.That(
+                        renderedText,
+                        Has.None.EqualTo(typeof(AudioFile).FullName));
+                });
+            }
+            finally
+            {
+                window.Close();
+            }
         });
     }
 
@@ -774,6 +909,26 @@ public class OperationProgressViewTests
         }
 
         return null;
+    }
+
+    private static IEnumerable<T> FindVisualDescendants<T>(
+        DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0;
+             index < VisualTreeHelper.GetChildrenCount(root);
+             index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+                yield return match;
+
+            foreach (var descendant in
+                     FindVisualDescendants<T>(child))
+            {
+                yield return descendant;
+            }
+        }
     }
 
     private static void PumpDispatcher(TimeSpan duration)

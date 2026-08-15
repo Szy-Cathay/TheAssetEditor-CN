@@ -130,7 +130,7 @@
             Margin="10,0,10,8">
             <progress:OperationProgressWindowHost
                 CurrentDetailText="{Binding ProgressDetail}"
-                IsOperationActive="{Binding IsBusy}"
+                IsOperationActive="{Binding IsGenerating}"
                 IsProgressIndeterminate="{Binding ProgressIsIndeterminate}"
                 ProgressMaximum="{Binding ProgressMaximum}"
                 ProgressValue="{Binding ProgressValue}"
@@ -143,7 +143,7 @@
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                            <DataTrigger Binding="{Binding IsGenerating}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>

@@ -43,6 +43,7 @@ namespace Editors.Audio.AudioEditor.Presentation
         [ObservableProperty] private bool _isSettingsBorderVisible = false;
         [ObservableProperty] private bool _isCompiling = false;
         [ObservableProperty] private bool _isLoading = false;
+        [ObservableProperty] private bool _isLoadProgressWindowActive = false;
         [ObservableProperty] private bool _isBusy = false;
         [ObservableProperty] private bool _isEditorIdle = true;
         [ObservableProperty] private bool _canEditAudioProject = false;
@@ -218,7 +219,10 @@ namespace Editors.Audio.AudioEditor.Presentation
             try
             {
                 var loaded = await _audioEditorFileService
-                    .LoadFromDialogAsync(progress, cancellationToken);
+                    .LoadFromDialogAsync(
+                        progress,
+                        cancellationToken,
+                        () => IsLoadProgressWindowActive = true);
                 if (loaded)
                 {
                     CompileStatus = LocalizationManager.Instance.Get(
@@ -250,6 +254,7 @@ namespace Editors.Audio.AudioEditor.Presentation
             }
             finally
             {
+                IsLoadProgressWindowActive = false;
                 IsLoading = false;
             }
         }
