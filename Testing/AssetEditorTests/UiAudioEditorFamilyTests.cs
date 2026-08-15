@@ -93,6 +93,32 @@ public class UiAudioEditorFamilyTests
         });
     }
 
+    [Test]
+    public void AudioProjectConverter_LoadingUsesRealBusyProgressBindings()
+    {
+        var source = ReadAudioSources().Single(source =>
+            source.Contains("AudioProjectConverter.Title"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                source,
+                Does.Contain("IsOperationActive=\"{Binding IsBusy}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("CurrentDetailText=\"{Binding ProgressDetail}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("ProgressMaximum=\"{Binding ProgressMaximum}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("ProgressValue=\"{Binding ProgressValue}\""));
+            NUnitAssert.That(
+                source,
+                Does.Contain("StatusText=\"{Binding Status}\""));
+        });
+    }
+
     private static IReadOnlyList<string> ReadAudioSources()
     {
         var root = FindSolutionRoot();
