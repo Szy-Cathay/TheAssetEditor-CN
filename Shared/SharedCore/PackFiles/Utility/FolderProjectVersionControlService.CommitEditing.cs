@@ -5,6 +5,187 @@ namespace Shared.Core.PackFiles.Utility;
 
 internal sealed partial class FolderProjectVersionControlService
 {
+    public FolderProjectRestorePointDeleteRollback BeginDeleteRestorePoint(
+        string projectRoot,
+        string commitId)
+    {
+        var objectId = ParseFullCommitId(commitId);
+        return Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureCommitStateSupported(repository);
+                if (repository.Info.IsHeadDetached)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError
+                            .UnsupportedOperationState,
+                        "A restore point cannot be deleted from a detached HEAD.");
+                }
+
+                var target = LookupCommit(repository, objectId);
+                var originalHead = repository.Head.Tip ??
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.CommitNotFound,
+                        "The repository has no current restore point.");
+                if (target.Parents.Count() != 1)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError
+                            .CommitCannotBeDeleted,
+                        "The initial restore point cannot be deleted.");
+                }
+
+                var descendants = new List<Commit>();
+                var current = originalHead;
+                while (current.Id != target.Id)
+                {
+                    if (current.Parents.Count() != 1)
+                    {
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError
+                                .CommitCannotBeDeleted,
+                            "Only a restore point in the current linear history can be deleted.");
+                    }
+
+                    descendants.Add(current);
+                    current = current.Parents.Single();
+                }
+
+                var rewrittenHead = target.Parents.Single();
+                foreach (var descendant in descendants.AsEnumerable().Reverse())
+                {
+                    rewrittenHead = repository.ObjectDatabase.CreateCommit(
+                        descendant.Author,
+                        descendant.Committer,
+                        descendant.Message,
+                        descendant.Tree,
+                        [rewrittenHead],
+                        prettifyMessage: false);
+                }
+
+                var deletesCurrent = target.Id == originalHead.Id;
+                var indexSnapshot = deletesCurrent
+                    ? GitIndexSnapshot.Capture(
+                        Path.Combine(repository.Info.Path, "index"))
+                    : null;
+                var headUpdated = false;
+                try
+                {
+                    repository.Refs.UpdateTarget(
+                        repository.Refs[repository.Head.CanonicalName],
+                        rewrittenHead.Sha);
+                    headUpdated = true;
+                    if (deletesCurrent)
+                        _platform.ResetMixed(repository, rewrittenHead);
+                }
+                catch (Exception failure)
+                {
+                    var rollbackFailures = new List<Exception>();
+                    if (headUpdated)
+                    {
+                        try
+                        {
+                            repository.Refs.UpdateTarget(
+                                repository.Refs[
+                                    repository.Head.CanonicalName],
+                                originalHead.Sha);
+                        }
+                        catch (Exception rollbackFailure)
+                        {
+                            rollbackFailures.Add(rollbackFailure);
+                        }
+                    }
+                    if (indexSnapshot != null)
+                    {
+                        try
+                        {
+                            indexSnapshot.Restore(_platform);
+                        }
+                        catch (Exception rollbackFailure)
+                        {
+                            rollbackFailures.Add(rollbackFailure);
+                        }
+                    }
+
+                    if (rollbackFailures.Count != 0)
+                    {
+                        throw new FolderProjectVersionControlException(
+                            FolderProjectVersionControlError.RepositoryFailure,
+                            "Restore-point deletion failed and rollback was incomplete.",
+                            new AggregateException(
+                                [failure, .. rollbackFailures]),
+                            isRollbackIncomplete: true);
+                    }
+                    throw;
+                }
+
+                return new FolderProjectRestorePointDeleteRollback(
+                    originalHead.Sha,
+                    rewrittenHead.Sha,
+                    indexSnapshot == null
+                        ? null
+                        : new FolderProjectIndexSnapshot(
+                            indexSnapshot.Exists,
+                            indexSnapshot.Bytes,
+                            indexSnapshot.Attributes));
+            });
+    }
+
+    public void CompleteDeleteRestorePoint(
+        FolderProjectRestorePointDeleteRollback rollback)
+    {
+        ArgumentNullException.ThrowIfNull(rollback);
+    }
+
+    public void RollbackDeleteRestorePoint(
+        string projectRoot,
+        FolderProjectRestorePointDeleteRollback rollback)
+    {
+        ArgumentNullException.ThrowIfNull(rollback);
+        Execute(
+            () =>
+            {
+                using var repository = OpenRepository(projectRoot);
+                EnsureCommitStateSupported(repository);
+                if (repository.Head.Tip?.Sha != rollback.RewrittenCommitId)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError
+                            .CommitCannotBeDeleted,
+                        "The rewritten restore-point history is no longer current.");
+                }
+
+                try
+                {
+                    var originalHead = LookupCommit(
+                        repository,
+                        ParseFullCommitId(rollback.OriginalCommitId));
+                    repository.Refs.UpdateTarget(
+                        repository.Refs[repository.Head.CanonicalName],
+                        originalHead.Sha);
+                    if (rollback.Index != null)
+                    {
+                        new GitIndexSnapshot(
+                                Path.Combine(repository.Info.Path, "index"),
+                                rollback.Index.Existed,
+                                rollback.Index.Bytes,
+                                rollback.Index.Attributes)
+                            .Restore(_platform);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    throw new FolderProjectVersionControlException(
+                        FolderProjectVersionControlError.RepositoryFailure,
+                        "Restore-point deletion rollback was incomplete.",
+                        exception,
+                        isRollbackIncomplete: true);
+                }
+                return true;
+            });
+    }
+
     public FolderProjectCommitEditSession EditLatestCommitChanges(
         string projectRoot,
         string commitId,

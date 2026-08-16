@@ -11,6 +11,7 @@ internal enum FolderProjectVersionControlError
     EmptyCommitMessage,
     NothingToCommit,
     CommitNotFound,
+    CommitCannotBeDeleted,
     CommitCannotBeUndone,
     CommitIsNotLatest,
     InvalidCommitId,
@@ -187,6 +188,11 @@ internal sealed record FolderProjectProjectRestoreRollback(
     string RestoreCommitId,
     string? SafetyCommitId,
     FolderProjectIndexSnapshot Index);
+
+internal sealed record FolderProjectRestorePointDeleteRollback(
+    string OriginalCommitId,
+    string RewrittenCommitId,
+    FolderProjectIndexSnapshot? Index);
 
 internal sealed record FolderProjectDiscardRollback(
     string StagingPath,

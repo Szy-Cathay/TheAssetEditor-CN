@@ -286,6 +286,44 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             ApplySnapshot);
     }
 
+    [RelayCommand(CanExecute = nameof(CanDeleteRestorePoint))]
+    private async Task DeleteRestorePoint()
+    {
+        var project = _project;
+        var restorePoint = SelectedRestorePoint;
+        if (project == null || restorePoint == null || restorePoint.IsInitial)
+            return;
+        if (!Confirm("DeleteRestorePoint", restorePoint.Description))
+            return;
+
+        await RunOperation(
+            async () =>
+            {
+                HistorySnapshot? snapshot = null;
+                await _coordinator.ExecuteInPlaceTransactionalAsync(
+                    project.ProjectRoot,
+                    () => _historyService.BeginDeleteRestorePoint(
+                        project.ProjectRoot,
+                        restorePoint.Id,
+                        ReportProgress),
+                    operation =>
+                    {
+                        _restorePointChangesCache.Clear();
+                        ReportProgress(new FolderProjectHistoryProgress(
+                            FolderProjectHistoryProgressStage
+                                .RefreshingInterface,
+                            project.ProjectRoot));
+                        snapshot = LoadSnapshot(project.ProjectRoot);
+                        _historyService.CompleteDeleteRestorePoint(operation);
+                    },
+                    operation => _historyService.RollbackDeleteRestorePoint(
+                        project.ProjectRoot,
+                        operation));
+                return snapshot!;
+            },
+            ApplySnapshot);
+    }
+
     [RelayCommand(CanExecute = nameof(CanRestoreFile))]
     private async Task RestoreFile()
     {
@@ -462,6 +500,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     partial void OnSelectedRestorePointChanged(
         FolderProjectRestorePoint? value)
     {
+        RestoreProjectCommand.NotifyCanExecuteChanged();
+        DeleteRestorePointCommand.NotifyCanExecuteChanged();
         SelectedRestorePointChanges.Clear();
         HasSelectedRestorePointChanges = false;
         SelectedRestorePointChange = null;
@@ -735,6 +775,10 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         SelectedRestorePoint != null &&
         SelectedRestorePoint.Id != _currentRestorePointId;
 
+    private bool CanDeleteRestorePoint() =>
+        _project != null && IsReady && !IsBusy &&
+        SelectedRestorePoint is { IsInitial: false };
+
     private bool CanRestoreFile() =>
         _project != null && IsReady && !IsBusy &&
         SelectedRestorePoint != null &&
@@ -757,6 +801,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         RecoverHistoryCommand.NotifyCanExecuteChanged();
         CreateRestorePointCommand.NotifyCanExecuteChanged();
         RestoreProjectCommand.NotifyCanExecuteChanged();
+        DeleteRestorePointCommand.NotifyCanExecuteChanged();
         RestoreFileCommand.NotifyCanExecuteChanged();
         DiscardSelectedCommand.NotifyCanExecuteChanged();
         DiscardAllCommand.NotifyCanExecuteChanged();

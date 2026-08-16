@@ -1115,13 +1115,12 @@ public class UiCommonControlResourceTests
     }
 
     [Test]
-    public void MenusCollectionsAndSettingsNavigation_UseWeakInteractionMotion()
+    public void MenusAndSettingsNavigation_UseImmediateHoverFeedback()
     {
         var root = FindSolutionRoot();
         var paths = new[]
         {
             "AssetEditor/Themes/DesignSystem/Controls/MenusAndFeedback.xaml",
-            "AssetEditor/Themes/DesignSystem/Controls/Collections.xaml",
             "AssetEditor/Themes/DesignSystem/Workflows.xaml",
         };
 
@@ -1132,10 +1131,19 @@ public class UiCommonControlResourceTests
                 path.Replace('/', Path.DirectorySeparatorChar)));
             NUnitAssert.Multiple(() =>
             {
-                NUnitAssert.That(source, Does.Contain("AeMotion.Hover"));
-                NUnitAssert.That(source, Does.Contain("DoubleAnimation"));
+                NUnitAssert.That(source, Does.Not.Contain("AeMotion.Hover"));
+                NUnitAssert.That(source, Does.Not.Contain("DoubleAnimation"));
             });
         }
+
+        var menuSource = File.ReadAllText(Path.Combine(
+            root,
+            "AssetEditor",
+            "Themes",
+            "DesignSystem",
+            "Controls",
+            "MenusAndFeedback.xaml"));
+        NUnitAssert.That(menuSource, Does.Contain("AeBrush.AccentSoft"));
     }
 
     private static ResourceDictionary[] LoadDictionaries() =>

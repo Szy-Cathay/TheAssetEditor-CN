@@ -42,6 +42,18 @@ public interface IFolderProjectHistoryService
         string? description,
         Action<FolderProjectHistoryProgress> reportProgress);
 
+    FolderProjectRestorePointDeleteOperation BeginDeleteRestorePoint(
+        string projectRoot,
+        string restorePointId,
+        Action<FolderProjectHistoryProgress> reportProgress);
+
+    void CompleteDeleteRestorePoint(
+        FolderProjectRestorePointDeleteOperation operation);
+
+    void RollbackDeleteRestorePoint(
+        string projectRoot,
+        FolderProjectRestorePointDeleteOperation operation);
+
     IReadOnlyList<FolderProjectRestorePoint> GetRestorePoints(
         string projectRoot,
         int maxCount = 100);
@@ -267,6 +279,52 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 summary.Id,
                 reportProgress);
             return MapRestorePoint(summary, Summarize(changes));
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public FolderProjectRestorePointDeleteOperation BeginDeleteRestorePoint(
+        string projectRoot,
+        string restorePointId,
+        Action<FolderProjectHistoryProgress> reportProgress)
+    {
+        ArgumentNullException.ThrowIfNull(reportProgress);
+        reportProgress(new FolderProjectHistoryProgress(
+            FolderProjectHistoryProgressStage.UpdatingHistory,
+            restorePointId));
+        try
+        {
+            return new FolderProjectRestorePointDeleteOperation(
+                _versionControl.BeginDeleteRestorePoint(
+                    projectRoot,
+                    restorePointId));
+        }
+        catch (FolderProjectVersionControlException exception)
+        {
+            throw MapException(exception);
+        }
+    }
+
+    public void CompleteDeleteRestorePoint(
+        FolderProjectRestorePointDeleteOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        _versionControl.CompleteDeleteRestorePoint(operation.Rollback);
+    }
+
+    public void RollbackDeleteRestorePoint(
+        string projectRoot,
+        FolderProjectRestorePointDeleteOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        try
+        {
+            _versionControl.RollbackDeleteRestorePoint(
+                projectRoot,
+                operation.Rollback);
         }
         catch (FolderProjectVersionControlException exception)
         {
@@ -730,6 +788,8 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 FolderProjectVersionControlError.CommitNotFound or
                 FolderProjectVersionControlError.InvalidCommitId =>
                     FolderProjectHistoryError.RestorePointNotFound,
+                FolderProjectVersionControlError.CommitCannotBeDeleted =>
+                    FolderProjectHistoryError.RestorePointCannotBeDeleted,
                 FolderProjectVersionControlError.RepositoryBusy or
                 FolderProjectVersionControlError.UnsupportedOperationState or
                 FolderProjectVersionControlError.WorkingTreeNotClean or

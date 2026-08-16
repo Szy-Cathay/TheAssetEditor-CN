@@ -127,6 +127,17 @@ public sealed class FolderProjectDiscardResult
     }
 }
 
+public sealed class FolderProjectRestorePointDeleteOperation
+{
+    internal FolderProjectRestorePointDeleteRollback Rollback { get; }
+
+    internal FolderProjectRestorePointDeleteOperation(
+        FolderProjectRestorePointDeleteRollback rollback)
+    {
+        Rollback = rollback;
+    }
+}
+
 public sealed class FolderProjectRecoveryOperation
 {
     public FolderProjectHistoryStatus Status { get; }
@@ -162,6 +173,7 @@ public enum FolderProjectHistoryError
     RecoveryRequired,
     NoUnrecordedChanges,
     RestorePointNotFound,
+    RestorePointCannotBeDeleted,
     StorageFailure,
 }
 

@@ -24,7 +24,7 @@
                 <Grid>
                     <Border
                         x:Name="StateOverlay"
-                        Background="{DynamicResource AeBrush.SurfaceHover}"
+                        Background="{DynamicResource AeBrush.AccentSoft}"
                         CornerRadius="{StaticResource AeRadius.Compact}"
                         IsHitTestVisible="False"
                         Opacity="0" />
@@ -61,20 +61,7 @@
         </Grid>
         <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
-                <Trigger.EnterActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource AeMotion.Hover}" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource AeMotion.Hover}" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.ExitActions>
+                <Setter TargetName="StateOverlay" Property="Opacity" Value="1" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -101,7 +88,7 @@
                     <Border
                         x:Name="StateOverlay"
                         Grid.ColumnSpan="4"
-                        Background="{DynamicResource AeBrush.SurfaceHover}"
+                        Background="{DynamicResource AeBrush.AccentSoft}"
                         CornerRadius="{StaticResource AeRadius.Compact}"
                         IsHitTestVisible="False"
                         Opacity="0" />
@@ -185,20 +172,7 @@
                 <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsHighlighted" Value="True">
-                <Trigger.EnterActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource AeMotion.Hover}" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetName="StateOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource AeMotion.Hover}" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.ExitActions>
+                <Setter TargetName="StateOverlay" Property="Opacity" Value="1" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -217,9 +191,11 @@
         <Style.Triggers>
             <Trigger Property="Role" Value="TopLevelHeader">
                 <Setter Property="Template" Value="{StaticResource AeMenu.TopLevelItemTemplate}" />
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
             </Trigger>
             <Trigger Property="Role" Value="TopLevelItem">
                 <Setter Property="Template" Value="{StaticResource AeMenu.TopLevelItemTemplate}" />
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
             </Trigger>
             <Trigger Property="IsCheckable" Value="True">
                 <Setter Property="StaysOpenOnClick" Value="True" />
