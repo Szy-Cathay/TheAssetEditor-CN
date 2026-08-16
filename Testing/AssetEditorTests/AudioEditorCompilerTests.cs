@@ -226,6 +226,48 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void CreateWsourcesFile_RequestsLoudnessAnalysisForEverySource()
+        {
+            var tempDirectory = Path.Combine(
+                Path.GetTempPath(),
+                $"AssetEditor.CN.Tests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDirectory);
+
+            try
+            {
+                var wsourcesPath = Path.Combine(
+                    tempDirectory,
+                    "loudness-analysis.wsources");
+                var wrapper = new WSourcesWrapper(
+                    new ApplicationSettingsService());
+
+                wrapper.CreateWsourcesFile(
+                    ["first.wav", "second.wav"],
+                    tempDirectory,
+                    wsourcesPath);
+
+                var document = System.Xml.Linq.XDocument.Load(
+                    wsourcesPath);
+                var sources = document
+                    .Root!
+                    .Elements("Source")
+                    .ToList();
+
+                Assert.AreEqual(2, sources.Count);
+                foreach (var source in sources)
+                {
+                    Assert.AreEqual(
+                        "2",
+                        source.Attribute("AnalysisTypes")?.Value);
+                }
+            }
+            finally
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+        }
+
+        [TestMethod]
         public async Task WwiseCommand_NonZeroExitCode_Throws()
         {
             var settings = new ApplicationSettingsService();
