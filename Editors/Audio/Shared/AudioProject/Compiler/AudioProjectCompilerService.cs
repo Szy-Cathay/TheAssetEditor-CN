@@ -546,27 +546,46 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                     _logger.Here().Information($"Generating SoundBank {soundBank.FilePath}");
 
                     // Create the .bnk that modders should keep
-                    outputs.Add(
+                    outputs.AddRange(ExpandSoundBankOutput(
+                        soundBank,
                         _soundBankGeneratorService
-                            .GenerateSoundBankWithoutDialogueEvents(soundBank));
+                            .GenerateSoundBankWithoutDialogueEvents(soundBank)));
 
                     if (soundBank.DialogueEvents.Count != 0)
                     {
                         // Create a .bnk of the compiled Dialogue Events merged with vanilla Dialogue Events for modders to test
                         _logger.Here().Information($"Generating SoundBank {soundBank.TestingFilePath} and {soundBank.MergingFilePath}");
-                        outputs.Add(
+                        outputs.AddRange(ExpandSoundBankOutput(
+                            soundBank,
                             _soundBankGeneratorService
-                                .GenerateDialogueEventsForTestingSoundBank(soundBank));
+                                .GenerateDialogueEventsForTestingSoundBank(soundBank)));
 
                         // Create the .bnk that modders should give to the merger
-                        outputs.Add(
+                        outputs.AddRange(ExpandSoundBankOutput(
+                            soundBank,
                             _soundBankGeneratorService
-                                .GenerateMergingSoundBank(soundBank));
+                                .GenerateMergingSoundBank(soundBank)));
                     }
                 }
             }
 
             return outputs;
+        }
+
+        private static IEnumerable<AudioPackOutput> ExpandSoundBankOutput(
+            SoundBank soundBank,
+            AudioPackOutput output)
+        {
+            if (soundBank.GameSoundBank != Wh3SoundBank.FrontendVO)
+                return [output];
+
+            return Enum.GetValues<Wh3Language>()
+                .Where(language => language != Wh3Language.Sfx)
+                .Select(language => output with
+                {
+                    FilePath =
+                        $"{AudioProjectCompileTarget.AllLanguages.OutputDirectory}\\{Wh3LanguageInformation.GetLanguageAsString(language)}\\{output.FileName}"
+                });
         }
 
         private List<AudioPackOutput> GenerateDatFiles(

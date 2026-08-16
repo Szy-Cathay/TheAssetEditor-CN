@@ -526,8 +526,75 @@ namespace AssetEditorTests
                 "audio\\wwise\\771.wem");
         }
 
+        [TestMethod]
+        public async Task Compile_FrontendVo_WritesBnkToEveryVoiceLanguageRegardlessOfTarget()
+        {
+            var allLanguagesOutputPaths = await CompileAndCaptureOutputPaths(
+                AudioProjectCompileTarget.AllLanguages,
+                Wh3SoundBank.FrontendVO);
+            var selectedLanguageOutputPaths = await CompileAndCaptureOutputPaths(
+                new AudioProjectCompileTarget(Wh3Language.Chinese),
+                Wh3SoundBank.FrontendVO);
+            string[] voiceLanguages =
+            [
+                "chinese",
+                "english(uk)",
+                "french(france)",
+                "german",
+                "italian",
+                "polish",
+                "russian",
+                "spanish(spain)"
+            ];
+            string[] soundBankFileNames =
+            [
+                "frontend_vo_target.bnk",
+                "frontend_vo_1_target_for_testing.bnk",
+                "frontend_vo_target_for_merging.bnk"
+            ];
+
+            foreach (var outputPaths in new[]
+                     {
+                         allLanguagesOutputPaths,
+                         selectedLanguageOutputPaths
+                     })
+            {
+                var soundBankPaths = outputPaths
+                    .Where(path => path.EndsWith(
+                        ".bnk",
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                Assert.AreEqual(24, soundBankPaths.Count);
+
+                foreach (var language in voiceLanguages)
+                {
+                    foreach (var soundBankFileName in soundBankFileNames)
+                    {
+                        CollectionAssert.Contains(
+                            soundBankPaths,
+                            $"audio\\wwise\\{language}\\{soundBankFileName}");
+                    }
+                }
+
+                foreach (var soundBankFileName in soundBankFileNames)
+                {
+                    CollectionAssert.DoesNotContain(
+                        soundBankPaths,
+                        $"audio\\wwise\\{soundBankFileName}");
+                }
+            }
+
+            CollectionAssert.Contains(
+                allLanguagesOutputPaths,
+                "audio\\wwise\\771.wem");
+            CollectionAssert.Contains(
+                selectedLanguageOutputPaths,
+                "audio\\wwise\\chinese\\771.wem");
+        }
+
         private static async Task<List<string>> CompileAndCaptureOutputPaths(
-            AudioProjectCompileTarget compileTarget)
+            AudioProjectCompileTarget compileTarget,
+            Wh3SoundBank gameSoundBank = Wh3SoundBank.BattleIndividualMagic)
         {
             const uint sourceId = 771;
             var audioFile = new AudioFile(
@@ -544,20 +611,33 @@ namespace AssetEditorTests
                 "english(uk)",
                 Editors.Audio.Shared.AudioProject.Models.HircSettings
                     .CreateDefaultSoundSettings());
+            var soundBankName =
+                $"{Wh3SoundBankInformation.GetName(gameSoundBank)}_target";
             var soundBank = new SoundBank(
-                "battle_individual_magic_target",
-                Wh3SoundBank.BattleIndividualMagic,
+                soundBankName,
+                gameSoundBank,
                 "english(uk)");
             soundBank.Sounds.Add(sound);
-            soundBank.ActionEvents.Add(new ActionEvent(
-                44,
-                "target_event",
-                [AudioProjectAction.CreatePlay(
-                    43,
-                    AkBkHircType.Sound,
-                    sound.Id,
-                    soundBank.Id)],
-                Wh3ActionEventType.BattleAbilities));
+            if (gameSoundBank == Wh3SoundBank.FrontendVO)
+            {
+                var dialogueEvent = new DialogueEvent(
+                    "frontend_vo_character_select");
+                dialogueEvent.StatePaths.Add(
+                    new StatePath([], sound.Id, AkBkHircType.Sound));
+                soundBank.DialogueEvents.Add(dialogueEvent);
+            }
+            else
+            {
+                soundBank.ActionEvents.Add(new ActionEvent(
+                    44,
+                    "target_event",
+                    [AudioProjectAction.CreatePlay(
+                        43,
+                        AkBkHircType.Sound,
+                        sound.Id,
+                        soundBank.Id)],
+                    Wh3ActionEventType.BattleAbilities));
+            }
             var project = new AudioProjectFile
             {
                 Language = "english(uk)",
@@ -599,6 +679,20 @@ namespace AssetEditorTests
                 .Returns((SoundBank bank) => new AudioPackOutput(
                     bank.FileName,
                     bank.FilePath,
+                    [1]));
+            soundBankGenerator
+                .Setup(x => x.GenerateDialogueEventsForTestingSoundBank(
+                    It.IsAny<SoundBank>()))
+                .Returns((SoundBank bank) => new AudioPackOutput(
+                    bank.TestingFileName,
+                    bank.TestingFilePath,
+                    [1]));
+            soundBankGenerator
+                .Setup(x => x.GenerateMergingSoundBank(
+                    It.IsAny<SoundBank>()))
+                .Returns((SoundBank bank) => new AudioPackOutput(
+                    bank.MergingFileName,
+                    bank.MergingFilePath,
                     [1]));
             var savedOutputs = new List<AudioPackOutput>();
             var outputService = new Mock<IAudioPackOutputService>();
