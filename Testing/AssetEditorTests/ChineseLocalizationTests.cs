@@ -46,6 +46,17 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void ChineseLanguageFile_UsesConsistentTopLevelMenuLabels()
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "Language_Cn.json");
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+
+            Assert.AreEqual(
+                "文件",
+                document.RootElement.GetProperty("MenuBar.File").GetString());
+        }
+
+        [TestMethod]
         [DoNotParallelize]
         public void LoadLanguage_UsesApplicationDirectoryWhenCurrentDirectoryChanges()
         {

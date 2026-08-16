@@ -262,7 +262,7 @@
             <GridSplitter 
                 Grid.Column="1" 
                 Width="5" 
-                Background="{DynamicResource AeBrush.Border}"
+                Style="{StaticResource AeVerticalGridSplitterStyle}"
                 VerticalAlignment="Stretch" 
                 HorizontalAlignment="Center"
                 ResizeBehavior="PreviousAndNext" 

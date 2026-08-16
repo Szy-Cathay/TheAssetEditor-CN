@@ -19,6 +19,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVisRoot"/>
             <views:CscFloatConverter x:Key="CscFloat"/>
@@ -148,7 +149,8 @@
                 </Grid>
             </Grid>
 
-            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{DynamicResource AeBrush.BorderStrong}"/>
+            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
+                          Style="{StaticResource AeVerticalGridSplitterStyle}"/>
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
@@ -205,7 +207,8 @@
                     </TreeView>
                 </GroupBox>
 
-                <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" Background="{DynamicResource AeBrush.BorderStrong}"/>
+                <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"
+                              Style="{StaticResource AeHorizontalGridSplitterStyle}"/>
 
                 <!-- Details -->
                 <GroupBox Grid.Row="2" Header="{loc:Loc Csc.Details}">

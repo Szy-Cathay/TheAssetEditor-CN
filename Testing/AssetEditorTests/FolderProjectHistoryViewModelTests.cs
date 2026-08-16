@@ -519,15 +519,15 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
-    public async Task SelectingRestorePoint_ReusesPreviouslyLoadedChanges()
+    public async Task SelectingCachedRestorePoint_RefreshesRestoreCommandState()
     {
         using var directory = new TemporaryDirectory();
         using var project = CreateProject(directory.Path);
         var initial = RestorePoint("initial", "初始还原点", true);
-        var later = RestorePoint("later", "后续还原点");
+        var current = RestorePoint("head", "当前还原点");
         var history = CreateHistoryService(
             project.ProjectRoot,
-            [later, initial]);
+            [current, initial]);
         history.Setup(item => item.GetRestorePointChanges(
                 project.ProjectRoot,
                 It.IsAny<string>(),
@@ -539,11 +539,22 @@ public class FolderProjectHistoryViewModelTests
 
         viewModel.SelectedRestorePoint = initial;
         await viewModel.SelectedChangesLoadTask;
-        viewModel.SelectedRestorePoint = later;
+        NUnitAssert.That(
+            viewModel.RestoreProjectCommand.CanExecute(null),
+            Is.True);
+        viewModel.SelectedRestorePoint = current;
         await viewModel.SelectedChangesLoadTask;
+        NUnitAssert.That(
+            viewModel.RestoreProjectCommand.CanExecute(null),
+            Is.False);
+        var notifiedStates = new List<bool>();
+        viewModel.RestoreProjectCommand.CanExecuteChanged += (_, _) =>
+            notifiedStates.Add(
+                viewModel.RestoreProjectCommand.CanExecute(null));
         viewModel.SelectedRestorePoint = initial;
         await viewModel.SelectedChangesLoadTask;
 
+        NUnitAssert.That(notifiedStates, Does.Contain(true));
         history.Verify(item => item.GetRestorePointChanges(
             project.ProjectRoot,
             initial.Id,
@@ -612,6 +623,80 @@ public class FolderProjectHistoryViewModelTests
                 viewModel.SelectedRestorePointChanges.Single().Path,
                 Is.EqualTo("second.bin"));
         });
+    }
+
+    [Test]
+    public async Task DeleteRestorePoint_ConfirmsAndUsesRollbackCoordinator()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("target", "待删除状态");
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        var operation = new FolderProjectRestorePointDeleteOperation(
+            new FolderProjectRestorePointDeleteRollback(
+                "head",
+                "rewritten",
+                null));
+        history.Setup(item => item.BeginDeleteRestorePoint(
+                project.ProjectRoot,
+                point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(operation);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowYesNoBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(ShowMessageBoxResult.OK);
+        var coordinator = new Mock<IFolderProjectGitOperationCoordinator>();
+        coordinator.Setup(item => item.ExecuteInPlaceTransactionalAsync(
+                project.ProjectRoot,
+                It.IsAny<Func<FolderProjectRestorePointDeleteOperation>>(),
+                It.IsAny<Action<FolderProjectRestorePointDeleteOperation>>(),
+                It.IsAny<Action<FolderProjectRestorePointDeleteOperation>>()))
+            .Returns<string,
+                Func<FolderProjectRestorePointDeleteOperation>,
+                Action<FolderProjectRestorePointDeleteOperation>,
+                Action<FolderProjectRestorePointDeleteOperation>>(
+                (_, action, complete, rollback) =>
+                {
+                    var result = action();
+                    try
+                    {
+                        complete(result);
+                    }
+                    catch
+                    {
+                        rollback(result);
+                        throw;
+                    }
+                    return Task.FromResult(result);
+                });
+        var viewModel = CreateViewModel(
+            history.Object,
+            dialogs: dialogs.Object,
+            coordinator: coordinator.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+
+        await viewModel.DeleteRestorePointCommand.ExecuteAsync(null);
+
+        dialogs.Verify(item => item.ShowYesNoBox(
+            It.Is<string>(message =>
+                message.Contains("待删除状态") &&
+                message.Contains("工程文件不会改变")),
+            It.IsAny<string>()), Times.Once);
+        history.Verify(item => item.BeginDeleteRestorePoint(
+            project.ProjectRoot,
+            point.Id,
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+        history.Verify(item => item.CompleteDeleteRestorePoint(operation),
+            Times.Once);
+        history.Verify(item => item.RollbackDeleteRestorePoint(
+            It.IsAny<string>(),
+            It.IsAny<FolderProjectRestorePointDeleteOperation>()),
+            Times.Never);
     }
 
     [Test]

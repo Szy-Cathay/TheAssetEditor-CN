@@ -29,9 +29,11 @@ public sealed class FolderProjectHistoryServiceTests
                 methodNames,
                 Is.EqualTo(new[]
                 {
+                    "BeginDeleteRestorePoint",
                     "BeginDiscardChanges",
                     "BeginRecoverToSafeState",
                     "BeginRestoreFile",
+                    "CompleteDeleteRestorePoint",
                     "CompleteDiscardChanges",
                     "CompleteRecoverToSafeState",
                     "CompleteRestoreFile",
@@ -44,6 +46,7 @@ public sealed class FolderProjectHistoryServiceTests
                     "Initialize",
                     "RecoverToSafeState",
                     "RestoreProject",
+                    "RollbackDeleteRestorePoint",
                     "RollbackDiscardChanges",
                     "RollbackProjectRestore",
                     "RollbackRecoverToSafeState",
@@ -636,6 +639,133 @@ public sealed class FolderProjectHistoryServiceTests
         Assert.That(
             service.GetRestorePoints(project.Root).Select(item => item.Id),
             Is.EqualTo(originalHistory.Select(item => item.Id)));
+    }
+
+    [Test]
+    public void DeleteRestorePoint_PreservesDiskAndLaterRestorePointSnapshot()
+    {
+        using var project = new TemporaryProject();
+        var relativePath = "db/units.bin";
+        var fullPath = Path.Combine(project.Root, "db", "units.bin");
+        File.WriteAllBytes(fullPath, [1]);
+        var service = CreateService();
+        var initial = service.Initialize(project.Root);
+
+        File.WriteAllBytes(fullPath, [2]);
+        var removed = service.CreateRestorePoint(project.Root, "中间状态");
+        File.WriteAllBytes(fullPath, [3]);
+        var later = service.CreateRestorePoint(project.Root, "后续状态");
+        File.WriteAllBytes(fullPath, [4]);
+
+        var operation = service.BeginDeleteRestorePoint(
+            project.Root,
+            removed.Id,
+            _ => { });
+        service.CompleteDeleteRestorePoint(operation);
+
+        var history = service.GetRestorePoints(project.Root);
+        var rewrittenLater = history.Single(point =>
+            point.Description == later.Description);
+        using var repository = new Repository(project.Root);
+        var rewrittenCommit = repository.Lookup<Commit>(
+            rewrittenLater.Id)!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(history, Has.Count.EqualTo(2));
+            Assert.That(history.Select(point => point.Id),
+                Does.Not.Contain(removed.Id));
+            Assert.That(history.Select(point => point.Id),
+                Does.Contain(initial.Id));
+            Assert.That(rewrittenLater.Id, Is.Not.EqualTo(later.Id));
+            Assert.That(
+                ReadBlobBytes(rewrittenCommit, relativePath),
+                Is.EqualTo(new byte[] { 3 }));
+            Assert.That(
+                File.ReadAllBytes(fullPath),
+                Is.EqualTo(new byte[] { 4 }));
+        });
+    }
+
+    [Test]
+    public void DeleteCurrentRestorePoint_PreservesDiskAsUnrecordedChange()
+    {
+        using var project = new TemporaryProject();
+        var fullPath = Path.Combine(project.Root, "db", "units.bin");
+        File.WriteAllBytes(fullPath, [1]);
+        var service = CreateService();
+        var initial = service.Initialize(project.Root);
+
+        File.WriteAllBytes(fullPath, [2]);
+        var current = service.CreateRestorePoint(project.Root, "当前状态");
+
+        var operation = service.BeginDeleteRestorePoint(
+            project.Root,
+            current.Id,
+            _ => { });
+        service.CompleteDeleteRestorePoint(operation);
+
+        var status = service.GetStatus(project.Root);
+        var history = service.GetRestorePoints(project.Root);
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Select(point => point.Id),
+                Is.EqualTo(new[] { initial.Id }));
+            Assert.That(status.CurrentRestorePointId, Is.EqualTo(initial.Id));
+            Assert.That(status.UnrecordedChanges, Has.Count.EqualTo(1));
+            Assert.That(
+                File.ReadAllBytes(fullPath),
+                Is.EqualTo(new byte[] { 2 }));
+        });
+    }
+
+    [Test]
+    public void DeleteRestorePoint_RollbackRestoresHeadIndexAndCleanState()
+    {
+        using var project = new TemporaryProject();
+        var fullPath = Path.Combine(project.Root, "db", "units.bin");
+        File.WriteAllBytes(fullPath, [1]);
+        var service = CreateService();
+        service.Initialize(project.Root);
+        File.WriteAllBytes(fullPath, [2]);
+        var current = service.CreateRestorePoint(project.Root, "当前状态");
+        var indexPath = Path.Combine(project.Root, ".git", "index");
+        var originalIndex = File.ReadAllBytes(indexPath);
+
+        var operation = service.BeginDeleteRestorePoint(
+            project.Root,
+            current.Id,
+            _ => { });
+        service.RollbackDeleteRestorePoint(project.Root, operation);
+
+        var status = service.GetStatus(project.Root);
+        Assert.Multiple(() =>
+        {
+            Assert.That(status.CurrentRestorePointId, Is.EqualTo(current.Id));
+            Assert.That(status.IsClean, Is.True);
+            Assert.That(File.ReadAllBytes(indexPath),
+                Is.EqualTo(originalIndex));
+            Assert.That(File.ReadAllBytes(fullPath),
+                Is.EqualTo(new byte[] { 2 }));
+        });
+    }
+
+    [Test]
+    public void DeleteInitialRestorePoint_IsRejected()
+    {
+        using var project = new TemporaryProject();
+        var service = CreateService();
+        var initial = service.Initialize(project.Root);
+
+        var exception = Assert.Throws<FolderProjectHistoryException>(() =>
+            service.BeginDeleteRestorePoint(
+                project.Root,
+                initial.Id,
+                _ => { }));
+
+        Assert.That(
+            exception!.Code,
+            Is.EqualTo(
+                FolderProjectHistoryError.RestorePointCannotBeDeleted));
     }
 
     [Test]

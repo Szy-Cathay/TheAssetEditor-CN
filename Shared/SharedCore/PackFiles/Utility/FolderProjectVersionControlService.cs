@@ -56,6 +56,17 @@ internal interface IFolderProjectVersionControlService
         string message,
         Action<FolderProjectVersionControlProgress> reportProgress);
 
+    FolderProjectRestorePointDeleteRollback BeginDeleteRestorePoint(
+        string projectRoot,
+        string commitId);
+
+    void CompleteDeleteRestorePoint(
+        FolderProjectRestorePointDeleteRollback rollback);
+
+    void RollbackDeleteRestorePoint(
+        string projectRoot,
+        FolderProjectRestorePointDeleteRollback rollback);
+
     void StageChanges(
         string projectRoot,
         IReadOnlyList<string> relativePaths);

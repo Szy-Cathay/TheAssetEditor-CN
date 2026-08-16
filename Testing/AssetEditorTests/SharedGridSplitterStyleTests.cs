@@ -38,9 +38,11 @@ namespace AssetEditorTests
                 NUnitAssert.That(style, Is.Not.Null);
                 NUnitAssert.That(style!.TargetType, Is.EqualTo(typeof(GridSplitter)));
 
-                var template = style.Setters
+                var setters = style.Setters
                     .OfType<Setter>()
-                    .Single(setter => setter.Property == Control.TemplateProperty)
+                    .ToDictionary(setter => setter.Property);
+
+                var template = setters[Control.TemplateProperty]
                     .Value as ControlTemplate;
                 NUnitAssert.That(template, Is.Not.Null);
                 var root = template!.LoadContent() as Border;
@@ -54,6 +56,21 @@ namespace AssetEditorTests
                     NUnitAssert.That(grip.Children.OfType<Ellipse>().Count(), Is.EqualTo(3));
                     NUnitAssert.That(root.HorizontalAlignment, Is.EqualTo(HorizontalAlignment.Stretch));
                     NUnitAssert.That(root.VerticalAlignment, Is.EqualTo(VerticalAlignment.Stretch));
+                    NUnitAssert.That(
+                        setters[GridSplitter.ResizeBehaviorProperty].Value,
+                        Is.EqualTo(GridResizeBehavior.PreviousAndNext));
+                    NUnitAssert.That(
+                        setters[GridSplitter.ResizeDirectionProperty].Value,
+                        Is.EqualTo(
+                            orientation == Orientation.Vertical
+                                ? GridResizeDirection.Columns
+                                : GridResizeDirection.Rows));
+                    NUnitAssert.That(
+                        setters[
+                            orientation == Orientation.Vertical
+                                ? FrameworkElement.WidthProperty
+                                : FrameworkElement.HeightProperty].Value,
+                        Is.EqualTo(5d));
                 });
             });
         }

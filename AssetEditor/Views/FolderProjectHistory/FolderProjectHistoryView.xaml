@@ -197,7 +197,7 @@
                     </Grid>
                     <ListView
                         MaxHeight="176"
-                        Margin="0,0,0,12"
+                        Margin="0,0,0,4"
                         ItemsSource="{Binding RestorePoints}"
                         SelectedItem="{Binding SelectedRestorePoint, Mode=TwoWay}"
                         Style="{StaticResource AeList.View}">
@@ -232,6 +232,12 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+                    <Button
+                        Margin="0,0,0,12"
+                        HorizontalAlignment="Right"
+                        Command="{Binding DeleteRestorePointCommand}"
+                        Content="{loc:Loc FolderProject.History.DeleteRestorePoint}"
+                        Style="{StaticResource AeButton.Danger}" />
 
                     <Grid Margin="0,0,0,4">
                         <Grid.ColumnDefinitions>

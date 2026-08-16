@@ -151,28 +151,86 @@ namespace AssetEditorTests
             var solutionRoot = FindSolutionRoot();
             var expectations = new Dictionary<string, string[]>
             {
+                ["AssetEditor/Views/MainWindow.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
+                ["Editors/Audio/AudioEditor/Presentation/AudioEditorView.xaml"] =
+                [
+                    "{StaticResource AeHorizontalGridSplitterStyle}",
+                    "{StaticResource AeHorizontalGridSplitterStyle}",
+                    "{StaticResource AeVerticalGridSplitterStyle}",
+                ],
+                ["Editors/Audio/AudioExplorer/AudioExplorerView.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
+                ["Editors/CscEditor/Editors.CscEditor/Views/CscEditorView.xaml"] =
+                [
+                    "{StaticResource AeVerticalGridSplitterStyle}",
+                    "{StaticResource AeHorizontalGridSplitterStyle}",
+                ],
                 ["Editors/Kitbashing/KitbasherEditor/Core/KitbasherView.xaml"] =
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",
-                "{StaticResource AeHorizontalGridSplitterStyle}",
-            ],
+                    "{StaticResource AeHorizontalGridSplitterStyle}",
+                ],
                 ["Editors/Shared/Editors.Shared.Core/Common/BaseControl/EditorHostView.xaml"] =
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/TwuiEditor/Editor.Twui/Editor/Presentation/TwuiMainView.xaml"] =
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",
-                "{StaticResource AeVerticalGridSplitterStyle}",
-            ],
+                    "{StaticResource AeVerticalGridSplitterStyle}",
+                ],
             };
             XNamespace presentation =
                 "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
             var failures = new List<string>();
 
+            var productXamlPaths = new[]
+                {
+                    "AssetEditor",
+                    "Editors",
+                    "GameWorld",
+                    "Shared",
+                }
+                .SelectMany(root => Directory.EnumerateFiles(
+                    Path.Combine(solutionRoot, root),
+                    "*.xaml",
+                    SearchOption.AllDirectories))
+                .Where(path => !IsBuildOutputPath(path))
+                .Select(path => new
+                {
+                    RelativePath = Path.GetRelativePath(solutionRoot, path)
+                        .Replace(Path.DirectorySeparatorChar, '/'),
+                    Document = XDocument.Load(path),
+                })
+                .Where(item => item.Document
+                    .Descendants(presentation + "GridSplitter")
+                    .Any())
+                .ToArray();
+
+            var unexpectedFiles = productXamlPaths
+                .Select(item => item.RelativePath)
+                .Except(expectations.Keys, StringComparer.Ordinal)
+                .ToArray();
+            failures.AddRange(unexpectedFiles.Select(path =>
+                $"{path}: GridSplitter style expectation missing"));
+
+            var missingFiles = expectations.Keys
+                .Except(
+                    productXamlPaths.Select(item => item.RelativePath),
+                    StringComparer.Ordinal)
+                .ToArray();
+            failures.AddRange(missingFiles.Select(path =>
+                $"{path}: expected GridSplitter not found"));
+
             foreach (var expectation in expectations)
             {
-                var document = XDocument.Load(Path.Combine(
-                    solutionRoot,
-                    expectation.Key));
+                var item = productXamlPaths.SingleOrDefault(candidate =>
+                    candidate.RelativePath.Equals(
+                        expectation.Key,
+                        StringComparison.Ordinal));
+                if (item is null)
+                    continue;
+
+                var document = item.Document;
                 var sources = document
                     .Descendants(presentation + "ResourceDictionary")
                     .Select(element => (string?)element.Attribute("Source"));
@@ -196,6 +254,14 @@ namespace AssetEditorTests
                         element.Element(presentation + "GridSplitter.Template") != null))
                 {
                     failures.Add($"{expectation.Key}: inline template remains");
+                }
+
+                if (splitters.Any(element =>
+                        element.Attribute("Background") != null ||
+                        element.Attribute("BorderBrush") != null ||
+                        element.Attribute("BorderThickness") != null))
+                {
+                    failures.Add($"{expectation.Key}: inline visual override remains");
                 }
             }
 
