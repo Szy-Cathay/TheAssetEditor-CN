@@ -88,6 +88,7 @@ internal enum FolderProjectVersionControlProgressStage
 {
     PreparingRepository,
     ScanningWorkingTree,
+    CatalogingWorkingChanges,
     ProcessingWorkingChanges,
     IndexingFiles,
     CreatingInitialCommit,

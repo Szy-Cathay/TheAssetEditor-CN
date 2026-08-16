@@ -27,6 +27,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         </ResourceDictionary>
@@ -208,11 +209,13 @@
 
                     <Grid.RowDefinitions>
                         <RowDefinition 
-                            Height="*"/>
+                            Height="3*"
+                            MinHeight="180"/>
                         <RowDefinition 
                             Height="Auto"/>
                         <RowDefinition 
-                            Height="*"/>
+                            Height="2*"
+                            MinHeight="160"/>
                         <RowDefinition 
                             Height="Auto"/>
                         <RowDefinition 
@@ -227,7 +230,7 @@
                     <GridSplitter
                         Grid.Row="1"
                         Height="5"
-                        Background="{DynamicResource AeBrush.Border}"
+                        Style="{StaticResource AeHorizontalGridSplitterStyle}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"
@@ -241,7 +244,7 @@
                     <GridSplitter
                         Grid.Row="3"
                         Height="5"
-                        Background="{DynamicResource AeBrush.Border}"
+                        Style="{StaticResource AeHorizontalGridSplitterStyle}"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Stretch"
                         ResizeBehavior="PreviousAndNext"

@@ -51,6 +51,11 @@ internal interface IFolderProjectVersionControlService
         string projectRoot,
         string message);
 
+    FolderProjectCommitSummary CommitAll(
+        string projectRoot,
+        string message,
+        Action<FolderProjectVersionControlProgress> reportProgress);
+
     void StageChanges(
         string projectRoot,
         IReadOnlyList<string> relativePaths);
@@ -619,7 +624,7 @@ internal sealed partial class FolderProjectVersionControlService :
                 previousPaths[repositoryPath] = previousPath;
             reportProgress?.Invoke(new FolderProjectVersionControlProgress(
                 FolderProjectVersionControlProgressStage
-                    .ProcessingWorkingChanges,
+                    .CatalogingWorkingChanges,
                 repositoryPath,
                 index + 1,
                 statusEntries.Count));
@@ -1090,8 +1095,15 @@ internal sealed partial class FolderProjectVersionControlService :
 
     public FolderProjectCommitSummary CommitAll(
         string projectRoot,
-        string message)
+        string message) =>
+        CommitAll(projectRoot, message, _ => { });
+
+    public FolderProjectCommitSummary CommitAll(
+        string projectRoot,
+        string message,
+        Action<FolderProjectVersionControlProgress> reportProgress)
     {
+        ArgumentNullException.ThrowIfNull(reportProgress);
         if (string.IsNullOrWhiteSpace(message))
         {
             throw new FolderProjectVersionControlException(
@@ -1107,8 +1119,10 @@ internal sealed partial class FolderProjectVersionControlService :
                 var identity = ReadLocalIdentity(repository);
                 ValidateIdentity(identity);
                 var signature = CreateSignature(identity);
-                var changes = RetrieveWorkingStatus(repository);
-                if (!changes.Any())
+                var changes = RetrieveWorkingStatus(repository)
+                    .Where(entry => entry.State != FileStatus.Ignored)
+                    .ToList();
+                if (changes.Count == 0)
                 {
                     throw new FolderProjectVersionControlException(
                         FolderProjectVersionControlError.NothingToCommit,
@@ -1121,7 +1135,26 @@ internal sealed partial class FolderProjectVersionControlService :
                 Commit commit;
                 try
                 {
-                    Commands.Stage(repository, "*");
+                    for (var index = 0; index < changes.Count; index++)
+                    {
+                        var change = changes[index];
+                        var repositoryPath = change.FilePath.Replace('\\', '/');
+                        var paths = new[]
+                            {
+                                repositoryPath,
+                                GetPreviousRepositoryPath(change),
+                            }
+                            .Where(path => !string.IsNullOrWhiteSpace(path))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Cast<string>()
+                            .ToArray();
+                        Commands.Stage(repository, paths);
+                        reportProgress(new FolderProjectVersionControlProgress(
+                            FolderProjectVersionControlProgressStage.IndexingFiles,
+                            repositoryPath,
+                            index + 1,
+                            changes.Count));
+                    }
                     commit = _platform.Commit(
                         repository,
                         message.Trim(),

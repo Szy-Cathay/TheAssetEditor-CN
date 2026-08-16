@@ -149,7 +149,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             return;
 
         await RunOperation(
-            () => LoadSnapshot(projectRoot),
+            () => LoadSnapshot(projectRoot, validateUnrecordedChanges: true),
             ApplySnapshot);
     }
 
@@ -254,7 +254,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             {
                 HistorySnapshot? snapshot = null;
                 ReportProgress(new FolderProjectHistoryProgress(
-                    FolderProjectHistoryProgressStage.PreparingEditors));
+                    FolderProjectHistoryProgressStage.PreparingEditors,
+                    project.ProjectRoot));
                 await _coordinator.ExecuteTransactionalAsync(
                     project.ProjectRoot,
                     () =>
@@ -265,14 +266,16 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                             ReportProgress);
                         ReportProgress(new FolderProjectHistoryProgress(
                             FolderProjectHistoryProgressStage
-                                .ReconcilingProject));
+                                .ReconcilingProject,
+                            project.ProjectRoot));
                         return result;
                     },
                     _ =>
                     {
                         ReportProgress(new FolderProjectHistoryProgress(
                             FolderProjectHistoryProgressStage
-                                .RefreshingInterface));
+                                .RefreshingInterface,
+                            project.ProjectRoot));
                         snapshot = LoadSnapshot(project.ProjectRoot);
                     },
                     result => _historyService.RollbackProjectRestore(
@@ -301,13 +304,27 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         await RunOperation(
             () => ExecuteWorkspaceFileOperation(
                 project,
-                () => _historyService.BeginRestoreFile(
-                    project.ProjectRoot,
-                    change.Kind == FolderProjectRestorePointChangeKind.Deleted
-                        ? restorePoint.PreviousRestorePointId!
-                        : restorePoint.Id,
-                    change.Path,
-                    overwrite),
+                () =>
+                {
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage.WritingProjectFiles,
+                        change.Path,
+                        0,
+                        1));
+                    var operation = _historyService.BeginRestoreFile(
+                        project.ProjectRoot,
+                        change.Kind == FolderProjectRestorePointChangeKind.Deleted
+                            ? restorePoint.PreviousRestorePointId!
+                            : restorePoint.Id,
+                        change.Path,
+                        overwrite);
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage.WritingProjectFiles,
+                        change.Path,
+                        1,
+                        1));
+                    return operation;
+                },
                 _historyService.CompleteRestoreFile,
                 _historyService.RollbackRestoreFile),
             ApplySnapshot);
@@ -425,14 +442,16 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             {
                 var result = operation();
                 ReportProgress(new FolderProjectHistoryProgress(
-                    FolderProjectHistoryProgressStage.ReconcilingProject));
+                    FolderProjectHistoryProgressStage.ReconcilingProject,
+                    project.ProjectRoot));
                 return result;
             },
             result =>
             {
                 project.RefreshFromDisk();
                 ReportProgress(new FolderProjectHistoryProgress(
-                    FolderProjectHistoryProgressStage.RefreshingInterface));
+                    FolderProjectHistoryProgressStage.RefreshingInterface,
+                    project.ProjectRoot));
                 snapshot = LoadSnapshot(project.ProjectRoot);
                 complete(result);
             },
@@ -519,9 +538,13 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         }
     }
 
-    private HistorySnapshot LoadSnapshot(string projectRoot)
+    private HistorySnapshot LoadSnapshot(
+        string projectRoot,
+        bool validateUnrecordedChanges = false)
     {
-        var status = _historyService.GetDisplayStatus(projectRoot);
+        var status = validateUnrecordedChanges
+            ? _historyService.GetStatus(projectRoot, ReportProgress)
+            : _historyService.GetDisplayStatus(projectRoot);
         var restorePoints = status.Availability ==
                             FolderProjectHistoryAvailability.NotInitialized
             ? []

@@ -11,6 +11,7 @@ using Editors.Audio.Shared.Wwise;
 using Editors.Audio.Shared.Wwise.Generators;
 using Editors.Audio.Shared.Wwise.Generators.Hirc.V136;
 using Moq;
+using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
 using Shared.GameFormats.Wwise;
@@ -419,6 +420,85 @@ namespace AssetEditorTests
                 .All(value =>
                     value.Completed >= 0 &&
                     value.Completed <= value.Total));
+            Assert.IsTrue(progress.Values.Any(value =>
+                value.StageResourceKey ==
+                    "AudioOperation.Compile.SoundBanks" &&
+                value.Detail.EndsWith(
+                    "battle_individual_magic_test.bnk",
+                    StringComparison.OrdinalIgnoreCase) &&
+                value.Completed == 1 &&
+                value.Total == 1));
+        }
+
+        [TestMethod]
+        public async Task WemGenerator_ReportsEachExportedWavWithExactProgress()
+        {
+            var workspacePath = Path.Combine(
+                Path.GetTempPath(),
+                $"ae-wem-progress-{Guid.NewGuid():N}");
+            var audioFiles = new List<AudioFile>
+            {
+                new(
+                    Guid.NewGuid(),
+                    101,
+                    "first.wav",
+                    "audio\\first.wav"),
+                new(
+                    Guid.NewGuid(),
+                    102,
+                    "second.wav",
+                    "audio\\second.wav"),
+            };
+            var packFiles = audioFiles.ToDictionary(
+                audioFile => audioFile.WavPackFilePath,
+                audioFile => PackFile.CreateFromBytes(
+                    audioFile.WavPackFileName,
+                    [1, 2, 3]),
+                StringComparer.OrdinalIgnoreCase);
+            var packFileService = new Mock<IPackFileService>();
+            packFileService.Setup(service => service.FindFile(
+                    It.IsAny<string>(),
+                    It.IsAny<PackFileContainer?>()))
+                .Returns((string path, PackFileContainer? _) =>
+                    packFiles.GetValueOrDefault(path));
+            using var cancellationTokenSource =
+                new CancellationTokenSource();
+            var progress = new RecordingProgress<AudioOperationProgress>(
+                value =>
+                {
+                    if (value.Completed == audioFiles.Count)
+                        cancellationTokenSource.Cancel();
+                });
+            var generator = new WemGeneratorService(
+                packFileService.Object,
+                new WSourcesWrapper(null!));
+
+            try
+            {
+                await generator.GenerateWemsAsync(
+                    audioFiles,
+                    workspacePath,
+                    progress,
+                    cancellationTokenSource.Token);
+            }
+            finally
+            {
+                if (Directory.Exists(workspacePath))
+                    Directory.Delete(workspacePath, recursive: true);
+            }
+
+            var wavProgress = progress.Values.Where(value =>
+                    value.StageResourceKey ==
+                        "AudioOperation.Compile.Wems" &&
+                    value.Total > 0)
+                .ToArray();
+            CollectionAssert.AreEqual(
+                new[] { "audio\\first.wav", "audio\\second.wav" },
+                wavProgress.Select(value => value.Detail).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { 1, 2 },
+                wavProgress.Select(value => value.Completed).ToArray());
+            Assert.IsTrue(wavProgress.All(value => value.Total == 2));
         }
 
         [TestMethod]
@@ -496,6 +576,52 @@ namespace AssetEditorTests
                     It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
                     It.IsAny<bool>()),
                 Times.Never);
+        }
+
+        [TestMethod]
+        public async Task Compile_ReportsEachPreparedSoundBankWithExactProgress()
+        {
+            var project = new AudioProjectFile
+            {
+                Language = "sfx",
+                SoundBanks =
+                [
+                    new SoundBank(
+                        "bank_one",
+                        Wh3SoundBank.BattleIndividualMagic,
+                        "sfx"),
+                    new SoundBank(
+                        "bank_two",
+                        Wh3SoundBank.BattleIndividualMagic,
+                        "sfx"),
+                ],
+            };
+            var compiler = new AudioProjectCompilerService(
+                Mock.Of<ISoundBankGeneratorService>(),
+                Mock.Of<IWemGeneratorService>(),
+                Mock.Of<IDatGeneratorService>(),
+                Mock.Of<IAudioPackOutputService>());
+            var progress = new RecordingProgress<AudioOperationProgress>();
+
+            var completed = await ((IAudioProjectCompilerProgressService)
+                compiler).CompileAsync(
+                project,
+                "test.aproj",
+                "audio\\test.aproj",
+                AudioProjectCompileTarget.AllLanguages,
+                progress);
+
+            Assert.IsTrue(completed);
+            Assert.IsTrue(progress.Values.Any(value =>
+                value.StageResourceKey == "AudioOperation.Compile.Preparing" &&
+                value.Detail?.EndsWith("bank_one.bnk") == true &&
+                value.Completed == 1 &&
+                value.Total == 2));
+            Assert.IsTrue(progress.Values.Any(value =>
+                value.StageResourceKey == "AudioOperation.Compile.Preparing" &&
+                value.Detail?.EndsWith("bank_two.bnk") == true &&
+                value.Completed == 2 &&
+                value.Total == 2));
         }
 
         [TestMethod]
@@ -730,11 +856,16 @@ namespace AssetEditorTests
             return savedOutputs.Select(output => output.FilePath).ToList();
         }
 
-        private sealed class RecordingProgress<T> : IProgress<T>
+        private sealed class RecordingProgress<T>(
+            Action<T>? onReport = null) : IProgress<T>
         {
             public List<T> Values { get; } = [];
 
-            public void Report(T value) => Values.Add(value);
+            public void Report(T value)
+            {
+                Values.Add(value);
+                onReport?.Invoke(value);
+            }
         }
 
         private static CAkActorMixer_V136 CreateSpatialActorMixerTemplate(

@@ -150,7 +150,8 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                             compileTarget.OutputDirectory,
                             audioFiles,
                             sounds,
-                            cancellationToken);
+                            cancellationToken,
+                            progress);
                         progress?.Report(new AudioOperationProgress(
                             "AudioOperation.Compile.Preparing",
                             audioProjectFileName,
@@ -170,7 +171,8 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                                 audioFiles,
                                 sounds,
                                 workspacePath,
-                                cancellationToken));
+                                cancellationToken,
+                                progress));
                         progress?.Report(new AudioOperationProgress(
                             "AudioOperation.Compile.Wems",
                             $"{wemCount} WEM",
@@ -194,7 +196,8 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                             soundBankCount));
                         generatedOutputs.AddRange(GenerateSoundBanks(
                             audioProject,
-                            cancellationToken));
+                            cancellationToken,
+                            progress));
                         progress?.Report(new AudioOperationProgress(
                             "AudioOperation.Compile.SoundBanks",
                             audioProjectFileName,
@@ -235,9 +238,7 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
 
                 progress?.Report(new AudioOperationProgress(
                     "AudioOperation.Saving",
-                    audioProjectFilePath,
-                    0,
-                    compilationResult.Outputs.Count));
+                    audioProjectFilePath));
                 _audioPackOutputService.SaveBatch(
                     compilationResult.Outputs);
                 progress?.Report(new AudioOperationProgress(
@@ -286,13 +287,17 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             string outputDirectory,
             List<AudioFile> audioFiles,
             List<Sound> sounds,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IProgress<AudioOperationProgress>? progress)
         {
             _logger.Here().Information($"Setting SoundBank data");
 
-            foreach (var soundBank in audioProject.SoundBanks)
+            for (var index = 0;
+                 index < audioProject.SoundBanks.Count;
+                 index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var soundBank = audioProject.SoundBanks[index];
 
                 soundBank.FileName = $"{soundBank.Name}.bnk";
                 soundBank.FilePath =
@@ -340,6 +345,12 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                         workspacePath,
                         outputDirectory,
                         cancellationToken);
+
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Compile.Preparing",
+                    soundBank.FilePath,
+                    index + 1,
+                    audioProject.SoundBanks.Count));
             }
         }
 
@@ -485,7 +496,8 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             List<AudioFile> audioFiles,
             List<Sound> sounds,
             string workspacePath,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IProgress<AudioOperationProgress>? progress)
         {
             var uniqueAudioFiles = audioFiles
                 .DistinctBy(audioFile => audioFile.Id)
@@ -497,10 +509,22 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
             if (uniqueAudioFiles.Count > 0)
             {
                 _logger.Here().Information($"Generating {uniqueAudioFiles.Count} WEMs");
-                await _wemGeneratorService.GenerateWemsAsync(
-                    uniqueAudioFiles,
-                    workspacePath,
-                    cancellationToken);
+                if (_wemGeneratorService is IWemGeneratorProgressService
+                    progressService)
+                {
+                    await progressService.GenerateWemsAsync(
+                        uniqueAudioFiles,
+                        workspacePath,
+                        progress,
+                        cancellationToken);
+                }
+                else
+                {
+                    await _wemGeneratorService.GenerateWemsAsync(
+                        uniqueAudioFiles,
+                        workspacePath,
+                        cancellationToken);
+                }
                 if (cancellationToken.IsCancellationRequested)
                     return [];
 
@@ -534,39 +558,49 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
 
         private List<AudioPackOutput> GenerateSoundBanks(
             AudioProjectFile audioProject,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IProgress<AudioOperationProgress>? progress)
         {
             var outputs = new List<AudioPackOutput>();
-            foreach (var soundBank in audioProject.SoundBanks)
+            var soundBanks = audioProject.SoundBanks
+                .Where(soundBank =>
+                    soundBank.ActionEvents.Count != 0 ||
+                    soundBank.DialogueEvents.Count != 0)
+                .ToList();
+            for (var index = 0; index < soundBanks.Count; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var soundBank = soundBanks[index];
 
-                if (soundBank.ActionEvents.Count != 0 || soundBank.DialogueEvents.Count != 0)
+                _logger.Here().Information($"Generating SoundBank {soundBank.FilePath}");
+
+                // Create the .bnk that modders should keep
+                outputs.AddRange(ExpandSoundBankOutput(
+                    soundBank,
+                    _soundBankGeneratorService
+                        .GenerateSoundBankWithoutDialogueEvents(soundBank)));
+
+                if (soundBank.DialogueEvents.Count != 0)
                 {
-                    _logger.Here().Information($"Generating SoundBank {soundBank.FilePath}");
-
-                    // Create the .bnk that modders should keep
+                    // Create a .bnk of the compiled Dialogue Events merged with vanilla Dialogue Events for modders to test
+                    _logger.Here().Information($"Generating SoundBank {soundBank.TestingFilePath} and {soundBank.MergingFilePath}");
                     outputs.AddRange(ExpandSoundBankOutput(
                         soundBank,
                         _soundBankGeneratorService
-                            .GenerateSoundBankWithoutDialogueEvents(soundBank)));
+                            .GenerateDialogueEventsForTestingSoundBank(soundBank)));
 
-                    if (soundBank.DialogueEvents.Count != 0)
-                    {
-                        // Create a .bnk of the compiled Dialogue Events merged with vanilla Dialogue Events for modders to test
-                        _logger.Here().Information($"Generating SoundBank {soundBank.TestingFilePath} and {soundBank.MergingFilePath}");
-                        outputs.AddRange(ExpandSoundBankOutput(
-                            soundBank,
-                            _soundBankGeneratorService
-                                .GenerateDialogueEventsForTestingSoundBank(soundBank)));
-
-                        // Create the .bnk that modders should give to the merger
-                        outputs.AddRange(ExpandSoundBankOutput(
-                            soundBank,
-                            _soundBankGeneratorService
-                                .GenerateMergingSoundBank(soundBank)));
-                    }
+                    // Create the .bnk that modders should give to the merger
+                    outputs.AddRange(ExpandSoundBankOutput(
+                        soundBank,
+                        _soundBankGeneratorService
+                            .GenerateMergingSoundBank(soundBank)));
                 }
+
+                progress?.Report(new AudioOperationProgress(
+                    "AudioOperation.Compile.SoundBanks",
+                    soundBank.FilePath,
+                    index + 1,
+                    soundBanks.Count));
             }
 
             return outputs;

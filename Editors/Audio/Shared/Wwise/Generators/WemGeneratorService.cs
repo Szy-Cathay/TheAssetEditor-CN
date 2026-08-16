@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.AudioProject.Models;
+using Editors.Audio.Shared.Storage;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -22,7 +23,16 @@ namespace Editors.Audio.Shared.Wwise.Generators
             List<AudioFile> audioFiles);
     }
 
-    public class WemGeneratorService(IPackFileService packFileService, WSourcesWrapper wSourcesWrapper) : IWemGeneratorService
+    public interface IWemGeneratorProgressService
+    {
+        Task GenerateWemsAsync(
+            List<AudioFile> audioFiles,
+            string workspacePath,
+            IProgress<AudioOperationProgress>? progress,
+            CancellationToken cancellationToken = default);
+    }
+
+    public class WemGeneratorService(IPackFileService packFileService, WSourcesWrapper wSourcesWrapper) : IWemGeneratorService, IWemGeneratorProgressService
     {
         private readonly IPackFileService _packFileService = packFileService;
         private readonly WSourcesWrapper _wSourcesWrapper = wSourcesWrapper;
@@ -30,6 +40,17 @@ namespace Editors.Audio.Shared.Wwise.Generators
         public async Task GenerateWemsAsync(
             List<AudioFile> audioFiles,
             string workspacePath,
+            CancellationToken cancellationToken = default) =>
+            await GenerateWemsAsync(
+                audioFiles,
+                workspacePath,
+                progress: null,
+                cancellationToken);
+
+        public async Task GenerateWemsAsync(
+            List<AudioFile> audioFiles,
+            string workspacePath,
+            IProgress<AudioOperationProgress>? progress,
             CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -49,10 +70,11 @@ namespace Editors.Audio.Shared.Wwise.Generators
             var wavFileNames = new List<string>(audioFiles.Count);
             var preparationCompleted = await Task.Run(() =>
             {
-                foreach (var audioFile in audioFiles)
+                for (var index = 0; index < audioFiles.Count; index++)
                 {
                     if (cancellationToken.IsCancellationRequested)
                         return false;
+                    var audioFile = audioFiles[index];
 
                     var wavFile =
                         _packFileService.FindFile(
@@ -68,6 +90,11 @@ namespace Editors.Audio.Shared.Wwise.Generators
                         wavFileName);
                     ExportWav(wavFilePath, wavFile.DataSource);
                     wavFileNames.Add(wavFileName);
+                    progress?.Report(new AudioOperationProgress(
+                        "AudioOperation.Compile.Wems",
+                        audioFile.WavPackFilePath,
+                        index + 1,
+                        audioFiles.Count));
                 }
 
                 if (cancellationToken.IsCancellationRequested)
@@ -88,6 +115,9 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 return;
 
             var arguments = $"\"{wprojPath}\" -ConvertExternalSources \"{wsourcesPath}\" -ExternalSourcesOutput \"{workspacePath}\"";
+            progress?.Report(new AudioOperationProgress(
+                "AudioOperation.Compile.Wwise",
+                wsourcesPath));
             try
             {
                 await _wSourcesWrapper.RunExternalCommandAsync(
