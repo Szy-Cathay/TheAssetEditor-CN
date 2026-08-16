@@ -118,7 +118,7 @@ public class UiMainShellTests
                     "<RowDefinition Height=\"{StaticResource AeSize.TabGridLength}\" />"));
             NUnitAssert.That(
                 workspaceSplitter,
-                Does.Not.Contain("Margin="));
+                Does.Contain("Margin=\"0,24,0,0\""));
             NUnitAssert.That(
                 workspaceSplitter,
                 Does.Not.Contain("Background="));
