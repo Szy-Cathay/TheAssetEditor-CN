@@ -25964,38 +25964,38 @@
   "questions": [
     {
       "type": "bridge_node",
-      "question": "Why does `Shared.Core.Services` connect `Community 0` to `Community 1`, `Community 3`, `Community 4`, `Community 9`, `Community 16`, `Community 17`, `Community 19`, `Community 21`, `Community 283`, `Community 27`, `Community 29`, `Community 36`, `Community 42`, `Community 46`, `Community 176`, `Community 51`, `Community 321`, `Community 204`, `Community 83`, `Community 362`, `Community 374`, `Community 382`?",
+      "question": "Why does `Shared.Core.Services` connect `Core Services and Pack Files` to `3D Scene Graph`, `Rigid Model Materials`, `Shared UI and Galleries`, `3D Camera and Input`, `Editor Dependency Infrastructure`, `Kitbash Commands and Services`, `Animation and glTF Import`, `Kitbash Menu Commands`, `Kitbashing Blender Shortcuts Help Window`, `Pack Serialization`, `Audio Editor Core`, `Wwise Binary Formats`, `Audio Project Infrastructure`, `Animation Metadata Architecture`, `ESF Game Formats`, `WPF 3D Editor Hosting`, `Scene Render Parameters Store`, `Keyboard Input Component`, `Shared Utilities and Diagnostics`, `Shared UI Unified Message Box`, `Game World Core WPF Window`, `Audio Explorer View Model Export`?",
       "why": "High betweenness centrality (0.087) - this node is a cross-community bridge."
     },
     {
       "type": "bridge_node",
-      "question": "Why does `IPackFileService` connect `Community 14` to `Community 0`, `Community 6`, `Community 8`, `Community 10`, `Community 527`, `Community 21`, `Community 22`, `Community 24`, `Community 27`, `Community 30`, `Community 31`, `Community 39`, `Community 42`, `Community 48`, `Community 54`, `Community 57`, `Community 59`, `Community 62`, `Community 64`, `Community 65`, `Community 73`, `Community 76`, `Community 77`, `Community 84`, `Community 85`, `Community 90`, `Community 93`, `Community 95`, `Community 98`, `Community 103`, `Community 620`, `Community 114`, `Community 628`, `Community 122`, `Community 124`, `Community 637`, `Community 126`, `Community 135`, `Community 137`, `Community 139`, `Community 141`, `Community 142`, `Community 149`, `Community 666`, `Community 154`, `Community 157`, `Community 158`, `Community 161`, `Community 162`, `Community 163`, `Community 164`, `Community 167`, `Community 169`, `Community 186`, `Community 193`, `Community 194`, `Community 202`, `Community 213`, `Community 223`, `Community 238`, `Community 240`, `Community 254`, `Community 258`, `Community 259`, `Community 271`, `Community 275`, `Community 284`, `Community 291`, `Community 297`, `Community 300`, `Community 306`, `Community 308`, `Community 322`, `Community 331`, `Community 339`, `Community 341`, `Community 345`, `Community 363`, `Community 393`, `Community 410`, `Community 413`, `Community 433`, `Community 479`?",
+      "question": "Why does `CscEditorViewModel` connect `Composite Scene Editor` to `3D Scene Graph`, `CSC Edit History Tests`, `Editor Lifecycle Management`, `Pack Export Tools`, `3D Camera and Input`, `Pack File Operations`, `I Skeleton Animation Look Up`, `Disposable Test Infrastructure`, `I Saveable Editor`, `CSC Gizmo Component`, `Composite Scene Animation Components`, `Kitbasher View Model`, `Property Change Notifications`, `WPF 3D Editor Hosting`, `Audio Editor Event Tables`, `Localization Management`, `Scene Object Editing`, `Composite Scene Debug Rendering`, `Scene Graph Construction`, `Composite Scene View`, `Composite Scene Data Model`, `Curve Editor Rendering`, `Animation Pack Command Tests`, `I Standard Dialogs`?",
       "why": "High betweenness centrality (0.062) - this node is a cross-community bridge."
     },
     {
       "type": "bridge_node",
-      "question": "Why does `Shared.Core.PackFiles.Models` connect `Community 0` to `Community 1`, `Community 3`, `Community 132`, `Community 6`, `Community 8`, `Community 10`, `Community 16`, `Community 17`, `Community 19`, `Community 29`, `Community 162`, `Community 40`, `Community 42`, `Community 46`, `Community 447`, `Community 575`, `Community 63`, `Community 83`, `Community 95`, `Community 98`, `Community 106`, `Community 240`?",
-      "why": "High betweenness centrality (0.060) - this node is a cross-community bridge."
+      "question": "Why does `PackFile` connect `Pack Export Tools` to `Folder Project Storage`, `Observable Object`, `RMV To glTF Exporter`, `glTF Material Mode Import Tests`, `Editor Lifecycle Management`, `FastBin Parsing`, `glTF Model Import`, `Pack Container Management`, `Pack File Operations`, `I Skeleton Animation Look Up`, `IPC Request Handling`, `Wwise HIRC Repository`, `Import File Context Menu Helper`, `Animation Metadata Preview`, `File List Report Generator`, `Pack Serialization`, `Xml To Binary Converter`, `3D Capability Material`, `Audio File Services`, `Animation Playback`, `RMV Helper Warhammer 3 Save`, `Sound Data Files`, `Animation Pack ViewModel`, `Audio Playback`, `glTF External Animation Import Tests`, `Skeleton Animation View`, `Kitbasher View Model`, `Pack Material File Writing`, `glTF Exporter UI`, `Audio Project Infrastructure`, `Open Node In Command`, `glTF To RMV Importer View`, `Pack Report File Utilities`, `Unsaved Changes Detection`, `Skeleton Animation Lookup`, `Composite Scene Editor`, `Operation Progress Updates`, `Shared Core Pack File Container`, `Animation Retarget Saving`, `Skeleton Editing`, `WH3 Language Information`, `Exporter Core View Model`, `RMV To Text Report`, `Audio Project Compilation`, `Save Dialog ViewModel`, `Scene Object Editing`, `glTF Humanoid Scale Tests`, `Metadata Entry Commands`, `Campaign Animation Binary`, `Wwise BNK Parsing`, `Text Editor View Model`, `Animation Set Table Editing`, `glTF PBR Material Tests`, `Animation File and glTF Export`, `Audio Editor Reliability Tests`, `Scene Graph Construction`, `RMV Textures and Conversion`, `Metadata File Parsing`, `Animation Pack Serialization`, `Pack and Folder Project Serialization`, `Standard Dialog Interface`, `Pack File Browser`, `TWUI Component Serialization`, `Animation Pack Command Tests`, `CA VP8 Export Commands`, `Mount Animation Creation`, `Metadata Editor Integration Tests`, `Texture Preview Rendering`, `glTF RMV Material Import`, `Animation Batch Export View Model`?",
+      "why": "High betweenness centrality (0.061) - this node is a cross-community bridge."
     },
     {
       "type": "isolated_nodes",
-      "question": "What connects `net10.0-windows`, `Serilog (4.3.1)`, `SharpCompress (0.50.1)` to the rest of the system?",
+      "question": "What connects `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `CaPackLoadProgressStage` to the rest of the system?",
       "why": "2215 weakly-connected nodes found - possible documentation gaps or missing edges."
     },
     {
       "type": "low_cohesion",
-      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "question": "Should `Core Services and Pack Files` be split into smaller, more focused modules?",
       "why": "Cohesion score 0.020705968582898835 - nodes in this community are weakly interconnected."
     },
     {
       "type": "low_cohesion",
-      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "question": "Should `3D Scene Graph` be split into smaller, more focused modules?",
       "why": "Cohesion score 0.027120016191054443 - nodes in this community are weakly interconnected."
     },
     {
       "type": "low_cohesion",
-      "question": "Should `Community 2` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.022658294086865514 - nodes in this community are weakly interconnected."
+      "question": "Should `Pack Container Management` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.03417634996582365 - nodes in this community are weakly interconnected."
     }
   ]
 }
