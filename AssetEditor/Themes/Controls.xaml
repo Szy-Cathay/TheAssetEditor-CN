@@ -2060,17 +2060,6 @@
         </Setter>
     </Style>
 
-    <Style TargetType="{x:Type GridSplitter}">
-        <Setter Property="Background" Value="{DynamicResource ABrush.Tone5.Border.Static}"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type GridSplitter}">
-                    <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"/>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <Style TargetType="{x:Type ProgressBar}">
         <Setter Property="Foreground" Value="{DynamicResource ProgressBar.Progress}"/>
         <Setter Property="Background" Value="{DynamicResource ProgressBar.Background}"/>

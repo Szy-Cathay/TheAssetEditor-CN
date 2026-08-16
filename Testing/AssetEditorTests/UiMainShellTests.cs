@@ -21,7 +21,6 @@ public class UiMainShellTests
             ["AeShell.SidebarHeader"] = typeof(TextBlock),
             ["AeShell.StatusBar"] = typeof(Border),
             ["AeShell.StatusText"] = typeof(TextBlock),
-            ["AeShell.Splitter"] = typeof(GridSplitter),
         };
 
     [Test]

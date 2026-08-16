@@ -23,6 +23,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Editors.Audio;component/AudioUiStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter
                 x:Key="BooleanToVisibilityConverter"/>
@@ -590,7 +591,7 @@
             Grid.Row="0"
             Grid.Column="1" 
             Width="5" 
-            Background="{DynamicResource AeBrush.Border}"
+            Style="{StaticResource AeVerticalGridSplitterStyle}"
             VerticalAlignment="Stretch" 
             HorizontalAlignment="Center"
             ResizeBehavior="PreviousAndNext" 

@@ -27,8 +27,13 @@
         Background="{DynamicResource AeBrush.Canvas}">
 
     <Window.Resources>
-        <datatemplates:EditorTemplateSelector x:Key="EditorSelector" />
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <datatemplates:EditorTemplateSelector x:Key="EditorSelector" />
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid x:Name="rootGrid">
@@ -133,7 +138,7 @@
             <GridSplitter
                 Grid.Column="1"
                 Margin="0,24,0,0"
-                Style="{StaticResource AeShell.Splitter}"
+                Style="{StaticResource AeVerticalGridSplitterStyle}"
                 Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
 
             <views:CachedTabControl
