@@ -45,7 +45,7 @@
 
         <views:MenuBarView x:Name="MainMenuBar" Grid.Row="0" />
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" Background="{DynamicResource AeBrush.Surface1}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding FileTreeColumnWidth}" />
                 <ColumnDefinition Width="Auto" />
@@ -137,7 +137,6 @@
 
             <GridSplitter
                 Grid.Column="1"
-                Margin="0,24,0,0"
                 Style="{StaticResource AeVerticalGridSplitterStyle}"
                 Visibility="{Binding IsPackFileExplorerVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
 

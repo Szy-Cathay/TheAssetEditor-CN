@@ -83,7 +83,7 @@
         <Setter Property="Padding" Value="0" />
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
-        <Setter Property="BorderThickness" Value="0,0,1,0" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Stretch" />
         <Setter Property="Template">

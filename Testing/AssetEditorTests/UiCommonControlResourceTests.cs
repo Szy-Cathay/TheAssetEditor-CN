@@ -475,6 +475,9 @@ public class UiCommonControlResourceTests
                             contextMenu.Padding,
                             Is.EqualTo(new Thickness(2)));
                         NUnitAssert.That(popup.IsOpen, Is.True);
+                        NUnitAssert.That(
+                            popup.PopupAnimation,
+                            Is.EqualTo(PopupAnimation.None));
                     });
                 }
                 finally
@@ -1143,7 +1146,17 @@ public class UiCommonControlResourceTests
             "DesignSystem",
             "Controls",
             "MenusAndFeedback.xaml"));
-        NUnitAssert.That(menuSource, Does.Contain("AeBrush.AccentSoft"));
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(menuSource, Does.Contain("AeBrush.AccentSoft"));
+            NUnitAssert.That(menuSource, Does.Not.Contain("PopupAnimation"));
+            NUnitAssert.That(menuSource, Does.Not.Contain("StateOverlay"));
+            NUnitAssert.That(
+                menuSource.Split(
+                    "<Setter TargetName=\"Chrome\" Property=\"Background\"",
+                    StringSplitOptions.None),
+                Has.Length.EqualTo(3));
+        });
     }
 
     private static ResourceDictionary[] LoadDictionaries() =>

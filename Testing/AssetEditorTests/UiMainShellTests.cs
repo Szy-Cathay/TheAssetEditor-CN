@@ -49,6 +49,15 @@ public class UiMainShellTests
                         dictionary.Keys.OfType<Type>(),
                         Is.Empty,
                         "Shell styles must not replace implicit styles.");
+                    var sidebar = (Style)dictionary[
+                        "AeShell.WorkspaceSidebar"];
+                    var sidebarBorder = sidebar.Setters
+                        .OfType<Setter>()
+                        .Single(setter =>
+                            setter.Property == Control.BorderThicknessProperty);
+                    NUnitAssert.That(
+                        sidebarBorder.Value,
+                        Is.EqualTo(new Thickness(0)));
                 });
             });
     }
@@ -68,6 +77,14 @@ public class UiMainShellTests
             "Themes",
             "DesignSystem",
             "Shell.xaml"));
+        var splitterStart = mainWindow.IndexOf(
+            "<GridSplitter",
+            StringComparison.Ordinal);
+        var splitterEnd = mainWindow.IndexOf(
+            "/>",
+            splitterStart,
+            StringComparison.Ordinal);
+        var workspaceSplitter = mainWindow[splitterStart..splitterEnd];
 
         NUnitAssert.Multiple(() =>
         {
@@ -100,8 +117,15 @@ public class UiMainShellTests
                 Does.Contain(
                     "<RowDefinition Height=\"{StaticResource AeSize.TabGridLength}\" />"));
             NUnitAssert.That(
+                workspaceSplitter,
+                Does.Not.Contain("Margin="));
+            NUnitAssert.That(
+                workspaceSplitter,
+                Does.Not.Contain("Background="));
+            NUnitAssert.That(
                 mainWindow,
-                Does.Contain("Margin=\"0,24,0,0\""));
+                Does.Contain(
+                    "<Grid Grid.Row=\"1\" Background=\"{DynamicResource AeBrush.Surface1}\">"));
             NUnitAssert.That(shell, Does.Contain("PART_ItemsHolder"));
             NUnitAssert.That(shell, Does.Contain("EmptyEditorState"));
         });
