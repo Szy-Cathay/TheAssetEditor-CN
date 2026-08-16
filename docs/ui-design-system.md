@@ -147,6 +147,12 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - 类型图标需要在 16–20 DIP 下仍可辨识。Kitbash 场景树沿用已确认的 C 组类型语义：复选框、类型图标、名称紧凑排列；锁图标紧贴名称右侧，不放到行的最远端。
 - 可见性使用小眼睛图标，不使用含义不明确的蓝色圆点；启用/禁用使用复选框或明确的状态图标。
 
+### 4.5 菜单与可拖动分隔条
+
+- 顶部菜单、子菜单和上下文菜单复用 `AeMenu.Bar`、`AeMenu.Item` 与 `AeMenu.Context`。高亮直接改变菜单项表面为 `AeBrush.AccentSoft`；不得叠加第二层状态遮罩，也不使用 Popup 淡入动画，避免残影和悬停状态不同步。
+- 所有可拖动面板分隔条复用 `Shared/SharedUI/Common/Styles/GridSplitterStyles.xaml` 中的 `AeVerticalGridSplitterStyle` 或 `AeHorizontalGridSplitterStyle`。两种样式统一提供 5 DIP 命中区域、正确方向的调整光标、`PreviousAndNext` 调整语义以及悬停/拖动反馈。
+- 业务 XAML 可以设置布局所需的行列、跨度和 Margin，但不得内联覆盖分隔条的背景、边框、方向、调整行为或模板。新增 GridSplitter 时必须同步加入 `SharedUiArchitectureTests` 的消费清单，并通过 `SharedGridSplitterStyleTests`。
+
 ## 5. 布局规则
 
 ### 5.1 主窗口与设置

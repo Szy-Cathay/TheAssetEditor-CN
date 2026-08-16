@@ -1,11 +1,11 @@
-# Graph Report - TheAssetEditor-CN  (2026-08-16)
+# Graph Report - TheAssetEditor-CN  (2026-08-17)
 
 ## Corpus Check
 - Codex host labeling; code-only graph; file stats unavailable
 
 ## Summary
-- 23485 nodes · 56150 edges · 788 communities (716 shown, 72 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 4850 edges (avg confidence: 0.75)
+- 23521 nodes · 56195 edges · 789 communities (717 shown, 72 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 4858 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
@@ -821,7 +821,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (788 total, 72 thin omitted)
+## Communities (789 total, 72 thin omitted)
 
 ### Community 0 - "Core Services and Pack Files"
 Cohesion: 0.02
@@ -3651,8 +3651,12 @@ Nodes (3): ResourceTreeView, DataContext.FileTree, FileTreeView
 Cohesion: 0.03
 Nodes (62): ExpanderAudioFiles, UserControl, AlwaysResetPlaylist, EnableRepetitionInterval, IsLoopingTypeVisible, IsPlaylistEndBehaviourEnabled, IsRemoveAudioFilesEnabled, IsTransitionTypeEnabled (+54 more)
 
+### Community 788 - "Project Rules and Architecture"
+Cohesion: 0.07
+Nodes (36): Codex 项目规则, AssetEditor.CN 国区版身份边界, Git 分阶段授权边界, 简单优先与外科手术式修改, Shared.Ui 依赖边界, 文件夹工程三层状态分离, 按风险确定验证范围, 任务收尾清理与知识图谱更新 (+28 more)
+
 ## Knowledge Gaps
-- **2215 isolated node(s):** `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `CaPackLoadProgressStage`, `MetaDataMarkerPointerActionKind`, `VertexTransformOperationMode` (+2210 more)
+- **2227 isolated node(s):** `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `CaPackLoadProgressStage`, `MetaDataMarkerPointerActionKind`, `VertexTransformOperationMode` (+2222 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **72 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -3672,7 +3676,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `PackFile` connect `Pack Export Tools` to `Folder Project Storage`, `Observable Object`, `RMV To glTF Exporter`, `glTF Material Mode Import Tests`, `Editor Lifecycle Management`, `FastBin Parsing`, `glTF Model Import`, `Pack Container Management`, `Pack File Operations`, `I Skeleton Animation Look Up`, `IPC Request Handling`, `Wwise HIRC Repository`, `Import File Context Menu Helper`, `Animation Metadata Preview`, `File List Report Generator`, `Pack Serialization`, `Xml To Binary Converter`, `3D Capability Material`, `Audio File Services`, `Animation Playback`, `RMV Helper Warhammer 3 Save`, `Sound Data Files`, `Animation Pack ViewModel`, `Audio Playback`, `glTF External Animation Import Tests`, `Skeleton Animation View`, `Kitbasher View Model`, `Pack Material File Writing`, `glTF Exporter UI`, `Audio Project Infrastructure`, `Open Node In Command`, `glTF To RMV Importer View`, `Pack Report File Utilities`, `Unsaved Changes Detection`, `Skeleton Animation Lookup`, `Composite Scene Editor`, `Operation Progress Updates`, `Shared Core Pack File Container`, `Animation Retarget Saving`, `Skeleton Editing`, `WH3 Language Information`, `Exporter Core View Model`, `RMV To Text Report`, `Audio Project Compilation`, `Save Dialog ViewModel`, `Scene Object Editing`, `glTF Humanoid Scale Tests`, `Metadata Entry Commands`, `Campaign Animation Binary`, `Wwise BNK Parsing`, `Text Editor View Model`, `Animation Set Table Editing`, `glTF PBR Material Tests`, `Animation File and glTF Export`, `Audio Editor Reliability Tests`, `Scene Graph Construction`, `RMV Textures and Conversion`, `Metadata File Parsing`, `Animation Pack Serialization`, `Pack and Folder Project Serialization`, `Standard Dialog Interface`, `Pack File Browser`, `TWUI Component Serialization`, `Animation Pack Command Tests`, `CA VP8 Export Commands`, `Mount Animation Creation`, `Metadata Editor Integration Tests`, `Texture Preview Rendering`, `glTF RMV Material Import`, `Animation Batch Export View Model`?**
   _High betweenness centrality (0.061) - this node is a cross-community bridge._
 - **What connects `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `CaPackLoadProgressStage` to the rest of the system?**
-  _2215 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2227 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Core Services and Pack Files` be split into smaller, more focused modules?**
   _Cohesion score 0.020705968582898835 - nodes in this community are weakly interconnected._
 - **Should `3D Scene Graph` be split into smaller, more focused modules?**
