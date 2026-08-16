@@ -1,4 +1,4 @@
-﻿using Shared.ByteParsing;
+using Shared.ByteParsing;
 
 namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
 {
@@ -17,5 +17,19 @@ namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
                 Interp = chunk.ReadUInt32()
             };
         }
+
+        public byte[] WriteData()
+        {
+            using var memStream = new MemoryStream();
+            memStream.Write(ByteParsers.Single.EncodeValue(From, out _));
+            memStream.Write(ByteParsers.Single.EncodeValue(To, out _));
+            memStream.Write(ByteParsers.UInt32.EncodeValue(Interp, out _));
+            return memStream.ToArray();
+        }
+
+        public uint GetSize() =>
+            ByteHelper.GetPropertyTypeSize(From) +
+            ByteHelper.GetPropertyTypeSize(To) +
+            ByteHelper.GetPropertyTypeSize(Interp);
     }
 }

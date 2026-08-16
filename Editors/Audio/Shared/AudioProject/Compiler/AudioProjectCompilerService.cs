@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Data;
 using System;
 using System.IO;
@@ -238,9 +238,8 @@ namespace Editors.Audio.Shared.AudioProject.Compiler
                     audioProjectFilePath,
                     0,
                     compilationResult.Outputs.Count));
-                await Task.Run(() =>
-                    _audioPackOutputService.SaveBatch(
-                        compilationResult.Outputs));
+                _audioPackOutputService.SaveBatch(
+                    compilationResult.Outputs);
                 progress?.Report(new AudioOperationProgress(
                     "AudioOperation.Saving",
                     audioProjectFilePath,

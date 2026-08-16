@@ -32,8 +32,12 @@ namespace Editors.Audio.Shared.Wwise
             string audioFolderPath,
             string wsourcesPath)
         {
-            var sources = from wavFileName in wavFilesNames 
-                          select new XElement("Source", new XAttribute("Path", wavFileName), new XAttribute("Conversion", "Vorbis Quality High"));
+            var sources = from wavFileName in wavFilesNames
+                          select new XElement(
+                              "Source",
+                              new XAttribute("Path", wavFileName),
+                              new XAttribute("Conversion", "Vorbis Quality High"),
+                              new XAttribute("AnalysisTypes", 2));
 
             var document = new XDocument(
                 new XDeclaration("1.0", "UTF-8", null), 

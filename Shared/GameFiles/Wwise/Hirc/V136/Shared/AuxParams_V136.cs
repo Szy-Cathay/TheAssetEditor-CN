@@ -1,4 +1,4 @@
-﻿using Shared.ByteParsing;
+using Shared.ByteParsing;
 
 namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
 {
@@ -26,11 +26,15 @@ namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
 
         public byte[] WriteData()
         {
-            if (BitVector != 0)
-                throw new NotSupportedException("Users probably don't need this complexity.");
-
             using var memStream = new MemoryStream();
             memStream.Write(ByteParsers.Byte.EncodeValue(BitVector, out _));
+            if ((BitVector & 8) != 0)
+            {
+                memStream.Write(ByteParsers.UInt32.EncodeValue(AuxBus0, out _));
+                memStream.Write(ByteParsers.UInt32.EncodeValue(AuxBus1, out _));
+                memStream.Write(ByteParsers.UInt32.EncodeValue(AuxBus2, out _));
+                memStream.Write(ByteParsers.UInt32.EncodeValue(AuxBus3, out _));
+            }
             memStream.Write(ByteParsers.UInt32.EncodeValue(ReflectionsAuxBus, out _));
             return memStream.ToArray();
         }
@@ -38,11 +42,11 @@ namespace Shared.GameFormats.Wwise.Hirc.V136.Shared
         public uint GetSize()
         {
             var bitVectorSize = ByteHelper.GetPropertyTypeSize(BitVector);
-            if (BitVector != 0)
-                throw new NotSupportedException("Users probably don't need this complexity.");
-
+            var auxBusSize = (BitVector & 8) != 0
+                ? 4u * ByteHelper.GetPropertyTypeSize(AuxBus0)
+                : 0u;
             var reflectionsAuxBusSize = ByteHelper.GetPropertyTypeSize(ReflectionsAuxBus);
-            return bitVectorSize + reflectionsAuxBusSize;
+            return bitVectorSize + auxBusSize + reflectionsAuxBusSize;
         }
     }
 }
