@@ -298,6 +298,17 @@ internal sealed partial class FolderProjectVersionControlService
                         new CheckoutOptions
                         {
                             CheckoutModifiers = CheckoutModifiers.Force,
+                            OnCheckoutProgress = (
+                                path,
+                                completedSteps,
+                                totalSteps) =>
+                                reportProgress(
+                                    new FolderProjectVersionControlProgress(
+                                        FolderProjectVersionControlProgressStage
+                                            .ProcessingWorkingChanges,
+                                        path?.Replace('\\', '/'),
+                                        completedSteps,
+                                        totalSteps)),
                         });
                 }
                 catch (Exception failure)

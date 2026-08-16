@@ -279,6 +279,14 @@ public sealed class FolderProjectHistoryServiceTests
                     change.Path == "db/entry.bin" &&
                     change.Kind.HasFlag(
                         FolderProjectUnrecordedChangeKind.Unreadable)));
+            Assert.That(
+                progress,
+                Has.Some.Matches<FolderProjectHistoryProgress>(item =>
+                    item.Stage == FolderProjectHistoryProgressStage
+                        .ProcessingUnrecordedChanges &&
+                    item.Detail == "db/entry.bin" &&
+                    item.Completed == item.Total &&
+                    item.Total == 1));
         });
     }
 
@@ -549,6 +557,43 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void CreateRestorePoint_ReportsEachIndexedPathWithExactTotal()
+    {
+        using var project = new TemporaryProject();
+        var modifiedPath = Path.Combine(project.Root, "db", "modified.bin");
+        File.WriteAllBytes(modifiedPath, [1]);
+        var service = CreateService();
+        service.Initialize(project.Root);
+        File.WriteAllBytes(modifiedPath, [2]);
+        File.WriteAllBytes(
+            Path.Combine(project.Root, "db", "added.bin"),
+            [3]);
+        var progress = new List<FolderProjectHistoryProgress>();
+
+        service.CreateRestorePoint(
+            project.Root,
+            "记录两项修改",
+            progress.Add);
+
+        var indexedFiles = progress.Where(item =>
+                item.Stage == FolderProjectHistoryProgressStage.UpdatingHistory &&
+                item.Total > 0)
+            .ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(indexedFiles, Is.Not.Empty);
+            Assert.That(indexedFiles.Last().Completed, Is.EqualTo(2));
+            Assert.That(indexedFiles.Last().Total, Is.EqualTo(2));
+            Assert.That(
+                indexedFiles.Select(item => item.Detail),
+                Does.Contain("db/modified.bin"));
+            Assert.That(
+                indexedFiles.Select(item => item.Detail),
+                Does.Contain("db/added.bin"));
+        });
+    }
+
+    [Test]
     public void CreateRestorePoint_StillReportsExactRenames()
     {
         using var project = new TemporaryProject();
@@ -591,6 +636,41 @@ public sealed class FolderProjectHistoryServiceTests
         Assert.That(
             service.GetRestorePoints(project.Root).Select(item => item.Id),
             Is.EqualTo(originalHistory.Select(item => item.Id)));
+    }
+
+    [Test]
+    public void RestoreProject_ReportsEachWrittenPathWithExactProgress()
+    {
+        using var project = new TemporaryProject();
+        var firstPath = Path.Combine(project.Root, "db", "first.bin");
+        var secondPath = Path.Combine(project.Root, "db", "second.bin");
+        File.WriteAllBytes(firstPath, [1]);
+        File.WriteAllBytes(secondPath, [2]);
+        var service = CreateService();
+        var target = service.Initialize(project.Root);
+        File.WriteAllBytes(firstPath, [3]);
+        File.WriteAllBytes(secondPath, [4]);
+        service.CreateRestorePoint(project.Root, "后续状态");
+        var progress = new List<FolderProjectHistoryProgress>();
+
+        service.RestoreProject(project.Root, target, progress.Add);
+
+        var writtenFiles = progress.Where(item =>
+                item.Stage == FolderProjectHistoryProgressStage
+                    .WritingProjectFiles &&
+                item.Total > 0)
+            .ToList();
+        Assert.Multiple(() =>
+        {
+            Assert.That(writtenFiles, Is.Not.Empty);
+            Assert.That(
+                writtenFiles.Last().Completed,
+                Is.EqualTo(writtenFiles.Last().Total));
+            Assert.That(
+                writtenFiles.Select(item => item.Detail),
+                Has.Some.EqualTo("db/first.bin")
+                    .Or.EqualTo("db/second.bin"));
+        });
     }
 
     [Test]
@@ -1192,7 +1272,8 @@ public sealed class FolderProjectHistoryServiceTests
         var firstVersionControl = new Mock<IFolderProjectVersionControlService>();
         firstVersionControl.Setup(item => item.CommitAll(
                 project.Root,
-                "记录当前状态"))
+                "记录当前状态",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
             .Returns(commit);
         firstVersionControl.Setup(item => item.GetCommitChangeSummary(
                 project.Root,
@@ -1294,7 +1375,8 @@ public sealed class FolderProjectHistoryServiceTests
             [new string('0', 40)]);
         versionControl.Setup(item => item.CommitAll(
                 "project",
-                "记录当前状态"))
+                "记录当前状态",
+                It.IsAny<Action<FolderProjectVersionControlProgress>>()))
             .Returns(commit);
         versionControl.Setup(item => item.GetCommitChanges(
                 "project",

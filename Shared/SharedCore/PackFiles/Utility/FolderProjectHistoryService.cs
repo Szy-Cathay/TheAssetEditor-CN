@@ -260,7 +260,8 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
         {
             var summary = _versionControl.CommitAll(
                 projectRoot,
-                normalizedDescription);
+                normalizedDescription,
+                progress => reportProgress(MapProgress(progress)));
             var changes = LoadAndCacheRestorePointChanges(
                 projectRoot,
                 summary.Id,
@@ -691,6 +692,10 @@ public sealed class FolderProjectHistoryService : IFolderProjectHistoryService
                 FolderProjectVersionControlProgressStage.ScanningWorkingTree =>
                     FolderProjectHistoryProgressStage
                         .ScanningUnrecordedChanges,
+                FolderProjectVersionControlProgressStage
+                    .CatalogingWorkingChanges =>
+                    FolderProjectHistoryProgressStage
+                        .ProcessingUnrecordedChanges,
                 FolderProjectVersionControlProgressStage
                     .ProcessingWorkingChanges =>
                     FolderProjectHistoryProgressStage

@@ -139,6 +139,33 @@ public class UiAudioEditorFamilyTests
         });
     }
 
+    [Test]
+    public void AudioEditor_EventSelectionGetsMostOfTheResizableLeftPane()
+    {
+        var source = ReadAudioSources().Single(item =>
+            item.Contains("AudioEditor.Menu.File.CompileAudioProject"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                source,
+                Does.Match("<RowDefinition\\s+Height=\\\"3\\*\\\""));
+            NUnitAssert.That(
+                source,
+                Does.Match("<RowDefinition\\s+Height=\\\"2\\*\\\""));
+            NUnitAssert.That(
+                Regex.Matches(
+                    source,
+                    "Style=\\\"\\{StaticResource AeHorizontalGridSplitterStyle\\}\\\"")
+                    .Count,
+                Is.EqualTo(2));
+            NUnitAssert.That(
+                source,
+                Does.Contain(
+                    "Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml"));
+        });
+    }
+
     private static IReadOnlyList<string> ReadAudioSources()
     {
         var root = FindSolutionRoot();

@@ -94,6 +94,48 @@ public class GiteeUpdateSourceTests
     }
 
     [Test]
+    [NonParallelizable]
+    public async Task DownloadAssetAsync_FailureReportsOriginalException()
+    {
+        var root = CreateTemporaryDirectory();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var originalOutput = Console.Out;
+        var originalError = Console.Error;
+        try
+        {
+            var testData = CreateTestDownload(root);
+            using var client = new HttpClient(
+                new PartResponseHandler(new Dictionary<Uri, byte[]>()));
+            Console.SetOut(output);
+            Console.SetError(error);
+
+            var result = await UpdaterProgram.DownloadAssetAsync(
+                client,
+                testData.Plan,
+                testData.ArchivePath,
+                testData.InstallationDirectory,
+                testData.Workspace,
+                testData.LocalRoot,
+                testData.CommonRoot);
+
+            var consoleText = output + error.ToString();
+            Assert.Multiple(() =>
+            {
+                Assert.That(result, Is.False);
+                Assert.That(consoleText, Does.Contain("无法从 Gitee 下载并校验最新版本"));
+                Assert.That(consoleText, Does.Contain("404"));
+            });
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+            Console.SetError(originalError);
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Test]
     [Explicit("Downloads and installs the current public Gitee release.")]
     public async Task LiveGiteeRelease_DownloadsVerifiesAndInstallsInIsolation()
     {

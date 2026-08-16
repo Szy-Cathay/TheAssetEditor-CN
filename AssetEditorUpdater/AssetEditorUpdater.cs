@@ -16,34 +16,77 @@ namespace AssetEditorUpdater
         private const string AssetEditorExe = "AssetEditor.CN.exe";
         private const string AssetEditorUpdaterExe = "AssetEditor.CN.Updater.exe";
          
-        public static async Task Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
-            var currentDirectory = AppContext.BaseDirectory;
-            var invocation = ParseInvocation(currentDirectory, args);
-
-            Console.WriteLine($"国区版更新器运行目录：{currentDirectory}");
-
-            if (invocation.IsInitialLaunch)
+            try
             {
-                var layout = UpdaterWorkspaceFactory.GetLayout(
-                    UpdaterWorkspaceFactory.IsProcessElevated(),
-                    Guid.NewGuid());
-                var workspace = UpdaterWorkspaceFactory.Create(layout);
-                RelaunchFromUpdateDirectory(
-                    currentDirectory,
-                    workspace,
-                    invocation.InstallationDirectory);
+                var currentDirectory = AppContext.BaseDirectory;
+                var invocation = ParseInvocation(currentDirectory, args);
+
+                Console.WriteLine($"国区版更新器运行目录：{currentDirectory}");
+
+                if (invocation.IsInitialLaunch)
+                {
+                    var layout = UpdaterWorkspaceFactory.GetLayout(
+                        UpdaterWorkspaceFactory.IsProcessElevated(),
+                        Guid.NewGuid());
+                    var workspace = UpdaterWorkspaceFactory.Create(layout);
+                    RelaunchFromUpdateDirectory(
+                        currentDirectory,
+                        workspace,
+                        invocation.InstallationDirectory);
+                }
+                else
+                {
+                    var updateDirectory = invocation.UpdateDirectory!;
+                    var workspace = UpdateInstaller.ValidateDirectoryLayout(
+                        invocation.InstallationDirectory,
+                        updateDirectory,
+                        UpdaterWorkspaceFactory.IsProcessElevated());
+                    await RunUpdateAndWaitAsync(
+                        () => UpdateAsync(
+                            invocation.InstallationDirectory,
+                            workspace),
+                        WaitForExit);
+                }
+
+                return 0;
             }
-            else
+            catch (Exception exception)
             {
-                var updateDirectory = invocation.UpdateDirectory!;
-                var workspace = UpdateInstaller.ValidateDirectoryLayout(
-                    invocation.InstallationDirectory,
-                    updateDirectory,
-                    UpdaterWorkspaceFactory.IsProcessElevated());
-                await UpdateAsync(
-                    invocation.InstallationDirectory,
-                    workspace);
+                Console.Error.WriteLine($"更新失败：{exception.Message}");
+                Console.Error.WriteLine(exception);
+                WaitForExit();
+                return 1;
+            }
+        }
+
+        internal static async Task RunUpdateAndWaitAsync(
+            Func<Task> updateAsync,
+            Action waitForExit)
+        {
+            ArgumentNullException.ThrowIfNull(updateAsync);
+            ArgumentNullException.ThrowIfNull(waitForExit);
+
+            await updateAsync();
+            waitForExit();
+        }
+
+        private static void WaitForExit()
+        {
+            Console.WriteLine("按任意键关闭。");
+            if (Console.IsInputRedirected || Console.IsOutputRedirected)
+                return;
+
+            try
+            {
+                Console.ReadKey(intercept: true);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (IOException)
+            {
             }
         }
 
@@ -103,7 +146,7 @@ namespace AssetEditorUpdater
                     AssetEditorUpdaterExe);
                 var processStartInfo = CreateUpdaterProcessStartInfo(
                     newUpdaterPath,
-                    workspace.UpdateDirectory,
+                    installationDirectory,
                     installationDirectory,
                     workspace.UpdateDirectory);
 
@@ -313,8 +356,6 @@ namespace AssetEditorUpdater
             else
                 Console.WriteLine("更新失败：未找到 AssetEditor.CN.exe。");
 
-            Console.WriteLine("按任意键关闭。");
-            Console.ReadKey();
         }
 
         private static async Task<GiteeRelease?> GetLatestReleaseAsync(HttpClient httpClient)
@@ -525,12 +566,14 @@ namespace AssetEditorUpdater
             return UpdateInstaller.GetBackupRootDirectory(GetUpdateDirectory());
         }
 
-        private static async Task<bool> DownloadAssetAsync(
+        internal static async Task<bool> DownloadAssetAsync(
             HttpClient httpClient,
             GiteeDownloadPlan downloadPlan,
             string downloadPath,
             string installationDirectory,
-            UpdaterWorkspace workspace)
+            UpdaterWorkspace workspace,
+            string? localApplicationDataRoot = null,
+            string? commonApplicationDataRoot = null)
         {
             Console.WriteLine("正在下载最新版本……");
 
@@ -541,13 +584,17 @@ namespace AssetEditorUpdater
                     downloadPlan,
                     downloadPath,
                     installationDirectory,
-                    workspace);
+                    workspace,
+                    localApplicationDataRoot,
+                    commonApplicationDataRoot);
 
                 return true;
             }
-            catch
+            catch (Exception exception)
             {
-                Console.WriteLine("无法从 Gitee 下载并校验最新版本。");
+                Console.Error.WriteLine(
+                    $"无法从 Gitee 下载并校验最新版本：{exception.Message}");
+                Console.Error.WriteLine(exception);
                 return false;
             }
         }

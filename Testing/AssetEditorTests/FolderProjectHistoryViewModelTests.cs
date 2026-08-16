@@ -25,12 +25,14 @@ public class FolderProjectHistoryViewModelTests
     }
 
     [Test]
-    public async Task Refresh_UsesDisplayStatusAndShowsHistorySnapshot()
+    public async Task Refresh_UsesValidatedStatusAndShowsHistorySnapshot()
     {
         using var directory = new TemporaryDirectory();
         using var project = CreateProject(directory.Path);
         var history = CreateHistoryService(project.ProjectRoot);
-        history.Setup(item => item.GetDisplayStatus(project.ProjectRoot))
+        history.Setup(item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns(new FolderProjectHistoryStatus(
                 FolderProjectHistoryAvailability.Ready,
                 "head",
@@ -67,7 +69,7 @@ public class FolderProjectHistoryViewModelTests
         });
         history.Verify(item => item.GetStatus(
             project.ProjectRoot,
-            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Never);
+            It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
     }
 
     [Test]
@@ -92,8 +94,11 @@ public class FolderProjectHistoryViewModelTests
                     FolderProjectUnrecordedChangeKind.Modified),
             ]);
         var history = new Mock<IFolderProjectHistoryService>();
-        history.SetupSequence(item => item.GetDisplayStatus(projectRoot))
-            .Returns(recoveryStatus)
+        history.Setup(item => item.GetStatus(
+                projectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(recoveryStatus);
+        history.Setup(item => item.GetDisplayStatus(projectRoot))
             .Returns(readyStatus);
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
@@ -735,6 +740,16 @@ public class FolderProjectHistoryViewModelTests
         var viewModel = CreateViewModel(
             history.Object,
             dialogs: dialogs.Object);
+        var operationDetails = new List<string>();
+        viewModel.PropertyChanged += (_, eventArgs) =>
+        {
+            if (eventArgs.PropertyName ==
+                nameof(FolderProjectHistoryViewModel.OperationDetailText) &&
+                !string.IsNullOrWhiteSpace(viewModel.OperationDetailText))
+            {
+                operationDetails.Add(viewModel.OperationDetailText);
+            }
+        };
         viewModel.OpenProject(project);
         await viewModel.RefreshCommand.ExecuteAsync(null);
         viewModel.SelectedRestorePoint = point;
@@ -751,6 +766,7 @@ public class FolderProjectHistoryViewModelTests
             point.Id,
             change.Path,
             true), Times.Once);
+        NUnitAssert.That(operationDetails, Does.Contain(change.Path));
     }
 
     [Test]

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
@@ -8,6 +9,64 @@ namespace AssetEditorUpdaterTests;
 
 public class UpdaterWorkspaceTests
 {
+    [Test]
+    public async Task RunUpdateAndWait_NormalEarlyReturnStillWaitsForUser()
+    {
+        var updateCount = 0;
+        var waitCount = 0;
+
+        await UpdaterProgram.RunUpdateAndWaitAsync(
+            () =>
+            {
+                updateCount++;
+                return Task.CompletedTask;
+            },
+            () => waitCount++);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(updateCount, Is.EqualTo(1));
+            Assert.That(waitCount, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void Main_SecondaryLaunchFailureReportsErrorBeforeClosing()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var originalOutput = Console.Out;
+        var originalError = Console.Error;
+        try
+        {
+            Console.SetOut(output);
+            Console.SetError(error);
+
+            Assert.DoesNotThrowAsync(async () =>
+            {
+                Task mainTask = UpdaterProgram.Main(
+                [
+                    Path.Combine(Path.GetTempPath(), "missing-installation"),
+                    Path.Combine(Path.GetTempPath(), "missing-transaction", "Update"),
+                ]);
+                await mainTask;
+            });
+
+            var consoleText = output + error.ToString();
+            Assert.Multiple(() =>
+            {
+                Assert.That(consoleText, Does.Contain("更新失败"));
+                Assert.That(consoleText, Does.Contain("按任意键关闭"));
+            });
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+            Console.SetError(originalError);
+        }
+    }
+
     [Test]
     public void ParseInvocation_ZeroArgumentsUsesCurrentUpdaterParentAsInstallationDirectory()
     {
@@ -82,6 +141,34 @@ public class UpdaterWorkspaceTests
                 startInfo.ArgumentList,
                 Is.EqualTo(new[] { installationDirectory, updateDirectory }));
         });
+    }
+
+    [Test]
+    public void RelaunchFromUpdateDirectory_UsesInstallationAsSecondaryWorkingDirectory()
+    {
+        var transactionRoot = Path.Combine(Path.GetTempPath(), "transaction");
+        var updateDirectory = Path.Combine(transactionRoot, "Update");
+        var installationDirectory = Path.Combine(Path.GetTempPath(), "installation");
+        var workspace = new UpdaterWorkspace(
+            transactionRoot,
+            updateDirectory,
+            IsProtected: false);
+        ProcessStartInfo? capturedStartInfo = null;
+
+        UpdaterProgram.RelaunchFromUpdateDirectory(
+            Path.Combine(Path.GetTempPath(), "payload"),
+            workspace,
+            installationDirectory,
+            (_, _, _) => new Dictionary<string, string>(),
+            (_, _) => workspace,
+            _ => null,
+            startInfo => capturedStartInfo = startInfo,
+            _ => Assert.Fail("Local relaunch failure must not request protected cleanup."));
+
+        Assert.That(capturedStartInfo, Is.Not.Null);
+        Assert.That(
+            capturedStartInfo!.WorkingDirectory,
+            Is.EqualTo(installationDirectory));
     }
 
     [Test]
