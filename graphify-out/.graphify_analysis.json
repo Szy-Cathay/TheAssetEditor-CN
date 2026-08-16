@@ -25060,6 +25060,44 @@
     ],
     "787": [
       "testing_asseteditortests_usings"
+    ],
+    "788": [
+      "agents_project_rules",
+      "agents_cn_identity_boundary",
+      "agents_git_authorization_boundary",
+      "agents_minimal_and_surgical_change",
+      "agents_shared_ui_dependency_boundary",
+      "agents_folder_project_state_separation",
+      "agents_risk_proportional_verification",
+      "agents_completion_cleanup_graph_refresh",
+      "docs_readme_ai_context_routing",
+      "docs_readme_task_scoped_context_loading",
+      "docs_readme_fact_priority",
+      "docs_readme_stable_documentation_policy",
+      "docs_architecture_overall_architecture",
+      "docs_architecture_composition_root",
+      "docs_architecture_editor_registration_flow",
+      "docs_architecture_shared_ui_boundary",
+      "docs_architecture_editable_folder_project",
+      "docs_architecture_pack_role_model",
+      "docs_architecture_packfile_identity",
+      "docs_architecture_localization_pipeline",
+      "docs_architecture_transactional_updater",
+      "docs_architecture_ipc_named_pipe",
+      "docs_architecture_change_based_verification",
+      "docs_ui_design_system_ui_specification",
+      "docs_ui_design_system_ui_fact_priority",
+      "docs_ui_design_system_semantic_design_system",
+      "docs_ui_design_system_resource_merge_order",
+      "docs_ui_design_system_button_interaction_contract",
+      "docs_ui_design_system_keyboard_focus_contract",
+      "docs_ui_design_system_agent_public_component_reuse_protocol",
+      "docs_ui_design_system_reuse_decision_ladder",
+      "docs_ui_design_system_common_component_admission",
+      "docs_ui_design_system_real_progress_contract",
+      "docs_ui_design_system_ui_architecture_boundary",
+      "docs_ui_design_system_visual_acceptance_boundary",
+      "docs_ui_design_system_localization_accessibility"
     ]
   },
   "cohesion": {
@@ -25850,7 +25888,8 @@
     "784": 1.0,
     "785": 1.0,
     "786": 1.0,
-    "787": 1.0
+    "787": 1.0,
+    "788": 0.07142857142857142
   },
   "gods": [
     {

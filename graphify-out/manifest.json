@@ -11428,5 +11428,29 @@
     "seen": 1786887590.9333386,
     "ast_hash": "a839a0045fe878a3096ec5a56656215c",
     "semantic_hash": "a839a0045fe878a3096ec5a56656215c"
+  },
+  "AGENTS.md": {
+    "mtime": 1786893780.4063976,
+    "seen": 1786896008.8210573,
+    "ast_hash": "",
+    "semantic_hash": "44eb1c38f663e58e4f460de16dc0fbc5"
+  },
+  "docs/README.md": {
+    "mtime": 1786892329.826409,
+    "seen": 1786896008.8210738,
+    "ast_hash": "",
+    "semantic_hash": "295af7e5994a16711a0134b100b9ff8b"
+  },
+  "docs/architecture.md": {
+    "mtime": 1786892329.8284087,
+    "seen": 1786896008.8210816,
+    "ast_hash": "",
+    "semantic_hash": "ad439a399619670e8e72c87e41ccd774"
+  },
+  "docs/ui-design-system.md": {
+    "mtime": 1786892329.8284087,
+    "seen": 1786896008.821087,
+    "ast_hash": "",
+    "semantic_hash": "224d3e7d419a51b09391f5961aaf0bec"
   }
 }

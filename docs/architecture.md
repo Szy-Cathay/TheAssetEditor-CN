@@ -61,6 +61,8 @@
 - 主程序从 Gitee `szy-cathay/AssetEditor-CN-Downloads` 检查版本；更新器读取同一发行版中的清单，按清单顺序下载小于 Gitee 单附件限制的 ZIP 分片，合并后校验每个分片和完整 ZIP 的 SHA-256。
 - 更新安装必须验证安装目录与事务目录不重叠，拒绝重解析点、路径别名重叠和非自有事务工作区。
 - updater payload 复制后逐文件复核 SHA-256；安装在事务目录完成暂存、备份和替换，失败时尝试回滚并保留原始错误。
+- 二次更新进程从事务目录中的更新器副本启动，但工作目录必须保持为安装目录；不能用进程当前目录猜测安装位置或事务所有权。
+- 更新器顶层失败必须输出原始异常并返回非零退出码。交互式控制台在正常结束和可捕获失败后都等待用户确认；标准输入或输出被重定向时不得阻塞等待。
 - 发布布局同时由 `AssetEditor/AssetEditor.csproj` 的 `PublishUpdater` 目标和 `AssetEditor/Properties/PublishProfiles/FolderProfile.pubxml` 决定。
 
 ### IPC
