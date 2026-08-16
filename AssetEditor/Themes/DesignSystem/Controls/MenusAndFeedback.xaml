@@ -21,27 +21,18 @@
                 BorderBrush="{TemplateBinding BorderBrush}"
                 BorderThickness="{TemplateBinding BorderThickness}"
                 CornerRadius="{StaticResource AeRadius.Compact}">
-                <Grid>
-                    <Border
-                        x:Name="StateOverlay"
-                        Background="{DynamicResource AeBrush.AccentSoft}"
-                        CornerRadius="{StaticResource AeRadius.Compact}"
-                        IsHitTestVisible="False"
-                        Opacity="0" />
-                    <ContentPresenter
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        ContentSource="Header"
-                        RecognizesAccessKey="True" />
-                </Grid>
+                <ContentPresenter
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    ContentSource="Header"
+                    RecognizesAccessKey="True" />
             </Border>
             <Popup
                 x:Name="PART_Popup"
                 AllowsTransparency="True"
                 Focusable="False"
                 IsOpen="{Binding IsSubmenuOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                Placement="Bottom"
-                PopupAnimation="Fade">
+                Placement="Bottom">
                 <Border
                     MaxHeight="640"
                     Margin="0,2,0,0"
@@ -61,7 +52,7 @@
         </Grid>
         <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter TargetName="StateOverlay" Property="Opacity" Value="1" />
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -85,13 +76,6 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Border
-                        x:Name="StateOverlay"
-                        Grid.ColumnSpan="4"
-                        Background="{DynamicResource AeBrush.AccentSoft}"
-                        CornerRadius="{StaticResource AeRadius.Compact}"
-                        IsHitTestVisible="False"
-                        Opacity="0" />
                     <Grid VerticalAlignment="Center">
                         <ContentPresenter
                             x:Name="IconPresenter"
@@ -145,7 +129,6 @@
                 HorizontalOffset="-2"
                 IsOpen="{Binding IsSubmenuOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                 Placement="Right"
-                PopupAnimation="Fade"
                 VerticalOffset="-2">
                 <Border
                     MaxHeight="640"
@@ -172,7 +155,7 @@
                 <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter TargetName="StateOverlay" Property="Opacity" Value="1" />
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
