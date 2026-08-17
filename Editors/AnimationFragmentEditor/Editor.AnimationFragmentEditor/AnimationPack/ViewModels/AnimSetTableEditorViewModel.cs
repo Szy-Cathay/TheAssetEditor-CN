@@ -22,6 +22,7 @@ using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.AnimationMeta.Parsing;
 using Shared.GameFormats.AnimationPack;
@@ -59,6 +60,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         private ITextConverter? _activeConverter;
         private bool _suppressDirtyTracking;
         private readonly HashSet<AnimationEntryRowViewModel> _trackedRows = new();
+        private string _feedbackMessage = string.Empty;
 
         // Undo system - snapshot based (includes header metadata)
         private readonly Stack<TableSnapshot> _undoSnapshots = new();
@@ -68,26 +70,72 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             List<AnimationEntryRowViewModel> Rows,
             string Name, string SkeletonName, string MountBin, string LocomotionGraph,
             uint TableVersion, uint TableSubVersion, short UnknownValue1,
-            string Skeleton, bool IsWh3);
+            string Skeleton, bool IsWh3, bool IsDirty);
 
         private TableSnapshot CaptureSnapshot() => new(
             Rows.Select(r => r.Clone()).ToList(),
             Name, SkeletonName, MountBin, LocomotionGraph,
             TableVersion, TableSubVersion, UnknownValue1,
-            Skeleton, IsWh3);
+            Skeleton, IsWh3, IsDirty);
 
         public void SaveSnapshot()
         {
             _undoSnapshots.Push(CaptureSnapshot());
-            // Limit undo depth
-            while (_undoSnapshots.Count > MaxUndoDepth)
-                _undoSnapshots.Pop();
+            if (_undoSnapshots.Count > MaxUndoDepth)
+            {
+                var retainedSnapshots = _undoSnapshots
+                    .Take(MaxUndoDepth)
+                    .Reverse()
+                    .ToArray();
+                _undoSnapshots.Clear();
+                foreach (var snapshot in retainedSnapshots)
+                    _undoSnapshots.Push(snapshot);
+            }
+            UndoCommand.NotifyCanExecuteChanged();
         }
 
         public void DiscardLastSnapshot()
         {
             if (_undoSnapshots.Count > 0)
                 _undoSnapshots.Pop();
+            UndoCommand.NotifyCanExecuteChanged();
+        }
+
+        public void DiscardLastSnapshotIfUnchanged()
+        {
+            if (_undoSnapshots.Count > 0 && SnapshotEquals(_undoSnapshots.Peek(), CaptureSnapshot()))
+                _undoSnapshots.Pop();
+            UndoCommand.NotifyCanExecuteChanged();
+        }
+
+        private static bool SnapshotEquals(TableSnapshot left, TableSnapshot right)
+        {
+            return left.Name == right.Name &&
+                left.SkeletonName == right.SkeletonName &&
+                left.MountBin == right.MountBin &&
+                left.LocomotionGraph == right.LocomotionGraph &&
+                left.TableVersion == right.TableVersion &&
+                left.TableSubVersion == right.TableSubVersion &&
+                left.UnknownValue1 == right.UnknownValue1 &&
+                left.Skeleton == right.Skeleton &&
+                left.IsWh3 == right.IsWh3 &&
+                left.IsDirty == right.IsDirty &&
+                left.Rows.Count == right.Rows.Count &&
+                left.Rows.Zip(right.Rows).All(pair => RowsEqual(pair.First, pair.Second));
+        }
+
+        private static bool RowsEqual(AnimationEntryRowViewModel left, AnimationEntryRowViewModel right)
+        {
+            return left.SlotIndex == right.SlotIndex &&
+                left.SlotName == right.SlotName &&
+                left.AnimationFile == right.AnimationFile &&
+                left.MetaFile == right.MetaFile &&
+                left.SoundFile == right.SoundFile &&
+                left.BlendInTime == right.BlendInTime &&
+                left.SelectionWeight == right.SelectionWeight &&
+                left.Unk == right.Unk &&
+                left.VariantIndex == right.VariantIndex &&
+                left.GetWeaponBoneAsInt() == right.GetWeaponBoneAsInt();
         }
 
         public ObservableCollection<AnimationEntryRowViewModel> Rows { get; } = new();
@@ -142,8 +190,35 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         // State
         public bool IsWh3 { get => _isWh3; set => SetAndNotify(ref _isWh3, value); }
         public bool IsDirty { get => _isDirty; set => SetAndNotifyWhenChanged(ref _isDirty, value); }
-        public AnimationEntryRowViewModel? SelectedRow { get => _selectedRow; set => SetAndNotify(ref _selectedRow, value); }
-        public IList MultiSelectedRows { get => _multiSelectedRows; set => SetAndNotify(ref _multiSelectedRows, value); }
+        public string FeedbackMessage
+        {
+            get => _feedbackMessage;
+            private set
+            {
+                SetAndNotifyWhenChanged(ref _feedbackMessage, value);
+                NotifyPropertyChanged(nameof(HasFeedback));
+            }
+        }
+        public bool HasFeedback => !string.IsNullOrWhiteSpace(FeedbackMessage);
+        public AnimationEntryRowViewModel? SelectedRow
+        {
+            get => _selectedRow;
+            set
+            {
+                SetAndNotify(ref _selectedRow, value);
+                NotifyRowCommandStates();
+            }
+        }
+
+        public IList MultiSelectedRows
+        {
+            get => _multiSelectedRows;
+            set
+            {
+                SetAndNotify(ref _multiSelectedRows, value);
+                NotifyRowCommandStates();
+            }
+        }
 
         public AnimSetTableEditorViewModel(
             IPackFileService pfs,
@@ -203,6 +278,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             }
 
             MarkDirty();
+            NotifyRowCommandStates();
         }
 
         private void TrackRow(AnimationEntryRowViewModel row)
@@ -271,6 +347,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             {
                 _suppressDirtyTracking = false;
                 IsDirty = false;
+                UndoCommand.NotifyCanExecuteChanged();
             }
         }
 
@@ -552,25 +629,35 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         }
 
         // Commands
-        [RelayCommand] private void Undo()
+        private bool CanUndo() => _undoSnapshots.Count > 0;
+
+        [RelayCommand(CanExecute = nameof(CanUndo))]
+        private void Undo()
         {
-            if (_undoSnapshots.Count == 0) return;
             var snapshot = _undoSnapshots.Pop();
-            SelectedRow = null;
-            Rows.Clear();
-            foreach (var row in snapshot.Rows)
-                Rows.Add(row);
-            // Restore header metadata
-            Name = snapshot.Name;
-            SkeletonName = snapshot.SkeletonName;
-            MountBin = snapshot.MountBin;
-            LocomotionGraph = snapshot.LocomotionGraph;
-            TableVersion = snapshot.TableVersion;
-            TableSubVersion = snapshot.TableSubVersion;
-            UnknownValue1 = snapshot.UnknownValue1;
-            Skeleton = snapshot.Skeleton;
-            IsWh3 = snapshot.IsWh3;
-            IsDirty = true;
+            _suppressDirtyTracking = true;
+            try
+            {
+                SelectedRow = null;
+                Rows.Clear();
+                foreach (var row in snapshot.Rows)
+                    Rows.Add(row);
+                Name = snapshot.Name;
+                SkeletonName = snapshot.SkeletonName;
+                MountBin = snapshot.MountBin;
+                LocomotionGraph = snapshot.LocomotionGraph;
+                TableVersion = snapshot.TableVersion;
+                TableSubVersion = snapshot.TableSubVersion;
+                UnknownValue1 = snapshot.UnknownValue1;
+                Skeleton = snapshot.Skeleton;
+                IsWh3 = snapshot.IsWh3;
+            }
+            finally
+            {
+                _suppressDirtyTracking = false;
+            }
+            IsDirty = snapshot.IsDirty;
+            UndoCommand.NotifyCanExecuteChanged();
         }
 
         [RelayCommand] private void AddEntry()
@@ -592,50 +679,65 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             IsDirty = true;
         }
 
-        [RelayCommand] private void DeleteEntries()
+        private bool CanDeleteEntries() => MultiSelectedRows?.Count > 0;
+
+        [RelayCommand(CanExecute = nameof(CanDeleteEntries))]
+        private void DeleteEntries()
         {
-            if (MultiSelectedRows == null || MultiSelectedRows.Count == 0)
-                return;
             SaveSnapshot();
             var toDelete = MultiSelectedRows.Cast<AnimationEntryRowViewModel>().ToList();
             foreach (var row in toDelete)
                 Rows.Remove(row);
+            SelectedRow = null;
             IsDirty = true;
         }
 
-        [RelayCommand] private void DuplicateEntry()
+        private bool CanDuplicateEntry() => SelectedRow != null;
+
+        [RelayCommand(CanExecute = nameof(CanDuplicateEntry))]
+        private void DuplicateEntry()
         {
-            if (SelectedRow == null) return;
             SaveSnapshot();
-            var index = Rows.IndexOf(SelectedRow);
-            var clone = SelectedRow.Clone();
+            var index = Rows.IndexOf(SelectedRow!);
+            var clone = SelectedRow!.Clone();
             clone.VariantIndex = SelectedRow.VariantIndex + 1;
             Rows.Insert(index + 1, clone);
             SelectedRow = clone;
             IsDirty = true;
         }
 
-        [RelayCommand] private void MoveUp()
+        private bool CanMoveUp() => SelectedRow != null && Rows.IndexOf(SelectedRow) > 0;
+
+        [RelayCommand(CanExecute = nameof(CanMoveUp))]
+        private void MoveUp()
         {
-            if (SelectedRow == null) return;
-            var index = Rows.IndexOf(SelectedRow);
-            if (index <= 0) return;
+            var index = Rows.IndexOf(SelectedRow!);
             SaveSnapshot();
             Rows.Move(index, index - 1);
             IsDirty = true;
+            NotifyRowCommandStates();
         }
 
-        [RelayCommand] private void MoveDown()
+        private bool CanMoveDown()
         {
-            if (SelectedRow == null) return;
-            var index = Rows.IndexOf(SelectedRow);
-            if (index < 0 || index >= Rows.Count - 1) return;
+            var index = SelectedRow == null ? -1 : Rows.IndexOf(SelectedRow);
+            return index >= 0 && index < Rows.Count - 1;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanMoveDown))]
+        private void MoveDown()
+        {
+            var index = Rows.IndexOf(SelectedRow!);
             SaveSnapshot();
             Rows.Move(index, index + 1);
             IsDirty = true;
+            NotifyRowCommandStates();
         }
 
-        [RelayCommand] private void CopyRows()
+        private bool CanCopyRows() => MultiSelectedRows?.Count > 0 || SelectedRow != null;
+
+        [RelayCommand(CanExecute = nameof(CanCopyRows))]
+        private void CopyRows()
         {
             var rows = MultiSelectedRows?.Cast<AnimationEntryRowViewModel>().ToList()
                 ?? new List<AnimationEntryRowViewModel>();
@@ -664,9 +766,40 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
             var json = JsonSerializer.Serialize(data);
             Clipboard.SetText("AE_ANIM_ROWS|" + json);
+            FeedbackMessage = string.Empty;
+            PasteRowsCommand.NotifyCanExecuteChanged();
         }
 
-        [RelayCommand] private void PasteRows()
+        private void NotifyRowCommandStates()
+        {
+            DeleteEntriesCommand.NotifyCanExecuteChanged();
+            DuplicateEntryCommand.NotifyCanExecuteChanged();
+            MoveUpCommand.NotifyCanExecuteChanged();
+            MoveDownCommand.NotifyCanExecuteChanged();
+            CopyRowsCommand.NotifyCanExecuteChanged();
+        }
+
+        public void RefreshCommandStates()
+        {
+            NotifyRowCommandStates();
+            PasteRowsCommand.NotifyCanExecuteChanged();
+        }
+
+        private bool CanPasteRows()
+        {
+            try
+            {
+                return Clipboard.ContainsText() &&
+                    Clipboard.GetText().StartsWith("AE_ANIM_ROWS|", StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanPasteRows))]
+        private void PasteRows()
         {
             var text = Clipboard.GetText();
             if (string.IsNullOrEmpty(text) || !text.StartsWith("AE_ANIM_ROWS|"))
@@ -676,7 +809,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             {
                 var json = text.Substring("AE_ANIM_ROWS|".Length);
                 var data = JsonSerializer.Deserialize<ClipboardData>(json);
-                if (data?.Rows == null || data.Rows.Count == 0) return;
+                if (data?.Rows == null || data.Rows.Count == 0)
+                {
+                    FeedbackMessage = LocalizationManager.Instance?.Get("AnimPack.Table.PasteInvalid")
+                        ?? "AnimPack.Table.PasteInvalid";
+                    return;
+                }
 
                 SaveSnapshot();
                 var insertIndex = SelectedRow != null ? Rows.IndexOf(SelectedRow) + 1 : Rows.Count;
@@ -701,8 +839,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 }
 
                 IsDirty = true;
+                FeedbackMessage = string.Empty;
             }
-            catch { }
+            catch
+            {
+                FeedbackMessage = LocalizationManager.Instance?.Get("AnimPack.Table.PasteFailed")
+                    ?? "AnimPack.Table.PasteFailed";
+            }
         }
 
         private class ClipboardData

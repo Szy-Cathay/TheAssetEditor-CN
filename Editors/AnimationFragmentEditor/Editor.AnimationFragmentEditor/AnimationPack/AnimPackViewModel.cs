@@ -1,4 +1,6 @@
 ﻿using System.Windows;
+using System.ComponentModel;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationFragmentEditor.AnimationPack.Commands;
 using Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinConverter;
@@ -31,6 +33,7 @@ namespace CommonControls.Editors.AnimationPack
         private readonly ApplicationSettingsService _appSettings;
         private readonly IFileSaveService _packFileSaveService;
         private readonly MetaDataFileParser _metaDataFileParser;
+        private readonly IStandardDialogs _standardDialogs;
 
         public string DisplayName { get; set; } = "Not set";
 
@@ -38,11 +41,71 @@ namespace CommonControls.Editors.AnimationPack
 
         public FilterCollection<IAnimationPackFile> AnimationPackItems { get; set; }
 
-        SimpleTextEditorViewModel _selectedItemViewModel;
-        public SimpleTextEditorViewModel SelectedItemViewModel { get => _selectedItemViewModel; set => SetAndNotify(ref _selectedItemViewModel, value); }
+        private string _fileFilterText = string.Empty;
+        public string FileFilterText
+        {
+            get => _fileFilterText;
+            set
+            {
+                SetAndNotifyWhenChanged(ref _fileFilterText, value ?? string.Empty);
+                RefreshFileFilter();
+            }
+        }
 
-        AnimSetTableEditorViewModel _tableEditorVM;
-        public AnimSetTableEditorViewModel TableEditorVM { get => _tableEditorVM; set => SetAndNotify(ref _tableEditorVM, value); }
+        private bool _useRegexFilter;
+        public bool UseRegexFilter
+        {
+            get => _useRegexFilter;
+            set
+            {
+                SetAndNotifyWhenChanged(ref _useRegexFilter, value);
+                RefreshFileFilter();
+            }
+        }
+
+        public bool IsFileFilterInvalid =>
+            UseRegexFilter && !AnimationPackItems.FilterValid;
+
+        public bool HasFilterResults => AnimationPackItems.Values.Count > 0;
+
+        public string FilterSummary => LocalizationManager.Instance?.GetFormat(
+            "AnimPack.FilterSummary",
+            AnimationPackItems.Values.Count,
+            AnimationPackItems.PossibleValues.Count) ?? string.Empty;
+
+        public bool HasSelectedItem => AnimationPackItems.SelectedItem != null;
+
+        SimpleTextEditorViewModel _selectedItemViewModel = null!;
+        public SimpleTextEditorViewModel SelectedItemViewModel
+        {
+            get => _selectedItemViewModel;
+            set
+            {
+                if (_selectedItemViewModel != null)
+                    _selectedItemViewModel.PropertyChanged -= ChildEditor_PropertyChanged;
+                _selectedItemViewModel = value;
+                NotifyPropertyChanged(nameof(SelectedItemViewModel));
+                if (_selectedItemViewModel != null)
+                    _selectedItemViewModel.PropertyChanged += ChildEditor_PropertyChanged;
+                NotifyEditState();
+            }
+        }
+
+        AnimSetTableEditorViewModel _tableEditorVM = null!;
+        public AnimSetTableEditorViewModel TableEditorVM
+        {
+            get => _tableEditorVM;
+            set
+            {
+                if (_tableEditorVM != null)
+                    _tableEditorVM.PropertyChanged -= ChildEditor_PropertyChanged;
+                _tableEditorVM = value;
+                NotifyPropertyChanged(nameof(TableEditorVM));
+                if (_tableEditorVM != null)
+                    _tableEditorVM.PropertyChanged += ChildEditor_PropertyChanged;
+                NotifyEditState();
+            }
+        }
 
         bool _isTableView = true;
         public bool IsTableView { get => _isTableView; set => SetAndNotify(ref _isTableView, value); }
@@ -52,7 +115,8 @@ namespace CommonControls.Editors.AnimationPack
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper, 
             ApplicationSettingsService appSettings, 
             IFileSaveService packFileSaveService,
-            MetaDataFileParser metaDataFileParser)
+            MetaDataFileParser metaDataFileParser,
+            IStandardDialogs standardDialogs)
         {
             _uiCommandFactory = uiCommandFactory;
             _pfs = pfs;
@@ -60,27 +124,56 @@ namespace CommonControls.Editors.AnimationPack
             _appSettings = appSettings;
             _packFileSaveService = packFileSaveService;
             _metaDataFileParser = metaDataFileParser;
+            _standardDialogs = standardDialogs;
             AnimationPackItems = new FilterCollection<IAnimationPackFile>(new List<IAnimationPackFile>(), OnItemSelected, BeforeItemSelected)
             {
                 SearchFilter = (value, rx) => { return rx.Match(value.FileName).Success; }
             };
         }
 
-        [RelayCommand] private void RenameAction() => _uiCommandFactory.Create<RenameSelectedFileCommand>().Execute(this);
-        [RelayCommand] private void RemoveAction() => _uiCommandFactory.Create<RemoveSelectedFileCommand>().Execute(this);
-        [RelayCommand] private void CopyFullPathAction() => Clipboard.SetText(AnimationPackItems.SelectedItem.FileName);
+        public void RefreshFileFilter()
+        {
+            AnimationPackItems.Filter = UseRegexFilter
+                ? FileFilterText
+                : Regex.Escape(FileFilterText);
+            NotifyPropertyChanged(nameof(IsFileFilterInvalid));
+            NotifyPropertyChanged(nameof(HasFilterResults));
+            NotifyPropertyChanged(nameof(FilterSummary));
+        }
+
+        private bool CanUseSelectedItem() => AnimationPackItems.SelectedItem != null;
+
+        [RelayCommand(CanExecute = nameof(CanUseSelectedItem))]
+        private void RenameAction() => _uiCommandFactory.Create<RenameSelectedFileCommand>().Execute(this);
+        [RelayCommand(CanExecute = nameof(CanUseSelectedItem))]
+        private void RemoveAction() => _uiCommandFactory.Create<RemoveSelectedFileCommand>().Execute(this);
+        [RelayCommand(CanExecute = nameof(CanUseSelectedItem))]
+        private void CopyFullPathAction()
+        {
+            if (AnimationPackItems.SelectedItem is { } selectedItem)
+                Clipboard.SetText(selectedItem.FileName);
+        }
         [RelayCommand] private void CreateEmptyWarhammer3AnimSetFileAction() => _uiCommandFactory.Create<CreateEmptyWarhammer3AnimSetFileCommand>().Execute(this);
         [RelayCommand] private void ExportAnimationSlotsWh3Action() => _uiCommandFactory.Create<ExportAnimationSlotCommand>().Warhammer3();
         [RelayCommand] private void ExportAnimationSlotsWh2Action() => _uiCommandFactory.Create<ExportAnimationSlotCommand>().Warhammer2();
 
         [RelayCommand] private void SaveAction() => Save();
-        [RelayCommand] private void ToggleViewMode() => IsTableView = !IsTableView;
+
+        [RelayCommand]
+        private void ToggleViewMode()
+        {
+            if (HasUnsavedChildChanges() && !SaveActiveFile())
+                return;
+            IsTableView = !IsTableView;
+        }
 
         bool BeforeItemSelected(IAnimationPackFile item)
         {
             if (HasUnsavedChildChanges())
             {
-                if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.UnsavedChangesLost"), "", MessageBoxButton.YesNo) == MessageBoxResult.No)
+                if (_standardDialogs.ShowYesNoBox(
+                        GetLocalizedText("Msg.UnsavedChangesLost"),
+                        GetLocalizedText("Msg.UnsavedChangesOnQuitTitle")) != ShowMessageBoxResult.OK)
                     return false;
             }
 
@@ -105,7 +198,7 @@ namespace CommonControls.Editors.AnimationPack
                 SelectedItemViewModel.TextEditor?.SetSyntaxHighlighting("XML");
                 SelectedItemViewModel.Text = "";
                 SelectedItemViewModel.ResetChangeLog();
-                TableEditorVM = null;
+                TableEditorVM = null!;
             }
             else
             {
@@ -125,14 +218,44 @@ namespace CommonControls.Editors.AnimationPack
                 tableVM.SaveCommand = new RelayCommand(() => SaveActiveFile());
                 TableEditorVM = tableVM;
             }
-
+            NotifySelectionState();
         }
         public void Close() { }
         private bool _hasUnsavedChanges;
         public bool HasUnsavedChanges
         {
             get => _hasUnsavedChanges || HasUnsavedChildChanges();
-            set => SetAndNotify(ref _hasUnsavedChanges, value);
+            set
+            {
+                SetAndNotify(ref _hasUnsavedChanges, value);
+                NotifyEditState();
+            }
+        }
+
+        public bool HasEditConflict =>
+            TableEditorVM?.IsDirty == true &&
+            SelectedItemViewModel?.HasUnsavedChanges() == true;
+
+        public bool HasEditStatus => HasUnsavedChanges;
+
+        public bool IsSelectedItemUnsupported =>
+            AnimationPackItems.SelectedItem != null &&
+            (_activeConverter == null || AnimationPackItems.SelectedItem.IsUnknownFile);
+
+        public string EditStatusMessage
+        {
+            get
+            {
+                if (HasEditConflict)
+                    return GetLocalizedText("AnimPack.Status.EditConflict");
+                if (TableEditorVM?.IsDirty == true)
+                    return GetLocalizedText("AnimPack.Status.TablePending");
+                if (SelectedItemViewModel?.HasUnsavedChanges() == true)
+                    return GetLocalizedText("AnimPack.Status.XmlPending");
+                if (_hasUnsavedChanges)
+                    return GetLocalizedText("AnimPack.Status.PackPending");
+                return string.Empty;
+            }
         }
 
         public PackFile CurrentFile => _packFile;
@@ -143,22 +266,70 @@ namespace CommonControls.Editors.AnimationPack
                 SelectedItemViewModel?.HasUnsavedChanges() == true;
         }
 
+        private static string GetLocalizedText(string key) =>
+            LocalizationManager.Instance?.Get(key) ?? key;
+
+        private void ChildEditor_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (sender == TableEditorVM && e.PropertyName != nameof(AnimSetTableEditorViewModel.IsDirty))
+                return;
+            if (sender == SelectedItemViewModel && e.PropertyName != nameof(SimpleTextEditorViewModel.Text))
+                return;
+            NotifyEditState();
+        }
+
+        private void NotifyEditState()
+        {
+            NotifyPropertyChanged(nameof(HasUnsavedChanges));
+            NotifyPropertyChanged(nameof(HasEditConflict));
+            NotifyPropertyChanged(nameof(HasEditStatus));
+            NotifyPropertyChanged(nameof(EditStatusMessage));
+        }
+
+        private void NotifySelectionState()
+        {
+            NotifyPropertyChanged(nameof(HasSelectedItem));
+            NotifyPropertyChanged(nameof(IsSelectedItemUnsupported));
+            RenameActionCommand.NotifyCanExecuteChanged();
+            RemoveActionCommand.NotifyCanExecuteChanged();
+            CopyFullPathActionCommand.NotifyCanExecuteChanged();
+        }
+
 
         public bool SaveActiveFile()
         {
             if (_packFile == null)
             {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.CannotSaveInThisMode"));
+                _standardDialogs.ShowDialogBox(
+                    GetLocalizedText("Msg.CannotSaveInThisMode"),
+                    GetLocalizedText("Msg.GeneralError"));
+                return false;
+            }
+
+            var selectedFile = AnimationPackItems.SelectedItem;
+            var converter = _activeConverter;
+            var textEditor = SelectedItemViewModel;
+            if (selectedFile == null || converter == null || textEditor == null)
+            {
+                _standardDialogs.ShowDialogBox(
+                    GetLocalizedText("Msg.CannotSaveInThisMode"),
+                    GetLocalizedText("Msg.GeneralError"));
                 return false;
             }
 
             var tableDirty = TableEditorVM?.IsDirty == true;
             var xmlDirty = SelectedItemViewModel?.HasUnsavedChanges() == true;
             if (tableDirty && xmlDirty)
+            {
+                NotifyEditState();
+                _standardDialogs.ShowDialogBox(
+                    EditStatusMessage,
+                    GetLocalizedText("Msg.GeneralError"));
                 return false;
+            }
 
-            var fileName = AnimationPackItems.SelectedItem.FileName;
-            byte[] bytes;
+            var fileName = selectedFile.FileName;
+            byte[]? bytes;
             ITextConverter.SaveError? error;
             var saveTable = (tableDirty && !xmlDirty) ||
                 (tableDirty == xmlDirty && IsTableView);
@@ -170,30 +341,31 @@ namespace CommonControls.Editors.AnimationPack
             }
             else
             {
-                bytes = _activeConverter.ToBytes(SelectedItemViewModel.Text, fileName, _pfs, out error);
+                bytes = converter.ToBytes(textEditor.Text, fileName, _pfs, out error);
             }
 
             if (bytes == null || error != null)
             {
-                if (error != null && SelectedItemViewModel?.TextEditor != null)
-                    SelectedItemViewModel.TextEditor.HightLightText(error.ErrorLineNumber, error.ErrorPosition, error.ErrorLength);
-                MessageBox.Show(error?.Text ?? "Unknown error", LocalizationManager.Instance.Get("Msg.GeneralError"));
+                if (error != null && textEditor.TextEditor != null)
+                    textEditor.TextEditor.HightLightText(error.ErrorLineNumber, error.ErrorPosition, error.ErrorLength);
+                _standardDialogs.ShowDialogBox(
+                    error?.Text ?? GetLocalizedText("Msg.UnknownError"),
+                    GetLocalizedText("Msg.GeneralError"));
                 return false;
             }
 
-            var seletedFile = AnimationPackItems.SelectedItem;
-            seletedFile.CreateFromBytes(bytes);
-            seletedFile.IsChanged.Value = true;
+            selectedFile.CreateFromBytes(bytes);
+            selectedFile.IsChanged.Value = true;
 
             if (tableEditorToSave != null)
             {
                 tableEditorToSave.IsDirty = false;
-                SelectedItemViewModel.Text = _activeConverter.GetText(bytes);
-                SelectedItemViewModel.ResetChangeLog();
+                textEditor.Text = converter.GetText(bytes);
+                textEditor.ResetChangeLog();
             }
             else
             {
-                SelectedItemViewModel.ResetChangeLog();
+                textEditor.ResetChangeLog();
                 TableEditorVM?.LoadFromBinary(bytes, fileName);
             }
             HasUnsavedChanges = true;
@@ -206,14 +378,22 @@ namespace CommonControls.Editors.AnimationPack
         {
             if (_packFile == null)
             {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.CannotSaveInThisMode"));
+                _standardDialogs.ShowDialogBox(
+                    GetLocalizedText("Msg.CannotSaveInThisMode"),
+                    GetLocalizedText("Msg.GeneralError"));
                 return false;
             }
 
             var tableDirty = TableEditorVM?.IsDirty == true;
             var xmlDirty = SelectedItemViewModel?.HasUnsavedChanges() == true;
             if (tableDirty && xmlDirty)
+            {
+                NotifyEditState();
+                _standardDialogs.ShowDialogBox(
+                    EditStatusMessage,
+                    GetLocalizedText("Msg.GeneralError"));
                 return false;
+            }
 
             if (tableDirty || xmlDirty)
             {
@@ -245,6 +425,8 @@ namespace CommonControls.Editors.AnimationPack
             var animPack = AnimationPackSerializer.Load(_packFile, _pfs);
             var itemNames = animPack.Files.ToList();
             AnimationPackItems.UpdatePossibleValues(itemNames);
+            RefreshFileFilter();
+            NotifySelectionState();
             DisplayName = animPack.FileName;
         }
     }

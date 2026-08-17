@@ -27,12 +27,14 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
             }
 
             // way to refresh the view
-            editor.AnimationPackItems.RefreshFilter();
+            editor.RefreshFileFilter();
         }
 
         protected virtual string? GetNewFileName(string currentFileName)
         {
-            var input = _standardDialogs.ShowTextInputDialog("Rename Anim File", currentFileName);
+            var input = _standardDialogs.ShowTextInputDialog(
+                LocalizationManager.Instance.Get("AnimPack.RenameFileTitle"),
+                currentFileName);
             if (input.Result)
                 return input.Text;
 

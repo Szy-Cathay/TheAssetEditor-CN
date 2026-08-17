@@ -27,12 +27,15 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
             var animSet = CreateExampleWarhammer3AnimSet(fileName);
             editor.AnimationPackItems.PossibleValues.Add(animSet);
             editor.AnimationPackItems.UpdatePossibleValues(editor.AnimationPackItems.PossibleValues);
+            editor.RefreshFileFilter();
             editor.HasUnsavedChanges = true;
         }
 
         protected virtual string? GetAnimSetFileName()
         {
-            var input = _standardDialogs.ShowTextInputDialog("Fragment name", "");
+            var input = _standardDialogs.ShowTextInputDialog(
+                LocalizationManager.Instance.Get("AnimPack.CreateFileTitle"),
+                "");
             if (input.Result)
             {
                 var filename = SaveUtility.EnsureEnding(input.Text, ".frg");

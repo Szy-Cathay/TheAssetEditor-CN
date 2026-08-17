@@ -161,6 +161,8 @@ namespace AssetEditorTests
                 ],
                 ["Editors/Audio/AudioExplorer/AudioExplorerView.xaml"] =
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
+                ["Editors/AnimationFragmentEditor/Editor.AnimationFragmentEditor/AnimationPack/AnimationPackView.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/CscEditor/Editors.CscEditor/Views/CscEditorView.xaml"] =
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",

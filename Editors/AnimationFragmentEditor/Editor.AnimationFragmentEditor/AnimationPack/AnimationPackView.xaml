@@ -1,16 +1,16 @@
-﻿<UserControl x:Class="CommonControls.Editors.AnimationPack.AnimationPackView"
+<UserControl x:Class="CommonControls.Editors.AnimationPack.AnimationPackView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
-             xmlns:s="http://schemas.singulink.com/xaml"
              xmlns:texteditor="clr-namespace:CommonControls.Editors.TextEditor;assembly=Editors.Shared.Core"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:local="clr-namespace:CommonControls.Editors.AnimationPack"
              xmlns:converters="clr-namespace:Editors.AnimationFragmentEditor.AnimationPack.Converters"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
+             d:DesignHeight="720" d:DesignWidth="1180"
              Background="{DynamicResource AeBrush.Canvas}"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
              FontFamily="{DynamicResource AppFontFamily}"
@@ -19,112 +19,211 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
         </ResourceDictionary>
     </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="auto"/>
-            <RowDefinition/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width=".3*"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="0.3*" MinWidth="180" />
+            <ColumnDefinition Width="5" />
+            <ColumnDefinition Width="*" MinWidth="320" />
         </Grid.ColumnDefinitions>
 
-        <!-- File Menu -->
-        <DockPanel Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="0">
-            <Menu DockPanel.Dock="Top">
-                <MenuItem Header="{loc:Loc AnimPack.FileMenu}">
-                    <MenuItem Header="{loc:Loc General.Save}" Command="{Binding SaveActionCommand}"/>
-                    <Separator/>
-                    <MenuItem Header="{loc:Loc AnimPack.NewAnimSetWh3}"  Command="{Binding CreateEmptyWarhammer3AnimSetFileActionCommand}" />
-                    <Separator/>
-                    <MenuItem Header="{loc:Loc AnimPack.ExportAnimSlotsWh3}"  Command="{Binding ExportAnimationSlotsWh3ActionCommand}" />
-                    <MenuItem Header="{loc:Loc AnimPack.ExportAnimSlotsWh2}"  Command="{Binding ExportAnimationSlotsWh2ActionCommand}" />
-                </MenuItem>
-                <MenuItem Header="{loc:Loc AnimPack.ViewMenu}">
-                    <MenuItem Header="{loc:Loc AnimPack.TableView}" IsCheckable="True" IsChecked="{Binding IsTableView}"/>
-                </MenuItem>
-            </Menu>
-        </DockPanel>
+        <Menu Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">
+            <MenuItem Header="{loc:Loc AnimPack.FileMenu}">
+                <MenuItem Header="{loc:Loc AnimPack.SavePack}" Command="{Binding SaveActionCommand}" />
+                <Separator />
+                <MenuItem Header="{loc:Loc AnimPack.NewAnimSetWh3}" Command="{Binding CreateEmptyWarhammer3AnimSetFileActionCommand}" />
+                <Separator />
+                <MenuItem Header="{loc:Loc AnimPack.ExportAnimSlotsWh3}" Command="{Binding ExportAnimationSlotsWh3ActionCommand}" />
+                <MenuItem Header="{loc:Loc AnimPack.ExportAnimSlotsWh2}" Command="{Binding ExportAnimationSlotsWh2ActionCommand}" />
+            </MenuItem>
+            <MenuItem Header="{loc:Loc AnimPack.ViewMenu}">
+                <MenuItem Header="{loc:Loc AnimPack.TableView}"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsTableView, Mode=OneWay}"
+                          Command="{Binding ToggleViewModeCommand}" />
+            </MenuItem>
+        </Menu>
 
-        <!-- Left side - file list and filter -->
-        <Grid Grid.Row="1" Grid.Column="0">
+        <Grid Grid.Row="1" Grid.Column="0" Margin="8">
             <Grid.RowDefinitions>
-                <RowDefinition Height="auto"/>
-                <RowDefinition/>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <TextBox Grid.Row="0" 
-                     Text="{Binding AnimationPackItems.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                     behaviors:TextBoxExtensions.Watermark="{loc:Loc AnimPack.Watermark}">
-                <TextBox.Style>
-                    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}">
-                        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding AnimationPackItems.FilterValid, UpdateSourceTrigger=PropertyChanged}" Value="false">
-                                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
-                                <Setter Property="BorderThickness" Value="2" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBox.Style>
-            </TextBox>
-            <ListView Grid.Row="1" ItemsSource="{Binding AnimationPackItems.Values}" SelectedItem="{Binding AnimationPackItems.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="{x:Type ListViewItem}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsUnknownFile, UpdateSourceTrigger=PropertyChanged}" Value="True">
-                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsUnknownFile, UpdateSourceTrigger=PropertyChanged}" Value="False">
-                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ListView.ItemContainerStyle>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Text="{Binding FileFilterText, UpdateSourceTrigger=PropertyChanged}"
+                         behaviors:TextBoxExtensions.Watermark="{loc:Loc AnimPack.Watermark}">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource AeInput.TextBox}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFileFilterInvalid}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
+                                    <Setter Property="BorderThickness" Value="2" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+                <CheckBox Grid.Column="1"
+                          Margin="8,0,0,0"
+                          VerticalAlignment="Center"
+                          Content="{loc:Loc AnimPack.RegexFilter}"
+                          IsChecked="{Binding UseRegexFilter}" />
+            </Grid>
 
-                <ListView.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="{loc:Loc AnimPack.ContextMenuRename}" Command="{Binding RenameActionCommand}" />
-                        <MenuItem Header="{loc:Loc AnimPack.ContextMenuRemove}" Command="{Binding RemoveActionCommand}"/>
-                        <MenuItem Header="{loc:Loc AnimPack.ContextMenuCopyFullPath}" Command="{Binding CopyFullPathActionCommand}"/>
-                    </ContextMenu>
-                </ListView.ContextMenu>
+            <Border Grid.Row="1"
+                    Margin="0,6,0,0"
+                    Style="{StaticResource AeFeedback.Notice}"
+                    Visibility="{Binding IsFileFilterInvalid, Converter={StaticResource BoolToVis}}">
+                <DockPanel>
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource AeBrush.Danger}"
+                            Style="{StaticResource AeFeedback.Icon}" />
+                    <TextBlock VerticalAlignment="Center"
+                               Foreground="{DynamicResource AeBrush.Danger}"
+                               Style="{StaticResource AeText.Caption}"
+                               Text="{loc:Loc AnimPack.FilterInvalid}"
+                               TextWrapping="Wrap" />
+                </DockPanel>
+            </Border>
 
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding IsChanged.Value, Converter={StaticResource BoolToChangedPrefixStr}, UpdateSourceTrigger=PropertyChanged}"/>
-                            <TextBlock Margin="4,0,0,0" Grid.Column="1" Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}"/>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-                
-                
-            </ListView>
+            <TextBlock Grid.Row="2"
+                       Margin="2,6,2,4"
+                       Foreground="{DynamicResource AeBrush.TextMuted}"
+                       Style="{StaticResource AeText.Caption}"
+                       Text="{Binding FilterSummary}" />
+
+            <Grid Grid.Row="3" MinHeight="0">
+                <ListView ItemsSource="{Binding AnimationPackItems.Values}"
+                          SelectedItem="{Binding AnimationPackItems.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                          Style="{StaticResource AeList.View}">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" BasedOn="{StaticResource AeList.Item}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsUnknownFile}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ContextMenu>
+                        <ContextMenu Style="{StaticResource AeMenu.Context}">
+                            <MenuItem Header="{loc:Loc AnimPack.ContextMenuRename}" Command="{Binding RenameActionCommand}" />
+                            <MenuItem Header="{loc:Loc AnimPack.ContextMenuRemove}" Command="{Binding RemoveActionCommand}" />
+                            <MenuItem Header="{loc:Loc AnimPack.ContextMenuCopyFullPath}" Command="{Binding CopyFullPathActionCommand}" />
+                        </ContextMenu>
+                    </ListView.ContextMenu>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ToolTip="{Binding FileName}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding IsChanged.Value, Converter={StaticResource BoolToChangedPrefixStr}}" />
+                                <materialIcons:MaterialIcon Grid.Column="1"
+                                                            Width="16" Height="16"
+                                                            Margin="4,0,0,0"
+                                                            Foreground="{DynamicResource AeBrush.Danger}"
+                                                            Kind="AlertCircleOutline"
+                                                            ToolTip="{loc:Loc AnimPack.UnknownFile}"
+                                                            Visibility="{Binding IsUnknownFile, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock Grid.Column="2"
+                                           Margin="4,0,0,0"
+                                           Text="{Binding FileName}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <Border Style="{StaticResource AeEmptyState.Panel}"
+                        Visibility="{Binding HasFilterResults, Converter={StaticResource InverseBoolToVis}}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource AeEmptyState.Title}" Text="{loc:Loc AnimPack.FilterEmptyTitle}" />
+                        <TextBlock Style="{StaticResource AeEmptyState.Description}"
+                                   Text="{loc:Loc AnimPack.FilterEmptyDescription}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
 
-        <!-- Right side - dual view -->
-        <Grid Grid.Row="1" Grid.Column="2">
-            <!-- Table view (default) -->
-            <local:AnimSetTableEditorView
-                DataContext="{Binding TableEditorVM}"
-                Visibility="{Binding DataContext.IsTableView, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"/>
+        <GridSplitter Grid.Row="1" Grid.Column="1"
+                      Style="{StaticResource AeVerticalGridSplitterStyle}" />
 
-            <!-- XML text view (fallback) -->
-            <texteditor:TextEditorView
-                DataContext="{Binding SelectedItemViewModel, UpdateSourceTrigger=PropertyChanged}"
-                Visibility="{Binding DataContext.IsTableView, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBoolToVis}}"/>
+        <Grid Grid.Row="1" Grid.Column="2" Margin="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Margin="0,0,0,8"
+                    Style="{StaticResource AeFeedback.Notice}"
+                    Visibility="{Binding HasEditStatus, Converter={StaticResource BoolToVis}}">
+                <DockPanel>
+                    <Border Margin="0,0,8,0">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource AeFeedback.Icon}">
+                                <Setter Property="Background" Value="{DynamicResource AeBrush.Warning}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasEditConflict}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource AeBrush.Danger}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
+                    <TextBlock VerticalAlignment="Center"
+                               Style="{StaticResource AeText.Body}"
+                               Text="{Binding EditStatusMessage}"
+                               TextWrapping="Wrap" />
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Row="1" MinHeight="0">
+                <local:AnimSetTableEditorView DataContext="{Binding TableEditorVM}"
+                                              Visibility="{Binding DataContext.IsTableView, RelativeSource={RelativeSource AncestorType={x:Type local:AnimationPackView}}, Converter={StaticResource BoolToVis}}" />
+                <texteditor:TextEditorView DataContext="{Binding SelectedItemViewModel}"
+                                           Visibility="{Binding DataContext.IsTableView, RelativeSource={RelativeSource AncestorType={x:Type local:AnimationPackView}}, Converter={StaticResource InverseBoolToVis}}" />
+
+                <Border Style="{StaticResource AeEmptyState.Panel}"
+                        Visibility="{Binding HasSelectedItem, Converter={StaticResource InverseBoolToVis}}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource AeEmptyState.Title}" Text="{loc:Loc AnimPack.NoSelectionTitle}" />
+                        <TextBlock Style="{StaticResource AeEmptyState.Description}"
+                                   Text="{loc:Loc AnimPack.NoSelectionDescription}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource AeEmptyState.Panel}"
+                        Visibility="{Binding IsSelectedItemUnsupported, Converter={StaticResource BoolToVis}}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource AeEmptyState.Title}" Text="{loc:Loc AnimPack.UnsupportedTitle}" />
+                        <TextBlock Style="{StaticResource AeEmptyState.Description}"
+                                   Text="{loc:Loc AnimPack.UnsupportedDescription}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
-
     </Grid>
 </UserControl>

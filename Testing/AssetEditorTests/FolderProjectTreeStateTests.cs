@@ -181,6 +181,51 @@ public class FolderProjectTreeStateTests
     }
 
     [Test]
+    public async Task NoOpFolderProjectSave_ClearsOptimisticChangeMarker()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\unchanged.animpack", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(service => service.GetDisplayStatus(projectRoot.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                new string('1', 40),
+                []));
+        using var harness = CreateViewModelWithHistory(
+            history.Object,
+            project);
+        await harness.ViewModel.HistoryStatusRefreshTask;
+        var root = harness.ViewModel.Files.Single();
+        var file = FindNode(root, @"folder\unchanged.animpack").Item!;
+
+        harness.EventHub.Publish(new FolderProjectChangedEvent(
+            project,
+            new FolderProjectChangeSet(
+                1,
+                [
+                    new FolderProjectFileChange(
+                        @"folder\unchanged.animpack",
+                        FolderProjectFileChangeKind.Updated,
+                        file),
+                ])));
+        await harness.ViewModel.HistoryStatusRefreshTask;
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.UnsavedChanged, Is.False);
+            NUnitAssert.That(
+                FindNode(root, @"folder\unchanged.animpack")
+                    .UnsavedChanged,
+                Is.False);
+        });
+        history.Verify(service => service.GetDisplayStatus(projectRoot.Path),
+            Times.Exactly(2));
+    }
+
+    [Test]
     public void UpdatedFolderProjectFile_MarksFileAndAncestorsChanged()
     {
         using var projectRoot = new TemporaryDirectory();

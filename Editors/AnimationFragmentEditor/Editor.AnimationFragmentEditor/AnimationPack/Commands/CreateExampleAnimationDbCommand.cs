@@ -26,7 +26,9 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
         public PackFile? CreateAnimationDbWarhammer3()
         {
-            var input = _standardDialogs.ShowTextInputDialog("New AnimPack name", "");
+            var input = _standardDialogs.ShowTextInputDialog(
+                LocalizationManager.Instance.Get("AnimPack.CreatePackTitle"),
+                "");
             if (input.Result)
                 return CreateAnimationDbWarhammer3(input.Text);
             return null;
@@ -45,7 +47,9 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
             if (!SaveUtility.IsFilenameUnique(_pfs, filePath))
             {
-                _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.FilenameNotUnique"));
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.FilenameNotUnique"),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
                 return null;
             }
 
@@ -55,14 +59,18 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
 
         public void CreateAnimationDb3k()
         {
-            var input = _standardDialogs.ShowTextInputDialog("New AnimPack name", "");
+            var input = _standardDialogs.ShowTextInputDialog(
+                LocalizationManager.Instance.Get("AnimPack.CreatePackTitle"),
+                "");
             if (input.Result)
             {
                 var fileName = SaveUtility.EnsureEnding(input.Text, ".animpack");
                 var filePath = @"animations/database/battle/bin/" + fileName;
                 if (!SaveUtility.IsFilenameUnique(_pfs, filePath))
                 {
-                    _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.FilenameNotUnique"));
+                    _standardDialogs.ShowDialogBox(
+                        LocalizationManager.Instance.Get("Msg.FilenameNotUnique"),
+                        LocalizationManager.Instance.Get("Msg.GeneralError"));
                     return;
                 }
 

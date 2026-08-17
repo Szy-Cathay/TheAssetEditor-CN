@@ -354,6 +354,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             }
 
             Filter.Refresh();
+            QueueFolderProjectHistoryStatusRefresh(e.Container, root);
         }
 
         private static IReadOnlyList<FolderProjectDirectoryChange>

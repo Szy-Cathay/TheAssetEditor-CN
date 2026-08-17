@@ -113,6 +113,42 @@ public class UiAnimationMetadataFamilyTests
     }
 
     [Test]
+    public void AnimPackTable_PreservesCompleteResizableColumnsAndShowsShortPaths()
+    {
+        var root = FindSolutionRoot();
+        var table = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "AnimationFragmentEditor",
+            "Editor.AnimationFragmentEditor",
+            "AnimationPack",
+            "Views",
+            "AnimSetTableEditorView.xaml"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(table, Does.Contain("CanUserResizeColumns=\"True\""));
+            NUnitAssert.That(table, Does.Contain("ColumnWidth=\"Auto\""));
+            NUnitAssert.That(
+                table,
+                Does.Contain(
+                    "ScrollViewer.HorizontalScrollBarVisibility=\"Auto\""));
+            NUnitAssert.That(table, Does.Contain("AnimationFileName"));
+            NUnitAssert.That(table, Does.Contain("ToolTip=\"{Binding AnimationFile}\""));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.Slot.ToolTip"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.BlendIn.ToolTip"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.Weight.ToolTip"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.BlendIn"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.Weight"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.WeaponBone"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.Table.Unk"));
+            NUnitAssert.That(table, Does.Contain("materialIcons:MaterialIcon"));
+            NUnitAssert.That(table, Does.Not.Contain("&#x25B2;"));
+            NUnitAssert.That(table, Does.Not.Contain("&#x25BC;"));
+        });
+    }
+
+    [Test]
     public void AnimationRetargetEditor_UsesValidBindingsAndSharedWindowContract()
     {
         var root = FindSolutionRoot();

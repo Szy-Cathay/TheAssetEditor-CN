@@ -1,3 +1,4 @@
+using System.IO;
 using Shared.Core.Misc;
 
 namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
@@ -19,9 +20,42 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
         public int SlotIndex { get => _slotIndex; set => SetAndNotify(ref _slotIndex, value); }
         public string SlotName { get => _slotName; set => SetAndNotify(ref _slotName, value); }
-        public string AnimationFile { get => _animationFile; set => SetAndNotify(ref _animationFile, value); }
-        public string MetaFile { get => _metaFile; set => SetAndNotify(ref _metaFile, value); }
-        public string SoundFile { get => _soundFile; set => SetAndNotify(ref _soundFile, value); }
+        public string AnimationFile
+        {
+            get => _animationFile;
+            set
+            {
+                if (_animationFile == value)
+                    return;
+                SetAndNotify(ref _animationFile, value);
+                NotifyPropertyChanged(nameof(AnimationFileName));
+            }
+        }
+        public string MetaFile
+        {
+            get => _metaFile;
+            set
+            {
+                if (_metaFile == value)
+                    return;
+                SetAndNotify(ref _metaFile, value);
+                NotifyPropertyChanged(nameof(MetaFileName));
+            }
+        }
+        public string SoundFile
+        {
+            get => _soundFile;
+            set
+            {
+                if (_soundFile == value)
+                    return;
+                SetAndNotify(ref _soundFile, value);
+                NotifyPropertyChanged(nameof(SoundFileName));
+            }
+        }
+        public string AnimationFileName => GetFileName(AnimationFile);
+        public string MetaFileName => GetFileName(MetaFile);
+        public string SoundFileName => GetFileName(SoundFile);
         public float BlendInTime { get => _blendInTime; set => SetAndNotify(ref _blendInTime, value); }
         public float SelectionWeight { get => _selectionWeight; set => SetAndNotify(ref _selectionWeight, value); }
         public bool Unk { get => _unk; set => SetAndNotify(ref _unk, value); }
@@ -39,6 +73,17 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         public string WeaponBone => $"{Wb0}, {Wb1}, {Wb2}, {Wb3}, {Wb4}, {Wb5}";
 
         public string DisplayName => VariantIndex > 0 ? $"[{VariantIndex}] {SlotName}" : SlotName;
+
+        private static string GetFileName(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return string.Empty;
+
+            var normalizedPath = path
+                .Replace('\\', Path.DirectorySeparatorChar)
+                .Replace('/', Path.DirectorySeparatorChar);
+            return Path.GetFileName(normalizedPath);
+        }
 
         public void SetWeaponBoneFromInt(int value)
         {
