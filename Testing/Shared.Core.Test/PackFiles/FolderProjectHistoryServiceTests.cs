@@ -370,6 +370,36 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void CreateRestorePoint_RecordsCopiedFileAsAdded()
+    {
+        using var project = new TemporaryProject();
+        var sourcePath = Path.Combine(project.Root, "db", "source.bin");
+        File.WriteAllBytes(sourcePath, [1, 2, 3]);
+        var service = CreateService();
+        service.Initialize(project.Root);
+        var copiedPath = Path.Combine(project.Root, "db", "copied.bin");
+        File.Copy(sourcePath, copiedPath);
+
+        var restorePoint = service.CreateRestorePoint(
+            project.Root,
+            "复制文件");
+        var changes = service.GetRestorePointChanges(
+            project.Root,
+            restorePoint.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restorePoint.ChangeSummary.Added, Is.EqualTo(1));
+            Assert.That(restorePoint.ChangeSummary.Total, Is.EqualTo(1));
+            Assert.That(changes, Has.Count.EqualTo(1));
+            Assert.That(changes[0].Path, Is.EqualTo("db/copied.bin"));
+            Assert.That(
+                changes[0].Kind,
+                Is.EqualTo(FolderProjectRestorePointChangeKind.Added));
+        });
+    }
+
+    [Test]
     public void GetStatus_AfterRestartOpensOnlyAddedAndModifiedFiles()
     {
         using var project = new TemporaryProject();

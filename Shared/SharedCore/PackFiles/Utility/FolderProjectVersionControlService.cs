@@ -1296,7 +1296,8 @@ internal sealed partial class FolderProjectVersionControlService :
                     });
                 return new FolderProjectCommitChangeSummary(
                     changes.Count(change =>
-                        change.Status == ChangeKind.Added),
+                        change.Status is ChangeKind.Added or
+                            ChangeKind.Copied),
                     changes.Count(change =>
                         change.Status == ChangeKind.Modified),
                     changes.Count(change =>
@@ -1534,7 +1535,7 @@ internal sealed partial class FolderProjectVersionControlService :
     {
         var kind = change.Status switch
         {
-            ChangeKind.Added =>
+            ChangeKind.Added or ChangeKind.Copied =>
                 FolderProjectCommitChangeKind.Added,
             ChangeKind.Modified =>
                 FolderProjectCommitChangeKind.Modified,
