@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using AssetEditor.Services.Settings;
 using Editors.AnimationMeta.SuperView.Inspection;
 using Editors.AnimationMeta.SuperView.Visualisation;
@@ -68,7 +69,9 @@ public class UiAnimationMetadataFamilyGallery
         "mount-visualisation",
         "animation-batch-export",
         "animation-pack",
+        "animation-pack-narrow",
         "animset-table",
+        "animset-table-narrow",
         "retarget-animation-settings",
         "retarget-bone-mapping-window",
         "retarget-bone-settings",
@@ -137,6 +140,10 @@ public class UiAnimationMetadataFamilyGallery
             try
             {
                 window.Show();
+                window.UpdateLayout();
+                window.Dispatcher.Invoke(
+                    () => { },
+                    DispatcherPriority.ApplicationIdle);
                 window.UpdateLayout();
                 AssertVisualContracts(window, variant);
                 Capture(window, theme, variant);
@@ -233,9 +240,17 @@ public class UiAnimationMetadataFamilyGallery
             new AnimationPackView { DataContext = CreateAnimationPackModel() },
             1180,
             720),
+        "animation-pack-narrow" => Host(
+            new AnimationPackView { DataContext = CreateAnimationPackModel() },
+            820,
+            720),
         "animset-table" => Host(
             new AnimSetTableEditorView { DataContext = CreateAnimSetModel() },
             1180,
+            720),
+        "animset-table-narrow" => Host(
+            new AnimSetTableEditorView { DataContext = CreateAnimSetModel() },
+            760,
             720),
         "retarget-animation-settings" => Host(
             new RetargetAnimationSettingsView
@@ -540,7 +555,7 @@ public class UiAnimationMetadataFamilyGallery
     {
         var item = new GalleryModel
         {
-            DisplayName = "empire_general.animset",
+            FileName = "animations/database/battle/bin/empire_general.animset",
             IsUnknownFile = false,
             IsChanged = new GalleryModel { Value = true },
         };
@@ -555,17 +570,34 @@ public class UiAnimationMetadataFamilyGallery
                     item,
                     new GalleryModel
                     {
-                        DisplayName = "empire_cavalry.animset",
-                        IsUnknownFile = false,
+                        FileName = "animations/database/battle/bin/empire_cavalry.animset",
+                        IsUnknownFile = true,
                         IsChanged = new GalleryModel { Value = false },
                     },
                 },
                 SelectedItem = item,
             },
+            FileFilterText = "empire",
+            UseRegexFilter = false,
+            IsFileFilterInvalid = false,
+            HasFilterResults = true,
+            FilterSummary = "显示 2 / 2 个文件",
+            HasSelectedItem = true,
+            IsSelectedItemUnsupported = false,
+            IsTableView = true,
+            HasEditStatus = true,
+            HasEditConflict = false,
+            EditStatusMessage = "表格修改尚未应用到动画包。",
+            TableEditorVM = CreateAnimSetModel(),
             SelectedItemViewModel = new GalleryModel
             {
                 Text = "<anim_set name=\"empire_general\" />",
             },
+            SaveActionCommand = GalleryCommand.Instance,
+            ToggleViewModeCommand = GalleryCommand.Instance,
+            RenameActionCommand = GalleryCommand.Instance,
+            RemoveActionCommand = GalleryCommand.Instance,
+            CopyFullPathActionCommand = GalleryCommand.Instance,
         };
     }
 
@@ -581,22 +613,47 @@ public class UiAnimationMetadataFamilyGallery
             new GalleryModel
             {
                 SlotName = "stand_idle",
-                AnimationFile = "animations/humanoid/stand_idle.anim",
+                AnimationFile = "animations/humanoid/szy_shenhua_celestial_general_very_long_stand_idle_variant_01.anim",
+                AnimationFileName = "szy_shenhua_celestial_general_very_long_stand_idle_variant_01.anim",
                 MetaFile = "animations/humanoid/stand_idle.meta",
+                MetaFileName = "stand_idle.meta",
                 SoundFile = "",
+                SoundFileName = "",
+                BlendInTime = 0.25f,
+                SelectionWeight = 1.0f,
+                Wb0 = true,
+                Unk = false,
             },
             new GalleryModel
             {
                 SlotName = "walk",
                 AnimationFile = "animations/humanoid/walk.anim",
+                AnimationFileName = "walk.anim",
                 MetaFile = "animations/humanoid/walk.meta",
+                MetaFileName = "walk.meta",
                 SoundFile = "footsteps/armour_heavy",
+                SoundFileName = "armour_heavy",
+                BlendInTime = 0.15f,
+                SelectionWeight = 0.8f,
+                Wb0 = true,
+                Wb1 = true,
+                Unk = false,
             },
         },
         SlotNames = new[] { "stand_idle", "walk", "run" },
         AnimFiles = new[] { "stand_idle.anim", "walk.anim", "run.anim" },
         MetaFiles = new[] { "stand_idle.meta", "walk.meta" },
         SoundFiles = new[] { "footsteps/armour_heavy" },
+        HasFeedback = false,
+        SaveCommand = GalleryCommand.Instance,
+        UndoCommand = GalleryCommand.Instance,
+        AddEntryCommand = GalleryCommand.Instance,
+        DeleteEntriesCommand = GalleryCommand.Instance,
+        DuplicateEntryCommand = GalleryCommand.Instance,
+        MoveUpCommand = GalleryCommand.Instance,
+        MoveDownCommand = GalleryCommand.Instance,
+        CopyRowsCommand = GalleryCommand.Instance,
+        PasteRowsCommand = GalleryCommand.Instance,
     };
 
     private static GalleryModel CreateBoneModel()
@@ -1067,6 +1124,67 @@ public class UiAnimationMetadataFamilyGallery
                 FindVisualDescendants<System.Windows.Shapes.Path>(window)
                     .Count(),
                 Is.GreaterThanOrEqualTo(5));
+        }
+
+        if (variant.StartsWith("animset-table", StringComparison.Ordinal))
+        {
+            var table = FindVisualDescendants<DataGrid>(window).Single();
+            var columnDetails = string.Join(
+                ", ",
+                table.Columns.Select(column =>
+                    $"{column.Width.UnitType}:{column.Width.Value}:{column.ActualWidth}"));
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(table.CanUserResizeColumns, Is.True);
+                NUnitAssert.That(table.Columns, Has.Count.EqualTo(8));
+                NUnitAssert.That(table.Columns, Has.All.Matches<DataGridColumn>(column =>
+                    column.Visibility == Visibility.Visible));
+                NUnitAssert.That(
+                    table.Columns,
+                    Has.All.Matches<DataGridColumn>(column =>
+                        column.Width.UnitType == DataGridLengthUnitType.Auto),
+                    columnDetails);
+                NUnitAssert.That(
+                    ScrollViewer.GetHorizontalScrollBarVisibility(table),
+                    Is.EqualTo(ScrollBarVisibility.Auto));
+                NUnitAssert.That(
+                    table.Columns.Select(column => column.Header)
+                        .OfType<TextBlock>()
+                        .Select(header => header.ToolTip as string),
+                    Is.EquivalentTo(new[]
+                    {
+                        LocalizationManager.Instance.Get(
+                            "AnimPack.Table.Slot.ToolTip"),
+                        LocalizationManager.Instance.Get(
+                            "AnimPack.Table.BlendIn.ToolTip"),
+                        LocalizationManager.Instance.Get(
+                            "AnimPack.Table.Weight.ToolTip"),
+                    }));
+            });
+
+            if (variant == "animset-table-narrow")
+            {
+                var scrollViewer = FindVisualDescendants<ScrollViewer>(table)
+                    .Single(viewer => viewer.Name == "DG_ScrollViewer");
+                NUnitAssert.That(
+                    scrollViewer.ScrollableWidth,
+                    Is.GreaterThan(0),
+                    columnDetails);
+            }
+        }
+
+        if (variant.StartsWith("animation-pack", StringComparison.Ordinal))
+        {
+            var tableView = FindVisualDescendants<AnimSetTableEditorView>(window).Single();
+            var textView = FindVisualDescendants<TextEditorView>(window).Single();
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    FindVisualDescendants<GridSplitter>(window),
+                    Has.Exactly(1).Items);
+                NUnitAssert.That(tableView.IsVisible, Is.True);
+                NUnitAssert.That(textView.IsVisible, Is.False);
+            });
         }
 
         if (variant == "shared-animation-player-timeline")
@@ -1599,6 +1717,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? ActiveFragmentSlot { get; set; }
         public object? ActiveOutputFragment { get; set; }
         public object? AnimationFile { get; set; }
+        public object? AnimationFileName { get; set; }
         public object? AnimationName { get; set; }
         public object? AnimationOutputFormats { get; set; }
         public object? AnimationPackItems { get; set; }
@@ -1606,6 +1725,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? AnimationSpeedMult { get; set; }
         public object? AnimFiles { get; set; }
         public object? AnimPackName { get; set; }
+        public object? AddEntryCommand { get; set; }
         public object? ApplyRelativeScale { get; set; }
         public object? BoneIndex { get; set; }
         public object? BoneManager { get; set; }
@@ -1617,11 +1737,14 @@ public class UiAnimationMetadataFamilyGallery
         public object? CanSave { get; set; }
         public object? Children { get; set; }
         public object? CopyActionCommand { get; set; }
+        public object? CopyFullPathActionCommand { get; set; }
+        public object? CopyRowsCommand { get; set; }
         public object? CreateAnimations { get; set; }
         public object? CreateAnimPack { get; set; }
         public object? CreateFragment { get; set; }
         public object? Data { get; set; }
         public object? DeleteActionCommand { get; set; }
+        public object? DeleteEntriesCommand { get; set; }
         public object? Description { get; set; }
         public object? DisplayGeneratedMesh { get; set; }
         public object? DisplayGeneratedSkeleton { get; set; }
@@ -1629,6 +1752,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? EnsureUniqeFileName { get; set; }
         public object? FieldName { get; set; }
         public object? FileName { get; set; }
+        public object? FileFilterText { get; set; }
         public object? Filter { get; set; }
         public object? FilterValid { get; set; }
         public object? FitAnimation { get; set; }
@@ -1637,8 +1761,14 @@ public class UiAnimationMetadataFamilyGallery
         public object? FreezeUnmapped { get; set; }
         public object? GameWorld { get; set; }
         public object? HasMapping { get; set; }
+        public object? HasEditConflict { get; set; }
+        public object? HasEditStatus { get; set; }
+        public object? HasFeedback { get; set; }
+        public object? HasFilterResults { get; set; }
+        public object? HasSelectedItem { get; set; }
         public object? HeaderName { get; set; }
         public object? IsChanged { get; set; }
+        public object? IsFileFilterInvalid { get; set; }
         public object? IsControlVisible { get; set; }
         public object? IsDecodedCorrectly { get; set; }
         public object? IsEnabled { get; set; }
@@ -1646,6 +1776,8 @@ public class UiAnimationMetadataFamilyGallery
         public object? IsReadOnly { get; set; }
         public object? IsRootNodeAnimation { get; set; }
         public object? IsSelected { get; set; }
+        public object? IsSelectedItemUnsupported { get; set; }
+        public bool IsTableView { get; set; }
         public object? IsUnknownFile { get; set; }
         public object? IsUsedByCurrentModel { get; set; }
         public object? IsValid { get; set; }
@@ -1665,12 +1797,15 @@ public class UiAnimationMetadataFamilyGallery
         public object? MetaDataFileVersion { get; set; }
         public object? MetaEditor { get; set; }
         public object? MetaFile { get; set; }
+        public object? MetaFileName { get; set; }
         public object? MetaFiles { get; set; }
         public object? ModelBoneList { get; set; }
         public object? ModelBoneListForIKEndBone { get; set; }
         public object? MountBin { get; set; }
         public object? MoveDownActionCommand { get; set; }
+        public object? MoveDownCommand { get; set; }
         public object? MoveUpActionCommand { get; set; }
+        public object? MoveUpCommand { get; set; }
         public object? Name { get; set; }
         public object? NewActionCommand { get; set; }
         public object? OnlyShowUsedBones { get; set; }
@@ -1678,6 +1813,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? ParentModelBones { get; set; }
         public object? ParentSkeletonName { get; set; }
         public object? PasteActionCommand { get; set; }
+        public object? PasteRowsCommand { get; set; }
         public object? PersistentMetaEditor { get; set; }
         public object? PersistentMetaFilePath { get; set; }
         public object? HasPersistentMetaFile { get; set; }
@@ -1742,6 +1878,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? SlotName { get; set; }
         public object? SlotNames { get; set; }
         public object? SoundFile { get; set; }
+        public object? SoundFileName { get; set; }
         public object? SoundFiles { get; set; }
         public object? SpeedMult { get; set; }
         public object? SubHeaderName { get; set; }
@@ -1751,6 +1888,20 @@ public class UiAnimationMetadataFamilyGallery
         public object? TimelineAnnotationContent { get; set; }
         public object? Translation { get; set; }
         public object? UpdateAnimationCommand { get; set; }
+        public object? ToggleViewModeCommand { get; set; }
+        public object? TableEditorVM { get; set; }
+        public object? UndoCommand { get; set; }
+        public object? UseRegexFilter { get; set; }
+        public object? RenameActionCommand { get; set; }
+        public object? RemoveActionCommand { get; set; }
+        public object? DuplicateEntryCommand { get; set; }
+        public object? BlendInTime { get; set; }
+        public object? SelectionWeight { get; set; }
+        public object? Wb0 { get; set; }
+        public object? Wb1 { get; set; }
+        public object? Unk { get; set; }
+        public object? FilterSummary { get; set; }
+        public object? EditStatusMessage { get; set; }
         public object? Value { get; set; }
         public object? ValueAsString { get; set; }
         public object? Values { get; set; }

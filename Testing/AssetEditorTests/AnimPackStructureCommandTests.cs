@@ -15,12 +15,19 @@ namespace AssetEditorTests
     [TestClass]
     public class AnimPackStructureCommandTests
     {
+        [TestInitialize]
+        public void InitializeLocalization()
+        {
+            var localization = new LocalizationManager();
+            localization.LoadLanguage();
+        }
+
         [TestMethod]
         public void Create_Success_AddsFileAndMarksDirty()
         {
             var editor = CreateEditor();
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("Fragment name", ""))
+            dialogs.Setup(x => x.ShowTextInputDialog("新建动画集文件", ""))
                 .Returns(new TextInputDialogResult(true, "new.frg"));
             var command = new CreateEmptyWarhammer3AnimSetFileCommand(dialogs.Object);
 
@@ -35,7 +42,7 @@ namespace AssetEditorTests
         {
             var editor = CreateEditor();
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("Fragment name", ""))
+            dialogs.Setup(x => x.ShowTextInputDialog("新建动画集文件", ""))
                 .Returns(new TextInputDialogResult(false, ""));
             var command = new CreateEmptyWarhammer3AnimSetFileCommand(dialogs.Object);
 
@@ -51,7 +58,7 @@ namespace AssetEditorTests
             var editor = CreateEditor();
             var file = AddAndSelectFile(editor);
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("Rename Anim File", "original.bin"))
+            dialogs.Setup(x => x.ShowTextInputDialog("重命名动画文件", "original.bin"))
                 .Returns(new TextInputDialogResult(true, "renamed.bin"));
             var command = new RenameSelectedFileCommand(dialogs.Object);
 
@@ -67,7 +74,7 @@ namespace AssetEditorTests
             var editor = CreateEditor();
             var file = AddAndSelectFile(editor);
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("Rename Anim File", "original.bin"))
+            dialogs.Setup(x => x.ShowTextInputDialog("重命名动画文件", "original.bin"))
                 .Returns(new TextInputDialogResult(false, ""));
             var command = new RenameSelectedFileCommand(dialogs.Object);
 
@@ -89,11 +96,32 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void FileFilter_DefaultsToLiteralTextAndKeepsRegexAsAnOption()
+        {
+            var editor = CreateEditor();
+            editor.AnimationPackItems.PossibleValues.Add(
+                new UnknownAnimFile("animations/test[1].bin", [1]));
+
+            editor.FileFilterText = "[1]";
+
+            Assert.IsTrue(editor.AnimationPackItems.FilterValid);
+            Assert.AreEqual(1, editor.AnimationPackItems.Values.Count);
+
+            editor.UseRegexFilter = true;
+            editor.FileFilterText = "[";
+
+            Assert.IsFalse(editor.AnimationPackItems.FilterValid);
+        }
+
+        [TestMethod]
         public void Remove_Success_RemovesFileAndMarksDirty()
         {
             var editor = CreateEditor();
             AddAndSelectFile(editor);
-            var command = new RemoveSelectedFileCommand();
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowYesNoBox(It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(ShowMessageBoxResult.OK);
+            var command = new RemoveSelectedFileCommand(dialogs.Object);
 
             command.Execute(editor);
 
@@ -102,10 +130,26 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void Remove_Cancel_KeepsFileAndCleanState()
+        {
+            var editor = CreateEditor();
+            AddAndSelectFile(editor);
+            var dialogs = new Mock<IStandardDialogs>();
+            dialogs.Setup(x => x.ShowYesNoBox(It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(ShowMessageBoxResult.Cancel);
+            var command = new RemoveSelectedFileCommand(dialogs.Object);
+
+            command.Execute(editor);
+
+            Assert.AreEqual(1, editor.AnimationPackItems.PossibleValues.Count);
+            Assert.IsFalse(editor.HasUnsavedChanges);
+        }
+
+        [TestMethod]
         public void Remove_NoSelection_DoesNotMarkDirty()
         {
             var editor = CreateEditor();
-            var command = new RemoveSelectedFileCommand();
+            var command = new RemoveSelectedFileCommand(Mock.Of<IStandardDialogs>());
 
             command.Execute(editor);
 
@@ -117,7 +161,7 @@ namespace AssetEditorTests
         {
             var editor = CreateEditor();
             editor.AnimationPackItems.SelectedItem = new UnknownAnimFile("missing.bin", [1]);
-            var command = new RemoveSelectedFileCommand();
+            var command = new RemoveSelectedFileCommand(Mock.Of<IStandardDialogs>());
 
             command.Execute(editor);
 
@@ -129,7 +173,7 @@ namespace AssetEditorTests
         {
             const string filePath = @"animations/database/battle/bin/new.animpack";
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+            dialogs.Setup(x => x.ShowTextInputDialog("新建动画包", ""))
                 .Returns(new TextInputDialogResult(true, "new"));
             var editablePack = new PackFileContainer("output.pack");
             var packFileService = new Mock<IPackFileService>();
@@ -150,7 +194,7 @@ namespace AssetEditorTests
         public void CreateAnimationDbWarhammer3_Cancel_DoesNotSave()
         {
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+            dialogs.Setup(x => x.ShowTextInputDialog("新建动画包", ""))
                 .Returns(new TextInputDialogResult(false, ""));
             var saveService = new Mock<IFileSaveService>();
             var command = new CreateExampleAnimationDbCommand(
@@ -168,9 +212,8 @@ namespace AssetEditorTests
         public void CreateAnimationDbWarhammer3_DuplicateName_ShowsStandardDialogAndDoesNotSave()
         {
             const string filePath = @"animations/database/battle/bin/existing.animpack";
-            _ = new LocalizationManager();
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+            dialogs.Setup(x => x.ShowTextInputDialog("新建动画包", ""))
                 .Returns(new TextInputDialogResult(true, "existing"));
             var editablePack = new PackFileContainer("output.pack");
             var packFileService = new Mock<IPackFileService>();
@@ -183,7 +226,7 @@ namespace AssetEditorTests
             var result = command.CreateAnimationDbWarhammer3();
 
             Assert.IsNull(result);
-            dialogs.Verify(x => x.ShowDialogBox(It.IsAny<string>(), "Error"), Times.Once);
+            dialogs.Verify(x => x.ShowDialogBox(It.IsAny<string>(), "错误"), Times.Once);
             saveService.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
         }
 
@@ -192,7 +235,7 @@ namespace AssetEditorTests
         {
             const string filePath = @"animations/database/battle/bin/new.animpack";
             var dialogs = new Mock<IStandardDialogs>();
-            dialogs.Setup(x => x.ShowTextInputDialog("New AnimPack name", ""))
+            dialogs.Setup(x => x.ShowTextInputDialog("新建动画包", ""))
                 .Returns(new TextInputDialogResult(true, "new"));
             var editablePack = new PackFileContainer("output.pack");
             var packFileService = new Mock<IPackFileService>();
@@ -214,7 +257,8 @@ namespace AssetEditorTests
                 new Mock<ISkeletonAnimationLookUpHelper>().Object,
                 new ApplicationSettingsService(GameTypeEnum.Warhammer3),
                 new Mock<IFileSaveService>().Object,
-                new MetaDataFileParser(new Mock<IMetaDataDatabase>().Object));
+                new MetaDataFileParser(new Mock<IMetaDataDatabase>().Object),
+                Mock.Of<IStandardDialogs>());
         }
 
         private static UnknownAnimFile AddAndSelectFile(AnimPackViewModel editor)

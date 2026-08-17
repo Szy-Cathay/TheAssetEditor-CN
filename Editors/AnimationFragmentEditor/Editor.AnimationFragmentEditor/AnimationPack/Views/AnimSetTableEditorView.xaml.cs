@@ -25,8 +25,10 @@ namespace CommonControls.Editors.AnimationPack
         {
             if (MainDataGrid != null)
             {
+                MainDataGrid.SelectionChanged -= DataGrid_SelectionChanged;
                 MainDataGrid.SelectionChanged += DataGrid_SelectionChanged;
             }
+            RefreshCommandStates();
         }
 
         private void DataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -40,6 +42,32 @@ namespace CommonControls.Editors.AnimationPack
         {
             if (DataContext is AnimSetTableEditorViewModel vm)
                 vm.SaveSnapshot();
+        }
+
+        private void MainDataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            Dispatcher.BeginInvoke(
+                () =>
+                {
+                    if (DataContext is AnimSetTableEditorViewModel vm)
+                        vm.DiscardLastSnapshotIfUnchanged();
+                },
+                DispatcherPriority.Background);
+        }
+
+        private void Editor_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+            RefreshCommandStates();
+
+        private void MainDataGrid_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+            RefreshCommandStates();
+
+        private void MainDataGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e) =>
+            RefreshCommandStates();
+
+        private void RefreshCommandStates()
+        {
+            if (DataContext is AnimSetTableEditorViewModel vm)
+                vm.RefreshCommandStates();
         }
 
         // === Shift+MouseWheel horizontal scrolling ===

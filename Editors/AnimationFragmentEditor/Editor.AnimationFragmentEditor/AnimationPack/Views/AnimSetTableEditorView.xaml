@@ -5,270 +5,354 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:converters="clr-namespace:Editors.AnimationFragmentEditor.AnimationPack.Converters"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="900">
+             d:DesignHeight="600" d:DesignWidth="900"
+             Background="{DynamicResource AeBrush.Canvas}"
+             Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontWeight="{DynamicResource AppFontWeight}"
+             GotKeyboardFocus="Editor_GotKeyboardFocus">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <UserControl.InputBindings>
-        <KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}"/>
-        <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyRowsCommand}"/>
-        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteRowsCommand}"/>
-        <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateEntryCommand}"/>
-        <KeyBinding Key="Delete" Command="{Binding DeleteEntriesCommand}"/>
+        <KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}" />
+        <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyRowsCommand}" />
+        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteRowsCommand}" />
+        <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateEntryCommand}" />
+        <KeyBinding Key="Delete" Command="{Binding DeleteEntriesCommand}" />
     </UserControl.InputBindings>
 
-    <DockPanel>
-        <!-- Header metadata panel -->
-        <GroupBox DockPanel.Dock="Top" Header="{loc:Loc AnimPack.Table.General}" Margin="4" Padding="4">
+    <Grid MinHeight="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Grid.Row="0" Header="{loc:Loc AnimPack.Table.General}" Padding="8">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" MinWidth="80" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" MinWidth="80" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- WH3 header fields -->
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc AnimPack.Table.Name}" VerticalAlignment="Center" Margin="0,0,4,0"
-                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
-                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Margin="0,0,6,0"
+                           VerticalAlignment="Center"
+                           Text="{loc:Loc AnimPack.Table.Name}"
+                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
+                <TextBox Grid.Row="0" Grid.Column="1"
+                         Margin="0,2"
+                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
 
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="{loc:Loc AnimPack.Table.Skeleton}" VerticalAlignment="Center" Margin="4,0,4,0"/>
-                <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
-                <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Skeleton, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
-                         Visibility="{Binding IsWh3, Converter={StaticResource InverseBoolToVis}}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2"
+                           Margin="12,0,6,0"
+                           VerticalAlignment="Center"
+                           Text="{loc:Loc AnimPack.Table.Skeleton}" />
+                <TextBox Grid.Row="0" Grid.Column="3"
+                         Margin="0,2"
+                         Text="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
+                <TextBox Grid.Row="0" Grid.Column="3"
+                         Margin="0,2"
+                         Text="{Binding Skeleton, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="{Binding IsWh3, Converter={StaticResource InverseBoolToVis}}" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc AnimPack.Table.Mount}" VerticalAlignment="Center" Margin="0,0,4,0"
-                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
-                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MountBin, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Margin="0,0,6,0"
+                           VerticalAlignment="Center"
+                           Text="{loc:Loc AnimPack.Table.Mount}"
+                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
+                <TextBox Grid.Row="1" Grid.Column="1"
+                         Margin="0,2"
+                         Text="{Binding MountBin, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
 
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="{loc:Loc AnimPack.Table.Locomotion}" VerticalAlignment="Center" Margin="4,0,4,0"
-                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
-                <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding LocomotionGraph, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Grid.Row="1" Grid.Column="2"
+                           Margin="12,0,6,0"
+                           VerticalAlignment="Center"
+                           Text="{loc:Loc AnimPack.Table.Locomotion}"
+                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
+                <TextBox Grid.Row="1" Grid.Column="3"
+                         Margin="0,2"
+                         Text="{Binding LocomotionGraph, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
             </Grid>
         </GroupBox>
 
-        <!-- Toolbar -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,2">
-            <Button Content="{loc:Loc General.Save}" Command="{Binding SaveCommand}" Margin="0,0,2,0" Padding="8,2" FontWeight="Bold"/>
-            <Separator Margin="4,0"/>
-            <Button Content="{loc:Loc General.New}" Command="{Binding AddEntryCommand}" Margin="2,0" Padding="8,2"/>
-            <Button Content="{loc:Loc General.Delete}" Command="{Binding DeleteEntriesCommand}" Margin="2,0" Padding="8,2"/>
-            <Button Content="{loc:Loc General.Duplicate}" Command="{Binding DuplicateEntryCommand}" Margin="2,0" Padding="8,2"/>
-            <Separator Margin="4,0"/>
-            <Button Content="&#x25B2;" Command="{Binding MoveUpCommand}" Margin="2,0" Padding="8,2" ToolTip="{loc:Loc AnimPack.Table.MoveUp}"/>
-            <Button Content="&#x25BC;" Command="{Binding MoveDownCommand}" Margin="2,0" Padding="8,2" ToolTip="{loc:Loc AnimPack.Table.MoveDown}"/>
-            <Separator Margin="4,0"/>
-            <Button Content="{loc:Loc General.Copy}" Command="{Binding CopyRowsCommand}" Margin="2,0" Padding="8,2" ToolTip="Ctrl+C"/>
-            <Button Content="{loc:Loc General.Paste}" Command="{Binding PasteRowsCommand}" Margin="2,0" Padding="8,2" ToolTip="Ctrl+V"/>
-        </StackPanel>
+        <WrapPanel Grid.Row="1" Margin="0,6,0,4">
+            <Button Margin="0,0,4,4"
+                    Command="{Binding SaveCommand}"
+                    Content="{loc:Loc AnimPack.ApplyToPack}"
+                    Style="{StaticResource AeButton.Primary}"
+                    ToolTip="{loc:Loc AnimPack.ApplyToPackTip}" />
+            <Button Margin="0,0,4,4"
+                    Command="{Binding UndoCommand}"
+                    Content="{loc:Loc General.Undo}"
+                    Style="{StaticResource AeButton.Quiet}"
+                    ToolTip="{loc:Loc AnimPack.Table.UndoTip}" />
+            <Separator Height="28" Margin="2,0,6,4" />
+            <Button Margin="0,0,4,4" Command="{Binding AddEntryCommand}" Content="{loc:Loc General.New}" Style="{StaticResource AeButton.Secondary}" />
+            <Button Margin="0,0,4,4" Command="{Binding DeleteEntriesCommand}" Content="{loc:Loc General.Delete}" Style="{StaticResource AeButton.Danger}" />
+            <Button Margin="0,0,4,4" Command="{Binding DuplicateEntryCommand}" Content="{loc:Loc General.Duplicate}" Style="{StaticResource AeButton.Secondary}" />
+            <Separator Height="28" Margin="2,0,6,4" />
+            <Button Margin="0,0,4,4"
+                    AutomationProperties.Name="{loc:Loc AnimPack.Table.MoveUp}"
+                    Command="{Binding MoveUpCommand}"
+                    Style="{StaticResource AeButton.Icon}"
+                    ToolTip="{loc:Loc AnimPack.Table.MoveUp}">
+                <materialIcons:MaterialIcon Width="18" Height="18" Kind="ArrowUp" />
+            </Button>
+            <Button Margin="0,0,4,4"
+                    AutomationProperties.Name="{loc:Loc AnimPack.Table.MoveDown}"
+                    Command="{Binding MoveDownCommand}"
+                    Style="{StaticResource AeButton.Icon}"
+                    ToolTip="{loc:Loc AnimPack.Table.MoveDown}">
+                <materialIcons:MaterialIcon Width="18" Height="18" Kind="ArrowDown" />
+            </Button>
+            <Separator Height="28" Margin="2,0,6,4" />
+            <Button Margin="0,0,4,4"
+                    Command="{Binding CopyRowsCommand}"
+                    Content="{loc:Loc General.Copy}"
+                    Style="{StaticResource AeButton.Secondary}"
+                    ToolTip="{loc:Loc AnimPack.Table.CopyTip}" />
+            <Button Margin="0,0,4,4"
+                    Command="{Binding PasteRowsCommand}"
+                    Content="{loc:Loc General.Paste}"
+                    Style="{StaticResource AeButton.Secondary}"
+                    ToolTip="{loc:Loc AnimPack.Table.PasteTip}" />
+        </WrapPanel>
 
-        <!-- DataGrid -->
-        <DataGrid x:Name="MainDataGrid"
-                  ItemsSource="{Binding Rows}"
-                  SelectedItem="{Binding SelectedRow}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  CanUserSortColumns="True"
-                  SelectionMode="Extended"
-                  SelectionUnit="FullRow"
-                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                  PreviewMouseWheel="DataGrid_PreviewMouseWheel"
-                  BeginningEdit="MainDataGrid_BeginningEdit"
-                  Margin="4,2">
+        <Border Grid.Row="2"
+                Margin="0,0,0,6"
+                Style="{StaticResource AeFeedback.Notice}"
+                Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVis}}">
+            <DockPanel>
+                <Border Margin="0,0,8,0"
+                        Background="{DynamicResource AeBrush.Danger}"
+                        Style="{StaticResource AeFeedback.Icon}" />
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource AeText.Body}"
+                           Text="{Binding FeedbackMessage}"
+                           TextWrapping="Wrap" />
+            </DockPanel>
+        </Border>
 
-            <DataGrid.Columns>
-                <!-- Slot - ComboBox with searchable dropdown -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.Slot}" Width="Auto" SortMemberPath="SlotName">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding SlotName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <ComboBox IsEditable="True"
-                                      Text="{Binding SlotName, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding DataContext.SlotNames, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                      IsTextSearchEnabled="True"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+        <Grid Grid.Row="3" MinHeight="0">
+            <DataGrid x:Name="MainDataGrid"
+                      Margin="0"
+                      ItemsSource="{Binding Rows}"
+                      SelectedItem="{Binding SelectedRow}"
+                      AutoGenerateColumns="False"
+                      ColumnWidth="Auto"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserResizeColumns="True"
+                      CanUserSortColumns="True"
+                      SelectionMode="Extended"
+                      SelectionUnit="FullRow"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      BeginningEdit="MainDataGrid_BeginningEdit"
+                      CellEditEnding="MainDataGrid_CellEditEnding"
+                      ContextMenuOpening="MainDataGrid_ContextMenuOpening"
+                      GotKeyboardFocus="MainDataGrid_GotKeyboardFocus"
+                      PreviewMouseWheel="DataGrid_PreviewMouseWheel"
+                      Style="{StaticResource AeTable.Grid}">
 
-                <!-- Animation File - filtered ComboBox -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.AnimationFile}" Width="Auto" SortMemberPath="AnimationFile">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding AnimationFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <ComboBox IsEditable="True"
-                                      Text="{Binding AnimationFile, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding DataContext.AnimFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                      IsTextSearchEnabled="False"
-                                      Tag="Anim"
-                                      Loaded="FileComboBox_Loaded"
-                                      DropDownOpened="FileComboBox_DropDownOpened">
-                                <ComboBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel/>
-                                    </ItemsPanelTemplate>
-                                </ComboBox.ItemsPanel>
-                            </ComboBox>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn SortMemberPath="SlotName">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="{loc:Loc AnimPack.Table.Slot}"
+                                       ToolTip="{loc:Loc AnimPack.Table.Slot.ToolTip}" />
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center" Text="{Binding SlotName}" TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <ComboBox IsEditable="True"
+                                          IsTextSearchEnabled="True"
+                                          ItemsSource="{Binding DataContext.SlotNames, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          Text="{Binding SlotName, UpdateSourceTrigger=PropertyChanged}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-                <!-- Meta File - filtered ComboBox -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.MetaFile}" Width="Auto" SortMemberPath="MetaFile">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding MetaFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <ComboBox IsEditable="True"
-                                      Text="{Binding MetaFile, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding DataContext.MetaFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                      IsTextSearchEnabled="False"
-                                      Tag="Meta"
-                                      Loaded="FileComboBox_Loaded"
-                                      DropDownOpened="FileComboBox_DropDownOpened">
-                                <ComboBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel/>
-                                    </ItemsPanelTemplate>
-                                </ComboBox.ItemsPanel>
-                            </ComboBox>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.AnimationFile}" SortMemberPath="AnimationFile">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{Binding AnimationFileName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding AnimationFile}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <ComboBox IsEditable="True"
+                                          IsTextSearchEnabled="False"
+                                          ItemsSource="{Binding DataContext.AnimFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          Loaded="FileComboBox_Loaded"
+                                          DropDownOpened="FileComboBox_DropDownOpened"
+                                          Tag="Anim"
+                                          Text="{Binding AnimationFile, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ComboBox.ItemsPanel>
+                                </ComboBox>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-                <!-- Sound File - filtered ComboBox -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.SoundFile}" Width="Auto" SortMemberPath="SoundFile">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding SoundFile}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <ComboBox IsEditable="True"
-                                      Text="{Binding SoundFile, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding DataContext.SoundFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                      IsTextSearchEnabled="False"
-                                      Tag="Sound"
-                                      Loaded="FileComboBox_Loaded"
-                                      DropDownOpened="FileComboBox_DropDownOpened">
-                                <ComboBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel/>
-                                    </ItemsPanelTemplate>
-                                </ComboBox.ItemsPanel>
-                            </ComboBox>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.MetaFile}" SortMemberPath="MetaFile">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{Binding MetaFileName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding MetaFile}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <ComboBox IsEditable="True"
+                                          IsTextSearchEnabled="False"
+                                          ItemsSource="{Binding DataContext.MetaFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          Loaded="FileComboBox_Loaded"
+                                          DropDownOpened="FileComboBox_DropDownOpened"
+                                          Tag="Meta"
+                                          Text="{Binding MetaFile, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ComboBox.ItemsPanel>
+                                </ComboBox>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-                <!-- BlendIn -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.BlendIn}" Width="Auto" SortMemberPath="BlendInTime">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding BlendInTime}" VerticalAlignment="Center"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <TextBox Text="{Binding BlendInTime, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" Padding="0"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.SoundFile}" SortMemberPath="SoundFile">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{Binding SoundFileName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding SoundFile}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <ComboBox IsEditable="True"
+                                          IsTextSearchEnabled="False"
+                                          ItemsSource="{Binding DataContext.SoundFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          Loaded="FileComboBox_Loaded"
+                                          DropDownOpened="FileComboBox_DropDownOpened"
+                                          Tag="Sound"
+                                          Text="{Binding SoundFile, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ComboBox.ItemsPanel>
+                                </ComboBox>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-                <!-- Weight -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.Weight}" Width="Auto" SortMemberPath="SelectionWeight">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding SelectionWeight}" VerticalAlignment="Center"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <TextBox Text="{Binding SelectionWeight, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" Padding="0"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                    <DataGridTemplateColumn SortMemberPath="BlendInTime">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="{loc:Loc AnimPack.Table.BlendIn}"
+                                       ToolTip="{loc:Loc AnimPack.Table.BlendIn.ToolTip}" />
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding BlendInTime}" /></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox BorderThickness="0" Text="{Binding BlendInTime, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-                <!-- WeaponBone - 6 checkboxes with labels -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.WeaponBone}" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <CheckBox Content="1" IsChecked="{Binding Wb0, Mode=OneWay}" IsHitTestVisible="False" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="2" IsChecked="{Binding Wb1, Mode=OneWay}" IsHitTestVisible="False" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="3" IsChecked="{Binding Wb2, Mode=OneWay}" IsHitTestVisible="False" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="4" IsChecked="{Binding Wb3, Mode=OneWay}" IsHitTestVisible="False" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="5" IsChecked="{Binding Wb4, Mode=OneWay}" IsHitTestVisible="False" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="6" IsChecked="{Binding Wb5, Mode=OneWay}" IsHitTestVisible="False" Margin="1,0" FontSize="10"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <CheckBox Content="1" IsChecked="{Binding Wb0, UpdateSourceTrigger=PropertyChanged}" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="2" IsChecked="{Binding Wb1, UpdateSourceTrigger=PropertyChanged}" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="3" IsChecked="{Binding Wb2, UpdateSourceTrigger=PropertyChanged}" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="4" IsChecked="{Binding Wb3, UpdateSourceTrigger=PropertyChanged}" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="5" IsChecked="{Binding Wb4, UpdateSourceTrigger=PropertyChanged}" Margin="1,0" FontSize="10"/>
-                                <CheckBox Content="6" IsChecked="{Binding Wb5, UpdateSourceTrigger=PropertyChanged}" Margin="1,0" FontSize="10"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                    <DataGridTemplateColumn SortMemberPath="SelectionWeight">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="{loc:Loc AnimPack.Table.Weight}"
+                                       ToolTip="{loc:Loc AnimPack.Table.Weight.ToolTip}" />
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding SelectionWeight}" /></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox BorderThickness="0" Text="{Binding SelectionWeight, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-                <!-- Unk -->
-                <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.Unk}" Width="Auto" SortMemberPath="Unk">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding Unk, Mode=OneWay}" IsHitTestVisible="False" HorizontalAlignment="Center"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding Unk, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
-            </DataGrid.Columns>
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.WeaponBone}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox Margin="1,0" Content="1" FontSize="10" IsChecked="{Binding Wb0, Mode=OneWay}" IsHitTestVisible="False" />
+                                    <CheckBox Margin="1,0" Content="2" FontSize="10" IsChecked="{Binding Wb1, Mode=OneWay}" IsHitTestVisible="False" />
+                                    <CheckBox Margin="1,0" Content="3" FontSize="10" IsChecked="{Binding Wb2, Mode=OneWay}" IsHitTestVisible="False" />
+                                    <CheckBox Margin="1,0" Content="4" FontSize="10" IsChecked="{Binding Wb3, Mode=OneWay}" IsHitTestVisible="False" />
+                                    <CheckBox Margin="1,0" Content="5" FontSize="10" IsChecked="{Binding Wb4, Mode=OneWay}" IsHitTestVisible="False" />
+                                    <CheckBox Margin="1,0" Content="6" FontSize="10" IsChecked="{Binding Wb5, Mode=OneWay}" IsHitTestVisible="False" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox Margin="1,0" Content="1" FontSize="10" IsChecked="{Binding Wb0, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Margin="1,0" Content="2" FontSize="10" IsChecked="{Binding Wb1, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Margin="1,0" Content="3" FontSize="10" IsChecked="{Binding Wb2, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Margin="1,0" Content="4" FontSize="10" IsChecked="{Binding Wb3, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Margin="1,0" Content="5" FontSize="10" IsChecked="{Binding Wb4, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Margin="1,0" Content="6" FontSize="10" IsChecked="{Binding Wb5, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
-            <DataGrid.ContextMenu>
-                <ContextMenu>
-                    <MenuItem Header="{loc:Loc General.Copy}" Command="{Binding CopyRowsCommand}" InputGestureText="Ctrl+C"/>
-                    <MenuItem Header="{loc:Loc General.Paste}" Command="{Binding PasteRowsCommand}" InputGestureText="Ctrl+V"/>
-                    <Separator/>
-                    <MenuItem Header="{loc:Loc General.Duplicate}" Command="{Binding DuplicateEntryCommand}" InputGestureText="Ctrl+D"/>
-                    <MenuItem Header="{loc:Loc General.Delete}" Command="{Binding DeleteEntriesCommand}" InputGestureText="Delete"/>
-                    <Separator/>
-                    <MenuItem Header="{loc:Loc AnimPack.Table.MoveUp}" Command="{Binding MoveUpCommand}"/>
-                    <MenuItem Header="{loc:Loc AnimPack.Table.MoveDown}" Command="{Binding MoveDownCommand}"/>
-                </ContextMenu>
-            </DataGrid.ContextMenu>
-        </DataGrid>
-    </DockPanel>
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.Unk}" SortMemberPath="Unk">
+                        <DataGridTemplateColumn.CellTemplate><DataTemplate><CheckBox HorizontalAlignment="Center" IsChecked="{Binding Unk, Mode=OneWay}" IsHitTestVisible="False" /></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><CheckBox HorizontalAlignment="Center" IsChecked="{Binding Unk, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+
+                <DataGrid.ContextMenu>
+                    <ContextMenu Style="{StaticResource AeMenu.Context}">
+                        <MenuItem Header="{loc:Loc General.Copy}" Command="{Binding CopyRowsCommand}" InputGestureText="Ctrl+C" />
+                        <MenuItem Header="{loc:Loc General.Paste}" Command="{Binding PasteRowsCommand}" InputGestureText="Ctrl+V" />
+                        <Separator />
+                        <MenuItem Header="{loc:Loc General.Duplicate}" Command="{Binding DuplicateEntryCommand}" InputGestureText="Ctrl+D" />
+                        <MenuItem Header="{loc:Loc General.Delete}" Command="{Binding DeleteEntriesCommand}" InputGestureText="Delete" />
+                        <Separator />
+                        <MenuItem Header="{loc:Loc AnimPack.Table.MoveUp}" Command="{Binding MoveUpCommand}" />
+                        <MenuItem Header="{loc:Loc AnimPack.Table.MoveDown}" Command="{Binding MoveDownCommand}" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+            </DataGrid>
+
+            <Border>
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource AeEmptyState.Panel}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Rows.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource AeEmptyState.Title}" Text="{loc:Loc AnimPack.Table.EmptyTitle}" />
+                    <TextBlock Style="{StaticResource AeEmptyState.Description}"
+                               Text="{loc:Loc AnimPack.Table.EmptyDescription}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
 </UserControl>

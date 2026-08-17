@@ -1,9 +1,14 @@
 using System.Xml.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using CommonControls.BaseDialogs;
+using CommonControls.BaseDialogs.ErrorListDialog;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using Shared.Core.ErrorHandling;
 using Shared.Core.Services;
+using Shared.Ui.BaseDialogs.ErrorListDialog;
 using Shared.Ui.BaseDialogs.StandardDialog;
 using NUnitAssert = NUnit.Framework.Assert;
 
@@ -178,6 +183,73 @@ public class UiCommonWorkflowTests
     }
 
     [Test]
+    public void ErrorListView_RendersStructuredErrorDetails()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var view = new ErrorListView
+                {
+                    DataContext = new ErrorListViewModel
+                    {
+                        ErrorItems =
+                        [
+                            new ErrorListDataItem
+                            {
+                                ErrorType = "Error",
+                                ItemName = "STAND",
+                                Description = "Animation file is missing",
+                                IsError = true,
+                            },
+                        ],
+                    },
+                };
+                var window = new Window
+                {
+                    Width = 720,
+                    Height = 320,
+                    Content = view,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.None,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var list = FindVisualDescendants<ListView>(view).Single();
+                    var item = (ListViewItem)list.ItemContainerGenerator
+                        .ContainerFromIndex(0);
+                    var visibleText = FindVisualDescendants<TextBlock>(item)
+                        .Select(text => text.Text)
+                        .ToArray();
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            FindVisualDescendants<GridViewRowPresenter>(item),
+                            Has.Exactly(1).Items);
+                        NUnitAssert.That(visibleText, Does.Contain("Error"));
+                        NUnitAssert.That(visibleText, Does.Contain("STAND"));
+                        NUnitAssert.That(
+                            visibleText,
+                            Does.Contain("Animation file is missing"));
+                        NUnitAssert.That(
+                            visibleText,
+                            Does.Not.Contain(
+                                "Shared.Core.ErrorHandling.ErrorListDataItem"));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
     public void LoadingAndProgressSurfaces_UseSemanticFeedbackStyles()
     {
         var root = FindSolutionRoot();
@@ -310,5 +382,18 @@ public class UiCommonWorkflowTests
 
         throw new DirectoryNotFoundException(
             "Could not locate the solution root.");
+    }
+
+    private static IEnumerable<T> FindVisualDescendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+                yield return match;
+            foreach (var descendant in FindVisualDescendants<T>(child))
+                yield return descendant;
+        }
     }
 }

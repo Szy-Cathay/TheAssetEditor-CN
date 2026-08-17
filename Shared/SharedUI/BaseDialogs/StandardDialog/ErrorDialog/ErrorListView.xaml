@@ -8,12 +8,11 @@
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
         <ListView
-            ItemsSource="{Binding ErrorItems, Mode=OneTime, UpdateSourceTrigger=PropertyChanged}"
-            Style="{StaticResource AeList.View}">
+            ItemsSource="{Binding ErrorItems, Mode=OneTime, UpdateSourceTrigger=PropertyChanged}">
             <ListView.Resources>
                 <Style
                     TargetType="{x:Type ListViewItem}"
-                    BasedOn="{StaticResource AeList.Item}">
+                    BasedOn="{StaticResource {x:Type ListViewItem}}">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsError}" Value="true">
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
