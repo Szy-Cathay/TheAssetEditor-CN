@@ -57,6 +57,53 @@ public class UiAudioEditorFamilyGallery
             () => Render(theme, variant));
     }
 
+    [Test]
+    public void DialogueMerger_DefaultWindowShowsPrimaryAction()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            services,
+            () =>
+            {
+                Application.Current.Resources["InvBoolConverter"] =
+                    new InverseBooleanConverter();
+                Application.Current.Resources["BoolToVisibilityConverter"] =
+                    new Shared.Ui.Common.ValueConverters
+                        .BoolToVisibilityConverter();
+                var window = new DialogueEventMergerWindow
+                {
+                    DataContext = CreateDialogueMerger(),
+                };
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var primaryAction = FindVisualDescendants<Button>(window)
+                        .Single(button => button.IsDefault);
+                    var buttonBottom = primaryAction.TranslatePoint(
+                        new Point(0, primaryAction.ActualHeight),
+                        window);
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            window.SizeToContent,
+                            Is.EqualTo(SizeToContent.Manual));
+                        NUnitAssert.That(primaryAction.IsVisible, Is.True);
+                        NUnitAssert.That(
+                            buttonBottom.Y,
+                            Is.LessThan(window.ActualHeight));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
     private static IEnumerable<TestCaseData> Cases()
     {
         foreach (var theme in new[]

@@ -674,6 +674,23 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void NewAudioProject_LanguagesExcludeSfx()
+        {
+            var viewModel = new NewAudioProjectViewModel(
+                Mock.Of<IPackFileService>(),
+                Mock.Of<IAudioEditorFileService>(),
+                new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+                Mock.Of<IStandardDialogs>());
+
+            CollectionAssert.DoesNotContain(
+                viewModel.Languages,
+                Wh3Language.Sfx);
+            Assert.AreEqual(
+                Wh3Language.EnglishUK,
+                viewModel.SelectedLanguage);
+        }
+
+        [TestMethod]
         public async Task NewAudioProject_WhenSaveIsCancelled_KeepsDialogAndState()
         {
             var packFileService = new Mock<IPackFileService>();
