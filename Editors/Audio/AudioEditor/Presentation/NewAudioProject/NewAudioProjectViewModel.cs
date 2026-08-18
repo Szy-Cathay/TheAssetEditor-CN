@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -32,7 +33,9 @@ namespace Editors.Audio.AudioEditor.Presentation.NewAudioProject
         [ObservableProperty] private string _audioProjectFileName;
         [ObservableProperty] private string _audioProjectDirectory;
         [ObservableProperty] private Wh3Language _selectedLanguage;
-        [ObservableProperty] private ObservableCollection<Wh3Language> _languages = new (Enum.GetValues<Wh3Language>());
+        [ObservableProperty] private ObservableCollection<Wh3Language> _languages = new (
+            Enum.GetValues<Wh3Language>()
+                .Where(language => language != Wh3Language.Sfx));
 
         [ObservableProperty] private bool _isAudioProjectFileNameSet;
         [ObservableProperty] private bool _isAudioProjectDirectorySet;

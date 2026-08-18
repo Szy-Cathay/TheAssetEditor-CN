@@ -11,7 +11,10 @@
     d:DataContext="{d:DesignInstance Type=DialogueEventMerger:DialogueEventMergerViewModel}"
     mc:Ignorable="d"
     Width="700"
-    SizeToContent="Height"
+    Height="420"
+    MinHeight="320"
+    SizeToContent="Manual"
+    ResizeMode="CanResizeWithGrip"
     WindowStartupLocation="CenterOwner"
     Closing="OnClosing"
     Closed="OnClosed"
@@ -31,7 +34,7 @@
             <RowDefinition
                 Height="Auto"/>
             <RowDefinition
-                Height="Auto"/>
+                Height="*"/>
             <RowDefinition 
                 Height="Auto"/>
             <RowDefinition 
@@ -52,7 +55,7 @@
 
             <Grid.RowDefinitions>
                 <RowDefinition 
-                    Height="Auto"/>
+                    Height="*"/>
             </Grid.RowDefinitions>
 
             <Grid 
@@ -64,7 +67,7 @@
                     <RowDefinition 
                         Height="Auto"/>
                     <RowDefinition 
-                        Height="Auto"/>
+                        Height="*"/>
                 </Grid.RowDefinitions>
                 
                 <Grid.ColumnDefinitions>
