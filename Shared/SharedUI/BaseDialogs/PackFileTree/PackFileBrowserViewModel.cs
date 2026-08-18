@@ -81,6 +81,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             _eventHub?.Register<FolderProjectChangedEvent>(
                 this,
                 ApplyFolderProjectChangeSet);
+            _eventHub?.Register<FolderProjectRestorePointCreatedEvent>(
+                this,
+                RestorePointCreated);
             _eventHub?.Register<PackFileContainerSavedEvent>(this, ContainerSaved);
             _eventHub?.Register<ShowCaWemFilesChangedEvent>(
                 this,
@@ -179,10 +182,27 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         private void ContainerSaved(PackFileContainerSavedEvent e)
         {
+            if (e.Container is FolderProjectContainer)
+                return;
+
             var root = GetPackFileCollectionRootNode(e.Container);
 
             root.UnsavedChanged = false;
             root.ForeachNode((node) => node.UnsavedChanged = false);
+        }
+
+        private void RestorePointCreated(
+            FolderProjectRestorePointCreatedEvent e)
+        {
+            var root = GetPackFileCollectionRootNode(e.Container);
+            if (root == null)
+                return;
+
+            _folderProjectHistoryStatusCache.Remove(
+                e.Container.ProjectRoot);
+            root.UnsavedChanged = false;
+            root.ForeachNode(node => node.UnsavedChanged = false);
+            QueueFolderProjectHistoryStatusRefresh(e.Container, root);
         }
 
         private void Database_PackFilesRemoved(PackFileContainer container, List<PackFile> files)

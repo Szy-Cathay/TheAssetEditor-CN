@@ -226,6 +226,92 @@ public class FolderProjectTreeStateTests
     }
 
     [Test]
+    public async Task RestorePointCreated_ClearsFolderProjectChangeMarkers()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\changed.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var status = new FolderProjectHistoryStatus(
+            FolderProjectHistoryAvailability.Ready,
+            new string('1', 40),
+            [
+                new FolderProjectUnrecordedChange(
+                    "folder/changed.bin",
+                    FolderProjectUnrecordedChangeKind.Modified),
+            ]);
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(service => service.GetDisplayStatus(projectRoot.Path))
+            .Returns(() => status);
+        using var harness = CreateViewModelWithHistory(
+            history.Object,
+            project);
+        await harness.ViewModel.HistoryStatusRefreshTask;
+        var root = harness.ViewModel.Files.Single();
+        NUnitAssert.That(
+            FindNode(root, @"folder\changed.bin").UnsavedChanged,
+            Is.True);
+
+        status = status with { UnrecordedChanges = [] };
+        harness.EventHub.Publish(
+            new FolderProjectRestorePointCreatedEvent(project));
+        await harness.ViewModel.HistoryStatusRefreshTask;
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.UnsavedChanged, Is.False);
+            NUnitAssert.That(
+                FindNode(root, "folder").UnsavedChanged,
+                Is.False);
+            NUnitAssert.That(
+                FindNode(root, @"folder\changed.bin").UnsavedChanged,
+                Is.False);
+        });
+        history.Verify(service => service.GetDisplayStatus(projectRoot.Path),
+            Times.Exactly(2));
+    }
+
+    [Test]
+    public async Task GeneratedPack_PreservesFolderProjectChangeMarkers()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"folder\changed.bin", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(service => service.GetDisplayStatus(projectRoot.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready,
+                new string('1', 40),
+                [
+                    new FolderProjectUnrecordedChange(
+                        "folder/changed.bin",
+                        FolderProjectUnrecordedChangeKind.Modified),
+                ]));
+        using var harness = CreateViewModelWithHistory(
+            history.Object,
+            project);
+        await harness.ViewModel.HistoryStatusRefreshTask;
+        var root = harness.ViewModel.Files.Single();
+        NUnitAssert.That(root.UnsavedChanged, Is.True);
+
+        harness.EventHub.Publish(new PackFileContainerSavedEvent(project));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.UnsavedChanged, Is.True);
+            NUnitAssert.That(
+                FindNode(root, "folder").UnsavedChanged,
+                Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"folder\changed.bin").UnsavedChanged,
+                Is.True);
+        });
+    }
+
+    [Test]
     public void UpdatedFolderProjectFile_MarksFileAndAncestorsChanged()
     {
         using var projectRoot = new TemporaryDirectory();

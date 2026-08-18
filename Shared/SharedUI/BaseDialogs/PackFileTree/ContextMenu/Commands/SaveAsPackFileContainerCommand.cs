@@ -8,7 +8,10 @@ using Shared.Ui.Common;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
 {
-    public class SaveAsPackFileContainerCommand(IPackFileService packFileService, ApplicationSettingsService applicationSettingsService) : IContextMenuCommand
+    public class SaveAsPackFileContainerCommand(
+        IPackFileService packFileService,
+        ApplicationSettingsService applicationSettingsService,
+        IFolderProjectPackGenerationGuard packGenerationGuard) : IContextMenuCommand
     {
         public string GetDisplayName(TreeNode node) =>
             LocalizationManager.Instance.Get(
@@ -27,6 +30,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
             if (saveFileDialog.ShowDialog() != DialogResult.OK)
                 return;
 
+            if (!packGenerationGuard.CanGenerate(_selectedNode.FileOwner))
+                return;
+
             using (new WaitCursor())
             {
                 try
@@ -40,9 +46,13 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                         saveFileDialog.FileName,
                         false,
                         gameInformation);
-                    _selectedNode.UnsavedChanged = false;
-                    _selectedNode.ForeachNode(
-                        node => node.UnsavedChanged = false);
+                    if (_selectedNode.FileOwner is not
+                        FolderProjectContainer)
+                    {
+                        _selectedNode.UnsavedChanged = false;
+                        _selectedNode.ForeachNode(
+                            node => node.UnsavedChanged = false);
+                    }
                 }
                 catch (Exception exception)
                 {
