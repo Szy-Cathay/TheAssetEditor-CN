@@ -13,7 +13,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
     public class SavePackFileContainerCommand(
         IPackFileService packFileService,
         IStandardDialogs standardDialogs,
-        ApplicationSettingsService applicationSettingsService) : IContextMenuCommand
+        ApplicationSettingsService applicationSettingsService,
+        IFolderProjectPackGenerationGuard packGenerationGuard) : IContextMenuCommand
     {
         private readonly ILogger _logger = Logging.Create<SavePackFileContainerCommand>();
         public string GetDisplayName(TreeNode node) =>
@@ -37,6 +38,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                     return;
                 systemPath = saveFileDialog.FileName;
             }
+
+            if (!packGenerationGuard.CanGenerate(_selectedNode.FileOwner))
+                return;
 
             using (new WaitCursor())
             {
@@ -78,6 +82,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                     return;
                 systemPath = saveFileDialog.FileName;
             }
+
+            if (!packGenerationGuard.CanGenerate(pack))
+                return;
 
             using (new WaitCursor())
             {

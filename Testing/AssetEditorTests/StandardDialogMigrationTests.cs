@@ -138,10 +138,15 @@ namespace AssetEditorTests
                     It.IsAny<GameInformation>()))
                 .Throws(new IOException("save failed"));
             var dialogs = new Mock<IStandardDialogs>();
+            var generationGuard = new Mock<
+                IFolderProjectPackGenerationGuard>();
+            generationGuard.Setup(guard => guard.CanGenerate(pack))
+                .Returns(true);
             var command = new SavePackFileContainerCommand(
                 packFileService.Object,
                 dialogs.Object,
-                new ApplicationSettingsService(GameTypeEnum.Warhammer3));
+                new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+                generationGuard.Object);
 
             command.Execute();
 

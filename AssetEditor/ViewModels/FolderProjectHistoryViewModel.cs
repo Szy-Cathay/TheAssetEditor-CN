@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using AssetEditor.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
@@ -25,6 +27,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private readonly IFolderProjectGitOperationCoordinator _coordinator;
     private readonly IStandardDialogs _dialogs;
     private readonly LocalizationManager _localization;
+    private readonly IGlobalEventHub? _eventHub;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly Dictionary<string,
         IReadOnlyList<FolderProjectRestorePointChange>>
@@ -78,7 +81,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         IFolderProjectUnsavedChangesPrompt unsavedChangesPrompt,
         IFolderProjectGitOperationCoordinator coordinator,
         IStandardDialogs dialogs,
-        LocalizationManager localization)
+        LocalizationManager localization,
+        IGlobalEventHub? eventHub = null)
     {
         _historyService = historyService;
         _unsavedChangesService = unsavedChangesService;
@@ -86,6 +90,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         _coordinator = coordinator;
         _dialogs = dialogs;
         _localization = localization;
+        _eventHub = eventHub;
         _synchronizationContext = SynchronizationContext.Current;
         LoadedProjectText = _localization.GetFormat(
             "FolderProject.History.CurrentProject",
@@ -217,6 +222,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                     return;
 
                 ApplySnapshot(snapshot);
+                _eventHub?.PublishGlobalEvent(
+                    new FolderProjectRestorePointCreatedEvent(project));
                 RestorePointDescription = "";
             });
     }

@@ -50,6 +50,8 @@ namespace Shared.Ui
             services.AddScoped<OpenNodeInNotepadCommand>();
             services.AddScoped<OpenNodeInHxDCommand>();
             services.AddScoped<OpenPackInFileExplorerCommand>();
+            services.AddScoped<IFolderProjectPackGenerationGuard,
+                FolderProjectPackGenerationGuard>();
             services.AddScoped<SaveAsPackFileContainerCommand>();
             services.AddScoped<SavePackFileContainerCommand>();
             services.AddScoped<ToggleFolderProjectIgnoreCommand>();

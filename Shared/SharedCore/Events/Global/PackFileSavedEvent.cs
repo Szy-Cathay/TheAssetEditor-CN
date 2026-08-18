@@ -4,6 +4,8 @@ namespace Shared.Core.Events.Global
 {
     public record PackFileSavedEvent(PackFile File);
     public record PackFileContainerSavedEvent(PackFileContainer Container);
+    public record FolderProjectRestorePointCreatedEvent(
+        FolderProjectContainer Container);
     public record PackFileLookUpEvent(string FileName, PackFileContainer? Container, bool Found);
 
     public abstract record PackFileContainerManipulationEvent();

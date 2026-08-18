@@ -356,10 +356,15 @@ public class MenuBarFolderProjectRecentTests
             .Returns(project);
         var settings =
             new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+        var generationGuard = new Mock<
+            IFolderProjectPackGenerationGuard>();
+        generationGuard.Setup(guard => guard.CanGenerate(project))
+            .Returns(true);
         var saveCommand = new SavePackFileContainerCommand(
             packFileService.Object,
             Mock.Of<IStandardDialogs>(),
-            settings);
+            settings,
+            generationGuard.Object);
         var commandFactory = new Mock<IUiCommandFactory>();
         commandFactory.Setup(factory => factory.Create<
                 SavePackFileContainerCommand>(
@@ -379,6 +384,59 @@ public class MenuBarFolderProjectRecentTests
             outputPath,
             false,
             It.IsAny<GameInformation>()), Times.Once);
+        generationGuard.Verify(guard => guard.CanGenerate(project),
+            Times.Once);
+    }
+
+    [Test]
+    [Apartment(ApartmentState.STA)]
+    public void GeneratePack_UnrecordedChangesRejected_DoesNotGenerate()
+    {
+        new LocalizationManager().LoadLanguage();
+        using var directory = new TemporaryDirectory();
+        var outputPath = Path.Combine(
+            Path.GetTempPath(),
+            $"ae-generated-{Guid.NewGuid():N}.pack");
+        using var project = FolderProjectContainer.Create(
+            directory.Path,
+            new FolderProjectSettings
+            {
+                Name = "测试工程",
+                OutputPackPath = outputPath,
+            });
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetEditablePack())
+            .Returns(project);
+        var settings =
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+        var generationGuard = new Mock<
+            IFolderProjectPackGenerationGuard>();
+        generationGuard.Setup(guard => guard.CanGenerate(project))
+            .Returns(false);
+        var saveCommand = new SavePackFileContainerCommand(
+            packFileService.Object,
+            Mock.Of<IStandardDialogs>(),
+            settings,
+            generationGuard.Object);
+        var commandFactory = new Mock<IUiCommandFactory>();
+        commandFactory.Setup(factory => factory.Create<
+                SavePackFileContainerCommand>(
+                It.IsAny<Action<SavePackFileContainerCommand>?>()))
+            .Returns(saveCommand);
+        var viewModel = CreateViewModel(
+            packFileService.Object,
+            settings,
+            commandFactory.Object,
+            Mock.Of<IFolderProjectOpenService>(),
+            new TestEventHub());
+
+        viewModel.GeneratePackCommand.Execute(null);
+
+        packFileService.Verify(service => service.SavePackContainer(
+            It.IsAny<PackFileContainer>(),
+            It.IsAny<string>(),
+            It.IsAny<bool>(),
+            It.IsAny<GameInformation>()), Times.Never);
     }
 
     [Test]

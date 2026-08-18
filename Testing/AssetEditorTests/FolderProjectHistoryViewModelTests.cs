@@ -10,6 +10,8 @@ using CommunityToolkit.Mvvm.Input;
 using Moq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
+using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
@@ -324,10 +326,12 @@ public class FolderProjectHistoryViewModelTests
         var prompt = new Mock<IFolderProjectUnsavedChangesPrompt>();
         prompt.Setup(item => item.Show())
             .Returns(FolderProjectUnsavedChangesChoice.Save);
+        var eventHub = new Mock<IGlobalEventHub>();
         var viewModel = CreateViewModel(
             history.Object,
             unsaved.Object,
-            prompt.Object);
+            prompt.Object,
+            eventHub: eventHub.Object);
         viewModel.OpenProject(project);
         await viewModel.RefreshCommand.ExecuteAsync(null);
 
@@ -340,6 +344,9 @@ public class FolderProjectHistoryViewModelTests
             project.ProjectRoot,
             "记录工程当前状态",
             It.IsAny<Action<FolderProjectHistoryProgress>>()), Times.Once);
+        eventHub.Verify(item => item.PublishGlobalEvent(
+            It.Is<FolderProjectRestorePointCreatedEvent>(created =>
+                ReferenceEquals(created.Container, project))), Times.Once);
     }
 
     [Test]
@@ -1360,14 +1367,16 @@ public class FolderProjectHistoryViewModelTests
         IFolderProjectUnsavedChangesService? unsaved = null,
         IFolderProjectUnsavedChangesPrompt? prompt = null,
         IStandardDialogs? dialogs = null,
-        IFolderProjectGitOperationCoordinator? coordinator = null) =>
+        IFolderProjectGitOperationCoordinator? coordinator = null,
+        IGlobalEventHub? eventHub = null) =>
         new(
             history,
             unsaved ?? Mock.Of<IFolderProjectUnsavedChangesService>(),
             prompt ?? Mock.Of<IFolderProjectUnsavedChangesPrompt>(),
             coordinator ?? CreateImmediateCoordinator(),
             dialogs ?? Mock.Of<IStandardDialogs>(),
-            LocalizationManager.Instance);
+            LocalizationManager.Instance,
+            eventHub);
 
     private static IFolderProjectGitOperationCoordinator
         CreateImmediateCoordinator()

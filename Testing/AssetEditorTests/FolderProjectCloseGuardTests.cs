@@ -36,15 +36,30 @@ public class FolderProjectCloseGuardTests
         eventHub.Register<OpenFolderProjectHistoryPanelEvent>(
             this,
             item => published = item);
+        string? promptMessage = null;
         var guard = new FolderProjectCloseGuard(
             service.Object,
             eventHub,
-            (_, _, _) => MessageBoxResult.No);
+            (message, _, _) =>
+            {
+                promptMessage = message;
+                return MessageBoxResult.No;
+            });
 
         var canClose = await guard.CanCloseAsync(project);
 
-        NUnit.Framework.Assert.That(canClose, NUnit.Framework.Is.False);
-        NUnit.Framework.Assert.That(published, NUnit.Framework.Is.Not.Null);
+        NUnit.Framework.Assert.Multiple(() =>
+        {
+            NUnit.Framework.Assert.That(
+                canClose,
+                NUnit.Framework.Is.False);
+            NUnit.Framework.Assert.That(
+                published,
+                NUnit.Framework.Is.Not.Null);
+            NUnit.Framework.Assert.That(
+                promptMessage,
+                NUnit.Framework.Does.Contain("尚未创建还原点"));
+        });
     }
 
     [NUnit.Framework.Test]
