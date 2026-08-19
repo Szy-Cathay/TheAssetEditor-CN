@@ -530,6 +530,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
             CancellationToken cancellationToken)
         {
             var dialogueEvents = new List<HircItem>();
+            var targetHircsById = new Dictionary<uint, HircItem>();
 
             var soundBankNameBase = Wh3SoundBankInformation.GetName(currentSoundBank);
             var soundBankNameWithoutExtension = $"{soundBankNameBase}_0_{soundBankSuffix}";
@@ -564,6 +565,10 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     _logger.Here().Information($"Merging decision tree from {Path.GetFileName(moddedDialogueEventHirc.BnkFilePath)}");
+                    AddDialogueTargetHircs(
+                        moddedDialogueEventHirc,
+                        targetHircsById,
+                        cancellationToken);
 
                     var currentDecisionTree = mergedDialogueEvent.AkDecisionTree as AkDecisionTree_V136;
                     var moddedDialogueEvent = moddedDialogueEventHirc as CAkDialogueEvent_V136;
@@ -582,13 +587,153 @@ namespace Editors.Audio.Shared.Wwise.Generators
             }
 
             SortHircs(dialogueEvents);
+            var hircItems = OrderTargetHircs(targetHircsById)
+                .Concat(dialogueEvents)
+                .ToList();
 
             return WriteSoundBank(
                 soundBankId,
                 languageId,
                 soundBankFileName,
                 soundBankFilePath,
-                dialogueEvents);
+                hircItems);
+        }
+
+        private void AddDialogueTargetHircs(
+            HircItem dialogueEventHirc,
+            Dictionary<uint, HircItem> targetHircsById,
+            CancellationToken cancellationToken)
+        {
+            var dialogueEvent = (ICAkDialogueEvent)dialogueEventHirc;
+            foreach (var targetId in GetDialogueTargetIds(
+                         dialogueEvent.AkDecisionTree.GetDecisionTree()))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                AddReachableTargetHirc(
+                    targetId,
+                    dialogueEventHirc.BnkFilePath,
+                    targetHircsById,
+                    [],
+                    cancellationToken);
+            }
+        }
+
+        private void AddReachableTargetHirc(
+            uint hircId,
+            string soundBankPath,
+            Dictionary<uint, HircItem> targetHircsById,
+            HashSet<uint> visitingIds,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (targetHircsById.ContainsKey(hircId))
+                return;
+            if (!visitingIds.Add(hircId))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+
+            var targetHirc = _audioRepository
+                .GetHircs(hircId, soundBankPath)
+                .FirstOrDefault(hircItem =>
+                    hircItem is not ICAkDialogueEvent);
+            if (targetHirc == null)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+
+            targetHircsById[hircId] = targetHirc;
+            if (targetHirc is ICAkRanSeqCntr randomSequenceContainer)
+            {
+                foreach (var childId in randomSequenceContainer
+                             .GetChildren()
+                             .OrderBy(id => id))
+                {
+                    AddReachableTargetHirc(
+                        childId,
+                        soundBankPath,
+                        targetHircsById,
+                        visitingIds,
+                        cancellationToken);
+                }
+            }
+
+            visitingIds.Remove(hircId);
+        }
+
+        private static List<HircItem> OrderTargetHircs(
+            IReadOnlyDictionary<uint, HircItem> targetHircsById)
+        {
+            var orderedHircs = new List<HircItem>(targetHircsById.Count);
+            var addedIds = new HashSet<uint>();
+            foreach (var hircItem in targetHircsById.Values
+                         .OrderBy(item => item.Id))
+            {
+                AddOrderedTargetHirc(
+                    hircItem,
+                    targetHircsById,
+                    addedIds,
+                    orderedHircs);
+            }
+
+            return orderedHircs;
+        }
+
+        private static void AddOrderedTargetHirc(
+            HircItem hircItem,
+            IReadOnlyDictionary<uint, HircItem> targetHircsById,
+            HashSet<uint> addedIds,
+            List<HircItem> orderedHircs)
+        {
+            if (addedIds.Contains(hircItem.Id))
+                return;
+            if (hircItem is ICAkRanSeqCntr randomSequenceContainer)
+            {
+                foreach (var childId in randomSequenceContainer
+                             .GetChildren()
+                             .OrderBy(id => id))
+                {
+                    if (targetHircsById.TryGetValue(
+                            childId,
+                            out var childHirc))
+                    {
+                        AddOrderedTargetHirc(
+                            childHirc,
+                            targetHircsById,
+                            addedIds,
+                            orderedHircs);
+                    }
+                }
+            }
+
+            if (addedIds.Add(hircItem.Id))
+                orderedHircs.Add(hircItem);
+        }
+
+        private static IEnumerable<uint> GetDialogueTargetIds(
+            ICAkDialogueEvent.IAkDecisionNode node)
+        {
+            if (node.GetChildrenCount() == 0)
+            {
+                if (node.GetAudioNodeId() != 0)
+                    yield return node.GetAudioNodeId();
+                yield break;
+            }
+
+            for (var index = 0;
+                 index < node.GetChildrenCount();
+                 index++)
+            {
+                foreach (var targetId in GetDialogueTargetIds(
+                             node.GetChildAtIndex(index)))
+                {
+                    yield return targetId;
+                }
+            }
         }
 
         private static void SortHircs(List<HircItem> hircItems)

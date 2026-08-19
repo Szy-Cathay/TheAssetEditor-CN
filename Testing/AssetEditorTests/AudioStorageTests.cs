@@ -1135,6 +1135,165 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public async Task DialogueMerger_MixedLanguageRootBanksCopyTargetSoundsIntoEveryOutput()
+        {
+            var localizationManager = new LocalizationManager();
+            localizationManager.LoadLanguage();
+            var settings = new ApplicationSettingsService(
+                GameTypeEnum.Warhammer3);
+            var packFileService = new Mock<IPackFileService>();
+            using var repository = new AudioRepository(
+                settings,
+                new BnkLoader(packFileService.Object),
+                new DatLoader(packFileService.Object, settings));
+            var voiceLanguages = Wh3LanguageInformation.GetAllLanguages()
+                .Where(language => language != "sfx")
+                .ToList();
+            const string dialogueEventName =
+                "frontend_vo_character_select";
+            const string englishBankPath =
+                "audio\\wwise\\english_for_merging.bnk";
+            const string chineseBankPath =
+                "audio\\wwise\\chinese_for_merging.bnk";
+            const uint englishTargetId = 100;
+            const uint chineseTargetId = 200;
+            const uint chineseSoundId = 201;
+            const uint englishSourceId = 1000;
+            const uint chineseSourceId = 2000;
+            var dialogueEventId = WwiseHash.Compute(dialogueEventName);
+            var englishLanguageId = WwiseHash.Compute("english(uk)");
+            var chineseLanguageId = WwiseHash.Compute("chinese");
+            repository.NameById[dialogueEventId] = dialogueEventName;
+
+            var eventHircs = new List<HircItem>();
+            foreach (var language in voiceLanguages)
+            {
+                var languageId = WwiseHash.Compute(language);
+                repository.NameById[languageId] = language;
+                var vanillaEvent = CreateModdedDialogueEvent(
+                    dialogueEventId,
+                    languageId,
+                    $"audio\\wwise\\{language}\\frontend_vo.bnk",
+                    1,
+                    1);
+                vanillaEvent.IsCAHircItem = true;
+                eventHircs.Add(vanillaEvent);
+            }
+
+            eventHircs.Add(CreateModdedDialogueEvent(
+                dialogueEventId,
+                englishLanguageId,
+                englishBankPath,
+                10,
+                englishTargetId));
+            eventHircs.Add(CreateModdedDialogueEvent(
+                dialogueEventId,
+                chineseLanguageId,
+                chineseBankPath,
+                20,
+                chineseTargetId));
+            repository.HircsById[dialogueEventId] = eventHircs;
+
+            var englishSound = CreateModdedSound(
+                englishTargetId,
+                englishSourceId,
+                englishLanguageId,
+                englishBankPath);
+            var chineseSound = CreateModdedSound(
+                chineseSoundId,
+                chineseSourceId,
+                chineseLanguageId,
+                chineseBankPath);
+            var chineseContainer = new CAkRanSeqCntr_V136
+            {
+                Id = chineseTargetId,
+                HircType = AkBkHircType.RandomSequenceContainer,
+                LanguageId = chineseLanguageId,
+                BnkFilePath = chineseBankPath,
+                IsCAHircItem = false,
+                Children = new Children_V136
+                {
+                    ChildIds = [chineseSoundId]
+                },
+                CAkPlayList = new CAkRanSeqCntr_V136.CAkPlayList_V136
+                {
+                    Playlist =
+                    [
+                        new CAkRanSeqCntr_V136.CAkPlayList_V136
+                            .AkPlaylistItem_V136
+                        {
+                            PlayId = chineseSoundId,
+                            Weight = 1
+                        }
+                    ]
+                }
+            };
+            englishSound.HircType = AkBkHircType.Sound;
+            chineseSound.HircType = AkBkHircType.Sound;
+            englishSound.UpdateSectionSize();
+            chineseSound.UpdateSectionSize();
+            chineseContainer.UpdateSectionSize();
+            repository.HircsById[englishTargetId] = [englishSound];
+            repository.HircsById[chineseTargetId] = [chineseContainer];
+            repository.HircsById[chineseSoundId] = [chineseSound];
+
+            IReadOnlyCollection<AudioPackOutput>? savedOutputs = null;
+            var outputService = new Mock<IAudioPackOutputService>();
+            outputService
+                .Setup(service => service.SaveBatch(
+                    It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
+                    true))
+                .Callback((
+                    IReadOnlyCollection<AudioPackOutput> outputs,
+                    bool _) => savedOutputs = outputs)
+                .Returns(true);
+            var generator = new SoundBankGeneratorService(
+                outputService.Object,
+                settings,
+                repository,
+                new AudioEditorIntegrityService(
+                    packFileService.Object,
+                    repository));
+
+            var result = await generator
+                .GenerateMergedDialogueEventSoundBanksAsync(
+                    [englishBankPath, chineseBankPath],
+                    "merged",
+                    CancellationToken.None);
+
+            Assert.IsTrue(result);
+            Assert.IsNotNull(savedOutputs);
+            Assert.AreEqual(voiceLanguages.Count, savedOutputs.Count);
+            foreach (var output in savedOutputs)
+            {
+                var parsed = BnkParser.Parse(
+                    PackFile.CreateFromBytes(output.FileName, output.Data),
+                    output.FilePath,
+                    false);
+                var outputLanguageId =
+                    parsed.BkhdChunk.AkBankHeader.LanguageId;
+                var sounds = parsed.HircChunk.HircItems
+                    .OfType<ICAkSound>()
+                    .Cast<HircItem>()
+                    .ToList();
+
+                CollectionAssert.AreEquivalent(
+                    new uint[] { englishTargetId, chineseSoundId },
+                    sounds.Select(sound => sound.Id).ToArray());
+                Assert.IsTrue(parsed.HircChunk.HircItems.Any(hircItem =>
+                    hircItem.Id == chineseTargetId &&
+                    hircItem is ICAkRanSeqCntr));
+                Assert.IsTrue(sounds.All(sound =>
+                    sound.LanguageId == outputLanguageId));
+                CollectionAssert.AreEquivalent(
+                    new uint[] { englishSourceId, chineseSourceId },
+                    sounds.Cast<ICAkSound>()
+                        .Select(sound => sound.GetSourceId())
+                        .ToArray());
+            }
+        }
+
+        [TestMethod]
         public async Task DialogueMerger_MissingRequiredLanguageOutputDoesNotSave()
         {
             var localizationManager = new LocalizationManager();
