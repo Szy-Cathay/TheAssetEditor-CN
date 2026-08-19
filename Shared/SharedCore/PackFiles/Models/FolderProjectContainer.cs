@@ -1521,6 +1521,12 @@ public sealed class FolderProjectContainer :
         return ExecuteSynchronized(() => FindKey(file));
     }
 
+    internal string? FindRelativePath(PackFile file)
+    {
+        return ExecuteSynchronized(() =>
+            _pathsByFile.GetValueOrDefault(file));
+    }
+
     private string FindKey(PackFile file)
     {
         if (!_pathsByFile.TryGetValue(file, out var key))

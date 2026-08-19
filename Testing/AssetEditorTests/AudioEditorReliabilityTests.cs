@@ -1068,7 +1068,10 @@ namespace AssetEditorTests
         {
             var repository = new Mock<IAudioRepository>();
             repository
-                .Setup(x => x.GetModdedSoundBankFilePaths("for_merging"))
+                .Setup(x => x.LoadDialogueEventMergerData(
+                    "for_merging",
+                    It.IsAny<IProgress<AudioLoadProgress>>(),
+                    It.IsAny<CancellationToken>()))
                 .Returns([]);
             var viewModel = new DialogueEventMergerViewModel(
                 repository.Object,
@@ -1076,8 +1079,8 @@ namespace AssetEditorTests
                 Mock.Of<IStandardDialogs>());
 
             repository.Verify(
-                x => x.Load(
-                    It.IsAny<List<string>>(),
+                x => x.LoadDialogueEventMergerData(
+                    "for_merging",
                     It.IsAny<IProgress<AudioLoadProgress>>(),
                     It.IsAny<CancellationToken>()),
                 Times.Never);
@@ -1085,8 +1088,8 @@ namespace AssetEditorTests
             await viewModel.InitializeAsync(CancellationToken.None);
 
             repository.Verify(
-                x => x.Load(
-                    It.IsAny<List<string>>(),
+                x => x.LoadDialogueEventMergerData(
+                    "for_merging",
                     It.IsAny<IProgress<AudioLoadProgress>>(),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
@@ -1099,18 +1102,19 @@ namespace AssetEditorTests
             using var cancellation = new CancellationTokenSource();
             var repository = new Mock<IAudioRepository>();
             repository
-                .Setup(x => x.Load(
-                    It.IsAny<List<string>>(),
+                .Setup(x => x.LoadDialogueEventMergerData(
+                    "for_merging",
                     It.IsAny<IProgress<AudioLoadProgress>>(),
                     cancellation.Token))
                 .Callback((
-                    List<string> _,
+                    string _,
                     IProgress<AudioLoadProgress> _,
                     CancellationToken cancellationToken) =>
                 {
                     cancellation.Cancel();
                     cancellationToken.ThrowIfCancellationRequested();
-                });
+                })
+                .Returns([]);
             var dialogs = new Mock<IStandardDialogs>();
             var viewModel = new DialogueEventMergerViewModel(
                 repository.Object,
@@ -1133,19 +1137,20 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
-        public async Task DialogueMerger_WhenRepositoryLoadFails_RemainsDisabled()
+        public async Task DialogueMerger_WhenRepositoryLoadFails_ShowsInlineErrorAndStopsLoading()
         {
             var repository = new Mock<IAudioRepository>();
             repository
-                .Setup(x => x.Load(
-                    It.IsAny<List<string>>(),
+                .Setup(x => x.LoadDialogueEventMergerData(
+                    "for_merging",
                     It.IsAny<IProgress<AudioLoadProgress>>(),
                     It.IsAny<CancellationToken>()))
                 .Throws(new InvalidOperationException("load failed"));
+            var dialogs = new Mock<IStandardDialogs>();
             var viewModel = new DialogueEventMergerViewModel(
                 repository.Object,
                 Mock.Of<ISoundBankGeneratorService>(),
-                Mock.Of<IStandardDialogs>())
+                dialogs.Object)
             {
                 SoundBankSuffix = "merged"
             };
@@ -1156,7 +1161,15 @@ namespace AssetEditorTests
 
             await viewModel.InitializeAsync(CancellationToken.None);
 
+            Assert.IsFalse(viewModel.IsLoading);
+            Assert.IsFalse(viewModel.IsBusy);
             Assert.IsFalse(viewModel.IsOkButtonEnabled);
+            StringAssert.Contains(viewModel.LoadStatus, "load failed");
+            dialogs.Verify(
+                x => x.ShowDialogBox(
+                    It.IsAny<string>(),
+                    It.IsAny<string>()),
+                Times.Never);
         }
 
         [TestMethod]
@@ -1181,7 +1194,10 @@ namespace AssetEditorTests
         {
             var repository = new Mock<IAudioRepository>();
             repository
-                .Setup(x => x.GetModdedSoundBankFilePaths("for_merging"))
+                .Setup(x => x.LoadDialogueEventMergerData(
+                    "for_merging",
+                    It.IsAny<IProgress<AudioLoadProgress>>(),
+                    It.IsAny<CancellationToken>()))
                 .Returns(
                 [
                     "audio\\wwise\\english(uk)\\test_for_merging.bnk"

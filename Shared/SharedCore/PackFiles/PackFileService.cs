@@ -1194,7 +1194,7 @@ namespace Shared.Core.PackFiles
                 {
                     var res =
                         pf is FolderProjectContainer folderProject
-                            ? folderProject.GetRelativePath(file)
+                            ? folderProject.FindRelativePath(file)
                             : FindPath(pf, file);
                     if (string.IsNullOrWhiteSpace(res) == false)
                         return res;

@@ -54,6 +54,7 @@ namespace Shared.Ui
                 FolderProjectPackGenerationGuard>();
             services.AddScoped<SaveAsPackFileContainerCommand>();
             services.AddScoped<SavePackFileContainerCommand>();
+            services.AddScoped<SetAsEditableFolderProjectCommand>();
             services.AddScoped<ToggleFolderProjectIgnoreCommand>();
             services.AddScoped<
                 ToggleFolderProjectCorruptionDetectionCommand>();

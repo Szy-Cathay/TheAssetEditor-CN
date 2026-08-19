@@ -1,8 +1,10 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using CommonControls;
+using Shared.Ui.Common.OperationProgress;
 
 namespace Editors.Audio.DialogueEventMerger
 {
@@ -10,11 +12,15 @@ namespace Editors.Audio.DialogueEventMerger
     {
         private readonly CancellationTokenSource _initializationCancellation =
             new();
+        private readonly OperationProgressWindowHost _operationProgressHost;
         private bool _closeWhenIdle;
 
         public DialogueEventMergerWindow()
         {
             InitializeComponent();
+            _operationProgressHost = ProgressSurface.Children
+                .OfType<OperationProgressWindowHost>()
+                .Single();
             DarkTitleBarHelper.Enable(this);
             Loaded += DialogueEventMergerWindowLoaded;
         }
@@ -26,6 +32,8 @@ namespace Editors.Audio.DialogueEventMerger
             if (DataContext is DialogueEventMergerViewModel viewModel)
             {
                 viewModel.SetCloseAction(Close);
+                viewModel.SetProgressCompletionAction(
+                    _operationProgressHost.CompleteAsync);
                 viewModel.PropertyChanged += OnViewModelPropertyChanged;
                 await viewModel.InitializeAsync(
                     _initializationCancellation.Token);

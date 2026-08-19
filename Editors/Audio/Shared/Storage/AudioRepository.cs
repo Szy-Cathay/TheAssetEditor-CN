@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
+using Editors.Audio.Shared.Wwise;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
@@ -39,6 +40,10 @@ namespace Editors.Audio.Shared.Storage
             List<string> languages,
             IProgress<AudioLoadProgress> progress = null,
             CancellationToken cancellationToken = default);
+        List<string> LoadDialogueEventMergerData(
+            string bankNameSubstring,
+            IProgress<AudioLoadProgress> progress = null,
+            CancellationToken cancellationToken = default);
         void Clear();
         AudioRepositorySnapshot CreateSnapshot();
         void Restore(AudioRepositorySnapshot snapshot);
@@ -62,7 +67,6 @@ namespace Editors.Audio.Shared.Storage
         private readonly ApplicationSettingsService _applicationSettingsService = applicationSettingsService;
         private readonly BnkLoader _bnkLoader = bnkLoader;
         private readonly DatLoader _datLoader = datLoader;
-
         private readonly HashSet<string> _loadedBnkDataLanguages = new(StringComparer.OrdinalIgnoreCase);
         private bool _isDatDataLoaded = false;
 
@@ -116,6 +120,56 @@ namespace Editors.Audio.Shared.Storage
             }
         }
 
+        public List<string> LoadDialogueEventMergerData(
+            string bankNameSubstring,
+            IProgress<AudioLoadProgress> progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrentGameSupported)
+                return [];
+
+            var discovery = _bnkLoader.DiscoverModdedSoundBanks(
+                bankNameSubstring,
+                cancellationToken);
+            if (discovery.BankPaths.Count == 0)
+                return [];
+
+            var voiceLanguages = DialogueEventMergerBankScopeResolver
+                .VoiceLanguages
+                .ToList();
+            var languageById = voiceLanguages.ToDictionary(
+                WwiseHash.Compute);
+            var useAllLanguages =
+                discovery.HasUniversalBanks ||
+                discovery.HasUnreadableLanguageIds ||
+                discovery.LanguageIds.Any(
+                    languageId => !languageById.ContainsKey(languageId));
+            var languages = useAllLanguages
+                ? voiceLanguages
+                : discovery.LanguageFolders
+                    .Concat(discovery.LanguageIds.Select(
+                        languageId => languageById[languageId]))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            MemoryOptimiser.LogMemory(
+                "Before loading Dialogue Event Merger AudioRepository");
+            if (!_isDatDataLoaded)
+                LoadDatData();
+            cancellationToken.ThrowIfCancellationRequested();
+            LoadBnkData(
+                languages,
+                progress,
+                cancellationToken,
+                discovery.BankPaths);
+            MemoryOptimiser.Optimise();
+            MemoryOptimiser.LogMemory(
+                "After loading Dialogue Event Merger AudioRepository");
+
+            return GetModdedSoundBankFilePaths(bankNameSubstring);
+        }
+
         private void LoadDatData()
         {
             var result = _datLoader.LoadDatData();
@@ -130,7 +184,8 @@ namespace Editors.Audio.Shared.Storage
         private void LoadBnkData(
             List<string> languages,
             IProgress<AudioLoadProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<string> requiredBankPaths = null)
         {
             var allLanguages = Wh3LanguageInformation.GetAllLanguages();
             var sharedSfxLanguage = Wh3LanguageInformation.GetLanguageAsString(
@@ -143,7 +198,16 @@ namespace Editors.Audio.Shared.Storage
                         StringComparison.OrdinalIgnoreCase) &&
                     !languages.Contains(language))
                 .ToList();
-            var result = _bnkLoader.LoadBnkFiles(languageToFilterOut, progress, cancellationToken);
+            var result = requiredBankPaths is null
+                ? _bnkLoader.LoadBnkFiles(
+                    languageToFilterOut,
+                    progress,
+                    cancellationToken)
+                : _bnkLoader.LoadBnkFiles(
+                    languageToFilterOut,
+                    requiredBankPaths,
+                    progress,
+                    cancellationToken);
             HircsById = result.HircsById ?? [];
             DidxAudioListById = result.DidxAudioListById ?? [];
             PackFileByBnkName = result.PackFileByBnkName ?? [];
@@ -231,22 +295,53 @@ namespace Editors.Audio.Shared.Storage
             return HircsById
                 .SelectMany(hirc => hirc.Value)
                 .Where(hirc => hirc.IsCAHircItem == false)
-                .GroupBy(hirc => GetNameFromId(hirc.LanguageId))
+                .SelectMany(hirc => GetDialogueMergerLanguages(hirc)
+                    .Select(language => (Language: language, Hirc: hirc)))
+                .GroupBy(entry => entry.Language)
                 .ToDictionary(
                     languageGroup => languageGroup.Key,
                     languageGroup => languageGroup
-                        .GroupBy(hircItem => hircItem.BnkFilePath)
-                        .ToDictionary(bnkGroup => bnkGroup.Key, bnkGroup => bnkGroup.ToList())
+                        .GroupBy(entry => entry.Hirc.BnkFilePath)
+                        .ToDictionary(
+                            bnkGroup => bnkGroup.Key,
+                            bnkGroup => bnkGroup
+                                .Select(entry => entry.Hirc)
+                                .ToList())
                 );
         }
 
         public Dictionary<string, List<HircItem>> GetModdedDialogueEventsByLanguage(List<string> moddedSoundBanks)
         {
+            var selectedSoundBanks = new HashSet<string>(
+                moddedSoundBanks,
+                StringComparer.OrdinalIgnoreCase);
             return GetHircsByType<ICAkDialogueEvent>()
                 .Select(hirc => hirc as HircItem)
-                .Where(hirc => hirc.IsCAHircItem == false && moddedSoundBanks.Contains(hirc.BnkFilePath))
-                .GroupBy(hirc => GetNameFromId(hirc.LanguageId))
-                .ToDictionary(group => group.Key, group => group.ToList());
+                .Where(hirc =>
+                    hirc.IsCAHircItem == false &&
+                    selectedSoundBanks.Contains(hirc.BnkFilePath))
+                .SelectMany(hirc => GetDialogueMergerLanguages(hirc)
+                    .Select(language => (Language: language, Hirc: hirc)))
+                .GroupBy(entry => entry.Language)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(entry => entry.Hirc).ToList());
+        }
+
+        private IEnumerable<string> GetDialogueMergerLanguages(HircItem hirc)
+        {
+            var scope = DialogueEventMergerBankScopeResolver.Resolve(
+                hirc.BnkFilePath);
+            if (scope.Kind ==
+                DialogueEventMergerBankScopeKind.AllVoiceLanguages)
+            {
+                return DialogueEventMergerBankScopeResolver.VoiceLanguages;
+            }
+
+            return scope.Kind ==
+                DialogueEventMergerBankScopeKind.SpecificLanguage
+                ? [scope.Language]
+                : [GetNameFromId(hirc.LanguageId)];
         }
 
         public List<string> GetModdedSoundBankFilePaths(string bnkNameSubstring)

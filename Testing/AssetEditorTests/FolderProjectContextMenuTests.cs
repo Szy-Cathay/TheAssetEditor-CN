@@ -413,6 +413,86 @@ public class FolderProjectContextMenuTests
     }
 
     [NUnit.Framework.Test]
+    public void InactiveFolderProject_CanBecomeCurrentFromContextMenu()
+    {
+        var serviceProvider =
+            new DependencyInjectionConfig(false).Build(true);
+        using var firstRoot = new TemporaryDirectory();
+        using var secondRoot = new TemporaryDirectory();
+        IPackFileService? packFileService = null;
+        FolderProjectContainer? firstProject = null;
+        FolderProjectContainer? secondProject = null;
+
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var services = scope.ServiceProvider;
+            services.GetRequiredService<LocalizationManager>()
+                .LoadLanguage();
+            packFileService =
+                services.GetRequiredService<IPackFileService>();
+            packFileService.EnforceGameFilesMustBeLoaded = false;
+            firstProject = FolderProjectContainer.Create(
+                firstRoot.Path,
+                new FolderProjectSettings { Name = "工程一" });
+            secondProject = FolderProjectContainer.Create(
+                secondRoot.Path,
+                new FolderProjectSettings { Name = "工程二" });
+            packFileService.AddEditableFolderProject(firstProject);
+            packFileService.AddEditableFolderProject(secondProject);
+            var firstProjectRoot = new TreeNode(
+                firstProject.Name,
+                NodeType.Root,
+                firstProject,
+                null);
+            var menuBuilder = services
+                .GetServices<IContextMenuBuilder>()
+                .Single(builder =>
+                    builder.Type == ContextMenuType.MainApplication);
+
+            var menuItem = FindMenuItem(
+                menuBuilder.Build(firstProjectRoot),
+                "设为可编辑 Pack");
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    packFileService.GetEditablePack(),
+                    NUnit.Framework.Is.SameAs(secondProject));
+                NUnitAssert.That(
+                    menuItem,
+                    NUnit.Framework.Is.Not.Null);
+                NUnitAssert.That(
+                    menuItem?.Command?.CanExecute(null),
+                    NUnit.Framework.Is.True);
+            });
+
+            menuItem!.Command!.Execute(null);
+
+            NUnitAssert.That(
+                packFileService.GetEditablePack(),
+                NUnit.Framework.Is.SameAs(firstProject));
+        }
+        finally
+        {
+            if (packFileService != null)
+            {
+                if (secondProject != null)
+                    packFileService.UnloadPackContainer(secondProject);
+                if (firstProject != null)
+                    packFileService.UnloadPackContainer(firstProject);
+            }
+            else
+            {
+                secondProject?.Dispose();
+                firstProject?.Dispose();
+            }
+
+            (serviceProvider as IDisposable)?.Dispose();
+        }
+    }
+
+    [NUnit.Framework.Test]
     public void PackTreeContextMenus_ContainNoEnglishSectionNames()
     {
         var serviceProvider = new DependencyInjectionConfig(false).Build(true);
