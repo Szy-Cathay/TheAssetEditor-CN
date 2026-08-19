@@ -656,6 +656,13 @@ namespace Editors.Audio.Shared.Wwise.Generators
                     LocalizationManager.Instance.Get(
                         "DialogueEventMerger.IncompleteOutput"));
             }
+            if (targetHirc is ICAkSound sound &&
+                sound.GetStreamType() != AKBKSourceType.Streaming)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
 
             targetHircsById[hircId] = targetHirc;
             if (targetHirc is ICAkRanSeqCntr randomSequenceContainer)

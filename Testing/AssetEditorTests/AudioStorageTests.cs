@@ -1322,6 +1322,21 @@ namespace AssetEditorTests
                     [englishBankPath, chineseBankPath],
                     "merged",
                     CancellationToken.None));
+
+            chineseContainer.Children.ChildIds = [chineseSoundId];
+            chineseContainer.CAkPlayList.Playlist[0].PlayId =
+                chineseSoundId;
+            chineseContainer.UpdateSectionSize();
+            chineseSound.AkBankSourceData.StreamType =
+                AKBKSourceType.Data_BNK;
+            chineseSound.UpdateSectionSize();
+            repository.HircsById[chineseTargetId] =
+                [chineseContainer];
+            await Assert.ThrowsExceptionAsync<InvalidDataException>(() =>
+                generator.GenerateMergedDialogueEventSoundBanksAsync(
+                    [englishBankPath, chineseBankPath],
+                    "merged",
+                    CancellationToken.None));
             outputService.Verify(service => service.SaveBatch(
                 It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
                 true), Times.Once);
