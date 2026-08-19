@@ -1641,9 +1641,10 @@ namespace AssetEditorTests
             };
             var integrity = new Mock<IAudioEditorIntegrityService>();
             integrity
-                .Setup(x => x.CheckMergingSoundBanksIdIntegrity(
-                    selectedBanks))
-                .Returns(false);
+                .Setup(x => x.GetMergingSoundBanksIntegrityError(
+                    selectedBanks,
+                    It.IsAny<CancellationToken>()))
+                .Returns("clash");
             var repository = new Mock<IAudioRepository>();
             var service = new SoundBankGeneratorService(
                 Mock.Of<IAudioPackOutputService>(),
@@ -1651,8 +1652,8 @@ namespace AssetEditorTests
                 repository.Object,
                 integrity.Object);
 
-            Assert.IsFalse(
-                await service.GenerateMergedDialogueEventSoundBanksAsync(
+            await Assert.ThrowsExceptionAsync<InvalidDataException>(() =>
+                service.GenerateMergedDialogueEventSoundBanksAsync(
                     selectedBanks,
                     "merged",
                     CancellationToken.None));

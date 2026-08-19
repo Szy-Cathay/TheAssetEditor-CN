@@ -613,10 +613,12 @@
   "DialogueEventMerger.Cancelled": "操作已取消。",
   "DialogueEventMerger.LoadFailed": "SoundBank 数据加载失败。",
   "DialogueEventMerger.LoadFailed.Detail": "加载 SoundBank 数据失败：\n{0}",
+  "DialogueEventMerger.RequiredBankLoadFailed": "以下待合并 SoundBank 无法解析，操作已停止且不会写入兼容 Mod：\n{0}",
   "DialogueEventMerger.Generating": "正在生成合并 SoundBank…",
   "DialogueEventMerger.NotGenerated": "操作已取消，或没有可生成的 SoundBank。",
   "DialogueEventMerger.InvalidSuffix": "后缀不能包含空格、文件名禁用字符、尾随句点或 Windows 保留名称。",
   "DialogueEventMerger.GenerateFailed": "生成合并 SoundBank 失败：\n{0}",
+  "DialogueEventMerger.IncompleteOutput": "无法为所有目标语言生成完整的兼容 SoundBank，操作已停止且未写入任何文件。",
 
   "AudioProjectMerger.Title": "音频项目合并器",
   "AudioProjectMerger.Description": "音频项目合并器用于合并两个音频项目。",

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
@@ -7,6 +8,7 @@ using Editors.Audio.Shared.Wwise;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
+using Shared.Core.Services;
 using Shared.GameFormats.Wwise.Didx;
 using Shared.GameFormats.Wwise.Enums;
 using Shared.GameFormats.Wwise.Hirc;
@@ -158,11 +160,23 @@ namespace Editors.Audio.Shared.Storage
             if (!_isDatDataLoaded)
                 LoadDatData();
             cancellationToken.ThrowIfCancellationRequested();
-            LoadBnkData(
+            var loadResult = LoadBnkData(
                 languages,
                 progress,
                 cancellationToken,
                 discovery.BankPaths);
+            var failedRequiredBanks = loadResult.FailedBnkPaths
+                .Intersect(
+                    discovery.BankPaths,
+                    StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (failedRequiredBanks.Count != 0)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "DialogueEventMerger.RequiredBankLoadFailed",
+                        string.Join("\n", failedRequiredBanks)));
+            }
             MemoryOptimiser.Optimise();
             MemoryOptimiser.LogMemory(
                 "After loading Dialogue Event Merger AudioRepository");
@@ -181,7 +195,7 @@ namespace Editors.Audio.Shared.Storage
             _isDatDataLoaded = true;
         }
 
-        private void LoadBnkData(
+        private BnkLoader.Result LoadBnkData(
             List<string> languages,
             IProgress<AudioLoadProgress> progress,
             CancellationToken cancellationToken,
@@ -214,6 +228,7 @@ namespace Editors.Audio.Shared.Storage
 
             _loadedBnkDataLanguages.Clear();
             _loadedBnkDataLanguages.UnionWith(languages);
+            return result;
         }
 
         public List<T> GetHircsByType<T>() where T : class
@@ -348,7 +363,11 @@ namespace Editors.Audio.Shared.Storage
         {
             return HircsById
                 .SelectMany(hircDictionaryEntry => hircDictionaryEntry.Value) 
-                .Where(hirc => hirc.IsCAHircItem == false && hirc.BnkFilePath.Contains(bnkNameSubstring))
+                .Where(hirc =>
+                    hirc.IsCAHircItem == false &&
+                    hirc.BnkFilePath.Contains(
+                        bnkNameSubstring,
+                        StringComparison.OrdinalIgnoreCase))
                 .Select(hirc => hirc.BnkFilePath ) 
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(bnkFilePath => bnkFilePath, StringComparer.OrdinalIgnoreCase)

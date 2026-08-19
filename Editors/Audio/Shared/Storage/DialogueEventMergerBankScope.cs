@@ -41,21 +41,17 @@ namespace Editors.Audio.Shared.Storage
             var pathParts = bankPath.Split(
                 ['\\', '/'],
                 StringSplitOptions.RemoveEmptyEntries);
-            for (var index = 0; index < pathParts.Length - 1; index++)
+            if (pathParts.Length >= 3 &&
+                string.Equals(
+                    pathParts[0],
+                    "audio",
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    pathParts[1],
+                    "wwise",
+                    StringComparison.OrdinalIgnoreCase))
             {
-                if (!string.Equals(
-                        pathParts[index],
-                        "audio",
-                        StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(
-                        pathParts[index + 1],
-                        "wwise",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var relativePartCount = pathParts.Length - index - 2;
+                var relativePartCount = pathParts.Length - 2;
                 if (relativePartCount == 1)
                 {
                     return new DialogueEventMergerBankScope(
@@ -64,7 +60,7 @@ namespace Editors.Audio.Shared.Storage
 
                 if (relativePartCount == 2 &&
                     VoiceLanguageByFolder.TryGetValue(
-                        pathParts[index + 2],
+                        pathParts[2],
                         out var language))
                 {
                     return new DialogueEventMergerBankScope(
@@ -72,7 +68,6 @@ namespace Editors.Audio.Shared.Storage
                         language);
                 }
 
-                break;
             }
 
             return new DialogueEventMergerBankScope(

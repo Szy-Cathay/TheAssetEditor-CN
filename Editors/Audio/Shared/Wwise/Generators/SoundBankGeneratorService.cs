@@ -214,11 +214,15 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 soundBankSuffix,
                 0,
                 moddedSoundBanks.Count));
-            if (!_audioEditorIntegrityService
-                    .CheckMergingSoundBanksIdIntegrity(moddedSoundBanks))
-            {
-                return false;
-            }
+            var integrityError = await Task.Run(
+                () => _audioEditorIntegrityService
+                    .GetMergingSoundBanksIntegrityError(
+                        moddedSoundBanks,
+                        cancellationToken),
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (integrityError != null)
+                throw new InvalidDataException(integrityError);
 
             progress?.Report(new AudioOperationProgress(
                 "AudioOperation.Merge.Analysing",
@@ -284,6 +288,11 @@ namespace Editors.Audio.Shared.Wwise.Generators
                         .Select(dialogueEventName => Wh3DialogueEventInformation.GetSoundBank(dialogueEventName))
                         .Distinct()
                         .ToList());
+            var expectedTargets = soundBanksToGenerateByLanguage
+                .SelectMany(languageEntry => languageEntry.Value.Select(
+                    soundBank => (languageEntry.Key, soundBank)))
+                .ToHashSet();
+            var generatedTargets = new HashSet<(string, Wh3SoundBank)>();
 
             foreach (var bnkByLanguage in vanillaDialogueEventsByBnkByLanguage)
             {
@@ -300,6 +309,12 @@ namespace Editors.Audio.Shared.Wwise.Generators
                     var currentSoundBank = Wh3DialogueEventInformation.GetSoundBank(firstDialogueEventName);
                     if (!soundBanksToGenerate.Contains(currentSoundBank))
                         continue;
+                    if (!generatedTargets.Add((language, currentSoundBank)))
+                    {
+                        throw new InvalidDataException(
+                            LocalizationManager.Instance.Get(
+                                "DialogueEventMerger.IncompleteOutput"));
+                    }
 
                     _logger.Here().Information($"Merging SoundBanks for language {language}");
 
@@ -312,6 +327,13 @@ namespace Editors.Audio.Shared.Wwise.Generators
                             soundBankSuffix,
                             cancellationToken));
                 }
+            }
+
+            if (!generatedTargets.SetEquals(expectedTargets))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
             }
 
             return outputs;

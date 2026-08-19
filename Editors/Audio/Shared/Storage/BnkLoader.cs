@@ -33,6 +33,7 @@ namespace Editors.Audio.Shared.Storage
             public Dictionary<uint, List<HircItem>> HircsById { get; internal set; } = [];
             public Dictionary<uint, List<DidxAudio>> DidxAudioListById { get; internal set; } = [];
             public Dictionary<string, PackFile> PackFileByBnkName { get; internal set; } = [];
+            public List<string> FailedBnkPaths { get; internal set; } = [];
         }
 
         private readonly IPackFileService _packFileService = packFileService;
@@ -93,7 +94,9 @@ namespace Editors.Audio.Shared.Storage
             var parsedBnks = new ConcurrentBag<ParsedBnkFile>();
             var bnksWithUnknownHircs = new ConcurrentBag<string>();
             var failedBnks = new ConcurrentBag<(string bnkFile, string Error)>();
-            var packFileByBnkName = new ConcurrentDictionary<string, PackFile>();
+            var packFileByBnkName =
+                new ConcurrentDictionary<string, PackFile>(
+                    StringComparer.OrdinalIgnoreCase);
             var result = new Result();
             var startedCount = 0;
             var completedCount = 0;
@@ -112,6 +115,7 @@ namespace Editors.Audio.Shared.Storage
 
                     var packFile = bnkFile.Value;
                     var packFileContainer = _packFileService.GetPackFileContainer(packFile);
+                    packFileByBnkName.TryAdd(filePath, packFile);
                     packFileByBnkName.TryAdd(packFile.Name, packFile);
 
                     var parsedBnk = LoadBnkFile(packFile, filePath, packFileContainer.IsCaPackFile);
@@ -136,7 +140,13 @@ namespace Editors.Audio.Shared.Storage
             });
 
             cancellationToken.ThrowIfCancellationRequested();
-            result.PackFileByBnkName = new Dictionary<string, PackFile>(packFileByBnkName);
+            result.PackFileByBnkName = new Dictionary<string, PackFile>(
+                packFileByBnkName,
+                StringComparer.OrdinalIgnoreCase);
+            result.FailedBnkPaths = failedBnks
+                .Select(failure => failure.bnkFile)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var allHircItems = parsedBnks.SelectMany(x => x.HircChunk.HircItems);
             PrintHircList(allHircItems, "All");

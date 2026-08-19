@@ -11,6 +11,7 @@ using Shared.Core.Settings;
 using Shared.Core.Services;
 using Shared.GameFormats.Wwise;
 using Shared.GameFormats.Wwise.Bkhd;
+using Shared.GameFormats.Wwise.Didx;
 using Shared.GameFormats.Wwise.Enums;
 using Shared.GameFormats.Wwise.Hirc;
 using Shared.GameFormats.Wwise.Hirc.V136;
@@ -43,7 +44,38 @@ namespace AssetEditorTests
 
             var result = loader.LoadBnkFiles([]);
 
-            Assert.AreEqual(bankCount, result.PackFileByBnkName.Count);
+            Assert.AreEqual(
+                bankCount,
+                result.PackFileByBnkName.Values.Distinct().Count());
+        }
+
+        [TestMethod]
+        public void LoadBnkFiles_IndexesSameNamedBanksByFullPath()
+        {
+            const string rootBankPath =
+                "audio\\wwise\\copied_for_merging.bnk";
+            const string languageBankPath =
+                "audio\\wwise\\chinese\\copied_for_merging.bnk";
+            var container = new PackFileContainer("audio");
+            var rootBank = PackFile.CreateFromBytes(
+                "copied_for_merging.bnk",
+                []);
+            var languageBank = PackFile.CreateFromBytes(
+                "copied_for_merging.bnk",
+                []);
+            container.FileList[rootBankPath] = rootBank;
+            container.FileList[languageBankPath] = languageBank;
+            var packFileService = CreatePackFileService(container);
+            var loader = new TestBnkLoader(packFileService.Object);
+
+            var result = loader.LoadBnkFiles([]);
+
+            Assert.AreSame(
+                rootBank,
+                result.PackFileByBnkName[rootBankPath]);
+            Assert.AreSame(
+                languageBank,
+                result.PackFileByBnkName[languageBankPath]);
         }
 
         [TestMethod]
@@ -307,6 +339,82 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void AudioRepository_DialogueMergerNestedAudioPathUsesInternalLanguage()
+        {
+            var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            var gameContainer = new PackFileContainer("audio")
+            {
+                IsCaPackFile = true
+            };
+            gameContainer.FileList["audio\\wwise\\english(uk)\\english.bnk"] =
+                CreateHeaderOnlyBank("english.bnk", "english(uk)");
+            gameContainer.FileList["audio\\wwise\\french(france)\\french.bnk"] =
+                CreateHeaderOnlyBank("french.bnk", "french(france)");
+            const string modBankPath =
+                "legacy\\audio\\wwise\\custom_for_merging.bnk";
+            var modContainer = new PackFileContainer("mod");
+            modContainer.FileList[modBankPath] =
+                CreateHeaderOnlyBank(
+                    "custom_for_merging.bnk",
+                    "english(uk)");
+            var packFileService = CreatePackFileService(
+                gameContainer,
+                modContainer);
+            var loader = new TestBnkLoader(packFileService.Object);
+            using var repository = new AudioRepository(
+                settings,
+                loader,
+                new DatLoader(packFileService.Object, settings));
+
+            repository.LoadDialogueEventMergerData(
+                "for_merging",
+                null,
+                CancellationToken.None);
+
+            CollectionAssert.Contains(
+                loader.LoadedPaths,
+                "audio\\wwise\\english(uk)\\english.bnk");
+            CollectionAssert.DoesNotContain(
+                loader.LoadedPaths,
+                "audio\\wwise\\french(france)\\french.bnk");
+        }
+
+        [TestMethod]
+        public void AudioRepository_DialogueMergerStopsWhenRequiredBankFailsToParse()
+        {
+            var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            var gameContainer = new PackFileContainer("audio")
+            {
+                IsCaPackFile = true
+            };
+            gameContainer.FileList["audio\\wwise\\english(uk)\\english.bnk"] =
+                CreateHeaderOnlyBank("english.bnk", "english(uk)");
+            const string modBankPath =
+                "audio\\wwise\\english(uk)\\broken_for_merging.bnk";
+            var modContainer = new PackFileContainer("mod");
+            modContainer.FileList[modBankPath] =
+                CreateHeaderOnlyBank(
+                    "broken_for_merging.bnk",
+                    "english(uk)");
+            var packFileService = CreatePackFileService(
+                gameContainer,
+                modContainer);
+            var loader = new FailingBnkLoader(
+                packFileService.Object,
+                modBankPath);
+            using var repository = new AudioRepository(
+                settings,
+                loader,
+                new DatLoader(packFileService.Object, settings));
+
+            Assert.ThrowsException<InvalidDataException>(() =>
+                repository.LoadDialogueEventMergerData(
+                    "for_merging",
+                    null,
+                    CancellationToken.None));
+        }
+
+        [TestMethod]
         public void AudioRepository_DialogueMergerSkipsLoadWhenNoInputsExist()
         {
             var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
@@ -388,6 +496,31 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void AudioRepository_DialogueMergerBankFilterIgnoresCase()
+        {
+            var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            var packFileService = new Mock<IPackFileService>();
+            using var repository = new AudioRepository(
+                settings,
+                new BnkLoader(packFileService.Object),
+                new DatLoader(packFileService.Object, settings));
+            const string bankPath =
+                "audio\\wwise\\A_FOR_MERGING.BNK";
+            var dialogueEvent = CreateModdedDialogueEvent(
+                1,
+                WwiseHash.Compute("chinese"),
+                bankPath);
+            repository.HircsById[dialogueEvent.Id] = [dialogueEvent];
+
+            var result = repository.GetModdedSoundBankFilePaths(
+                "for_merging");
+
+            CollectionAssert.AreEqual(
+                new List<string> { bankPath },
+                result);
+        }
+
+        [TestMethod]
         public void AudioIntegrity_DialogueMergerAllowsCopiedIdsAcrossVoiceLanguages()
         {
             var localizationManager = new LocalizationManager();
@@ -421,13 +554,13 @@ namespace AssetEditorTests
                 [englishBank, chineseBank];
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                Mock.Of<IStandardDialogs>());
+                repository);
 
-            var result = integrityService.CheckMergingSoundBanksIdIntegrity(
-                [englishBank.BnkFilePath, chineseBank.BnkFilePath]);
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [englishBank.BnkFilePath, chineseBank.BnkFilePath],
+                CancellationToken.None);
 
-            Assert.IsTrue(result);
+            Assert.IsNull(result);
         }
 
         [TestMethod]
@@ -469,17 +602,15 @@ namespace AssetEditorTests
                 campaignBankPath);
             repository.HircsById[battleSound.Id] = [battleSound];
             repository.HircsById[campaignSound.Id] = [campaignSound];
-            var dialogs = new Mock<IStandardDialogs>();
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                dialogs.Object);
+                repository);
 
-            var result = integrityService.CheckMergingSoundBanksIdIntegrity(
-                [battleBankPath, campaignBankPath]);
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [battleBankPath, campaignBankPath],
+                CancellationToken.None);
 
-            Assert.IsTrue(result);
-            dialogs.VerifyNoOtherCalls();
+            Assert.IsNull(result);
         }
 
         [TestMethod]
@@ -491,11 +622,11 @@ namespace AssetEditorTests
             using var repository = scenario.Repository;
 
             var result = scenario.IntegrityService
-                .CheckMergingSoundBanksIdIntegrity(
-                    [scenario.FirstBankPath, scenario.SecondBankPath]);
+                .GetMergingSoundBanksIntegrityError(
+                    [scenario.FirstBankPath, scenario.SecondBankPath],
+                    CancellationToken.None);
 
-            Assert.IsTrue(result);
-            scenario.Dialogs.VerifyNoOtherCalls();
+            Assert.IsNull(result);
         }
 
         [TestMethod]
@@ -507,13 +638,93 @@ namespace AssetEditorTests
             using var repository = scenario.Repository;
 
             var result = scenario.IntegrityService
-                .CheckMergingSoundBanksIdIntegrity(
-                    [scenario.FirstBankPath, scenario.SecondBankPath]);
+                .GetMergingSoundBanksIntegrityError(
+                    [scenario.FirstBankPath, scenario.SecondBankPath],
+                    CancellationToken.None);
 
-            Assert.IsFalse(result);
-            scenario.Dialogs.Verify(dialogs => dialogs.ShowDialogBox(
-                It.IsAny<string>(),
-                It.IsAny<string>()), Times.Once);
+            Assert.IsNotNull(result);
+        }
+
+        [TestMethod]
+        public void AudioIntegrity_DialogueMergerRejectsDifferentEmbeddedAudio()
+        {
+            var localizationManager = new LocalizationManager();
+            localizationManager.LoadLanguage();
+            const uint sourceId = 157925570;
+            const string firstBankPath =
+                "audio\\wwise\\first_for_merging.bnk";
+            const string secondBankPath =
+                "audio\\wwise\\second_for_merging.bnk";
+            var firstContainer = new PackFileContainer("first");
+            var secondContainer = new PackFileContainer("second");
+            var firstBank = PackFile.CreateFromBytes(
+                "first_for_merging.bnk",
+                []);
+            var secondBank = PackFile.CreateFromBytes(
+                "second_for_merging.bnk",
+                []);
+            firstContainer.FileList[firstBankPath] = firstBank;
+            secondContainer.FileList[secondBankPath] = secondBank;
+            firstContainer.FileList[$"audio\\wwise\\{sourceId}.wem"] =
+                PackFile.CreateFromBytes($"{sourceId}.wem", [9]);
+            secondContainer.FileList[$"audio\\wwise\\{sourceId}.wem"] =
+                PackFile.CreateFromBytes($"{sourceId}.wem", [9]);
+            var packFileService = CreatePackFileService(
+                firstContainer,
+                secondContainer);
+            var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            using var repository = new AudioRepository(
+                settings,
+                new BnkLoader(packFileService.Object),
+                new DatLoader(packFileService.Object, settings));
+            var languageId = WwiseHash.Compute("chinese");
+            repository.NameById[languageId] = "chinese";
+            repository.PackFileByBnkName[firstBankPath] = firstBank;
+            repository.PackFileByBnkName[secondBankPath] = secondBank;
+            repository.HircsById[1] =
+            [
+                CreateModdedSound(
+                    1,
+                    sourceId,
+                    languageId,
+                    firstBankPath,
+                    AKBKSourceType.Data_BNK)
+            ];
+            repository.HircsById[2] =
+            [
+                CreateModdedSound(
+                    2,
+                    sourceId,
+                    languageId,
+                    secondBankPath,
+                    AKBKSourceType.Data_BNK)
+            ];
+            repository.DidxAudioListById[sourceId] =
+            [
+                new DidxAudio
+                {
+                    Id = sourceId,
+                    OwnerFilePath = firstBankPath,
+                    LanguageId = languageId,
+                    ByteArray = [1, 2, 3]
+                },
+                new DidxAudio
+                {
+                    Id = sourceId,
+                    OwnerFilePath = secondBankPath,
+                    LanguageId = languageId,
+                    ByteArray = [4, 5, 6]
+                }
+            ];
+            var integrityService = new AudioEditorIntegrityService(
+                packFileService.Object,
+                repository);
+
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [firstBankPath, secondBankPath],
+                CancellationToken.None);
+
+            Assert.IsNotNull(result);
         }
 
         [TestMethod]
@@ -550,19 +761,15 @@ namespace AssetEditorTests
                     IsCAHircItem = false
                 }
             ];
-            var dialogs = new Mock<IStandardDialogs>();
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                dialogs.Object);
+                repository);
 
-            var result = integrityService.CheckMergingSoundBanksIdIntegrity(
-                [firstBankPath, secondBankPath]);
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [firstBankPath, secondBankPath],
+                CancellationToken.None);
 
-            Assert.IsFalse(result);
-            dialogs.Verify(value => value.ShowDialogBox(
-                It.IsAny<string>(),
-                It.IsAny<string>()), Times.Once);
+            Assert.IsNotNull(result);
         }
 
         [TestMethod]
@@ -606,17 +813,15 @@ namespace AssetEditorTests
                     languageId,
                     secondBankPath)
             ];
-            var dialogs = new Mock<IStandardDialogs>();
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                dialogs.Object);
+                repository);
 
-            var result = integrityService.CheckMergingSoundBanksIdIntegrity(
-                [firstBankPath, secondBankPath]);
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [firstBankPath, secondBankPath],
+                CancellationToken.None);
 
-            Assert.IsTrue(result);
-            dialogs.VerifyNoOtherCalls();
+            Assert.IsNull(result);
         }
 
         [TestMethod]
@@ -652,21 +857,16 @@ namespace AssetEditorTests
                     10,
                     200)
             ];
-            var dialogs = new Mock<IStandardDialogs>();
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                dialogs.Object);
+                repository);
 
-            var result = integrityService.CheckMergingSoundBanksIdIntegrity(
-                [firstBankPath, secondBankPath]);
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [firstBankPath, secondBankPath],
+                CancellationToken.None);
 
-            Assert.IsFalse(result);
-            dialogs.Verify(value => value.ShowDialogBox(
-                It.Is<string>(message => message.Contains(
-                    dialogueEventId.ToString(),
-                    StringComparison.Ordinal)),
-                It.IsAny<string>()), Times.Once);
+            Assert.IsNotNull(result);
+            StringAssert.Contains(result, dialogueEventId.ToString());
         }
 
         [TestMethod]
@@ -702,17 +902,15 @@ namespace AssetEditorTests
                     20,
                     200)
             ];
-            var dialogs = new Mock<IStandardDialogs>();
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                dialogs.Object);
+                repository);
 
-            var result = integrityService.CheckMergingSoundBanksIdIntegrity(
-                [firstBankPath, secondBankPath]);
+            var result = integrityService.GetMergingSoundBanksIntegrityError(
+                [firstBankPath, secondBankPath],
+                CancellationToken.None);
 
-            Assert.IsTrue(result);
-            dialogs.VerifyNoOtherCalls();
+            Assert.IsNull(result);
         }
 
         [TestMethod]
@@ -755,16 +953,14 @@ namespace AssetEditorTests
                 repository,
                 new AudioEditorIntegrityService(
                     packFileService.Object,
-                    repository,
-                    Mock.Of<IStandardDialogs>()));
+                    repository));
 
-            var result = await generator
-                .GenerateMergedDialogueEventSoundBanksAsync(
+            await Assert.ThrowsExceptionAsync<InvalidDataException>(() =>
+                generator.GenerateMergedDialogueEventSoundBanksAsync(
                     [firstBankPath, secondBankPath],
                     "merged",
-                    CancellationToken.None);
+                    CancellationToken.None));
 
-            Assert.IsFalse(result);
             outputService.Verify(service => service.SaveBatch(
                 It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
                 It.IsAny<bool>()), Times.Never);
@@ -835,8 +1031,7 @@ namespace AssetEditorTests
                 repository,
                 new AudioEditorIntegrityService(
                     packFileService.Object,
-                    repository,
-                    Mock.Of<IStandardDialogs>()));
+                    repository));
 
             var result = await generator
                 .GenerateMergedDialogueEventSoundBanksAsync(
@@ -919,8 +1114,7 @@ namespace AssetEditorTests
                 repository,
                 new AudioEditorIntegrityService(
                     packFileService.Object,
-                    repository,
-                    Mock.Of<IStandardDialogs>()));
+                    repository));
 
             var result = await generator
                 .GenerateMergedDialogueEventSoundBanksAsync(
@@ -938,6 +1132,70 @@ namespace AssetEditorTests
                         $"audio\\wwise\\{language}\\{outputFileName}")
                     .ToList(),
                 savedOutputs.Select(output => output.FilePath).ToList());
+        }
+
+        [TestMethod]
+        public async Task DialogueMerger_MissingRequiredLanguageOutputDoesNotSave()
+        {
+            var localizationManager = new LocalizationManager();
+            localizationManager.LoadLanguage();
+            var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            var packFileService = new Mock<IPackFileService>();
+            using var repository = new AudioRepository(
+                settings,
+                new BnkLoader(packFileService.Object),
+                new DatLoader(packFileService.Object, settings));
+            var voiceLanguages = Wh3LanguageInformation.GetAllLanguages()
+                .Where(language => language != "sfx")
+                .ToList();
+            const string dialogueEventName = "frontend_vo_character_select";
+            const string moddedBankPath =
+                "audio\\wwise\\universal_for_merging.bnk";
+            var dialogueEventId = WwiseHash.Compute(dialogueEventName);
+            var englishLanguageId = WwiseHash.Compute("english(uk)");
+            repository.NameById[dialogueEventId] = dialogueEventName;
+            var hircs = new List<HircItem>();
+            foreach (var language in voiceLanguages.SkipLast(1))
+            {
+                var languageId = WwiseHash.Compute(language);
+                repository.NameById[languageId] = language;
+                hircs.Add(new CAkDialogueEvent_V136
+                {
+                    Id = dialogueEventId,
+                    HircType = AkBkHircType.Dialogue_Event,
+                    LanguageId = languageId,
+                    BnkFilePath =
+                        $"audio\\wwise\\{language}\\frontend_vo.bnk",
+                    IsCAHircItem = true
+                });
+            }
+
+            hircs.Add(new CAkDialogueEvent_V136
+            {
+                Id = dialogueEventId,
+                HircType = AkBkHircType.Dialogue_Event,
+                LanguageId = englishLanguageId,
+                BnkFilePath = moddedBankPath,
+                IsCAHircItem = false
+            });
+            repository.HircsById[dialogueEventId] = hircs;
+            var outputService = new Mock<IAudioPackOutputService>();
+            var generator = new SoundBankGeneratorService(
+                outputService.Object,
+                settings,
+                repository,
+                new AudioEditorIntegrityService(
+                    packFileService.Object,
+                    repository));
+
+            await Assert.ThrowsExceptionAsync<InvalidDataException>(() =>
+                generator.GenerateMergedDialogueEventSoundBanksAsync(
+                    [moddedBankPath],
+                    "merged",
+                    CancellationToken.None));
+            outputService.Verify(service => service.SaveBatch(
+                It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
+                It.IsAny<bool>()), Times.Never);
         }
 
         private static Mock<IPackFileService> CreatePackFileService(
@@ -971,7 +1229,6 @@ namespace AssetEditorTests
         private static (
             AudioEditorIntegrityService IntegrityService,
             AudioRepository Repository,
-            Mock<IStandardDialogs> Dialogs,
             string FirstBankPath,
             string SecondBankPath) CreateSourceIntegrityScenario(
                 byte[] firstWemData,
@@ -1016,15 +1273,12 @@ namespace AssetEditorTests
                 secondBankPath);
             repository.HircsById[firstSound.Id] = [firstSound];
             repository.HircsById[secondSound.Id] = [secondSound];
-            var dialogs = new Mock<IStandardDialogs>();
             var integrityService = new AudioEditorIntegrityService(
                 packFileService.Object,
-                repository,
-                dialogs.Object);
+                repository);
             return (
                 integrityService,
                 repository,
-                dialogs,
                 firstBankPath,
                 secondBankPath);
         }
@@ -1119,7 +1373,8 @@ namespace AssetEditorTests
             uint id,
             uint sourceId,
             uint languageId,
-            string bnkFilePath) =>
+            string bnkFilePath,
+            AKBKSourceType streamType = AKBKSourceType.Streaming) =>
             new()
             {
                 Id = id,
@@ -1128,6 +1383,7 @@ namespace AssetEditorTests
                 IsCAHircItem = false,
                 AkBankSourceData = new AkBankSourceData_V136
                 {
+                    StreamType = streamType,
                     AkMediaInformation = new AkBankSourceData_V136
                         .AkMediaInformation_V136
                     {
@@ -1151,6 +1407,28 @@ namespace AssetEditorTests
                 Interlocked.Increment(ref _loadCount);
                 lock (LoadedPaths)
                     LoadedPaths.Add(bnkFilePath);
+                return new ParsedBnkFile();
+            }
+        }
+
+        private sealed class FailingBnkLoader(
+            IPackFileService packFileService,
+            string failingPath) : BnkLoader(packFileService)
+        {
+            public override ParsedBnkFile LoadBnkFile(
+                PackFile bnkFile,
+                string bnkFilePath,
+                bool isCAHircItem,
+                bool printData = false)
+            {
+                if (string.Equals(
+                        bnkFilePath,
+                        failingPath,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("broken bank");
+                }
+
                 return new ParsedBnkFile();
             }
         }
