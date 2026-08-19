@@ -587,7 +587,9 @@ namespace Editors.Audio.Shared.Wwise.Generators
             }
 
             SortHircs(dialogueEvents);
-            var hircItems = OrderTargetHircs(targetHircsById)
+            var hircItems = OrderTargetHircs(
+                    targetHircsById,
+                    cancellationToken)
                 .Concat(dialogueEvents)
                 .ToList();
 
@@ -626,20 +628,29 @@ namespace Editors.Audio.Shared.Wwise.Generators
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (targetHircsById.ContainsKey(hircId))
-                return;
-            if (!visitingIds.Add(hircId))
+            if (visitingIds.Contains(hircId))
             {
                 throw new InvalidDataException(
                     LocalizationManager.Instance.Get(
                         "DialogueEventMerger.IncompleteOutput"));
             }
+            if (targetHircsById.ContainsKey(hircId))
+                return;
+
+            visitingIds.Add(hircId);
 
             var targetHirc = _audioRepository
                 .GetHircs(hircId, soundBankPath)
                 .FirstOrDefault(hircItem =>
                     hircItem is not ICAkDialogueEvent);
             if (targetHirc == null)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+            if (targetHirc is not ICAkSound &&
+                targetHirc is not ICAkRanSeqCntr)
             {
                 throw new InvalidDataException(
                     LocalizationManager.Instance.Get(
@@ -666,18 +677,21 @@ namespace Editors.Audio.Shared.Wwise.Generators
         }
 
         private static List<HircItem> OrderTargetHircs(
-            IReadOnlyDictionary<uint, HircItem> targetHircsById)
+            IReadOnlyDictionary<uint, HircItem> targetHircsById,
+            CancellationToken cancellationToken)
         {
             var orderedHircs = new List<HircItem>(targetHircsById.Count);
             var addedIds = new HashSet<uint>();
             foreach (var hircItem in targetHircsById.Values
                          .OrderBy(item => item.Id))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 AddOrderedTargetHirc(
                     hircItem,
                     targetHircsById,
                     addedIds,
-                    orderedHircs);
+                    orderedHircs,
+                    cancellationToken);
             }
 
             return orderedHircs;
@@ -687,8 +701,10 @@ namespace Editors.Audio.Shared.Wwise.Generators
             HircItem hircItem,
             IReadOnlyDictionary<uint, HircItem> targetHircsById,
             HashSet<uint> addedIds,
-            List<HircItem> orderedHircs)
+            List<HircItem> orderedHircs,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (addedIds.Contains(hircItem.Id))
                 return;
             if (hircItem is ICAkRanSeqCntr randomSequenceContainer)
@@ -705,7 +721,8 @@ namespace Editors.Audio.Shared.Wwise.Generators
                             childHirc,
                             targetHircsById,
                             addedIds,
-                            orderedHircs);
+                            orderedHircs,
+                            cancellationToken);
                     }
                 }
             }

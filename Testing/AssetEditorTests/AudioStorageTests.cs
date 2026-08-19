@@ -1291,6 +1291,40 @@ namespace AssetEditorTests
                         .Select(sound => sound.GetSourceId())
                         .ToArray());
             }
+
+            chineseContainer.Children.ChildIds = [chineseTargetId];
+            chineseContainer.CAkPlayList.Playlist[0].PlayId =
+                chineseTargetId;
+            chineseContainer.UpdateSectionSize();
+            await Assert.ThrowsExceptionAsync<InvalidDataException>(() =>
+                generator.GenerateMergedDialogueEventSoundBanksAsync(
+                    [englishBankPath, chineseBankPath],
+                    "merged",
+                    CancellationToken.None));
+
+            var unsupportedTarget = new CAkActorMixer_V136
+            {
+                Id = chineseTargetId,
+                HircType = AkBkHircType.ActorMixer,
+                LanguageId = chineseLanguageId,
+                BnkFilePath = chineseBankPath,
+                IsCAHircItem = false,
+                Children = new Children_V136
+                {
+                    ChildIds = [chineseSoundId]
+                }
+            };
+            unsupportedTarget.UpdateSectionSize();
+            repository.HircsById[chineseTargetId] =
+                [unsupportedTarget];
+            await Assert.ThrowsExceptionAsync<InvalidDataException>(() =>
+                generator.GenerateMergedDialogueEventSoundBanksAsync(
+                    [englishBankPath, chineseBankPath],
+                    "merged",
+                    CancellationToken.None));
+            outputService.Verify(service => service.SaveBatch(
+                It.IsAny<IReadOnlyCollection<AudioPackOutput>>(),
+                true), Times.Once);
         }
 
         [TestMethod]
