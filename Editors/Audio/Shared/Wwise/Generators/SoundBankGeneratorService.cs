@@ -336,6 +336,50 @@ namespace Editors.Audio.Shared.Wwise.Generators
                         "DialogueEventMerger.IncompleteOutput"));
             }
 
+            var selectedSoundBanks = new HashSet<string>(
+                moddedSoundBanks,
+                StringComparer.OrdinalIgnoreCase);
+            var universalOutputSoundBanks = moddedDialogueEventsByLanguage
+                .Values
+                .SelectMany(hircItems => hircItems)
+                .Where(hircItem => selectedSoundBanks.Contains(
+                    hircItem.BnkFilePath))
+                .GroupBy(hircItem => Wh3DialogueEventInformation
+                    .GetSoundBank(_audioRepository.GetNameFromId(
+                        hircItem.Id)))
+                .Where(group => group
+                    .Select(hircItem => hircItem.BnkFilePath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .All(bankPath => DialogueEventMergerBankScopeResolver
+                        .Resolve(bankPath).Kind ==
+                        DialogueEventMergerBankScopeKind.AllVoiceLanguages))
+                .Select(group => group.Key)
+                .ToList();
+            var englishLanguage = Wh3LanguageInformation
+                .GetLanguageAsString(Wh3Language.EnglishUK);
+            foreach (var soundBank in universalOutputSoundBanks)
+            {
+                var soundBankName = Wh3SoundBankInformation.GetName(soundBank);
+                var fileName = $"{soundBankName}_0_{soundBankSuffix}.bnk";
+                var englishOutputPath =
+                    $"audio\\wwise\\{englishLanguage}\\{fileName}";
+                var englishOutput = outputs.SingleOrDefault(output =>
+                    output.FilePath.Equals(
+                        englishOutputPath,
+                        StringComparison.OrdinalIgnoreCase));
+                if (englishOutput == null)
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.Get(
+                            "DialogueEventMerger.IncompleteOutput"));
+                }
+
+                outputs.Add(new AudioPackOutput(
+                    fileName,
+                    $"audio\\wwise\\{fileName}",
+                    englishOutput.Data));
+            }
+
             return outputs;
         }
 
@@ -575,7 +619,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
                     var moddedDecisionTree = moddedDialogueEvent.AkDecisionTree as AkDecisionTree_V136;
 
                     var mergedDecisionTree = new AkDecisionTree_V136();
-                    mergedDecisionTree.DecisionTree = AkDecisionTree_V136.MergeDecisionTrees(currentDecisionTree.DecisionTree, moddedDecisionTree.DecisionTree);
+                    mergedDecisionTree.DecisionTree = AkDecisionTree_V136.MergeDecisionTrees(moddedDecisionTree.DecisionTree, currentDecisionTree.DecisionTree);
                     mergedDecisionTree.Nodes = AkDecisionTree_V136.FlattenDecisionTree(mergedDecisionTree.DecisionTree);
 
                     mergedDialogueEvent.AkDecisionTree = mergedDecisionTree;

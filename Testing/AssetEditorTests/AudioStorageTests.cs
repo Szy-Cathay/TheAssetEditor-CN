@@ -382,6 +382,8 @@ namespace AssetEditorTests
         [TestMethod]
         public void AudioRepository_DialogueMergerStopsWhenRequiredBankFailsToParse()
         {
+            var localizationManager = new LocalizationManager();
+            localizationManager.LoadLanguage();
             var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
             var gameContainer = new PackFileContainer("audio")
             {
@@ -1052,7 +1054,7 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
-        public async Task DialogueMerger_RootBankGeneratesEveryVoiceLanguage()
+        public async Task DialogueMerger_RootBankAlsoGeneratesUniversalOutput()
         {
             var localizationManager = new LocalizationManager();
             localizationManager.LoadLanguage();
@@ -1130,6 +1132,7 @@ namespace AssetEditorTests
                 voiceLanguages
                     .Select(language =>
                         $"audio\\wwise\\{language}\\{outputFileName}")
+                    .Append($"audio\\wwise\\{outputFileName}")
                     .ToList(),
                 savedOutputs.Select(output => output.FilePath).ToList());
         }
@@ -1184,7 +1187,7 @@ namespace AssetEditorTests
                 dialogueEventId,
                 englishLanguageId,
                 englishBankPath,
-                10,
+                1,
                 englishTargetId));
             eventHircs.Add(CreateModdedDialogueEvent(
                 dialogueEventId,
@@ -1263,7 +1266,10 @@ namespace AssetEditorTests
 
             Assert.IsTrue(result);
             Assert.IsNotNull(savedOutputs);
-            Assert.AreEqual(voiceLanguages.Count, savedOutputs.Count);
+            Assert.AreEqual(voiceLanguages.Count + 1, savedOutputs.Count);
+            Assert.IsTrue(savedOutputs.Any(output => output.FilePath.Equals(
+                "audio\\wwise\\frontend_vo_0_merged.bnk",
+                StringComparison.OrdinalIgnoreCase)));
             foreach (var output in savedOutputs)
             {
                 var parsed = BnkParser.Parse(
@@ -1290,6 +1296,17 @@ namespace AssetEditorTests
                     sounds.Cast<ICAkSound>()
                         .Select(sound => sound.GetSourceId())
                         .ToArray());
+                var mergedDialogueEvent = parsed.HircChunk.HircItems
+                    .OfType<ICAkDialogueEvent>()
+                    .Single(item => ((HircItem)item).Id == dialogueEventId);
+                var replacedVanillaPath = mergedDialogueEvent
+                    .AkDecisionTree
+                    .GetDecisionTree()
+                    .GetChildAtIndex(0);
+                Assert.AreEqual(1u, replacedVanillaPath.GetKey());
+                Assert.AreEqual(
+                    englishTargetId,
+                    replacedVanillaPath.GetAudioNodeId());
             }
 
             chineseContainer.Children.ChildIds = [chineseTargetId];
