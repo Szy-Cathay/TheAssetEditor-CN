@@ -23,7 +23,6 @@ namespace AssetEditor.Views
         IEditorInterface _draggedItem;
 
         private readonly IServiceProvider _serviceProvider;
-        private readonly PackAutoSaveService _autoSaveService;
         private bool _closeCheckRunning;
         private bool _closeApproved;
 
@@ -41,12 +40,7 @@ namespace AssetEditor.Views
             DarkTitleBarHelper.Enable(this);
             KeyDown += MainWindow_KeyDown;
 
-            // Start auto-save service
-            _autoSaveService = serviceProvider.GetRequiredService<PackAutoSaveService>();
-            _autoSaveService.Start();
-
             Closing += OnWindowClosing;
-            Closed += OnWindowClosed;
         }
 
         private async void OnWindowClosing(
@@ -81,11 +75,6 @@ namespace AssetEditor.Views
             {
                 _closeCheckRunning = false;
             }
-        }
-
-        private void OnWindowClosed(object sender, EventArgs e)
-        {
-            _autoSaveService?.Stop();
         }
 
         private void MainWindow_KeyDown(object sender, KeyEventArgs e)

@@ -274,10 +274,16 @@ namespace Shared.Core.PackFiles.Serialization
          
         public static FileCompressionInfo DetermineFileCompression(PackFileVersion outputPackFileVersion, GameInformation currentGameInformation, string fullFileName, CompressionFormat currentFileCompressionFormat, bool enableCompression = true)
         {
-            var doesGameSupportCompression = FileCompression.DoesGameSupportCompression(currentGameInformation);
-            var compressIfPossible = enableCompression && doesGameSupportCompression && outputPackFileVersion == PackFileVersion.PFH5;
+            var compressIfPossible =
+                enableCompression &&
+                FileCompression.ShouldCompressGeneratedPack(
+                    currentGameInformation) &&
+                outputPackFileVersion == PackFileVersion.PFH5;
 
-            var targetFileCompressionFormat = FileCompression.GetCompressionFormat(currentGameInformation, fullFileName);
+            var targetFileCompressionFormat =
+                FileCompression.GetGeneratedPackCompressionFormat(
+                    currentGameInformation,
+                    fullFileName);
             var isFileCompressed = currentFileCompressionFormat != CompressionFormat.None;
 
             if (isFileCompressed == false)

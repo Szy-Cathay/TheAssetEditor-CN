@@ -18,8 +18,11 @@ namespace Test.Shared.Core.PackFiles.Serialization
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH4, "folder//filex.txt", CompressionFormat.Zstd, CompressionFormat.None, true)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH5, "folder//filex.txt", CompressionFormat.Zstd, CompressionFormat.Zstd, false)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH5, "folder//filex.txt", CompressionFormat.Lzma1, CompressionFormat.Zstd, true)]
+        [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH5, "folder//filex.wsmodel", CompressionFormat.None, CompressionFormat.Zstd, true)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH4, "folder//filex", CompressionFormat.None, CompressionFormat.None, false)]
         [TestCase(GameTypeEnum.Warhammer3, PackFileVersion.PFH4, "folder//filex", CompressionFormat.Lz4, CompressionFormat.None, true)]
+        [TestCase(GameTypeEnum.Warhammer2, PackFileVersion.PFH5, "folder//filex.txt", CompressionFormat.None, CompressionFormat.None, false)]
+        [TestCase(GameTypeEnum.Warhammer2, PackFileVersion.PFH5, "folder//filex.txt", CompressionFormat.Lzma1, CompressionFormat.None, true)]
         [TestCase(GameTypeEnum.Rome2, PackFileVersion.PFH4, "folder//filex.txt", CompressionFormat.Lz4, CompressionFormat.None, true)]
         [TestCase(GameTypeEnum.Rome2, PackFileVersion.PFH4, "folder//filex.txt", CompressionFormat.None, CompressionFormat.None, false)]
         // Rome 2 cases

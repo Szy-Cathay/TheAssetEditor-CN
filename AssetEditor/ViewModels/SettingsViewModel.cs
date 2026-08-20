@@ -89,15 +89,6 @@ namespace AssetEditor.ViewModels
         [ObservableProperty] private string _wwisePath;
         [ObservableProperty] private bool _onlyLoadLod0ForReferenceMeshes;
 
-        // Auto-save & backup settings
-        [ObservableProperty] private bool _enableAutoSave;
-        [ObservableProperty] private int _autoSaveIntervalMinutes;
-        [ObservableProperty] private string _backupPath;
-        [ObservableProperty] private int _maxBackupCount;
-
-        // Compression settings
-        [ObservableProperty] private bool _useZstdCompression;
-
         [ObservableProperty] private bool _simulateGameBackfaces;
         partial void OnSimulateGameBackfacesChanged(bool value) =>
             PreviewViewportIfValid();
@@ -224,14 +215,6 @@ namespace AssetEditor.ViewModels
             }
             WwisePath = _settingsService.CurrentSettings.WwisePath;
 
-            // Auto-save & backup settings
-            EnableAutoSave = _settingsService.CurrentSettings.EnableAutoSave;
-            AutoSaveIntervalMinutes = _settingsService.CurrentSettings.AutoSaveIntervalMinutes;
-            BackupPath = _settingsService.CurrentSettings.BackupPath ?? "";
-            MaxBackupCount = _settingsService.CurrentSettings.MaxBackupCount;
-
-            // Compression settings
-            UseZstdCompression = _settingsService.CurrentSettings.UseZstdCompression;
             _allowPreview = true;
         }
 
@@ -281,15 +264,6 @@ namespace AssetEditor.ViewModels
             foreach (var item in GameDirectores)
                 _settingsService.CurrentSettings.GameDirectories.Add(new ApplicationSettings.GamePathPair() { Game = item.GameType, Path = item.Path });
             _settingsService.CurrentSettings.WwisePath = WwisePath;
-
-            // Auto-save & backup settings
-            _settingsService.CurrentSettings.EnableAutoSave = EnableAutoSave;
-            _settingsService.CurrentSettings.AutoSaveIntervalMinutes = AutoSaveIntervalMinutes;
-            _settingsService.CurrentSettings.BackupPath = BackupPath;
-            _settingsService.CurrentSettings.MaxBackupCount = MaxBackupCount;
-
-            // Compression settings
-            _settingsService.CurrentSettings.UseZstdCompression = UseZstdCompression;
 
             var result = _settingsApplier.CompleteSave();
             IsSaved = true;
@@ -462,14 +436,6 @@ namespace AssetEditor.ViewModels
                 WwisePath = dialog.FileName;
         }
 
-        [RelayCommand]
-        private void BrowseBackupPath()
-        {
-            var dialog = new FolderBrowserDialog();
-            dialog.Description = LocalizationManager.Instance.Get("SettingsWindow.BackupPath");
-            if (dialog.ShowDialog() == DialogResult.OK)
-                BackupPath = dialog.SelectedPath;
-        }
     }
 
     class GamePathItem : NotifyPropertyChangedImpl

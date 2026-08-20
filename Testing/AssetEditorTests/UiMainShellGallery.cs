@@ -11,7 +11,6 @@ using AssetEditor.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using NUnit.Framework;
-using Shared.Core.PackFiles;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
@@ -235,9 +234,6 @@ public class UiMainShellGallery
         Action<IEditorDatabase> action)
     {
         var settings = new ApplicationSettingsService();
-        var autoSaveService = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var editorDatabase = new Mock<IEditorDatabase>();
         editorDatabase
             .Setup(database => database.GetViewTypeFromViewModel(
@@ -246,7 +242,6 @@ public class UiMainShellGallery
         using var services = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
             .AddSingleton(settings)
-            .AddSingleton(autoSaveService)
             .BuildServiceProvider();
 
         WpfTestApplicationHost.InvokeWithThemeResources(

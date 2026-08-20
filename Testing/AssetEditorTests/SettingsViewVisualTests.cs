@@ -108,10 +108,7 @@ public class SettingsViewVisualTests
                     localization.Get("SettingsWindow.Timing.SaveRefresh"),
                     localization.Get("SettingsWindow.Timing.NextModelLoad"),
                     localization.Get("SettingsWindow.Timing.GamePath"),
-                    localization.Get("SettingsWindow.Timing.NextAudioCompile"),
-                    localization.Get("SettingsWindow.Timing.SaveImmediate"),
-                    localization.Get("SettingsWindow.Timing.NextBackup"),
-                    localization.Get("SettingsWindow.Timing.NextPackSave")
+                    localization.Get("SettingsWindow.Timing.NextAudioCompile")
                 };
                 var pageTexts = GetDescendants<TextBlock>(view)
                     .Select(textBlock => textBlock.Text)
@@ -188,8 +185,7 @@ public class SettingsViewVisualTests
                             localization.Get("SettingsWindow.General"),
                             localization.Get("SettingsWindow.ThemeCategory"),
                             localization.Get("SettingsWindow.Rendering"),
-                            localization.Get("SettingsWindow.Audio"),
-                            localization.Get("SettingsWindow.Save")
+                            localization.Get("SettingsWindow.Audio")
                         }));
                     NUnitAssert.That(colourPickers, Has.Count.EqualTo(2));
                     NUnitAssert.That(lighting.IsExpanded, Is.False);
@@ -243,7 +239,7 @@ public class SettingsViewVisualTests
 
                 NUnitAssert.Multiple(() =>
                 {
-                    NUnitAssert.That(pages, Has.Count.EqualTo(5));
+                    NUnitAssert.That(pages, Has.Count.EqualTo(4));
                     NUnitAssert.That(
                         pages.Select(page => page.HorizontalAlignment),
                         Has.All.EqualTo(HorizontalAlignment.Left));
@@ -253,7 +249,7 @@ public class SettingsViewVisualTests
                     NUnitAssert.That(
                         pages.Select(page => page.Margin),
                         Has.All.EqualTo(new Thickness(12, 10, 12, 10)));
-                    NUnitAssert.That(pageScrollViewers, Has.Count.EqualTo(5));
+                    NUnitAssert.That(pageScrollViewers, Has.Count.EqualTo(4));
                     NUnitAssert.That(
                         pageScrollViewers.Select(item =>
                             item.HorizontalContentAlignment),

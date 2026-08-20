@@ -5,7 +5,6 @@ using AssetEditor.ViewModels;
 using AssetEditor.Views.Settings;
 using Moq;
 using NUnit.Framework;
-using Shared.Core.PackFiles;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -22,38 +21,27 @@ public class OpenSettingsDialogCommandTests
     public void Execute_WhenSettingsWindowIsFirstWindow_ShowsWithoutSelfOwnerException()
     {
         var settings = new ApplicationSettingsService();
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var viewModel = new SettingsViewModel(
             settings,
             new ApplicationSettingsApplier(
                 settings,
-                autoSave,
                 new TestEventHub()),
             Mock.Of<IStandardDialogs>());
 
-        try
-        {
-            WpfTestApplicationHost.InvokeWithThemeResources(
-                Mock.Of<IServiceProvider>(),
-                () =>
-                {
-                    Application.Current.MainWindow = null;
-                    using var services = new SettingsServiceProvider(viewModel);
-                    var command = new OpenSettingsDialogCommand(services);
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            Mock.Of<IServiceProvider>(),
+            () =>
+            {
+                Application.Current.MainWindow = null;
+                using var services = new SettingsServiceProvider(viewModel);
+                var command = new OpenSettingsDialogCommand(services);
 
-                    NUnitAssert.That(
-                        Application.Current.MainWindow,
-                        Is.Null);
-                    NUnitAssert.DoesNotThrow(command.Execute);
-                    NUnitAssert.That(services.WasShown, Is.True);
-                });
-        }
-        finally
-        {
-            autoSave.Stop();
-        }
+                NUnitAssert.That(
+                    Application.Current.MainWindow,
+                    Is.Null);
+                NUnitAssert.DoesNotThrow(command.Execute);
+                NUnitAssert.That(services.WasShown, Is.True);
+            });
     }
 
     private sealed class SettingsServiceProvider : IServiceProvider, IDisposable

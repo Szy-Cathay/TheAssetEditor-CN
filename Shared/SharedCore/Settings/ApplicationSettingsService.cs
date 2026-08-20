@@ -49,15 +49,6 @@ namespace Shared.Core.Settings
         public string AppFontWeight { get; set; } = "Regular";
         public string CustomBackgroundColour { get; set; } = "50,50,50";
 
-        // Auto-save & backup settings
-        public bool EnableAutoSave { get; set; } = false;
-        public int AutoSaveIntervalMinutes { get; set; } = 5;
-        public string BackupPath { get; set; } = "";
-        public int MaxBackupCount { get; set; } = 10;
-
-        // Compression settings
-        public bool UseZstdCompression { get; set; } = true;
-
         public ApplicationSettings()
         {
 
