@@ -2,7 +2,9 @@ using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.AudioEditor.Presentation.Settings;
+using Editors.Audio.DialogueEventMerger;
 using Editors.Audio.Shared.Storage;
+using Editors.Audio.Shared.Wwise.Generators;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Ui.Common.OperationProgress;
@@ -545,6 +547,110 @@ public class OperationProgressViewTests
     }
 
     [Test]
+    public async Task DialogueMerger_GenerationFailure_ClosesProgressBeforeErrorDialog()
+    {
+        var localization = new LocalizationManager();
+        localization.LoadLanguage();
+        var repository = new Mock<IAudioRepository>();
+        repository
+            .Setup(value => value.LoadDialogueEventMergerData(
+                "for_merging",
+                It.IsAny<IProgress<AudioLoadProgress>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(
+            [
+                @"audio\wwise\chinese\test_for_merging.bnk",
+            ]);
+        var generation = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var generator = new Mock<ISoundBankGeneratorService>();
+        generator
+            .Setup(value => value.GenerateMergedDialogueEventSoundBanksAsync(
+                It.IsAny<List<string>>(),
+                "ui_probe",
+                It.IsAny<CancellationToken>()))
+            .Returns(generation.Task);
+        var progressWindowsAtError = -1;
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs
+            .Setup(value => value.ShowDialogBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Callback(() => progressWindowsAtError =
+                Application.Current.Windows
+                    .OfType<OperationProgressWindow>()
+                    .Count());
+        var viewModel = new DialogueEventMergerViewModel(
+            repository.Object,
+            generator.Object,
+            dialogs.Object);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SoundBankSuffix = "ui_probe";
+
+        InvokeWithWpfApplication(() =>
+        {
+            Application.Current.Resources["InvBoolConverter"] =
+                new Shared.Ui.Common.ValueConverters
+                    .InverseBooleanConverter();
+            var window = new DialogueEventMergerWindow
+            {
+                DataContext = viewModel,
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                Left = -10000,
+                Top = -10000,
+            };
+            Task? generationTask = null;
+            try
+            {
+                window.Show();
+                generationTask =
+                    viewModel.GenerateMergedDialogueEventSoundBankAsync(
+                        CancellationToken.None);
+                PumpDispatcher(TimeSpan.FromMilliseconds(650));
+
+                Assert.That(
+                    Application.Current.Windows
+                        .OfType<OperationProgressWindow>(),
+                    Has.Exactly(1).Items,
+                    "The failure path was not tested with a visible progress window.");
+
+                generation.SetException(
+                    new InvalidOperationException(
+                        "No editable Pack was selected."));
+                PumpDispatcher(TimeSpan.FromMilliseconds(400));
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(
+                        generationTask.IsCompletedSuccessfully,
+                        Is.True);
+                    Assert.That(progressWindowsAtError, Is.Zero);
+                    Assert.That(viewModel.IsBusy, Is.False);
+                });
+            }
+            finally
+            {
+                generation.TrySetCanceled();
+                foreach (var progressWindow in Application.Current.Windows
+                             .OfType<OperationProgressWindow>()
+                             .ToArray())
+                {
+                    progressWindow.Complete();
+                }
+
+                window.Close();
+            }
+        });
+
+        dialogs.Verify(
+            value => value.ShowDialogBox(
+                It.IsAny<string>(),
+                It.IsAny<string>()),
+            Times.Once);
+    }
+
+    [Test]
     public void EmbeddedProgress_DelaysShowAndKeepsVisibleBriefly()
     {
         InvokeWithWpfApplication(() =>
@@ -758,11 +864,11 @@ public class OperationProgressViewTests
             Assert.That(
                 dialogueMerger,
                 Does.Contain(
-                    "IsOperationActive=\"{Binding IsGenerating}\""));
+                    "IsOperationActive=\"{Binding IsBusy}\""));
             Assert.That(
                 dialogueMerger,
                 Does.Contain(
-                    "Binding=\"{Binding IsGenerating}\" Value=\"True\""));
+                    "Binding=\"{Binding IsBusy}\" Value=\"True\""));
             Assert.That(
                 audioEditor,
                 Does.Contain(

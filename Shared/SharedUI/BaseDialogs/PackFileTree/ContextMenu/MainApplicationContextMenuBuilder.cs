@@ -92,6 +92,15 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
                 Add<ClosePackContainerFileCommand>(selectedNode, rootNode);
                 AddSeperator(rootNode);
 
+                if (selectedNode.FileOwner is FolderProjectContainer &&
+                    !isCurrentProject)
+                {
+                    Add<SetAsEditableFolderProjectCommand>(
+                        selectedNode,
+                        rootNode);
+                    AddSeperator(rootNode);
+                }
+
                 if (isCurrentProject)
                 {
                     Add<SavePackFileContainerCommand>(selectedNode, rootNode);

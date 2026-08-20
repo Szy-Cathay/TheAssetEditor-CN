@@ -68,6 +68,45 @@ namespace Test.Shared.Core.PackFiles
         }
 
         [Test]
+        public void GetFullPath_WhenEarlierFolderProjectDoesNotOwnFile_ContinuesToOwningProject()
+        {
+            var firstRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"ae-path-first-{Guid.NewGuid():N}");
+            var secondRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"ae-path-second-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(firstRoot);
+            Directory.CreateDirectory(secondRoot);
+            const string relativePath =
+                "event_data__surtr_arts_fighter.dat";
+            File.WriteAllBytes(
+                Path.Combine(secondRoot, relativePath),
+                [1]);
+
+            try
+            {
+                using var first = FolderProjectContainer.Create(
+                    firstRoot,
+                    new FolderProjectSettings { Name = "工程一" });
+                using var second = FolderProjectContainer.Create(
+                    secondRoot,
+                    new FolderProjectSettings { Name = "工程二" });
+                var requested = second.FileList[relativePath];
+                var service = CreateService(first, second);
+
+                Assert.That(
+                    service.GetFullPath(requested),
+                    Is.EqualTo(relativePath));
+            }
+            finally
+            {
+                Directory.Delete(firstRoot, true);
+                Directory.Delete(secondRoot, true);
+            }
+        }
+
+        [Test]
         public void GetFullPath_WhenDetachedObjectSharesBasenameWithStoredFile_Throws()
         {
             var stored = PackFile.CreateFromBytes("shared.bin", [1]);

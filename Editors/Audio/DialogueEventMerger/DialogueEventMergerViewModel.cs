@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.Audio.Shared.AudioProject;
-using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Editors.Audio.Shared.Storage;
 using Editors.Audio.Shared.Wwise.Generators;
 using Serilog;
@@ -27,6 +26,8 @@ namespace Editors.Audio.DialogueEventMerger
         private readonly ILogger _logger =
             Logging.Create<DialogueEventMergerViewModel>();
         private Action _closeAction;
+        private Func<Task> _completeProgressAction =
+            () => Task.CompletedTask;
 
         [ObservableProperty] private string _soundBankSuffix;
         [ObservableProperty] private bool _isSoundBankSuffixSet;
@@ -93,23 +94,26 @@ namespace Editors.Audio.DialogueEventMerger
                     ProgressMaximum = value.Total;
                     ProgressIsIndeterminate = value.Total <= 0;
                 });
-                var loadWasCancelled = await Task.Run(() =>
+                var loadResult = await Task.Run(() =>
                 {
                     try
                     {
-                        _audioRepository.Load(
-                            Wh3LanguageInformation.GetAllLanguages(),
-                            progress,
-                            cancellationToken);
-                        return false;
+                        var soundBanks = _audioRepository
+                            .LoadDialogueEventMergerData(
+                                "for_merging",
+                                progress,
+                                cancellationToken);
+                        return (Cancelled: false, SoundBanks: soundBanks);
                     }
                     catch (OperationCanceledException)
                         when (cancellationToken.IsCancellationRequested)
                     {
-                        return true;
+                        return (
+                            Cancelled: true,
+                            SoundBanks: new System.Collections.Generic.List<string>());
                     }
                 });
-                if (loadWasCancelled ||
+                if (loadResult.Cancelled ||
                     cancellationToken.IsCancellationRequested)
                 {
                     LoadStatus = LocalizationManager.Instance.Get(
@@ -117,8 +121,7 @@ namespace Editors.Audio.DialogueEventMerger
                     return;
                 }
 
-                foreach (var path in _audioRepository
-                             .GetModdedSoundBankFilePaths("for_merging"))
+                foreach (var path in loadResult.SoundBanks)
                 {
                     ModdedSoundBanks.Add(
                         new ModdedSoundBank(path, isChecked: true));
@@ -138,13 +141,9 @@ namespace Editors.Audio.DialogueEventMerger
             }
             catch (Exception exception)
             {
-                LoadStatus = LocalizationManager.Instance.Get(
-                    "DialogueEventMerger.LoadFailed");
-                _standardDialogs.ShowDialogBox(
-                    LocalizationManager.Instance.GetFormat(
-                        "DialogueEventMerger.LoadFailed.Detail",
-                        exception.Message),
-                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                LoadStatus = LocalizationManager.Instance.GetFormat(
+                    "DialogueEventMerger.LoadFailed.Detail",
+                    exception.Message);
             }
             finally
             {
@@ -242,6 +241,7 @@ namespace Editors.Audio.DialogueEventMerger
             ProgressValue = 0;
             ProgressMaximum = 0;
             ProgressIsIndeterminate = true;
+            Exception generationException = null;
             try
             {
                 var progress = new Progress<AudioOperationProgress>(
@@ -272,15 +272,21 @@ namespace Editors.Audio.DialogueEventMerger
             }
             catch (Exception exception)
             {
-                _standardDialogs.ShowDialogBox(
-                    LocalizationManager.Instance.GetFormat(
-                        "DialogueEventMerger.GenerateFailed",
-                        exception.Message),
-                    LocalizationManager.Instance.Get("Msg.GeneralError"));
+                generationException = exception;
             }
             finally
             {
                 IsGenerating = false;
+            }
+
+            if (generationException != null)
+            {
+                await _completeProgressAction();
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "DialogueEventMerger.GenerateFailed",
+                        generationException.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
             }
         }
 
@@ -326,5 +332,9 @@ namespace Editors.Audio.DialogueEventMerger
         [RelayCommand] public void CloseWindowAction() => _closeAction?.Invoke();
 
         public void SetCloseAction(Action closeAction) => _closeAction = closeAction;
+
+        public void SetProgressCompletionAction(
+            Func<Task> completeProgressAction) =>
+            _completeProgressAction = completeProgressAction;
     }
 }

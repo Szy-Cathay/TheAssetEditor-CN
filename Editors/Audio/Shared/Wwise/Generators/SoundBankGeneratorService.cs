@@ -214,11 +214,15 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 soundBankSuffix,
                 0,
                 moddedSoundBanks.Count));
-            if (!_audioEditorIntegrityService
-                    .CheckMergingSoundBanksIdIntegrity(moddedSoundBanks))
-            {
-                return false;
-            }
+            var integrityError = await Task.Run(
+                () => _audioEditorIntegrityService
+                    .GetMergingSoundBanksIntegrityError(
+                        moddedSoundBanks,
+                        cancellationToken),
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (integrityError != null)
+                throw new InvalidDataException(integrityError);
 
             progress?.Report(new AudioOperationProgress(
                 "AudioOperation.Merge.Analysing",
@@ -284,6 +288,11 @@ namespace Editors.Audio.Shared.Wwise.Generators
                         .Select(dialogueEventName => Wh3DialogueEventInformation.GetSoundBank(dialogueEventName))
                         .Distinct()
                         .ToList());
+            var expectedTargets = soundBanksToGenerateByLanguage
+                .SelectMany(languageEntry => languageEntry.Value.Select(
+                    soundBank => (languageEntry.Key, soundBank)))
+                .ToHashSet();
+            var generatedTargets = new HashSet<(string, Wh3SoundBank)>();
 
             foreach (var bnkByLanguage in vanillaDialogueEventsByBnkByLanguage)
             {
@@ -300,6 +309,12 @@ namespace Editors.Audio.Shared.Wwise.Generators
                     var currentSoundBank = Wh3DialogueEventInformation.GetSoundBank(firstDialogueEventName);
                     if (!soundBanksToGenerate.Contains(currentSoundBank))
                         continue;
+                    if (!generatedTargets.Add((language, currentSoundBank)))
+                    {
+                        throw new InvalidDataException(
+                            LocalizationManager.Instance.Get(
+                                "DialogueEventMerger.IncompleteOutput"));
+                    }
 
                     _logger.Here().Information($"Merging SoundBanks for language {language}");
 
@@ -312,6 +327,57 @@ namespace Editors.Audio.Shared.Wwise.Generators
                             soundBankSuffix,
                             cancellationToken));
                 }
+            }
+
+            if (!generatedTargets.SetEquals(expectedTargets))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+
+            var selectedSoundBanks = new HashSet<string>(
+                moddedSoundBanks,
+                StringComparer.OrdinalIgnoreCase);
+            var universalOutputSoundBanks = moddedDialogueEventsByLanguage
+                .Values
+                .SelectMany(hircItems => hircItems)
+                .Where(hircItem => selectedSoundBanks.Contains(
+                    hircItem.BnkFilePath))
+                .GroupBy(hircItem => Wh3DialogueEventInformation
+                    .GetSoundBank(_audioRepository.GetNameFromId(
+                        hircItem.Id)))
+                .Where(group => group
+                    .Select(hircItem => hircItem.BnkFilePath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .All(bankPath => DialogueEventMergerBankScopeResolver
+                        .Resolve(bankPath).Kind ==
+                        DialogueEventMergerBankScopeKind.AllVoiceLanguages))
+                .Select(group => group.Key)
+                .ToList();
+            var englishLanguage = Wh3LanguageInformation
+                .GetLanguageAsString(Wh3Language.EnglishUK);
+            foreach (var soundBank in universalOutputSoundBanks)
+            {
+                var soundBankName = Wh3SoundBankInformation.GetName(soundBank);
+                var fileName = $"{soundBankName}_0_{soundBankSuffix}.bnk";
+                var englishOutputPath =
+                    $"audio\\wwise\\{englishLanguage}\\{fileName}";
+                var englishOutput = outputs.SingleOrDefault(output =>
+                    output.FilePath.Equals(
+                        englishOutputPath,
+                        StringComparison.OrdinalIgnoreCase));
+                if (englishOutput == null)
+                {
+                    throw new InvalidDataException(
+                        LocalizationManager.Instance.Get(
+                            "DialogueEventMerger.IncompleteOutput"));
+                }
+
+                outputs.Add(new AudioPackOutput(
+                    fileName,
+                    $"audio\\wwise\\{fileName}",
+                    englishOutput.Data));
             }
 
             return outputs;
@@ -508,6 +574,7 @@ namespace Editors.Audio.Shared.Wwise.Generators
             CancellationToken cancellationToken)
         {
             var dialogueEvents = new List<HircItem>();
+            var targetHircsById = new Dictionary<uint, HircItem>();
 
             var soundBankNameBase = Wh3SoundBankInformation.GetName(currentSoundBank);
             var soundBankNameWithoutExtension = $"{soundBankNameBase}_0_{soundBankSuffix}";
@@ -542,13 +609,17 @@ namespace Editors.Audio.Shared.Wwise.Generators
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     _logger.Here().Information($"Merging decision tree from {Path.GetFileName(moddedDialogueEventHirc.BnkFilePath)}");
+                    AddDialogueTargetHircs(
+                        moddedDialogueEventHirc,
+                        targetHircsById,
+                        cancellationToken);
 
                     var currentDecisionTree = mergedDialogueEvent.AkDecisionTree as AkDecisionTree_V136;
                     var moddedDialogueEvent = moddedDialogueEventHirc as CAkDialogueEvent_V136;
                     var moddedDecisionTree = moddedDialogueEvent.AkDecisionTree as AkDecisionTree_V136;
 
                     var mergedDecisionTree = new AkDecisionTree_V136();
-                    mergedDecisionTree.DecisionTree = AkDecisionTree_V136.MergeDecisionTrees(currentDecisionTree.DecisionTree, moddedDecisionTree.DecisionTree);
+                    mergedDecisionTree.DecisionTree = AkDecisionTree_V136.MergeDecisionTrees(moddedDecisionTree.DecisionTree, currentDecisionTree.DecisionTree);
                     mergedDecisionTree.Nodes = AkDecisionTree_V136.FlattenDecisionTree(mergedDecisionTree.DecisionTree);
 
                     mergedDialogueEvent.AkDecisionTree = mergedDecisionTree;
@@ -560,13 +631,177 @@ namespace Editors.Audio.Shared.Wwise.Generators
             }
 
             SortHircs(dialogueEvents);
+            var hircItems = OrderTargetHircs(
+                    targetHircsById,
+                    cancellationToken)
+                .Concat(dialogueEvents)
+                .ToList();
 
             return WriteSoundBank(
                 soundBankId,
                 languageId,
                 soundBankFileName,
                 soundBankFilePath,
-                dialogueEvents);
+                hircItems);
+        }
+
+        private void AddDialogueTargetHircs(
+            HircItem dialogueEventHirc,
+            Dictionary<uint, HircItem> targetHircsById,
+            CancellationToken cancellationToken)
+        {
+            var dialogueEvent = (ICAkDialogueEvent)dialogueEventHirc;
+            foreach (var targetId in GetDialogueTargetIds(
+                         dialogueEvent.AkDecisionTree.GetDecisionTree()))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                AddReachableTargetHirc(
+                    targetId,
+                    dialogueEventHirc.BnkFilePath,
+                    targetHircsById,
+                    [],
+                    cancellationToken);
+            }
+        }
+
+        private void AddReachableTargetHirc(
+            uint hircId,
+            string soundBankPath,
+            Dictionary<uint, HircItem> targetHircsById,
+            HashSet<uint> visitingIds,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (visitingIds.Contains(hircId))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+            if (targetHircsById.ContainsKey(hircId))
+                return;
+
+            visitingIds.Add(hircId);
+
+            var targetHirc = _audioRepository
+                .GetHircs(hircId, soundBankPath)
+                .FirstOrDefault(hircItem =>
+                    hircItem is not ICAkDialogueEvent);
+            if (targetHirc == null)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+            if (targetHirc is not ICAkSound &&
+                targetHirc is not ICAkRanSeqCntr)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+            if (targetHirc is ICAkSound sound &&
+                sound.GetStreamType() != AKBKSourceType.Streaming)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "DialogueEventMerger.IncompleteOutput"));
+            }
+
+            targetHircsById[hircId] = targetHirc;
+            if (targetHirc is ICAkRanSeqCntr randomSequenceContainer)
+            {
+                foreach (var childId in randomSequenceContainer
+                             .GetChildren()
+                             .OrderBy(id => id))
+                {
+                    AddReachableTargetHirc(
+                        childId,
+                        soundBankPath,
+                        targetHircsById,
+                        visitingIds,
+                        cancellationToken);
+                }
+            }
+
+            visitingIds.Remove(hircId);
+        }
+
+        private static List<HircItem> OrderTargetHircs(
+            IReadOnlyDictionary<uint, HircItem> targetHircsById,
+            CancellationToken cancellationToken)
+        {
+            var orderedHircs = new List<HircItem>(targetHircsById.Count);
+            var addedIds = new HashSet<uint>();
+            foreach (var hircItem in targetHircsById.Values
+                         .OrderBy(item => item.Id))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                AddOrderedTargetHirc(
+                    hircItem,
+                    targetHircsById,
+                    addedIds,
+                    orderedHircs,
+                    cancellationToken);
+            }
+
+            return orderedHircs;
+        }
+
+        private static void AddOrderedTargetHirc(
+            HircItem hircItem,
+            IReadOnlyDictionary<uint, HircItem> targetHircsById,
+            HashSet<uint> addedIds,
+            List<HircItem> orderedHircs,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (addedIds.Contains(hircItem.Id))
+                return;
+            if (hircItem is ICAkRanSeqCntr randomSequenceContainer)
+            {
+                foreach (var childId in randomSequenceContainer
+                             .GetChildren()
+                             .OrderBy(id => id))
+                {
+                    if (targetHircsById.TryGetValue(
+                            childId,
+                            out var childHirc))
+                    {
+                        AddOrderedTargetHirc(
+                            childHirc,
+                            targetHircsById,
+                            addedIds,
+                            orderedHircs,
+                            cancellationToken);
+                    }
+                }
+            }
+
+            if (addedIds.Add(hircItem.Id))
+                orderedHircs.Add(hircItem);
+        }
+
+        private static IEnumerable<uint> GetDialogueTargetIds(
+            ICAkDialogueEvent.IAkDecisionNode node)
+        {
+            if (node.GetChildrenCount() == 0)
+            {
+                if (node.GetAudioNodeId() != 0)
+                    yield return node.GetAudioNodeId();
+                yield break;
+            }
+
+            for (var index = 0;
+                 index < node.GetChildrenCount();
+                 index++)
+            {
+                foreach (var targetId in GetDialogueTargetIds(
+                             node.GetChildAtIndex(index)))
+                {
+                    yield return targetId;
+                }
+            }
         }
 
         private static void SortHircs(List<HircItem> hircItems)

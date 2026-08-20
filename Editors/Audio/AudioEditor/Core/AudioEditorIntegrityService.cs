@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Windows;
 using Editors.Audio.Shared.AudioProject.Compiler;
 using Editors.Audio.Shared.AudioProject.Models;
@@ -9,7 +11,9 @@ using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Editors.Audio.Shared.Storage;
 using Editors.Audio.Shared.Wwise;
 using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using Shared.GameFormats.Wwise.Enums;
 using Shared.GameFormats.Wwise.Hirc;
 
 namespace Editors.Audio.AudioEditor.Core
@@ -22,11 +26,14 @@ namespace Editors.Audio.AudioEditor.Core
         void CheckAudioProjectDialogueEventIntegrity(AudioProjectFile audioProject);
         void CheckAudioProjectWavFilesIntegrity(AudioProjectFile audioProject);
         void CheckAudioProjectDataIntegrity(AudioProjectFile audioProject, string audioProjectNameWithoutExtension);
-        bool CheckMergingSoundBanksIdIntegrity(
-            List<string> selectedModdedSoundBanks);
+        string GetMergingSoundBanksIntegrityError(
+            List<string> selectedModdedSoundBanks,
+            CancellationToken cancellationToken);
     }
 
-    public class AudioEditorIntegrityService(IPackFileService packFileService, IAudioRepository audioRepository) : IAudioEditorIntegrityService
+    public class AudioEditorIntegrityService(
+        IPackFileService packFileService,
+        IAudioRepository audioRepository) : IAudioEditorIntegrityService
     {
         private readonly IPackFileService _packFileService = packFileService;
         private readonly IAudioRepository _audioRepository = audioRepository;
@@ -522,21 +529,33 @@ namespace Editors.Audio.AudioEditor.Core
                 throw new InvalidOperationException("AudioFile.SoundReferences should not be empty.");
         }
 
-        public bool CheckMergingSoundBanksIdIntegrity(
-            List<string> selectedModdedSoundBanks)
+        public string GetMergingSoundBanksIntegrityError(
+            List<string> selectedModdedSoundBanks,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var moddedHircsByBnkByLanguage = _audioRepository.GetModdedHircsByBnkByLanguage();
             var selectedSoundBanks = new HashSet<string>(
                 selectedModdedSoundBanks,
                 StringComparer.OrdinalIgnoreCase);
 
             var hasClashes = false;
+            var wemHashByPackFile = new Dictionary<PackFile, string>(
+                ReferenceEqualityComparer.Instance);
+            var hircHashByHirc = new Dictionary<HircItem, string>(
+                ReferenceEqualityComparer.Instance);
+            var sourceHashByHirc = new Dictionary<HircItem, string>(
+                ReferenceEqualityComparer.Instance);
+            var dialogueIndexByEvent =
+                new Dictionary<ICAkDialogueEvent, DialogueEventIndex>(
+                    ReferenceEqualityComparer.Instance);
             var messageBuilder = new StringBuilder()
                 .AppendLine(LocalizationManager.Instance.Get("Msg.MergingSoundBanksIdIntegrityFailed"))
                 .AppendLine();
 
             foreach (var languageEntry in moddedHircsByBnkByLanguage)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var languageName = languageEntry.Key;
                 var hircsByBnkDictionary = languageEntry.Value
                     .Where(entry => selectedSoundBanks.Contains(entry.Key))
@@ -553,6 +572,7 @@ namespace Editors.Audio.AudioEditor.Core
 
                 foreach (var bnkEntry in hircsByBnkDictionary)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var bnkName = bnkEntry.Key;
 
                     if (!idsByBnk.TryGetValue(bnkName, out var idSet))
@@ -569,6 +589,7 @@ namespace Editors.Audio.AudioEditor.Core
 
                     foreach (var hirc in bnkEntry.Value)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (hirc is ICAkDialogueEvent)
                             continue;
 
@@ -603,14 +624,36 @@ namespace Editors.Audio.AudioEditor.Core
                 }
 
                 var clashingIdsById = bnksById
-                    .Where(pair => pair.Value.Count > 1)
+                    .Where(pair =>
+                        pair.Value.Count > 1 &&
+                        !SoundBanksUseIdenticalHirc(
+                            pair.Key,
+                            pair.Value,
+                            hircsByBnkDictionary,
+                            hircHashByHirc,
+                            cancellationToken))
                     .ToDictionary(pair => pair.Key, pair => pair.Value);
 
                 var clashingSourceIdsById = bnksBySourceId
-                    .Where(pair => pair.Value.Count > 1)
+                    .Where(pair =>
+                        pair.Value.Count > 1 &&
+                        !SoundBanksUseIdenticalSource(
+                            pair.Key,
+                            pair.Value,
+                            hircsByBnkDictionary,
+                            wemHashByPackFile,
+                            sourceHashByHirc,
+                            cancellationToken))
                     .ToDictionary(pair => pair.Key, pair => pair.Value);
+                var conflictingDialogueEventsById =
+                    FindConflictingDialogueEvents(
+                        hircsByBnkDictionary,
+                        dialogueIndexByEvent,
+                        cancellationToken);
 
-                if (clashingIdsById.Count == 0 && clashingSourceIdsById.Count == 0)
+                if (clashingIdsById.Count == 0 &&
+                    clashingSourceIdsById.Count == 0 &&
+                    conflictingDialogueEventsById.Count == 0)
                     continue;
 
                 hasClashes = true;
@@ -619,18 +662,28 @@ namespace Editors.Audio.AudioEditor.Core
                 var conflictingBnks = clashingIdsById.Values
                     .SelectMany(bnkNames => bnkNames)
                     .Concat(clashingSourceIdsById.Values.SelectMany(bnkNames => bnkNames))
+                    .Concat(conflictingDialogueEventsById.Values
+                        .SelectMany(bnkNames => bnkNames))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var conflictingBnk in conflictingBnks)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     messageBuilder.AppendLine(conflictingBnk);
+                }
 
                 messageBuilder.AppendLine();
 
                 foreach (var sourceBnk in idsByBnk.Keys
                              .Union(sourceIdsByBnk.Keys, StringComparer.OrdinalIgnoreCase)
+                             .Union(
+                                 conflictingDialogueEventsById.Values
+                                     .SelectMany(bnkNames => bnkNames),
+                                 StringComparer.OrdinalIgnoreCase)
                              .OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var anyConflicts = false;
 
                     if (idsByBnk.TryGetValue(sourceBnk, out var idsFromThisBnk))
@@ -641,6 +694,7 @@ namespace Editors.Audio.AudioEditor.Core
 
                         foreach (var id in conflictingIdsFromThisBnk)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             anyConflicts = true;
                             var otherBnks = clashingIdsById[id]
                                 .Where(other => !string.Equals(other, sourceBnk, StringComparison.OrdinalIgnoreCase))
@@ -661,6 +715,7 @@ namespace Editors.Audio.AudioEditor.Core
 
                         foreach (var sourceId in conflictingSourceIdsFromThisBnk)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             anyConflicts = true;
                             var otherBnks = clashingSourceIdsById[sourceId]
                                 .Where(other => !string.Equals(other, sourceBnk, StringComparison.OrdinalIgnoreCase))
@@ -673,6 +728,28 @@ namespace Editors.Audio.AudioEditor.Core
                         }
                     }
 
+                    foreach (var dialogueConflict in
+                             conflictingDialogueEventsById
+                                 .Where(entry => entry.Value.Contains(sourceBnk))
+                                 .OrderBy(entry => entry.Key))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        anyConflicts = true;
+                        var otherBnks = dialogueConflict.Value
+                            .Where(other => !string.Equals(
+                                other,
+                                sourceBnk,
+                                StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(
+                                name => name,
+                                StringComparer.OrdinalIgnoreCase);
+                        messageBuilder.AppendLine(
+                            LocalizationManager.Instance.GetFormat(
+                                "Msg.DialogueEventConflict",
+                                dialogueConflict.Key,
+                                string.Join(", ", otherBnks)));
+                    }
+
                     if (anyConflicts)
                         messageBuilder.AppendLine();
                 }
@@ -680,10 +757,536 @@ namespace Editors.Audio.AudioEditor.Core
                 messageBuilder.AppendLine();
             }
 
-            if (hasClashes)
-                MessageBox.Show(messageBuilder.ToString(), LocalizationManager.Instance.Get("Msg.GeneralError"));
+            return hasClashes ? messageBuilder.ToString() : null;
+        }
 
-            return !hasClashes;
+        private static bool SoundBanksUseIdenticalHirc(
+            uint hircId,
+            IEnumerable<string> soundBankPaths,
+            IReadOnlyDictionary<string, List<HircItem>> hircsBySoundBank,
+            Dictionary<HircItem, string> hircHashByHirc,
+            CancellationToken cancellationToken)
+        {
+            var hircs = soundBankPaths
+                .SelectMany(soundBankPath => hircsBySoundBank[soundBankPath]
+                    .Where(hirc =>
+                        hirc.Id == hircId &&
+                        hirc is not ICAkDialogueEvent))
+                .ToList();
+            if (hircs.Count < 2)
+                return false;
+
+            string expectedHash = null;
+            foreach (var hirc in hircs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryGetHircHash(hirc, hircHashByHirc, out var hash))
+                    return false;
+
+                if (expectedHash == null)
+                    expectedHash = hash;
+                else if (!string.Equals(
+                             expectedHash,
+                             hash,
+                             StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryGetHircHash(
+            HircItem hirc,
+            Dictionary<HircItem, string> hircHashByHirc,
+            out string hash)
+        {
+            if (hircHashByHirc.TryGetValue(hirc, out hash))
+                return true;
+
+            var originalSectionSize = hirc.SectionSize;
+            try
+            {
+                hirc.UpdateSectionSize();
+                hash = Convert.ToHexString(
+                    SHA256.HashData(hirc.WriteData()));
+                hircHashByHirc[hirc] = hash;
+                return true;
+            }
+            catch (Exception)
+            {
+                hash = null;
+                return false;
+            }
+            finally
+            {
+                hirc.SectionSize = originalSectionSize;
+            }
+        }
+
+        private static Dictionary<uint, HashSet<string>>
+            FindConflictingDialogueEvents(
+                IReadOnlyDictionary<string, List<HircItem>>
+                    hircsBySoundBank,
+                Dictionary<ICAkDialogueEvent, DialogueEventIndex>
+                    dialogueIndexByEvent,
+                CancellationToken cancellationToken)
+        {
+            var dialogueEventsById = hircsBySoundBank
+                .SelectMany(soundBankEntry => soundBankEntry.Value
+                    .OfType<ICAkDialogueEvent>()
+                    .Select(dialogueEvent => (
+                        SoundBankPath: soundBankEntry.Key,
+                        Hirc: (HircItem)dialogueEvent,
+                        DialogueEvent: dialogueEvent)))
+                .GroupBy(entry => entry.Hirc.Id);
+            var conflicts = new Dictionary<uint, HashSet<string>>();
+
+            foreach (var dialogueEventGroup in dialogueEventsById)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var entries = dialogueEventGroup.ToList();
+                for (var firstIndex = 0;
+                     firstIndex < entries.Count - 1;
+                     firstIndex++)
+                {
+                    for (var secondIndex = firstIndex + 1;
+                         secondIndex < entries.Count;
+                         secondIndex++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var first = entries[firstIndex];
+                        var second = entries[secondIndex];
+                        if (string.Equals(
+                                first.SoundBankPath,
+                                second.SoundBankPath,
+                                StringComparison.OrdinalIgnoreCase) ||
+                            !DialogueEventsConflict(
+                                first.DialogueEvent,
+                                second.DialogueEvent,
+                                dialogueIndexByEvent,
+                                cancellationToken))
+                        {
+                            continue;
+                        }
+
+                        if (!conflicts.TryGetValue(
+                                dialogueEventGroup.Key,
+                                out var conflictingBanks))
+                        {
+                            conflictingBanks = new HashSet<string>(
+                                StringComparer.OrdinalIgnoreCase);
+                            conflicts[dialogueEventGroup.Key] =
+                                conflictingBanks;
+                        }
+
+                        conflictingBanks.Add(first.SoundBankPath);
+                        conflictingBanks.Add(second.SoundBankPath);
+                    }
+                }
+            }
+
+            return conflicts;
+        }
+
+        private static bool DialogueEventsConflict(
+            ICAkDialogueEvent first,
+            ICAkDialogueEvent second,
+            Dictionary<ICAkDialogueEvent, DialogueEventIndex>
+                dialogueIndexByEvent,
+            CancellationToken cancellationToken)
+        {
+            var firstIndex = GetDialogueEventIndex(
+                first,
+                dialogueIndexByEvent,
+                cancellationToken);
+            var secondIndex = GetDialogueEventIndex(
+                second,
+                dialogueIndexByEvent,
+                cancellationToken);
+            if (!firstIndex.Arguments.SequenceEqual(secondIndex.Arguments) ||
+                firstIndex.HasInternalConflict ||
+                secondIndex.HasInternalConflict)
+            {
+                return true;
+            }
+
+            foreach (var secondLeaf in secondIndex.AudioNodeByPath)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (firstIndex.AudioNodeByPath.TryGetValue(
+                        secondLeaf.Key,
+                        out var firstAudioNodeId) &&
+                    firstAudioNodeId != secondLeaf.Value)
+                {
+                    return true;
+                }
+
+                if (firstIndex.ProperLeafPrefixes.Contains(secondLeaf.Key))
+                    return true;
+
+                for (var length = 0;
+                     length < secondLeaf.Key.Length;
+                     length++)
+                {
+                    if (firstIndex.AudioNodeByPath.ContainsKey(
+                            secondLeaf.Key[..length]))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static DialogueEventIndex GetDialogueEventIndex(
+            ICAkDialogueEvent dialogueEvent,
+            Dictionary<ICAkDialogueEvent, DialogueEventIndex>
+                dialogueIndexByEvent,
+            CancellationToken cancellationToken)
+        {
+            if (dialogueIndexByEvent.TryGetValue(
+                    dialogueEvent,
+                    out var cachedIndex))
+            {
+                return cachedIndex;
+            }
+
+            var leaves = new List<DialogueLeaf>();
+            AddDialogueLeaves(
+                dialogueEvent.AkDecisionTree.GetDecisionTree(),
+                [],
+                leaves,
+                isRoot: true,
+                cancellationToken);
+            var audioNodeByPath = new Dictionary<uint[], uint>(
+                DialoguePathComparer.Instance);
+            var properLeafPrefixes = new HashSet<uint[]>(
+                DialoguePathComparer.Instance);
+            var hasInternalConflict = false;
+            foreach (var leaf in leaves)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (audioNodeByPath.TryGetValue(
+                        leaf.Path,
+                        out var existingAudioNodeId) &&
+                    existingAudioNodeId != leaf.AudioNodeId)
+                {
+                    hasInternalConflict = true;
+                }
+                else
+                {
+                    audioNodeByPath[leaf.Path] = leaf.AudioNodeId;
+                }
+
+                for (var length = 0;
+                     length < leaf.Path.Length;
+                     length++)
+                {
+                    properLeafPrefixes.Add(leaf.Path[..length]);
+                }
+            }
+
+            var index = new DialogueEventIndex(
+                dialogueEvent.Arguments
+                    .Select(argument => (
+                        argument.GroupId,
+                        argument.GroupType))
+                    .ToList(),
+                audioNodeByPath,
+                properLeafPrefixes,
+                hasInternalConflict);
+            dialogueIndexByEvent[dialogueEvent] = index;
+            return index;
+        }
+
+        private static void AddDialogueLeaves(
+            ICAkDialogueEvent.IAkDecisionNode node,
+            List<uint> path,
+            List<DialogueLeaf> leaves,
+            bool isRoot,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (node == null)
+                return;
+
+            if (!isRoot)
+                path.Add(node.GetKey());
+
+            if (node.GetChildrenCount() == 0)
+            {
+                leaves.Add(new DialogueLeaf(
+                    path.ToArray(),
+                    node.GetAudioNodeId()));
+            }
+            else
+            {
+                for (var index = 0;
+                     index < node.GetChildrenCount();
+                     index++)
+                {
+                    AddDialogueLeaves(
+                        node.GetChildAtIndex(index),
+                        path,
+                        leaves,
+                        isRoot: false,
+                        cancellationToken);
+                }
+            }
+
+            if (!isRoot)
+                path.RemoveAt(path.Count - 1);
+        }
+
+        private sealed record DialogueLeaf(
+            uint[] Path,
+            uint AudioNodeId);
+
+        private sealed record DialogueEventIndex(
+            List<(uint GroupId, AkGroupType GroupType)> Arguments,
+            Dictionary<uint[], uint> AudioNodeByPath,
+            HashSet<uint[]> ProperLeafPrefixes,
+            bool HasInternalConflict);
+
+        private sealed class DialoguePathComparer : IEqualityComparer<uint[]>
+        {
+            public static DialoguePathComparer Instance { get; } = new();
+
+            public bool Equals(uint[] first, uint[] second) =>
+                ReferenceEquals(first, second) ||
+                first != null &&
+                second != null &&
+                first.AsSpan().SequenceEqual(second);
+
+            public int GetHashCode(uint[] path)
+            {
+                var hash = new HashCode();
+                foreach (var value in path)
+                    hash.Add(value);
+                return hash.ToHashCode();
+            }
+        }
+
+        private bool SoundBanksUseIdenticalSource(
+            uint sourceId,
+            IEnumerable<string> soundBankPaths,
+            IReadOnlyDictionary<string, List<HircItem>> hircsBySoundBank,
+            Dictionary<PackFile, string> wemHashByPackFile,
+            Dictionary<HircItem, string> sourceHashByHirc,
+            CancellationToken cancellationToken)
+        {
+            string expectedHash = null;
+            foreach (var soundBankPath in soundBankPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sounds = hircsBySoundBank[soundBankPath]
+                    .Where(hirc =>
+                        hirc is ICAkSound sound &&
+                        sound.GetSourceId() == sourceId)
+                    .ToList();
+                if (sounds.Count == 0)
+                {
+                    return false;
+                }
+
+                foreach (var hirc in sounds)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!TryGetSourceHash(
+                            soundBankPath,
+                            hirc,
+                            (ICAkSound)hirc,
+                            sourceId,
+                            wemHashByPackFile,
+                            sourceHashByHirc,
+                            cancellationToken,
+                            out var sourceHash))
+                    {
+                        return false;
+                    }
+
+                    if (expectedHash == null)
+                        expectedHash = sourceHash;
+                    else if (!string.Equals(
+                                 expectedHash,
+                                 sourceHash,
+                                 StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return expectedHash != null;
+        }
+
+        private bool TryGetSourceHash(
+            string soundBankPath,
+            HircItem hirc,
+            ICAkSound sound,
+            uint sourceId,
+            Dictionary<PackFile, string> wemHashByPackFile,
+            Dictionary<HircItem, string> sourceHashByHirc,
+            CancellationToken cancellationToken,
+            out string sourceHash)
+        {
+            if (sourceHashByHirc.TryGetValue(hirc, out sourceHash))
+                return true;
+
+            var components = new List<string>
+            {
+                ((ushort)sound.GetStreamType()).ToString()
+            };
+            if (sound.GetStreamType() != AKBKSourceType.Streaming)
+            {
+                if (!_audioRepository.DidxAudioListById.TryGetValue(
+                        sourceId,
+                        out var embeddedCandidates))
+                {
+                    return false;
+                }
+
+                var embeddedHashes = embeddedCandidates
+                    .Where(audio => string.Equals(
+                        audio.OwnerFilePath,
+                        soundBankPath,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Select(audio => Convert.ToHexString(
+                        SHA256.HashData(audio.ByteArray)))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+                if (embeddedHashes.Count != 1)
+                    return false;
+
+                components.Add(embeddedHashes[0]);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (sound.GetStreamType() != AKBKSourceType.Data_BNK)
+            {
+                if (!TryResolveWemFile(
+                        soundBankPath,
+                        sourceId,
+                        wemHashByPackFile,
+                        out var wemFile))
+                {
+                    return false;
+                }
+
+                components.Add(GetWemHash(wemFile, wemHashByPackFile));
+            }
+
+            sourceHash = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes(string.Join("|", components))));
+            sourceHashByHirc[hirc] = sourceHash;
+            return true;
+        }
+
+        private bool TryResolveWemFile(
+            string soundBankPath,
+            uint sourceId,
+            Dictionary<PackFile, string> wemHashByPackFile,
+            out PackFile wemFile)
+        {
+            wemFile = null;
+            if (!TryGetSoundBankPackFile(soundBankPath, out var soundBankFile))
+                return false;
+
+            var container = _packFileService.GetPackFileContainer(soundBankFile);
+            if (container == null ||
+                !ReferenceEquals(
+                    _packFileService.FindFile(soundBankPath, container),
+                    soundBankFile))
+            {
+                return false;
+            }
+
+            var normalisedBankPath = soundBankPath.Replace('/', '\\');
+            var directorySeparatorIndex = normalisedBankPath.LastIndexOf('\\');
+            var candidatePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                $"audio\\wwise\\{sourceId}.wem",
+                $"audio\\{sourceId}.wem"
+            };
+            if (directorySeparatorIndex >= 0)
+            {
+                candidatePaths.Add(
+                    $"{normalisedBankPath[..directorySeparatorIndex]}\\{sourceId}.wem");
+            }
+
+            var candidateFiles = candidatePaths
+                .Select(path => _packFileService.FindFile(path, container))
+                .Where(file => file != null)
+                .Distinct()
+                .ToList();
+            if (candidateFiles.Count == 0)
+                return false;
+
+            var firstCandidate = candidateFiles[0];
+            if (candidateFiles.Skip(1).Any(candidate =>
+                    !ReferenceEquals(candidate, firstCandidate) &&
+                    !string.Equals(
+                        GetWemHash(candidate, wemHashByPackFile),
+                        GetWemHash(firstCandidate, wemHashByPackFile),
+                        StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            wemFile = firstCandidate;
+            return true;
+        }
+
+        private bool TryGetSoundBankPackFile(
+            string soundBankPath,
+            out PackFile soundBankFile)
+        {
+            var separatorIndex = Math.Max(
+                soundBankPath.LastIndexOf('\\'),
+                soundBankPath.LastIndexOf('/'));
+            var soundBankFileName = separatorIndex >= 0
+                ? soundBankPath[(separatorIndex + 1)..]
+                : soundBankPath;
+
+            if (_audioRepository.PackFileByBnkName.TryGetValue(
+                    soundBankPath,
+                    out soundBankFile) ||
+                _audioRepository.PackFileByBnkName.TryGetValue(
+                    soundBankFileName,
+                    out soundBankFile))
+            {
+                return true;
+            }
+
+            soundBankFile = _audioRepository.PackFileByBnkName
+                .FirstOrDefault(entry =>
+                    string.Equals(
+                        entry.Key,
+                        soundBankPath,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        entry.Key,
+                        soundBankFileName,
+                        StringComparison.OrdinalIgnoreCase))
+                .Value;
+            return soundBankFile != null;
+        }
+
+        private static string GetWemHash(
+            PackFile wemFile,
+            Dictionary<PackFile, string> wemHashByPackFile)
+        {
+            if (!wemHashByPackFile.TryGetValue(wemFile, out var hash))
+            {
+                hash = Convert.ToHexString(
+                    SHA256.HashData(wemFile.DataSource.ReadData()));
+                wemHashByPackFile[wemFile] = hash;
+            }
+
+            return hash;
         }
     }
 }
