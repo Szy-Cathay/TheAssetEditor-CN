@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Editors.Audio.AudioEditor.Core;
@@ -96,6 +97,56 @@ public class AudioProjectExplorerInteractionTests
                         actionItem.Visibility,
                         Is.EqualTo(Visibility.Visible));
                 });
+            }
+            finally
+            {
+                viewModel.Dispose();
+                window.Close();
+            }
+        });
+    }
+
+    [Test]
+    public void TreeExpander_CollapsesOnMousePress_WhenChildRemainsSelected()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
+        {
+            var (viewModel, view, window) = CreateView();
+            try
+            {
+                var dialogueEvents = Flatten(viewModel.AudioProjectTree)
+                    .Single(node =>
+                        node.Type == AudioProjectTreeNodeType.DialogueEvents &&
+                        node.GameSoundBank == Wh3SoundBank.CampaignVO);
+                var selectedDialogue = dialogueEvents.Children.Last();
+                var selectedItem = FindTreeViewItem(view, selectedDialogue);
+                var dialogueEventsItem = FindTreeViewItem(
+                    view,
+                    dialogueEvents);
+                selectedItem.IsSelected = true;
+                dialogueEventsItem.BringIntoView();
+                FlushBindings(view);
+                Assert.That(selectedItem.IsSelected, Is.True);
+
+                var expander = dialogueEventsItem.Template.FindName(
+                    "Expander",
+                    dialogueEventsItem) as ToggleButton;
+                Assert.That(expander, Is.Not.Null);
+
+                expander!.RaiseEvent(new MouseButtonEventArgs(
+                    Mouse.PrimaryDevice,
+                    Environment.TickCount,
+                    MouseButton.Left)
+                {
+                    RoutedEvent = Mouse.MouseDownEvent,
+                    Source = expander,
+                });
+                FlushBindings(view);
+
+                Assert.That(dialogueEvents.IsExpanded, Is.False);
             }
             finally
             {

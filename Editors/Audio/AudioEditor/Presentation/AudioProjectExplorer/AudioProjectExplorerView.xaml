@@ -292,6 +292,10 @@
                 </TreeView.ItemContainerStyle>
 
                 <TreeView.Resources>
+                    <Style TargetType="{x:Type ToggleButton}">
+                        <Setter Property="ClickMode" Value="Press" />
+                    </Style>
+
                     <HierarchicalDataTemplate 
                         DataType="{x:Type Models:AudioProjectTreeNode}" 
                         ItemsSource="{Binding Children}">
