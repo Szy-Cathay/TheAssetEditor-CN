@@ -35,7 +35,6 @@ public class UiCommonWorkflowGallery
         "settings-theme",
         "settings-rendering",
         "settings-audio",
-        "settings-save",
         "confirm",
         "error",
         "loading",
@@ -104,14 +103,10 @@ public class UiCommonWorkflowGallery
                 Game = GameTypeEnum.Warhammer3,
                 Path = @"D:\Games\Total War WARHAMMER III",
             });
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var viewModel = new SettingsViewModel(
             settings,
             new ApplicationSettingsApplier(
                 settings,
-                autoSave,
                 new TestEventHub()),
             Mock.Of<IStandardDialogs>());
         var category = Array.IndexOf(Variants, variant);
@@ -136,7 +131,7 @@ public class UiCommonWorkflowGallery
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(categories.SelectedIndex, Is.EqualTo(category));
-                NUnitAssert.That(categories.Items.Count, Is.EqualTo(5));
+                NUnitAssert.That(categories.Items.Count, Is.EqualTo(4));
                 NUnitAssert.That(window.ActualWidth, Is.GreaterThanOrEqualTo(760));
                 NUnitAssert.That(window.ActualHeight, Is.GreaterThanOrEqualTo(600));
             });
@@ -144,7 +139,6 @@ public class UiCommonWorkflowGallery
         finally
         {
             window.Close();
-            autoSave.Stop();
         }
     }
 

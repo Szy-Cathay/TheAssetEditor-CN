@@ -171,7 +171,6 @@ public class FolderProjectPackFileServiceTests
                 service.SavePackContainer(
                     reference,
                     outputPath,
-                    false,
                     GameInformationDatabase.GetGameById(
                         GameTypeEnum.Warhammer3)));
             Assert.That(File.Exists(outputPath), Is.False);
@@ -1454,7 +1453,6 @@ public class FolderProjectPackFileServiceTests
             service.SavePackContainer(
                 container,
                 outputPath,
-                false,
                 GameInformationDatabase.GetGameById(
                     GameTypeEnum.Rome2));
 
@@ -1505,6 +1503,59 @@ public class FolderProjectPackFileServiceTests
         }
     }
 
+    [TestCase(
+        GameTypeEnum.Warhammer3,
+        CompressionFormat.Zstd)]
+    [TestCase(
+        GameTypeEnum.Warhammer2,
+        CompressionFormat.None)]
+    public void SavePackContainer_UsesCompressionOnlyForWarhammer3(
+        GameTypeEnum game,
+        CompressionFormat expectedCompression)
+    {
+        using var project = new TemporaryDirectory();
+        using var output = new TemporaryDirectory();
+        project.Write(
+            @"text\entry.txt",
+            Enumerable.Repeat((byte)'A', 1024).ToArray());
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings
+            {
+                Name = "工程",
+                GameVersion = game,
+                PackFileVersion = PackFileVersion.PFH5,
+            });
+        var outputPath = Path.Combine(output.Path, "generated.pack");
+        var service = CreateService();
+
+        service.SavePackContainer(
+            container,
+            outputPath,
+            GameInformationDatabase.GetGameById(game));
+
+        using var stream = File.OpenRead(outputPath);
+        using var reader = new BinaryReader(stream);
+        var loaded = PackFileSerializerLoader.Load(
+            outputPath,
+            stream.Length,
+            reader,
+            new CaPackDuplicateFileResolver());
+        var packedSource = (PackedFileSource)loaded
+            .FileList[@"text\entry.txt"]
+            .DataSource;
+        try
+        {
+            Assert.That(
+                packedSource.CompressionFormat,
+                Is.EqualTo(expectedCompression));
+        }
+        finally
+        {
+            packedSource.Parent.CloseStream();
+        }
+    }
+
     [Test]
     public void SavePackContainer_FolderProjectDoesNotCreateGitHistory()
     {
@@ -1535,7 +1586,6 @@ public class FolderProjectPackFileServiceTests
         service.SavePackContainer(
             container,
             outputPath,
-            false,
             GameInformationDatabase.GetGameById(
                 GameTypeEnum.Warhammer3));
 
@@ -1571,7 +1621,6 @@ public class FolderProjectPackFileServiceTests
         service.SavePackContainer(
             container,
             outputPath,
-            false,
             GameInformationDatabase.GetGameById(
                 GameTypeEnum.Warhammer3));
 
@@ -1615,7 +1664,6 @@ public class FolderProjectPackFileServiceTests
             service.SavePackContainer(
                 container,
                 outputPath,
-                false,
                 GameInformationDatabase.GetGameById(
                     GameTypeEnum.Warhammer3));
 
@@ -1681,7 +1729,6 @@ public class FolderProjectPackFileServiceTests
             () => service.SavePackContainer(
                 container,
                 outputPath,
-                false,
                 GameInformationDatabase.GetGameById(
                     GameTypeEnum.Warhammer3)),
             Throws.TypeOf<InvalidDataException>());
@@ -1718,7 +1765,6 @@ public class FolderProjectPackFileServiceTests
                 () => service.SavePackContainer(
                     folderProject,
                     outputPath,
-                    false,
                     GameInformationDatabase.GetGameById(
                         GameTypeEnum.Warhammer3)),
                 Throws.TypeOf<InvalidOperationException>());
@@ -1755,7 +1801,6 @@ public class FolderProjectPackFileServiceTests
                 () => service.SavePackContainer(
                     container,
                     outputPath,
-                    false,
                     GameInformationDatabase.GetGameById(
                         GameTypeEnum.Rome2)),
                 CancellationToken.None,
@@ -1868,7 +1913,6 @@ public class FolderProjectPackFileServiceTests
                 () => service.SavePackContainer(
                     container,
                     outputPath,
-                    false,
                     GameInformationDatabase.GetGameById(
                         GameTypeEnum.Rome2)),
                 CancellationToken.None,
@@ -1914,39 +1958,6 @@ public class FolderProjectPackFileServiceTests
             source.ReleaseRead.Set();
             File.Delete(outputPath);
         }
-    }
-
-    [Test]
-    public void TryAutoSavePackContainer_FolderProjectIsRejected()
-    {
-        using var project = new TemporaryDirectory();
-        project.Write("keep.bin", [4, 5, 6]);
-        var outputPath = System.IO.Path.Combine(
-            System.IO.Path.GetTempPath(),
-            $"ae-folder-autosave-{Guid.NewGuid():N}.pack");
-        using var container = FolderProjectContainer.Create(
-            project.Path,
-            new FolderProjectSettings
-            {
-                Name = "工程",
-                OutputPackPath = outputPath,
-                GameVersion = GameTypeEnum.Warhammer3,
-            });
-        var service = CreateService();
-        service.AddContainer(container, true);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(
-                service.TryAutoSavePackContainer(
-                    container,
-                    outputPath,
-                    GameInformationDatabase.GetGameById(
-                        GameTypeEnum.Rome2)),
-                Is.False);
-            Assert.That(File.Exists(outputPath), Is.False);
-            Assert.That(container.SystemFilePath, Is.EqualTo(project.Path));
-        });
     }
 
     [Test]

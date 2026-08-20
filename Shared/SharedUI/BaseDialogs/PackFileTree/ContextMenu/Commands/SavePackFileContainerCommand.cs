@@ -47,7 +47,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 try
                 {
                     var gameInformation = GameInformationDatabase.GetGameById(applicationSettingsService.CurrentSettings.CurrentGame);
-                    packFileService.SavePackContainer(_selectedNode.FileOwner, systemPath, false, gameInformation);
+                    packFileService.SavePackContainer(
+                        _selectedNode.FileOwner,
+                        systemPath,
+                        gameInformation);
                 }
                 catch (Exception e)
                 {
@@ -91,7 +94,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 try
                 {
                     var gameInformation = GameInformationDatabase.GetGameById(applicationSettingsService.CurrentSettings.CurrentGame);
-                    packFileService.SavePackContainer(pack, systemPath, false, gameInformation);
+                    packFileService.SavePackContainer(
+                        pack,
+                        systemPath,
+                        gameInformation);
                 }
                 catch (Exception e)
                 {

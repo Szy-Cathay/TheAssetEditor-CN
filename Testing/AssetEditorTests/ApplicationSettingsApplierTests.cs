@@ -1,11 +1,7 @@
-using System.Reflection;
 using AssetEditor.Services.Settings;
-using Moq;
 using NUnit.Framework;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
-using Shared.Core.PackFiles;
-using Shared.Core.Services;
 using Shared.Core.Settings;
 using NUnitAssert = NUnit.Framework.Assert;
 
@@ -33,12 +29,8 @@ public class ApplicationSettingsApplierTests
         eventHub.Register<ShowCaWemFilesChangedEvent>(
             this,
             value => caWemChanges.Add(value.ShowFiles));
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var applier = new ApplicationSettingsApplier(
             settings,
-            autoSave,
             eventHub);
 
         settings.CurrentSettings.GameDirectories[0].Path = @"C:\new";
@@ -58,7 +50,6 @@ public class ApplicationSettingsApplierTests
                     .EqualTo(BackgroundColour.Green));
             NUnitAssert.That(caWemChanges, Is.EqualTo(new[] { true }));
         });
-        autoSave.Stop();
     }
 
     [Test]
@@ -72,12 +63,8 @@ public class ApplicationSettingsApplierTests
                 Game = GameTypeEnum.Rome2,
                 Path = @"C:\old"
             });
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var applier = new ApplicationSettingsApplier(
             settings,
-            autoSave,
             new TestEventHub());
 
         settings.CurrentSettings.GameDirectories[0].Path = @"C:\new";
@@ -85,7 +72,6 @@ public class ApplicationSettingsApplierTests
         var result = applier.CompleteSave();
 
         NUnitAssert.That(result.RequiresApplicationRestart, Is.False);
-        autoSave.Stop();
     }
 
     [Test]
@@ -98,12 +84,8 @@ public class ApplicationSettingsApplierTests
         eventHub.Register<ViewportRenderSettingsChangedEvent>(
             this,
             value => changes.Add(value.Settings));
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var applier = new ApplicationSettingsApplier(
             settings,
-            autoSave,
             eventHub);
 
         applier.PreviewViewport(
@@ -116,31 +98,5 @@ public class ApplicationSettingsApplierTests
         NUnitAssert.That(
             changes.Select(value => value.GridColour),
             Is.EqualTo(new[] { "90,80,70", "10,20,30" }));
-        autoSave.Stop();
-    }
-
-    [Test]
-    public void CompleteSave_RestartsAutoSaveTimerWhenScheduleChanges()
-    {
-        var settings = new ApplicationSettingsService();
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
-        var applier = new ApplicationSettingsApplier(
-            settings,
-            autoSave,
-            new TestEventHub());
-
-        settings.CurrentSettings.EnableAutoSave = true;
-        settings.CurrentSettings.AutoSaveIntervalMinutes = 8;
-        applier.CompleteSave();
-
-        var timer = typeof(PackAutoSaveService)
-            .GetField(
-                "_timer",
-                BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(autoSave);
-        NUnitAssert.That(timer, Is.Not.Null);
-        autoSave.Stop();
     }
 }

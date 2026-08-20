@@ -134,7 +134,6 @@ namespace AssetEditorTests
             packFileService.Setup(service => service.SavePackContainer(
                     pack,
                     pack.SystemFilePath,
-                    false,
                     It.IsAny<GameInformation>()))
                 .Throws(new IOException("save failed"));
             var dialogs = new Mock<IStandardDialogs>();

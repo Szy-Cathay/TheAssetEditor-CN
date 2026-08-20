@@ -44,7 +44,6 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                     packFileService.SavePackContainer(
                         _selectedNode.FileOwner,
                         saveFileDialog.FileName,
-                        false,
                         gameInformation);
                     if (_selectedNode.FileOwner is not
                         FolderProjectContainer)

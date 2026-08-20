@@ -1,7 +1,6 @@
 using System;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
-using Shared.Core.Services;
 using Shared.Core.Settings;
 
 namespace AssetEditor.Services.Settings
@@ -13,23 +12,18 @@ namespace AssetEditor.Services.Settings
     internal sealed class ApplicationSettingsApplier
     {
         private readonly ApplicationSettingsService _settingsService;
-        private readonly PackAutoSaveService _autoSaveService;
         private readonly IGlobalEventHub _globalEventHub;
         private readonly GameTypeEnum _originalGame;
         private readonly string? _originalGamePath;
         private readonly bool _originalShowCaWemFiles;
         private readonly bool _originalOnlyLoadLod0;
-        private readonly bool _originalAutoSaveEnabled;
-        private readonly int _originalAutoSaveInterval;
         private readonly ViewportRenderSettings _originalViewportSettings;
 
         public ApplicationSettingsApplier(
             ApplicationSettingsService settingsService,
-            PackAutoSaveService autoSaveService,
             IGlobalEventHub globalEventHub)
         {
             _settingsService = settingsService;
-            _autoSaveService = autoSaveService;
             _globalEventHub = globalEventHub;
 
             var settings = settingsService.CurrentSettings;
@@ -38,8 +32,6 @@ namespace AssetEditor.Services.Settings
             _originalShowCaWemFiles = settings.ShowCAWemFiles;
             _originalOnlyLoadLod0 =
                 settings.OnlyLoadLod0ForReferenceMeshes;
-            _originalAutoSaveEnabled = settings.EnableAutoSave;
-            _originalAutoSaveInterval = settings.AutoSaveIntervalMinutes;
             _originalViewportSettings =
                 ViewportRenderSettings.From(settings);
         }
@@ -67,13 +59,6 @@ namespace AssetEditor.Services.Settings
                 _globalEventHub.PublishGlobalEvent(
                     new ShowCaWemFilesChangedEvent(
                         settings.ShowCAWemFiles));
-            }
-
-            if (settings.EnableAutoSave != _originalAutoSaveEnabled ||
-                settings.AutoSaveIntervalMinutes !=
-                    _originalAutoSaveInterval)
-            {
-                _autoSaveService.Restart();
             }
 
             var requiresRestart =

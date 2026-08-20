@@ -5,7 +5,6 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Serialization;
 using Shared.Core.PackFiles.Utility;
-using Shared.Core.Services;
 using Shared.Core.Settings;
 
 namespace Test.Shared.Core.PackFiles
@@ -144,7 +143,10 @@ namespace Test.Shared.Core.PackFiles
             var packPath = Path.Combine(_tempDirectory, "shared.pack");
             var gameInfo = GameInformationDatabase.GetGameById(GameTypeEnum.Rome2);
             var initialService = CreatePackFileService();
-            initialService.SavePackContainer(CreatePackContainer([0, 0, 0, 0]), packPath, false, gameInfo);
+            initialService.SavePackContainer(
+                CreatePackContainer([0, 0, 0, 0]),
+                packPath,
+                gameInfo);
 
             var loader = new PackFileContainerLoader(new ApplicationSettingsService(GameTypeEnum.Rome2));
             var saves = Enumerable.Range(0, serviceCount)
@@ -159,7 +161,10 @@ namespace Test.Shared.Core.PackFiles
             {
                 ready.Signal();
                 start.Wait();
-                save.Service.SavePackContainer(save.Pack, packPath, false, gameInfo);
+                save.Service.SavePackContainer(
+                    save.Pack,
+                    packPath,
+                    gameInfo);
             }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
             var allSaves = Task.WhenAll(tasks);
 
@@ -203,7 +208,7 @@ namespace Test.Shared.Core.PackFiles
         }
 
         [Test]
-        public void SavePackContainer_RegularPackStillCreatesRotatingBackup()
+        public void SavePackContainer_OverwriteDoesNotCreateBackup()
         {
             var packPath = Path.Combine(
                 _tempDirectory,
@@ -212,25 +217,18 @@ namespace Test.Shared.Core.PackFiles
             var pack = CreatePackContainer([1, 2, 3, 4]);
             var gameInfo = GameInformationDatabase.GetGameById(
                 GameTypeEnum.Rome2);
-            service.SavePackContainer(
-                pack,
-                packPath,
-                false,
-                gameInfo);
+            service.SavePackContainer(pack, packPath, gameInfo);
             pack.FileList["data\\entry.bin"].DataSource =
                 new MemorySource([4, 3, 2, 1]);
 
-            service.SavePackContainer(
-                pack,
-                packPath,
-                false,
-                gameInfo);
+            service.SavePackContainer(pack, packPath, gameInfo);
 
             Assert.That(
                 Directory.GetFiles(
-                    Path.Combine(_tempDirectory, "backups"),
-                    "regular_*_backup.pack"),
-                Has.Length.EqualTo(1));
+                    _tempDirectory,
+                    "*",
+                    SearchOption.AllDirectories),
+                Is.EqualTo(new[] { packPath }));
         }
 
         [Test]
@@ -253,7 +251,7 @@ namespace Test.Shared.Core.PackFiles
             var originalLoadByteSize = pack.OriginalLoadByteSize;
 
             Assert.Throws<UnauthorizedAccessException>(() =>
-                service.SavePackContainer(pack, destinationPath, false, gameInfo));
+                service.SavePackContainer(pack, destinationPath, gameInfo));
 
             foreach (var file in pack.FileList)
                 Assert.That(file.Value.DataSource, Is.SameAs(originalSources[file.Key]));
@@ -262,169 +260,9 @@ namespace Test.Shared.Core.PackFiles
             Assert.That(Directory.Exists(destinationPath), Is.True);
         }
 
-        [Test]
-        public void TryAutoSavePackContainer_SavedEventRunsOnceAfterSaveGateIsReleased()
-        {
-            var firstPath = Path.Combine(_tempDirectory, "first.pack");
-            var secondPath = Path.Combine(_tempDirectory, "second.pack");
-            var gameInfo = GameInformationDatabase.GetGameById(GameTypeEnum.Rome2);
-            var eventHub = new Mock<IGlobalEventHub>();
-            var callbackHandled = 0;
-            Task? nestedSave = null;
-            PackFileService service = null!;
-
-            eventHub
-                .Setup(hub => hub.PublishGlobalEvent(It.IsAny<PackFileContainerSavedEvent>()))
-                .Callback<PackFileContainerSavedEvent>(_ =>
-                {
-                    if (Interlocked.Exchange(ref callbackHandled, 1) != 0)
-                        return;
-
-                    nestedSave = Task.Factory.StartNew(
-                        () => service.SavePackContainer(CreatePackContainer(), secondPath, false, gameInfo),
-                        CancellationToken.None,
-                        TaskCreationOptions.LongRunning,
-                        TaskScheduler.Default);
-                    Assert.That(nestedSave.Wait(TimeSpan.FromSeconds(2)), Is.True,
-                        "The saved event callback still held the process-wide save gate.");
-                });
-            service = CreatePackFileService(eventHub.Object);
-            var firstPack = CreatePackContainer();
-            firstPack.SystemFilePath = firstPath;
-            service.SetEditablePack(firstPack);
-
-            try
-            {
-                Assert.That(service.TryAutoSavePackContainer(firstPack, firstPath, gameInfo), Is.True);
-            }
-            finally
-            {
-                if (nestedSave != null)
-                    nestedSave.GetAwaiter().GetResult();
-            }
-
-            eventHub.Verify(
-                hub => hub.PublishGlobalEvent(It.IsAny<PackFileContainerSavedEvent>()),
-                Times.Exactly(2));
-        }
-
-        [Test]
-        public void TryAutoSavePackContainer_AfterSaveAsDoesNotWriteTheOldPath()
-        {
-            var oldPath = Path.Combine(_tempDirectory, "old.pack");
-            var newPath = Path.Combine(_tempDirectory, "new.pack");
-            var gameInfo = GameInformationDatabase.GetGameById(GameTypeEnum.Rome2);
-            var service = CreatePackFileService();
-            var pack = CreatePackContainer();
-            service.SetEditablePack(pack);
-            service.SavePackContainer(pack, oldPath, false, gameInfo);
-            var oldBytes = File.ReadAllBytes(oldPath);
-
-            service.SavePackContainer(pack, newPath, false, gameInfo);
-            pack.FileList["data\\entry.bin"].DataSource = new MemorySource([9, 9, 9, 9]);
-
-            var saved = service.TryAutoSavePackContainer(pack, oldPath, gameInfo);
-
-            Assert.That(saved, Is.False);
-            Assert.That(pack.SystemFilePath, Is.EqualTo(newPath));
-            Assert.That(File.ReadAllBytes(oldPath), Is.EqualTo(oldBytes));
-            Assert.That(File.Exists(newPath), Is.True);
-        }
-
-        [Test]
-        public async Task TryAutoSave_WhileSaveIsRunningReturnsFalseWithoutQueueing()
-        {
-            var packPath = Path.Combine(_tempDirectory, "autosave.pack");
-            File.WriteAllBytes(packPath, [0]);
-            var editablePack = CreatePackContainer();
-            editablePack.SystemFilePath = packPath;
-
-            using var saveEntered = new ManualResetEventSlim();
-            using var releaseSave = new ManualResetEventSlim();
-            var packFileService = new Mock<IPackFileService>();
-            packFileService.Setup(service => service.GetEditablePack()).Returns(editablePack);
-            packFileService
-                .Setup(service => service.TryAutoSavePackContainer(
-                    editablePack,
-                    packPath,
-                    It.IsAny<GameInformation>()))
-                .Returns(() =>
-                {
-                    saveEntered.Set();
-                    releaseSave.Wait();
-                    return true;
-                });
-
-            var settings = new ApplicationSettingsService(GameTypeEnum.Rome2);
-            var autoSaveService = new PackAutoSaveService(packFileService.Object, settings);
-            var firstSave = Task.Run(autoSaveService.TryAutoSave);
-
-            try
-            {
-                Assert.That(saveEntered.Wait(TimeSpan.FromSeconds(10)), Is.True, "The first auto-save did not start.");
-                Assert.That(autoSaveService.TryAutoSave(), Is.False);
-            }
-            finally
-            {
-                releaseSave.Set();
-                try
-                {
-                    await firstSave;
-                }
-                catch
-                {
-                }
-            }
-
-            Assert.That(await firstSave, Is.True);
-            packFileService.Verify(service => service.TryAutoSavePackContainer(
-                editablePack,
-                packPath,
-                It.IsAny<GameInformation>()), Times.Once);
-        }
-
-        [Test]
-        public void TryAutoSave_FolderProjectDoesNotGeneratePack()
-        {
-            var projectPath = Path.Combine(
-                _tempDirectory,
-                "folder-project");
-            Directory.CreateDirectory(projectPath);
-            var outputPath = Path.Combine(
-                _tempDirectory,
-                "generated.pack");
-            using var project = FolderProjectContainer.Create(
-                projectPath,
-                new FolderProjectSettings
-                {
-                    Name = "folder project",
-                    OutputPackPath = outputPath,
-                });
-            var packFileService = new Mock<IPackFileService>();
-            packFileService.Setup(service => service.GetEditablePack())
-                .Returns(project);
-            var autoSaveService = new PackAutoSaveService(
-                packFileService.Object,
-                new ApplicationSettingsService(GameTypeEnum.Rome2));
-
-            var saved = autoSaveService.TryAutoSave();
-
-            Assert.That(saved, Is.False);
-            packFileService.Verify(
-                service => service.TryAutoSavePackContainer(
-                    It.IsAny<PackFileContainer>(),
-                    It.IsAny<string>(),
-                    It.IsAny<GameInformation>()),
-                Times.Never);
-        }
-
         private PackFileService CreatePackFileService(IGlobalEventHub? eventHub = null)
         {
-            var settings = new ApplicationSettingsService(GameTypeEnum.Rome2);
-            settings.CurrentSettings.UseZstdCompression = false;
-            settings.CurrentSettings.BackupPath = Path.Combine(_tempDirectory, "backups");
-            settings.CurrentSettings.MaxBackupCount = 2;
-            return new PackFileService(eventHub) { SettingsService = settings };
+            return new PackFileService(eventHub);
         }
 
         private static PackFileContainer CreatePackContainer(byte[]? payload = null)

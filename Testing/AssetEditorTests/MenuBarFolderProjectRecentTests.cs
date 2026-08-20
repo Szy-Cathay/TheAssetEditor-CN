@@ -382,7 +382,6 @@ public class MenuBarFolderProjectRecentTests
         packFileService.Verify(service => service.SavePackContainer(
             project,
             outputPath,
-            false,
             It.IsAny<GameInformation>()), Times.Once);
         generationGuard.Verify(guard => guard.CanGenerate(project),
             Times.Once);
@@ -435,7 +434,6 @@ public class MenuBarFolderProjectRecentTests
         packFileService.Verify(service => service.SavePackContainer(
             It.IsAny<PackFileContainer>(),
             It.IsAny<string>(),
-            It.IsAny<bool>(),
             It.IsAny<GameInformation>()), Times.Never);
     }
 

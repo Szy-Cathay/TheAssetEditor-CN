@@ -292,7 +292,6 @@
   "SettingsWindow.General": "常规",
   "SettingsWindow.ThemeCategory": "主题",
   "SettingsWindow.Audio": "音频",
-  "SettingsWindow.Save": "保存",
   "SettingsWindow.Appearance": "外观与启动",
   "SettingsWindow.Viewport3D": "3D 视口",
   "SettingsWindow.ModelAndContent": "模型与内容加载",
@@ -330,9 +329,6 @@
   "SettingsWindow.Timing.NextModelLoad": "下次加载参考模型时生效",
   "SettingsWindow.Timing.GamePath": "当前游戏路径变化时需重启 AE",
   "SettingsWindow.Timing.NextAudioCompile": "下次编译音频时生效",
-  "SettingsWindow.Timing.SaveImmediate": "保存后立即生效",
-  "SettingsWindow.Timing.NextBackup": "下次保存普通 Pack 并生成备份时生效；文件夹工程不备份",
-  "SettingsWindow.Timing.NextPackSave": "下次保存 Pack 时生效",
 
   "UpdaterWindow.Title": "更新",
   "UpdaterWindow.UpdateInfo": "Asset Editor 国区版有新版本可用！\n\n当前版本为 {0}，更新到版本 {1} 以获取以下最新更改。",
@@ -2083,14 +2079,6 @@
 
   "SettingsWindow.Font": "字体",
   "SettingsWindow.FontWeight": "字重",
-  "SettingsWindow.AutoSaveAndBackup": "自动保存与备份",
-  "SettingsWindow.EnableAutoSave": "自动保存",
-  "SettingsWindow.AutoSaveInterval": "保存间隔",
-  "SettingsWindow.Minutes": "分钟",
-  "SettingsWindow.BackupPath": "自动保存目录",
-  "SettingsWindow.MaxBackupCount": "最大保存数量",
-  "SettingsWindow.UseZstdCompression": "ZSTD 压缩格式",
-
   "Font.Default": "默认（系统字体）",
   "Font.AlibabaPuHuiTi": "阿里巴巴普惠体 3.0",
   "Font.HarmonyOS": "鸿蒙OS字体",

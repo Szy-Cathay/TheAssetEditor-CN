@@ -49,8 +49,10 @@ namespace Shared.Core.PackFiles
         void RenameDirectory(PackFileContainer pf, string currentNodeName, string newName);
         void RenameFile(PackFileContainer pf, PackFile file, string newName);
         void SaveFile(PackFile file, byte[] data);
-        void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation);
-        bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation);
+        void SavePackContainer(
+            PackFileContainer pf,
+            string path,
+            GameInformation gameInformation);
         void SetEditablePack(PackFileContainer? pf);
         bool TryUnloadPackContainer(PackFileContainer pf);
         void UnloadPackContainer(PackFileContainer pf);

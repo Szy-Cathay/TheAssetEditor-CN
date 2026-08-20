@@ -52,7 +52,7 @@ namespace Shared.Core.Services
                 _pfs.CopyFileFromOtherPackFile(item.Container, item.FilePath, newPack);
 
             var gameInformation = GameInformationDatabase.GetGameById(_applicationSettingsService.CurrentSettings.CurrentGame);
-            _pfs.SavePackContainer(newPack, path, false, gameInformation);
+            _pfs.SavePackContainer(newPack, path, gameInformation);
         }
 
         public void Stop()

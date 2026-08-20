@@ -43,9 +43,6 @@ public class MainViewModelCloseTests
         var serviceProvider = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
             .AddSingleton(settings)
-            .AddSingleton(new PackAutoSaveService(
-                Mock.Of<IPackFileService>(),
-                settings))
             .BuildServiceProvider();
         WpfTestApplicationHost.InvokeWithThemeResources(serviceProvider, () =>
         {
@@ -139,9 +136,6 @@ public class MainViewModelCloseTests
             var serviceProvider = new ServiceCollection()
                 .AddSingleton(LocalizationManager.Instance)
                 .AddSingleton(settings)
-                .AddSingleton(new PackAutoSaveService(
-                    Mock.Of<IPackFileService>(),
-                    settings))
                 .BuildServiceProvider();
 
             WpfTestApplicationHost.InvokeWithThemeResources(

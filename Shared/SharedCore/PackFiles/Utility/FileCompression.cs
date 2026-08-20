@@ -61,13 +61,8 @@ namespace Shared.Core.PackFiles.Utility
         private const uint Lz4MagicNumber = 0x184D_2204;
         private const uint ZstdMagicNumber = 0xfd2f_b528;
 
-        // CA generally compress file types in specific formats, presumably because they compress better in that format.
-        // Sometimes CA compress file types in various formats (though predominantly in one format), presumably by
-        // mistake as they use BOB which compresses by folder not file type. We try to replicate that by assigning
-        // some file types a specific compression format according to whether they are exclusively compressed
-        // in a given  format or predominantly compressed in a given format by CA.
-        // Lmza1 is not specified as it's legacy so we only use that for games that support only that format.
-        // Zstd is not specified as by default everything not None or Lz4 is Zstd.
+        // Generated packs only use compression for WH3. File types listed here
+        // remain uncompressed because the game expects or benefits from that form.
         public static List<string> NoneFileTypes { get; } =
         [
             // In CA packs these files are exclusively in this format
@@ -89,22 +84,6 @@ namespace Shared.Core.PackFiles.Utility
 
              // .wav files aren't? in CA packs but probably better not to compress them
             ".wav",
-        ];
-
-        public static List<string> Lz4FileTypes { get; } =
-        [
-            // In CA packs these files are exclusively in this format
-            ".animpack",
-            ".collision",
-            ".cs2",
-            ".exr",
-            ".mvscene",
-            ".variantmeshdefinition",
-            ".wsmodel",
-            ".xt",
-
-            // In CA packs these files are mostly in this format
-            ".parsed",
         ];
 
         public static byte[] Decompress(byte[] data, int outputSize, CompressionFormat compressionFormat)
@@ -263,21 +242,20 @@ namespace Shared.Core.PackFiles.Utility
                 return CompressionFormat.None;
         }
 
-        public static bool DoesGameSupportCompression(GameInformation gameInformation)
+        public static bool ShouldCompressGeneratedPack(
+            GameInformation gameInformation)
         {
-            var doesGameFilesSupportCompression = !(gameInformation.CompressionFormats.Count == 1 && gameInformation.CompressionFormats.First() == CompressionFormat.None);
-            return doesGameFilesSupportCompression;
+            return gameInformation.Type == GameTypeEnum.Warhammer3;
         }
 
-        public static CompressionFormat GetCompressionFormat(GameInformation gameInformation, string fileName)
+        public static CompressionFormat GetGeneratedPackCompressionFormat(
+            GameInformation gameInformation,
+            string fileName)
         {
             var extension = Path.GetExtension(fileName);
             var firstFilePathPart = fileName.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).First();
 
-            var compressionFormats = gameInformation.CompressionFormats;
-
-            // Check if the game supports any compression at all
-            if (compressionFormats.All(compressionFormat => compressionFormat == CompressionFormat.None))
+            if (gameInformation.Type != GameTypeEnum.Warhammer3)
                 return CompressionFormat.None;
 
             // We use the root folder for db tables because they don't have an extension
@@ -288,24 +266,10 @@ namespace Shared.Core.PackFiles.Utility
             if (!isTable && !hasExtension)
                 return CompressionFormat.None;
 
-            // Only compress tables in WH3 (and newer games?) as compressed tables are bugged in older games
-            if (isTable && compressionFormats.Contains(CompressionFormat.Zstd) && gameInformation.Type == GameTypeEnum.Warhammer3)
-                return CompressionFormat.Zstd;
-            else if (isTable)
-                return CompressionFormat.None;
-
-            // Anything that isn't preferrably None, Lzma1, or Lz4 is set to Zstd unless the game doesn't support that in which case use None
-            // Lzma1 is a legacy format so only use it if it's all the game can use even though games with other formats can use it
             if (NoneFileTypes.Contains(extension))
                 return CompressionFormat.None;
-            else if (compressionFormats.Count == 1 && compressionFormats.Contains(CompressionFormat.Lzma1))
-                return CompressionFormat.Lzma1;
-            else if (Lz4FileTypes.Contains(extension) && compressionFormats.Contains(CompressionFormat.Lz4))
-                return CompressionFormat.Lz4;
-            else if (compressionFormats.Contains(CompressionFormat.Zstd))
-                return CompressionFormat.Zstd;
-            else
-                return CompressionFormat.None;
+
+            return CompressionFormat.Zstd;
         }
     }
 }

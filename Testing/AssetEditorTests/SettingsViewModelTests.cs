@@ -7,7 +7,6 @@ using NUnit.Framework;
 using System.Windows;
 using System.Windows.Media;
 using Shared.Core.Events.Global;
-using Shared.Core.PackFiles;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -30,12 +29,8 @@ public class SettingsViewModelTests
         eventHub.Register<ViewportRenderSettingsChangedEvent>(
             this,
             value => previews.Add(value.Settings));
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var applier = new ApplicationSettingsApplier(
             settings,
-            autoSave,
             eventHub);
 
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -62,7 +57,6 @@ public class SettingsViewModelTests
                     previews.Last().GridColour,
                     Is.EqualTo("10,20,30"));
             });
-        autoSave.Stop();
     }
 
     [Test]
@@ -71,9 +65,6 @@ public class SettingsViewModelTests
         var settings = new ApplicationSettingsService(
             GameTypeEnum.Warhammer3);
         var eventHub = new TestEventHub();
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var dialogs = new Mock<IStandardDialogs>();
 
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -84,7 +75,6 @@ public class SettingsViewModelTests
                     settings,
                     new ApplicationSettingsApplier(
                         settings,
-                        autoSave,
                         eventHub),
                     dialogs.Object);
                 viewModel.SimulateGameBackfaces = true;
@@ -112,7 +102,6 @@ public class SettingsViewModelTests
                     settings,
                     new ApplicationSettingsApplier(
                         settings,
-                        autoSave,
                         eventHub),
                     dialogs.Object);
                 viewModel.CurrentGame = GameTypeEnum.Rome2;
@@ -125,7 +114,6 @@ public class SettingsViewModelTests
                         It.IsAny<string>()),
                     Times.Once);
             });
-        autoSave.Stop();
     }
 
     [Test]
@@ -138,9 +126,6 @@ public class SettingsViewModelTests
         eventHub.Register<ViewportRenderSettingsChangedEvent>(
             this,
             value => previews.Add(value.Settings));
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         using var services = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
             .BuildServiceProvider();
@@ -153,7 +138,6 @@ public class SettingsViewModelTests
                     settings,
                     new ApplicationSettingsApplier(
                         settings,
-                        autoSave,
                         eventHub),
                     Mock.Of<IStandardDialogs>());
                 var window = new SettingsWindow
@@ -173,7 +157,6 @@ public class SettingsViewModelTests
                     previews.Last().GridColour,
                     Is.EqualTo("1,2,3"));
             });
-        autoSave.Stop();
     }
 
     [Test]
@@ -181,10 +164,6 @@ public class SettingsViewModelTests
     {
         var settings = new ApplicationSettingsService();
         settings.CurrentSettings.AppFont = AppFontFamily.Default;
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
-
         WpfTestApplicationHost.InvokeWithThemeResources(
             serviceProvider: Mock.Of<IServiceProvider>(),
             () =>
@@ -197,7 +176,6 @@ public class SettingsViewModelTests
                     settings,
                     new ApplicationSettingsApplier(
                         settings,
-                        autoSave,
                         new TestEventHub()),
                     Mock.Of<IStandardDialogs>());
 
@@ -236,7 +214,6 @@ public class SettingsViewModelTests
                         Is.EqualTo(originalWeight));
                 });
             });
-        autoSave.Stop();
     }
 
     [Test]
@@ -356,10 +333,6 @@ public class SettingsViewModelTests
         eventHub.Register<ViewportRenderSettingsChangedEvent>(
             this,
             value => previews.Add(value.Settings));
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
-
         WpfTestApplicationHost.InvokeWithThemeResources(
             serviceProvider: Mock.Of<IServiceProvider>(),
             () =>
@@ -368,7 +341,6 @@ public class SettingsViewModelTests
                     settings,
                     new ApplicationSettingsApplier(
                         settings,
-                        autoSave,
                         eventHub),
                     Mock.Of<IStandardDialogs>());
 
@@ -405,16 +377,12 @@ public class SettingsViewModelTests
                         Is.EqualTo("1,2,3"));
                 });
             });
-        autoSave.Stop();
     }
 
     [Test]
     public void InvalidLightingText_DoesNotSaveOrCloseSettings()
     {
         var settings = new ApplicationSettingsService();
-        var autoSave = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         var dialogs = new Mock<IStandardDialogs>();
 
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -425,7 +393,6 @@ public class SettingsViewModelTests
                     settings,
                     new ApplicationSettingsApplier(
                         settings,
-                        autoSave,
                         new TestEventHub()),
                     dialogs.Object)
                 {
@@ -442,6 +409,5 @@ public class SettingsViewModelTests
                         It.IsAny<string>()),
                     Times.Once);
             });
-        autoSave.Stop();
     }
 }

@@ -1662,13 +1662,6 @@ public class FolderProjectGitOperationCoordinatorTests
         public void SavePackContainer(
             PackFileContainer container,
             string path,
-            bool createBackup,
-            Shared.Core.Settings.GameInformation gameInformation) =>
-            throw new NotSupportedException();
-
-        public bool TryAutoSavePackContainer(
-            PackFileContainer container,
-            string expectedPath,
             Shared.Core.Settings.GameInformation gameInformation) =>
             throw new NotSupportedException();
     }

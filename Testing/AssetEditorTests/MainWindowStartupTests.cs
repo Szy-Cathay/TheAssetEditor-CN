@@ -1,8 +1,6 @@
 using System.Windows;
 using AssetEditor.Views;
 using Microsoft.Extensions.DependencyInjection;
-using Moq;
-using Shared.Core.PackFiles;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 
@@ -54,13 +52,9 @@ public class MainWindowStartupTests
         ApplicationSettingsService settings,
         Action<MainWindow> assertion)
     {
-        var autoSaveService = new PackAutoSaveService(
-            Mock.Of<IPackFileService>(),
-            settings);
         using var services = new ServiceCollection()
             .AddSingleton(LocalizationManager.Instance)
             .AddSingleton(settings)
-            .AddSingleton(autoSaveService)
             .BuildServiceProvider();
         WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
         {
@@ -71,7 +65,6 @@ public class MainWindowStartupTests
             }
             finally
             {
-                autoSaveService.Stop();
                 window.Close();
             }
         });

@@ -25,9 +25,6 @@ namespace Shared.Core.PackFiles
         public bool EnableFileLookUpEvents { get; set; } = false;
         public bool EnforceGameFilesMustBeLoaded { get; set; } = true;
 
-        // Injected via DI after construction
-        public ApplicationSettingsService? SettingsService { get; set; }
-
         public PackFileService(IGlobalEventHub? globalEventHub)
         {
             _globalEventHub = globalEventHub;
@@ -878,7 +875,10 @@ namespace Shared.Core.PackFiles
             _globalEventHub?.PublishGlobalEvent(new PackFileSavedEvent(file));
         }
 
-        public void SavePackContainer(PackFileContainer pf, string path, bool createBackup, GameInformation gameInformation)
+        public void SavePackContainer(
+            PackFileContainer pf,
+            string path,
+            GameInformation gameInformation)
         {
             EnsureWritable(pf);
             lock (s_saveGate)
@@ -888,50 +888,18 @@ namespace Shared.Core.PackFiles
                     SaveFolderProjectContainerCore(
                         folderProject,
                         path,
-                        createBackup,
                         gameInformation);
                 }
                 else
-                    SavePackContainerCore(pf, path, createBackup, gameInformation);
+                    SavePackContainerCore(pf, path, gameInformation);
             }
 
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
-        }
-
-        public bool TryAutoSavePackContainer(PackFileContainer pf, string expectedPath, GameInformation gameInformation)
-        {
-            if (pf.Role == PackFileContainerRole.Reference)
-                return false;
-            if (pf is FolderProjectContainer)
-                return false;
-
-            lock (s_saveGate)
-            {
-                var currentPath = pf.SystemFilePath;
-                if (!ReferenceEquals(_packFileContainerSelectedForEdit, pf) ||
-                    !string.Equals(
-                        currentPath,
-                        expectedPath,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                SavePackContainerCore(
-                    pf,
-                    expectedPath,
-                    false,
-                    gameInformation);
-            }
-
-            _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
-            return true;
         }
 
         private void SaveFolderProjectContainerCore(
             FolderProjectContainer project,
             string path,
-            bool createBackup,
             GameInformation gameInformation)
         {
             var outputPath = Path.GetFullPath(path);
@@ -1013,10 +981,8 @@ namespace Shared.Core.PackFiles
                     SavePackContainerCore(
                         snapshot.Container,
                         path,
-                        createBackup,
                         gameInformation,
-                        snapshot.EnableCorruptionDetection,
-                        false);
+                        snapshot.EnableCorruptionDetection);
 
                     project.ExecuteSynchronized(
                         () =>
@@ -1032,10 +998,8 @@ namespace Shared.Core.PackFiles
         private void SavePackContainerCore(
             PackFileContainer pf,
             string path,
-            bool createBackup,
             GameInformation gameInformation,
-            bool enableCorruptionDetection = false,
-            bool createRotatingBackup = true)
+            bool enableCorruptionDetection = false)
         {
             var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
             try
@@ -1047,9 +1011,6 @@ namespace Shared.Core.PackFiles
 
                 if (pf.IsCaPackFile)
                     throw new Exception("Can not save ca pack file");
-                if (createBackup)
-                    SaveUtility.CreateFileBackup(path);
-
                 // Check if file has changed in size
                 if (pf.OriginalLoadByteSize != -1)
                 {
@@ -1071,37 +1032,21 @@ namespace Shared.Core.PackFiles
                 using (var memoryStream = new FileStream(tempPath, FileMode.CreateNew))
                 {
                     using var writer = new BinaryWriter(memoryStream);
-                    var useCompression = SettingsService?.CurrentSettings.UseZstdCompression ?? true;
-                    _logger.Here().Information($"Saving pack with compression={useCompression}");
+                    var enableCompression =
+                        gameInformation.Type == GameTypeEnum.Warhammer3;
+                    _logger.Here().Information(
+                        $"Saving pack with compression={enableCompression}");
                     serializationResult = PackFileSerializerWriter.SaveToByteArray(
                         path,
                         pf,
                         writer,
                         gameInformation,
-                        useCompression,
+                        enableCompression,
                         enableCorruptionDetection);
                 }
 
                 foreach (var parent in oldParents)
                     parent.CloseStream();
-
-                // Auto-backup the original file before overwriting (only for non-CA packs with existing file)
-                if (createRotatingBackup &&
-                    !pf.IsCaPackFile &&
-                    File.Exists(path))
-                {
-                    try
-                    {
-                        var settings = SettingsService?.CurrentSettings;
-                        var backupDir = settings?.BackupPath ?? "";
-                        var maxCount = settings?.MaxBackupCount ?? 10;
-                        SaveUtility.CreateBackupWithRotation(path, backupDir, maxCount);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Here().Error(ex, "Failed to create backup, proceeding with save");
-                    }
-                }
 
                 File.Move(tempPath, path, true);
 
