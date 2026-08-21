@@ -935,6 +935,16 @@ namespace GameWorld.Core.Components.Rendering
                     DepthFormat.None,
                     msaaCount,
                     RenderTargetUsage.DiscardContents);
+            }
+
+            if (_mainRenderTargets == null ||
+                !ReferenceEquals(
+                    _mainRenderTargets[0].RenderTarget,
+                    _defaultRenderTarget) ||
+                !ReferenceEquals(
+                    _mainRenderTargets[1].RenderTarget,
+                    _selectionMaskTarget))
+            {
                 _mainRenderTargets =
                 [
                     new RenderTargetBinding(
