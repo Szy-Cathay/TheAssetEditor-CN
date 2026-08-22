@@ -9,6 +9,7 @@ using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Ui.Common.OperationProgress;
 
+using System.Diagnostics;
 using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -673,20 +674,49 @@ public class OperationProgressViewTests
 
             try
             {
+                long shownTimestamp = 0;
+                long hiddenTimestamp = 0;
+                progress.IsVisibleChanged += (_, eventArgs) =>
+                {
+                    if (eventArgs.NewValue is true)
+                    {
+                        shownTimestamp = Stopwatch.GetTimestamp();
+                        progress.IsOperationActive = false;
+                    }
+                    else if (shownTimestamp != 0)
+                    {
+                        hiddenTimestamp = Stopwatch.GetTimestamp();
+                    }
+                };
+
                 host.Show();
+                var startedTimestamp = Stopwatch.GetTimestamp();
                 progress.IsOperationActive = true;
-                PumpDispatcher(TimeSpan.FromMilliseconds(150));
-                Assert.That(progress.Visibility, Is.EqualTo(Visibility.Collapsed));
+                var completedVisibilityCycle = PumpDispatcherUntil(
+                    () => hiddenTimestamp != 0,
+                    TimeSpan.FromSeconds(3));
 
-                PumpDispatcher(TimeSpan.FromMilliseconds(450));
-                Assert.That(progress.Visibility, Is.EqualTo(Visibility.Visible));
-
-                progress.IsOperationActive = false;
-                PumpDispatcher(TimeSpan.FromMilliseconds(150));
-                Assert.That(progress.Visibility, Is.EqualTo(Visibility.Visible));
-
-                PumpDispatcher(TimeSpan.FromMilliseconds(250));
-                Assert.That(progress.Visibility, Is.EqualTo(Visibility.Collapsed));
+                var timingTolerance = TimeSpan.FromMilliseconds(10);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(completedVisibilityCycle, Is.True);
+                    Assert.That(
+                        Stopwatch.GetElapsedTime(
+                            startedTimestamp,
+                            shownTimestamp),
+                        Is.GreaterThanOrEqualTo(
+                            OperationProgressVisibilityController.ShowDelay));
+                    Assert.That(
+                        Stopwatch.GetElapsedTime(
+                            shownTimestamp,
+                            hiddenTimestamp),
+                        Is.GreaterThanOrEqualTo(
+                            OperationProgressVisibilityController
+                                .MinimumVisibleDuration - timingTolerance));
+                    Assert.That(
+                        progress.Visibility,
+                        Is.EqualTo(Visibility.Collapsed));
+                });
             }
             finally
             {
@@ -1053,6 +1083,17 @@ public class OperationProgressViewTests
         };
         timer.Start();
         Dispatcher.PushFrame(frame);
+    }
+
+    private static bool PumpDispatcherUntil(
+        Func<bool> condition,
+        TimeSpan timeout)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (!condition() && stopwatch.Elapsed < timeout)
+            PumpDispatcher(TimeSpan.FromMilliseconds(10));
+
+        return condition();
     }
 
 }
