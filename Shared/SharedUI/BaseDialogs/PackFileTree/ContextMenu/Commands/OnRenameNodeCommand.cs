@@ -13,6 +13,40 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
         public void Execute(TreeNode _selectedNode)
         {
             var FileOwner = _selectedNode.FileOwner;
+            if (_selectedNode.NodeType == NodeType.Root &&
+                FileOwner is FolderProjectContainer project)
+            {
+                var result = standardDialogs.ShowTextInputDialog(
+                    LocalizationManager.Instance.Get(
+                        "FolderProject.RenameProject.Title"),
+                    project.Name);
+                var newProjectName = result.Text.Trim();
+                if (!result.Result ||
+                    string.IsNullOrWhiteSpace(newProjectName) ||
+                    string.Equals(
+                        newProjectName,
+                        project.Name,
+                        System.StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                try
+                {
+                    project.SetProjectDisplayName(newProjectName);
+                    _selectedNode.Name = project.Name;
+                    _selectedNode.UnsavedChanged = true;
+                }
+                catch (System.Exception exception)
+                {
+                    standardDialogs.ShowExceptionWindow(
+                        exception,
+                        LocalizationManager.Instance.Get(
+                            "FolderProject.RenameProject.Failed"));
+                }
+                return;
+            }
+
             if (FileOwner.IsCaPackFile)
             {
                 standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.UnableToEditPackfile"), LocalizationManager.Instance.Get("Msg.GeneralError"));

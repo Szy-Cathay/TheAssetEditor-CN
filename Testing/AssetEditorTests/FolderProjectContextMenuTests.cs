@@ -17,6 +17,122 @@ namespace AssetEditorTests;
 public class FolderProjectContextMenuTests
 {
     [NUnit.Framework.Test]
+    public void FolderProjectRootRename_PersistsProjectDisplayName()
+    {
+        new LocalizationManager().LoadLanguage();
+        using var projectRoot = new TemporaryDirectory();
+        var outputPackPath = Path.Combine(
+            Path.GetTempPath(),
+            $"ae-folder-project-output-{Guid.NewGuid():N}.pack");
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings
+            {
+                Name = "旧工程名",
+                OutputPackPath = outputPackPath,
+            });
+        var root = new TreeNode(
+            project.Name,
+            NodeType.Root,
+            project,
+            null);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowTextInputDialog(
+                "重命名工程",
+                "旧工程名"))
+            .Returns(new TextInputDialogResult(true, "  新工程名  "));
+        var command = new OnRenameNodeCommand(
+            Mock.Of<IPackFileService>(),
+            dialogs.Object);
+
+        command.Execute(root);
+
+        var savedSettings = FolderProjectSettings.Load(projectRoot.Path);
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.Name, NUnit.Framework.Is.EqualTo("新工程名"));
+            NUnitAssert.That(
+                project.Name,
+                NUnit.Framework.Is.EqualTo("新工程名"));
+            NUnitAssert.That(
+                project.ProjectSettings.Name,
+                NUnit.Framework.Is.EqualTo("新工程名"));
+            NUnitAssert.That(
+                savedSettings.Name,
+                NUnit.Framework.Is.EqualTo("新工程名"));
+            NUnitAssert.That(
+                project.ProjectRoot,
+                NUnit.Framework.Is.EqualTo(projectRoot.Path));
+            NUnitAssert.That(
+                project.ProjectSettings.OutputPackPath,
+                NUnit.Framework.Is.EqualTo(outputPackPath));
+            NUnitAssert.That(
+                savedSettings.OutputPackPath,
+                NUnit.Framework.Is.EqualTo(outputPackPath));
+            NUnitAssert.That(
+                root.UnsavedChanged,
+                NUnit.Framework.Is.True);
+        });
+    }
+
+    [NUnit.Framework.Test]
+    public void FolderProjectRootRename_SaveFailurePreservesOldName()
+    {
+        new LocalizationManager().LoadLanguage();
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "旧工程名" });
+        var root = new TreeNode(
+            project.Name,
+            NodeType.Root,
+            project,
+            null);
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.ShowTextInputDialog(
+                "重命名工程",
+                "旧工程名"))
+            .Returns(new TextInputDialogResult(true, "新工程名"));
+        var command = new OnRenameNodeCommand(
+            Mock.Of<IPackFileService>(),
+            dialogs.Object);
+        var settingsPath = Path.Combine(
+            projectRoot.Path,
+            FolderProjectSettings.CnFileName);
+
+        using (File.Open(
+                   settingsPath,
+                   FileMode.Open,
+                   FileAccess.Read,
+                   FileShare.None))
+        {
+            NUnitAssert.DoesNotThrow(() => command.Execute(root));
+        }
+
+        var savedSettings = FolderProjectSettings.Load(projectRoot.Path);
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(root.Name, NUnit.Framework.Is.EqualTo("旧工程名"));
+            NUnitAssert.That(
+                project.Name,
+                NUnit.Framework.Is.EqualTo("旧工程名"));
+            NUnitAssert.That(
+                project.ProjectSettings.Name,
+                NUnit.Framework.Is.EqualTo("旧工程名"));
+            NUnitAssert.That(
+                savedSettings.Name,
+                NUnit.Framework.Is.EqualTo("旧工程名"));
+            NUnitAssert.That(
+                root.UnsavedChanged,
+                NUnit.Framework.Is.False);
+        });
+        dialogs.Verify(item => item.ShowExceptionWindow(
+            It.IsAny<Exception>(),
+            "无法重命名工程。请检查工程目录权限或配置文件是否正被占用。"),
+            Times.Once);
+    }
+
+    [NUnit.Framework.Test]
     [NUnit.Framework.Apartment(ApartmentState.STA)]
     public void CopyFromReferencePack_TargetsActiveFolderProject()
     {
