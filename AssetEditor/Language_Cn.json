@@ -252,6 +252,8 @@
   "FolderProject.Context.DisableCorruptionDetection": "关闭 Pack 保存损坏检测",
   "FolderProject.Output.Failed": "无法更改生成位置。生成的 Pack 必须位于工程目录之外。",
   "FolderProject.Rename.Failed": "无法重命名该文件夹。请检查名称是否合法以及目录是否正被占用。",
+  "FolderProject.RenameProject.Title": "重命名工程",
+  "FolderProject.RenameProject.Failed": "无法重命名工程。请检查工程目录权限或配置文件是否正被占用。",
   "FolderProject.Import.OverwriteTitle": "确认覆盖",
   "FolderProject.Import.ConfirmOverwrite": "文件夹工程中已有 {0} 个同路径文件。导入后会立即覆盖磁盘原文件，且无法撤销。\n\n是否继续？",
 

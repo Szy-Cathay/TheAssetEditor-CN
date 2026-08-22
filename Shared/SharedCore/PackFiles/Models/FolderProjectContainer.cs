@@ -423,6 +423,36 @@ public sealed class FolderProjectContainer :
             });
     }
 
+    public void SetProjectDisplayName(string name)
+    {
+        var normalizedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            throw new ArgumentException(
+                "Project name cannot be empty.",
+                nameof(name));
+        }
+
+        ExecuteSynchronizedMutation(
+            () =>
+            {
+                var previousName = Name;
+                var previousSettingsName = ProjectSettings.Name;
+                try
+                {
+                    ProjectSettings.Name = normalizedName;
+                    ProjectSettings.Save(ProjectRoot);
+                    Name = normalizedName;
+                }
+                catch
+                {
+                    Name = previousName;
+                    ProjectSettings.Name = previousSettingsName;
+                    throw;
+                }
+            });
+    }
+
     public bool IsIgnored(string relativePath)
     {
         return ExecuteSynchronized(
