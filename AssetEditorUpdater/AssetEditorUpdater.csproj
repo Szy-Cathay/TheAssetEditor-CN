@@ -6,7 +6,7 @@
     <AssemblyName>AssetEditor.CN.Updater</AssemblyName>
     <RootNamespace>AssetEditorUpdater</RootNamespace>
     <Product>AssetEditor.CN.Updater</Product>
-    <Version>2.4.5</Version>
+    <Version>2.4.6</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

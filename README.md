@@ -22,7 +22,7 @@ Asset Editor 国区版是一款运行在 Windows 上的《全面战争》系列�
 
 ### 国区版身份
 
-- 当前版本：`2.4.5`
+- 当前版本：`2.4.6`
 - 主程序：`AssetEditor.CN.exe`
 - 更新器：`AssetEditor.CN.Updater.exe`
 - 用户数据目录：`%USERPROFILE%\AssetEditor.CN`
