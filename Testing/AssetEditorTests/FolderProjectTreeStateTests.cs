@@ -1,7 +1,8 @@
-using System.Collections.ObjectModel;
-using System.Threading;
+﻿using System.Collections.ObjectModel;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using Moq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -17,6 +18,169 @@ namespace AssetEditorTests;
 
 public class FolderProjectTreeStateTests
 {
+    [Test]
+    public void CtrlAndShiftSelection_UpdatesAllVisibleSelectedNodes()
+    {
+        var pack = new PackFileContainer("Pack");
+        pack.FileList["a.bin"] = PackFile.CreateFromBytes("a.bin", [1]);
+        pack.FileList["b.bin"] = PackFile.CreateFromBytes("b.bin", [2]);
+        pack.FileList["c.bin"] = PackFile.CreateFromBytes("c.bin", [3]);
+        using var harness = CreateViewModel(pack);
+        var root = harness.ViewModel.Files.Single();
+        root.IsNodeExpanded = true;
+        var first = FindNode(root, "a.bin");
+        var middle = FindNode(root, "b.bin");
+        var last = FindNode(root, "c.bin");
+
+        harness.ViewModel.SelectNode(
+            first,
+            PackFileTreeSelectionMode.Replace);
+        harness.ViewModel.SelectNode(
+            last,
+            PackFileTreeSelectionMode.Range);
+
+        NUnitAssert.That(
+            harness.ViewModel.SelectedItems.Select(node => node.Name),
+            Is.EqualTo(new[] { "a.bin", "b.bin", "c.bin" }));
+
+        harness.ViewModel.SelectNode(
+            middle,
+            PackFileTreeSelectionMode.Toggle);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItems.Select(node => node.Name),
+                Is.EqualTo(new[] { "a.bin", "c.bin" }));
+            NUnitAssert.That(first.IsSelected, Is.True);
+            NUnitAssert.That(middle.IsSelected, Is.False);
+            NUnitAssert.That(last.IsSelected, Is.True);
+        });
+    }
+
+    [Test]
+    public void SavingExistingMetaFile_PreservesExpandedResourceTree()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"animations\folder\selected.meta", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new TestEventHub();
+        var service = new PackFileService(eventHub);
+        service.AddEditableFolderProject(project);
+        var contextMenu = new Mock<IContextMenuBuilder>();
+        contextMenu.Setup(builder => builder.Build(It.IsAny<TreeNode?>()))
+            .Returns(new ObservableCollection<ContextMenuItem2>());
+        using var viewModel = new PackFileBrowserViewModel(
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            contextMenu.Object,
+            service,
+            eventHub,
+            true,
+            false);
+        var root = viewModel.Files.Single();
+        root.IsNodeExpanded = true;
+        FindNode(root, "animations").IsNodeExpanded = true;
+        FindNode(root, @"animations\folder").IsNodeExpanded = true;
+        var selected = FindNode(
+            root,
+            @"animations\folder\selected.meta");
+        viewModel.SelectedItem = selected;
+
+        service.SaveFile(selected.Item!, [2]);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.Files.Single(), Is.SameAs(root));
+            NUnitAssert.That(root.IsNodeExpanded, Is.True);
+            NUnitAssert.That(
+                FindNode(root, "animations").IsNodeExpanded,
+                Is.True);
+            NUnitAssert.That(
+                FindNode(root, @"animations\folder").IsNodeExpanded,
+                Is.True);
+            NUnitAssert.That(viewModel.SelectedItem, Is.SameAs(selected));
+        });
+    }
+
+    [Test]
+    public void LegacyUpdatedEvent_DoesNotRebuildExpandedFolderProjectTree()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write(@"animations\folder\selected.meta", [1]);
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        root.IsNodeExpanded = true;
+        var animations = FindNode(root, "animations");
+        animations.IsNodeExpanded = true;
+        var folder = FindNode(root, @"animations\folder");
+        folder.IsNodeExpanded = true;
+        var selected = FindNode(
+            root,
+            @"animations\folder\selected.meta");
+        harness.ViewModel.SelectedItem = selected;
+
+        harness.EventHub.Publish(new PackFileContainerFilesUpdatedEvent(
+            project,
+            [selected.Item!]));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(harness.ViewModel.Files.Single(), Is.SameAs(root));
+            NUnitAssert.That(root.IsNodeExpanded, Is.True);
+            NUnitAssert.That(animations.IsNodeExpanded, Is.True);
+            NUnitAssert.That(folder.IsNodeExpanded, Is.True);
+            NUnitAssert.That(harness.ViewModel.SelectedItem, Is.SameAs(selected));
+        });
+    }
+
+    [Test]
+    public void LegacyFolderRemoval_PreservesOtherSelectionAndHighlightsFallback()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        projectRoot.Write("keep.bin", [1]);
+        Directory.CreateDirectory(Path.Combine(
+            projectRoot.Path,
+            "folder",
+            "child"));
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "工程" });
+        using var harness = CreateViewModel(project);
+        var root = harness.ViewModel.Files.Single();
+        var keep = FindNode(root, "keep.bin");
+        var removed = FindNode(root, @"folder\child");
+        harness.ViewModel.SelectNode(
+            keep,
+            PackFileTreeSelectionMode.Replace);
+        harness.ViewModel.SelectNode(
+            removed,
+            PackFileTreeSelectionMode.Toggle);
+
+        project.DeleteFolderFromDisk(@"folder\child");
+        harness.EventHub.Publish(new PackFileContainerFolderRemovedEvent(
+            project,
+            @"folder\child"));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItem.GetFullPath(),
+                Is.EqualTo("folder").IgnoreCase);
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItems.Select(node =>
+                    node.GetFullPath()),
+                Is.EquivalentTo(new[] { "keep.bin", "folder" }));
+            NUnitAssert.That(
+                harness.ViewModel.SelectedItems.All(node => node.IsSelected),
+                Is.True);
+        });
+    }
+
     [Test]
     public async Task CaWemSettingChanged_RefreshesCaPackAndPreservesSelection()
     {
@@ -984,23 +1148,157 @@ public class FolderProjectTreeStateTests
     }
 
     [Test]
-    [Apartment(ApartmentState.STA)]
-    public void TreeNodeSelection_BindsToTreeViewItem()
+    [NonParallelizable]
+    public void MultiSelectionHighlight_UsesTreeNodeSelectionState()
     {
-        var pack = new PackFileContainer("Pack");
-        var node = new TreeNode("node.bin", NodeType.File, pack, null);
-        var item = new TreeViewItem { DataContext = node };
-        BindingOperations.SetBinding(
-            item,
-            TreeViewItem.IsSelectedProperty,
-            new Binding(nameof(TreeNode.IsSelected))
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
             {
-                Mode = BindingMode.TwoWay,
+                var view = new PackFileBrowserView();
+                var tree = (TreeView)view.FindName("tvParameters");
+                var selectionTrigger = tree.ItemContainerStyle.Triggers
+                    .OfType<DataTrigger>()
+                    .Single(trigger =>
+                        trigger.Binding is Binding binding &&
+                        binding.Path.Path == nameof(TreeNode.IsSelected));
+
+                NUnitAssert.That(
+                    selectionTrigger.Setters
+                        .OfType<Setter>()
+                        .Any(setter =>
+                            setter.Property == Control.BackgroundProperty),
+                    Is.True);
             });
+    }
 
-        node.IsSelected = true;
+    [TestCase("folder")]
+    [TestCase(@"folder\file.bin")]
+    [NonParallelizable]
+    public void RightClickingNestedNode_ActivatesClickedNode(string path)
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var pack = new PackFileContainer("Pack");
+                pack.FileList[@"folder\file.bin"] =
+                    PackFile.CreateFromBytes("file.bin", [1]);
+                using var harness = CreateViewModel(pack);
+                var root = harness.ViewModel.Files.Single();
+                root.IsNodeExpanded = true;
+                FindNode(root, "folder").IsNodeExpanded = true;
+                var target = FindNode(root, path);
+                var view = new PackFileBrowserView
+                {
+                    DataContext = harness.ViewModel,
+                };
+                var window = new Window
+                {
+                    Content = view,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    Width = 400,
+                    Height = 500,
+                };
 
-        NUnitAssert.That(item.IsSelected, Is.True);
+                try
+                {
+                    window.Show();
+                    view.UpdateLayout();
+                    var tree = (TreeView)view.FindName("tvParameters");
+                    var targetItem = FindTreeViewItem(tree, target);
+
+                    targetItem.RaiseEvent(new MouseButtonEventArgs(
+                        Mouse.PrimaryDevice,
+                        Environment.TickCount,
+                        MouseButton.Right)
+                    {
+                        RoutedEvent = UIElement.MouseRightButtonDownEvent,
+                        Source = targetItem,
+                    });
+
+                    NUnitAssert.That(
+                        harness.ViewModel.SelectedItem,
+                        Is.SameAs(target));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void PreviewLeftClickOnNestedSelection_DoesNotActivateAncestor()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var pack = new PackFileContainer("Pack");
+                pack.FileList[@"folder\first.bin"] =
+                    PackFile.CreateFromBytes("first.bin", [1]);
+                pack.FileList[@"folder\second.bin"] =
+                    PackFile.CreateFromBytes("second.bin", [2]);
+                using var harness = CreateViewModel(pack);
+                var root = harness.ViewModel.Files.Single();
+                root.IsNodeExpanded = true;
+                FindNode(root, "folder").IsNodeExpanded = true;
+                var first = FindNode(root, @"folder\first.bin");
+                var second = FindNode(root, @"folder\second.bin");
+                harness.ViewModel.SelectNode(
+                    first,
+                    PackFileTreeSelectionMode.Replace);
+                harness.ViewModel.SelectNode(
+                    second,
+                    PackFileTreeSelectionMode.Toggle);
+                var view = new PackFileBrowserView
+                {
+                    DataContext = harness.ViewModel,
+                };
+                var window = new Window
+                {
+                    Content = view,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    Width = 400,
+                    Height = 500,
+                };
+
+                try
+                {
+                    window.Show();
+                    view.UpdateLayout();
+                    var tree = (TreeView)view.FindName("tvParameters");
+                    var rootItem = FindTreeViewItem(tree, root);
+                    var clickedItem = FindTreeViewItem(tree, second);
+
+                    rootItem.RaiseEvent(new MouseButtonEventArgs(
+                        Mouse.PrimaryDevice,
+                        Environment.TickCount,
+                        MouseButton.Left)
+                    {
+                        RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+                        Source = clickedItem,
+                    });
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            harness.ViewModel.SelectedItem,
+                            Is.SameAs(second));
+                        NUnitAssert.That(
+                            harness.ViewModel.SelectedItems,
+                            Is.EquivalentTo(new[] { first, second }));
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
     }
 
     private static TreeNode FindNode(TreeNode root, string path)
@@ -1019,6 +1317,37 @@ public class FolderProjectTreeStateTests
             foreach (var descendant in GetAllNodes(child))
                 yield return descendant;
         }
+    }
+
+    private static TreeViewItem FindTreeViewItem(
+        ItemsControl parent,
+        TreeNode target)
+    {
+        parent.ApplyTemplate();
+        parent.UpdateLayout();
+        foreach (var node in parent.Items.OfType<TreeNode>())
+        {
+            var item = parent.ItemContainerGenerator.ContainerFromItem(node)
+                as TreeViewItem;
+            if (item == null)
+                continue;
+            if (ReferenceEquals(node, target))
+                return item;
+
+            item.IsExpanded = true;
+            item.ApplyTemplate();
+            item.UpdateLayout();
+            try
+            {
+                return FindTreeViewItem(item, target);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Could not find the tree item for '{target.GetFullPath()}'.");
     }
 
     private static TreeHarness CreateViewModel(

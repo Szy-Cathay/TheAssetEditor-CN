@@ -741,6 +741,87 @@ namespace Shared.Core.PackFiles
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerFilesAddedEvent(pf, [file]));
         }
 
+        public void MoveFolder(
+            PackFileContainer pf,
+            string folderPath,
+            string newParentPath)
+        {
+            EnsureWritable(pf);
+            if (pf.IsCaPackFile)
+                throw new Exception("Can not move folders inside CA pack files");
+
+            var oldPath = folderPath.TrimEnd('\\', '/');
+            var newPath = Path.Combine(
+                newParentPath ?? "",
+                Path.GetFileName(oldPath));
+            if (newPath.Equals(
+                    oldPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var oldPrefix = oldPath + "\\";
+            if (newPath.StartsWith(
+                    oldPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "A folder can not be moved into itself.");
+            }
+
+            if (pf is FolderProjectContainer folderProject)
+            {
+                var affectedFiles = folderProject.FileList
+                    .Where(pair => pair.Key.StartsWith(
+                        oldPrefix,
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                newPath = folderProject.MoveDirectoryOnDisk(
+                    oldPath,
+                    newParentPath);
+                var fileChanges = affectedFiles
+                    .Select(pair => new FolderProjectFileChange(
+                        newPath + pair.Key[oldPath.Length..],
+                        FolderProjectFileChangeKind.Moved,
+                        pair.Value,
+                        pair.Key))
+                    .ToList();
+                _globalEventHub?.PublishGlobalEvent(
+                    new FolderProjectChangedEvent(
+                        folderProject,
+                        new FolderProjectChangeSet(
+                            folderProject.NextRevision(),
+                            fileChanges,
+                            [
+                                new FolderProjectDirectoryChange(
+                                    newPath,
+                                    FolderProjectDirectoryChangeKind.Moved,
+                                    oldPath),
+                            ])));
+                return;
+            }
+
+            var affected = pf.FileList
+                .Where(pair => pair.Key.StartsWith(
+                    oldPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            _globalEventHub?.PublishGlobalEvent(
+                new PackFileContainerFilesRemovedEvent(
+                    pf,
+                    affected.Select(pair => pair.Value).ToList()));
+            foreach (var (path, file) in affected)
+            {
+                pf.FileList.Remove(path);
+                pf.FileList[newPath + path[oldPath.Length..]] = file;
+            }
+            _globalEventHub?.PublishGlobalEvent(
+                new PackFileContainerFilesAddedEvent(
+                    pf,
+                    affected.Select(pair => pair.Value).ToList()));
+        }
+
         public void RenameDirectory(PackFileContainer pf, string currentNodeName, string newName)
         {
             EnsureWritable(pf);

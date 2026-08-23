@@ -46,6 +46,10 @@ namespace Shared.Core.PackFiles
         string GetFullPath(PackFile file, PackFileContainer? container = null);
         PackFileContainer? GetPackFileContainer(PackFile file);
         void MoveFile(PackFileContainer pf, PackFile file, string newFolderPath);
+        void MoveFolder(
+            PackFileContainer pf,
+            string folderPath,
+            string newParentPath);
         void RenameDirectory(PackFileContainer pf, string currentNodeName, string newName);
         void RenameFile(PackFileContainer pf, PackFile file, string newName);
         void SaveFile(PackFile file, byte[] data);

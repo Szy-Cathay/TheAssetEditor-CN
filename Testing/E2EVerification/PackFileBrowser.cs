@@ -10,21 +10,27 @@ namespace Test.E2EVerification
         private readonly string _inputPackFileKarl = PathHelper.GetDataFolder("Data\\Karl_and_celestialgeneral_Pack");
 
         [Test]
+        [Apartment(ApartmentState.STA)]
         public void DragAndDrop()
         {
             // Arrange
             var runner = new AssetEditorTestRunner();
             runner.CreateCaContainer();
-            var outputPackFile = runner.LoadFolderPackFile(_inputPackFileKarl);
+            var outputPackFile = runner.LoadFolderPackFile(_inputPackFileKarl) ??
+                throw new InvalidOperationException("Unable to load the editable test pack.");
+            runner.PackFileService.SetEditablePack(outputPackFile);
 
             var mainApplicationView = runner.ServiceProvider.GetRequiredService<MainViewModel>();
             var treeView = mainApplicationView.FileTree;
             var packRootNode = treeView.Files[1];
 
             // Act
-            var fileToMove = treeView.GetFromPath(packRootNode, @"animations\battle\humanoid01\2handed_hammer\stand\hu1_2hh_stand_idle_01.anim");
-            var destinationNode = treeView.GetFromPath(packRootNode, @"animations");
-            treeView.Drop(fileToMove, destinationNode);
+            var fileToMove = treeView.GetFromPath(packRootNode, @"animations\battle\humanoid01\2handed_hammer\stand\hu1_2hh_stand_idle_01.anim") ??
+                throw new InvalidOperationException("Unable to find the file to move.");
+            var destinationNode = treeView.GetFromPath(packRootNode, @"animations") ??
+                throw new InvalidOperationException("Unable to find the move destination.");
+            Assert.That(treeView.AllowDrop(fileToMove, destinationNode), Is.True);
+            Assert.That(treeView.Drop(fileToMove, destinationNode), Is.True);
 
             // Assert
             // Get file in packfileservice

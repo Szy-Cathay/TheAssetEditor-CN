@@ -13,20 +13,22 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private readonly IEventHub _eventHub;
         private readonly ContextMenuFactory _contextMenuFactory;
         private readonly IFolderProjectHistoryService? _historyService;
+        private readonly PackFileTreeOperations? _operations;
 
-        public PackFileTreeViewFactory(ApplicationSettingsService applicationSettingsService, IPackFileService packFileService, IEventHub eventHub, ContextMenuFactory contextMenuFactory, IFolderProjectHistoryService? historyService = null)
+        public PackFileTreeViewFactory(ApplicationSettingsService applicationSettingsService, IPackFileService packFileService, IEventHub eventHub, ContextMenuFactory contextMenuFactory, IFolderProjectHistoryService? historyService = null, PackFileTreeOperations? operations = null)
         {
             _applicationSettingsService = applicationSettingsService;
             _packFileService = packFileService;
             _eventHub = eventHub;
             _contextMenuFactory = contextMenuFactory;
+            _operations = operations;
             _historyService = historyService;
         }
 
         public PackFileBrowserViewModel Create(ContextMenuType contextMenu, bool showCaFiles, bool showFoldersOnly)
         {
             var contextMenuBuilder = _contextMenuFactory.GetContextMenu(contextMenu);
-            var fileTree = new PackFileBrowserViewModel(_applicationSettingsService, contextMenuBuilder, _packFileService, _eventHub, showCaFiles, showFoldersOnly, _historyService);
+            var fileTree = new PackFileBrowserViewModel(_applicationSettingsService, contextMenuBuilder, _packFileService, _eventHub, showCaFiles, showFoldersOnly, _historyService, _operations);
             return fileTree;
         }
     }

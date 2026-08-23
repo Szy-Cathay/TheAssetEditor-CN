@@ -1644,6 +1644,12 @@ public class FolderProjectGitOperationCoordinatorTests
             string newFolderPath) =>
             throw new NotSupportedException();
 
+        public void MoveFolder(
+            PackFileContainer container,
+            string folderPath,
+            string newParentPath) =>
+            throw new NotSupportedException();
+
         public void RenameDirectory(
             PackFileContainer container,
             string currentNodeName,

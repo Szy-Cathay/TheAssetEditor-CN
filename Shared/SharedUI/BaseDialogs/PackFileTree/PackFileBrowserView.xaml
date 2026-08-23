@@ -91,7 +91,7 @@
         </Grid>
 
         <!-- TreeView -->
-        <TreeView x:Name="tvParameters" AllowDrop="True" Grid.Row="2" Margin="0, 2.5, 0, 5" behaviors:TreeViewExtension.SelectItemOnRightClick="True" 
+        <TreeView x:Name="tvParameters" AllowDrop="True" Grid.Row="2" Margin="0, 2.5, 0, 5" PreviewKeyDown="TreeView_PreviewKeyDown"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding Path=Files, UpdateSourceTrigger=PropertyChanged}" 
                   VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                   BorderBrush="Transparent" Background="Transparent"
@@ -132,16 +132,19 @@
                     <EventSetter Event="TreeViewItem.MouseMove" Handler="treeView_MouseMove"/>
                     <EventSetter Event="TreeViewItem.Drop" Handler="treeView_Drop"/>
                     <EventSetter Event="TreeViewItem.PreviewMouseLeftButtonDown" Handler="TreeView_MouseDown"/>
-                    <EventSetter Event="TreeViewItem.PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
+                    <EventSetter Event="TreeViewItem.MouseRightButtonDown" Handler="TreeViewItem_MouseRightButtonDown"/>
                     <Setter Property="behaviors:MouseDoubleClick.Command" Value="{Binding DataContext.DoubleClickCommand,  RelativeSource={RelativeSource FindAncestor, AncestorType=TreeView}, Mode=OneTime}"/>
                     <Setter Property="ContextMenu" Value="{StaticResource NodeContextMenu}"/>
                     <Setter Property="IsExpanded" Value="{Binding IsNodeExpanded, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-                    <Setter Property="IsSelected" Value="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
                     <Setter Property="Visibility" Value="Visible" />
                     <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsVisible}" Value="False">
                             <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsMainEditabelPack, UpdateSourceTrigger=PropertyChanged}" Value="True">
                             <Setter Property="FontWeight" Value="Bold" />

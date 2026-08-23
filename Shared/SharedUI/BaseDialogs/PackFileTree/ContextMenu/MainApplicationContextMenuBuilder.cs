@@ -33,6 +33,28 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             }
         }
 
+        protected override void Create(
+            ContextMenuItem2 rootNode,
+            System.Collections.Generic.IReadOnlyList<TreeNode> selectedNodes)
+        {
+            if (selectedNodes.Count == 1)
+            {
+                Create(rootNode, selectedNodes[0]);
+                return;
+            }
+
+            Add<CopyTreeNodesCommand>(selectedNodes, rootNode);
+            if (System.Linq.Enumerable.All(
+                    selectedNodes,
+                    IsCurrentProject) &&
+                System.Linq.Enumerable.All(
+                    selectedNodes,
+                    node => node.NodeType != NodeType.Root))
+            {
+                Add<DeleteNodeCommand>(selectedNodes, rootNode);
+            }
+        }
+
         void CreateForFile(ContextMenuItem2 rootNode, TreeNode selectedNode)
         {
             var isCurrentProject = IsCurrentProject(selectedNode);
@@ -47,6 +69,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             if (isCurrentProject)
             {
                 AddSeperator(rootNode);
+                Add<CopyTreeNodesCommand>(selectedNode, rootNode);
                 Add<DuplicateFileCommand>(selectedNode, rootNode);
                 Add<OnRenameNodeCommand>(selectedNode, rootNode);
                 Add<DeleteNodeCommand>(selectedNode, rootNode);
@@ -144,6 +167,12 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
                 Add<CreateFolderCommand>(selectedNode, createMenu);
 
                 AddSeperator(rootNode);
+                if (selectedNode.NodeType != NodeType.Root)
+                    Add<CopyTreeNodesCommand>(selectedNode, rootNode);
+                Add<PasteTreeNodesCommand>(
+                    selectedNode,
+                    rootNode,
+                    includeWhenDisabled: true);
                 Add<OnRenameNodeCommand>(selectedNode, rootNode);
                 Add<DeleteNodeCommand>(selectedNode, rootNode);
                 if (selectedNode.FileOwner is FolderProjectContainer &&

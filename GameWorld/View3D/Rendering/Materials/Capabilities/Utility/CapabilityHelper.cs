@@ -4,6 +4,7 @@ using System.Linq;
 using CommunityToolkit.Diagnostics;
 using Microsoft.Xna.Framework;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
+using Shared.GameFormats.RigidModel.Types;
 using Shared.GameFormats.WsModel;
 
 namespace GameWorld.Core.Rendering.Materials.Capabilities.Utility
@@ -26,10 +27,10 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities.Utility
             if (rmvMaterial != null)
             {
                 var textureType = textureInput.Type;
-                var modelTexture = rmvMaterial.GetTexture(textureType);
-                if (modelTexture != null)
+                var texturePath = GetRmvTexturePath(rmvMaterial, textureType);
+                if (texturePath != null)
                 {
-                    textureInput.TexturePath = modelTexture.Value.Path;
+                    textureInput.TexturePath = texturePath;
                     textureInput.UseTexture = true;
                     return;
                 }
@@ -37,6 +38,57 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities.Utility
 
             textureInput.TexturePath = defaultPath;
             textureInput.UseTexture = false;
+        }
+
+        private static string? GetRmvTexturePath(
+            IRmvMaterial rmvMaterial,
+            TextureType textureType)
+        {
+            var texture = rmvMaterial.GetTexture(textureType);
+            if (texture != null)
+                return texture.Value.Path;
+
+            return textureType switch
+            {
+                TextureType.BaseColour => GetRenamedLegacyTexturePath(
+                    rmvMaterial,
+                    TextureType.Diffuse,
+                    "_diffuse",
+                    "_base_colour"),
+                TextureType.MaterialMap => GetRenamedLegacyTexturePath(
+                    rmvMaterial,
+                    TextureType.Specular,
+                    "_specular",
+                    "_material_map"),
+                _ => null,
+            };
+        }
+
+        private static string? GetRenamedLegacyTexturePath(
+            IRmvMaterial rmvMaterial,
+            TextureType legacyType,
+            string legacySuffix,
+            string currentSuffix)
+        {
+            var legacyTexture = rmvMaterial.GetTexture(legacyType);
+            if (legacyTexture == null)
+                return null;
+
+            var texturePath = legacyTexture.Value.Path;
+            var extension = System.IO.Path.GetExtension(texturePath);
+            var nameWithoutExtension = System.IO.Path.GetFileNameWithoutExtension(
+                texturePath);
+            if (!nameWithoutExtension.EndsWith(
+                    legacySuffix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return texturePath[..^(
+                extension.Length + legacySuffix.Length)] +
+                currentSuffix +
+                extension;
         }
 
         public static float GetParameterFloat(WsModelMaterialFile? wsModelMaterial, WsModelParamters.Instance parameterInstance, float defaultValue)

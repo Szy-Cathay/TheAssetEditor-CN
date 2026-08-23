@@ -1,8 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using Shared.Ui.Common;
+using Shared.Ui.Common.Behaviors;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree
 {
@@ -14,7 +19,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         }
 
         Point _lastMouseDown;
-        TreeNode? _draggedItem;
+        IReadOnlyList<TreeNode> _draggedItems = [];
+        TreeNode? _pendingSingleClickNode;
+        bool _dragInProgress;
 
         public System.Windows.Controls.ContextMenu CustomContextMenu
         {
@@ -28,16 +35,59 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             set { SetValue(ShowTitleProperty, value); }
         }
 
-        private void TreeView_MouseDown(object sender, MouseButtonEventArgs e)
+        private void TreeView_MouseDown(
+            object sender,
+            MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left)
+            if (e.ChangedButton != MouseButton.Left ||
+                sender is not TreeViewItem item ||
+                e.OriginalSource is not DependencyObject source ||
+                !ReferenceEquals(
+                    item,
+                    TreeViewExtension.VisualUpwardSearch(source)) ||
+                WasExpanderClicked(source) ||
+                item.DataContext is not TreeNode node ||
+                DataContext is not PackFileBrowserViewModel viewModel)
             {
-                var item = (TreeViewItem)sender;
-
-                _lastMouseDown = e.GetPosition(tvParameters);
-
-                _draggedItem = item.DataContext as TreeNode;
+                return;
             }
+
+            _lastMouseDown = e.GetPosition(tvParameters);
+            _pendingSingleClickNode = null;
+            var modifiers = Keyboard.Modifiers;
+            if (modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                viewModel.SelectNode(
+                    node,
+                    PackFileTreeSelectionMode.Range);
+            }
+            else if (modifiers.HasFlag(ModifierKeys.Control))
+            {
+                var wasSelected = node.IsSelected;
+                viewModel.SelectNode(
+                    node,
+                    PackFileTreeSelectionMode.Toggle);
+                if (wasSelected)
+                {
+                    item.Focus();
+                    e.Handled = true;
+                }
+            }
+            else if (node.IsSelected)
+            {
+                viewModel.ActivateNode(node);
+                _pendingSingleClickNode = node;
+            }
+            else
+            {
+                viewModel.SelectNode(
+                    node,
+                    PackFileTreeSelectionMode.Replace);
+            }
+
+            _draggedItems = node.IsSelected
+                ? viewModel.SelectedItems.ToList()
+                : [];
         }
 
         public void TriggerPreviewKeyDown()
@@ -57,43 +107,56 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         private void treeView_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
+            if (e.LeftButton != MouseButtonState.Pressed)
             {
-                var currentPosition = e.GetPosition(tvParameters);
-
-                if (Math.Abs(currentPosition.X - _lastMouseDown.X) > 10.0 ||
-                    Math.Abs(currentPosition.Y - _lastMouseDown.Y) > 10.0)
-                {
-                    if (_draggedItem != null)
-                    {
-                        DragDrop.DoDragDrop(tvParameters, tvParameters.SelectedValue, DragDropEffects.Move);
-                    }
-                }
+                _draggedItems = [];
+                return;
             }
-            else
+
+            if (_dragInProgress)
+                return;
+
+            var currentPosition = e.GetPosition(tvParameters);
+            if (Math.Abs(currentPosition.X - _lastMouseDown.X) <= 10.0 &&
+                Math.Abs(currentPosition.Y - _lastMouseDown.Y) <= 10.0)
             {
-                _draggedItem = null;
+                return;
+            }
+
+            if (_draggedItems.Count == 0)
+                return;
+
+            _dragInProgress = true;
+            _pendingSingleClickNode = null;
+            try
+            {
+                DragDrop.DoDragDrop(
+                    tvParameters,
+                    _draggedItems,
+                    DragDropEffects.Move);
+            }
+            finally
+            {
+                _draggedItems = [];
+                _dragInProgress = false;
             }
         }
 
         private void treeView_Drop(object sender, DragEventArgs e)
         {
-            if (DataContext is IDropTarget<TreeNode> dropContainer)
+            if (DataContext is not PackFileBrowserViewModel viewModel ||
+                _draggedItems.Count == 0 ||
+                sender is not TreeViewItem dropTargetItem ||
+                dropTargetItem.DataContext is not TreeNode dropTargetNode)
             {
-                if (_draggedItem == null)
-                    return;
+                return;
+            }
 
-                var dropTargetItem = sender as TreeViewItem;
-                var dropTargetNode = dropTargetItem?.DataContext as TreeNode;
-                if (dropTargetNode == null)
-                    return;
-
-                if (dropContainer.AllowDrop(_draggedItem, dropTargetNode))
-                {
-                    dropContainer.Drop(_draggedItem, dropTargetNode);
-                    e.Effects = DragDropEffects.None;
-                    e.Handled = true;
-                }
+            if (viewModel.AllowDrop(_draggedItems, dropTargetNode))
+            {
+                viewModel.Drop(_draggedItems, dropTargetNode);
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
             }
         }
 
@@ -102,14 +165,71 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             FilterTextBoxItem.Focus();
         }
 
-        private void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseEventArgs e)
+        private void TreeViewItem_MouseRightButtonDown(
+            object sender,
+            MouseEventArgs e)
         {
-            var item = sender as TreeViewItem;
-            if (item != null)
+            if (sender is TreeViewItem item &&
+                item.DataContext is TreeNode node &&
+                DataContext is PackFileBrowserViewModel viewModel)
             {
+                viewModel.ActivateNode(node);
                 item.Focus();
                 e.Handled = true;
             }
+        }
+
+        private void TreeView_PreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            if (DataContext is not PackFileBrowserViewModel viewModel)
+                return;
+
+            if (Keyboard.Modifiers == ModifierKeys.Control &&
+                e.Key == Key.C)
+            {
+                viewModel.CopySelection();
+                e.Handled = true;
+            }
+            else if (Keyboard.Modifiers == ModifierKeys.Control &&
+                     e.Key == Key.V)
+            {
+                viewModel.PasteSelection();
+                e.Handled = true;
+            }
+            else if (Keyboard.Modifiers == ModifierKeys.None &&
+                     e.Key == Key.Delete)
+            {
+                viewModel.DeleteSelection();
+                e.Handled = true;
+            }
+        }
+
+        protected override void OnPreviewMouseLeftButtonUp(
+            MouseButtonEventArgs e)
+        {
+            base.OnPreviewMouseLeftButtonUp(e);
+            if (_pendingSingleClickNode != null &&
+                DataContext is PackFileBrowserViewModel viewModel)
+            {
+                viewModel.SelectNode(
+                    _pendingSingleClickNode,
+                    PackFileTreeSelectionMode.Replace);
+            }
+            _pendingSingleClickNode = null;
+            _draggedItems = [];
+        }
+
+        private static bool WasExpanderClicked(DependencyObject? source)
+        {
+            while (source != null)
+            {
+                if (source is ToggleButton { Name: "Expander" })
+                    return true;
+                source = VisualTreeHelper.GetParent(source);
+            }
+            return false;
         }
 
         public static readonly DependencyProperty CustomContextMenuProperty = DependencyProperty.Register("CustomContextMenu", typeof(System.Windows.Controls.ContextMenu), typeof(PackFileBrowserView), new UIPropertyMetadata(null));
