@@ -41,6 +41,44 @@ namespace GameWorld.Core.Test.Rendering.Materials
         }
 
         [Test]
+        public void Create_FromLegacyRmv_Wh3_MapsLegacyTextureNames()
+        {
+            var rmvMaterial = RmvMaterialHelper
+                .Create(ModelMaterialEnum.weighted)
+                .AssignMaterials([TextureType.Diffuse, TextureType.Specular, TextureType.Normal]);
+            rmvMaterial.SetTexture(
+                TextureType.Diffuse,
+                @"rigidmodels\buildings\textures\building_diffuse.dds");
+            rmvMaterial.SetTexture(
+                TextureType.Specular,
+                @"rigidmodels\buildings\textures\building_specular.dds");
+            rmvMaterial.SetTexture(
+                TextureType.Normal,
+                @"rigidmodels\buildings\textures\building_normal.dds");
+
+            var appSettings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            var materialFactory = new CapabilityMaterialFactory(appSettings, null);
+            var material = materialFactory.Create(rmvMaterial, null);
+
+            var capability = material.GetCapability<MetalRoughCapability>();
+            Assert.Multiple(() =>
+            {
+                Assert.That(capability.BaseColour.UseTexture, Is.True);
+                Assert.That(
+                    capability.BaseColour.TexturePath,
+                    Is.EqualTo(@"rigidmodels\buildings\textures\building_base_colour.dds"));
+                Assert.That(capability.MaterialMap.UseTexture, Is.True);
+                Assert.That(
+                    capability.MaterialMap.TexturePath,
+                    Is.EqualTo(@"rigidmodels\buildings\textures\building_material_map.dds"));
+                Assert.That(capability.NormalMap.UseTexture, Is.True);
+                Assert.That(
+                    capability.NormalMap.TexturePath,
+                    Is.EqualTo(@"rigidmodels\buildings\textures\building_normal.dds"));
+            });
+        }
+
+        [Test]
         public void Create_FromWs_Wh3_Default()
         {
             var rmvMaterial = RmvMaterialHelper
@@ -140,7 +178,7 @@ namespace GameWorld.Core.Test.Rendering.Materials
                 .SetAlpha(true)
                 .SetDecalAndDirt(true, true)
                 .AssignMaterials([TextureType.Diffuse, TextureType.Decal_dirtmap, TextureType.Decal_mask, TextureType.Decal_dirtmask]);
-            
+
             var appSettings = new ApplicationSettingsService(GameTypeEnum.Rome2);
             var abstractMaterialFactory = new CapabilityMaterialFactory(appSettings, null);
             var material = abstractMaterialFactory.Create(rmvMaterial, null);

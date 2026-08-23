@@ -25,6 +25,8 @@ namespace Shared.Ui
             services.AddTransient<IToolSelectorUiProvider, ToolSelectorUiProvider>();
 
             services.AddScoped<PackFileTreeViewFactory>();
+            services.AddSingleton<PackFileTreeClipboard>();
+            services.AddScoped<PackFileTreeOperations>();
 
             // Context menu
             services.AddScoped<ContextMenuFactory>();
@@ -42,6 +44,8 @@ namespace Shared.Ui
             services.AddScoped<CollapseNodeCommand>();
             services.AddScoped<DuplicateFileCommand>();
             services.AddScoped<DeleteNodeCommand>();
+            services.AddScoped<CopyTreeNodesCommand>();
+            services.AddScoped<PasteTreeNodesCommand>();
             services.AddScoped<ExportToDirectoryCommand>();
             services.AddScoped<ExpandNodeCommand>();
             services.AddScoped<ImportDirectoryCommand>();

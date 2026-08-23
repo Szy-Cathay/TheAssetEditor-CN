@@ -30,6 +30,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
     {
         ContextMenuType Type { get; }
         public ObservableCollection<ContextMenuItem2> Build(TreeNode? node);
+        public ObservableCollection<ContextMenuItem2> Build(
+            IReadOnlyList<TreeNode> nodes);
     }
 
     public abstract class ContextMenuBuilder : IContextMenuBuilder
@@ -46,14 +48,27 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
 
         protected abstract void Create(ContextMenuItem2 rootNode, TreeNode selectedNode);
 
+        protected virtual void Create(
+            ContextMenuItem2 rootNode,
+            IReadOnlyList<TreeNode> selectedNodes) =>
+            Create(rootNode, selectedNodes[0]);
+
         public ObservableCollection<ContextMenuItem2> Build(TreeNode? node)
         {
+            return node == null
+                ? []
+                : Build([node]);
+        }
+
+        public ObservableCollection<ContextMenuItem2> Build(
+            IReadOnlyList<TreeNode> nodes)
+        {
             var output = new ObservableCollection<ContextMenuItem2>();
-            if (node == null)
+            if (nodes.Count == 0)
                 return output;
 
             var placeholderRoot = new ContextMenuItem2("Root", null);
-            Create(placeholderRoot, node);
+            Create(placeholderRoot, nodes);
 
             foreach (var item in placeholderRoot.ContextMenu)
                 output.Add(item);
@@ -78,6 +93,26 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             var item = new ContextMenuItem2(
                 name,
                 () => instance.Execute(node),
+                isEnabled);
+            parent.ContextMenu.Add(item);
+        }
+
+        protected void Add<T>(
+            IReadOnlyList<TreeNode> nodes,
+            ContextMenuItem2 parent,
+            bool includeWhenDisabled = false)
+            where T : IContextMenuCommand
+        {
+            var instance = _commandFactory.Create<T>();
+            var isEnabled = instance.IsEnabled(nodes);
+
+            if (!isEnabled && !includeWhenDisabled)
+                return;
+
+            var name = instance.GetDisplayName(nodes);
+            var item = new ContextMenuItem2(
+                name,
+                () => instance.Execute(nodes),
                 isEnabled);
             parent.ContextMenu.Add(item);
         }

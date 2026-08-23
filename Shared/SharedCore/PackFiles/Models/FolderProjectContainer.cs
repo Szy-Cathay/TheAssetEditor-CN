@@ -924,63 +924,85 @@ public sealed class FolderProjectContainer :
                 var newPath =
                     FolderProjectPathPolicy.EnsureResourceDirectoryPath(
                         Path.Combine(parent ?? "", newName));
-                var oldFullPath =
-                    FolderProjectPathPolicy.ResolveFilePath(
-                        ProjectRoot,
-                        oldPath);
-                var newFullPath =
-                    FolderProjectPathPolicy.ResolveFilePath(
-                        ProjectRoot,
-                        newPath);
-
-                MovePathCaseAware(oldFullPath, newFullPath, true);
-
-                var oldPrefix = oldPath + "\\";
-                var affected = FileList
-                    .Where(
-                        pair =>
-                            pair.Key.StartsWith(
-                                oldPrefix,
-                                StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                foreach (var (oldKey, file) in affected)
-                {
-                    var suffix = oldKey[oldPath.Length..];
-                    var newKey =
-                        (newPath + suffix).ToLowerInvariant();
-                    FileList.Remove(oldKey);
-                    _fingerprints.Remove(oldKey);
-                    var filePath =
-                        FolderProjectPathPolicy.ResolveFilePath(
-                            ProjectRoot,
-                            newKey);
-                    file.DataSource = new FileSystemSource(filePath);
-                    FileList[newKey] = file;
-                    _pathsByFile[file] = newKey;
-                    UpdateFingerprint(newKey, filePath);
-                }
-
-                var renamedEmptyDirectories = EmptyDirectories
-                    .Where(
-                        path =>
-                            path.Equals(
-                                oldPath,
-                                StringComparison.OrdinalIgnoreCase) ||
-                            path.StartsWith(
-                                oldPrefix,
-                                StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                foreach (var oldEmptyPath in renamedEmptyDirectories)
-                {
-                    EmptyDirectories.Remove(oldEmptyPath);
-                    EmptyDirectories.Add(
-                        newPath +
-                        oldEmptyPath[oldPath.Length..]);
-                }
-                MoveIgnoredPaths(oldPath, newPath);
-                SaveEmptyDirectorySettings();
-                return newPath;
+                return MoveDirectoryCore(oldPath, newPath);
             });
+    }
+
+    public string MoveDirectoryOnDisk(
+        string currentPath,
+        string newParentPath)
+    {
+        return ExecuteSynchronizedMutation(
+            () =>
+            {
+                var oldPath =
+                    FolderProjectPathPolicy.EnsureResourceDirectoryPath(
+                        currentPath);
+                var parent = string.IsNullOrWhiteSpace(newParentPath)
+                    ? ""
+                    : FolderProjectPathPolicy
+                        .EnsureResourceDirectoryPath(newParentPath);
+                var newPath =
+                    FolderProjectPathPolicy.EnsureResourceDirectoryPath(
+                        Path.Combine(
+                            parent,
+                            Path.GetFileName(oldPath)));
+                return MoveDirectoryCore(oldPath, newPath);
+            });
+    }
+
+    private string MoveDirectoryCore(string oldPath, string newPath)
+    {
+        var oldFullPath = FolderProjectPathPolicy.ResolveFilePath(
+            ProjectRoot,
+            oldPath);
+        var newFullPath = FolderProjectPathPolicy.ResolveFilePath(
+            ProjectRoot,
+            newPath);
+
+        MovePathCaseAware(oldFullPath, newFullPath, true);
+
+        var oldPrefix = oldPath + "\\";
+        var affected = FileList
+            .Where(pair => pair.Key.StartsWith(
+                oldPrefix,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var (oldKey, file) in affected)
+        {
+            var suffix = oldKey[oldPath.Length..];
+            var newKey = (newPath + suffix).ToLowerInvariant();
+            FileList.Remove(oldKey);
+            _fingerprints.Remove(oldKey);
+            var filePath = FolderProjectPathPolicy.ResolveFilePath(
+                ProjectRoot,
+                newKey);
+            file.DataSource = new FileSystemSource(filePath);
+            FileList[newKey] = file;
+            _pathsByFile[file] = newKey;
+            UpdateFingerprint(newKey, filePath);
+        }
+
+        var renamedEmptyDirectories = EmptyDirectories
+            .Where(path =>
+                path.Equals(
+                    oldPath,
+                    StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith(
+                    oldPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var oldEmptyPath in renamedEmptyDirectories)
+        {
+            EmptyDirectories.Remove(oldEmptyPath);
+            EmptyDirectories.Add(
+                newPath + oldEmptyPath[oldPath.Length..]);
+        }
+        MoveIgnoredPaths(oldPath, newPath);
+        MarkParentEmptyIfNeeded(oldPath);
+        MarkPathHasContent(newPath);
+        SaveEmptyDirectorySettings();
+        return newPath;
     }
 
     public void Dispose()
