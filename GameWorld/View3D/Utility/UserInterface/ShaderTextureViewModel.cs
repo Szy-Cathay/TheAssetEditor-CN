@@ -42,8 +42,8 @@ namespace GameWorld.Core.Utility.UserInterface
             _resourceLibrary = resourceLibrary;
             _packFileUiProvider = packFileUiProvider;
             _propertyEditor = propertyEditor;
-            Path = _shaderTextureReference.TexturePath;
             _shouldRenderTexture = _shaderTextureReference.UseTexture;
+            Path = _shaderTextureReference.TexturePath;
         }
 
         partial void OnShouldRenderTextureChanged(bool value) 
@@ -56,6 +56,7 @@ namespace GameWorld.Core.Utility.UserInterface
                     value,
                     newValue => _shaderTextureReference.UseTexture = newValue,
                     newValue => ShouldRenderTexture = newValue);
+            ValidatePath();
         }
 
         partial void OnPathChanged(string value)
@@ -75,7 +76,15 @@ namespace GameWorld.Core.Utility.UserInterface
         void HandlePreviewTexture()
         {
             if (HasErrors == false)
-                _uiCommandFactory.Create<OpenEditorCommand>().ExecuteAsWindow(Path, 800, 900);
+            {
+                TexturePathResolver.FindTextureFile(
+                    _packFileService,
+                    Path,
+                    out var resolvedPath);
+                _uiCommandFactory
+                    .Create<OpenEditorCommand>()
+                    .ExecuteAsWindow(resolvedPath, 800, 900);
+            }
         }
 
         [RelayCommand]
@@ -109,16 +118,19 @@ namespace GameWorld.Core.Utility.UserInterface
         void ValidatePath()
         {
             _errorsByPropertyName[nameof(Path)] = new List<string>();
-            if (string.IsNullOrWhiteSpace(Path))
+            if (ShouldRenderTexture && string.IsNullOrWhiteSpace(Path))
             {
                 _errorsByPropertyName[nameof(Path)].Add(
                     GetText("Kitbash.Texture.PathRequired"));
             }
-            else
+            else if (ShouldRenderTexture)
             {
                 if (Path.Contains("test_mask.dds") == false)
                 {
-                    var isFileFound = _packFileService.FindFile(Path) != null;
+                    var isFileFound = TexturePathResolver.FindTextureFile(
+                        _packFileService,
+                        Path,
+                        out _) != null;
                     if (isFileFound == false)
                     {
                         _errorsByPropertyName[nameof(Path)].Add(

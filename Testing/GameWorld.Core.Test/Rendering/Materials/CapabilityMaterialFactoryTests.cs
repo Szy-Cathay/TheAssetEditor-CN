@@ -1,5 +1,6 @@
 ﻿using GameWorld.Core.Rendering.Materials;
 using GameWorld.Core.Rendering.Materials.Capabilities;
+using GameWorld.Core.Rendering.Materials.Serialization;
 using GameWorld.Core.Test.TestUtility;
 using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
@@ -75,6 +76,36 @@ namespace GameWorld.Core.Test.Rendering.Materials
                 Assert.That(
                     capability.NormalMap.TexturePath,
                     Is.EqualTo(@"rigidmodels\buildings\textures\building_normal.dds"));
+            });
+        }
+
+        [Test]
+        public void Create_FromLegacyDefaultRmv_Wh3_PreservesNormalPathForSerialization()
+        {
+            const string normalPath =
+                @"rigidmodels\buildings\textures\flatnormal.dds";
+            const string specularPath =
+                @"rigidmodels\buildings\textures\test_black.dds";
+            var rmvMaterial = RmvMaterialHelper.Create(ModelMaterialEnum.weighted);
+            rmvMaterial.SetTexture(TextureType.Normal, normalPath);
+            rmvMaterial.SetTexture(TextureType.Specular, specularPath);
+
+            var appSettings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+            var materialFactory = new CapabilityMaterialFactory(appSettings, null);
+            var material = materialFactory.Create(rmvMaterial, null);
+            var capability = material.GetCapability<MetalRoughCapability>();
+
+            var serializedMaterial = new MaterialToRmvSerializer()
+                .CreateMaterialFromCapabilityMaterial(material);
+            var serializedNormal = serializedMaterial.GetTexture(TextureType.Normal);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(capability.NormalMap.TexturePath, Is.EqualTo(normalPath));
+                Assert.That(capability.NormalMap.UseTexture, Is.True);
+                Assert.That(capability.MaterialMap.UseTexture, Is.False);
+                Assert.That(serializedNormal, Is.Not.Null);
+                Assert.That(serializedNormal!.Value.Path, Is.EqualTo(normalPath));
             });
         }
 

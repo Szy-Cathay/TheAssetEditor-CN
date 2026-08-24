@@ -357,6 +357,122 @@ public class RenderEngineSelectionMaskOffscreenTests
     }
 
     [Test]
+    public void GridBeforeSelectedGeometry_DoesNotCreateInternalSelectionOutline()
+    {
+        const int size = 64;
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var deviceResolver = new Mock<IDeviceResolver>();
+        deviceResolver
+            .SetupGet(resolver => resolver.Device)
+            .Returns(device);
+        var camera = new ArcBallCamera(
+            deviceResolver.Object,
+            Mock.Of<IKeyboardComponent>(),
+            Mock.Of<IMouseComponent>())
+        {
+            ViewMatrixOverride = Matrix.CreateLookAt(
+                new Vector3(0, 10, 0),
+                Vector3.Zero,
+                Vector3.Forward),
+            ProjectionMatrixOverride = Matrix.CreateOrthographic(
+                100,
+                100,
+                0.1f,
+                100)
+        };
+        camera.Initialize();
+        var resources = new ResourceLibrary(
+            Mock.Of<IPackFileService>());
+        resources.Initialize(device, game.Content);
+        using var grid = new GridComponent(
+            camera,
+            resources,
+            deviceResolver.Object)
+        {
+            ShowGrid = true
+        };
+        grid.Initialize();
+        var renderEngine = new RenderEngineComponent(
+            game,
+            resources,
+            camera,
+            deviceResolver.Object,
+            new ApplicationSettingsService(),
+            new SceneRenderParametersStore(),
+            Mock.Of<IEventHub>(),
+            grid);
+        renderEngine.Initialize();
+        renderEngine.AddRenderItem(
+            RenderBuckedId.Normal,
+            new SelectionMaskRenderItem(
+                game.Content.Load<Effect>(
+                    "Shaders\\Pbr\\SpecGloss\\SpecGloss_main"),
+                device));
+        using var sceneTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24);
+        using var maskTarget = new RenderTarget2D(
+            device,
+            size,
+            size,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.None);
+        using var outlineFilter = new OutlineFilter();
+        outlineFilter.Load(
+            device,
+            resources,
+            new QuadRenderer(device));
+        var cameraPosition = new Vector3(0, 10, 0);
+        var parameters = new CommonShaderParameters(
+            camera.ViewMatrix,
+            camera.ProjectionMatrix,
+            cameraPosition,
+            Vector3.Down,
+            0,
+            0,
+            0,
+            1,
+            Vector3.One,
+            []);
+
+        device.SetRenderTargets(
+            new RenderTargetBinding(sceneTarget),
+            new RenderTargetBinding(maskTarget));
+        device.Clear(
+            ClearOptions.Target | ClearOptions.DepthBuffer,
+            Color.Transparent,
+            1,
+            0);
+        grid.RenderGrid(device, parameters);
+        device.DepthStencilState = DepthStencilState.Default;
+        device.BlendState = BlendState.Opaque;
+        InvokeRender3DObjects(renderEngine);
+        device.SetRenderTarget(null);
+
+        outlineFilter.Draw(maskTarget, size, size);
+        var outlinePixels = new Color[size * size];
+        outlineFilter.GetOutlineTarget().GetData(outlinePixels);
+
+        Assert.That(
+            CountPixels(
+                outlinePixels,
+                size,
+                8,
+                56,
+                8,
+                56,
+                IsOrange),
+            Is.EqualTo(0),
+            "The ground grid must not cut orange lines into selected geometry.");
+    }
+
+    [Test]
     public void Render3DObjects_ActiveEditElementsUseThirdVisualLayer()
     {
         const int size = 64;
