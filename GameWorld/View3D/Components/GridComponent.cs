@@ -127,10 +127,10 @@ namespace GameWorld.Core.Components
             _quadVertices[2] = new VertexPositionTexture(new Vector3(cx - halfSize, 0, cz - halfSize), Vector2.Zero);
             _quadVertices[3] = new VertexPositionTexture(new Vector3(cx + halfSize, 0, cz - halfSize), Vector2.Zero);
 
-            // Set render state: no backface culling (visible from both sides), alpha blending, depth test
+            // Keep the grid from clipping geometry rendered after it.
             device.RasterizerState = RasterizerState.CullNone;
             device.BlendState = BlendState.AlphaBlend;
-            device.DepthStencilState = DepthStencilState.Default;
+            device.DepthStencilState = DepthStencilState.DepthRead;
 
             // Set shader parameters
             _worldParam.SetValue(Matrix.Identity);

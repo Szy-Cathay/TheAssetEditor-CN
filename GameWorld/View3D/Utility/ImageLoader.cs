@@ -37,7 +37,10 @@ namespace GameWorld.Core.Utility
             }
             else
             {
-                var imageFile = packFileService.FindFile(fileName);
+                var imageFile = TexturePathResolver.FindTextureFile(
+                    packFileService,
+                    fileName,
+                    out _);
                 if (imageFile == null)
                     return null;
                 var imageContent = imageFile.DataSource.ReadData();
