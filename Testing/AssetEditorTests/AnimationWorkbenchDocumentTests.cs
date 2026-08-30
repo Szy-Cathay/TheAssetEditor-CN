@@ -209,11 +209,14 @@ public class AnimationWorkbenchDocumentTests
 
         document.Load(request);
         var loadToken = previewHost.CurrentCancellationToken;
+        var loadSession = previewHost.CurrentSession;
 
         document.SelectPreview(AnimationWorkbenchPreviewKind.AnimationB);
         var selectionToken = previewHost.CurrentCancellationToken;
+        var selectionSession = previewHost.CurrentSession;
 
         Assert.IsTrue(loadToken.IsCancellationRequested);
+        Assert.IsTrue(previewHost.IsSessionDisposed(loadSession));
         Assert.AreEqual(
             AnimationWorkbenchPreviewKind.AnimationB,
             previewHost.CurrentPreview?.Kind);
@@ -235,8 +238,10 @@ public class AnimationWorkbenchDocumentTests
 
         var reloadedState = document.Load(replacementRequest);
         var reloadToken = previewHost.CurrentCancellationToken;
+        var reloadSession = previewHost.CurrentSession;
 
         Assert.IsTrue(selectionToken.IsCancellationRequested);
+        Assert.IsTrue(previewHost.IsSessionDisposed(selectionSession));
         Assert.AreEqual("replacement_animation_a", reloadedState.AnimationA?.Name);
         Assert.IsNull(reloadedState.AnimationB);
         Assert.AreEqual(
@@ -255,6 +260,7 @@ public class AnimationWorkbenchDocumentTests
         var closedState = document.Close();
 
         Assert.IsTrue(reloadToken.IsCancellationRequested);
+        Assert.IsTrue(previewHost.IsSessionDisposed(reloadSession));
         Assert.IsTrue(previewHost.IsDisposed);
         Assert.IsNull(previewHost.CurrentPreview);
         Assert.IsTrue(closedState.IsClosed);
@@ -277,6 +283,7 @@ public class AnimationWorkbenchDocumentTests
             GameTypeEnum.Warhammer3,
             skeleton));
         var currentToken = previewHost.CurrentCancellationToken;
+        var currentSession = previewHost.CurrentSession;
 
         Assert.ThrowsException<ArgumentException>(() =>
             document.Load(new AnimationWorkbenchLoadRequest(
@@ -289,6 +296,7 @@ public class AnimationWorkbenchDocumentTests
                 skeleton)));
 
         Assert.IsFalse(currentToken.IsCancellationRequested);
+        Assert.IsFalse(previewHost.IsSessionDisposed(currentSession));
         Assert.AreEqual("animation_a", previewHost.CurrentPreview?.Name);
         Assert.AreEqual(
             GameTypeEnum.Warhammer3,
@@ -352,25 +360,44 @@ public class AnimationWorkbenchDocumentTests
 
         public CancellationToken CurrentCancellationToken { get; private set; }
 
+        public IDisposable? CurrentSession { get; private set; }
+
         public bool IsDisposed { get; private set; }
 
-        public void Show(
+        public IDisposable Show(
             AnimationWorkbenchPreviewSnapshot preview,
             CancellationToken cancellationToken)
         {
             CurrentPreview = preview;
             CurrentCancellationToken = cancellationToken;
+            CurrentSession = new RecordingPreviewSession(() =>
+            {
+                CurrentPreview = null;
+                CurrentSession = null;
+            });
+            return CurrentSession;
         }
 
-        public void Clear()
-        {
-            CurrentPreview = null;
-        }
+        public bool IsSessionDisposed(IDisposable? session) =>
+            session is RecordingPreviewSession { IsDisposed: true };
 
         public void Dispose()
         {
-            Clear();
             IsDisposed = true;
+        }
+    }
+
+    private sealed class RecordingPreviewSession(Action release) : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            if (IsDisposed)
+                return;
+
+            IsDisposed = true;
+            release();
         }
     }
 }

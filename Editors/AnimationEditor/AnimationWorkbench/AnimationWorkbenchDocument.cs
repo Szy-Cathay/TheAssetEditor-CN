@@ -18,7 +18,6 @@ public enum AnimationWorkbenchSourceSlot
 
 public enum AnimationWorkbenchDiagnosticSeverity
 {
-    Information,
     Warning,
     Error,
 }
@@ -63,11 +62,13 @@ public sealed record AnimationWorkbenchDiagnostic(
 
 public interface IAnimationWorkbenchPreviewHost : IDisposable
 {
-    void Show(
+    /// <summary>
+    /// Creates a preview session that owns its player, scene nodes, and event
+    /// subscriptions. Disposing the session must release all of them.
+    /// </summary>
+    IDisposable Show(
         AnimationWorkbenchPreviewSnapshot preview,
         CancellationToken cancellationToken);
-
-    void Clear();
 }
 
 public sealed class AnimationWorkbenchPreviewSnapshot
@@ -114,6 +115,7 @@ public sealed class AnimationWorkbenchDocument : IDisposable
     private GameSkeleton? _targetSkeleton;
     private AnimationWorkbenchPreviewKind? _selectedPreview;
     private CancellationTokenSource? _previewCancellationSource;
+    private IDisposable? _previewSession;
     private bool _isClosed;
 
     public AnimationWorkbenchDocument(
@@ -293,10 +295,21 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         if (preview == null)
             return;
 
-        _previewCancellationSource = new CancellationTokenSource();
-        _previewHost.Show(
-            preview,
-            _previewCancellationSource.Token);
+        var cancellationSource = new CancellationTokenSource();
+        try
+        {
+            var previewSession = _previewHost.Show(
+                preview,
+                cancellationSource.Token);
+            _previewCancellationSource = cancellationSource;
+            _previewSession = previewSession;
+        }
+        catch
+        {
+            cancellationSource.Cancel();
+            cancellationSource.Dispose();
+            throw;
+        }
     }
 
     private void ReleasePreview()
@@ -304,9 +317,25 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         var cancellationSource = Interlocked.Exchange(
             ref _previewCancellationSource,
             null);
-        cancellationSource?.Cancel();
-        cancellationSource?.Dispose();
-        _previewHost.Clear();
+        var previewSession = Interlocked.Exchange(
+            ref _previewSession,
+            null);
+
+        try
+        {
+            cancellationSource?.Cancel();
+        }
+        finally
+        {
+            try
+            {
+                previewSession?.Dispose();
+            }
+            finally
+            {
+                cancellationSource?.Dispose();
+            }
+        }
     }
 
     private sealed class SourceSnapshot(
@@ -356,15 +385,21 @@ public sealed class AnimationWorkbenchDocument : IDisposable
 
     private sealed class EmptyPreviewHost : IAnimationWorkbenchPreviewHost
     {
-        public void Show(
+        public IDisposable Show(
             AnimationWorkbenchPreviewSnapshot preview,
             CancellationToken cancellationToken)
         {
+            return EmptyPreviewSession.Instance;
         }
 
-        public void Clear()
+        public void Dispose()
         {
         }
+    }
+
+    private sealed class EmptyPreviewSession : IDisposable
+    {
+        public static EmptyPreviewSession Instance { get; } = new();
 
         public void Dispose()
         {
