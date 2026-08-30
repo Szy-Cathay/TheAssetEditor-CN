@@ -206,6 +206,16 @@ namespace GameWorld.Core.Animation
             return clone;
         }
 
+        public GameSkeleton Clone(AnimationPlayer animationPlayer)
+        {
+            ArgumentNullException.ThrowIfNull(animationPlayer);
+
+            var clone = Clone();
+            clone.AnimationPlayer = animationPlayer;
+            clone._frame = null;
+            return clone;
+        }
+
 
         public void Update()
         {
