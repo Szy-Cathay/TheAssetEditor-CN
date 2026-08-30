@@ -73,20 +73,24 @@ namespace GameWorld.Core.Animation
 
         public List<IAnimationChangeRule> AnimationRules { get; set; } = new List<IAnimationChangeRule>();
 
-        private int TimeUsToFrame(long timeUs)
+        private int TimeToFrame(TimeSpan time)
         {
-            var frame = (int)(timeUs / _animationClip.MicrosecondsPerFrame);
-            return MathUtil.EnsureRange(frame, 0, FrameCount() - 1);
+            var timebase = _animationClip?.Timebase;
+            if (timebase == null)
+                return 0;
+
+            return (int)Math.Floor(timebase.GetSamplePosition(time));
         }
 
-        private long FrameToStartTimeUs(int frame)
+        private TimeSpan FrameToStartTime(int frame)
         {
-            return _animationClip.MicrosecondsPerFrame <= 0 ? 0 : MathUtil.EnsureRange(_animationClip.MicrosecondsPerFrame * frame, 0L, GetAnimationLengthUs() - _animationClip.MicrosecondsPerFrame);
+            var timebase = _animationClip?.Timebase;
+            return timebase == null ? TimeSpan.Zero : timebase.GetSampleTime(frame);
         }
 
         public int CurrentFrame
         {
-            get => _animationClip == null ? 0 : TimeUsToFrame(_timeSinceStart.TotalMicrosecondsAsLong);
+            get => _animationClip == null ? 0 : TimeToFrame(_timeSinceStart.TimeSpan);
             set
             {
                 if (CurrentFrame == value)
@@ -95,8 +99,7 @@ namespace GameWorld.Core.Animation
                 if (_animationClip != null)
                 {
                     var frameIndex = MathUtil.EnsureRange(value, 0, FrameCount() - 1);
-                    var timeInUs = FrameToStartTimeUs(frameIndex);
-                    _timeSinceStart = TimeSpanExtension.FromMicroseconds(timeInUs);
+                    _timeSinceStart = new TimeSpanExtension(FrameToStartTime(frameIndex));
                     OnFrameChanged?.Invoke(CurrentFrame);
                 }
                 else
@@ -170,9 +173,9 @@ namespace GameWorld.Core.Animation
                 }
                 //Fix this so if crash no break
                 float sampleT = 0;
-                var animationLengthUs = GetAnimationLengthUs();
-                if (animationLengthUs != 0)
-                    sampleT = (float)_timeSinceStart.TotalMicrosecondsAsLong / animationLengthUs;
+                var timebase = _animationClip?.Timebase;
+                if (timebase != null)
+                    sampleT = (float)(_timeSinceStart.TimeSpan.TotalSeconds / timebase.Duration.TotalSeconds);
                 _currentAnimFrame = AnimationSampler.Sample(sampleT, _skeleton, _animationClip, AnimationRules, !IsPlaying);
                 _skeleton?.Update();
             }
@@ -212,13 +215,9 @@ namespace GameWorld.Core.Animation
             _skeleton?.Update();
         }
 
-        public int GetFps()
-        {
-            if (_animationClip == null)
-                return 0;
-            var fps = _animationClip.DynamicFrames.Count / _animationClip.PlayTimeInSec;
-            return (int)fps;
-        }
+        public double FramesPerSecond => _animationClip?.Timebase?.FramesPerSecond ?? 0;
+
+        public int GetFps() => (int)FramesPerSecond;
 
         /// <summary>
         /// Overrides the sampled frame until the next refresh.

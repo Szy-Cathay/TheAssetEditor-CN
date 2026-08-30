@@ -48,6 +48,19 @@ namespace GameWorld.Core.Animation
 
         public long PlayTimeUs => _playTimeUs;
 
+        public AnimationTimebase? Timebase
+        {
+            get
+            {
+                if (DynamicFrames.Count == 0 || _playTimeUs <= 0)
+                    return null;
+
+                return new AnimationTimebase(
+                    DynamicFrames.Count,
+                    TimeSpan.FromTicks(_playTimeUs * TimeSpan.TicksPerMicrosecond));
+            }
+        }
+
         public long MicrosecondsPerFrame
         {
             get
@@ -63,18 +76,7 @@ namespace GameWorld.Core.Animation
         public float PlayTimeInSec
         {
             get => (float)_playTimeUs / MicrosecondsPerSecond;
-            set
-            {
-                if (DynamicFrames.Count == 0)
-                {
-                    _playTimeUs = (long)(value * MicrosecondsPerSecond);
-                    return;
-                }
-
-                // make sure we have whole number of microsecond per frame
-                var framePlayTimeUs = (long)Math.Ceiling(value / DynamicFrames.Count * MicrosecondsPerSecond);
-                _playTimeUs = framePlayTimeUs * DynamicFrames.Count;
-            }
+            set => _playTimeUs = (long)Math.Round(value * MicrosecondsPerSecond);
         }
 
         public int AnimationBoneCount
@@ -154,10 +156,7 @@ namespace GameWorld.Core.Animation
         {
             var output = new AnimationFile();
 
-            var fRate = (DynamicFrames.Count() - 1) / PlayTimeInSec;
-            output.Header.FrameRate = (float)Math.Round(fRate);
-            if (output.Header.FrameRate <= 0)
-                output.Header.FrameRate = 20;
+            output.Header.FrameRate = (float)(Timebase?.FramesPerSecond ?? 20);
 
             output.Header.Version = 7;
             output.Header.AnimationTotalPlayTimeInSec = PlayTimeInSec;

@@ -91,13 +91,19 @@ namespace GameWorld.Core.Animation
 
         public static AnimationClip ReSample(GameSkeleton skeleton, AnimationClip newAnim, int newFrameCount, float playTime)
         {
+            if (newFrameCount < 0)
+                throw new ArgumentOutOfRangeException(nameof(newFrameCount));
+
             var output = newAnim.Clone();
             output.DynamicFrames.Clear();
+            output.PlayTimeInSec = playTime;
 
-            var fraction = 1.0f / (newFrameCount - 1);
+            if (newFrameCount == 0 || newAnim.Timebase == null)
+                return output;
+
             for (var i = 0; i < newFrameCount; i++)
             {
-                var t = i * fraction;
+                var t = (float)i / newFrameCount;
                 var keyframe = AnimationSampler.Sample(t, skeleton, newAnim);
 
                 var newKeyFrame = new KeyFrame();
@@ -113,8 +119,6 @@ namespace GameWorld.Core.Animation
 
                 output.DynamicFrames.Add(newKeyFrame);
             }
-
-            output.PlayTimeInSec = playTime;// (output.DynamicFrames.Count() - 1) / 20.0f;
 
             return output;
         }
