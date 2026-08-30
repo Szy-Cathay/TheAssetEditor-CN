@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using CommunityToolkit.Mvvm.Input;
 using Editors.ImportExport.Common;
 using System.Windows.Controls;
 using Editors.ImportExport.Exporting.Presentation;
@@ -15,6 +16,7 @@ public partial class ImportWindow : AssetEditorWindow
     private readonly ImporterCoreViewModel _viewModel;
     private readonly IStandardDialogs _standardDialogs;
     private readonly OperationProgressWindowHost _importOperationProgress;
+    private CancellationTokenSource? _importCancellation;
 
     public ImportWindow(
         ImporterCoreViewModel viewModel,
@@ -54,7 +56,18 @@ public partial class ImportWindow : AssetEditorWindow
         try
         {
             var progress = new Progress<OperationProgressUpdate>(ApplyProgress);
-            result = await _viewModel.ImportAsync(progress);
+            _importCancellation = new CancellationTokenSource();
+            if (_viewModel.SelectedImporter?.SupportsCancellation == true)
+            {
+                _importOperationProgress.CancelCommand = new RelayCommand(
+                    () => _importCancellation?.Cancel());
+            }
+            result = await _viewModel.ImportAsync(
+                progress,
+                _importCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
@@ -62,6 +75,9 @@ public partial class ImportWindow : AssetEditorWindow
         }
         finally
         {
+            _importCancellation?.Dispose();
+            _importCancellation = null;
+            _importOperationProgress.CancelCommand = null;
             _viewModel.IsOperationActive = false;
             await _importOperationProgress.CompleteAsync();
             ImportButton.IsEnabled = true;

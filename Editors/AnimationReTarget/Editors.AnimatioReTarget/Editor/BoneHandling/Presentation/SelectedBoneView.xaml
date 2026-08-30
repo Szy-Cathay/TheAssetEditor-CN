@@ -81,7 +81,9 @@
             Margin="0,2"
             Text="{Binding BoneManager.SelectedBone.BoneLengthMult, UpdateSourceTrigger=LostFocus, Mode=TwoWay}">
             <b:Interaction.Behaviors>
-                <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                <behaviors:TextBoxInputBehavior
+                    InputMode="DecimalInput"
+                    JustPositivDecimalInput="True" />
             </b:Interaction.Behaviors>
         </TextBox>
 

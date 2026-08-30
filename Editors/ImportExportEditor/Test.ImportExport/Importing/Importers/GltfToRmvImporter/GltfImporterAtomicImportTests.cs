@@ -56,8 +56,7 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 false,
-                20,
-                true));
+                20));
 
             Assert.Multiple(() =>
             {
@@ -68,6 +67,50 @@ public class GltfImporterAtomicImportTests
                 Assert.That(
                     destination.FileList[targetPath].DataSource.ReadData(),
                     Is.EqualTo(new byte[] { 1, 2, 3 }));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void Import_MultipleSkeletonMarkers_ReturnsFailureInsteadOfUsingFirstMarker()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        scene.CreateNode("//skeleton//first");
+        scene.CreateNode("//skeleton//second");
+        var glbPath = Path.Combine(
+            Path.GetTempPath(),
+            $"{Guid.NewGuid():N}.glb");
+        modelRoot.SaveGLB(glbPath);
+        try
+        {
+            var destination = new PackFileContainer("test");
+            var importer = new GltfImporter(
+                PackFileSerivceTestHelper.Create(TestData.InputPack),
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "models",
+                destination,
+                GameTypeEnum.Warhammer3,
+                false,
+                false,
+                false,
+                false,
+                false,
+                20));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Errors, Has.Some.Contains("骨架标记"));
+                Assert.That(destination.FileList, Is.Empty);
             });
         }
         finally
@@ -105,8 +148,7 @@ public class GltfImporterAtomicImportTests
                 false,
                 true,
                 0,
-                true,
-                false);
+                AutoDetectAnimationKeysPerSecond: false);
 
             ImportResult? result = null;
             Exception? thrownException = null;
@@ -183,8 +225,7 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 true,
-                20,
-                true));
+                20));
 
             Assert.Multiple(() =>
             {
@@ -243,8 +284,7 @@ public class GltfImporterAtomicImportTests
             false,
             false,
             false,
-            20,
-            true));
+            20));
 
         Assert.Multiple(() =>
         {
@@ -297,8 +337,7 @@ public class GltfImporterAtomicImportTests
             false,
             false,
             false,
-            20,
-            true));
+            20));
 
         Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
         var rmvPath = destination.FileList.Keys.Single(path =>
@@ -337,8 +376,7 @@ public class GltfImporterAtomicImportTests
             false,
             false,
             false,
-            20,
-            true));
+            20));
 
         Assert.That(result.Succeeded, Is.True, string.Join(Environment.NewLine, result.Errors));
         var rmvPath = destination.FileList.Keys.Single(path =>
@@ -382,8 +420,7 @@ public class GltfImporterAtomicImportTests
             false,
             false,
             false,
-            20,
-            true));
+            20));
 
         Assert.Multiple(() =>
         {
@@ -426,7 +463,6 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 20,
-                true,
                 NewSkeletonName: "oversized_test_skeleton",
                 AutoScaleHumanoid: false));
 
@@ -574,8 +610,7 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 true,
-                20,
-                true));
+                20));
 
             Assert.Multiple(() =>
             {
@@ -647,8 +682,7 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 true,
-                20,
-                true));
+                20));
 
             Assert.Multiple(() =>
             {
@@ -698,8 +732,7 @@ public class GltfImporterAtomicImportTests
                 false,
                 false,
                 false,
-                20,
-                true));
+                20));
 
             Assert.Multiple(() =>
             {

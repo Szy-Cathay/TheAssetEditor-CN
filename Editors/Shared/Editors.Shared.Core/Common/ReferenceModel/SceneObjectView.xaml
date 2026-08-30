@@ -142,13 +142,15 @@
                 Grid.ColumnSpan="5"
                 Height="1"
                 Margin="0,3"
-                Background="{DynamicResource AeBrush.Border}" />
+                Background="{DynamicResource AeBrush.Border}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
             <Label
                 Grid.Row="3"
                 Grid.Column="0"
                 Content="{loc:Loc SceneObject.Fragment}"
-                Style="{StaticResource AeForm.Label}" />
+                Style="{StaticResource AeForm.Label}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <ComboBox
                 Grid.Row="3"
                 Grid.Column="1"
@@ -159,20 +161,23 @@
                 IsTextSearchEnabled="False"
                 ItemsSource="{Binding FragAndSlotSelection.FragmentList.Values}"
                 SelectedItem="{Binding FragAndSlotSelection.FragmentList.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                Text="{Binding FragAndSlotSelection.FragmentList.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+                Text="{Binding FragAndSlotSelection.FragmentList.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <Button
                 Grid.Row="3"
                 Grid.Column="4"
                 Margin="2"
                 Content="..."
                 Click="{s:MethodBinding ViewFragment}"
-                Style="{StaticResource AeButton.Icon}" />
+                Style="{StaticResource AeButton.Icon}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
             <Label
                 Grid.Row="4"
                 Grid.Column="0"
                 Content="{loc:Loc SceneObject.Slot}"
-                Style="{StaticResource AeForm.Label}" />
+                Style="{StaticResource AeForm.Label}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <ComboBox
                 Grid.Row="4"
                 Grid.Column="1"
@@ -183,53 +188,68 @@
                 IsTextSearchEnabled="False"
                 ItemsSource="{Binding FragAndSlotSelection.FragmentSlotList.Values}"
                 SelectedItem="{Binding FragAndSlotSelection.FragmentSlotList.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                Text="{Binding FragAndSlotSelection.FragmentSlotList.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+                Text="{Binding FragAndSlotSelection.FragmentSlotList.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
             <Border
                 Grid.Row="5"
                 Grid.ColumnSpan="5"
                 Height="1"
                 Margin="0,3"
-                Background="{DynamicResource AeBrush.Border}" />
+                Background="{DynamicResource AeBrush.Border}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
             <Label
                 Grid.Row="6"
                 Grid.Column="0"
                 Content="{loc:Loc SceneObject.AnimationFile}"
-                Style="{StaticResource AeForm.Label}" />
+                Style="{StaticResource AeForm.Label}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <TextBox
                 Grid.Row="6"
                 Grid.Column="1"
-                Grid.ColumnSpan="4"
+                Grid.ColumnSpan="3"
                 Margin="0,2,0,2"
                 IsReadOnly="True"
-                Text="{Binding FragAndSlotSelection.AnimationFileName, UpdateSourceTrigger=PropertyChanged}" />
+                Text="{Binding FragAndSlotSelection.AnimationFileName, UpdateSourceTrigger=PropertyChanged}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
+            <Button
+                Grid.Row="6"
+                Grid.Column="4"
+                Margin="2"
+                Content="{loc:Loc General.Browse}"
+                Click="{s:MethodBinding BrowseAnimation}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
             <Label
                 Grid.Row="7"
                 Grid.Column="0"
                 Content="{loc:Loc SceneObject.MetaFile}"
-                Style="{StaticResource AeForm.Label}" />
+                Style="{StaticResource AeForm.Label}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <TextBox
                 Grid.Row="7"
                 Grid.Column="1"
                 Grid.ColumnSpan="4"
                 Margin="0,2,0,2"
                 IsReadOnly="True"
-                Text="{Binding FragAndSlotSelection.MetaDataName, UpdateSourceTrigger=PropertyChanged}" />
+                Text="{Binding FragAndSlotSelection.MetaDataName, UpdateSourceTrigger=PropertyChanged}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
             <Label
                 Grid.Row="8"
                 Grid.Column="0"
                 Content="{loc:Loc SceneObject.PersistMetaFile}"
-                Style="{StaticResource AeForm.Label}" />
+                Style="{StaticResource AeForm.Label}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <TextBox
                 Grid.Row="8"
                 Grid.Column="1"
                 Grid.ColumnSpan="4"
                 Margin="0,2,0,2"
                 IsReadOnly="True"
-                Text="{Binding FragAndSlotSelection.MetaDataPersistName, UpdateSourceTrigger=PropertyChanged}" />
+                Text="{Binding FragAndSlotSelection.MetaDataPersistName, UpdateSourceTrigger=PropertyChanged}"
+                Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
         </Grid>
     </Expander>
 </UserControl>

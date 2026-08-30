@@ -17,6 +17,7 @@ namespace Editors.Shared.Core.Common.ReferenceModel
         [ObservableProperty] SceneObject _data;
         [ObservableProperty] bool _isVisible = true;
         [ObservableProperty] bool _isControlVisible = true;
+        [ObservableProperty] bool _showAnimationControls = true;
 
         [ObservableProperty] bool _isEnabled = true;
         [ObservableProperty] bool _isExpanded = true;
@@ -73,6 +74,13 @@ namespace Editors.Shared.Core.Common.ReferenceModel
                 var file = result.File;
                 _sceneObjectBuilder.SetMesh(Data, file);
             }
+        }
+
+        public void BrowseAnimation()
+        {
+            var result = _uiProvider.DisplayBrowseDialog([".anim"]);
+            if (result.Result == true && result.File != null)
+                FragAndSlotSelection.LoadAnimation(result.File);
         }
     }
 }

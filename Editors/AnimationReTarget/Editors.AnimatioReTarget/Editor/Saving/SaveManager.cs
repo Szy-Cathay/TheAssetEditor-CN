@@ -232,13 +232,23 @@ namespace Editors.AnimatioReTarget.Editor.Saving
                 return false;
             }
 
-            if (!_boneManager.FlatBoneList.Any(bone =>
-                    bone.HasMapping && bone.MappedIndex >= 0))
+            if (!float.IsFinite(_generationSettings.SkeletonScale) ||
+                _generationSettings.SkeletonScale <= 0)
+            {
+                errorMessage = LocalizationManager.Instance.Get(
+                    "AnimReTarget.Error.InvalidSkeletonScale");
+                return false;
+            }
+
+            if (!_boneManager.HasValidMapping)
             {
                 errorMessage = LocalizationManager.Instance.Get(
                     "AnimReTarget.Batch.Error.MappingRequired");
                 return false;
             }
+
+            if (!_boneManager.TryValidateBoneSettings(out errorMessage))
+                return false;
 
             if (_pfs.GetEditablePack() is not FolderProjectContainer)
             {
@@ -250,6 +260,9 @@ namespace Editors.AnimatioReTarget.Editor.Saving
             errorMessage = string.Empty;
             return true;
         }
+
+        public bool ConfirmSparseMapping() =>
+            _boneManager.ConfirmSparseMapping();
 
         public FolderProjectContainer? GetEditableFolderProject() =>
             _pfs.GetEditablePack() as FolderProjectContainer;

@@ -3,7 +3,9 @@ using Editors.AnimatioReTarget.Editor.BoneHandling;
 using Editors.Shared.Core.Common;
 using GameWorld.Core.SceneNodes;
 using Shared.Core.Events.Global;
+using Shared.Core.Misc;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Core.ToolCreation;
 using Test.TestingUtility.Shared;
 using Test.TestingUtility.TestUtility;
@@ -33,7 +35,7 @@ namespace Test.AnimatioReTarget
            
             Step0_SelectSource_NoGeneratedSet(runner, editor!);
             Step1_SelectTarget_GeneratedSet(runner, editor!);
-            Step2_TryGeneratingAnimation(runner, editor!);
+            Step2_RejectGeneratingAnimationWithoutMapping(runner, editor!);
             Step3_ApplyDefaultMapping(runner, editor!);
             Step4_GenerateAnimation(runner, editor!);
             Step5_UpdateAnimationSettingsAndGenerateAnimation(runner, editor!, outputPackFile);
@@ -48,6 +50,7 @@ namespace Test.AnimatioReTarget
             var meshFile = runner.PackFileService.FindFile(@"variantmeshes\wh_variantmodels\hu1\emp\emp_karl_franz\emp_karl_franz.wsmodel");
 
             var sourceNode = editor.GetSceneObjectFromId(AnimationRetargetIds.Source);
+            Assert.That(sourceNode.ShowAnimationControls, Is.True);
             sceneObjectEditor.SetMesh(sourceNode.Data, meshFile);
             sceneObjectEditor.SetAnimation(sourceNode.Data, "animations\\battle\\humanoid01\\2handed_hammer\\stand\\hu1_2hh_stand_idle_01.anim");
 
@@ -68,6 +71,7 @@ namespace Test.AnimatioReTarget
             var meshFile = runner.PackFileService.FindFile(@"variantmeshes\wh_variantmodels\hu1e\cth\cth_celestial_general\cth_celestial_general_body_02.wsmodel");
 
             var targetNode = editor.GetSceneObjectFromId(AnimationRetargetIds.Target);
+            Assert.That(targetNode.ShowAnimationControls, Is.False);
             sceneObjectEditor.SetMesh(targetNode.Data, meshFile);
 
             // Check that the target node is created correctly
@@ -82,11 +86,14 @@ namespace Test.AnimatioReTarget
             Assert.That(meshCount, Is.Not.Zero);
         }
 
-        private void Step2_TryGeneratingAnimation(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
+        private void Step2_RejectGeneratingAnimationWithoutMapping(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
         {
             var result = editor.CanUpdateAnimation(out var text);
-            Assert.That(result, Is.True);
-            Assert.That(text, Is.EqualTo(""));
+            Assert.That(result, Is.False);
+            Assert.That(
+                text,
+                Is.EqualTo(LocalizationManager.Instance.Get(
+                    "AnimReTarget.Error.MappingRequired")));
         }
 
 
@@ -95,9 +102,14 @@ namespace Test.AnimatioReTarget
             var count0 = SkeletonBoneNodeHelper.CountMappedBones(editor.BoneManager.Bones);
             editor.BoneManager.ApplyDefaultMapping();
             var count1 = SkeletonBoneNodeHelper.CountMappedBones(editor.BoneManager.Bones);
+            var targetSkeleton = editor
+                .GetSceneObjectFromId(AnimationRetargetIds.Target)
+                .Data
+                .Skeleton!;
 
             Assert.That(count0, Is.EqualTo(0));
-            Assert.That(count1, Is.EqualTo(57));
+            Assert.That(editor.BoneManager.FlatBoneList.Count, Is.EqualTo(targetSkeleton.BoneCount));
+            Assert.That(count1, Is.EqualTo(64));
         }
 
         private void Step4_GenerateAnimation(AssetEditorTestRunner runner, AnimationRetargetEditor editor)
@@ -112,7 +124,7 @@ namespace Test.AnimatioReTarget
         {
             Assert.That(outputPackFile.FileList.Count, Is.EqualTo(0));
 
-            var bone = SkeletonBoneNodeHelper.GetNodeFromName("skirt_back_0", editor.BoneManager.Bones);
+            var bone = editor.BoneManager.FlatBoneList.First(bone => bone.HasMapping);
             bone.TranslationOffset.X.Value = 10;
 
             editor.UpdateAnimation();

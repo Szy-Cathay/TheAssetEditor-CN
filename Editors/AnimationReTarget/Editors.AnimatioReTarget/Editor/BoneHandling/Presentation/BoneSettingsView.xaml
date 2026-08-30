@@ -13,7 +13,12 @@
              mc:Ignorable="d" 
              d:DesignHeight="400" d:DesignWidth="800">
     <UserControl.Resources>
-        <System:Double x:Key="labelWidth">110</System:Double>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <System:Double x:Key="labelWidth">110</System:Double>
+        </ResourceDictionary>
     </UserControl.Resources>
     
     <Expander IsExpanded="True" Header="{loc:Loc AnimReTarget.BoneSettings}" >
@@ -21,25 +26,67 @@
 
             <Grid.RowDefinitions>
                 <RowDefinition Height="auto"/>
+                <RowDefinition Height="Auto" MaxHeight="520"/>
             </Grid.RowDefinitions>
 
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="0.5*"/>
-                <ColumnDefinition Width="0.5*"/>
+                <ColumnDefinition Width="*" MinWidth="180"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
-            <TreeView MinHeight="200" Grid.Column="0"
-                      MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Grid}}"
+            <Border
+                Grid.Row="0"
+                Grid.ColumnSpan="3"
+                Margin="0,8,0,8"
+                Style="{StaticResource AeFeedback.Notice}">
+                <StackPanel>
+                    <TextBlock
+                        Style="{StaticResource AeText.Label}"
+                        Text="{loc:Loc AnimReTarget.HumanoidMapping.Title}" />
+                    <TextBlock
+                        Margin="0,4,0,8"
+                        Style="{StaticResource AeText.Body}"
+                        Text="{loc:Loc AnimReTarget.HumanoidMapping.Description}"
+                        TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button
+                            AutomationProperties.Name="{loc:Loc AnimReTarget.HumanoidMapping.Action}"
+                            Command="{Binding BoneManager.ApplyHumanoidMappingCommand}"
+                            Content="{loc:Loc AnimReTarget.HumanoidMapping.Action}"
+                            Style="{StaticResource AeButton.Primary}"
+                            ToolTip="{loc:Loc AnimReTarget.HumanoidMapping.ToolTip}" />
+                        <Button
+                            Margin="6,0,0,0"
+                            AutomationProperties.Name="{loc:Loc AnimReTarget.Profile.Save}"
+                            Command="{Binding BoneManager.SaveCharacterProfileCommand}"
+                            Content="{loc:Loc AnimReTarget.Profile.Save}"
+                            Style="{StaticResource AeButton.Secondary}"
+                            ToolTip="{loc:Loc AnimReTarget.Profile.Save.ToolTip}" />
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.Caption}">
+                            <Run Text="{loc:Loc AnimReTarget.HumanoidMapping.Summary}" />
+                            <Run Text="{Binding BoneManager.MappingSummary, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TreeView Grid.Row="1" Grid.Column="0"
+                      MaxHeight="520"
                       VerticalAlignment="Stretch"
                       HorizontalAlignment="Stretch"
-                            ItemsSource="{Binding BoneManager.Bones, UpdateSourceTrigger=PropertyChanged}">
+                      Style="{StaticResource AeTree.View}"
+                      ItemsSource="{Binding BoneManager.Bones, UpdateSourceTrigger=PropertyChanged}">
   
                     <b:Interaction.Behaviors>
                         <behaviors:BindableSelectedItemBehavior SelectedItem="{Binding BoneManager.SelectedBone, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
                     </b:Interaction.Behaviors>
 
                     <TreeView.ItemContainerStyle>
-                        <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                        <Style TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
                             <Setter Property="IsExpanded" Value="True" />
                         </Style>
                     </TreeView.ItemContainerStyle>
@@ -65,7 +112,12 @@
                     </TreeView.ItemTemplate>
                 </TreeView>
 
-            <presentation:SelectedBoneView Grid.Column="1"/>
+            <GridSplitter
+                Grid.Row="1"
+                Grid.Column="1"
+                Style="{StaticResource AeVerticalGridSplitterStyle}" />
+
+            <presentation:SelectedBoneView Grid.Row="1" Grid.Column="2"/>
 
         </Grid>
     </Expander>

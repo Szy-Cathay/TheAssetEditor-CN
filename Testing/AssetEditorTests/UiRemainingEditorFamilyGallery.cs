@@ -1302,7 +1302,8 @@ public class UiRemainingEditorFamilyGallery
                 outputPath,
                 packFileContainer,
                 gameType,
-                null);
+                null,
+                CancellationToken.None);
 
         ImportResult IImporterViewModel.Execute(
             PackFile importSource,
@@ -1315,15 +1316,33 @@ public class UiRemainingEditorFamilyGallery
                 outputPath,
                 packFileContainer,
                 gameType,
-                progress);
+                progress,
+                CancellationToken.None);
+
+        ImportResult IImporterViewModel.Execute(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress,
+            CancellationToken cancellationToken) =>
+            ExecuteCore(
+                importSource,
+                outputPath,
+                packFileContainer,
+                gameType,
+                progress,
+                cancellationToken);
 
         private ImportResult ExecuteCore(
             PackFile importSource,
             string outputPath,
             PackFileContainer packFileContainer,
             GameTypeEnum gameType,
-            IProgress<OperationProgressUpdate>? progress)
+            IProgress<OperationProgressUpdate>? progress,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ExecuteCalled = true;
             progress?.Report(new OperationProgressUpdate(
                 "正在转换网格 1/2…",
@@ -1340,7 +1359,8 @@ public class UiRemainingEditorFamilyGallery
                     outputPath,
                     packFileContainer,
                     gameType,
-                    progress);
+                    progress,
+                    cancellationToken);
             }
             finally
             {

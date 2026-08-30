@@ -45,6 +45,27 @@ public class GltfSkeletonImporterTests
     }
 
     [Test]
+    public void Build_MultipleLogicalSkeletons_ThrowsInsteadOfPickingLargestSkin()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var scene = modelRoot.UseScene("default");
+        var firstRoot = scene.CreateNode("first_root");
+        var secondRoot = scene.CreateNode("second_root");
+        modelRoot.CreateSkin("first").BindJoints(
+            Matrix4x4.Identity,
+            firstRoot);
+        modelRoot.CreateSkin("second").BindJoints(
+            Matrix4x4.Identity,
+            secondRoot);
+
+        Assert.Throws<InvalidDataException>(() =>
+            GltfSkeletonImporter.Build(
+                modelRoot,
+                "test_skeleton",
+                mirrorMesh: true));
+    }
+
+    [Test]
     public void BuildExternal_ArmatureAncestorScale_IsBakedIntoBoneTranslations()
     {
         var modelRoot = ModelRoot.CreateModel();

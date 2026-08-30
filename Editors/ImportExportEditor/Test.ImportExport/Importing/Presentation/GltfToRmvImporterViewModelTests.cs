@@ -6,6 +6,7 @@ using Editors.ImportImport.Importing.Presentation.RmvToGltf;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using Shared.Ui.Common.OperationProgress;
 using SharpGLTF.Schema2;
 
 namespace Test.ImportExport.Importing.Presentation;
@@ -172,6 +173,36 @@ public class GltfToRmvImporterViewModelTests
     }
 
     [Test]
+    public void ImportAsync_CancelledTokenStopsCancellationAwareImporter()
+    {
+        var importer = new CancellationAwareImporter();
+        var viewModel = new ImporterCoreViewModel(
+            [importer],
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3));
+        var inputPath = Path.Combine(
+            Path.GetTempPath(),
+            $"{Guid.NewGuid():N}.glb");
+        try
+        {
+            File.WriteAllBytes(inputPath, []);
+            viewModel.Initialize(
+                new PackFileContainer("test"),
+                "models",
+                inputPath);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.CatchAsync<OperationCanceledException>(async () =>
+                await viewModel.ImportAsync(
+                    cancellationToken: cancellation.Token));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [Test]
     public void BuildResultMessage_ListsStructuredOutputsWarningsAndErrors()
     {
         var localization = new LocalizationManager();
@@ -248,6 +279,36 @@ public class GltfToRmvImporterViewModelTests
             string outputPath,
             PackFileContainer packFileContainer,
             GameTypeEnum gameType) => result;
+
+        public ImportSupportEnum CanImportFile(PackFile file) =>
+            ImportSupportEnum.HighPriority;
+    }
+
+    private sealed class CancellationAwareImporter : IImporterViewModel
+    {
+        public string DisplayName => "cancel-aware";
+        public string OutputExtension => ".rigid_model_v2";
+        public string[] InputExtensions => [".glb"];
+        public bool SupportsCancellation => true;
+
+        public ImportResult Execute(
+            PackFile exportSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType) =>
+            ImportResult.Success([]);
+
+        public ImportResult Execute(
+            PackFile exportSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ImportResult.Success([]);
+        }
 
         public ImportSupportEnum CanImportFile(PackFile file) =>
             ImportSupportEnum.HighPriority;

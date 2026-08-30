@@ -55,6 +55,22 @@ namespace Editors.Shared.Core.Common.ReferenceModel
                 _uiCommandFactory.Create<OpenEditorCommand>().ExecuteAsWindow(FragmentList.SelectedItem.PackFileReference.FileName, 800, 900);
         }
 
+        public void LoadAnimation(PackFile file)
+        {
+            FragmentList.SelectedItem = null;
+            FragmentSlotList.SelectedItem = null;
+
+            var animationReference = _skeletonAnimationLookUpHelper.FindAnimationRefFromPackFile(file);
+            _sceneObjectEditor.SetAnimation(_sceneObject, animationReference?.AnimationFile);
+            _sceneObjectEditor.SetMetaFile(_sceneObject, null, null);
+
+            MetaDataName = null;
+            MetaDataPersistName = null;
+            AnimationFileName = animationReference == null
+                ? null
+                : "[" + animationReference.Container.Name + "] " + animationReference.AnimationFile;
+        }
+
 
         private void OnSkeletonChange(GameSkeleton newValue)
         {

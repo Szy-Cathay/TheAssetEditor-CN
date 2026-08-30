@@ -437,8 +437,7 @@ public class GltfPbrMaterialImportTests
         convertMaterial,
         convertNormal,
         false,
-        20,
-        true);
+        20);
 
     private static string CreateStaticModel(
         string directory,

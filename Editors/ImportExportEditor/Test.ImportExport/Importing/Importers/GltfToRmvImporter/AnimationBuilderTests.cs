@@ -401,6 +401,85 @@ public class AnimationBuilderTests
             AnimationBuilder.Build(settings, new AnimationFile(), animation));
     }
 
+    [Test]
+    public void Build_AnimationWithoutChannels_ThrowsInsteadOfCreatingBindPoseAnimation()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var animation = modelRoot.CreateAnimation("empty");
+        var settings = new AnimationBuilderSettings(
+            modelRoot,
+            "test",
+            20,
+            new PackFileContainer("test"),
+            "animations",
+            false);
+
+        Assert.Throws<InvalidDataException>(() =>
+            AnimationBuilder.Build(
+                settings,
+                CreateSingleBoneSkeleton(),
+                animation));
+    }
+
+    [Test]
+    public void Build_AnimationExceedsTransformBudget_ThrowsBeforeAllocatingFrames()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var node = modelRoot.UseScene("default").CreateNode("root");
+        var animation = modelRoot.CreateAnimation("too_long");
+        animation.CreateTranslationChannel(
+            node,
+            new Dictionary<float, Numerics.Vector3>
+            {
+                [0] = Numerics.Vector3.Zero,
+                [5_000_001] = Numerics.Vector3.One,
+            });
+        var settings = new AnimationBuilderSettings(
+            modelRoot,
+            "test",
+            1,
+            new PackFileContainer("test"),
+            "animations",
+            false);
+
+        Assert.Throws<InvalidDataException>(() =>
+            AnimationBuilder.Build(
+                settings,
+                CreateSingleBoneSkeleton(),
+                animation));
+    }
+
+    [Test]
+    public void Build_CancelledBeforeSampling_ThrowsOperationCancelled()
+    {
+        var modelRoot = ModelRoot.CreateModel();
+        var node = modelRoot.UseScene("default").CreateNode("root");
+        var animation = modelRoot.CreateAnimation("cancelled");
+        animation.CreateTranslationChannel(
+            node,
+            new Dictionary<float, Numerics.Vector3>
+            {
+                [0] = Numerics.Vector3.Zero,
+                [1] = Numerics.Vector3.One,
+            });
+        var settings = new AnimationBuilderSettings(
+            modelRoot,
+            "test",
+            20,
+            new PackFileContainer("test"),
+            "animations",
+            false);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            AnimationBuilder.Build(
+                settings,
+                CreateSingleBoneSkeleton(),
+                animation,
+                cancellationToken: cancellation.Token));
+    }
+
     private static AnimationFile CreateSingleBoneSkeleton()
     {
         var frame = new AnimationFile.Frame

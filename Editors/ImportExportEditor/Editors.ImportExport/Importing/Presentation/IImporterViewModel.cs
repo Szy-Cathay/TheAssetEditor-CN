@@ -15,6 +15,7 @@ namespace Editors.ImportExport.Importing.Presentation
         public string DisplayName { get; }
         string OutputExtension { get; }
         string[] InputExtensions { get; } // ADDed THIS!
+        bool SupportsCancellation => false;
         void Initialize(PackFile inputFile) { }
         ImportResult Execute(PackFile exportSource, string outputPath, PackFileContainer packFileContainer, GameTypeEnum gameType);
         ImportResult Execute(
@@ -28,6 +29,22 @@ namespace Editors.ImportExport.Importing.Presentation
                 outputPath,
                 packFileContainer,
                 gameType);
+        ImportResult Execute(
+            PackFile exportSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Execute(
+                exportSource,
+                outputPath,
+                packFileContainer,
+                gameType,
+                progress);
+        }
         public ImportSupportEnum CanImportFile(PackFile file);
 
     }

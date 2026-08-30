@@ -21,14 +21,7 @@ public static class GltfSkeletonImporter
                 LocalizationManager.Instance.Get("GltfImporter.Error.MissingSkeletonName"));
         }
 
-        var skin = modelRoot.LogicalSkins
-            .OrderByDescending(candidate => candidate.JointsCount)
-            .FirstOrDefault();
-        if (skin == null || skin.JointsCount == 0)
-        {
-            throw new InvalidDataException(
-                LocalizationManager.Instance.Get("GltfImporter.Error.NoSkin"));
-        }
+        var skin = GetSingleLogicalSkeleton(modelRoot);
 
         return Build(skin, skeletonName, mirrorMesh, bakeAncestorTransform: false);
     }
@@ -40,6 +33,25 @@ public static class GltfSkeletonImporter
         bool mirrorMesh)
     {
         ArgumentNullException.ThrowIfNull(modelRoot);
+        var skin = GetSingleLogicalSkeleton(modelRoot);
+
+        var resolvedName = string.IsNullOrWhiteSpace(skeletonName)
+            ? GetDefaultSkeletonName(skin, inputFile)
+            : skeletonName.Trim();
+        if (resolvedName is "." or ".." ||
+            !string.Equals(Path.GetFileName(resolvedName), resolvedName, StringComparison.Ordinal) ||
+            resolvedName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.InvalidSkeletonName"));
+        }
+
+        return Build(skin, resolvedName, mirrorMesh, bakeAncestorTransform: true);
+    }
+
+    private static Skin GetSingleLogicalSkeleton(ModelRoot modelRoot)
+    {
         var skins = modelRoot.LogicalSkins.ToList();
         if (skins.Count == 0)
         {
@@ -66,19 +78,7 @@ public static class GltfSkeletonImporter
             ValidateEquivalentBindPose(referenceBindPose, equivalentBindPose);
         }
 
-        var resolvedName = string.IsNullOrWhiteSpace(skeletonName)
-            ? GetDefaultSkeletonName(skin, inputFile)
-            : skeletonName.Trim();
-        if (resolvedName is "." or ".." ||
-            !string.Equals(Path.GetFileName(resolvedName), resolvedName, StringComparison.Ordinal) ||
-            resolvedName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new InvalidDataException(
-                LocalizationManager.Instance.Get(
-                    "GltfImporter.Error.InvalidSkeletonName"));
-        }
-
-        return Build(skin, resolvedName, mirrorMesh, bakeAncestorTransform: true);
+        return skin;
     }
 
     private static Dictionary<Node, Matrix4x4> ValidateExternalSkin(Skin skin)

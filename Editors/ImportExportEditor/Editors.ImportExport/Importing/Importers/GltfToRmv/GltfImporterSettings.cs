@@ -23,7 +23,6 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         bool ConvertNormalTextureFromBlueToOrangeType,
         bool ImportAnimations,
         float AnimationKeysPerSecond,
-        bool MirrorMesh,
         bool AutoDetectAnimationKeysPerSecond = true,
         string? NewSkeletonName = null,
         bool AutoScaleHumanoid = true,

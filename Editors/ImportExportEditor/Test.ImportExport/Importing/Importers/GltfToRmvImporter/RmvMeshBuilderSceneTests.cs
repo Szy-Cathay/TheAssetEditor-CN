@@ -152,6 +152,35 @@ public class RmvMeshBuilderSceneTests
     }
 
     [Test]
+    public void BuildWithSummary_ValidNegativeTangentHandedness_PreservesTangentBasis()
+    {
+        var geometry = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>("mesh");
+        var primitive = geometry.UsePrimitive(CreateMaterial("material"));
+        primitive.AddTriangle(
+            CreateVertex(0, 0, -1),
+            CreateVertex(1, 0, -1),
+            CreateVertex(0, 1, -1));
+        var modelRoot = ModelRoot.CreateModel();
+        var mesh = modelRoot.CreateMesh(geometry);
+        modelRoot.UseScene("default").CreateNode("mesh_node").WithMesh(mesh);
+
+        var result = RmvMeshBuilder.BuildWithSummary(
+            CreateSettings(),
+            modelRoot,
+            null,
+            "");
+
+        var segment = result.Summary.Segments.Single();
+        var vertex = result.File!.ModelList[0][0].Mesh.VertexList[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(segment.RebuiltTangents, Is.False);
+            Assert.That(vertex.Tangent.X, Is.EqualTo(-1).Within(0.0001f));
+            Assert.That(vertex.BiNormal.Y, Is.EqualTo(-1).Within(0.0001f));
+        });
+    }
+
+    [Test]
     public void Import_GlbContainer_AddsRmvFile()
     {
         var geometry = new MeshBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>("mesh");
@@ -181,8 +210,7 @@ public class RmvMeshBuilderSceneTests
                 false,
                 false,
                 false,
-                20,
-                true);
+                20);
 
             var succeeded = importer.Import(settings).Succeeded;
 
@@ -267,8 +295,7 @@ public class RmvMeshBuilderSceneTests
                 false,
                 false,
                 true,
-                20,
-                true);
+                20);
 
             importer.Import(settings);
 
@@ -310,8 +337,7 @@ public class RmvMeshBuilderSceneTests
                 false,
                 false,
                 false,
-                20,
-                true);
+                20);
 
             importer.Import(settings);
 
@@ -355,8 +381,7 @@ public class RmvMeshBuilderSceneTests
                 false,
                 false,
                 false,
-                20,
-                true));
+                20));
 
             Assert.Multiple(() =>
             {
@@ -699,7 +724,6 @@ public class RmvMeshBuilderSceneTests
                 false,
                 false,
                 20,
-                true,
                 NewSkeletonName: "ShouldBeIgnored");
 
             importer.Import(settings);
@@ -733,8 +757,7 @@ public class RmvMeshBuilderSceneTests
         false,
         false,
         false,
-        20,
-        true);
+        20);
 
     private static GltfImporterSettings CreateSettings(
         string inputFile,
@@ -748,8 +771,7 @@ public class RmvMeshBuilderSceneTests
         false,
         false,
         false,
-        20,
-        true);
+        20);
 
     private static ModelRoot CreateSkinnedModelRoot(string? skeletonName)
     {
@@ -889,12 +911,13 @@ public class RmvMeshBuilderSceneTests
 
     private static VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4> CreateVertex(
         float x,
-        float y)
+        float y,
+        float tangentHandedness = 1)
     {
         var vertex = new VertexBuilder<VertexPositionNormalTangent, VertexTexture1, VertexJoints4>();
         vertex.Geometry.Position = new Vector3(x, y, 0);
         vertex.Geometry.Normal = Vector3.UnitZ;
-        vertex.Geometry.Tangent = new Vector4(1, 0, 0, 1);
+        vertex.Geometry.Tangent = new Vector4(1, 0, 0, tangentHandedness);
         vertex.Material.TexCoord = new Vector2(x, y);
         vertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
         return vertex;
