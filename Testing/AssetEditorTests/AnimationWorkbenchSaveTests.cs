@@ -71,12 +71,14 @@ public class AnimationWorkbenchSaveTests
     }
 
     [DataTestMethod]
-    [DataRow(8, 1, AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly)]
-    [DataRow(7, 2, AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly)]
-    [DataRow(9, 1, AnimationWorkbenchDiagnosticCode.SourceFormatUnsupported)]
+    [DataRow(8, 1, false, AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly)]
+    [DataRow(7, 2, false, AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly)]
+    [DataRow(7, 1, true, AnimationWorkbenchDiagnosticCode.SourceStaticFrameReadOnly)]
+    [DataRow(9, 1, false, AnimationWorkbenchDiagnosticCode.SourceFormatUnsupported)]
     public void SaveAsNewProjectResource_UnverifiedSourceStructure_BlocksBeforeWrite(
         int version,
         int partCount,
+        bool hasStaticFrame,
         AnimationWorkbenchDiagnosticCode expectedCode)
     {
         using var projectRoot = new TemporaryDirectory();
@@ -85,7 +87,10 @@ public class AnimationWorkbenchSaveTests
             new FolderProjectSettings { Name = "测试工程" });
         var packFileService = new Mock<IPackFileService>(MockBehavior.Strict);
         using var document = CreateLoadedDocument(
-            new AnimationWorkbenchSourceFormat((uint)version, partCount));
+            new AnimationWorkbenchSourceFormat(
+                (uint)version,
+                partCount,
+                hasStaticFrame));
 
         var saveResult = document.SaveAsNewProjectResource(
             packFileService.Object,
@@ -286,17 +291,7 @@ public class AnimationWorkbenchSaveTests
     {
         using var json = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(AppContext.BaseDirectory, "Language_Cn.json")));
-        var keys = new[]
-        {
-            AnimationWorkbenchDiagnosticCode.SourceFormatUnknown,
-            AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly,
-            AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly,
-            AnimationWorkbenchDiagnosticCode.SourceFormatUnsupported,
-            AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported,
-            AnimationWorkbenchDiagnosticCode.CandidateRoundTripMismatch,
-            AnimationWorkbenchDiagnosticCode.DestinationAlreadyExists,
-            AnimationWorkbenchDiagnosticCode.DestinationWriteFailed,
-        };
+        var keys = Enum.GetValues<AnimationWorkbenchDiagnosticCode>();
 
         foreach (var code in keys)
         {

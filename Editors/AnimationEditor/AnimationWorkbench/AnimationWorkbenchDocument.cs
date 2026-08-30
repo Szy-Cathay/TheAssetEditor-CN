@@ -1,5 +1,5 @@
-﻿using GameWorld.Core.Animation;
-using System.IO;
+﻿using System.IO;
+using GameWorld.Core.Animation;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
@@ -38,6 +38,7 @@ public enum AnimationWorkbenchDiagnosticCode
     SourceFormatUnsupported,
     SourceVersionEightReadOnly,
     SourceMultiplePartsReadOnly,
+    SourceStaticFrameReadOnly,
     TargetGameSaveUnsupported,
     ResultMissing,
     ResultTargetSkeletonBoneCountMismatch,
@@ -50,7 +51,8 @@ public enum AnimationWorkbenchDiagnosticCode
 
 public sealed record AnimationWorkbenchSourceFormat(
     uint Version,
-    int PartCount)
+    int PartCount,
+    bool HasStaticFrame = false)
 {
     public static AnimationWorkbenchSourceFormat FromFile(
         AnimationFile file)
@@ -58,7 +60,9 @@ public sealed record AnimationWorkbenchSourceFormat(
         ArgumentNullException.ThrowIfNull(file);
         return new AnimationWorkbenchSourceFormat(
             file.Header.Version,
-            file.AnimationParts.Count);
+            file.AnimationParts.Count,
+            file.AnimationParts.Any(
+                part => part.StaticFrame != null));
     }
 }
 
@@ -440,6 +444,13 @@ public sealed class AnimationWorkbenchDocument : IDisposable
                         reason,
                         null),
                 },
+                slot));
+        }
+
+        if (source.Format.HasStaticFrame)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                AnimationWorkbenchDiagnosticCode.SourceStaticFrameReadOnly,
                 slot));
         }
     }

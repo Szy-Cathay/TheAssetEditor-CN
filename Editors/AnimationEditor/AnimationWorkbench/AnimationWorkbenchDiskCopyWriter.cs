@@ -57,16 +57,7 @@ internal static class AnimationWorkbenchDiskCopyWriter
         finally
         {
             if (File.Exists(tempPath))
-            {
-                try
-                {
-                    File.Delete(tempPath);
-                }
-                catch
-                {
-                    // Preserve the original write exception.
-                }
-            }
+                File.Delete(tempPath);
         }
     }
 }

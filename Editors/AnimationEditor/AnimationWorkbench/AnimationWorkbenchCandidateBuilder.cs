@@ -36,7 +36,7 @@ internal static class AnimationWorkbenchCandidateBuilder
     private const float VectorTolerance = 0.0001f;
     private const float QuaternionDotTolerance = 0.9999f;
     private static readonly TimeSpan s_durationTolerance =
-        TimeSpan.FromTicks(100);
+        TimeSpan.FromMilliseconds(1);
 
     public static AnimationWorkbenchCandidateBuildResult Build(
         AnimationClip result,
@@ -50,11 +50,29 @@ internal static class AnimationWorkbenchCandidateBuilder
         }
 
         AnimationFile candidate;
+        try
+        {
+            candidate = result.ConvertToFileFormat(targetSkeleton);
+        }
+        catch (Exception)
+        {
+            return AnimationWorkbenchCandidateBuildResult.Failure(
+                AnimationWorkbenchDiagnosticCode.CandidateSerializationFailed);
+        }
+
+        if (!MatchesTargetStructure(
+                candidate,
+                result,
+                targetSkeleton))
+        {
+            return AnimationWorkbenchCandidateBuildResult.Failure(
+                AnimationWorkbenchDiagnosticCode.CandidateRoundTripMismatch);
+        }
+
         byte[] bytes;
         AnimationFile roundTripFile;
         try
         {
-            candidate = result.ConvertToFileFormat(targetSkeleton);
             bytes = AnimationFile.ConvertToBytes(candidate);
             roundTripFile = AnimationFile.Create(new ByteChunk(bytes));
         }
@@ -104,18 +122,67 @@ internal static class AnimationWorkbenchCandidateBuilder
 
         foreach (var frame in animation.DynamicFrames)
         {
-            try
-            {
-                if (frame.GetBoneCountFromFrame() != targetBoneCount)
-                    return false;
-            }
-            catch (Exception)
+            if (frame.Position.Count != targetBoneCount ||
+                frame.Rotation.Count != targetBoneCount ||
+                frame.Scale.Count != targetBoneCount)
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private static bool MatchesTargetStructure(
+        AnimationFile candidate,
+        AnimationClip expectedAnimation,
+        GameSkeleton targetSkeleton)
+    {
+        if (candidate.Header.Version != 7 ||
+            candidate.Header.SkeletonName != targetSkeleton.SkeletonName ||
+            candidate.Bones == null ||
+            candidate.Bones.Length != targetSkeleton.BoneCount ||
+            candidate.AnimationParts.Count != 1)
+        {
+            return false;
+        }
+
+        var part = candidate.AnimationParts[0];
+        if (part.StaticFrame != null ||
+            part.DynamicFrames.Count !=
+                expectedAnimation.DynamicFrames.Count ||
+            part.TranslationMappings.Count != targetSkeleton.BoneCount ||
+            part.RotationMappings.Count != targetSkeleton.BoneCount)
+        {
+            return false;
+        }
+
+        for (var boneIndex = 0;
+             boneIndex < targetSkeleton.BoneCount;
+             boneIndex++)
+        {
+            var bone = candidate.Bones[boneIndex];
+            var translationMapping = part.TranslationMappings[boneIndex];
+            var rotationMapping = part.RotationMappings[boneIndex];
+            if (bone.Id != boneIndex ||
+                bone.Name != targetSkeleton.BoneNames[boneIndex] ||
+                bone.ParentId !=
+                    targetSkeleton.GetParentBoneIndex(boneIndex) ||
+                translationMapping.MappingType !=
+                    AnimationFile.AnimationBoneMappingType.Dynamic ||
+                translationMapping.Id != boneIndex ||
+                rotationMapping.MappingType !=
+                    AnimationFile.AnimationBoneMappingType.Dynamic ||
+                rotationMapping.Id != boneIndex)
+            {
+                return false;
+            }
+        }
+
+        return part.DynamicFrames.All(
+            frame =>
+                frame.Transforms.Count == targetSkeleton.BoneCount &&
+                frame.Quaternion.Count == targetSkeleton.BoneCount);
     }
 
     private static bool HasEquivalentFileStructure(
