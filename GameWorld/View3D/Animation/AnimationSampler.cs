@@ -165,14 +165,15 @@ namespace GameWorld.Core.Animation
 
                 if (animationClip != null)
                 {
-                    var maxFrames = animationClip.DynamicFrames.Count() - 1;
-                    if (maxFrames < 0)
-                        maxFrames = 0;
-                    var frameWithLeftover = maxFrames * clampedT;
-                    var clampedFrame = (float)Math.Round(frameWithLeftover);
-
-                    frameIndex = (int)clampedFrame;
-                    frameIterpolation = frameWithLeftover - clampedFrame;
+                    var timebase = animationClip.Timebase;
+                    if (timebase != null)
+                    {
+                        var playheadTime = TimeSpan.FromTicks(
+                            (long)(timebase.Duration.Ticks * (double)clampedT));
+                        var samplePosition = timebase.GetSamplePosition(playheadTime);
+                        frameIndex = (int)Math.Floor(samplePosition);
+                        frameIterpolation = (float)(samplePosition - frameIndex);
+                    }
                 }
                 var currentTimeSeconds = animationClip == null ? 0 : clampedT * animationClip.PlayTimeInSec;
                 return Sample(frameIndex, frameIterpolation, skeleton, animationClip, animationChangeRules, freezeFrame, currentTimeSeconds);
@@ -187,12 +188,13 @@ namespace GameWorld.Core.Animation
 
         private static float GetFrameTimeSeconds(float frame, AnimationClip animationClip)
         {
-            if (animationClip == null || animationClip.DynamicFrames.Count <= 1)
+            var timebase = animationClip?.Timebase;
+            if (timebase == null)
                 return 0;
 
-            var lastFrame = animationClip.DynamicFrames.Count - 1;
+            var lastFrame = timebase.FrameCount - 1;
             var clampedFrame = MathUtil.EnsureRange(frame, 0, lastFrame);
-            return clampedFrame / lastFrame * animationClip.PlayTimeInSec;
+            return (float)timebase.GetSampleTime(clampedFrame).TotalSeconds;
         }
 
         static AnimationClip.KeyFrame GetKeyFrameFromIndex(List<AnimationClip.KeyFrame> keyframes, int frameIndex)
