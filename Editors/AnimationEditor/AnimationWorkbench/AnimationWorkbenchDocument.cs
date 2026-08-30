@@ -47,6 +47,15 @@ public enum AnimationWorkbenchDiagnosticCode
     DestinationAlreadyExists,
     DestinationInvalid,
     DestinationWriteFailed,
+    PoseFrameIndexInvalid,
+    PoseLastFrameDeleteRejected,
+    PoseBoneMissing,
+    PoseClipboardIncomplete,
+    PoseTransformInvalid,
+    PosePreviewAlreadyActive,
+    PosePreviewMissing,
+    PoseUndoUnavailable,
+    PoseRedoUnavailable,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
@@ -94,7 +103,8 @@ public sealed record AnimationWorkbenchDiagnostic(
     AnimationWorkbenchDiagnosticSeverity Severity,
     AnimationWorkbenchSourceSlot? Source = null,
     int? ExpectedValue = null,
-    int? ActualValue = null)
+    int? ActualValue = null,
+    string? BoneName = null)
 {
     public string ReasonKey => $"AnimationWorkbench.Diagnostic.{Code}";
 }
@@ -149,9 +159,12 @@ public sealed record AnimationWorkbenchDocumentState(
     IReadOnlyList<AnimationWorkbenchDiagnostic> Diagnostics,
     bool IsDirty,
     string? ProjectResourcePath,
-    bool IsClosed);
+    bool IsClosed,
+    bool CanUndo,
+    bool CanRedo,
+    bool HasActivePosePreview);
 
-public sealed class AnimationWorkbenchDocument : IDisposable
+public sealed partial class AnimationWorkbenchDocument : IDisposable
 {
     private readonly IAnimationWorkbenchPreviewHost _previewHost;
     private SourceSnapshot? _animationA;
@@ -194,8 +207,8 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         _targetGame = request.TargetGame;
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
-        _isDirty = result != null;
         _projectResourcePath = null;
+        ResetDocumentHistory();
 
         ShowCurrentPreview();
 
@@ -271,7 +284,7 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         }
 
         _projectResourcePath = normalizedPath;
-        _isDirty = false;
+        MarkDocumentHistorySaved();
         return CreateSaveResult(
             succeeded: true,
             Array.Empty<AnimationWorkbenchDiagnostic>());
@@ -329,8 +342,8 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         _targetGame = null;
         _targetSkeleton = null;
         _selectedPreview = null;
-        _isDirty = false;
         _projectResourcePath = null;
+        ResetDocumentHistory();
         _isClosed = true;
 
         return CreateState();
@@ -355,7 +368,10 @@ public sealed class AnimationWorkbenchDocument : IDisposable
             CreateDiagnostics(),
             _isDirty,
             _projectResourcePath,
-            _isClosed);
+            _isClosed,
+            _undoEdits.Count != 0,
+            _redoEdits.Count != 0,
+            _posePreviewResult != null);
     }
 
     private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()
@@ -365,6 +381,12 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         {
             diagnostics.Add(CreateSaveDiagnostic(
                 AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported));
+        }
+
+        if (_posePreviewResult != null)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
         }
 
         if (_result == null)
@@ -555,7 +577,8 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         {
             AnimationWorkbenchPreviewKind.AnimationA => _animationA,
             AnimationWorkbenchPreviewKind.AnimationB => _animationB,
-            AnimationWorkbenchPreviewKind.Result => _result,
+            AnimationWorkbenchPreviewKind.Result =>
+                _posePreviewResult ?? _result,
             _ => null,
         };
 
@@ -642,6 +665,12 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         public SourceSnapshot Clone() => new(
             name,
             animation.Clone(),
+            skeleton.Clone(new AnimationPlayer()),
+            format);
+
+        public SourceSnapshot WithAnimation(AnimationClip replacement) => new(
+            name,
+            replacement.Clone(),
             skeleton.Clone(new AnimationPlayer()),
             format);
 
