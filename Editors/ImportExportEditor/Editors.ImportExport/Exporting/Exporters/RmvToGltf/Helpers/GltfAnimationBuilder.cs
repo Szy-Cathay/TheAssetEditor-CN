@@ -77,10 +77,11 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             var animationClip = new AnimationClip(animationToExport, gameSkeleton);
             if (animationClip.DynamicFrames.Count == 0)
                 throw new InvalidDataException($"动画“{animationName}”不包含任何动态帧。");
-            if (!float.IsFinite(animationToExport.Header.FrameRate) || animationToExport.Header.FrameRate <= 0)
-                throw new InvalidDataException($"动画“{animationName}”的帧率无效。");
-
-            var secondsPerFrame = 1.0f / animationToExport.Header.FrameRate;
+            var timebase = animationClip.Timebase ??
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.GetFormat(
+                        "RmvToGltfExporter.Error.InvalidAnimationDuration",
+                        animationName));
 
             var gltfAnimation = modelRoot.CreateAnimation(animationName);
 
@@ -93,16 +94,19 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
                 // populate the bone track containers with the key frames from the .ANIM animation file
                 for (var frameIndex = 0; frameIndex < animationClip.DynamicFrames.Count; frameIndex++)
                 {
-                    translationKeyFrames.Add(secondsPerFrame * (float)frameIndex, VecConv.GetSys(GlobalSceneTransforms.FlipVector(animationClip.DynamicFrames[frameIndex].Position[boneIndex], doMirror)));
+                    var keyTime = (float)timebase
+                        .GetSampleTime(frameIndex)
+                        .TotalSeconds;
+                    translationKeyFrames.Add(keyTime, VecConv.GetSys(GlobalSceneTransforms.FlipVector(animationClip.DynamicFrames[frameIndex].Position[boneIndex], doMirror)));
                     var rotation = Microsoft.Xna.Framework.Quaternion.Normalize(
                         GlobalSceneTransforms.FlipQuaternion(
                             animationClip.DynamicFrames[frameIndex]
                                 .Rotation[boneIndex],
                             doMirror));
                     rotationKeyFrames.Add(
-                        secondsPerFrame * (float)frameIndex,
+                        keyTime,
                         VecConv.GetSys(rotation));
-                    scaleKeyFrames.Add(secondsPerFrame * (float)frameIndex, new SysNum.Vector3(1, 1, 1));
+                    scaleKeyFrames.Add(keyTime, new SysNum.Vector3(1, 1, 1));
                 }
 
                 // add the transformations

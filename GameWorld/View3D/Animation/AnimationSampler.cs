@@ -175,7 +175,9 @@ namespace GameWorld.Core.Animation
                         frameIterpolation = (float)(samplePosition - frameIndex);
                     }
                 }
-                var currentTimeSeconds = animationClip == null ? 0 : clampedT * animationClip.PlayTimeInSec;
+                var currentTimeSeconds = animationClip == null
+                    ? 0
+                    : clampedT * (float)animationClip.Duration.TotalSeconds;
                 return Sample(frameIndex, frameIterpolation, skeleton, animationClip, animationChangeRules, freezeFrame, currentTimeSeconds);
             }
             catch (Exception e)

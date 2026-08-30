@@ -53,7 +53,7 @@ namespace Test.KitbashEditor.Animation
                 });
             }
 
-            clip.PlayTimeInSec = seconds;
+            clip.Duration = TimeSpan.FromSeconds(seconds);
             return clip;
         }
 
@@ -229,7 +229,7 @@ namespace Test.KitbashEditor.Animation
 
             Assert.Multiple(() =>
             {
-                Assert.That(scene.Player.GetTimeUs(), Is.EqualTo(400_000));
+                Assert.That(scene.Player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(400)));
                 Assert.That(scene.Player.IsPlaying, Is.False);
                 Assert.That(vm.MaxTimeSeconds, Is.EqualTo(1));
             });
@@ -237,14 +237,14 @@ namespace Test.KitbashEditor.Animation
             vm.PausePlayCommand.Execute(null);
             Assert.Multiple(() =>
             {
-                Assert.That(scene.Player.GetTimeUs(), Is.EqualTo(400_000));
+                Assert.That(scene.Player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(400)));
                 Assert.That(scene.Player.IsPlaying, Is.True);
             });
 
             vm.PlaybackPositionSeconds = 0.6f;
             Assert.Multiple(() =>
             {
-                Assert.That(scene.Player.GetTimeUs(), Is.EqualTo(600_000));
+                Assert.That(scene.Player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(600)));
                 Assert.That(scene.Player.IsPlaying, Is.True);
             });
         }

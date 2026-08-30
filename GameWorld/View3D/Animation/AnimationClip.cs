@@ -40,43 +40,21 @@ namespace GameWorld.Core.Animation
             }
         }
 
-        private const long MicrosecondsPerSecond = 1_000_000;
-
-        private long _playTimeUs = -1 * MicrosecondsPerSecond;
-
         public List<KeyFrame> DynamicFrames = new List<KeyFrame>();
 
-        public long PlayTimeUs => _playTimeUs;
+        public TimeSpan Duration { get; set; }
 
         public AnimationTimebase? Timebase
         {
             get
             {
-                if (DynamicFrames.Count == 0 || _playTimeUs <= 0)
+                if (DynamicFrames.Count == 0 || Duration <= TimeSpan.Zero)
                     return null;
 
                 return new AnimationTimebase(
                     DynamicFrames.Count,
-                    TimeSpan.FromTicks(_playTimeUs * TimeSpan.TicksPerMicrosecond));
+                    Duration);
             }
-        }
-
-        public long MicrosecondsPerFrame
-        {
-            get
-            {
-                if (DynamicFrames.Count == 0)
-                {
-                    return -1;
-                }
-                return _playTimeUs / DynamicFrames.Count;
-            }
-        }
-
-        public float PlayTimeInSec
-        {
-            get => (float)_playTimeUs / MicrosecondsPerSecond;
-            set => _playTimeUs = (long)Math.Round(value * MicrosecondsPerSecond);
         }
 
         public int AnimationBoneCount
@@ -101,7 +79,8 @@ namespace GameWorld.Core.Animation
                 DynamicFrames.AddRange(frames);
             }
 
-            PlayTimeInSec = file.Header.AnimationTotalPlayTimeInSec;
+            Duration = TimeSpan.FromSeconds(
+                file.Header.AnimationTotalPlayTimeInSec);
         }
 
 
@@ -159,7 +138,8 @@ namespace GameWorld.Core.Animation
             output.Header.FrameRate = (float)(Timebase?.FramesPerSecond ?? 20);
 
             output.Header.Version = 7;
-            output.Header.AnimationTotalPlayTimeInSec = PlayTimeInSec;
+            output.Header.AnimationTotalPlayTimeInSec =
+                (float)Duration.TotalSeconds;
             output.Header.SkeletonName = skeleton.SkeletonName;
             output.AnimationParts.Add(new AnimationPart());
 
@@ -216,7 +196,7 @@ namespace GameWorld.Core.Animation
             var copy = new AnimationClip();
             foreach (var item in DynamicFrames)
                 copy.DynamicFrames.Add(item.Clone());
-            copy.PlayTimeInSec = PlayTimeInSec;
+            copy.Duration = Duration;
 
             return copy;
         }
@@ -237,7 +217,7 @@ namespace GameWorld.Core.Animation
             clip.DynamicFrames.Add(frame.Clone());
             clip.DynamicFrames.Add(frame.Clone());
 
-            clip.PlayTimeInSec = 0.1f;
+            clip.Duration = TimeSpan.FromSeconds(0.1);
             return clip;
         }
 

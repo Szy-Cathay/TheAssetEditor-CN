@@ -77,13 +77,26 @@ public class AnimationPlayerViewModelTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(first.Player.GetTimeUs(), Is.EqualTo(400_000));
-            Assert.That(second.Player.GetTimeUs(), Is.EqualTo(400_000));
-            Assert.That(metadataPlayer.GetTimeUs(), Is.EqualTo(400_000));
+            Assert.That(first.Player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(400)));
+            Assert.That(second.Player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(400)));
+            Assert.That(metadataPlayer.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(400)));
             Assert.That(first.Player.IsPlaying, Is.False);
             Assert.That(second.Player.IsPlaying, Is.False);
             Assert.That(metadataPlayer.IsPlaying, Is.False);
         });
+    }
+
+    [Test]
+    public void RegisterAsset_ReportsExactNonIntegerFrameRate()
+    {
+        var sceneObject = CreateSceneObject("main", 7, 0.3f);
+        var viewModel = new AnimationPlayerViewModel();
+
+        viewModel.RegisterAsset(sceneObject);
+
+        Assert.That(
+            viewModel.SelectedAnimationFps.Value,
+            Is.EqualTo(70.0 / 3.0).Within(0.000001));
     }
 
     [Test]
@@ -138,7 +151,7 @@ public class AnimationPlayerViewModelTests
             });
         }
 
-        clip.PlayTimeInSec = seconds;
+        clip.Duration = TimeSpan.FromSeconds(seconds);
         return clip;
     }
 

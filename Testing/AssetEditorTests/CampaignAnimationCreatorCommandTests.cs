@@ -171,7 +171,7 @@ namespace AssetEditorTests
             Assert.IsTrue(result);
             Assert.IsNotNull(convertedAnimation);
             Assert.AreNotSame(sourceAnimation, convertedAnimation);
-            Assert.AreEqual(sourceAnimation.PlayTimeInSec, convertedAnimation.PlayTimeInSec);
+            Assert.AreEqual(sourceAnimation.Duration, convertedAnimation.Duration);
             Assert.AreEqual(sourceAnimation.DynamicFrames.Count, convertedAnimation.DynamicFrames.Count);
             dialogs.Verify(x => x.ShowDialogBox(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
 
@@ -296,7 +296,7 @@ namespace AssetEditorTests
             CollectionAssert.AreEqual(skeleton.BoneNames, savedAnimation.Bones.Select(x => x.Name).ToList());
             Assert.AreEqual(animationClip.DynamicFrames.Count, savedAnimation.AnimationParts[0].DynamicFrames.Count);
             Assert.AreEqual(
-                animationClip.PlayTimeInSec,
+                (float)animationClip.Duration.TotalSeconds,
                 savedAnimation.Header.AnimationTotalPlayTimeInSec,
                 0.001f);
 
@@ -351,7 +351,7 @@ namespace AssetEditorTests
 
         private static AnimationClip CreateAnimationClip(int boneCount = 2, int frameCount = 2)
         {
-            var clip = new AnimationClip { PlayTimeInSec = 0.2f };
+            var clip = new AnimationClip { Duration = TimeSpan.FromSeconds(0.2) };
             for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
             {
                 var frame = new AnimationClip.KeyFrame();

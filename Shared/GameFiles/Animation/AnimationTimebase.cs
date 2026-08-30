@@ -19,6 +19,62 @@
 
         public double FramesPerSecond => FrameCount / Duration.TotalSeconds;
 
+        public TimeSpan SampleDuration => TimeSpan.FromTicks(
+            Math.Max(1, Duration.Ticks / FrameCount));
+
+        public static AnimationTimebase FromFramesPerSecond(
+            int frameCount,
+            double framesPerSecond)
+        {
+            if (frameCount <= 0)
+                throw new ArgumentOutOfRangeException(nameof(frameCount));
+            if (!double.IsFinite(framesPerSecond) || framesPerSecond <= 0)
+                throw new ArgumentOutOfRangeException(nameof(framesPerSecond));
+
+            var durationTicks = frameCount *
+                (double)TimeSpan.TicksPerSecond / framesPerSecond;
+            if (!double.IsFinite(durationTicks) ||
+                durationTicks < 1 ||
+                durationTicks > TimeSpan.MaxValue.Ticks)
+            {
+                throw new ArgumentOutOfRangeException(nameof(framesPerSecond));
+            }
+
+            return new AnimationTimebase(
+                frameCount,
+                TimeSpan.FromTicks((long)Math.Round(
+                    durationTicks,
+                    MidpointRounding.AwayFromZero)));
+        }
+
+        public AnimationTimebase WithPlaybackSpeed(double playbackSpeed)
+        {
+            if (!double.IsFinite(playbackSpeed) || playbackSpeed <= 0)
+                throw new ArgumentOutOfRangeException(nameof(playbackSpeed));
+
+            var scaledTicks = Duration.Ticks / playbackSpeed;
+            if (!double.IsFinite(scaledTicks) ||
+                scaledTicks < 1 ||
+                scaledTicks > TimeSpan.MaxValue.Ticks)
+            {
+                throw new ArgumentOutOfRangeException(nameof(playbackSpeed));
+            }
+
+            var scaledDuration = TimeSpan.FromTicks((long)Math.Round(
+                scaledTicks,
+                MidpointRounding.AwayFromZero));
+            var scaledFrameCount = (decimal)FrameCount *
+                scaledDuration.Ticks / Duration.Ticks;
+            if (scaledFrameCount > int.MaxValue)
+                throw new ArgumentOutOfRangeException(nameof(playbackSpeed));
+
+            return new AnimationTimebase(
+                Math.Max(1, (int)Math.Round(
+                    scaledFrameCount,
+                    MidpointRounding.AwayFromZero)),
+                scaledDuration);
+        }
+
         public TimeSpan GetSampleTime(int frameIndex)
         {
             if (frameIndex < 0 || frameIndex >= FrameCount)

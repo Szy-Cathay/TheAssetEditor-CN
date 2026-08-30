@@ -290,6 +290,56 @@ public class AnimationRoundTripTests
     }
 
     [Test]
+    public void ExportAnimation_ConflictingHeaderRate_UsesClipTimebase()
+    {
+        var packFileService = PackFileSerivceTestHelper.Create(
+            PathHelper.GetDataFolder("Data\\Karl_and_celestialgeneral_Pack"));
+        var skeleton = CreateSingleBoneAnimation(1.0f);
+        var animation = CreateSingleBoneAnimation(1.0f);
+        var sourceFrame = animation.AnimationParts[0].DynamicFrames[0];
+        animation.AnimationParts[0].DynamicFrames = Enumerable
+            .Range(0, 7)
+            .Select(_ => new AnimationFile.Frame
+            {
+                Transforms = [sourceFrame.Transforms[0]],
+                Quaternion = [sourceFrame.Quaternion[0]],
+            })
+            .ToList();
+        animation.Header.FrameRate = 20;
+        animation.Header.AnimationTotalPlayTimeInSec = 0.3f;
+        var animationPackFile = new PackFile(
+            "non_integer_rate.anim",
+            new MemorySource(AnimationFile.ConvertToBytes(animation)));
+        var modelRoot = ModelRoot.CreateModel();
+        var exportSettings = new RmvToGltfExporterSettings(
+            new PackFile("model.rigid_model_v2", new MemorySource([])),
+            [animationPackFile],
+            "roundtrip.gltf",
+            false,
+            false,
+            false,
+            true,
+            true);
+        var gltfSkeleton = new GltfSkeletonBuilder(packFileService)
+            .CreateSkeleton(skeleton, modelRoot, exportSettings);
+
+        new GltfAnimationBuilder(packFileService).Build(
+            skeleton,
+            exportSettings,
+            gltfSkeleton,
+            modelRoot);
+
+        var node = gltfSkeleton.Data[0].Item1;
+        var keyTimes = modelRoot.LogicalAnimations.Single()
+            .FindTranslationChannel(node)!
+            .GetTranslationSampler()
+            .GetLinearKeys()
+            .Select(key => key.Key)
+            .ToArray();
+        Assert.That(keyTimes[^1], Is.EqualTo(6.0 * 0.3 / 7.0).Within(0.000001));
+    }
+
+    [Test]
     public void ExportThenImport_NonUnitBindQuaternion_DoesNotCreateBoneScale()
     {
         var packFileService = PackFileSerivceTestHelper.Create(

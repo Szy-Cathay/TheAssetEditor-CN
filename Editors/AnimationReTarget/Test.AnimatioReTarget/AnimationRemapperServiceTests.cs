@@ -1007,7 +1007,7 @@ public class AnimationRemapperServiceTests
     public void ReMapAnimation_SpeedMultiplierTwo_HalvesDurationAndPreservesSamplingRate()
     {
         var skeleton = CreateSkeleton("shared", 1);
-        var animation = CreateAnimation(21, 1, 1.0f);
+        var animation = CreateAnimation(20, 1, 1.0f);
         var bone = new SkeletonBoneNode_new("root", 0, -1)
         {
             HasMapping = true,
@@ -1023,8 +1023,8 @@ public class AnimationRemapperServiceTests
 
         var result = service.ReMapAnimation(skeleton, skeleton, animation);
 
-        Assert.That(result.PlayTimeInSec, Is.EqualTo(0.5f).Within(0.0001f));
-        Assert.That(result.DynamicFrames, Has.Count.EqualTo(11));
+        Assert.That(result.Duration, Is.EqualTo(TimeSpan.FromSeconds(0.5)));
+        Assert.That(result.DynamicFrames, Has.Count.EqualTo(10));
     }
 
     [Test]
@@ -1096,7 +1096,7 @@ public class AnimationRemapperServiceTests
             Assert.That(result.DynamicFrames, Has.Count.EqualTo(1));
             Assert.That(result.DynamicFrames[0].Position[0],
                 Is.EqualTo(new Vector3(1, 2, 3)));
-            Assert.That(float.IsFinite(result.PlayTimeInSec), Is.True);
+            Assert.That(result.Duration, Is.GreaterThan(TimeSpan.Zero));
         });
     }
 
@@ -1304,7 +1304,7 @@ public class AnimationRemapperServiceTests
             animation.DynamicFrames.Add(frame);
         }
 
-        animation.PlayTimeInSec = playTime;
+        animation.Duration = TimeSpan.FromSeconds(playTime);
         return animation;
     }
 

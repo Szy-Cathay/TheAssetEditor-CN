@@ -358,7 +358,7 @@ namespace Test.AnimationMeta
             var clip = new AnimationClip();
             for (var frameIndex = 0; frameIndex < 30; frameIndex++)
                 clip.DynamicFrames.Add(new AnimationClip.KeyFrame());
-            clip.PlayTimeInSec = 1;
+            clip.Duration = TimeSpan.FromSeconds(1);
             player.SetAnimation(clip, null!);
 
             var instances = builder.Build(

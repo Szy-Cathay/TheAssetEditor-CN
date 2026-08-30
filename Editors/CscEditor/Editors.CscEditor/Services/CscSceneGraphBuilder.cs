@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Editors.CscEditor.Data;
 using GameWorld.Core.Animation;
@@ -22,8 +23,7 @@ namespace Editors.CscEditor.Services
         public required CscElement Element { get; init; }
         public required AnimationClip Clip { get; init; }
         public required GameSkeleton Skeleton { get; init; }
-        public float ClipLengthSeconds { get; init; }
-        public int FrameCount { get; init; }
+        public required AnimationTimebase Timebase { get; init; }
 
         /// <summary>Model-space transform the animroot bone accumulates over one full clip pass
         /// (identity when the clip ends where it started). Walk cycles and travelling idles put
@@ -255,13 +255,15 @@ namespace Editors.CscEditor.Services
                             : GameSkeleton.CreateFromAnimationFile(animFile, content.Player);
 
                         var clip = new AnimationClip(animFile, skeleton);
+                        var timebase = clip.Timebase ??
+                            throw new InvalidDataException(
+                                "动画时长必须大于 0，且至少包含一帧。");
                         content.Bindings.Add(new CscAnimationBinding
                         {
                             Element = animationElement,
                             Clip = clip,
                             Skeleton = skeleton,
-                            ClipLengthSeconds = clip.PlayTimeInSec,
-                            FrameCount = clip.DynamicFrames.Count,
+                            Timebase = timebase,
                             LoopRootMotion = ComputeLoopRootMotion(skeleton, clip),
                         });
                     }

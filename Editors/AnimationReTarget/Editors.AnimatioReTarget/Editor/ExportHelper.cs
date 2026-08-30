@@ -58,7 +58,6 @@ namespace Editors.AnimatioReTarget.Editor
             //var scaleAnimClip = new AnimationClip();
             //scaleAnimClip.DynamicFrames.Add(new AnimationClip.KeyFrame());
             //scaleAnimClip.DynamicFrames.Add(new AnimationClip.KeyFrame());
-            //scaleAnimClip.PlayTimeInSec = 2.0f / 20.0f;
             //for (int i = 0; i < Generated.Skeleton.BoneCount; i++)
             //{
             //    scaleAnimClip.DynamicFrames[0].Position.Add(Generated.Skeleton.Translation[i]);

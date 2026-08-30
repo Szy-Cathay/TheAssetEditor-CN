@@ -127,7 +127,7 @@
                     Margin="12,0,0,0"
                     VerticalAlignment="Center"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
-                    <Run Text="{Binding SelectedAnimationFps.Value}" />
+                    <Run Text="{Binding SelectedAnimationFps.Value, StringFormat=N2}" />
                     <Run Text="{loc:Loc SharedAnimPlayer.Fps}" />
                 </TextBlock>
                 <CheckBox
