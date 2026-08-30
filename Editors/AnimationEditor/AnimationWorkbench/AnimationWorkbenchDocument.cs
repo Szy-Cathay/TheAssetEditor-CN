@@ -1,5 +1,10 @@
 ﻿using GameWorld.Core.Animation;
+using System.IO;
+using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
+using Shared.Core.PackFiles.Utility;
 using Shared.Core.Settings;
+using Shared.GameFormats.Animation;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
 
@@ -29,12 +34,39 @@ public enum AnimationWorkbenchDiagnosticCode
     TargetGameMissing,
     TargetGameUnsupported,
     TargetSkeletonMissing,
+    SourceFormatUnknown,
+    SourceFormatUnsupported,
+    SourceVersionEightReadOnly,
+    SourceMultiplePartsReadOnly,
+    TargetGameSaveUnsupported,
+    ResultMissing,
+    ResultTargetSkeletonBoneCountMismatch,
+    CandidateSerializationFailed,
+    CandidateRoundTripMismatch,
+    DestinationAlreadyExists,
+    DestinationInvalid,
+    DestinationWriteFailed,
+}
+
+public sealed record AnimationWorkbenchSourceFormat(
+    uint Version,
+    int PartCount)
+{
+    public static AnimationWorkbenchSourceFormat FromFile(
+        AnimationFile file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        return new AnimationWorkbenchSourceFormat(
+            file.Header.Version,
+            file.AnimationParts.Count);
+    }
 }
 
 public sealed record AnimationWorkbenchSourceInput(
     string Name,
     AnimationClip Animation,
-    GameSkeleton Skeleton);
+    GameSkeleton Skeleton,
+    AnimationWorkbenchSourceFormat? Format = null);
 
 public sealed record AnimationWorkbenchLoadRequest(
     AnimationWorkbenchSourceInput? AnimationA,
@@ -58,7 +90,15 @@ public sealed record AnimationWorkbenchDiagnostic(
     AnimationWorkbenchDiagnosticSeverity Severity,
     AnimationWorkbenchSourceSlot? Source = null,
     int? ExpectedValue = null,
-    int? ActualValue = null);
+    int? ActualValue = null)
+{
+    public string ReasonKey => $"AnimationWorkbench.Diagnostic.{Code}";
+}
+
+public sealed record AnimationWorkbenchSaveResult(
+    bool Succeeded,
+    AnimationWorkbenchDocumentState State,
+    IReadOnlyList<AnimationWorkbenchDiagnostic> Diagnostics);
 
 public interface IAnimationWorkbenchPreviewHost : IDisposable
 {
@@ -103,6 +143,8 @@ public sealed record AnimationWorkbenchDocumentState(
     AnimationWorkbenchPreviewKind? SelectedPreview,
     AnimationWorkbenchPreviewSnapshot? CurrentPreview,
     IReadOnlyList<AnimationWorkbenchDiagnostic> Diagnostics,
+    bool IsDirty,
+    string? ProjectResourcePath,
     bool IsClosed);
 
 public sealed class AnimationWorkbenchDocument : IDisposable
@@ -116,6 +158,8 @@ public sealed class AnimationWorkbenchDocument : IDisposable
     private AnimationWorkbenchPreviewKind? _selectedPreview;
     private CancellationTokenSource? _previewCancellationSource;
     private IDisposable? _previewSession;
+    private bool _isDirty;
+    private string? _projectResourcePath;
     private bool _isClosed;
 
     public AnimationWorkbenchDocument(
@@ -146,6 +190,8 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         _targetGame = request.TargetGame;
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
+        _isDirty = result != null;
+        _projectResourcePath = null;
 
         ShowCurrentPreview();
 
@@ -166,6 +212,106 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         return CreateState();
     }
 
+    public AnimationWorkbenchSaveResult SaveAsNewProjectResource(
+        IPackFileService packFileService,
+        FolderProjectContainer project,
+        string resourcePath)
+    {
+        ObjectDisposedException.ThrowIf(_isClosed, this);
+        ArgumentNullException.ThrowIfNull(packFileService);
+        ArgumentNullException.ThrowIfNull(project);
+
+        var candidate = PrepareSaveCandidate();
+        if (!candidate.Succeeded)
+            return CreateSaveResult(false, candidate.Diagnostics);
+
+        string normalizedPath;
+        try
+        {
+            normalizedPath = FolderProjectPathPolicy.EnsureResourcePath(
+                resourcePath);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or
+                  InvalidDataException or
+                  NotSupportedException)
+        {
+            return CreateSaveFailure(
+                AnimationWorkbenchDiagnosticCode.DestinationInvalid);
+        }
+
+        var directory = Path.GetDirectoryName(normalizedPath) ?? "";
+        var fileName = Path.GetFileName(normalizedPath);
+        try
+        {
+            packFileService.AddFilesToPack(
+                project,
+                [
+                    new NewPackFileEntry(
+                        directory,
+                        PackFile.CreateFromBytes(
+                            fileName,
+                            candidate.Bytes!)),
+                ],
+                overwriteExisting: false);
+        }
+        catch (FolderProjectFileConflictException)
+        {
+            return CreateSaveFailure(
+                AnimationWorkbenchDiagnosticCode.DestinationAlreadyExists);
+        }
+        catch (Exception)
+        {
+            return CreateSaveFailure(
+                AnimationWorkbenchDiagnosticCode.DestinationWriteFailed);
+        }
+
+        _projectResourcePath = normalizedPath;
+        _isDirty = false;
+        return CreateSaveResult(
+            succeeded: true,
+            Array.Empty<AnimationWorkbenchDiagnostic>());
+    }
+
+    public AnimationWorkbenchSaveResult ExportDiskCopy(
+        string destinationPath)
+    {
+        ObjectDisposedException.ThrowIf(_isClosed, this);
+
+        var candidate = PrepareSaveCandidate();
+        if (!candidate.Succeeded)
+            return CreateSaveResult(false, candidate.Diagnostics);
+
+        try
+        {
+            AnimationWorkbenchDiskCopyWriter.Write(
+                destinationPath,
+                candidate.Bytes!);
+        }
+        catch (AnimationWorkbenchDestinationExistsException)
+        {
+            return CreateSaveFailure(
+                AnimationWorkbenchDiagnosticCode.DestinationAlreadyExists);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or
+                  NotSupportedException or
+                  PathTooLongException)
+        {
+            return CreateSaveFailure(
+                AnimationWorkbenchDiagnosticCode.DestinationInvalid);
+        }
+        catch (Exception)
+        {
+            return CreateSaveFailure(
+                AnimationWorkbenchDiagnosticCode.DestinationWriteFailed);
+        }
+
+        return CreateSaveResult(
+            succeeded: true,
+            Array.Empty<AnimationWorkbenchDiagnostic>());
+    }
+
     public AnimationWorkbenchDocumentState Close()
     {
         if (_isClosed)
@@ -179,6 +325,8 @@ public sealed class AnimationWorkbenchDocument : IDisposable
         _targetGame = null;
         _targetSkeleton = null;
         _selectedPreview = null;
+        _isDirty = false;
+        _projectResourcePath = null;
         _isClosed = true;
 
         return CreateState();
@@ -201,8 +349,119 @@ public sealed class AnimationWorkbenchDocument : IDisposable
             _selectedPreview,
             CreatePreview(_selectedPreview),
             CreateDiagnostics(),
+            _isDirty,
+            _projectResourcePath,
             _isClosed);
     }
+
+    private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()
+    {
+        var diagnostics = new List<AnimationWorkbenchDiagnostic>();
+        if (_targetGame != GameTypeEnum.Warhammer3)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported));
+        }
+
+        if (_result == null)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                AnimationWorkbenchDiagnosticCode.ResultMissing));
+        }
+
+        if (_targetSkeleton == null)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                AnimationWorkbenchDiagnosticCode.TargetSkeletonMissing));
+        }
+
+        AddSaveSourceDiagnostics(
+            diagnostics,
+            _animationA,
+            AnimationWorkbenchSourceSlot.AnimationA);
+        if (_animationB != null)
+        {
+            AddSaveSourceDiagnostics(
+                diagnostics,
+                _animationB,
+                AnimationWorkbenchSourceSlot.AnimationB);
+        }
+
+        if (diagnostics.Count != 0)
+            return AnimationWorkbenchCandidateBuildResult.Failure(diagnostics);
+
+        return AnimationWorkbenchCandidateBuilder.Build(
+            _result!.Animation,
+            _targetSkeleton!);
+    }
+
+    private static void AddSaveSourceDiagnostics(
+        ICollection<AnimationWorkbenchDiagnostic> diagnostics,
+        SourceSnapshot? source,
+        AnimationWorkbenchSourceSlot slot)
+    {
+        if (source == null)
+            return;
+
+        if (source.AnimationBoneCount != source.SkeletonBoneCount)
+        {
+            diagnostics.Add(new AnimationWorkbenchDiagnostic(
+                AnimationWorkbenchDiagnosticCode.SourceSkeletonBoneCountMismatch,
+                AnimationWorkbenchDiagnosticSeverity.Error,
+                slot,
+                source.SkeletonBoneCount,
+                source.AnimationBoneCount));
+        }
+
+        if (source.Format == null)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                AnimationWorkbenchDiagnosticCode.SourceFormatUnknown,
+                slot));
+            return;
+        }
+
+        var capabilities = AnimationFormatCapabilities.Evaluate(
+            source.Format.Version,
+            source.Format.PartCount);
+        foreach (var reason in capabilities.BlockingReasons)
+        {
+            diagnostics.Add(CreateSaveDiagnostic(
+                reason switch
+                {
+                    AnimationFormatBlockReason.UnsupportedVersion =>
+                        AnimationWorkbenchDiagnosticCode.SourceFormatUnsupported,
+                    AnimationFormatBlockReason.VersionEightIsReadOnly =>
+                        AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly,
+                    AnimationFormatBlockReason.MultiplePartsAreReadOnly =>
+                        AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly,
+                    _ => throw new ArgumentOutOfRangeException(
+                        nameof(reason),
+                        reason,
+                        null),
+                },
+                slot));
+        }
+    }
+
+    private AnimationWorkbenchSaveResult CreateSaveFailure(
+        AnimationWorkbenchDiagnosticCode code) => CreateSaveResult(
+            succeeded: false,
+            [CreateSaveDiagnostic(code)]);
+
+    private AnimationWorkbenchSaveResult CreateSaveResult(
+        bool succeeded,
+        IReadOnlyList<AnimationWorkbenchDiagnostic> diagnostics) => new(
+            succeeded,
+            CreateState(),
+            diagnostics.ToArray());
+
+    private static AnimationWorkbenchDiagnostic CreateSaveDiagnostic(
+        AnimationWorkbenchDiagnosticCode code,
+        AnimationWorkbenchSourceSlot? source = null) => new(
+            code,
+            AnimationWorkbenchDiagnosticSeverity.Error,
+            source);
 
     private IReadOnlyList<AnimationWorkbenchDiagnostic> CreateDiagnostics()
     {
@@ -341,11 +600,16 @@ public sealed class AnimationWorkbenchDocument : IDisposable
     private sealed class SourceSnapshot(
         string name,
         AnimationClip animation,
-        GameSkeleton skeleton)
+        GameSkeleton skeleton,
+        AnimationWorkbenchSourceFormat? format)
     {
+        public AnimationClip Animation => animation;
+
         public int AnimationBoneCount => animation.AnimationBoneCount;
 
         public int SkeletonBoneCount => skeleton.BoneCount;
+
+        public AnimationWorkbenchSourceFormat? Format => format;
 
         public static SourceSnapshot? Create(
             AnimationWorkbenchSourceInput? input)
@@ -360,13 +624,15 @@ public sealed class AnimationWorkbenchDocument : IDisposable
             return new SourceSnapshot(
                 input.Name,
                 input.Animation.Clone(),
-                input.Skeleton.Clone(new AnimationPlayer()));
+                input.Skeleton.Clone(new AnimationPlayer()),
+                input.Format);
         }
 
         public SourceSnapshot Clone() => new(
             name,
             animation.Clone(),
-            skeleton.Clone(new AnimationPlayer()));
+            skeleton.Clone(new AnimationPlayer()),
+            format);
 
         public AnimationWorkbenchSourceSummary CreateSummary() => new(
             name,
