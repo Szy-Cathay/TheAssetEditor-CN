@@ -3,6 +3,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -199,6 +200,34 @@ public class UiCommonControlResourceTests
                 {
                     window.Close();
                 }
+            });
+    }
+
+    [Test]
+    public void TreeChevron_CollapsesOnFirstMousePress_WhenChildRemainsSelected()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () => AssertTreeChevronCollapsesOnFirstMousePress(
+                (Style)Application.Current.FindResource("AeTree.Item"),
+                "audio",
+                "edited.wav"));
+    }
+
+    [Test]
+    public void KitbashSceneTreeChevron_CollapsesOnFirstMousePress_WhenChildRemainsSelected()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var dictionary = Load(
+                    "Editors.KitbasherEditor",
+                    "KitbashUiStyles.xaml");
+                AssertTreeChevronCollapsesOnFirstMousePress(
+                    (Style)dictionary["Kitbash.SceneTreeItem"],
+                    "scene",
+                    "edited model");
             });
     }
 
@@ -1335,6 +1364,60 @@ public class UiCommonControlResourceTests
         Source = new Uri(
             $"pack://application:,,,/{assemblyName};component/{path}"),
     };
+
+    private static void AssertTreeChevronCollapsesOnFirstMousePress(
+        Style style,
+        string directoryHeader,
+        string childHeader)
+    {
+        var child = new TreeViewItem
+        {
+            Header = childHeader,
+            IsSelected = true,
+            Style = style,
+        };
+        var directory = new TreeViewItem
+        {
+            Header = directoryHeader,
+            IsExpanded = true,
+            Style = style,
+            Items = { child },
+        };
+        var window = new Window
+        {
+            Content = directory,
+            ShowActivated = false,
+            ShowInTaskbar = false,
+        };
+
+        try
+        {
+            window.Show();
+            directory.ApplyTemplate();
+            var expander = directory.Template.FindName(
+                "Expander",
+                directory) as ToggleButton;
+            NUnitAssert.That(expander, Is.Not.Null);
+
+            expander!.RaiseEvent(new MouseButtonEventArgs(
+                Mouse.PrimaryDevice,
+                Environment.TickCount,
+                MouseButton.Left)
+            {
+                RoutedEvent = Mouse.MouseDownEvent,
+                Source = expander,
+            });
+            directory.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.DataBind);
+
+            NUnitAssert.That(directory.IsExpanded, Is.False);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
 
     private static string FindSolutionRoot()
     {
