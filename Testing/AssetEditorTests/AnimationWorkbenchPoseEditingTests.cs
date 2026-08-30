@@ -357,6 +357,38 @@ public class AnimationWorkbenchPoseEditingTests
             CaptureSavedBytes(exactDocument, "exact.anim"));
     }
 
+    [TestMethod]
+    public void SmallRotation_PreviewAndExactEditAreCommittedConsistently()
+    {
+        using var previewDocument = CreateLoadedDocument(CreateClip(
+            (Vector3.One, new Vector3(2))));
+        using var exactDocument = CreateLoadedDocument(CreateClip(
+            (Vector3.One, new Vector3(2))));
+        var transforms = new Dictionary<string, AnimationWorkbenchBoneTransform>
+        {
+            ["root"] = new(
+                Vector3.One,
+                Quaternion.CreateFromYawPitchRoll(
+                    MathHelper.ToRadians(0.1f),
+                    0,
+                    0),
+                Vector3.One),
+        };
+
+        Assert.IsTrue(previewDocument.BeginPosePreview(0).Succeeded);
+        Assert.IsTrue(previewDocument.PreviewPoseTransforms(transforms).Succeeded);
+        var committed = previewDocument.CommitPosePreview();
+        var exact = exactDocument.ApplyExactPoseTransforms(0, transforms);
+
+        Assert.IsTrue(committed.Succeeded);
+        Assert.IsTrue(exact.Succeeded);
+        Assert.IsTrue(committed.State.CanUndo);
+        Assert.IsTrue(exact.State.CanUndo);
+        CollectionAssert.AreEqual(
+            CaptureSavedBytes(previewDocument, "small-preview.anim"),
+            CaptureSavedBytes(exactDocument, "small-exact.anim"));
+    }
+
     private static AnimationWorkbenchDocument CreateLoadedDocument(AnimationClip animation)
     {
         var skeleton = CreateSkeleton();

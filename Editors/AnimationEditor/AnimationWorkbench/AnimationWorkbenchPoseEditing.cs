@@ -757,9 +757,9 @@ public sealed partial class AnimationWorkbenchDocument
             {
                 if (leftFrame.Position[boneIndex] != rightFrame.Position[boneIndex] ||
                     leftFrame.Scale[boneIndex] != rightFrame.Scale[boneIndex] ||
-                    Math.Abs(Quaternion.Dot(
+                    RotationsEqual(
                         leftFrame.Rotation[boneIndex],
-                        rightFrame.Rotation[boneIndex])) < 0.999999f)
+                        rightFrame.Rotation[boneIndex]) == false)
                 {
                     return false;
                 }
@@ -768,6 +768,13 @@ public sealed partial class AnimationWorkbenchDocument
 
         return true;
     }
+
+    private static bool RotationsEqual(Quaternion left, Quaternion right) =>
+        left == right ||
+        (left.X == -right.X &&
+         left.Y == -right.Y &&
+         left.Z == -right.Z &&
+         left.W == -right.W);
 
     private sealed record DocumentHistoryEntry(
         AnimationClip Before,
