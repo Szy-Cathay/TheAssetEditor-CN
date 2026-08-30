@@ -1005,7 +1005,7 @@
   "AnimationWorkbench.Diagnostic.PoseLastFrameDeleteRejected": "无法删除：动画必须至少保留一个姿态帧。",
   "AnimationWorkbench.Diagnostic.PoseBoneMissing": "无法编辑：目标骨架中不存在剪贴板或编辑操作指定的骨骼。",
   "AnimationWorkbench.Diagnostic.PoseClipboardIncomplete": "无法粘贴：姿态剪贴板为空或缺少必要骨骼数据。",
-  "AnimationWorkbench.Diagnostic.PoseTransformInvalid": "无法编辑：姿态包含无效数值、零缩放或无效旋转。",
+  "AnimationWorkbench.Diagnostic.PoseTransformInvalid": "无法编辑：姿态包含无效数值、格式不支持的非单位缩放或无效旋转。",
   "AnimationWorkbench.Diagnostic.PosePreviewAlreadyActive": "无法继续：请先提交或取消当前姿态预览。",
   "AnimationWorkbench.Diagnostic.PosePreviewMissing": "无法继续：当前没有可提交或取消的姿态预览。",
   "AnimationWorkbench.Diagnostic.PoseUndoUnavailable": "无法撤销：当前没有可撤销的姿态编辑。",

@@ -38,17 +38,15 @@ public sealed record AnimationWorkbenchPoseEditResult(
 
 public sealed partial class AnimationWorkbenchDocument
 {
-    private const float MinimumScaleMagnitude = 0.000001f;
     private const float MinimumQuaternionLengthSquared = 0.000000000001f;
+    private const float UnitScaleTolerance = 0.0001f;
 
-    private readonly Stack<PoseHistoryEntry> _undoPoseEdits = new();
-    private readonly Stack<PoseHistoryEntry> _redoPoseEdits = new();
+    private readonly Stack<DocumentHistoryEntry> _undoEdits = new();
+    private readonly Stack<DocumentHistoryEntry> _redoEdits = new();
     private SourceSnapshot? _posePreviewResult;
     private AnimationClip? _posePreviewStart;
+    private AnimationClip? _savedResultAnimation;
     private int _posePreviewFrameIndex = -1;
-    private long _nextPoseDocumentStateId;
-    private long _currentPoseDocumentStateId;
-    private long _savedPoseDocumentStateId;
 
     public AnimationWorkbenchPoseEditResult InsertPoseFrame(
         int insertionIndex,
@@ -88,7 +86,7 @@ public sealed partial class AnimationWorkbenchDocument
             animation.Duration,
             animation.DynamicFrames.Count,
             next.DynamicFrames.Count);
-        CommitPoseAnimation(next);
+        CommitResultAnimation(next);
         return CreatePoseSuccess();
     }
 
@@ -115,7 +113,7 @@ public sealed partial class AnimationWorkbenchDocument
         }
 
         var isCompletePose = boneNames == null;
-        var requestedBones = boneNames?.Distinct(StringComparer.Ordinal).ToArray()
+        var requestedBones = boneNames?.ToArray()
             ?? skeleton.BoneNames.ToArray();
         if (requestedBones.Length == 0)
         {
@@ -194,7 +192,7 @@ public sealed partial class AnimationWorkbenchDocument
             animation.Duration,
             animation.DynamicFrames.Count,
             next.DynamicFrames.Count);
-        CommitPoseAnimation(next);
+        CommitResultAnimation(next);
         return CreatePoseSuccess();
     }
 
@@ -231,7 +229,8 @@ public sealed partial class AnimationWorkbenchDocument
 
         var next = animation.Clone();
         ApplyTransforms(next.DynamicFrames[frameIndex], skeleton, transforms);
-        CommitPoseAnimation(next);
+        if (AnimationsEqual(animation, next) == false)
+            CommitResultAnimation(next);
         return CreatePoseSuccess();
     }
 
@@ -331,7 +330,7 @@ public sealed partial class AnimationWorkbenchDocument
             return CreatePoseSuccess();
         }
 
-        CommitPoseAnimation(next);
+        CommitResultAnimation(next);
         return CreatePoseSuccess();
     }
 
@@ -358,17 +357,16 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
         }
 
-        if (_undoPoseEdits.Count == 0 || _result == null)
+        if (_undoEdits.Count == 0 || _result == null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
                 AnimationWorkbenchDiagnosticCode.PoseUndoUnavailable));
         }
 
-        var entry = _undoPoseEdits.Pop();
-        _redoPoseEdits.Push(entry);
+        var entry = _undoEdits.Pop();
+        _redoEdits.Push(entry);
         _result = _result.WithAnimation(entry.Before);
-        _currentPoseDocumentStateId = entry.PreviousDocumentStateId;
-        UpdatePoseDirtyState();
+        UpdateDirtyState();
         RefreshSelectedResultPreview();
         return CreatePoseSuccess();
     }
@@ -382,17 +380,16 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
         }
 
-        if (_redoPoseEdits.Count == 0 || _result == null)
+        if (_redoEdits.Count == 0 || _result == null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
                 AnimationWorkbenchDiagnosticCode.PoseRedoUnavailable));
         }
 
-        var entry = _redoPoseEdits.Pop();
-        _undoPoseEdits.Push(entry);
+        var entry = _redoEdits.Pop();
+        _undoEdits.Push(entry);
         _result = _result.WithAnimation(entry.After);
-        _currentPoseDocumentStateId = entry.NextDocumentStateId;
-        UpdatePoseDirtyState();
+        UpdateDirtyState();
         RefreshSelectedResultPreview();
         return CreatePoseSuccess();
     }
@@ -434,7 +431,7 @@ public sealed partial class AnimationWorkbenchDocument
         var next = animation.Clone();
         ApplyTransforms(next.DynamicFrames[frameIndex], skeleton, normalized);
         if (AnimationsEqual(animation, next) == false)
-            CommitPoseAnimation(next);
+            CommitResultAnimation(next);
         return CreatePoseSuccess();
     }
 
@@ -595,9 +592,7 @@ public sealed partial class AnimationWorkbenchDocument
         if (IsFinite(transform.Position) == false ||
             IsFinite(transform.Rotation) == false ||
             IsFinite(transform.Scale) == false ||
-            Math.Abs(transform.Scale.X) < MinimumScaleMagnitude ||
-            Math.Abs(transform.Scale.Y) < MinimumScaleMagnitude ||
-            Math.Abs(transform.Scale.Z) < MinimumScaleMagnitude)
+            IsUnitScale(transform.Scale) == false)
         {
             return false;
         }
@@ -611,9 +606,18 @@ public sealed partial class AnimationWorkbenchDocument
 
         var rotation = transform.Rotation;
         rotation.Normalize();
-        normalized = transform with { Rotation = rotation };
+        normalized = transform with
+        {
+            Rotation = rotation,
+            Scale = Vector3.One,
+        };
         return true;
     }
+
+    private static bool IsUnitScale(Vector3 scale) =>
+        MathF.Abs(scale.X - 1) <= UnitScaleTolerance &&
+        MathF.Abs(scale.Y - 1) <= UnitScaleTolerance &&
+        MathF.Abs(scale.Z - 1) <= UnitScaleTolerance;
 
     private static bool IsFinite(Vector3 value) =>
         float.IsFinite(value.X) &&
@@ -640,42 +644,37 @@ public sealed partial class AnimationWorkbenchDocument
         }
     }
 
-    private void CommitPoseAnimation(AnimationClip next)
+    private void CommitResultAnimation(AnimationClip next)
     {
-        var previousDocumentStateId = _currentPoseDocumentStateId;
-        var nextDocumentStateId = ++_nextPoseDocumentStateId;
-        var entry = new PoseHistoryEntry(
+        var entry = new DocumentHistoryEntry(
             _result!.Animation.Clone(),
-            next.Clone(),
-            previousDocumentStateId,
-            nextDocumentStateId);
+            next.Clone());
         _result = _result.WithAnimation(next);
-        _undoPoseEdits.Push(entry);
-        _redoPoseEdits.Clear();
-        _currentPoseDocumentStateId = nextDocumentStateId;
-        UpdatePoseDirtyState();
+        _undoEdits.Push(entry);
+        _redoEdits.Clear();
+        UpdateDirtyState();
         RefreshSelectedResultPreview();
     }
 
-    private void ResetPoseEditing(bool hasResult)
+    private void ResetDocumentHistory()
     {
-        _undoPoseEdits.Clear();
-        _redoPoseEdits.Clear();
+        _undoEdits.Clear();
+        _redoEdits.Clear();
         ClearPosePreview();
-        _nextPoseDocumentStateId = hasResult ? 1 : 0;
-        _currentPoseDocumentStateId = _nextPoseDocumentStateId;
-        _savedPoseDocumentStateId = 0;
-        UpdatePoseDirtyState();
+        _savedResultAnimation = null;
+        UpdateDirtyState();
     }
 
-    private void MarkPoseHistorySaved()
+    private void MarkDocumentHistorySaved()
     {
-        _savedPoseDocumentStateId = _currentPoseDocumentStateId;
-        UpdatePoseDirtyState();
+        _savedResultAnimation = _result?.Animation.Clone();
+        UpdateDirtyState();
     }
 
-    private void UpdatePoseDirtyState() =>
-        _isDirty = _currentPoseDocumentStateId != _savedPoseDocumentStateId;
+    private void UpdateDirtyState() =>
+        _isDirty = _result != null &&
+            (_savedResultAnimation == null ||
+             AnimationsEqual(_result.Animation, _savedResultAnimation) == false);
 
     private void ClearPosePreview()
     {
@@ -770,9 +769,7 @@ public sealed partial class AnimationWorkbenchDocument
         return true;
     }
 
-    private sealed record PoseHistoryEntry(
+    private sealed record DocumentHistoryEntry(
         AnimationClip Before,
-        AnimationClip After,
-        long PreviousDocumentStateId,
-        long NextDocumentStateId);
+        AnimationClip After);
 }

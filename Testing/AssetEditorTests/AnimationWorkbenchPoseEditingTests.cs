@@ -125,6 +125,47 @@ public class AnimationWorkbenchPoseEditingTests
     }
 
     [TestMethod]
+    public void ExactPoseEdit_WithNonUnitScale_IsRejectedBeforeHistory()
+    {
+        using var document = CreateLoadedDocument(CreateClip(
+            (Vector3.One, new Vector3(2))));
+        var original = ResultClip(document);
+
+        var edit = document.ApplyExactPoseTransforms(
+            0,
+            new Dictionary<string, AnimationWorkbenchBoneTransform>
+            {
+                ["root"] = new(
+                    Vector3.One,
+                    Quaternion.Identity,
+                    new Vector3(2, 1, 1)),
+            });
+
+        Assert.IsFalse(edit.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.PoseTransformInvalid,
+            edit.Diagnostics.Single().Code);
+        AssertFrameEqual(original.DynamicFrames[0], ResultClip(document).DynamicFrames[0]);
+        Assert.IsFalse(edit.State.CanUndo);
+    }
+
+    [TestMethod]
+    public void CopyPoseFrame_WithDuplicateBones_IsRejected()
+    {
+        using var document = CreateLoadedDocument(CreateClip(
+            (Vector3.One, new Vector3(2))));
+
+        var copy = document.CopyPoseFrame(0, ["root", "root"]);
+
+        Assert.IsFalse(copy.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.PoseClipboardIncomplete,
+            copy.Diagnostics.Single().Code);
+        Assert.IsNull(copy.Clipboard);
+        Assert.IsFalse(copy.State.CanUndo);
+    }
+
+    [TestMethod]
     public void PastePose_WithMissingBone_IsRejectedAtomically()
     {
         using var document = CreateLoadedDocument(CreateClip(
@@ -207,6 +248,71 @@ public class AnimationWorkbenchPoseEditingTests
         Assert.IsTrue(edited.State.IsDirty);
         Assert.IsFalse(undone.State.IsDirty);
         Assert.IsTrue(redone.State.IsDirty);
+    }
+
+    [TestMethod]
+    public void PasteIdenticalPoseAfterSave_RemainsCleanWithoutHistoryEntry()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var packFileService = new Mock<IPackFileService>();
+        using var document = CreateLoadedDocument(CreateClip(
+            (Vector3.One, new Vector3(2))));
+
+        var saved = document.SaveAsNewProjectResource(
+            packFileService.Object,
+            project,
+            @"animations\saved.anim");
+        var clipboard = document.CopyPoseFrame(0).Clipboard!;
+        var pasted = document.PastePoseFrame(0, clipboard);
+
+        Assert.IsTrue(saved.Succeeded);
+        Assert.IsTrue(pasted.Succeeded);
+        Assert.IsFalse(pasted.State.IsDirty);
+        Assert.IsFalse(pasted.State.CanUndo);
+    }
+
+    [TestMethod]
+    public void ExactEditBackToSavedPose_ClearsDirtyByContent()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var packFileService = new Mock<IPackFileService>();
+        using var document = CreateLoadedDocument(CreateClip(
+            (Vector3.One, new Vector3(2))));
+
+        var saved = document.SaveAsNewProjectResource(
+            packFileService.Object,
+            project,
+            @"animations\saved.anim");
+        var changed = document.ApplyExactPoseTransforms(
+            0,
+            new Dictionary<string, AnimationWorkbenchBoneTransform>
+            {
+                ["root"] = new(
+                    new Vector3(9, 0, 0),
+                    Quaternion.Identity,
+                    Vector3.One),
+            });
+        var restored = document.ApplyExactPoseTransforms(
+            0,
+            new Dictionary<string, AnimationWorkbenchBoneTransform>
+            {
+                ["root"] = new(
+                    Vector3.One,
+                    Quaternion.Identity,
+                    Vector3.One),
+            });
+
+        Assert.IsTrue(saved.Succeeded);
+        Assert.IsTrue(changed.State.IsDirty);
+        Assert.IsTrue(restored.Succeeded);
+        Assert.IsFalse(restored.State.IsDirty);
+        Assert.IsTrue(restored.State.CanUndo);
     }
 
     [TestMethod]

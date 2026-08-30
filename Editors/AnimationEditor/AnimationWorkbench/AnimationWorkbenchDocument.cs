@@ -208,7 +208,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
         _projectResourcePath = null;
-        ResetPoseEditing(result != null);
+        ResetDocumentHistory();
 
         ShowCurrentPreview();
 
@@ -284,7 +284,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         }
 
         _projectResourcePath = normalizedPath;
-        MarkPoseHistorySaved();
+        MarkDocumentHistorySaved();
         return CreateSaveResult(
             succeeded: true,
             Array.Empty<AnimationWorkbenchDiagnostic>());
@@ -343,7 +343,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetSkeleton = null;
         _selectedPreview = null;
         _projectResourcePath = null;
-        ResetPoseEditing(hasResult: false);
+        ResetDocumentHistory();
         _isClosed = true;
 
         return CreateState();
@@ -369,8 +369,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _isDirty,
             _projectResourcePath,
             _isClosed,
-            _undoPoseEdits.Count != 0,
-            _redoPoseEdits.Count != 0,
+            _undoEdits.Count != 0,
+            _redoEdits.Count != 0,
             _posePreviewResult != null);
     }
 
