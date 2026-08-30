@@ -95,7 +95,7 @@ namespace Editors.Shared.Core.Common
         {
             ParentNode.ModelMatrix = Matrix.Multiply(Offset, Matrix.Identity);
 
-            var currentTimeSeconds = (float)Player.GetTimeUs() / 1_000_000;
+            var currentTimeSeconds = (float)Player.CurrentTime.TotalSeconds;
             foreach (var item in MetaDataItems)
                 item.Update(currentTimeSeconds);
         }

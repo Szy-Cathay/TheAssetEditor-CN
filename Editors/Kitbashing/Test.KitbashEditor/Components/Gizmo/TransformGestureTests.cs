@@ -1685,7 +1685,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
 
             var clip = new AnimationClip();
             clip.DynamicFrames.Add(initialFrame.Clone());
-            clip.PlayTimeInSec = 1;
+            clip.Duration = TimeSpan.FromSeconds(1);
             player.SetAnimation(clip, skeleton);
             player.IsEnabled = true;
             player.Pause();

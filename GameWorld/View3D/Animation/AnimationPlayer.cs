@@ -98,7 +98,14 @@ namespace GameWorld.Core.Animation
 
                 if (_animationClip != null)
                 {
-                    var frameIndex = MathUtil.EnsureRange(value, 0, FrameCount() - 1);
+                    if (FrameCount == 0)
+                    {
+                        OnFrameChanged?.Invoke(0);
+                        Refresh();
+                        return;
+                    }
+
+                    var frameIndex = MathUtil.EnsureRange(value, 0, FrameCount - 1);
                     _timeSinceStart = new TimeSpanExtension(FrameToStartTime(frameIndex));
                     OnFrameChanged?.Invoke(CurrentFrame);
                 }
@@ -139,11 +146,11 @@ namespace GameWorld.Core.Animation
             if (!IsPlaying && !RefreshWhilePaused)
                 return;
 
-            var animationLengthUs = GetAnimationLengthUs();
-            if (animationLengthUs != 0 && IsPlaying)
+            var animationDuration = Duration;
+            if (animationDuration > TimeSpan.Zero && IsPlaying)
             {
                 _timeSinceStart.TimeSpan += gameTime.ElapsedGameTime;
-                if (_timeSinceStart.TotalMicrosecondsAsLong >= animationLengthUs)
+                if (_timeSinceStart.TimeSpan >= animationDuration)
                 {
                     if (LoopAnimation)
                     {
@@ -151,7 +158,7 @@ namespace GameWorld.Core.Animation
                     }
                     else
                     {
-                        _timeSinceStart = TimeSpanExtension.FromMicroseconds(animationLengthUs);
+                        _timeSinceStart = new TimeSpanExtension(animationDuration);
                         IsPlaying = false;
                     }
                 }
@@ -195,14 +202,12 @@ namespace GameWorld.Core.Animation
             if (float.IsFinite(timeSeconds) == false)
                 throw new ArgumentOutOfRangeException(nameof(timeSeconds));
 
-            var requestedTimeUs = (long)Math.Round(
-                Math.Max(0, timeSeconds) * 1_000_000d);
-            var animationLengthUs = GetAnimationLengthUs();
-            if (animationLengthUs > 0)
-                requestedTimeUs = Math.Min(requestedTimeUs, animationLengthUs);
+            var requestedTime = TimeSpan.FromSeconds(
+                Math.Max(0, timeSeconds));
+            if (Duration > TimeSpan.Zero && requestedTime > Duration)
+                requestedTime = Duration;
 
-            _timeSinceStart = TimeSpanExtension.FromMicroseconds(
-                requestedTimeUs);
+            _timeSinceStart = new TimeSpanExtension(requestedTime);
             OnFrameChanged?.Invoke(CurrentFrame);
             Refresh();
         }
@@ -215,9 +220,13 @@ namespace GameWorld.Core.Animation
             _skeleton?.Update();
         }
 
-        public double FramesPerSecond => _animationClip?.Timebase?.FramesPerSecond ?? 0;
+        public TimeSpan CurrentTime => _timeSinceStart.TimeSpan;
 
-        public int GetFps() => (int)FramesPerSecond;
+        public TimeSpan Duration => _animationClip?.Timebase?.Duration ?? TimeSpan.Zero;
+
+        public int FrameCount => _animationClip?.Timebase?.FrameCount ?? 0;
+
+        public double FramesPerSecond => _animationClip?.Timebase?.FramesPerSecond ?? 0;
 
         /// <summary>
         /// Overrides the sampled frame until the next refresh.
@@ -225,8 +234,5 @@ namespace GameWorld.Core.Animation
         public void SetManualFrame(AnimationFrame frame) => _currentAnimFrame = frame;
 
         public AnimationFrame GetCurrentAnimationFrame() => _currentAnimFrame;
-        public int FrameCount() => _animationClip != null ? _animationClip.DynamicFrames.Count() : 0;
-        public long GetAnimationLengthUs() => _animationClip?.PlayTimeUs ?? 0;
-        public long GetTimeUs() => _timeSinceStart.TotalMicrosecondsAsLong;
     }
 }

@@ -134,6 +134,41 @@ internal class MetaDataPreviewTimeTests
         });
     }
 
+    [Test]
+    public void ZeroZeroSplashPreview_UsesPlayerTimebaseSampleDuration()
+    {
+        var player = new AnimationPlayer();
+        var skeleton = CreateSkeleton(player);
+        var clip = new AnimationClip
+        {
+            Duration = TimeSpan.FromMilliseconds(300),
+        };
+        for (var frameIndex = 0; frameIndex < 7; frameIndex++)
+            clip.DynamicFrames.Add(CreateFrame(Quaternion.Identity));
+        player.SetAnimation(clip, skeleton);
+        var node = new SimpleDrawableNode("splash");
+        var source = new SplashAttack_v10
+        {
+            StartTime = 0,
+            EndTime = 0,
+        };
+        var instance = new CombatMetaDataInstance(
+            source,
+            CombatMetaDataPreviewCategory.Splash,
+            Vector3.Zero,
+            node,
+            false,
+            _ => { },
+            player,
+            new MetaDataTimeRange(0, 0));
+
+        instance.Update(0.04f);
+        Assert.That(node.IsVisible, Is.True);
+
+        instance.Update(0.05f);
+        Assert.That(node.IsVisible, Is.False);
+    }
+
     [TestCaseSource(nameof(WholeAnimationZeroRangeTags))]
     public void ZeroZeroStateTag_IsActiveForTheWholeAnimation(
         ParsedMetadataAttribute source)
@@ -156,7 +191,7 @@ internal class MetaDataPreviewTimeTests
 
         player.SeekToTimeSeconds(1.25f);
 
-        Assert.That(player.GetTimeUs(), Is.EqualTo(1_250_000));
+        Assert.That(player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(1250)));
     }
 
     [Test]
@@ -222,7 +257,7 @@ internal class MetaDataPreviewTimeTests
     {
         var propPlayer = new AnimationPlayer();
         var propSkeleton = CreateSkeleton(propPlayer, includeChild: true);
-        var clip = new AnimationClip { PlayTimeInSec = 1 };
+        var clip = new AnimationClip { Duration = TimeSpan.FromSeconds(1) };
         clip.DynamicFrames.Add(CreateFrame(Quaternion.Identity));
         var expectedRotation = Quaternion.CreateFromAxisAngle(
             Vector3.Up,

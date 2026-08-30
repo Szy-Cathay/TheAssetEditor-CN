@@ -280,7 +280,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
            // if (newValue != null)
            // {
            //     _originalClip = newValue.Clone();
-           //     FramesDurationInSeconds = _originalClip.PlayTimeInSec.ToString();
+           //     FramesDurationInSeconds = _originalClip.Duration.TotalSeconds.ToString();
            //     SetFrameLengthMax();
            // }
            //
@@ -529,8 +529,8 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
 
         public void ResetDuration()
         {
-            FramesDurationInSeconds = _originalClip.PlayTimeInSec.ToString();
-            _rider.AnimationClip.PlayTimeInSec = _originalClip.PlayTimeInSec;
+            FramesDurationInSeconds = _originalClip.Duration.TotalSeconds.ToString();
+            _rider.AnimationClip.Duration = _originalClip.Duration;
         }
 
 
@@ -540,11 +540,11 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             if (!validSeconds)
             {
                 MessageBox.Show(LocalizationManager.Instance.Get("Msg.InvalidDecimalInput"), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                FramesDurationInSeconds = _rider.AnimationClip.PlayTimeInSec.ToString();
+                FramesDurationInSeconds = _rider.AnimationClip.Duration.TotalSeconds.ToString();
                 return;
             }
 
-            _rider.AnimationClip.PlayTimeInSec = seconds;
+            _rider.AnimationClip.Duration = TimeSpan.FromSeconds(seconds);
             IsDirty.Value = true;
         }
 

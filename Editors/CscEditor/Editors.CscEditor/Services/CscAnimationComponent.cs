@@ -427,8 +427,6 @@ namespace Editors.CscEditor.Services
             foreach (var binding in ordered)
             {
                 var animElement = binding.Element;
-                if (binding.FrameCount <= 0 || binding.ClipLengthSeconds <= 0)
-                    continue;
                 if (sceneTime < animElement.NormalizedBegin)
                     continue;
 
@@ -550,8 +548,6 @@ namespace Editors.CscEditor.Services
             foreach (var binding in spliceBindings.OrderBy(b => b.Element.NormalizedBegin))
             {
                 var animElement = binding.Element;
-                if (binding.FrameCount <= 0 || binding.ClipLengthSeconds <= 0)
-                    continue;
                 if (sceneTime < animElement.NormalizedBegin)
                     continue;
 
@@ -663,11 +659,10 @@ namespace Editors.CscEditor.Services
         /// tail end of the clip first" instead of freezing on frame 0 until elapsed time catches up
         /// to |offset|.
         /// <para/>
-        /// <see cref="Frame"/>/<see cref="FrameInterpolation"/> are deliberately computed the same
-        /// way <see cref="AnimationSampler.Sample(float, GameSkeleton, AnimationClip, List{IAnimationChangeRule}, bool)"/>
-        /// does (round to the nearest frame, keep the leftover as the blend factor toward its
-        /// neighbour) rather than truncating <paramref name="normalized"/> straight to an integer
-        /// frame index with no fractional remainder - the previous version discarded that remainder
+        /// <see cref="Frame"/>/<see cref="FrameInterpolation"/> are derived from the clip's shared
+        /// half-open timebase, keeping the leftover as the blend factor toward the next sample,
+        /// rather than truncating <paramref name="normalized"/> straight to an integer frame index
+        /// with no fractional remainder - the previous version discarded that remainder
         /// entirely (passed a hardcoded interpolation of 0 into <see cref="AnimationSampler.Sample(int, float, GameSkeleton, AnimationClip, List{IAnimationChangeRule}, bool)"/>),
         /// so playback only ever showed whichever whole frame the current time landed on with no
         /// blend toward the next - correct, but visibly stepped ("slideshow-y"), worst at a heavily
@@ -683,15 +678,15 @@ namespace Editors.CscEditor.Services
             var speed = animElement.PeriodSpeedMultiplier != 0 ? animElement.PeriodSpeedMultiplier : 1;
             var animTime = (clampedTime - begin) * speed + animElement.PeriodTimeOffset;
 
-            var passes = animTime / binding.ClipLengthSeconds;
+            var clipLengthSeconds = (float)binding.Timebase.Duration.TotalSeconds;
+            var passes = animTime / clipLengthSeconds;
             var completedLoops = (int)MathF.Floor(passes);
             var normalized = passes - completedLoops; // always in [0,1), even for negative animTime
 
-            var maxFrameIndex = MathF.Max(binding.FrameCount - 1, 0);
-            var frameWithLeftover = normalized * maxFrameIndex;
-            var frame = (int)MathF.Round(frameWithLeftover);
-            var frameInterpolation = frameWithLeftover - frame;
-            frame = Math.Clamp(frame, 0, binding.FrameCount - 1);
+            var frameWithLeftover = binding.Timebase.GetSamplePosition(
+                TimeSpan.FromSeconds(normalized * clipLengthSeconds));
+            var frame = (int)Math.Floor(frameWithLeftover);
+            var frameInterpolation = (float)(frameWithLeftover - frame);
 
             return (frame, frameInterpolation, completedLoops);
         }

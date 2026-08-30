@@ -858,7 +858,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                             }
                         });
                     animatedProp.Update(
-                        rootPlayer.GetTimeUs() / 1_000_000f);
+                        (float)rootPlayer.CurrentTime.TotalSeconds);
                     return animatedProp;
                 }
 

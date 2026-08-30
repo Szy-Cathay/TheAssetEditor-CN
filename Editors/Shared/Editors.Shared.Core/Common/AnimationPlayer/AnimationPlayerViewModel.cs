@@ -15,7 +15,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
 
         public NotifyAttr<float> SelectedAnimationCurrentTime { get; private set; } = new();
         public NotifyAttr<float> SelectedAnimationMaxTime { get; private set; } = new();
-        public NotifyAttr<int> SelectedAnimationFps { get; private set; } = new();
+        public NotifyAttr<double> SelectedAnimationFps { get; private set; } = new();
         public NotifyAttr<int> SelectedAnimationCurrentFrame { get; private set; } = new();
         public NotifyAttr<int> SelectedAnimationFrameCount { get; private set; } = new();
         public NotifyAttr<bool> IsEnabled { get; set; } = new();
@@ -59,10 +59,11 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
 
             SelectedAnimationFrameCount.Value = mainAnimation.MaxFrames.Value;
             SelectedAnimationCurrentTime.Value =
-                (float)mainAnimation.Asset.Player.GetTimeUs() / 1_000_000;
+                (float)mainAnimation.Asset.Player.CurrentTime.TotalSeconds;
             SelectedAnimationMaxTime.Value =
-                (float)mainAnimation.Asset.Player.GetAnimationLengthUs() /
-                1_000_000;
+                (float)mainAnimation.Asset.Player.Duration.TotalSeconds;
+            SelectedAnimationFps.Value =
+                mainAnimation.Asset.Player.FramesPerSecond;
             SetPlaybackPositionFromPlayer(
                 SelectedAnimationCurrentTime.Value);
             mainAnimation.Asset.Player.OnFrameChanged += OnAnimationFrameChanged;
@@ -86,7 +87,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         {
             playerItem.AnimationName.Value = asset.AnimationName.Value;
             playerItem.SlotName.Value = asset.Description;
-            playerItem.MaxFrames.Value = asset.Player.FrameCount();
+            playerItem.MaxFrames.Value = asset.Player.FrameCount;
         }
 
         public void ToggleAnimationPausePlay()
@@ -126,21 +127,24 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         {
             LoopAnimation.Value = false;
             foreach (var item in _assetList)
-                SetFrame(item, SelectedMainAnimation.Asset.Player.FrameCount());
+                SetFrame(item, SelectedMainAnimation.Asset.Player.FrameCount);
             UpdatePlayingState();
         }
 
         private void OnAnimationFrameChanged(int currentFrame)
         {
-            SelectedAnimationFrameCount.Value = SelectedMainAnimation.Asset.Player.FrameCount();
+            SelectedAnimationFrameCount.Value = SelectedMainAnimation.Asset.Player.FrameCount;
             SelectedAnimationCurrentFrame.Value = currentFrame;
-            SelectedAnimationCurrentTime.Value = (float)SelectedMainAnimation.Asset.Player.GetTimeUs() / 1_000_000;
-            SelectedAnimationMaxTime.Value = (float)SelectedMainAnimation.Asset.Player.GetAnimationLengthUs() / 1_000_000;
-            SelectedAnimationFps.Value = SelectedMainAnimation.Asset.Player.GetFps();
+            SelectedAnimationCurrentTime.Value =
+                (float)SelectedMainAnimation.Asset.Player.CurrentTime.TotalSeconds;
+            SelectedAnimationMaxTime.Value =
+                (float)SelectedMainAnimation.Asset.Player.Duration.TotalSeconds;
+            SelectedAnimationFps.Value =
+                SelectedMainAnimation.Asset.Player.FramesPerSecond;
             SetPlaybackPositionFromPlayer(
                 SelectedAnimationCurrentTime.Value);
 
-            if (SelectedAnimationCurrentFrame.Value + 1 == SelectedMainAnimation.Asset.Player.FrameCount())
+            if (SelectedAnimationCurrentFrame.Value + 1 == SelectedMainAnimation.Asset.Player.FrameCount)
             {
                 if (LoopAnimation.Value)
                 {

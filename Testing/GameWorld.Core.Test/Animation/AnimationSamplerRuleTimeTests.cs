@@ -13,7 +13,7 @@ internal class AnimationSamplerRuleTimeTests
     {
         var skeleton = CreateSkeleton();
         var clip = AnimationClip.CreateSkeletonAnimation(skeleton);
-        clip.PlayTimeInSec = 2;
+        clip.Duration = TimeSpan.FromSeconds(2);
         var rule = new RecordingWorldSpaceRule();
 
         AnimationSampler.Sample(0.25f, skeleton, clip, [rule]);

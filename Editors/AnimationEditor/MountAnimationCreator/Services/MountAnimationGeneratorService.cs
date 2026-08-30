@@ -48,7 +48,7 @@ namespace AnimationEditor.MountAnimationCreator.Services
 
             // Resample
             if (_animationSettings.FitAnimation)
-                newRiderAnim = GameWorld.Core.Animation.AnimationEditor.ReSample(_riderSkeleton, newRiderAnim, mountAnimation.DynamicFrames.Count, mountAnimation.PlayTimeInSec);
+                newRiderAnim = GameWorld.Core.Animation.AnimationEditor.ReSample(_riderSkeleton, newRiderAnim, mountAnimation.DynamicFrames.Count, mountAnimation.Duration);
 
             var maxFrameCount = Math.Min(mountAnimation.DynamicFrames.Count, newRiderAnim.DynamicFrames.Count);
             for (int i = 0; i < maxFrameCount; i++)

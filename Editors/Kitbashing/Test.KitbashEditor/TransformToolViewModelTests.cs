@@ -219,7 +219,7 @@ public class TransformToolViewModelTests
             Rotation = [Quaternion.Identity],
             Scale = [Vector3.One]
         });
-        clip.PlayTimeInSec = 1;
+        clip.Duration = TimeSpan.FromSeconds(1);
         player.SetAnimation(clip, skeleton);
         player.IsEnabled = true;
         player.Pause();

@@ -89,14 +89,18 @@ namespace GameWorld.Core.Animation
             }
         }
 
-        public static AnimationClip ReSample(GameSkeleton skeleton, AnimationClip newAnim, int newFrameCount, float playTime)
+        public static AnimationClip ReSample(
+            GameSkeleton skeleton,
+            AnimationClip newAnim,
+            int newFrameCount,
+            TimeSpan duration)
         {
             if (newFrameCount < 0)
                 throw new ArgumentOutOfRangeException(nameof(newFrameCount));
 
             var output = newAnim.Clone();
             output.DynamicFrames.Clear();
-            output.PlayTimeInSec = playTime;
+            output.Duration = duration;
 
             if (newFrameCount == 0 || newAnim.Timebase == null)
                 return output;

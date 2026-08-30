@@ -153,7 +153,7 @@
 
 `SceneObject.Update` 以主播放器的当前秒数调用每个 `IMetaDataInstance.Update(currentTimeSeconds)`。动画 Prop 的附属播放器也必须与主时间同步；主播放器暂停时仍要在显式 seek 后刷新附属 pose。
 
-时间单位是秒。不要在 UI、元数据或动画播放器之间隐式混用微秒、帧序号和秒；只有动画 clip 的 `MicrosecondsPerFrame` 在边界处换算。
+时间单位是秒。不要在 UI、元数据或动画播放器之间隐式混用微秒、帧序号和秒；播放器通过 `CurrentTime` / `Duration` 暴露时间，逐帧窗口通过动画 clip 的 `Timebase.SampleDuration` 取得。
 
 ## 7. 预览构建原理
 

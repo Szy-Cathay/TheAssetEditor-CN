@@ -41,7 +41,7 @@ internal class AnimationCoreTimeContractTests
         {
             Assert.That(player.FramesPerSecond, Is.EqualTo(70.0 / 3.0).Within(0.000001));
             Assert.That(player.CurrentFrame, Is.Zero);
-            Assert.That(player.GetTimeUs(), Is.Zero);
+            Assert.That(player.CurrentTime, Is.EqualTo(TimeSpan.Zero));
         });
 
         player.LoopAnimation = false;
@@ -53,7 +53,7 @@ internal class AnimationCoreTimeContractTests
         Assert.Multiple(() =>
         {
             Assert.That(player.CurrentFrame, Is.EqualTo(6));
-            Assert.That(player.GetTimeUs(), Is.EqualTo(300_000));
+            Assert.That(player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(300)));
             Assert.That(player.IsPlaying, Is.False);
         });
     }
@@ -69,6 +69,40 @@ internal class AnimationCoreTimeContractTests
         player.CurrentFrame = 1;
 
         Assert.That(player.CurrentFrame, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Timebase_FromFramesPerSecond_PreservesHalfOpenDuration()
+    {
+        var timebase = AnimationTimebase.FromFramesPerSecond(
+            7,
+            70.0 / 3.0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(timebase.Duration, Is.EqualTo(TimeSpan.FromMilliseconds(300)));
+            Assert.That(timebase.SampleDuration, Is.EqualTo(TimeSpan.FromTicks(428_571)));
+            Assert.That(timebase.GetSampleTime(6), Is.LessThan(timebase.Duration));
+        });
+    }
+
+    [Test]
+    public void Player_ExposesUnifiedTimebaseState()
+    {
+        var player = new AnimationPlayer();
+        var skeleton = CreateSkeleton(player);
+        var clip = CreateClip(frameCount: 7, durationSeconds: 0.3f);
+        player.SetAnimation(clip, skeleton);
+
+        player.SeekToTimeSeconds(0.15f);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(player.CurrentTime, Is.EqualTo(TimeSpan.FromMilliseconds(150)));
+            Assert.That(player.Duration, Is.EqualTo(TimeSpan.FromMilliseconds(300)));
+            Assert.That(player.FrameCount, Is.EqualTo(7));
+            Assert.That(player.FramesPerSecond, Is.EqualTo(70.0 / 3.0).Within(0.000001));
+        });
     }
 
     [Test]
@@ -96,7 +130,7 @@ internal class AnimationCoreTimeContractTests
             skeleton,
             clip,
             newFrameCount: 1,
-            playTime: 0.3f);
+            duration: TimeSpan.FromSeconds(0.3));
 
         Assert.Multiple(() =>
         {
@@ -116,18 +150,18 @@ internal class AnimationCoreTimeContractTests
     {
         var player = new AnimationPlayer();
         var skeleton = CreateSkeleton(player);
-        var clip = new AnimationClip { PlayTimeInSec = 1 };
+        var clip = new AnimationClip { Duration = TimeSpan.FromSeconds(1) };
 
         var result = global::GameWorld.Core.Animation.AnimationEditor.ReSample(
             skeleton,
             clip,
             newFrameCount: 4,
-            playTime: 0.3f);
+            duration: TimeSpan.FromSeconds(0.3));
 
         Assert.Multiple(() =>
         {
             Assert.That(result.DynamicFrames, Is.Empty);
-            Assert.That(result.PlayTimeInSec, Is.EqualTo(0.3f));
+            Assert.That(result.Duration, Is.EqualTo(TimeSpan.FromSeconds(0.3)));
             Assert.That(result.Timebase, Is.Null);
         });
     }
@@ -143,7 +177,7 @@ internal class AnimationCoreTimeContractTests
             skeleton,
             clip,
             newFrameCount: 4,
-            playTime: 1);
+            duration: TimeSpan.FromSeconds(1));
 
         Assert.That(
             result.DynamicFrames.Select(frame => frame.Position[0].X),
@@ -192,7 +226,7 @@ internal class AnimationCoreTimeContractTests
             });
         }
 
-        clip.PlayTimeInSec = durationSeconds;
+        clip.Duration = TimeSpan.FromSeconds(durationSeconds);
         return clip;
     }
 

@@ -200,11 +200,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         private float GetFrameDurationSeconds()
         {
-            var microsecondsPerFrame =
-                Player.AnimationClip?.MicrosecondsPerFrame ?? 0;
-            return microsecondsPerFrame > 0
-                ? microsecondsPerFrame / 1_000_000f
-                : 0;
+            return (float)(Player.AnimationClip?.Timebase?
+                .SampleDuration.TotalSeconds ?? 0);
         }
 
         private Matrix GetParentWorldTransform()

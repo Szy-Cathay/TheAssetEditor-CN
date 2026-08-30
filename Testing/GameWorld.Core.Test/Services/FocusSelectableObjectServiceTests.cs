@@ -111,7 +111,7 @@ public class FocusSelectableObjectServiceTests
             Rotation = [Quaternion.Identity],
             Scale = [Vector3.One]
         });
-        animation.PlayTimeInSec = 1;
+        animation.Duration = TimeSpan.FromSeconds(1);
         player.SetAnimation(animation, skeleton);
         player.IsEnabled = true;
         player.Pause();

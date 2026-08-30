@@ -50,7 +50,6 @@ public class AnimationBuilder
         var keysPerSecond = settings.AutoDetectKeysPerSecond
             ? DetectSamplingRate(settings.ModelRoot, animation) ?? settings.KeysPerSecond
             : settings.KeysPerSecond;
-        var keyInterval = 1.0f / keysPerSecond;
         var roundedIntervalCount = Math.Round(
             (double)animation.Duration * keysPerSecond,
             MidpointRounding.AwayFromZero);
@@ -64,6 +63,9 @@ public class AnimationBuilder
 
         var intervalCount = Math.Max(0, (int)roundedIntervalCount);
         var keyCount = intervalCount + 1;
+        var timebase = AnimationTimebase.FromFramesPerSecond(
+            keyCount,
+            keysPerSecond);
         if ((long)keyCount * skeletonAnimFile.Bones.Length >
             MaxAnimationTransformSamples)
         {
@@ -79,7 +81,8 @@ public class AnimationBuilder
                 Version = 7,
                 FrameRate = keysPerSecond,
                 SkeletonName = settings.SkeletonName,
-                AnimationTotalPlayTimeInSec = keyCount * keyInterval,
+                AnimationTotalPlayTimeInSec =
+                    (float)timebase.Duration.TotalSeconds,
             },
             Bones = skeletonAnimFile.Bones,
             AnimationParts = [new AnimationPart()],
@@ -97,7 +100,9 @@ public class AnimationBuilder
         for (var keyIndex = 0; keyIndex < keyCount; keyIndex++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var keyTime = keyIndex * keyInterval;
+            var keyTime = (float)timebase
+                .GetSampleTime(keyIndex)
+                .TotalSeconds;
             var frame = new Frame();
             FillFrame(
                 settings.ModelRoot,

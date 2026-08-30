@@ -118,7 +118,7 @@ namespace AssetEditorTests
 
             var clip = new AnimationClip();
             clip.DynamicFrames.Add(frame);
-            clip.PlayTimeInSec = 0.05f;
+            clip.Duration = TimeSpan.FromSeconds(0.05);
             return clip;
         }
 

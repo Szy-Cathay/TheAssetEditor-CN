@@ -277,8 +277,8 @@ namespace Editors.AnimationMeta.SuperView
                 : 0;
         public bool SelectedMetaDataIsActive =>
             TryGetSelectedMetaDataTimeRange(out var timeRange) &&
-            timeRange.Contains((float)_asset.Data.Player.GetTimeUs() /
-                1_000_000);
+            timeRange.Contains(
+                (float)_asset.Data.Player.CurrentTime.TotalSeconds);
         public bool SelectedMetaDataUsesZeroRangeConvention =>
             TryGetSelectedMetaDataTimeRange(out var timeRange) &&
             timeRange.IsWholeAnimationRange;
@@ -1129,7 +1129,7 @@ namespace Editors.AnimationMeta.SuperView
             if (change.Kind == CombatMetaDataEditChangeKind.Preview)
             {
                 var currentTimeSeconds =
-                    _asset.Data.Player.GetTimeUs() / 1_000_000f;
+                    (float)_asset.Data.Player.CurrentTime.TotalSeconds;
                 _asset.Data.MetaDataItems
                     .FirstOrDefault(item =>
                         item is IMetaDataPreview preview &&

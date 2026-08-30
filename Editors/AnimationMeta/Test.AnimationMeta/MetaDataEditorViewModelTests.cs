@@ -635,8 +635,8 @@ namespace Test.AnimationMeta
                 Assert.Multiple(() =>
                 {
                     Assert.That(
-                        superView.SceneObjects.Single().Data.Player.GetTimeUs(),
-                        Is.EqualTo(1_250_000));
+                        superView.SceneObjects.Single().Data.Player.CurrentTime,
+                        Is.EqualTo(TimeSpan.FromMilliseconds(1250)));
                     Assert.That(
                         superView.SelectedMetaDataIsActive,
                         Is.True);
@@ -644,8 +644,8 @@ namespace Test.AnimationMeta
 
                 superView.JumpToSelectedMetaDataEndAction();
                 Assert.That(
-                    superView.SceneObjects.Single().Data.Player.GetTimeUs(),
-                    Is.EqualTo(2_500_000));
+                    superView.SceneObjects.Single().Data.Player.CurrentTime,
+                    Is.EqualTo(TimeSpan.FromMilliseconds(2500)));
 
                 superView.MetaEditor.SelectedTag = effectTag;
                 Assert.That(superView.IsEffectMetaDataSelected, Is.True);
@@ -1618,8 +1618,8 @@ namespace Test.AnimationMeta
                         superView.PersistentMetaEditor.SelectedAttribute,
                         Is.SameAs(persistentMarker.Item.Source));
                     Assert.That(
-                        sceneObject.Data.Player.GetTimeUs(),
-                        Is.EqualTo(1_000_000));
+                        sceneObject.Data.Player.CurrentTime,
+                        Is.EqualTo(TimeSpan.FromSeconds(1)));
                     Assert.That(
                         sceneObject.Data.MetaDataItems,
                         Is.EqualTo(originalPreviews));
@@ -1737,8 +1737,8 @@ namespace Test.AnimationMeta
                         superView.PersistentMetaEditor.SelectedAttribute,
                         Is.SameAs(persistentItem.Source));
                     Assert.That(
-                        sceneObject.Data.Player.GetTimeUs(),
-                        Is.Zero);
+                        sceneObject.Data.Player.CurrentTime,
+                        Is.EqualTo(TimeSpan.Zero));
                     Assert.That(selectedTimelineMarker.IsSelected, Is.True);
                     Assert.That(superView.CanEditSelectedMetaData3D, Is.True);
                     Assert.That(
@@ -1912,8 +1912,8 @@ namespace Test.AnimationMeta
                         superView.PersistentMetaEditor.SelectedAttribute,
                         Is.SameAs(problem.Source));
                     Assert.That(
-                        sceneObject.Data.Player.GetTimeUs(),
-                        Is.EqualTo(1_000_000));
+                        sceneObject.Data.Player.CurrentTime,
+                        Is.EqualTo(TimeSpan.FromSeconds(1)));
                     Assert.That(camera.LookAt, Is.EqualTo(position));
                     Assert.That(
                         sceneObject.Data.MetaDataItems.Single(),

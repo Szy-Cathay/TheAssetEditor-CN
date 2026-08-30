@@ -132,12 +132,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
 
         private float GetPlayerTime(float mainAnimationTime)
         {
-            var animationLengthUs = Player.GetAnimationLengthUs();
-            if (!Player.LoopAnimation || animationLengthUs <= 0)
+            var animationDuration = Player.Duration;
+            if (!Player.LoopAnimation || animationDuration <= TimeSpan.Zero)
                 return mainAnimationTime;
 
-            var animationLengthSeconds = animationLengthUs / 1_000_000f;
-            return mainAnimationTime % animationLengthSeconds;
+            return mainAnimationTime % (float)animationDuration.TotalSeconds;
         }
 
         private void ApplyVisibility() =>

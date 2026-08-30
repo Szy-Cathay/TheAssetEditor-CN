@@ -53,10 +53,14 @@ namespace Editors.AnimatioReTarget.Editor
                     "AnimReTarget.Error.EmptySourceAnimation",
                     "Source animation must contain at least one frame."));
             }
-            var newFrameCount = originalFrameCount <= 1
-                ? originalFrameCount
-                : Math.Max(2, (int)MathF.Round((originalFrameCount - 1) / speedMultiplier) + 1);
-            var newPlayTime = animationToCopy.PlayTimeInSec / speedMultiplier;
+            var sourceTimebase = animationToCopy.Timebase ??
+                throw new InvalidDataException(
+                    GetLocalizedText(
+                        "AnimReTarget.Error.InvalidSourceDuration",
+                        "Source animation must have a positive duration."));
+            var targetTimebase = sourceTimebase.WithPlaybackSpeed(
+                speedMultiplier);
+            var newFrameCount = targetTimebase.FrameCount;
 
             //animationToCopy.RemoveOptimizations(copyFromSkeleton);
             var resampledAnimationToCopy = originalFrameCount == 1
@@ -65,8 +69,8 @@ namespace Editors.AnimatioReTarget.Editor
                     copyFromSkeleton,
                     animationToCopy,
                     newFrameCount,
-                    newPlayTime);
-            resampledAnimationToCopy.PlayTimeInSec = newPlayTime;
+                    targetTimebase.Duration);
+            resampledAnimationToCopy.Duration = targetTimebase.Duration;
             var newAnimation = CreateNewAnimation(copyToSkeleton, resampledAnimationToCopy);
 
             if (!HaveEquivalentSkeletonDefinitions(
@@ -539,7 +543,7 @@ namespace Editors.AnimatioReTarget.Editor
             var frameCount = animationToCopy.DynamicFrames.Count;
 
             var newAnimation = new AnimationClip();
-            newAnimation.PlayTimeInSec = animationToCopy.PlayTimeInSec;
+            newAnimation.Duration = animationToCopy.Duration;
             for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
             {
                 newAnimation.DynamicFrames.Add(new AnimationClip.KeyFrame());

@@ -751,6 +751,7 @@
   "GltfImporter.Error.MissingCaHumanoidSkeleton": "当前加载的原版 CA Pack 中找不到 animations\\skeletons\\humanoid01.anim，无法计算游戏标准人形尺寸。",
   "GltfImporter.Error.AutoScaleRequiresWarhammer3": "自动人形缩放当前只支持《全面战争：战锤3》。请选择战锤3，或关闭自动人形缩放。",
   "RmvToGltfExporter.Error.AnimationSkeletonMismatch": "动画“{0}”属于骨架“{1}”，与当前导出骨架“{2}”不一致，已停止导出。",
+  "RmvToGltfExporter.Error.InvalidAnimationDuration": "动画“{0}”的时长无效。",
   "GltfImporter.ScaleSkeleton.Source": "源骨架",
   "GltfImporter.ScaleAnchor.Head": "头部",
   "GltfImporter.ScaleAnchor.LeftFoot": "左脚",
@@ -905,6 +906,7 @@
   "AnimReTarget.Warning.SparseMapping.Title": "骨骼映射过少",
   "AnimReTarget.Warning.SparseMapping": "当前只映射了 1 根骨骼。继续重定向通常会导致身体大部分骨骼保持目标骨架原姿势。是否仍要继续？",
   "AnimReTarget.Error.EmptySourceAnimation": "源动画不包含任何帧，无法进行重定向。",
+  "AnimReTarget.Error.InvalidSourceDuration": "源动画时长必须大于 0。",
   "AnimReTarget.Error.SkeletonSelectionRequired": "请先选择源骨架和目标骨架。",
   "AnimReTarget.Error.GeneratedAnimationRequired": "尚未生成可保存的动画，请先应用设置。",
 

@@ -155,7 +155,7 @@ namespace Editors.KitbasherEditor.ViewModels
         void OnLastFrame()
         {
             _player.Pause();
-            _player.CurrentFrame = _player.FrameCount();
+            _player.CurrentFrame = _player.FrameCount;
             UpdatePlayingState();
         }
 
@@ -219,7 +219,7 @@ namespace Editors.KitbasherEditor.ViewModels
                 if (_player.IsPlaying && _player.IsEnabled)
                     _player.Play();
 
-                MaxFrames = _player.FrameCount();
+                MaxFrames = _player.FrameCount;
                 CurrentFrame = 0;
                 RefreshPlaybackPosition();
                 UpdatePlayingState();
@@ -266,9 +266,9 @@ namespace Editors.KitbasherEditor.ViewModels
             try
             {
                 PlaybackPositionSeconds =
-                    (float)_player.GetTimeUs() / 1_000_000;
+                    (float)_player.CurrentTime.TotalSeconds;
                 MaxTimeSeconds =
-                    (float)_player.GetAnimationLengthUs() / 1_000_000;
+                    (float)_player.Duration.TotalSeconds;
             }
             finally
             {
