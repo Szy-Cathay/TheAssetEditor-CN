@@ -224,6 +224,7 @@
                                         x:Name="Expander"
                                         Background="Transparent"
                                         BorderThickness="0"
+                                        ClickMode="Press"
                                         Focusable="False"
                                         IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                                         <ToggleButton.Template>
