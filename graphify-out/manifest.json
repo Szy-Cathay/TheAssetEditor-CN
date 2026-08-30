@@ -12,10 +12,10 @@
     "semantic_hash": "d1e8c2873177e4b21e96d806994fe680"
   },
   "AssetEditorUpdater/AssetEditorUpdater.csproj": {
-    "mtime": 1787360884.050138,
-    "seen": 1787367017.2175128,
-    "ast_hash": "1ced1cd1b26eedae2480b3bfdaad6f77",
-    "semantic_hash": "1ced1cd1b26eedae2480b3bfdaad6f77"
+    "mtime": 1788095715.5705695,
+    "seen": 1788100184.9060044,
+    "ast_hash": "17b5bc15336744ef85d2f2513a43b6c9",
+    "semantic_hash": "17b5bc15336744ef85d2f2513a43b6c9"
   },
   "AssetEditorUpdater/GiteeUpdateSource.cs": {
     "mtime": 1786560623.52502,
@@ -72,10 +72,10 @@
     "semantic_hash": "8578edea740460bb3e465b85fd13df05"
   },
   "AssetEditor/AssetEditor.csproj": {
-    "mtime": 1787360884.049122,
-    "seen": 1787367017.2175243,
-    "ast_hash": "3649c94e29a1eaaf51a6b1f986431ab3",
-    "semantic_hash": "3649c94e29a1eaaf51a6b1f986431ab3"
+    "mtime": 1788095715.5705695,
+    "seen": 1788100184.906014,
+    "ast_hash": "0e351c4328172ce9005a2f5c96868bb6",
+    "semantic_hash": "0e351c4328172ce9005a2f5c96868bb6"
   },
   "AssetEditor/DependencyInjectionContainer.cs": {
     "mtime": 1786678608.2583518,
@@ -294,10 +294,10 @@
     "semantic_hash": "0c901a545836921c10474537afd4b492"
   },
   "AssetEditor/Themes/DesignSystem/Controls/Collections.xaml": {
-    "mtime": 1787240467.1159952,
-    "seen": 1787367017.2175622,
-    "ast_hash": "f0808f61bd736a3358576a5bc6677a22",
-    "semantic_hash": "f0808f61bd736a3358576a5bc6677a22"
+    "mtime": 1788095096.1263747,
+    "seen": 1788100184.9060447,
+    "ast_hash": "2f8b18c107ae98797cb6a2389a6fd626",
+    "semantic_hash": "2f8b18c107ae98797cb6a2389a6fd626"
   },
   "AssetEditor/Themes/DesignSystem/Controls/Inputs.xaml": {
     "mtime": 1786773105.2351093,
@@ -1140,10 +1140,10 @@
     "semantic_hash": "8fe2f4fbafe6159a60b558529e83bc05"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/DependencyInjectionContainer.cs": {
-    "mtime": 1785392370.1783886,
-    "seen": 1787367017.2176785,
-    "ast_hash": "ee4ba6ad067d30406773532aba0cc1f8",
-    "semantic_hash": "ee4ba6ad067d30406773532aba0cc1f8"
+    "mtime": 1788080828.8449876,
+    "seen": 1788100184.906128,
+    "ast_hash": "0745e6ee1a94ea7721209cf71391c231",
+    "semantic_hash": "0745e6ee1a94ea7721209cf71391c231"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/DevConfig/AnimTransfer_DwarfArcher.cs": {
     "mtime": 1774212866.9552433,
@@ -1152,16 +1152,16 @@
     "semantic_hash": "6b42cc5a4ea2df9843a014ec70b741cf"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/AnimationRemapperService.cs": {
-    "mtime": 1786715587.3110878,
-    "seen": 1787367017.217681,
-    "ast_hash": "9fae3999a0d3fa382b31d91b902c8411",
-    "semantic_hash": "9fae3999a0d3fa382b31d91b902c8411"
+    "mtime": 1788080828.8460875,
+    "seen": 1788100184.906129,
+    "ast_hash": "8ecab2c9ec61ce16f3c6d39435bf9c8d",
+    "semantic_hash": "8ecab2c9ec61ce16f3c6d39435bf9c8d"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/AnimationRetargetEditor.cs": {
-    "mtime": 1786722769.5406928,
-    "seen": 1787367017.2176814,
-    "ast_hash": "efb8abc0e8d069509857d515d1f51d7d",
-    "semantic_hash": "efb8abc0e8d069509857d515d1f51d7d"
+    "mtime": 1788080828.8469067,
+    "seen": 1788100184.9061294,
+    "ast_hash": "3b61e11715bb21188efc04721716c86f",
+    "semantic_hash": "3b61e11715bb21188efc04721716c86f"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/AnimationSettingsView.xaml": {
     "mtime": 1786027958.7852304,
@@ -1176,10 +1176,10 @@
     "semantic_hash": "741458996b0a028b38301dbf5e0bc0ac"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/BoneManager.cs": {
-    "mtime": 1786715587.3116548,
-    "seen": 1787367017.2176843,
-    "ast_hash": "32ee294ea89d736c0220857dc1c85c8b",
-    "semantic_hash": "32ee294ea89d736c0220857dc1c85c8b"
+    "mtime": 1788080828.8474138,
+    "seen": 1788100184.9061308,
+    "ast_hash": "ea724d7fa0d7af40db11dc17be190257",
+    "semantic_hash": "ea724d7fa0d7af40db11dc17be190257"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/BoneMappingWindow.xaml": {
     "mtime": 1786027958.7852304,
@@ -1194,10 +1194,10 @@
     "semantic_hash": "7b278d8a5974c700697863c901c73469"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/BoneSettingsView.xaml": {
-    "mtime": 1786767359.1551628,
-    "seen": 1787367017.2176876,
-    "ast_hash": "4a4e1fdc8d62acbbb9eefecccb1a3a7b",
-    "semantic_hash": "4a4e1fdc8d62acbbb9eefecccb1a3a7b"
+    "mtime": 1788080828.8488057,
+    "seen": 1788100184.9061358,
+    "ast_hash": "08138f659ad4e8c906feaebef7c67085",
+    "semantic_hash": "08138f659ad4e8c906feaebef7c67085"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/BoneSettingsView.xaml.cs": {
     "mtime": 1774212866.9592433,
@@ -1206,10 +1206,10 @@
     "semantic_hash": "eeacdc95a25a55cd0081d3a2b7f81e63"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/SelectedBoneView.xaml": {
-    "mtime": 1786715587.3121881,
-    "seen": 1787367017.217689,
-    "ast_hash": "a7d5953d3ca4dfb6607f8288ed4f5f11",
-    "semantic_hash": "a7d5953d3ca4dfb6607f8288ed4f5f11"
+    "mtime": 1788080828.8494973,
+    "seen": 1788100184.9061368,
+    "ast_hash": "33fff5012d5ec0e4fd6f5032c7485636",
+    "semantic_hash": "33fff5012d5ec0e4fd6f5032c7485636"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/SelectedBoneView.xaml.cs": {
     "mtime": 1774212866.9602444,
@@ -1260,10 +1260,10 @@
     "semantic_hash": "2b13fcb55bc3e40f0000e33d5fe1b43d"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/Saving/SaveManager.cs": {
-    "mtime": 1786722769.5945392,
-    "seen": 1787367017.217697,
-    "ast_hash": "b8de5a5d577ef0408614751f46464c94",
-    "semantic_hash": "b8de5a5d577ef0408614751f46464c94"
+    "mtime": 1788080828.8500407,
+    "seen": 1788100184.9061413,
+    "ast_hash": "baeeafb0d2ff1bc31bf25642b0fd2cb4",
+    "semantic_hash": "baeeafb0d2ff1bc31bf25642b0fd2cb4"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/Saving/SaveSettings.cs": {
     "mtime": 1786722769.5955348,
@@ -1278,14 +1278,14 @@
     "semantic_hash": "c69f9969e3f5f141c24f5e3bb64c3041"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/Saving/SaveWindow.xaml.cs": {
-    "mtime": 1786722909.0813498,
-    "seen": 1787367017.2176993,
-    "ast_hash": "445eb95b5ede2fb88b6f208c1fc269da",
-    "semantic_hash": "445eb95b5ede2fb88b6f208c1fc269da"
+    "mtime": 1788080828.8506098,
+    "seen": 1788100184.906143,
+    "ast_hash": "2ea09b164363d8403f5191462ecaeec3",
+    "semantic_hash": "2ea09b164363d8403f5191462ecaeec3"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/Settings/AnimationGenerationSettings.cs": {
-    "mtime": 1774212866.9652436,
-    "seen": 1787367017.2177,
+    "mtime": 1787877631.8088095,
+    "seen": 1788100184.9061434,
     "ast_hash": "9d73312e0008753219c4e328fecb0827",
     "semantic_hash": "9d73312e0008753219c4e328fecb0827"
   },
@@ -1296,10 +1296,10 @@
     "semantic_hash": "e9e1dc73238bf616dd0d8e002dd3cab6"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/Settings/SettingsView.xaml": {
-    "mtime": 1786715587.3149183,
-    "seen": 1787367017.2177017,
-    "ast_hash": "097a2e5099af581e0b9869aa0ad04e28",
-    "semantic_hash": "097a2e5099af581e0b9869aa0ad04e28"
+    "mtime": 1788080828.8511593,
+    "seen": 1788100184.9061446,
+    "ast_hash": "094bc78b93e43e0d668f865477cdab6d",
+    "semantic_hash": "094bc78b93e43e0d668f865477cdab6d"
   },
   "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/Settings/SettingsView.xaml.cs": {
     "mtime": 1774212866.9662445,
@@ -1314,22 +1314,22 @@
     "semantic_hash": "c0fcd70aed8629df10e1db362b255333"
   },
   "Editors/AnimationReTarget/Test.AnimatioReTarget/AnimationRemapperServiceTests.cs": {
-    "mtime": 1786715587.315431,
-    "seen": 1787367017.2177036,
-    "ast_hash": "5db51e76e659b8b0d8768990ef8d9390",
-    "semantic_hash": "5db51e76e659b8b0d8768990ef8d9390"
+    "mtime": 1788080828.8511593,
+    "seen": 1788100184.906146,
+    "ast_hash": "f35da6b753583822f19a6a6abd3cc69d",
+    "semantic_hash": "f35da6b753583822f19a6a6abd3cc69d"
   },
   "Editors/AnimationReTarget/Test.AnimatioReTarget/AnimationRetargeTool_ComplexUseCase.cs": {
-    "mtime": 1786519168.8239825,
-    "seen": 1787367017.2177043,
-    "ast_hash": "3b79e8991d75e6e611ddc0f4fe583b3f",
-    "semantic_hash": "3b79e8991d75e6e611ddc0f4fe583b3f"
+    "mtime": 1788080828.8526146,
+    "seen": 1788100184.9061465,
+    "ast_hash": "5d0495bc902519b0b9d4c8402dd31ba7",
+    "semantic_hash": "5d0495bc902519b0b9d4c8402dd31ba7"
   },
   "Editors/AnimationReTarget/Test.AnimatioReTarget/BatchAnimationRetargetServiceTests.cs": {
-    "mtime": 1786722769.5975442,
-    "seen": 1787367017.217705,
-    "ast_hash": "4a66ce266a08d2ecf82f6584c41e792f",
-    "semantic_hash": "4a66ce266a08d2ecf82f6584c41e792f"
+    "mtime": 1788080828.8526146,
+    "seen": 1788100184.906147,
+    "ast_hash": "fc41e40569be526107b25c9bc3e68750",
+    "semantic_hash": "fc41e40569be526107b25c9bc3e68750"
   },
   "Editors/AnimationReTarget/Test.AnimatioReTarget/Test.AnimatioReTarget.csproj": {
     "mtime": 1774212866.9672432,
@@ -2820,16 +2820,16 @@
     "semantic_hash": "569a9038aeaf5a21ef14968cacf096e8"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/Helpers/GltfAnimationBuilder.cs": {
-    "mtime": 1786238545.1020422,
-    "seen": 1787367017.2178974,
-    "ast_hash": "3fbcb5aad5888c8acea0b11137b537f5",
-    "semantic_hash": "3fbcb5aad5888c8acea0b11137b537f5"
+    "mtime": 1788080828.8561943,
+    "seen": 1788100184.9062805,
+    "ast_hash": "94971c570dfcde2b23d4d3e19a4b67ac",
+    "semantic_hash": "94971c570dfcde2b23d4d3e19a4b67ac"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/Helpers/GltfMeshBuilder.cs": {
-    "mtime": 1786329994.1709518,
-    "seen": 1787367017.217898,
-    "ast_hash": "74954469d10f3035aaf9a64882107855",
-    "semantic_hash": "74954469d10f3035aaf9a64882107855"
+    "mtime": 1788080828.8561943,
+    "seen": 1788100184.906281,
+    "ast_hash": "c84301a90b35f373335330f12f9aef09",
+    "semantic_hash": "c84301a90b35f373335330f12f9aef09"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/Helpers/GltfSceneSaver.cs": {
     "mtime": 1786238545.1030445,
@@ -2838,10 +2838,10 @@
     "semantic_hash": "e7c8565a4cb466810150bde6630cf474"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/Helpers/GltfSkeletonBuilder.cs": {
-    "mtime": 1774212867.1446526,
-    "seen": 1787367017.2178998,
-    "ast_hash": "978790abc11994475ab577a4b4dea5e5",
-    "semantic_hash": "978790abc11994475ab577a4b4dea5e5"
+    "mtime": 1788080828.8576033,
+    "seen": 1788100184.906282,
+    "ast_hash": "d763010af253105400ec92440b91f2ec",
+    "semantic_hash": "d763010af253105400ec92440b91f2ec"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/Helpers/GltfTextureHandler.cs": {
     "mtime": 1786238545.1030445,
@@ -2850,10 +2850,10 @@
     "semantic_hash": "87e31dffacaf46d7140e758cac3c6af4"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/Helpers/SkeletalAnimationMath.cs": {
-    "mtime": 1786238545.1030445,
-    "seen": 1787367017.2179012,
-    "ast_hash": "df5152397d7dd9c40741f49de03feae9",
-    "semantic_hash": "df5152397d7dd9c40741f49de03feae9"
+    "mtime": 1788080828.8576033,
+    "seen": 1788100184.906283,
+    "ast_hash": "71fafb6c4d56dca0aadac45f5ffa29ea",
+    "semantic_hash": "71fafb6c4d56dca0aadac45f5ffa29ea"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Exporting/Exporters/RmvToGltf/RmvToGltfExporter.cs": {
     "mtime": 1786238545.1040432,
@@ -2988,22 +2988,22 @@
     "semantic_hash": "7e658a191479511ca997c9cb355c4239"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/GltfImporter.cs": {
-    "mtime": 1786583194.0858686,
-    "seen": 1787367017.2179182,
-    "ast_hash": "b05fb24276e0b2cf993e1aaebe401323",
-    "semantic_hash": "b05fb24276e0b2cf993e1aaebe401323"
+    "mtime": 1788080828.8586123,
+    "seen": 1788100184.9062948,
+    "ast_hash": "a17a29bf3a39ddbbdcac5c236bc6fea7",
+    "semantic_hash": "a17a29bf3a39ddbbdcac5c236bc6fea7"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/GltfImporterSettings.cs": {
-    "mtime": 1786526655.5132737,
-    "seen": 1787367017.2179189,
-    "ast_hash": "c36390b0c7b4d7c7e806aec2bf6ebe32",
-    "semantic_hash": "c36390b0c7b4d7c7e806aec2bf6ebe32"
+    "mtime": 1788080828.8596148,
+    "seen": 1788100184.9062958,
+    "ast_hash": "6e9b0baf61b6422f62f2bbe443c7c33d",
+    "semantic_hash": "6e9b0baf61b6422f62f2bbe443c7c33d"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/Helper/AnimationBuilder.cs": {
-    "mtime": 1786404178.151119,
-    "seen": 1787367017.2179198,
-    "ast_hash": "2e6c2af1b126354a274ed6983b643388",
-    "semantic_hash": "2e6c2af1b126354a274ed6983b643388"
+    "mtime": 1788080828.8596148,
+    "seen": 1788100184.906296,
+    "ast_hash": "6b995ddad59e48be9d9207e475a0da04",
+    "semantic_hash": "6b995ddad59e48be9d9207e475a0da04"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/Helper/GltfSceneLoader.cs": {
     "mtime": 1774212867.1563585,
@@ -3012,10 +3012,10 @@
     "semantic_hash": "f05dc823ff342ee7cf7d0bebf5c2221d"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/Helper/GltfSkeletonImporter.cs": {
-    "mtime": 1786329994.1729574,
-    "seen": 1787367017.2179213,
-    "ast_hash": "c01965aa97b926e6992566ea53f8acd8",
-    "semantic_hash": "c01965aa97b926e6992566ea53f8acd8"
+    "mtime": 1788080828.8606138,
+    "seen": 1788100184.9062972,
+    "ast_hash": "72b67f345682beae369790f82d25058d",
+    "semantic_hash": "72b67f345682beae369790f82d25058d"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/Helper/GltfSkeletonNameReader.cs": {
     "mtime": 1786277085.8227122,
@@ -3060,10 +3060,10 @@
     "semantic_hash": "ccae7a80d54205ae3791dc68210bfc26"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/Helper/RmvMeshBuilder.cs": {
-    "mtime": 1786404178.1533034,
-    "seen": 1787367017.217927,
-    "ast_hash": "c31bb62d32e28599cfff1fb9cedf4fad",
-    "semantic_hash": "c31bb62d32e28599cfff1fb9cedf4fad"
+    "mtime": 1788080828.8606138,
+    "seen": 1788100184.9063013,
+    "ast_hash": "387881d64ee7959ace9036748002874e",
+    "semantic_hash": "387881d64ee7959ace9036748002874e"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Importers/GltfToRmv/Helper/TangentBasisCalculator.cs": {
     "mtime": 1786238545.1130435,
@@ -3120,16 +3120,16 @@
     "semantic_hash": "64b5f8804e779b033c78969d1309406b"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Presentation/GltfToRmv/RmvToGltfImporterViewModel.cs": {
-    "mtime": 1786526655.5142822,
-    "seen": 1787367017.2179341,
-    "ast_hash": "a4ca42ca9fe4a203a639bb39c9af9561",
-    "semantic_hash": "a4ca42ca9fe4a203a639bb39c9af9561"
+    "mtime": 1788080828.8617635,
+    "seen": 1788100184.9063065,
+    "ast_hash": "b7db2d38b75ba38f9018551aec85f61c",
+    "semantic_hash": "b7db2d38b75ba38f9018551aec85f61c"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Presentation/IImporterViewModel.cs": {
-    "mtime": 1786404178.154322,
-    "seen": 1787367017.217935,
-    "ast_hash": "658df2b8d871fcac5ee1920ec20f3c21",
-    "semantic_hash": "658df2b8d871fcac5ee1920ec20f3c21"
+    "mtime": 1788080828.8617635,
+    "seen": 1788100184.906307,
+    "ast_hash": "a940267f50f600f6cd29fa5c0a3e6871",
+    "semantic_hash": "a940267f50f600f6cd29fa5c0a3e6871"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Presentation/ImportWindow.xaml": {
     "mtime": 1786767359.1611638,
@@ -3138,16 +3138,16 @@
     "semantic_hash": "b39f1374020b4aeaf19bbc1b4c250048"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Presentation/ImportWindow.xaml.cs": {
-    "mtime": 1786404178.154322,
-    "seen": 1787367017.2179375,
-    "ast_hash": "828229d707325d0f1d031569ec1643e0",
-    "semantic_hash": "828229d707325d0f1d031569ec1643e0"
+    "mtime": 1788080828.8617635,
+    "seen": 1788100184.9063082,
+    "ast_hash": "b745dcc060149d0a21b36f1c927a0997",
+    "semantic_hash": "b745dcc060149d0a21b36f1c927a0997"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Importing/Presentation/ImporterCoreViewModel.cs": {
-    "mtime": 1786404178.1553242,
-    "seen": 1787367017.2179384,
-    "ast_hash": "7c045fd9c59b97e348c96af9702c6b18",
-    "semantic_hash": "7c045fd9c59b97e348c96af9702c6b18"
+    "mtime": 1788080828.8631313,
+    "seen": 1788100184.9063087,
+    "ast_hash": "0cc9846240b1899b489c2aa649657481",
+    "semantic_hash": "0cc9846240b1899b489c2aa649657481"
   },
   "Editors/ImportExportEditor/Editors.ImportExport/Misc/ExportSupportEnum.cs": {
     "mtime": 1774212867.164301,
@@ -3174,10 +3174,10 @@
     "semantic_hash": "306cb7b3f25631514a5bfb54d4309f09"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Exporting/Exporters/RmvToGlft/RmvToGltfExporterTests.cs": {
-    "mtime": 1786238545.1180449,
-    "seen": 1787367017.217943,
-    "ast_hash": "b8e5d722fa23b8cc70262bee5e6b943e",
-    "semantic_hash": "b8e5d722fa23b8cc70262bee5e6b943e"
+    "mtime": 1788080828.8642077,
+    "seen": 1788100184.9063115,
+    "ast_hash": "879633ea2fb4715ebe5fb867f9b93311",
+    "semantic_hash": "879633ea2fb4715ebe5fb867f9b93311"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Exporting/Exporters/RmvToGlft/TestGltfSceneSaver.cs": {
     "mtime": 1786238545.1180449,
@@ -3192,16 +3192,16 @@
     "semantic_hash": "07f4c386d95e01b18538ef5fe733ca6a"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/AnimationBuilderTests.cs": {
-    "mtime": 1786349039.2855794,
-    "seen": 1787367017.217945,
-    "ast_hash": "9d239ba4ccfa71871fc2af49c0e97236",
-    "semantic_hash": "9d239ba4ccfa71871fc2af49c0e97236"
+    "mtime": 1788080828.8642077,
+    "seen": 1788100184.9063132,
+    "ast_hash": "66759e621b2405e9914caccdee07aef4",
+    "semantic_hash": "66759e621b2405e9914caccdee07aef4"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/AnimationRoundTripTests.cs": {
-    "mtime": 1786329994.1829605,
-    "seen": 1787367017.2179456,
-    "ast_hash": "103ebe20ffad4807bbe1a63f62860f1a",
-    "semantic_hash": "103ebe20ffad4807bbe1a63f62860f1a"
+    "mtime": 1788080828.8642077,
+    "seen": 1788100184.9063137,
+    "ast_hash": "11f8c7c9a661229baf09e97586ffc255",
+    "semantic_hash": "11f8c7c9a661229baf09e97586ffc255"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/EmbeddedTextureImportTests.cs": {
     "mtime": 1786238545.1200452,
@@ -3210,58 +3210,58 @@
     "semantic_hash": "083e4118afb70937379052dc5920fff8"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfExternalAnimationImportTests.cs": {
-    "mtime": 1786349039.2855794,
-    "seen": 1787367017.2179472,
-    "ast_hash": "ae98d4ba795cef463e275c5915566e5c",
-    "semantic_hash": "ae98d4ba795cef463e275c5915566e5c"
+    "mtime": 1788080828.865602,
+    "seen": 1788100184.9063146,
+    "ast_hash": "f05a195dcb6b16e41209292620daa6a1",
+    "semantic_hash": "f05a195dcb6b16e41209292620daa6a1"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfFullWorkflowImportTests.cs": {
-    "mtime": 1786583194.087869,
-    "seen": 1787367017.217948,
-    "ast_hash": "5feb5aece0386b03df60820746114c4d",
-    "semantic_hash": "5feb5aece0386b03df60820746114c4d"
+    "mtime": 1788080828.8669019,
+    "seen": 1788100184.9063153,
+    "ast_hash": "fae130864472f38c78ef98fa2903da4b",
+    "semantic_hash": "fae130864472f38c78ef98fa2903da4b"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfHumanoidAutoScaleTests.cs": {
-    "mtime": 1786329994.1839583,
-    "seen": 1787367017.2179487,
-    "ast_hash": "0cf5a20e367ead996471d1d6bf778651",
-    "semantic_hash": "0cf5a20e367ead996471d1d6bf778651"
+    "mtime": 1788080828.8669019,
+    "seen": 1788100184.9063158,
+    "ast_hash": "c26b9d165446580d69f65ad581fc61dc",
+    "semantic_hash": "c26b9d165446580d69f65ad581fc61dc"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfIToRmvImporterTests.cs": {
-    "mtime": 1786329994.1854787,
-    "seen": 1787367017.2179494,
-    "ast_hash": "4d0d037b3ad9c78fc65efd67112f0289",
-    "semantic_hash": "4d0d037b3ad9c78fc65efd67112f0289"
+    "mtime": 1788080828.8669019,
+    "seen": 1788100184.906316,
+    "ast_hash": "5bb7aa80fb4c4dbd356e4aab9cae7942",
+    "semantic_hash": "5bb7aa80fb4c4dbd356e4aab9cae7942"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfImporterAtomicImportTests.cs": {
-    "mtime": 1786339227.264692,
-    "seen": 1787367017.21795,
-    "ast_hash": "9ba8fb47958cd0b7add47d682ac03084",
-    "semantic_hash": "9ba8fb47958cd0b7add47d682ac03084"
+    "mtime": 1788080828.8682947,
+    "seen": 1788100184.9063165,
+    "ast_hash": "64f404bfab3e743157a832e8209d21b7",
+    "semantic_hash": "64f404bfab3e743157a832e8209d21b7"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfMaterialModeImportTests.cs": {
-    "mtime": 1786583194.087869,
-    "seen": 1787367017.2179508,
-    "ast_hash": "d90804bda1b59f596c6a77d1b10945ef",
-    "semantic_hash": "d90804bda1b59f596c6a77d1b10945ef"
+    "mtime": 1788080828.8688922,
+    "seen": 1788100184.906317,
+    "ast_hash": "62187d36f0bc75b4ac532cc2595bf660",
+    "semantic_hash": "62187d36f0bc75b4ac532cc2595bf660"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfPbrMaterialImportTests.cs": {
-    "mtime": 1786329994.187886,
-    "seen": 1787367017.2179515,
-    "ast_hash": "68fcb380ce72606bb9ce6b63202b52e0",
-    "semantic_hash": "68fcb380ce72606bb9ce6b63202b52e0"
+    "mtime": 1788080828.8694656,
+    "seen": 1788100184.9063175,
+    "ast_hash": "dbacb7775f0ddc5a41b31904264f89ab",
+    "semantic_hash": "dbacb7775f0ddc5a41b31904264f89ab"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/GltfSkeletonImporterTests.cs": {
-    "mtime": 1786276249.1907048,
-    "seen": 1787367017.2179523,
-    "ast_hash": "5784855c99ad1daca68b4eb0165f3a9a",
-    "semantic_hash": "5784855c99ad1daca68b4eb0165f3a9a"
+    "mtime": 1788080828.8700018,
+    "seen": 1788100184.9063182,
+    "ast_hash": "6e6308c2ef5181fecff58040209b1a86",
+    "semantic_hash": "6e6308c2ef5181fecff58040209b1a86"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/RmvMeshBuilderSceneTests.cs": {
-    "mtime": 1786329994.1899004,
-    "seen": 1787367017.217953,
-    "ast_hash": "8e327e43e81e9a9a5e7ce128746583ba",
-    "semantic_hash": "8e327e43e81e9a9a5e7ce128746583ba"
+    "mtime": 1788080828.8705509,
+    "seen": 1788100184.9063184,
+    "ast_hash": "2fececc66b10afcc4251ada6aaa046ce",
+    "semantic_hash": "2fececc66b10afcc4251ada6aaa046ce"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Importers/GltfToRmvImporter/TangentBasisCalculatorTests.cs": {
     "mtime": 1786238545.1220472,
@@ -3270,10 +3270,10 @@
     "semantic_hash": "64c77647b8e55d10c2076daa531ce749"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Importing/Presentation/GltfToRmvImporterViewModelTests.cs": {
-    "mtime": 1786526655.5152812,
-    "seen": 1787367017.2179544,
-    "ast_hash": "2a6511b98f7d1dc44e1e570ee2a6faf8",
-    "semantic_hash": "2a6511b98f7d1dc44e1e570ee2a6faf8"
+    "mtime": 1788080828.87113,
+    "seen": 1788100184.9063194,
+    "ast_hash": "9110833dcec6402289f4d26a5adfa777",
+    "semantic_hash": "9110833dcec6402289f4d26a5adfa777"
   },
   "Editors/ImportExportEditor/Test.ImportExport/Misc/FileExtensionHelperTests.cs": {
     "mtime": 1786238545.1230507,
@@ -4224,10 +4224,10 @@
     "semantic_hash": "9fbaedeaf988a96cf594a704f23dfe10"
   },
   "Editors/Kitbashing/KitbasherEditor/KitbashUiStyles.xaml": {
-    "mtime": 1786773105.2391174,
-    "seen": 1787367017.2180662,
-    "ast_hash": "d8574f1955a3586247c791389c749c6d",
-    "semantic_hash": "d8574f1955a3586247c791389c749c6d"
+    "mtime": 1788095096.127379,
+    "seen": 1788100184.9064004,
+    "ast_hash": "73c0007fdcb4084ee21e99676a7ad4bd",
+    "semantic_hash": "73c0007fdcb4084ee21e99676a7ad4bd"
   },
   "Editors/Kitbashing/KitbasherEditor/Services/KitbashSceneCreator.cs": {
     "mtime": 1785392371.5728128,
@@ -4536,10 +4536,10 @@
     "semantic_hash": "a752ff9052a4e79434d16cdaf900ac22"
   },
   "Editors/Kitbashing/Test.KitbashEditor/Rendering/RenderEngineSelectionMaskOffscreenTests.cs": {
-    "mtime": 1786182799.982756,
-    "seen": 1787367017.218104,
-    "ast_hash": "8a4059e3e2331b7339f5d6a29e062801",
-    "semantic_hash": "8a4059e3e2331b7339f5d6a29e062801"
+    "mtime": 1787537683.1422167,
+    "seen": 1788100184.9064322,
+    "ast_hash": "853f52cbe3501e411a89f9cfa9ed222b",
+    "semantic_hash": "853f52cbe3501e411a89f9cfa9ed222b"
   },
   "Editors/Kitbashing/Test.KitbashEditor/SaveDialogViewModelTests.cs": {
     "mtime": 1785392371.5798168,
@@ -5058,16 +5058,16 @@
     "semantic_hash": "b365ff4bdbe84de0636ba63d1938fede"
   },
   "Editors/Shared/Editors.Shared.Core/Common/ReferenceModel/BinAnimationViewModel.cs": {
-    "mtime": 1785392371.5888186,
-    "seen": 1787367017.2181609,
-    "ast_hash": "d7146aa0a97be04934bb00faa97a86be",
-    "semantic_hash": "d7146aa0a97be04934bb00faa97a86be"
+    "mtime": 1788080828.8718703,
+    "seen": 1788100184.9064772,
+    "ast_hash": "6c08ee9b9a0ad64e161a28f281b98f8b",
+    "semantic_hash": "6c08ee9b9a0ad64e161a28f281b98f8b"
   },
   "Editors/Shared/Editors.Shared.Core/Common/ReferenceModel/SceneObjectView.xaml": {
-    "mtime": 1786767359.167164,
-    "seen": 1787367017.2181616,
-    "ast_hash": "372f98cbb9506380d9fdc0874b91c569",
-    "semantic_hash": "372f98cbb9506380d9fdc0874b91c569"
+    "mtime": 1788080828.872497,
+    "seen": 1788100184.906478,
+    "ast_hash": "6f404648582d2d246cc5dc6eec6a95ed",
+    "semantic_hash": "6f404648582d2d246cc5dc6eec6a95ed"
   },
   "Editors/Shared/Editors.Shared.Core/Common/ReferenceModel/SceneObjectView.xaml.cs": {
     "mtime": 1774212867.2581604,
@@ -5076,10 +5076,10 @@
     "semantic_hash": "26369486ede1e20136ff5865c2c27e7d"
   },
   "Editors/Shared/Editors.Shared.Core/Common/ReferenceModel/SceneObjectViewModel.cs": {
-    "mtime": 1774212867.2591617,
-    "seen": 1787367017.2181628,
-    "ast_hash": "57e90522fef4ac2578c1aaf9ea00f860",
-    "semantic_hash": "57e90522fef4ac2578c1aaf9ea00f860"
+    "mtime": 1788080828.87304,
+    "seen": 1788100184.9064786,
+    "ast_hash": "d949ba7d8d13bd4ba95e0529ca29cda7",
+    "semantic_hash": "d949ba7d8d13bd4ba95e0529ca29cda7"
   },
   "Editors/Shared/Editors.Shared.Core/Common/ReferenceModel/SkeletonPreviewViewModel.cs": {
     "mtime": 1774212867.2591617,
@@ -5136,10 +5136,10 @@
     "semantic_hash": "acc317e71af1067c9673e345705a543b"
   },
   "Editors/Shared/Editors.Shared.Core/Editors/BoneMapping/BoneMappingViewModel.cs": {
-    "mtime": 1785392371.5898144,
-    "seen": 1787367017.2181702,
-    "ast_hash": "47cb871bdfdac1a1c4c2219adc24eb39",
-    "semantic_hash": "47cb871bdfdac1a1c4c2219adc24eb39"
+    "mtime": 1788080828.8736167,
+    "seen": 1788100184.9064837,
+    "ast_hash": "6eb559f81d5d31c54de88faa7fb3ca12",
+    "semantic_hash": "6eb559f81d5d31c54de88faa7fb3ca12"
   },
   "Editors/Shared/Editors.Shared.Core/Editors/BoneMapping/BoneNodeValueConverter.cs": {
     "mtime": 1774212867.26319,
@@ -5994,10 +5994,10 @@
     "semantic_hash": "69a55e283da4dfd01e545c1e9deb4728"
   },
   "GameWorld/View3D/Components/GridComponent.cs": {
-    "mtime": 1785873307.4316406,
-    "seen": 1787367017.2182748,
-    "ast_hash": "a4b97ed41f0c76735b5e6f3cb791cd32",
-    "semantic_hash": "a4b97ed41f0c76735b5e6f3cb791cd32"
+    "mtime": 1787537683.1432228,
+    "seen": 1788100184.9065564,
+    "ast_hash": "60ac95f325c9025333f5f341a9db073a",
+    "semantic_hash": "60ac95f325c9025333f5f341a9db073a"
   },
   "GameWorld/View3D/Components/Input/KeyboardComponent.cs": {
     "mtime": 1785392371.6090164,
@@ -6318,10 +6318,10 @@
     "semantic_hash": "33e539189591fc0c4dde7b8ef3904dba"
   },
   "GameWorld/View3D/Rendering/Materials/Capabilities/Utility/CapabilityHelper.cs": {
-    "mtime": 1774212867.5951197,
-    "seen": 1787367017.2183223,
-    "ast_hash": "10baae0a795528bfe8765da975d83440",
-    "semantic_hash": "10baae0a795528bfe8765da975d83440"
+    "mtime": 1787476437.7602415,
+    "seen": 1788100184.9065843,
+    "ast_hash": "66805a9fdeaa5e31b3ed110dc57fbccb",
+    "semantic_hash": "66805a9fdeaa5e31b3ed110dc57fbccb"
   },
   "GameWorld/View3D/Rendering/Materials/Capabilities/Utility/CompareHelper.cs": {
     "mtime": 1774212867.5951197,
@@ -6840,10 +6840,10 @@
     "semantic_hash": "0d4e302c25d6b1807259d56728fab93c"
   },
   "GameWorld/View3D/Utility/ImageLoader.cs": {
-    "mtime": 1774212867.6308618,
-    "seen": 1787367017.2183862,
-    "ast_hash": "b6f2fb3e1f914978c9b1e1196abc0fe1",
-    "semantic_hash": "b6f2fb3e1f914978c9b1e1196abc0fe1"
+    "mtime": 1787537683.1432228,
+    "seen": 1788100184.9066296,
+    "ast_hash": "e7a1b37044494b0af2a87dec5d2b25c7",
+    "semantic_hash": "e7a1b37044494b0af2a87dec5d2b25c7"
   },
   "GameWorld/View3D/Utility/IntersectionMath.cs": {
     "mtime": 1785392371.6250095,
@@ -6894,10 +6894,10 @@
     "semantic_hash": "f45e2d3dd3db336b028156d76eb3f486"
   },
   "GameWorld/View3D/Utility/UserInterface/ShaderTextureViewModel.cs": {
-    "mtime": 1785392371.6270094,
-    "seen": 1787367017.2183921,
-    "ast_hash": "370f7915fa4b777b0cda709ed7070907",
-    "semantic_hash": "370f7915fa4b777b0cda709ed7070907"
+    "mtime": 1787537683.1442237,
+    "seen": 1788100184.9066343,
+    "ast_hash": "e210a30cf78260033997acdb53b5b1a4",
+    "semantic_hash": "e210a30cf78260033997acdb53b5b1a4"
   },
   "GameWorld/View3D/WpfWindow/D3D11Host.cs": {
     "mtime": 1774815995.784205,
@@ -9012,10 +9012,10 @@
     "semantic_hash": "bd0f944d20a2394b25b117d58ed8b38d"
   },
   "Shared/SharedCore/PackFiles/IPackFileService.cs": {
-    "mtime": 1787238067.3189871,
-    "seen": 1787367017.2186577,
-    "ast_hash": "56eea4d7f39dd100c25e45ae831cb477",
-    "semantic_hash": "56eea4d7f39dd100c25e45ae831cb477"
+    "mtime": 1787476437.7602415,
+    "seen": 1788100184.9068458,
+    "ast_hash": "911eba02bc989c0d7ef638faf07d4e28",
+    "semantic_hash": "911eba02bc989c0d7ef638faf07d4e28"
   },
   "Shared/SharedCore/PackFiles/Models/FileSystemSource.cs": {
     "mtime": 1786799628.9545493,
@@ -9030,10 +9030,10 @@
     "semantic_hash": "03ad2067c6de7b74181d3849af864ba5"
   },
   "Shared/SharedCore/PackFiles/Models/FolderProjectContainer.cs": {
-    "mtime": 1787358875.817233,
-    "seen": 1787367017.2186606,
-    "ast_hash": "8447426ee044e16807f2a5f7f4859fa9",
-    "semantic_hash": "8447426ee044e16807f2a5f7f4859fa9"
+    "mtime": 1787476437.7612426,
+    "seen": 1788100184.906847,
+    "ast_hash": "7392033de253f58b4743ef4b78d4c1f1",
+    "semantic_hash": "7392033de253f58b4743ef4b78d4c1f1"
   },
   "Shared/SharedCore/PackFiles/Models/FolderProjectHistoryModels.cs": {
     "mtime": 1786863730.3148427,
@@ -9090,10 +9090,10 @@
     "semantic_hash": "3f19f0b5396fc43a28ae200800a95720"
   },
   "Shared/SharedCore/PackFiles/PackFileService.cs": {
-    "mtime": 1787238067.3189871,
-    "seen": 1787367017.2186687,
-    "ast_hash": "2fbaa82bfbf0ebe52a9d58837248dca5",
-    "semantic_hash": "2fbaa82bfbf0ebe52a9d58837248dca5"
+    "mtime": 1787476437.7622397,
+    "seen": 1788100184.9068518,
+    "ast_hash": "8c35a6b90e69d60ef75b0ddc76015e6d",
+    "semantic_hash": "8c35a6b90e69d60ef75b0ddc76015e6d"
   },
   "Shared/SharedCore/PackFiles/Serialization/PackFileSerializerLoader.cs": {
     "mtime": 1774212867.8925915,
@@ -9570,10 +9570,10 @@
     "semantic_hash": "4170988f0c457a74918d18eb30263c6f"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/DeleteNodeCommand.cs": {
-    "mtime": 1785392371.697118,
-    "seen": 1787367017.2187328,
-    "ast_hash": "8b5a342ba9d33ed70ff2d54c74e7932c",
-    "semantic_hash": "8b5a342ba9d33ed70ff2d54c74e7932c"
+    "mtime": 1787476437.7632422,
+    "seen": 1788100184.906894,
+    "ast_hash": "7c387df925a5c7cf7aabaf156100ce7a",
+    "semantic_hash": "7c387df925a5c7cf7aabaf156100ce7a"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/DuplicateFileCommand.cs": {
     "mtime": 1785489872.831839,
@@ -9600,10 +9600,10 @@
     "semantic_hash": "2d72790d531e2f5b120a395c67e0bed3"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/IContextMenuCommand.cs": {
-    "mtime": 1774212867.9198513,
-    "seen": 1787367017.2187376,
-    "ast_hash": "283a92a96eced343dab0c34e244bb766",
-    "semantic_hash": "283a92a96eced343dab0c34e244bb766"
+    "mtime": 1787476437.7632422,
+    "seen": 1788100184.9068973,
+    "ast_hash": "6bbbf5153894c48d9189074e0bd8f8c6",
+    "semantic_hash": "6bbbf5153894c48d9189074e0bd8f8c6"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/ImportDirectoryCommand.cs": {
     "mtime": 1786027958.8402557,
@@ -9660,10 +9660,10 @@
     "semantic_hash": "45ea533aeb9479cb24a50862aa96f110"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/ContextMenuBuilder.cs": {
-    "mtime": 1786593661.7699237,
-    "seen": 1787367017.2187476,
-    "ast_hash": "95d7f60457a76cfc1144f2017afe9d33",
-    "semantic_hash": "95d7f60457a76cfc1144f2017afe9d33"
+    "mtime": 1787476437.7642417,
+    "seen": 1788100184.9069037,
+    "ast_hash": "aa0f0004ceee4f71e6e623420d314857",
+    "semantic_hash": "aa0f0004ceee4f71e6e623420d314857"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/ContextMenuItem.cs": {
     "mtime": 1786593661.7699237,
@@ -9702,10 +9702,10 @@
     "semantic_hash": "8a62ac8a796006e64ec2fee0eb776937"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/MainApplicationContextMenuBuilder.cs": {
-    "mtime": 1787231525.114085,
-    "seen": 1787367017.2187538,
-    "ast_hash": "e4f8c9a925421d8a102eefe4aa001698",
-    "semantic_hash": "e4f8c9a925421d8a102eefe4aa001698"
+    "mtime": 1787476437.7642417,
+    "seen": 1788100184.906907,
+    "ast_hash": "271a6f9a5b4494154afd6e0e1bee3803",
+    "semantic_hash": "271a6f9a5b4494154afd6e0e1bee3803"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/NoContextMenuBuilder.cs": {
     "mtime": 1774212867.9248505,
@@ -9726,28 +9726,28 @@
     "semantic_hash": "b5b8317e19cc603bc5b10c9887ba9652"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/PackFileBrowserView.xaml": {
-    "mtime": 1786145544.636669,
-    "seen": 1787367017.2187564,
-    "ast_hash": "e093837eb7ffccb1f5dd3e2c2e4b61cc",
-    "semantic_hash": "e093837eb7ffccb1f5dd3e2c2e4b61cc"
+    "mtime": 1787476437.765241,
+    "seen": 1788100184.9069092,
+    "ast_hash": "08ac017dfedc84ea40d8c56277742023",
+    "semantic_hash": "08ac017dfedc84ea40d8c56277742023"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/PackFileBrowserView.xaml.cs": {
-    "mtime": 1785677057.2388232,
-    "seen": 1787367017.218757,
-    "ast_hash": "729bf6dfab0e869c798d4eb3c94d9dd1",
-    "semantic_hash": "729bf6dfab0e869c798d4eb3c94d9dd1"
+    "mtime": 1787476437.765241,
+    "seen": 1788100184.9069097,
+    "ast_hash": "928e71501845ac380aac0d0d8f648ae5",
+    "semantic_hash": "928e71501845ac380aac0d0d8f648ae5"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/PackFileBrowserViewModel.cs": {
-    "mtime": 1787053370.5871482,
-    "seen": 1787367017.2187574,
-    "ast_hash": "c5bb48a986a20e6a7154f15bffb59f85",
-    "semantic_hash": "c5bb48a986a20e6a7154f15bffb59f85"
+    "mtime": 1787476437.7662432,
+    "seen": 1788100184.90691,
+    "ast_hash": "366c63f005d0b3dfa5492d7bcad84e81",
+    "semantic_hash": "366c63f005d0b3dfa5492d7bcad84e81"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/PackFileTreeViewFactory.cs": {
-    "mtime": 1786678608.2735624,
-    "seen": 1787367017.2187579,
-    "ast_hash": "3d6f713a56c8eeb846b77448633d6f24",
-    "semantic_hash": "3d6f713a56c8eeb846b77448633d6f24"
+    "mtime": 1787476437.767241,
+    "seen": 1788100184.9069114,
+    "ast_hash": "0d7dfa689d77811149acad3d75b32033",
+    "semantic_hash": "0d7dfa689d77811149acad3d75b32033"
   },
   "Shared/SharedUI/BaseDialogs/PackFileTree/SearchFilter.cs": {
     "mtime": 1786182800.5425444,
@@ -10224,10 +10224,10 @@
     "semantic_hash": "f36b278c60ad1bb385d49bd3ed2efc88"
   },
   "Shared/SharedUI/DependencyInjectionContainer.cs": {
-    "mtime": 1787231525.114085,
-    "seen": 1787367017.2188232,
-    "ast_hash": "91cf997ae08bc281effb7c2f96b2fa32",
-    "semantic_hash": "91cf997ae08bc281effb7c2f96b2fa32"
+    "mtime": 1787476437.767241,
+    "seen": 1788100184.9069543,
+    "ast_hash": "9299de4a0c6286488ea3eb3f94c2a498",
+    "semantic_hash": "9299de4a0c6286488ea3eb3f94c2a498"
   },
   "Shared/SharedUI/Shared.Ui.csproj": {
     "mtime": 1786027958.854251,
@@ -10404,10 +10404,10 @@
     "semantic_hash": "cdb5f0eeca16ad7a680024c69101ac28"
   },
   "Testing/AssetEditorTests/FolderProjectGitOperationCoordinatorTests.cs": {
-    "mtime": 1787238067.323199,
-    "seen": 1787367017.2188556,
-    "ast_hash": "f41229cf19dc7067bb948bbec636060f",
-    "semantic_hash": "f41229cf19dc7067bb948bbec636060f"
+    "mtime": 1787476437.7682426,
+    "seen": 1788100184.90697,
+    "ast_hash": "95a450b0083364ce9bdd4cc6c6d703ad",
+    "semantic_hash": "95a450b0083364ce9bdd4cc6c6d703ad"
   },
   "Testing/AssetEditorTests/FolderProjectHistoryArchitectureTests.cs": {
     "mtime": 1786678608.2760606,
@@ -10434,10 +10434,10 @@
     "semantic_hash": "50dee7908beb8741dae4cedba750916e"
   },
   "Testing/AssetEditorTests/FolderProjectTreeStateTests.cs": {
-    "mtime": 1787053370.589151,
-    "seen": 1787367017.2188654,
-    "ast_hash": "7e0fd80707dc8520cd9734568c6292f8",
-    "semantic_hash": "7e0fd80707dc8520cd9734568c6292f8"
+    "mtime": 1787476437.7692406,
+    "seen": 1788100184.9069731,
+    "ast_hash": "5076b7ee49fd415048d9ec806d985b53",
+    "semantic_hash": "5076b7ee49fd415048d9ec806d985b53"
   },
   "Testing/AssetEditorTests/FolderProjectUnsavedChangesServiceTests.cs": {
     "mtime": 1785619737.3910706,
@@ -10506,10 +10506,10 @@
     "semantic_hash": "9aeb97cb24bd8012d281239f4cac2ff6"
   },
   "Testing/AssetEditorTests/OperationProgressViewTests.cs": {
-    "mtime": 1787371871.7784328,
-    "seen": 1787373844.7621999,
-    "ast_hash": "3648b6c84ca71fa113b4ee573b9fcbaf",
-    "semantic_hash": "3648b6c84ca71fa113b4ee573b9fcbaf"
+    "mtime": 1787375130.11044,
+    "seen": 1788100184.9069796,
+    "ast_hash": "61d7c03f6970f87778358f92558143ba",
+    "semantic_hash": "61d7c03f6970f87778358f92558143ba"
   },
   "Testing/AssetEditorTests/PackFileExportCommandTests.cs": {
     "mtime": 1785489872.8418434,
@@ -10554,10 +10554,10 @@
     "semantic_hash": "b2ed6ca9943bafb007a742de5b487499"
   },
   "Testing/AssetEditorTests/SharedUiArchitectureTests.cs": {
-    "mtime": 1786967774.351506,
-    "seen": 1787367017.21889,
-    "ast_hash": "656485b1c96cfd0cb353a516b4283dd5",
-    "semantic_hash": "656485b1c96cfd0cb353a516b4283dd5"
+    "mtime": 1788080828.8746867,
+    "seen": 1788100184.9069839,
+    "ast_hash": "d3df25bc486195353791e46dc889d53d",
+    "semantic_hash": "d3df25bc486195353791e46dc889d53d"
   },
   "Testing/AssetEditorTests/StandardDialogMigrationTests.cs": {
     "mtime": 1787238067.3275409,
@@ -10572,10 +10572,10 @@
     "semantic_hash": "ce8b260b47a2c9b6b3ca075676b0b7ea"
   },
   "Testing/AssetEditorTests/TestEventHub.cs": {
-    "mtime": 1785392371.906262,
-    "seen": 1787367017.2188928,
-    "ast_hash": "e1c4f346a996c06ad7bee3abff8e9890",
-    "semantic_hash": "e1c4f346a996c06ad7bee3abff8e9890"
+    "mtime": 1787468821.682081,
+    "seen": 1788100184.9069855,
+    "ast_hash": "43c6d27ce151980f4a46ae2151f7bae9",
+    "semantic_hash": "43c6d27ce151980f4a46ae2151f7bae9"
   },
   "Testing/AssetEditorTests/TextEditorViewLifecycleTests.cs": {
     "mtime": 1786182800.5810945,
@@ -10590,16 +10590,16 @@
     "semantic_hash": "8d7127c2d155795ce0170f050e6a8c47"
   },
   "Testing/AssetEditorTests/UiAnimationMetadataFamilyGallery.cs": {
-    "mtime": 1786967774.3525069,
-    "seen": 1787367017.2188954,
-    "ast_hash": "947e424fed7704fafda332a9f694d254",
-    "semantic_hash": "947e424fed7704fafda332a9f694d254"
+    "mtime": 1788080828.8752253,
+    "seen": 1788100184.906987,
+    "ast_hash": "e3d609c963afff00436a69dba43e0255",
+    "semantic_hash": "e3d609c963afff00436a69dba43e0255"
   },
   "Testing/AssetEditorTests/UiAnimationMetadataFamilyTests.cs": {
-    "mtime": 1786967774.3525069,
-    "seen": 1787367017.218897,
-    "ast_hash": "cd1487396ec1400287606e49952aa036",
-    "semantic_hash": "cd1487396ec1400287606e49952aa036"
+    "mtime": 1788080828.8757632,
+    "seen": 1788100184.9069877,
+    "ast_hash": "688b74f06bd147d61d7a0362c01690df",
+    "semantic_hash": "688b74f06bd147d61d7a0362c01690df"
   },
   "Testing/AssetEditorTests/UiAudioEditorFamilyGallery.cs": {
     "mtime": 1787012833.2579648,
@@ -10620,10 +10620,10 @@
     "semantic_hash": "9f819e58f9b51547e265745b3359787f"
   },
   "Testing/AssetEditorTests/UiCommonControlResourceTests.cs": {
-    "mtime": 1786877149.8488681,
-    "seen": 1787367017.2189035,
-    "ast_hash": "8aac6ad5ac2402e5c10fdadb8a354b0c",
-    "semantic_hash": "8aac6ad5ac2402e5c10fdadb8a354b0c"
+    "mtime": 1788095096.1283786,
+    "seen": 1788100184.90699,
+    "ast_hash": "4a1508def7ffea72931b1e1f74e9a16d",
+    "semantic_hash": "4a1508def7ffea72931b1e1f74e9a16d"
   },
   "Testing/AssetEditorTests/UiCommonWorkflowGallery.cs": {
     "mtime": 1787238067.3286498,
@@ -10680,10 +10680,10 @@
     "semantic_hash": "564008a9742d79e770ed9a0531293882"
   },
   "Testing/AssetEditorTests/UiRemainingEditorFamilyGallery.cs": {
-    "mtime": 1786526655.5162792,
-    "seen": 1787367017.2189167,
-    "ast_hash": "2b80201697c59b64631740db910e3498",
-    "semantic_hash": "2b80201697c59b64631740db910e3498"
+    "mtime": 1788080828.8768718,
+    "seen": 1788100184.9069958,
+    "ast_hash": "9da84a936655b003b27596b479333bc7",
+    "semantic_hash": "9da84a936655b003b27596b479333bc7"
   },
   "Testing/AssetEditorTests/UiRemainingEditorFamilyTests.cs": {
     "mtime": 1786027958.8672502,
@@ -10770,10 +10770,10 @@
     "semantic_hash": "5cd2a214632574f9ed428f64df5f224b"
   },
   "Testing/E2EVerification/PackFileBrowser.cs": {
-    "mtime": 1774212867.9578936,
-    "seen": 1787367017.2189357,
-    "ast_hash": "e4eb3736a1464015a6b20bf938bcd3c2",
-    "semantic_hash": "e4eb3736a1464015a6b20bf938bcd3c2"
+    "mtime": 1787476437.770244,
+    "seen": 1788100184.9070034,
+    "ast_hash": "15a5e96c23a91e41187f4197b69a1e09",
+    "semantic_hash": "15a5e96c23a91e41187f4197b69a1e09"
   },
   "Testing/E2EVerification/ServiceScopeValidation.cs": {
     "mtime": 1774212867.9584286,
@@ -10974,10 +10974,10 @@
     "semantic_hash": "f78226eb0a1db209d7ba4673efcab984"
   },
   "Testing/GameWorld.Core.Test/Rendering/Materials/CapabilityMaterialFactoryTests.cs": {
-    "mtime": 1774212867.966084,
-    "seen": 1787367017.2189705,
-    "ast_hash": "0b03cb27d8514bb9cc6509f3590efd92",
-    "semantic_hash": "0b03cb27d8514bb9cc6509f3590efd92"
+    "mtime": 1787537683.1452234,
+    "seen": 1788100184.9070215,
+    "ast_hash": "b055d0632f5984da724d8e092c2f8a4b",
+    "semantic_hash": "b055d0632f5984da724d8e092c2f8a4b"
   },
   "Testing/GameWorld.Core.Test/Rendering/Materials/Serialization/MaterialToWsMaterialSerializerTests.cs": {
     "mtime": 1786593661.7779243,
@@ -11034,10 +11034,10 @@
     "semantic_hash": "cb61cdd711cf918124b0d01e9b0804d4"
   },
   "Testing/GameWorld.Core.Test/Rendering/Shaders/MetalRough/DefaultMaterialTest.cs": {
-    "mtime": 1786593661.7789218,
-    "seen": 1787367017.2189822,
-    "ast_hash": "c3b65338dfc72974ffaacfbd76d0401a",
-    "semantic_hash": "c3b65338dfc72974ffaacfbd76d0401a"
+    "mtime": 1787467472.5204127,
+    "seen": 1788100184.907027,
+    "ast_hash": "67d1cdda34c4c50a91da69fd45306ccd",
+    "semantic_hash": "67d1cdda34c4c50a91da69fd45306ccd"
   },
   "Testing/GameWorld.Core.Test/Rendering/Shaders/MetalRough/EmissiveMaterialTest.cs": {
     "mtime": 1786593661.779922,
@@ -11508,10 +11508,10 @@
     "semantic_hash": "c7f8d9d22119d18575c2ffc29c4c1a59"
   },
   "README.md": {
-    "mtime": 1787360884.050138,
-    "seen": 1787367017.2190747,
-    "ast_hash": "019871d572af0ee505d106bb046841f9",
-    "semantic_hash": "019871d572af0ee505d106bb046841f9"
+    "mtime": 1788095715.571573,
+    "seen": 1788100184.9070647,
+    "ast_hash": "43e7dd3ca7e86a4df2d12e1e0385eb1b",
+    "semantic_hash": "43e7dd3ca7e86a4df2d12e1e0385eb1b"
   },
   "ReleaseNotes.txt": {
     "mtime": 1774212867.6409333,
@@ -12936,10 +12936,10 @@
     "semantic_hash": ""
   },
   "AssetEditor/Language_Cn.json": {
-    "mtime": 1787358875.8162334,
-    "seen": 1787367017.2175276,
-    "ast_hash": "2eae5d9711336ec3b5e859da36b74cf2",
-    "semantic_hash": "2eae5d9711336ec3b5e859da36b74cf2"
+    "mtime": 1788080828.8449876,
+    "seen": 1788100184.9060173,
+    "ast_hash": "9f1e91f3db85e2987557b642035ff2b0",
+    "semantic_hash": "9f1e91f3db85e2987557b642035ff2b0"
   },
   "AssetEditor/Properties/launchSettings.json": {
     "mtime": 1774212865.071027,
@@ -13060,5 +13060,89 @@
     "seen": 1787367017.2191885,
     "ast_hash": "e5d6e25915d46062b94a82cbfeb77403",
     "semantic_hash": "e5d6e25915d46062b94a82cbfeb77403"
+  },
+  "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/CharacterRetargetProfileStore.cs": {
+    "mtime": 1788080828.8474138,
+    "seen": 1788100184.9061322,
+    "ast_hash": "8e1d0e25a7a2903802f932bd795c68a3",
+    "semantic_hash": "8e1d0e25a7a2903802f932bd795c68a3"
+  },
+  "Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/HumanoidBoneMapper.cs": {
+    "mtime": 1788080828.8474138,
+    "seen": 1788100184.9061341,
+    "ast_hash": "17e6bb56ec56a99ad29ef62ae364e628",
+    "semantic_hash": "17e6bb56ec56a99ad29ef62ae364e628"
+  },
+  "Editors/AnimationReTarget/Test.AnimatioReTarget/BoneMappingViewModelTests.cs": {
+    "mtime": 1788080828.8526146,
+    "seen": 1788100184.9061475,
+    "ast_hash": "ff4967fd92ad0856ee9d5fe47108cbdf",
+    "semantic_hash": "ff4967fd92ad0856ee9d5fe47108cbdf"
+  },
+  "Editors/AnimationReTarget/Test.AnimatioReTarget/CharacterRetargetProfileStoreTests.cs": {
+    "mtime": 1788080828.8547058,
+    "seen": 1788100184.9061487,
+    "ast_hash": "6b34980ba757d37b20b2e7a02bf30bfb",
+    "semantic_hash": "6b34980ba757d37b20b2e7a02bf30bfb"
+  },
+  "Editors/AnimationReTarget/Test.AnimatioReTarget/HumanoidBoneMapperTests.cs": {
+    "mtime": 1788080828.8547058,
+    "seen": 1788100184.9061491,
+    "ast_hash": "aad75bf62d15133a1e418cda63d19f4c",
+    "semantic_hash": "aad75bf62d15133a1e418cda63d19f4c"
+  },
+  "GameWorld/View3D/Utility/TexturePathResolver.cs": {
+    "mtime": 1787537683.1442237,
+    "seen": 1788100184.9066327,
+    "ast_hash": "f66766d0f67711787c8583e00fe88a47",
+    "semantic_hash": "f66766d0f67711787c8583e00fe88a47"
+  },
+  "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/CopyTreeNodesCommand.cs": {
+    "mtime": 1787476437.7622397,
+    "seen": 1788100184.9068928,
+    "ast_hash": "3926cb0e138747ef81d69257e31fc8b6",
+    "semantic_hash": "3926cb0e138747ef81d69257e31fc8b6"
+  },
+  "Shared/SharedUI/BaseDialogs/PackFileTree/ContextMenu/Commands/PasteTreeNodesCommand.cs": {
+    "mtime": 1787476437.7632422,
+    "seen": 1788100184.9069002,
+    "ast_hash": "02c24d774067ef58a13f39b15b6dd274",
+    "semantic_hash": "02c24d774067ef58a13f39b15b6dd274"
+  },
+  "Shared/SharedUI/BaseDialogs/PackFileTree/PackFileTreeOperations.cs": {
+    "mtime": 1787476437.7662432,
+    "seen": 1788100184.9069107,
+    "ast_hash": "1b19cc19b0fb9c3d9eda6ffb20495c7f",
+    "semantic_hash": "1b19cc19b0fb9c3d9eda6ffb20495c7f"
+  },
+  "Testing/AssetEditorTests/AudioFilesExplorerInteractionTests.cs": {
+    "mtime": 1788095096.1283786,
+    "seen": 1788100184.9069605,
+    "ast_hash": "368170719463f4befafb4efef5a6bff1",
+    "semantic_hash": "368170719463f4befafb4efef5a6bff1"
+  },
+  "Testing/AssetEditorTests/PackFileTreeOperationsTests.cs": {
+    "mtime": 1787476437.7692406,
+    "seen": 1788100184.9069812,
+    "ast_hash": "25d339754c9bf790289565aacb053f1f",
+    "semantic_hash": "25d339754c9bf790289565aacb053f1f"
+  },
+  "Testing/GameWorld.Core.Test/Utility/TexturePathResolverTests.cs": {
+    "mtime": 1787537683.1455934,
+    "seen": 1788100184.9070418,
+    "ast_hash": "31da041d2f2257d854db263da216f687",
+    "semantic_hash": "31da041d2f2257d854db263da216f687"
+  },
+  "Testing/GameWorld.Core.Test/Utility/UserInterface/ShaderTextureViewModelTests.cs": {
+    "mtime": 1787537683.1460981,
+    "seen": 1788100184.9070423,
+    "ast_hash": "446eb90436b067dd5cb9d565e5628216",
+    "semantic_hash": "446eb90436b067dd5cb9d565e5628216"
+  },
+  "graphify-out/memory/query_20260830_113311_\u6709\u7528\u6237\u8868\u793a_\u97f3\u9891\u7f16\u8f91\u5668\u4e2d\u7684\u97f3\u9891\u6587\u4ef6\u5939\u6d4f\u89c8\u5668\u4f1a\u51fa\u73b0\u548c\u4e4b\u524d\u4e00\u6837\u7684\u9700\u8981\u70b9\u51fb\u4e24\u4e0b\u5c0f\u7bad\u5934\u624d\u80fd\u6536\u8d77_\u70b9\u4e00\u4e0b\u4f1a\u56de\u5230.md": {
+    "mtime": 1788089591.84982,
+    "seen": 1788100184.9070666,
+    "ast_hash": "0c60cce6be1d45b9b449a69f1b4411fd",
+    "semantic_hash": "0c60cce6be1d45b9b449a69f1b4411fd"
   }
 }
