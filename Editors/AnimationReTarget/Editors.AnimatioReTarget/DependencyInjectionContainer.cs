@@ -16,6 +16,7 @@ namespace Editors.AnimatioReTarget
         public override void Register(IServiceCollection serviceCollection)
         {
             serviceCollection.AddScoped<AnimationRetargetEditor>();
+            serviceCollection.AddScoped<CharacterRetargetProfileStore>();
             serviceCollection.AddScoped<BoneManager>();
             serviceCollection.AddScoped<SaveManager>();
             serviceCollection.AddScoped<SaveSettings>();

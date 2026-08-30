@@ -79,17 +79,21 @@ namespace Editors.ImportExport.Importing.Presentation
         }
 
         public Task<ImportResult> ImportAsync(
-            IProgress<OperationProgressUpdate>? progress = null)
+            IProgress<OperationProgressUpdate>? progress = null,
+            CancellationToken cancellationToken = default)
         {
             if (SelectedImporter == null || _inputFile == null || _destPackFileContainer == null)
                 throw new InvalidOperationException("没有可用于当前文件的导入器。");
 
-            return Task.Run(() => SelectedImporter.Execute(
+            var importer = SelectedImporter;
+            return Task.Run(() => importer.Execute(
                 _inputFile,
                 _packPath,
                 _destPackFileContainer,
                 _applicationSettings.CurrentSettings.CurrentGame,
-                progress));
+                progress,
+                cancellationToken),
+                cancellationToken);
         }
 
         [RelayCommand]

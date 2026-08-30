@@ -24,6 +24,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
         public string DisplayName => LocalizationManager.Instance.Get("RmvToGltfImporter.DisplayName");
         public string OutputExtension => ".rigid_model_v2";
         public string[] InputExtensions => new string[] { ".gltf", ".glb" };
+        public bool SupportsCancellation => true;
 
         [ObservableProperty] bool _importMeshes = true;        
         [ObservableProperty] bool _importMaterials = true;
@@ -82,14 +83,30 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 outputPath,
                 packFileContainer,
                 gameType,
-                null);
+                null,
+                CancellationToken.None);
 
         public ImportResult Execute(
             PackFile importSource,
             string outputPath,
             PackFileContainer packFileContainer,
             GameTypeEnum gameType,
-            IProgress<OperationProgressUpdate>? progress)
+            IProgress<OperationProgressUpdate>? progress) =>
+            Execute(
+                importSource,
+                outputPath,
+                packFileContainer,
+                gameType,
+                progress,
+                CancellationToken.None);
+
+        public ImportResult Execute(
+            PackFile importSource,
+            string outputPath,
+            PackFileContainer packFileContainer,
+            GameTypeEnum gameType,
+            IProgress<OperationProgressUpdate>? progress,
+            CancellationToken cancellationToken)
         {
             if (!float.IsFinite(AnimationKeysPerSecond) || AnimationKeysPerSecond <= 0)
                 throw new ArgumentOutOfRangeException(nameof(AnimationKeysPerSecond), "动画采样率必须大于 0。");
@@ -105,13 +122,12 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 ConvertNormalTextureFromBlueToOrangeType: this.ConvertNormalTextureToOrange,
                 ImportAnimations: this.ImportAnimations,
                 AnimationKeysPerSecond: this.AnimationKeysPerSecond,
-                MirrorMesh: true,
                 AutoDetectAnimationKeysPerSecond: this.AutoDetectAnimationKeysPerSecond,
                 NewSkeletonName: this.NewSkeletonName,
                 AutoScaleHumanoid: this.AutoScaleHumanoid,
                 SourceForwardDirection: this.SourceForwardDirection);
 
-            return _Importer.Import(settings, progress);
+            return _Importer.Import(settings, progress, cancellationToken);
         }
 
         partial void OnImportAnimationsChanged(bool value) =>

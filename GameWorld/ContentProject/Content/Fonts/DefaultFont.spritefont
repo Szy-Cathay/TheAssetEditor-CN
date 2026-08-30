@@ -64,6 +64,10 @@ with.
         <End>&#26524;</End>
       </CharacterRegion>
       <CharacterRegion>
+        <Start>&#26550;</Start>
+        <End>&#26550;</End>
+      </CharacterRegion>
+      <CharacterRegion>
         <Start>&#26631;</Start>
         <End>&#26631;</End>
       </CharacterRegion>
@@ -82,6 +86,10 @@ with.
       <CharacterRegion>
         <Start>&#32467;</Start>
         <End>&#32467;</End>
+      </CharacterRegion>
+      <CharacterRegion>
+        <Start>&#39592;</Start>
+        <End>&#39592;</End>
       </CharacterRegion>
     </CharacterRegions>
   </Asset>

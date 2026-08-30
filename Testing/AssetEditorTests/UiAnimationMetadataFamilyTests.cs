@@ -109,6 +109,7 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(combined, Does.Contain("AvalonEditBehaviour"));
             NUnitAssert.That(combined, Does.Contain("MouseDoubleClick"));
             NUnitAssert.That(combined, Does.Contain("BindableSelectedItemBehavior"));
+            NUnitAssert.That(combined, Does.Contain("MethodBinding BrowseAnimation"));
         });
     }
 
@@ -163,6 +164,22 @@ public class UiAnimationMetadataFamilyTests
             "BoneHandling",
             "Presentation",
             "SelectedBoneView.xaml"));
+        var boneSettingsView = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "BoneHandling",
+            "Presentation",
+            "BoneSettingsView.xaml"));
+        var sceneObjectView = File.ReadAllText(Path.Combine(
+            root,
+            "Editors",
+            "Shared",
+            "Editors.Shared.Core",
+            "Common",
+            "ReferenceModel",
+            "SceneObjectView.xaml"));
+        var editorSource = File.ReadAllText(Path.Combine(
+            editorRoot,
+            "AnimationRetargetEditor.cs"));
         var settingsView = File.ReadAllText(Path.Combine(
             editorRoot,
             "Settings",
@@ -191,6 +208,28 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 settingsView,
                 Does.Contain("JustPositivDecimalInput=\"True\""));
+            NUnitAssert.That(
+                boneSettingsView,
+                Does.Contain("AeVerticalGridSplitterStyle"));
+            NUnitAssert.That(
+                boneSettingsView,
+                Does.Contain("Style=\"{StaticResource AeTree.View}\""));
+            NUnitAssert.That(
+                boneSettingsView,
+                Does.Not.Contain("MaxHeight=\"{Binding ActualHeight"));
+            NUnitAssert.That(
+                sceneObjectView,
+                Does.Contain("Visibility=\"{Binding ShowAnimationControls"));
+            NUnitAssert.That(
+                editorSource,
+                Does.Contain("target.ShowAnimationControls = false"));
+            NUnitAssert.That(
+                boneSettingsView,
+                Does.Contain("Height=\"Auto\" MaxHeight=\"520\""));
+            NUnitAssert.That(
+                boneSettingsView,
+                Does.Match(
+                    "<TreeView\\s+Grid.Row=\"1\"\\s+Grid.Column=\"0\"\\s+MaxHeight=\"520\""));
             NUnitAssert.That(
                 saveSettings,
                 Does.Match("PossibleAnimationFormats\\s*\\{\\s*get;"));
@@ -269,6 +308,16 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 saveManagerSource,
                 Does.Contain("AnimReTarget.Error.GeneratedAnimationRequired"));
+            NUnitAssert.That(
+                language.RootElement
+                    .GetProperty("AnimReTarget.Scene.Target")
+                    .GetString(),
+                Is.EqualTo("目标骨架"));
+            NUnitAssert.That(
+                language.RootElement
+                    .GetProperty("AnimReTarget.Scene.Source")
+                    .GetString(),
+                Is.EqualTo("源骨架"));
             NUnitAssert.That(
                 language.RootElement
                     .GetProperty("AnimReTarget.Scene.Generated")

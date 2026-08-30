@@ -86,16 +86,28 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
             {
                 var glTfvertex = new VertexBuilder<VertexPositionNormalTangent, VertexTexture1, TSkinning>();
                 glTfvertex.Geometry.Position = new Vector3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z);
-                glTfvertex.Geometry.Normal = new Vector3(vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z);
-                glTfvertex.Geometry.Tangent = new Vector4(vertex.Tangent.X, vertex.Tangent.Y, vertex.Tangent.Z, 1);
                 glTfvertex.Material.TexCoord = new Vector2(vertex.Uv.X, vertex.Uv.Y);
 
                 glTfvertex.Geometry.Position = VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Position), doMirror));
 
-                glTfvertex.Geometry.Normal = VecConv.NormalizeVector3(
-                    VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Normal), doMirror)),
+                var normal = VecConv.NormalizeVector3(
+                    VecConv.GetSys(GlobalSceneTransforms.FlipVector(vertex.Normal, doMirror)),
                     Vector3.UnitZ);
-                glTfvertex.Geometry.Tangent = VecConv.NormalizeTangentVector4(VecConv.GetSys(GlobalSceneTransforms.FlipVector(VecConv.GetXna(glTfvertex.Geometry.Tangent), doMirror)));
+                var tangent = VecConv.NormalizeVector3(
+                    VecConv.GetSys(GlobalSceneTransforms.FlipVector(vertex.Tangent, doMirror)),
+                    Vector3.UnitX);
+                var binormal = VecConv.NormalizeVector3(
+                    VecConv.GetSys(GlobalSceneTransforms.FlipVector(vertex.BiNormal, doMirror)),
+                    Vector3.UnitY);
+                var handedness = Vector3.Dot(
+                    Vector3.Cross(normal, tangent),
+                    binormal) < 0
+                    ? -1
+                    : 1;
+                glTfvertex.Geometry.Normal = normal;
+                glTfvertex.Geometry.Tangent = new Vector4(
+                    tangent,
+                    handedness);
 
                 if (setSkinning != null)
                     glTfvertex = setSkinning(vertex, glTfvertex);

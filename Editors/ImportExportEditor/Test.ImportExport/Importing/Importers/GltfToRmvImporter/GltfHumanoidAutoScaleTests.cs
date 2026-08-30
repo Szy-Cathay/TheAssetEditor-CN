@@ -458,7 +458,6 @@ public class GltfHumanoidAutoScaleTests
         false,
         importAnimations,
         20,
-        true,
         AutoScaleHumanoid: autoScaleHumanoid);
 
     private static string CreateExternalHumanoidGlb(

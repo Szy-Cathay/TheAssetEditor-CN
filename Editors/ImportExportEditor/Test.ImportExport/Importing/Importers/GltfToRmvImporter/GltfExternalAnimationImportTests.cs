@@ -347,8 +347,7 @@ public class GltfExternalAnimationImportTests
         false,
         false,
         true,
-        20,
-        true);
+        20);
 
     private static PackFileContainer CreateDestinationWithExistingFile(
         out PackFile existingFile)

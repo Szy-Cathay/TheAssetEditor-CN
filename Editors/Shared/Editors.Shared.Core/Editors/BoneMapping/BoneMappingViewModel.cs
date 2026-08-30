@@ -134,7 +134,7 @@ namespace Shared.Ui.Editors.BoneMapping
             MeshBones.SelectedItem.MappedBoneName.Value = bone.Name.Value;
 
             if (_configuration.SkeletonBoneHighlighter != null)
-                _configuration.SkeletonBoneHighlighter.SelectTargetSkeletonBone(bone.BoneIndex.Value);
+                _configuration.SkeletonBoneHighlighter.SelectSourceSkeletonBone(bone.BoneIndex.Value);
             MappingUpdated();
         }
 
@@ -143,12 +143,17 @@ namespace Shared.Ui.Editors.BoneMapping
             if (_configuration.SkeletonBoneHighlighter != null)
             {
                 if (bone == null)
+                {
+                    _configuration.SkeletonBoneHighlighter.SelectTargetSkeletonBone(-1);
                     _configuration.SkeletonBoneHighlighter.SelectSourceSkeletonBone(-1);
+                }
                 else
                 {
-                    _configuration.SkeletonBoneHighlighter.SelectSourceSkeletonBone(bone.BoneIndex.Value);
+                    _configuration.SkeletonBoneHighlighter.SelectTargetSkeletonBone(bone.BoneIndex.Value);
                     if (bone.MappedBoneIndex.Value != -1)
-                        _configuration.SkeletonBoneHighlighter.SelectTargetSkeletonBone(bone.MappedBoneIndex.Value);
+                        _configuration.SkeletonBoneHighlighter.SelectSourceSkeletonBone(bone.MappedBoneIndex.Value);
+                    else
+                        _configuration.SkeletonBoneHighlighter.SelectSourceSkeletonBone(-1);
                 }
             }
         }

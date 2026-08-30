@@ -59,11 +59,16 @@ namespace Editors.ImportExport.Exporting.Exporters.RmvToGltf.Helpers
                 if (parentNode == null)
                     throw new Exception($"Parent Node cannot be null. boneIndex={boneIndex}");
 
+                var bindRotation = Microsoft.Xna.Framework.Quaternion.Normalize(
+                    GlobalSceneTransforms.FlipQuaternion(
+                        frame.Quaternion[boneIndex].ToQuaternion(),
+                        doMirror));
+
                 parentIdToGltfNode[boneIndex] = parentNode.CreateNode(animSkeletonFil.Bones[boneIndex].Name);
 
                 parentIdToGltfNode[boneIndex].
                     WithLocalTranslation(VecConv.GetSys(GlobalSceneTransforms.FlipVector(frame.Transforms[boneIndex].ToVector3(), doMirror))).
-                    WithLocalRotation(VecConv.GetSys(GlobalSceneTransforms.FlipQuaternion(frame.Quaternion[boneIndex].ToQuaternion(), doMirror))).
+                    WithLocalRotation(VecConv.GetSys(bindRotation)).
                     WithLocalScale(new System.Numerics.Vector3(1, 1, 1));
 
                 var invBindPoseMatrix4x4 = VecConv.GetSys(invMatrices[boneIndex]);

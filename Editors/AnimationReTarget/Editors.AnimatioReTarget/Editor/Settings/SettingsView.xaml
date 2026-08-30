@@ -88,7 +88,9 @@
                     Text="{Binding Settings.SkeletonScale, UpdateSourceTrigger=LostFocus, Mode=TwoWay}"
                     ToolTip="{loc:Loc AnimReTarget.SkeletonScale.ToolTip}">
                     <b:Interaction.Behaviors>
-                        <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                        <behaviors:TextBoxInputBehavior
+                            InputMode="DecimalInput"
+                            JustPositivDecimalInput="True" />
                     </b:Interaction.Behaviors>
                 </TextBox>
 

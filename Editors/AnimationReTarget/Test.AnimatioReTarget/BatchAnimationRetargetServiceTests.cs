@@ -448,6 +448,54 @@ public class BatchAnimationRetargetServiceTests
         });
     }
 
+    [Test]
+    public void SkeletonScaleZero_DisablesPreviewAndBatchRetarget()
+    {
+        const string sourceAnimationPath =
+            "animations\\battle\\humanoid01\\2handed_hammer\\stand\\hu1_2hh_stand_idle_01.anim";
+        using var context = new BatchTestContext(
+            _inputPackFile,
+            sourceAnimationPath);
+        context.Editor.Settings.SkeletonScale = 0;
+
+        var canUpdate = context.Editor.CanUpdateAnimation(
+            out var updateError);
+        var canBatch = context.Editor.SaveManager.CanBatchRetarget(
+            out var batchError);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canUpdate, Is.False);
+            Assert.That(canBatch, Is.False);
+            Assert.That(updateError, Is.Not.Empty);
+            Assert.That(batchError, Is.EqualTo(updateError));
+        });
+    }
+
+    [Test]
+    public void BoneLengthMultiplierZero_DisablesPreviewAndBatchRetarget()
+    {
+        const string sourceAnimationPath =
+            "animations\\battle\\humanoid01\\2handed_hammer\\stand\\hu1_2hh_stand_idle_01.anim";
+        using var context = new BatchTestContext(
+            _inputPackFile,
+            sourceAnimationPath);
+        context.Editor.BoneManager.FlatBoneList[0].BoneLengthMult = 0;
+
+        var canUpdate = context.Editor.CanUpdateAnimation(
+            out var updateError);
+        var canBatch = context.Editor.SaveManager.CanBatchRetarget(
+            out var batchError);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canUpdate, Is.False);
+            Assert.That(canBatch, Is.False);
+            Assert.That(updateError, Is.Not.Empty);
+            Assert.That(batchError, Is.EqualTo(updateError));
+        });
+    }
+
     [TestCase(5u)]
     [TestCase(6u)]
     [TestCase(7u)]

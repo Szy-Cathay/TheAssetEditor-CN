@@ -96,6 +96,8 @@ namespace Editors.AnimatioReTarget.Editor
             var target = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Target, true, targetLabel, Color.Black, null);
             var source = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Source, true, sourceLabel, Color.Black, null);
             var generated = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Generated, true, generatedLabel, Color.Black, null);
+            target.ShowAnimationControls = false;
+            generated.ShowAnimationControls = false;
             _target = target.Data;
             _source = source.Data;
             _generated = generated.Data;
@@ -147,6 +149,9 @@ namespace Editors.AnimatioReTarget.Editor
                 return;
             }
 
+            if (!BoneManager.ConfirmSparseMapping())
+                return;
+
             var newAnimationClip = UpdateAnimation(_source.AnimationClip);
             _sceneObjectEditor.SetAnimationClip(
                 _generated,
@@ -177,9 +182,26 @@ namespace Editors.AnimatioReTarget.Editor
                 return false;
             }
 
+            if (!BoneManager.HasValidMapping)
+            {
+                errorText = LocalizationManager.Instance.Get("AnimReTarget.Error.MappingRequired");
+                return false;
+            }
+
+            if (!BoneManager.TryValidateBoneSettings(out errorText))
+                return false;
+
             if (!float.IsFinite(Settings.AnimationSpeedMult) || Settings.AnimationSpeedMult <= 0)
             {
                 errorText = LocalizationManager.Instance.Get("AnimReTarget.Error.InvalidSpeedMultiplier");
+                return false;
+            }
+
+            if (!float.IsFinite(Settings.SkeletonScale) ||
+                Settings.SkeletonScale <= 0)
+            {
+                errorText = LocalizationManager.Instance.Get(
+                    "AnimReTarget.Error.InvalidSkeletonScale");
                 return false;
             }
 

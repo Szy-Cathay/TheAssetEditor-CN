@@ -219,7 +219,10 @@ public class RmvMeshBuilder
 
         var positionsCount = vertexBufferColumns.Positions.Count();
         var rebuildNormals = vertexBufferColumns.Normals == null;
-        var rebuildTangents = vertexBufferColumns.Tangents == null;
+        var rebuildTangents = rebuildNormals ||
+            vertexBufferColumns.Tangents == null ||
+            vertexBufferColumns.Tangents.Any(tangent =>
+                !IsValidTangent(tangent));
         var defaultTextureCoordinates = vertexBufferColumns.TexCoords0 == null;
         var ignoreVertexColors = vertexBufferColumns.Colors0 != null ||
             vertexBufferColumns.Colors1 != null;
@@ -282,7 +285,8 @@ public class RmvMeshBuilder
                     worldMatrix,
                     normalMatrix,
                     scaleFactor,
-                    sourceForwardDirection);
+                    sourceForwardDirection,
+                    useSourceTangents: !rebuildTangents);
                 rmv2Mesh.VertexList[outputVertexIndex] = converted.Vertex;
                 completedVertices++;
                 if (ShouldReportProgress(completedVertices, totalOutputVertices))
@@ -308,7 +312,8 @@ public class RmvMeshBuilder
                     source.ModelName)));
             if (rebuildNormals)
                 RebuildNormals(rmv2Mesh);
-            TangentBasisCalculator.CalculateForRmv2Mesh(rmv2Mesh);
+            if (rebuildTangents)
+                TangentBasisCalculator.CalculateForRmv2Mesh(rmv2Mesh);
             output.Add((
                 rmv2Mesh,
                 new RmvMeshSegmentImportSummary(
@@ -498,7 +503,8 @@ public class RmvMeshBuilder
         Matrix4x4 worldMatrix,
         Matrix4x4 normalMatrix,
         float scaleFactor,
-        GltfSourceForwardDirection sourceForwardDirection)
+        GltfSourceForwardDirection sourceForwardDirection,
+        bool useSourceTangents)
     {
         var position = Vector3.Transform(vertexBuilder.Geometry.Position, worldMatrix) * scaleFactor;
         var normal = Vector3.TransformNormal(vertexBuilder.Geometry.Normal, normalMatrix);
@@ -511,6 +517,47 @@ public class RmvMeshBuilder
         var gameNormal = GltfSourceForwardConverter.ConvertGameVector(
             new Vector3(-normal.X, normal.Y, normal.Z),
             sourceForwardDirection);
+        var gameTangent = Vector3.Zero;
+        var gameBinormal = Vector3.Zero;
+        if (useSourceTangents)
+        {
+            var sourceTangent = new Vector3(
+                vertexBuilder.Geometry.Tangent.X,
+                vertexBuilder.Geometry.Tangent.Y,
+                vertexBuilder.Geometry.Tangent.Z);
+            var sourceBinormal = Vector3.Cross(
+                    vertexBuilder.Geometry.Normal,
+                    sourceTangent) *
+                MathF.Sign(vertexBuilder.Geometry.Tangent.W);
+            var transformedTangent = Vector3.TransformNormal(
+                sourceTangent,
+                worldMatrix);
+            var transformedBinormal = Vector3.TransformNormal(
+                sourceBinormal,
+                worldMatrix);
+            gameTangent = GltfSourceForwardConverter.ConvertGameVector(
+                new Vector3(
+                    -transformedTangent.X,
+                    transformedTangent.Y,
+                    transformedTangent.Z),
+                sourceForwardDirection);
+            var binormalReference = GltfSourceForwardConverter.ConvertGameVector(
+                new Vector3(
+                    -transformedBinormal.X,
+                    transformedBinormal.Y,
+                    transformedBinormal.Z),
+                sourceForwardDirection);
+            gameTangent -= gameNormal * Vector3.Dot(
+                gameNormal,
+                gameTangent);
+            gameTangent = NormalizeOrDefault(gameTangent, Vector3.UnitX);
+            var cross = NormalizeOrDefault(
+                Vector3.Cross(gameNormal, gameTangent),
+                Vector3.UnitY);
+            gameBinormal = Vector3.Dot(cross, binormalReference) < 0
+                ? -cross
+                : cross;
+        }
         var rmv2Vertex = new CommonVertex
         {
             Position = new XNA.Vector4(
@@ -523,8 +570,8 @@ public class RmvMeshBuilder
                 gameNormal.X,
                 gameNormal.Y,
                 gameNormal.Z),
-            Tangent = XNA.Vector3.Zero,
-            BiNormal = XNA.Vector3.Zero,
+            Tangent = VecConv.GetXna(gameTangent),
+            BiNormal = VecConv.GetXna(gameBinormal),
             WeightCount = animSkeletonFile == null || skin == null ? 0 : 4,
         };
 
@@ -569,6 +616,27 @@ public class RmvMeshBuilder
 
         return (rmv2Vertex, discardedWeight);
     }
+
+    private static bool IsValidTangent(Vector4 tangent)
+    {
+        var direction = new Vector3(tangent.X, tangent.Y, tangent.Z);
+        return float.IsFinite(tangent.W) &&
+            Math.Abs(tangent.W) > 0.000001f &&
+            float.IsFinite(direction.X) &&
+            float.IsFinite(direction.Y) &&
+            float.IsFinite(direction.Z) &&
+            direction.LengthSquared() > 0.000000000001f;
+    }
+
+    private static Vector3 NormalizeOrDefault(
+        Vector3 value,
+        Vector3 fallback) =>
+        float.IsFinite(value.X) &&
+        float.IsFinite(value.Y) &&
+        float.IsFinite(value.Z) &&
+        value.LengthSquared() > 0.000000000001f
+            ? Vector3.Normalize(value)
+            : fallback;
 
     private static int GetMappedBoneTableIndex(
         int jointIndex,

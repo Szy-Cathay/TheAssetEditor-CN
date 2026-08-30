@@ -82,6 +82,9 @@ namespace Editors.AnimatioReTarget.Editor.Saving
                 return;
             }
 
+            if (!_saveManager.ConfirmSparseMapping())
+                return;
+
             var candidates = _saveManager.GetBatchCandidates();
             if (candidates.Count == 0)
             {

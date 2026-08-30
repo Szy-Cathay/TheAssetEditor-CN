@@ -262,7 +262,10 @@ public class UiAnimationMetadataFamilyGallery
         "retarget-bone-mapping-window" =>
             CreateRetargetBoneMappingWindow(),
         "retarget-bone-settings" => Host(
-            new RetargetBoneSettingsView { DataContext = CreateBoneModel() },
+            new RetargetBoneSettingsView
+            {
+                DataContext = CreateBoneModel(includeManyBones: true),
+            },
             900,
             680),
         "retarget-selected-bone" => Host(
@@ -656,7 +659,7 @@ public class UiAnimationMetadataFamilyGallery
         PasteRowsCommand = GalleryCommand.Instance,
     };
 
-    private static GalleryModel CreateBoneModel()
+    private static GalleryModel CreateBoneModel(bool includeManyBones = false)
     {
         var child = new GalleryModel
         {
@@ -670,6 +673,18 @@ public class UiAnimationMetadataFamilyGallery
             IsVisible = new GalleryModel { Value = true },
             Children = Array.Empty<object>(),
         };
+        var children = includeManyBones
+            ? new[] { child }
+                .Concat(Enumerable.Range(2, 38).Select(index =>
+                    new GalleryModel
+                    {
+                        BoneName = $"bone_{index:00}",
+                        BoneIndex = new GalleryModel { Value = index },
+                        HasMapping = true,
+                        Children = Array.Empty<object>(),
+                    }))
+                .ToArray()
+            : new[] { child };
         var root = new GalleryModel
         {
             BoneName = "root",
@@ -680,7 +695,7 @@ public class UiAnimationMetadataFamilyGallery
             HasMapping = true,
             IsUsedByCurrentModel = new GalleryModel { Value = true },
             IsVisible = new GalleryModel { Value = true },
-            Children = new[] { child },
+            Children = children,
         };
         var bones = new GalleryModel
         {
@@ -694,6 +709,9 @@ public class UiAnimationMetadataFamilyGallery
             {
                 Bones = new[] { root },
                 SelectedBone = child,
+                ApplyHumanoidMappingCommand = GalleryCommand.Instance,
+                SaveCharacterProfileCommand = GalleryCommand.Instance,
+                MappingSummary = "24 / 96",
                 ShowBoneMappingWindowCommand = GalleryCommand.Instance,
             },
             MeshBones = bones,
@@ -1013,6 +1031,7 @@ public class UiAnimationMetadataFamilyGallery
         IsExpanded = true,
         IsEnabled = true,
         IsControlVisible = true,
+        ShowAnimationControls = true,
         IsVisible = true,
         HeaderName = "参考模型",
         SubHeaderName = " · empire_general_body",
@@ -1124,6 +1143,37 @@ public class UiAnimationMetadataFamilyGallery
                 FindVisualDescendants<System.Windows.Shapes.Path>(window)
                     .Count(),
                 Is.GreaterThanOrEqualTo(5));
+        }
+
+        if (variant == "retarget-bone-settings")
+        {
+            var tree = FindVisualDescendants<TreeView>(window).Single();
+            var selectedBoneView =
+                FindVisualDescendants<RetargetSelectedBoneView>(window)
+                    .Single();
+            var splitter = FindVisualDescendants<GridSplitter>(window)
+                .Single();
+            var treeScrollViewer =
+                FindVisualDescendants<ScrollViewer>(tree).Single();
+
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(
+                    tree.ActualHeight,
+                    Is.EqualTo(selectedBoneView.ActualHeight).Within(1));
+                NUnitAssert.That(
+                    splitter.ActualHeight,
+                    Is.EqualTo(tree.ActualHeight).Within(1));
+                NUnitAssert.That(
+                    ScrollViewer.GetVerticalScrollBarVisibility(tree),
+                    Is.EqualTo(ScrollBarVisibility.Auto));
+                NUnitAssert.That(
+                    treeScrollViewer.ComputedVerticalScrollBarVisibility,
+                    Is.EqualTo(Visibility.Visible));
+                NUnitAssert.That(
+                    treeScrollViewer.ScrollableHeight,
+                    Is.GreaterThan(0));
+            });
         }
 
         if (variant.StartsWith("animset-table", StringComparison.Ordinal))
@@ -1726,6 +1776,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? AnimFiles { get; set; }
         public object? AnimPackName { get; set; }
         public object? AddEntryCommand { get; set; }
+        public object? ApplyHumanoidMappingCommand { get; set; }
         public object? ApplyRelativeScale { get; set; }
         public object? BoneIndex { get; set; }
         public object? BoneManager { get; set; }
@@ -1789,6 +1840,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? LocomotionGraph { get; set; }
         public object? LoopAnimation { get; set; }
         public object? LoopCounter { get; set; }
+        public object? MappingSummary { get; set; }
         public object? MappedBoneIndex { get; set; }
         public object? MappedBoneName { get; set; }
         public object? MaxFrames { get; set; }
@@ -1838,6 +1890,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? Rows { get; set; }
         public object? SaveActionCommand { get; set; }
         public object? SaveCommand { get; set; }
+        public object? SaveCharacterProfileCommand { get; set; }
         public object? SaveManager { get; set; }
         public object? SavePrefix { get; set; }
         public object? SavePrefixText { get; set; }
@@ -1864,6 +1917,7 @@ public class UiAnimationMetadataFamilyGallery
         public object? SelectedVertexesText { get; set; }
         public object? Settings { get; set; }
         public object? ShowBoneMappingWindowCommand { get; set; }
+        public object? ShowAnimationControls { get; set; }
         public object? ShowGeneratedMesh { get; set; }
         public object? ShowGeneratedSkeleton { get; set; }
         public object? ShowMesh { get; set; }

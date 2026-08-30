@@ -80,7 +80,6 @@ public class GltfFullWorkflowImportTests
             ConvertNormalTextureFromBlueToOrangeType: true,
             ImportAnimations: true,
             AnimationKeysPerSecond: 24,
-            MirrorMesh: true,
             AutoDetectAnimationKeysPerSecond: true,
             AutoScaleHumanoid: true),
             new InlineProgress<OperationProgressUpdate>(progressUpdates.Add));
@@ -273,7 +272,6 @@ public class GltfFullWorkflowImportTests
                 ConvertNormalTextureFromBlueToOrangeType: true,
                 ImportAnimations: true,
                 AnimationKeysPerSecond: 24,
-                MirrorMesh: true,
                 AutoDetectAnimationKeysPerSecond: true,
                 AutoScaleHumanoid: true));
 
@@ -461,7 +459,6 @@ public class GltfFullWorkflowImportTests
                 ConvertNormalTextureFromBlueToOrangeType: false,
                 ImportAnimations: true,
                 AnimationKeysPerSecond: 1,
-                MirrorMesh: true,
                 AutoDetectAnimationKeysPerSecond: false,
                 AutoScaleHumanoid: true));
 
@@ -537,7 +534,6 @@ public class GltfFullWorkflowImportTests
                 ConvertNormalTextureFromBlueToOrangeType: false,
                 ImportAnimations: false,
                 AnimationKeysPerSecond: 20,
-                MirrorMesh: true,
                 AutoScaleHumanoid: false));
 
             Assert.Multiple(() =>
@@ -653,7 +649,6 @@ public class GltfFullWorkflowImportTests
             ConvertNormalTextureFromBlueToOrangeType: true,
             ImportAnimations: true,
             AnimationKeysPerSecond: 24,
-            MirrorMesh: true,
             AutoDetectAnimationKeysPerSecond: true,
             AutoScaleHumanoid: true,
             SourceForwardDirection: sourceForwardDirection);

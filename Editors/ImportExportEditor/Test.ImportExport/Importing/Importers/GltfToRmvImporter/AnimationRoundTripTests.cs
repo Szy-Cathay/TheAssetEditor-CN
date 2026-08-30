@@ -10,6 +10,7 @@ using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
+using Shared.GameFormats.RigidModel.Transforms;
 using Shared.TestUtility;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
@@ -73,6 +74,82 @@ public class AnimationRoundTripTests
             modelRoot.LogicalAnimations.Single());
 
         AssertAnimationsMatch(originalAnimation, importedAnimation, skeleton);
+    }
+
+    [Test]
+    public void ExportThenImport_SameNamedAnimations_UsesUniqueAnimationNames()
+    {
+        var packFileService = PackFileSerivceTestHelper.Create(
+            PathHelper.GetDataFolder("Data\\Karl_and_celestialgeneral_Pack"));
+        var skeleton = CreateSingleBoneAnimation(1.0f);
+        var animationBytes = AnimationFile.ConvertToBytes(
+            CreateSingleBoneAnimation(1.0f));
+        var modelRoot = ModelRoot.CreateModel();
+        var exportSettings = new RmvToGltfExporterSettings(
+            new PackFile("model.rigid_model_v2", new MemorySource([])),
+            [
+                new PackFile("idle.anim", new MemorySource(animationBytes)),
+                new PackFile("idle.anim", new MemorySource(animationBytes)),
+            ],
+            "roundtrip.gltf",
+            false,
+            false,
+            false,
+            true,
+            true);
+        var gltfSkeleton = new GltfSkeletonBuilder(packFileService)
+            .CreateSkeleton(skeleton, modelRoot, exportSettings);
+        new GltfAnimationBuilder(packFileService).Build(
+            skeleton,
+            exportSettings,
+            gltfSkeleton,
+            modelRoot);
+        AddMinimalSkinnedMesh(modelRoot, gltfSkeleton);
+        var glbPath = Path.Combine(
+            Path.GetTempPath(),
+            $"same_named_animation_roundtrip_{Guid.NewGuid():N}.glb");
+
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var destination = new PackFileContainer("roundtrip");
+            var skeletonLookup = new Mock<ISkeletonAnimationLookUpHelper>();
+            skeletonLookup
+                .Setup(lookup => lookup.GetSkeletonFileFromName("single_bone"))
+                .Returns(skeleton);
+            var importer = new GltfImporter(
+                packFileService,
+                skeletonLookup.Object,
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "animations",
+                destination,
+                GameTypeEnum.Warhammer3,
+                ImportMeshes: false,
+                ImportMaterials: false,
+                ConvertMaterialFromBlenderType: false,
+                ConvertNormalTextureFromBlueToOrangeType: false,
+                ImportAnimations: true,
+                AnimationKeysPerSecond: 20,
+                AutoDetectAnimationKeysPerSecond: false,
+                AutoScaleHumanoid: false));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Succeeded, Is.True,
+                    result.Exception?.ToString() ??
+                    string.Join(Environment.NewLine, result.Errors));
+                Assert.That(modelRoot.LogicalAnimations.Select(animation => animation.Name),
+                    Is.EqualTo(new[] { "idle", "idle_2" }));
+                Assert.That(result.OutputPaths, Has.Count.EqualTo(2));
+            });
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
     }
 
     [Test]
@@ -142,7 +219,6 @@ public class AnimationRoundTripTests
                 ConvertNormalTextureFromBlueToOrangeType: false,
                 ImportAnimations: false,
                 AnimationKeysPerSecond: 20,
-                MirrorMesh: true,
                 AutoDetectAnimationKeysPerSecond: false,
                 AutoScaleHumanoid: false));
 
@@ -181,6 +257,148 @@ public class AnimationRoundTripTests
         }
     }
 
+    [Test]
+    public void ExportAnimation_DifferentSkeletonName_ThrowsBeforeWritingChannels()
+    {
+        var packFileService = PackFileSerivceTestHelper.Create(
+            PathHelper.GetDataFolder("Data\\Karl_and_celestialgeneral_Pack"));
+        var skeleton = CreateSingleBoneAnimation(1.0f);
+        var animation = CreateSingleBoneAnimation(1.0f);
+        animation.Header.SkeletonName = "different_skeleton";
+        var animationPackFile = new PackFile(
+            "wrong.anim",
+            new MemorySource(AnimationFile.ConvertToBytes(animation)));
+        var modelRoot = ModelRoot.CreateModel();
+        var exportSettings = new RmvToGltfExporterSettings(
+            new PackFile("model.rigid_model_v2", new MemorySource([])),
+            [animationPackFile],
+            "roundtrip.gltf",
+            false,
+            false,
+            false,
+            true,
+            true);
+        var gltfSkeleton = new GltfSkeletonBuilder(packFileService)
+            .CreateSkeleton(skeleton, modelRoot, exportSettings);
+
+        Assert.Throws<InvalidDataException>(() =>
+            new GltfAnimationBuilder(packFileService).Build(
+                skeleton,
+                exportSettings,
+                gltfSkeleton,
+                modelRoot));
+    }
+
+    [Test]
+    public void ExportThenImport_NonUnitBindQuaternion_DoesNotCreateBoneScale()
+    {
+        var packFileService = PackFileSerivceTestHelper.Create(
+            PathHelper.GetDataFolder("Data\\Karl_and_celestialgeneral_Pack"));
+        var skeleton = CreateSkeletonWithNonUnitBindQuaternion();
+        var modelRoot = ModelRoot.CreateModel();
+        var exportSettings = new RmvToGltfExporterSettings(
+            new PackFile("model.rigid_model_v2", new MemorySource([])),
+            [],
+            "roundtrip.gltf",
+            false,
+            false,
+            false,
+            false,
+            true);
+        var gltfSkeleton = new GltfSkeletonBuilder(packFileService)
+            .CreateSkeleton(skeleton, modelRoot, exportSettings);
+        AddMinimalSkinnedMesh(modelRoot, gltfSkeleton);
+        var glbPath = Path.Combine(
+            Path.GetTempPath(),
+            $"non_unit_bind_roundtrip_{Guid.NewGuid():N}.glb");
+
+        try
+        {
+            modelRoot.SaveGLB(glbPath);
+            var destination = new PackFileContainer("roundtrip");
+            var importer = new GltfImporter(
+                packFileService,
+                Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                new RmvMaterialBuilder());
+
+            var result = importer.Import(new GltfImporterSettings(
+                glbPath,
+                "animations",
+                destination,
+                GameTypeEnum.Warhammer3,
+                ImportMeshes: false,
+                ImportMaterials: false,
+                ConvertMaterialFromBlenderType: false,
+                ConvertNormalTextureFromBlueToOrangeType: false,
+                ImportAnimations: true,
+                AnimationKeysPerSecond: 20,
+                AutoDetectAnimationKeysPerSecond: false,
+                AutoScaleHumanoid: false));
+
+            Assert.That(
+                result.Succeeded,
+                Is.True,
+                result.Exception?.ToString() ??
+                string.Join(Environment.NewLine, result.Errors));
+            var importedSkeleton = AnimationFile.Create(
+                destination.FileList[@"animations\skeletons\non_unit_bind.anim"]);
+            Assert.That(importedSkeleton.Bones, Has.Length.EqualTo(skeleton.Bones.Length));
+        }
+        finally
+        {
+            File.Delete(glbPath);
+        }
+    }
+
+    [Test]
+    public void ExportThenImport_NonUnitAnimationQuaternion_DoesNotCreateBoneScale()
+    {
+        var packFileService = PackFileSerivceTestHelper.Create(
+            PathHelper.GetDataFolder("Data\\Karl_and_celestialgeneral_Pack"));
+        var skeleton = CreateSingleBoneAnimation(1.0f);
+        var animation = CreateSingleBoneAnimation(0.99995f);
+        var animationPackFile = new PackFile(
+            "non_unit_animation.anim",
+            new MemorySource(AnimationFile.ConvertToBytes(animation)));
+        var modelRoot = ModelRoot.CreateModel();
+        var exportSettings = new RmvToGltfExporterSettings(
+            new PackFile("model.rigid_model_v2", new MemorySource([])),
+            [animationPackFile],
+            "roundtrip.gltf",
+            false,
+            false,
+            false,
+            true,
+            true);
+        var gltfSkeleton = new GltfSkeletonBuilder(packFileService)
+            .CreateSkeleton(skeleton, modelRoot, exportSettings);
+        new GltfAnimationBuilder(packFileService).Build(
+            skeleton,
+            exportSettings,
+            gltfSkeleton,
+            modelRoot);
+
+        var gltfAnimation = modelRoot.LogicalAnimations.Single();
+        var exportedRotation = gltfSkeleton.Data[0].Item1
+            .GetLocalTransform(gltfAnimation, 0)
+            .Rotation;
+        Assert.That(exportedRotation.Length(), Is.EqualTo(1).Within(0.000001f));
+
+        var importedAnimation = AnimationBuilder.Build(
+            new AnimationBuilderSettings(
+                modelRoot,
+                skeleton.Header.SkeletonName,
+                animation.Header.FrameRate,
+                new PackFileContainer("roundtrip"),
+                "animations"),
+            skeleton,
+            gltfAnimation);
+
+        Assert.That(
+            importedAnimation.AnimationParts[0].DynamicFrames,
+            Is.Not.Empty);
+    }
+
     private static void AddMinimalSkinnedMesh(
         ModelRoot modelRoot,
         ProcessedGltfSkeleton skeleton)
@@ -216,6 +434,107 @@ public class AnimationRoundTripTests
         vertex.Material.TexCoord = new System.Numerics.Vector2(x, y);
         vertex.Skinning.SetBindings((0, 1), (0, 0), (0, 0), (0, 0));
         return vertex;
+    }
+
+    private static AnimationFile CreateSkeletonWithNonUnitBindQuaternion()
+    {
+        var rotation = Xna.Quaternion.CreateFromAxisAngle(
+            Xna.Vector3.UnitZ,
+            MathF.PI);
+        const int boneCount = 185;
+        const float storedQuaternionLength = 0.99995f;
+        var frame = new AnimationFile.Frame();
+        var bones = new AnimationFile.BoneInfo[boneCount];
+        var part = new AnimationFile.AnimationPart();
+        for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+        {
+            bones[boneIndex] = new AnimationFile.BoneInfo
+            {
+                Id = boneIndex,
+                ParentId = boneIndex - 1,
+                Name = $"bone_{boneIndex}",
+            };
+            frame.Transforms.Add(new RmvVector3(
+                boneIndex == 0 ? 0 : 0.1f,
+                0,
+                0));
+            frame.Quaternion.Add(new RmvVector4(
+                rotation.X * storedQuaternionLength,
+                rotation.Y * storedQuaternionLength,
+                rotation.Z * storedQuaternionLength,
+                rotation.W * storedQuaternionLength));
+            part.TranslationMappings.Add(new AnimationFile.AnimationBoneMapping(boneIndex));
+            part.RotationMappings.Add(new AnimationFile.AnimationBoneMapping(boneIndex));
+        }
+        part.DynamicFrames.Add(frame);
+
+        return new AnimationFile
+        {
+            Header = new AnimationFile.AnimationHeader
+            {
+                Version = 7,
+                SkeletonName = "non_unit_bind",
+                FrameRate = 20,
+                AnimationTotalPlayTimeInSec = 0.05f,
+            },
+            Bones = bones,
+            AnimationParts = [part],
+        };
+    }
+
+    private static AnimationFile CreateSingleBoneAnimation(
+        float storedQuaternionLength)
+    {
+        var rotation = Xna.Quaternion.CreateFromAxisAngle(
+            Xna.Vector3.UnitZ,
+            MathF.PI);
+        var frame = new AnimationFile.Frame
+        {
+            Transforms = [new RmvVector3(0, 0, 0)],
+            Quaternion =
+            [
+                new RmvVector4(
+                    rotation.X * storedQuaternionLength,
+                    rotation.Y * storedQuaternionLength,
+                    rotation.Z * storedQuaternionLength,
+                    rotation.W * storedQuaternionLength),
+            ],
+        };
+        var part = new AnimationFile.AnimationPart
+        {
+            DynamicFrames =
+            [
+                frame,
+                new AnimationFile.Frame
+                {
+                    Transforms = [frame.Transforms[0]],
+                    Quaternion = [frame.Quaternion[0]],
+                },
+            ],
+            TranslationMappings = [new AnimationFile.AnimationBoneMapping(0)],
+            RotationMappings = [new AnimationFile.AnimationBoneMapping(0)],
+        };
+
+        return new AnimationFile
+        {
+            Header = new AnimationFile.AnimationHeader
+            {
+                Version = 7,
+                SkeletonName = "single_bone",
+                FrameRate = 20,
+                AnimationTotalPlayTimeInSec = 0.1f,
+            },
+            Bones =
+            [
+                new AnimationFile.BoneInfo
+                {
+                    Id = 0,
+                    ParentId = AnimationFile.BoneIndexNoParent,
+                    Name = "root",
+                },
+            ],
+            AnimationParts = [part],
+        };
     }
 
     private static void AssertAnimationsMatch(
@@ -331,7 +650,8 @@ public class AnimationRoundTripTests
 
             var localTransform =
                 Xna.Matrix.CreateScale(frame.Scale[boneIndex]) *
-                Xna.Matrix.CreateFromQuaternion(frame.Rotation[boneIndex]) *
+                Xna.Matrix.CreateFromQuaternion(
+                    Xna.Quaternion.Normalize(frame.Rotation[boneIndex])) *
                 Xna.Matrix.CreateTranslation(frame.Position[boneIndex]);
             var parentBoneIndex = skeleton.GetParentBoneIndex(boneIndex);
             worldTransforms[boneIndex] = parentBoneIndex == -1

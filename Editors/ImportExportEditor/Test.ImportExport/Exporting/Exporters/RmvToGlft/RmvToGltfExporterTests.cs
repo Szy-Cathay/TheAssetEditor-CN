@@ -12,6 +12,7 @@ using Shared.Core.Settings;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.RigidModel.Types;
+using Shared.GameFormats.RigidModel.Vertex;
 using SharpGLTF.Materials;
 using SharpGLTF.Schema2;
 using Test.TestingUtility.TestUtility;
@@ -111,6 +112,75 @@ namespace Test.ImportExport.Exporting.Exporters.RmvToGlft
                 lookup => lookup.GetSkeletonFileFromName(It.IsAny<string>()),
                 Times.Never);
         }
+
+        [Test]
+        public void MeshExport_PreservesNegativeTangentHandedness()
+        {
+            var material = new WeightedMaterial
+            {
+                ModelName = "mesh",
+            };
+            var vertices = new[]
+            {
+                CreateTangentVertex(0, 0),
+                CreateTangentVertex(1, 0),
+                CreateTangentVertex(0, 1),
+            };
+            var rmvFile = new RmvFile
+            {
+                Header = new RmvFileHeader
+                {
+                    SkeletonName = "",
+                },
+                ModelList =
+                [
+                    [
+                        new RmvModel
+                        {
+                            Material = material,
+                            Mesh = new RmvMesh
+                            {
+                                VertexList = vertices,
+                                IndexList = [0, 1, 2],
+                            },
+                        },
+                    ],
+                ],
+            };
+            var settings = new RmvToGltfExporterSettings(
+                new PackFile("model.rigid_model_v2", new MemorySource([])),
+                [],
+                "model.gltf",
+                false,
+                false,
+                false,
+                false,
+                MirrorMesh: false);
+
+            var meshBuilder = new GltfMeshBuilder()
+                .Build(rmvFile, [], settings, willHaveSkeleton: false)
+                .Single();
+            var modelRoot = ModelRoot.CreateModel();
+            var mesh = modelRoot.CreateMesh(meshBuilder);
+            var tangents = mesh.Primitives.Single()
+                .GetVertexAccessor("TANGENT")!
+                .AsVector4Array();
+
+            Assert.That(tangents, Has.All.Matches<System.Numerics.Vector4>(
+                tangent => tangent.W == -1));
+        }
+
+        private static CommonVertex CreateTangentVertex(float x, float y) =>
+            new()
+            {
+                Position = new Microsoft.Xna.Framework.Vector4(x, y, 0, 1),
+                Normal = Microsoft.Xna.Framework.Vector3.UnitZ,
+                Tangent = Microsoft.Xna.Framework.Vector3.UnitX,
+                BiNormal = -Microsoft.Xna.Framework.Vector3.UnitY,
+                Uv = new Microsoft.Xna.Framework.Vector2(x, y),
+                BoneIndex = [],
+                BoneWeight = [],
+            };
 
         [Test]
         public void MissingTexture_StopsExportInsteadOfSilentlyOmittingIt()

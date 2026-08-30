@@ -275,8 +275,7 @@ public class GltfMaterialModeImportTests
         true,
         true,
         false,
-        20,
-        true);
+        20);
 
     private static string CreateModel(
         string directory,

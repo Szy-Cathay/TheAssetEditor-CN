@@ -21,12 +21,16 @@ public record AnimationBuilderSettings(
 
 public class AnimationBuilder
 {
+    private const long MaxAnimationTransformSamples = 5_000_000;
+
     public static AnimationFile Build(
         AnimationBuilderSettings settings,
         AnimationFile skeletonAnimFile,
         Animation animation,
-        Action<int, int>? reportProgress = null)
+        Action<int, int>? reportProgress = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!float.IsFinite(settings.KeysPerSecond) || settings.KeysPerSecond <= 0)
             throw new ArgumentOutOfRangeException(nameof(settings.KeysPerSecond), "动画采样率必须大于 0。");
         if (skeletonAnimFile.Bones.Length == 0)
@@ -34,17 +38,39 @@ public class AnimationBuilder
         if (skeletonAnimFile.AnimationParts.Count == 0 ||
             skeletonAnimFile.AnimationParts[0].DynamicFrames.Count == 0)
         {
-            throw new InvalidDataException("目标游戏骨架缺少绑定姿势，无法补全 glTF 的部分动画通道。");
+                throw new InvalidDataException("目标游戏骨架缺少绑定姿势，无法补全 glTF 的部分动画通道。");
+        }
+        if (animation.Channels.Count == 0)
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.EmptyAnimation"));
         }
 
         var keysPerSecond = settings.AutoDetectKeysPerSecond
             ? DetectSamplingRate(settings.ModelRoot, animation) ?? settings.KeysPerSecond
             : settings.KeysPerSecond;
         var keyInterval = 1.0f / keysPerSecond;
-        var intervalCount = Math.Max(
-            0,
-            (int)Math.Round(animation.Duration * keysPerSecond, MidpointRounding.AwayFromZero));
+        var roundedIntervalCount = Math.Round(
+            (double)animation.Duration * keysPerSecond,
+            MidpointRounding.AwayFromZero);
+        if (!double.IsFinite(roundedIntervalCount) ||
+            roundedIntervalCount > int.MaxValue - 1)
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.AnimationTooLarge"));
+        }
+
+        var intervalCount = Math.Max(0, (int)roundedIntervalCount);
         var keyCount = intervalCount + 1;
+        if ((long)keyCount * skeletonAnimFile.Bones.Length >
+            MaxAnimationTransformSamples)
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get(
+                    "GltfImporter.Error.AnimationTooLarge"));
+        }
 
         var newAnimFile = new AnimationFile
         {
@@ -70,6 +96,7 @@ public class AnimationBuilder
 
         for (var keyIndex = 0; keyIndex < keyCount; keyIndex++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var keyTime = keyIndex * keyInterval;
             var frame = new Frame();
             FillFrame(
