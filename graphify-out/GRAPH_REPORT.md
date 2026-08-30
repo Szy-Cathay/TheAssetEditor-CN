@@ -1,18 +1,13 @@
-# Graph Report - TheAssetEditor-CN  (2026-08-22)
+# Graph Report - TheAssetEditor-CN  (2026-08-30)
 
 ## Corpus Check
-- 2177 files · ~1,526,004 words
+- 92 files · ~1,538,805 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 24181 nodes · 56124 edges · 1001 communities (829 shown, 172 thin omitted)
-- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 4587 edges (avg confidence: 0.76)
+- 24468 nodes · 55719 edges · 1001 communities (829 shown, 172 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 4490 edges (avg confidence: 0.76)
 - Token cost: 0 input · 0 output
-
-## Graph Freshness
-- Built from commit: `04e9ffad`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Shared.Core.Services
@@ -43,7 +38,7 @@
 - AudioProjectViewerViewModel
 - CscEditorViewModel
 - CscElement
-- SaveWindow
+- Animation Retarget Saving
 - Rmv2MeshNode
 - Shared.ByteParsing
 - Shared.GameFormats.RigidModel
@@ -62,7 +57,7 @@
 - IEditorInterface
 - CombatMetaDataEditSession
 - IAudioEditorStateService
-- .Create
+- glTF Import Build Tests
 - Hotkey
 - Gizmo
 - FolderProjectHistoryService
@@ -98,7 +93,7 @@
 - GameSkeleton
 - .RebuildVertexBuffer
 - .ReadBytes
-- GameSkeleton
+- Skeleton Animation Remapping
 - RmvFile
 - .Parse
 - MountAnimationCreatorViewModel
@@ -109,7 +104,7 @@
 - SkeletonAnimationLookUpHelper
 - ExceptionInformation
 - .IntersectEdge
-- .Create
+- Folder Project Test Fixtures
 - BoneSelectionState
 - .Publish
 - MetaDataInspectionIndex
@@ -121,7 +116,7 @@
 - MeshDecimator.Math
 - .BuildRmvModelMaterial
 - Filter User Control
-- .InvokeWithThemeResources
+- Shared UI Resource Tests
 - UiAnimationMetadataFamilyGallery
 - KitbashModelGizmoComponent
 - SkeletonBoneAnimationResolverTests
@@ -136,9 +131,9 @@
 - MakeNodeEditableCommand
 - DependencyInjectionContainer
 - RenderEngineComponent
-- IDisposable
+- Test Resource Lifetimes
 - Equipment Dock Metadata
-- AnimationFile
+- Animation Mapping Core
 - UserControl
 - TransformUploadTests
 - MakeNodeEditableCommand
@@ -177,7 +172,7 @@
 - CAkAction_V136
 - .Create
 - ICapability
-- Getting vgmstream
+- AssetEditor.CN Project Knowledge
 - RmvMeshBuilder
 - AudioEditorFileService
 - AudioProjectMergerViewModel
@@ -189,7 +184,7 @@
 - ApplicationSettingsService
 - UserControl
 - AudioProjectExplorerViewModel
-- PackFileBrowserViewModel
+- Pack File Browser UI
 - Repository
 - ArcBallCamera
 - UserControl
@@ -211,7 +206,7 @@
 - Mesh Decimation Geometry
 - UiDesignSystemResourceTests
 - UI Theme Completion Tests
-- UserControl
+- Bone Mapping Views
 - MenuBarView
 - KitbashModelGizmoComponent
 - GltfImporter
@@ -233,7 +228,7 @@
 - Scene Object Reference UI
 - SelectionListWindow
 - PackFileContainer
-- UiAudioEditorFamilyGallery
+- Audio Editor UI Tests
 - BoneManager
 - SkeletonAnimationLookUpHelperTests
 - AudioProjectTreeNode
@@ -321,7 +316,7 @@
 - Kitbashing Load And Save Base
 - Shared Binary Parsing Test Project
 - .Execute
-- UserControl
+- Scene Explorer UI
 - ShaderTextureViewModel
 - AnimationFrame
 - AudioFilesExplorerViewModel
@@ -347,7 +342,7 @@
 - Folder Project History Workspace View
 - Updater View Model
 - StartupPackLoadingWindow
-- UserControl
+- Audio Files Explorer UI
 - VertexDebuggerViewModel
 - BaseComponent
 - SimpleDrawableNode
@@ -649,7 +644,7 @@
 - DependencyContainer
 - Project Rules and Architecture
 - Chinese Localization Tests
-- .CreateFromAnimationFile
+- Animation Retarget Tests
 - .GenerateHirc
 - .Capture
 - Editors Shared Core Brace Folding
@@ -1008,26 +1003,26 @@
 - PackConcurrencyTests
 
 ## God Nodes (most connected - your core abstractions)
-1. `Shared.Core.Services` - 334 edges
+1. `Shared.Core.Services` - 298 edges
 2. `ByteChunk` - 261 edges
-3. `Shared.Core.PackFiles.Models` - 254 edges
-4. `Shared.Core.PackFiles` - 236 edges
+3. `Shared.Core.PackFiles.Models` - 259 edges
+4. `Shared.Core.PackFiles` - 240 edges
 5. `ResourceDictionary` - 203 edges
-6. `IPackFileService` - 200 edges
-7. `Shared.Core.Settings` - 193 edges
-8. `Shared.Core.Events` - 193 edges
-9. `PackFile` - 181 edges
-10. `GameWorld.Core.SceneNodes` - 176 edges
+6. `IPackFileService` - 203 edges
+7. `Shared.Core.Events` - 182 edges
+8. `GameWorld.Core.SceneNodes` - 172 edges
+9. `FolderProjectVersionControlService` - 170 edges
+10. `Shared.Core.Settings` - 165 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `AssetEditor.CN Product Identity` --semantically_similar_to--> `Asset Editor Chinese Edition`  [INFERRED] [semantically similar]
-  README.md → CONTEXT.md
-- `Folder Projects and Local Git History` --semantically_similar_to--> `Folder Project`  [INFERRED] [semantically similar]
-  README.md → CONTEXT.md
 - `Legacy Release Notes and Roadmap` --semantically_similar_to--> `Legacy Development Backlog`  [INFERRED] [semantically similar]
   ReleaseNotes.txt → Notes.txt
 - `Retain Project Documentation` --semantically_similar_to--> `Stable Contract Documentation`  [INFERRED] [semantically similar]
   graphify-out/memory/query_20260806_220334_对了_你有了知识图谱后_项目文档中的各个文档还有保留的必要吗.md → docs/README.md
+- `AudioFilesExplorerView` --semantically_similar_to--> `音频编辑器与浏览器`  [INFERRED] [semantically similar]
+  graphify-out/memory/query_20260830_113311_有用户表示_音频编辑器中的音频文件夹浏览器会出现和之前一样的需要点击两下小箭头才能收起_点一下会回到.md → README.md
+- `TestComponent` --inherits--> `BaseComponent`  [EXTRACTED]
+  Testing/GameWorld.Core.Test/Components/Rendering/ArcBallCameraInputTests.cs → GameWorld/View3D/Components/ComponentBase.cs
 - `GraphItem` --references--> `AkBkHircType`  [EXTRACTED]
   Editors/Audio/Shared/Wwise/HircExploration/SoundParentStructureParser.cs → Shared/GameFiles/Wwise/Enums/Enums.cs
 
@@ -1035,6 +1030,7 @@
 - None detected.
 
 ## Hyperedges (group relationships)
+- **音频树展开器首次点击收起行为** — graphify_out_memory_query_20260830_113311_audiofilesexplorerview, graphify_out_memory_query_20260830_113311_expander, graphify_out_memory_query_20260830_113311_isexpanded, graphify_out_memory_query_20260830_113311_clickmode_release [EXTRACTED 1.00]
 - **WPF operation lifecycle coordination** — graphify_out_memory_query_20260808_211035____gltf_________________wpf_collectionview_______packfiledispatcherwriter, xaml_operationprogresswindowhost, graphify_out_memory_query_20260810_224924____ae____________________________________folderprojectcloseguard [INFERRED 0.75]
 - **Retarget preview gate history and current status** — graphify_out_memory_query_20260812_050331_issue_74_retarget_mapping_3d_preview_confirmation_naturalplaybackcompletiongate, graphify_out_memory_query_20260812_052535_issue_74_retarget_mapping_3d_preview_confirmation_sameanimationfinalrefresh, graphify_out_memory_query_20260812_063048_animation_retargeting_project_current_implementati_pr82retargetprojectreversion [INFERRED 0.75]
 - **Audio Project Conversion Integrity** — graphify_out_memory_query_20260815_134500____________________________________________________incremental_existing_project_merge, graphify_out_memory_query_20260815_143347_____________________________busy_bound_progress_and_shared_form_layout, graphify_out_memory_query_20260816_000649____________________bnk____wem_wav____bnk_and_akd_loudness_layers [INFERRED 0.85]
@@ -1043,7 +1039,7 @@
 - **Audio tree filter rendering and persisted semantics** — graphify_out_memory_query_20260815_020558_____________________________________treeviewitemcontainerstylebindings, graphify_out_memory_query_20260815_021032_____________________________________projectwidedialoguefilters, graphify_out_memory_query_20260815_022505____________________________________________________persistedcontenteditedfilter [INFERRED 0.85]
 - **Folder-project product and recovery flow** — graphify_out_memory_query_20260813_013151_ae_________git_______pack_____superview______folderprojectonlyeditableworkspace, graphify_out_memory_query_20260813_030436_issue__88__________________pack_________pack_______packfileservicerolegate, graphify_out_memory_query_20260813_043420_issue__89_____pack_______ipc__________externalpackworkflow, graphify_out_memory_query_20260813_061734_issue_90______________________folderprojectversioncontrolservice, graphify_out_memory_query_20260813_103309_issue__92_____________________saferestorecoordinator, graphify_out_memory_query_20260814_020550_issue__95_advanced_git_public_surface_production_c_advancedgitremovalboundary [INFERRED 0.85]
 - **Folder Project Lifecycle Safety** — graphify_out_memory_query_20260815_080900_ae__________mod_______________________________e____folder_project_scan_bottlenecks, graphify_out_memory_query_20260815_160517_________objectdisposedexception_folderprojectconta_remounted_container_reference_replacement, graphify_out_memory_query_20260816_183329_________asseteditor____________restore_point_workflow, graphify_out_memory_query_20260817_132233__________________________________repository_relative_history_portability, graphify_out_memory_query_20260818_015929____________________________________________pack____disk_persistence_vs_restore_history, graphify_out_memory_query_20260818_052923____pack____________________________________________restore_point_only_dirty_marker_clear, graphify_out_memory_query_20260818_152746________mod________________________activate_noncurrent_folder_project_command, graphify_out_memory_query_20260821_160041_______ae____mod______display_name_vs_directory_path [INFERRED 0.85]
-- **AssetEditor.CN Runtime Identity** — agents_asseteditor_cn_identity_boundary, context_asset_editor_cn, readme_asset_editor_cn_product_identity [INFERRED 0.95]
+- **AssetEditor.CN Runtime Identity** — agents_asseteditor_cn_identity_boundary, context_asset_editor_cn [INFERRED 0.95]
 - **Kitbash Editor Adaptive Workflow** — graphify_out_memory_query_20260816_225953_kitbasheditor_basic_layout_selection_transform_mat_selection_transform_material_workflow, graphify_out_memory_query_20260816_225953_kitbasheditor_toolbar_tools_and_child_windows_mode_sensitive_toolbar_tools, graphify_out_memory_query_20260816_234042_asseteditor___kitbasheditor___________________capability_driven_material_ui [INFERRED 0.95]
 - **Standard External glTF Import Contract** — context_standard_gltf_input, context_standard_gltf_material, context_external_owned_skeleton, context_atomic_import, editors_importexporteditor_test_importexport_testdata_gltf_readme_gltf_import_fixtures [INFERRED 0.95]
 - **Total War Animation Slot Vocabularies** — shared_embeddedresources_resources_animationslots_3kanimationslots_three_kingdoms_animation_slots, shared_embeddedresources_resources_animationslots_troyanimationslots_troy_animation_slots, shared_embeddedresources_resources_animationslots_warhammer2animationslots_warhammer_2_animation_slots, shared_embeddedresources_resources_animationslots_warhammer3animationslots_warhammer_3_animation_slots, shared_embeddedresources_resources_animationslots_warhammer3animationslots_dlc23_warhammer_3_dlc23_animation_slots, shared_embeddedresources_resources_animationslots_warhammer3animationslots_dlc24_warhammer_3_dlc24_animation_slots [INFERRED 0.95]
@@ -1052,7 +1048,7 @@
 
 ### Community 0 - "Shared.Core.Services"
 Cohesion: 0.02
-Nodes (68): OpenFolderProjectHistoryPanelEvent, FolderProjectCloseProgressStage, FolderProjectGitOperationCanceledException, ReleaseNoteItem, Editors.Reports.DeepSearch, Editor.VisualSkeletonEditor.DevConfig, Shared.Ui.BaseDialogs, Editors.Twui.DevConfig (+60 more)
+Nodes (76): OpenFolderProjectHistoryPanelEvent, FolderProjectCloseProgressStage, FolderProjectGitOperationCanceledException, ReleaseNoteItem, Editors.Reports.DeepSearch, Editor.VisualSkeletonEditor.DevConfig, Shared.Ui.BaseDialogs, Editors.Twui.DevConfig (+68 more)
 
 ### Community 1 - "GameWorld.Core.Services"
 Cohesion: 0.02
@@ -1060,7 +1056,7 @@ Nodes (58): GameWorld.Core.Rendering.RenderItems, GameWorld.Core.Components, Gam
 
 ### Community 2 - "Shared.GameFormats.AnimationMeta.Parsing"
 Cohesion: 0.02
-Nodes (63): Shared.ByteParsing, Editors.AnimationMeta.SuperView.Visualisation.Rules, AnimationEditor.MountAnimationCreator.ViewModels, Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFragmentConverter, Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinWh3Converter, Shared.GameFormats.AnimationPack, Editors.Shared.Core, Editors.AnimationMeta.SuperView.Editing (+55 more)
+Nodes (70): Shared.ByteParsing, Editors.AnimationMeta.SuperView.Visualisation.Rules, AnimationEditor.MountAnimationCreator.ViewModels, Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFragmentConverter, Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinWh3Converter, Shared.GameFormats.AnimationPack, Editors.Shared.Core, Editors.AnimationMeta.SuperView.Editing (+62 more)
 
 ### Community 3 - ".GetPropertyTypeSize"
 Cohesion: 0.02
@@ -1084,7 +1080,7 @@ Nodes (53): Shared.GameFormats.WsModel, GameWorld.Core.Test.Rendering.Shaders.Me
 
 ### Community 8 - "IPackFileService"
 Cohesion: 0.03
-Nodes (56): List, string, uint, BatchProcessorService, MountAnimationGeneratorService, int, AnimationBatchExportViewModel, PackFileListItem (+48 more)
+Nodes (57): List, string, uint, BatchProcessorService, MountAnimationGeneratorService, int, AnimationBatchExportViewModel, PackFileListItem (+49 more)
 
 ### Community 9 - "ByteChunk"
 Cohesion: 0.05
@@ -1162,8 +1158,8 @@ Nodes (28): FolderProjectHistoryProgressAdapter, OpenFolderProjectCommand, Func,
 Cohesion: 0.06
 Nodes (29): AttachGroupInfo, Begin, IEnumerable, List, Matrix, string, Vector3, CscElement (+21 more)
 
-### Community 28 - "SaveWindow"
-Cohesion: 0.04
+### Community 28 - "Animation Retarget Saving"
+Cohesion: 0.03
 Nodes (44): AnimationFormat, BatchOverwriteExisting, BatchTargetFolder, BatchUseSelectedFolder, BatchUseSourcePath, ExportScaledMesh, PossibleAnimationFormats, SavePrefix (+36 more)
 
 ### Community 29 - "Rmv2MeshNode"
@@ -1175,7 +1171,7 @@ Cohesion: 0.04
 Nodes (26): Editors.Audio.Shared.Wwise.Generators.Hirc.V136, Editors.Audio.Shared.Wwise.Generators.Hirc, Shared.GameFormats.Wwise.Enums, Shared.GameFormats.Wwise.Hirc.V136, Shared.GameFormats.Wwise.Hirc.V136.Shared, Shared.GameFormats.Wwise.Hirc, Shared.GameFormats.Wwise.Hirc.V112, Editors.Audio.AudioExplorer (+18 more)
 
 ### Community 31 - "Shared.GameFormats.RigidModel"
-Cohesion: 0.06
+Cohesion: 0.04
 Nodes (34): Test.ImportExport.Exporting.Presentation, Editors.ImportExport.Exporting.Exporters.RmvToGltf, Editors.ImportExport.Exporting.Exporters.DdsToMaterialPng, Editors.ImportExport.Exporting.Presentation, Editors.ImportExport.Importing.Importers.GltfToRmv.Helper, Shared.Ui.BaseDialogs.SelectionListDialog, Shared.TestUtility, Editors.ImportExport.Misc (+26 more)
 
 ### Community 32 - "SettingsViewModel"
@@ -1187,7 +1183,7 @@ Cohesion: 0.04
 Nodes (49): PlaybackStatus, PlayPauseLabel, WaveformPixelHeight, WaveformPixelWidth, WaveformVisualiserLabel, CacheWaveformRequestedEvent, PlayAudioRequestedEvent, WaveformCacheInvalidatedEvent (+41 more)
 
 ### Community 34 - "PackFile"
-Cohesion: 0.04
+Cohesion: 0.03
 Nodes (41): CAVp8Exporter, IEnumerable, ExportFileContextMenuHelper, bool, IEnumerable, ObservableCollection, RelayCommand, string (+33 more)
 
 ### Community 35 - "SkeletonEditorViewModel"
@@ -1223,7 +1219,7 @@ Cohesion: 0.07
 Nodes (20): BoneComponentContext, BoneContext, BoneDisplayScenario, ComponentContext, BoneScene, DirectContext, KeyFrame, Keys (+12 more)
 
 ### Community 43 - "RenderingTechnique"
-Cohesion: 0.04
+Cohesion: 0.03
 Nodes (45): BasicEffect, Effect, GraphicsDevice, Texture2D, VertexPositionColor, SelectionMaskRenderItem, SolidMeshRenderItem, GraphicsDevice (+37 more)
 
 ### Community 44 - "IEditorInterface"
@@ -1238,8 +1234,8 @@ Nodes (30): DocumentHistory, Func, IEnumerable, Matrix, Quaternion, Test, TestCa
 Cohesion: 0.05
 Nodes (39): SetAudioFilesCommand, DataRow, List, AddRowsToViewerCommand, DataRow, AddActionEventCommand, AddDialogueEventByPasteCommand, AddDialogueEventCommand (+31 more)
 
-### Community 47 - ".Create"
-Cohesion: 0.08
+### Community 47 - "glTF Import Build Tests"
+Cohesion: 0.06
 Nodes (25): SetUp, Test, Vector2, Vector3, VertexBuilder, VertexJoints4, VertexPositionNormalTangent, VertexTexture1 (+17 more)
 
 ### Community 48 - "Hotkey"
@@ -1351,7 +1347,7 @@ Cohesion: 0.07
 Nodes (23): IAudioEditorStateService, ActionEventService, IEnumerable, HashSet, IdGenerator, Result, Func, HashSet (+15 more)
 
 ### Community 75 - "WsModelMaterialFile"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (20): Instance, Vector2, Vector3, Vector4, CapabilityHelper, UiVertexFormat, Vector3, VertexFormat (+12 more)
 
 ### Community 76 - "AkDecisionTree_V136"
@@ -1363,7 +1359,7 @@ Cohesion: 0.05
 Nodes (27): Shared.Ui.BaseDialogs.ToolSelector, Editors.Twui.Editor.Presentation, Editors.AnimatioReTarget, Shared.GameFormats, Editor.VisualSkeletonEditor, Editors.Twui.Editor, Editors.TextureEditor.ViewModels, Editors.CscEditor.ViewModels (+19 more)
 
 ### Community 78 - "UiRemainingEditorFamilyGallery"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (23): BlockingGltfImporterViewModel, NativeRectangle, GalleryModel, GalleryValue, NativeRectangle, UiRemainingEditorFamilyGallery, Brush, DependencyObject (+15 more)
 
 ### Community 79 - "ITextConverter"
@@ -1382,8 +1378,8 @@ Nodes (18): List, SelectionManager, DeleteFaceCommand, IndexRemapping, BoundingB
 Cohesion: 0.05
 Nodes (32): Shared.GameFormats.Wwise.Wem.V132, string, uint, AkdChunk, List, string, CueChunk, CuePoint (+24 more)
 
-### Community 83 - "GameSkeleton"
-Cohesion: 0.07
+### Community 83 - "Skeleton Animation Remapping"
+Cohesion: 0.05
 Nodes (21): IEnumerable, Quaternion, AnimationRemapperService, BoneHelper_new, ExportHelper, Matrix, Frame, long (+13 more)
 
 ### Community 84 - "RmvFile"
@@ -1395,7 +1391,7 @@ Cohesion: 0.05
 Nodes (26): Shared.GameFormats.Wwise, Shared.GameFormats.Wwise.Bkhd, Editors.Audio.Shared.Wwise.Generators.Bkhd, Shared.GameFormats.Wwise.Didx, Shared.GameFormats.Wwise.Stid, BkhdChunkGenerator, ChunkHeaderGenerator, List (+18 more)
 
 ### Community 86 - "MountAnimationCreatorViewModel"
-Cohesion: 0.06
+Cohesion: 0.05
 Nodes (25): MountAnimationCreatorViewModel, List, ObservableCollection, SelectionManager, Type, MountLinkViewModel, Action, List (+17 more)
 
 ### Community 87 - "MetaDataFileParser"
@@ -1403,12 +1399,12 @@ Cohesion: 0.05
 Nodes (29): List, Test, Type, MetaDataFileParserTests, UnknownMetadataDatabase, NewEntryCommand, ILogger, SaveCommand (+21 more)
 
 ### Community 88 - "ImporterCoreViewModel"
-Cohesion: 0.05
-Nodes (30): Func, Exception, IReadOnlyList, HumanoidScaleImportSummary, ImportResult, MaskedMaterialImportSummary, MaterialImportSummary, SkippedMaterialSemantic (+22 more)
+Cohesion: 0.04
+Nodes (31): Func, Exception, IReadOnlyList, HumanoidScaleImportSummary, ImportResult, MaskedMaterialImportSummary, MaterialImportSummary, SkippedMaterialSemantic (+23 more)
 
 ### Community 89 - "PackFileBrowserViewModel"
-Cohesion: 0.09
-Nodes (23): FolderProjectTreeState, IContextMenuBuilder, IDropTarget, SearchFilter, FolderProjectRestorePointCreatedEvent, bool, Dictionary, FolderProjectHistoryStatus (+15 more)
+Cohesion: 0.06
+Nodes (33): FolderProjectTreeState, IContextMenuBuilder, IDropTarget, SearchFilter, FolderProjectRestorePointCreatedEvent, bool, Dictionary, FolderProjectHistoryStatus (+25 more)
 
 ### Community 90 - "AudioProjectFile"
 Cohesion: 0.08
@@ -1426,9 +1422,9 @@ Nodes (26): Test.Shared.Core.ErrorHandling, Stopwatch, uint, ApplicationStateRec
 Cohesion: 0.10
 Nodes (21): BoundingBox, BoundingFrustum, float, int, IReadOnlyList, IReadOnlySet, List, Matrix (+13 more)
 
-### Community 94 - ".Create"
-Cohesion: 0.11
-Nodes (8): GameTypeEnum, IGlobalEventHub, Mock, SetUp, string, Test, TestCase, FolderProjectPackFileServiceTests
+### Community 94 - "Folder Project Test Fixtures"
+Cohesion: 0.10
+Nodes (9): PackFileTreeOperationsTests, GameTypeEnum, IGlobalEventHub, Mock, SetUp, string, Test, TestCase (+1 more)
 
 ### Community 95 - "BoneSelectionState"
 Cohesion: 0.07
@@ -1451,8 +1447,8 @@ Cohesion: 0.05
 Nodes (55): AllowDeltaScale_v10, Alpha_v10, Bearing_v10, BoundingVolumeOverride_v10, Vector3, CameraShakePos, CameraShakeScale, CannotDismember (+47 more)
 
 ### Community 100 - "Themes Inputs Theme"
-Cohesion: 0.05
-Nodes (54): CommonStates, Determinate, Disabled, Focused, FocusStates, Indeterminate, MouseOver, Normal (+46 more)
+Cohesion: 0.04
+Nodes (55): CommonStates, Determinate, Disabled, Focused, FocusStates, Indeterminate, MouseOver, Normal (+47 more)
 
 ### Community 101 - "AssetEditorIpcServerTests"
 Cohesion: 0.14
@@ -1472,14 +1468,14 @@ Nodes (33): Dictionary, ImageProcessorFactory, Dictionary, GltfImporterSettings,
 
 ### Community 105 - "Filter User Control"
 Cohesion: 0.04
-Nodes (48): HasSelectedItem, OnSearch, SearchItems, Vector3.X.TextValue, Vector3.Y.TextValue, Vector3.Z.TextValue, AudioEditor, SuperViewRoot (+40 more)
+Nodes (49): HasSelectedItem, OnSearch, SearchItems, Vector3.X.TextValue, Vector3.Y.TextValue, Vector3.Z.TextValue, AudioEditor, SuperViewRoot (+41 more)
 
-### Community 106 - ".InvokeWithThemeResources"
-Cohesion: 0.08
+### Community 106 - "Shared UI Resource Tests"
+Cohesion: 0.06
 Nodes (20): Button, ButtonBase, ControlTemplate, ScaleTransform, Setter, Storyboard, NamedOption, PressStateTestButton (+12 more)
 
 ### Community 107 - "UiAnimationMetadataFamilyGallery"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (20): CombatMetaDataPreviewCategory, FontFamily, GalleryModel, MetaDataProblemListViewModel, MetaDataTimelineMarkerKind, MetaDataTimelineViewModel, MetaDataTimeRange, ParsedMetadataAttribute (+12 more)
 
 ### Community 108 - "KitbashModelGizmoComponent"
@@ -1534,17 +1530,17 @@ Nodes (28): DependencyInjectionContainer, IServiceCollection, IServiceCollection
 Cohesion: 0.08
 Nodes (22): GameTime, bool, float, int, CscPlaybackContext, Color, Matrix, Vector3 (+14 more)
 
-### Community 121 - "IDisposable"
-Cohesion: 0.04
-Nodes (25): BatchTestContext, TemporaryDirectory, BoneComponentContext, FailingModalContext, ModalContext, IDisposable, Cursor, WaitCursor (+17 more)
+### Community 121 - "Test Resource Lifetimes"
+Cohesion: 0.03
+Nodes (27): BatchTestContext, TemporaryDirectory, BoneComponentContext, FailingModalContext, ModalContext, IDisposable, Cursor, WaitCursor (+19 more)
 
 ### Community 122 - "Equipment Dock Metadata"
 Cohesion: 0.07
 Nodes (52): DockEquipment, DockEquipment_v0, DockEquipment_v2, DockEquipment_v3, DockEquipmentBack_v10, DockEquipmentBack_v11, DockEquipmentBack_v11_Troy, DockEquipmentBack_v14_Troy (+44 more)
 
-### Community 123 - "AnimationFile"
-Cohesion: 0.06
-Nodes (28): AnimationBoneMapping, AnimationBoneMappingType, AnimationHeader, AnimationV8OptimizationData, BoneInfo, Frame, StringBuilder, ModelRoot (+20 more)
+### Community 123 - "Animation Mapping Core"
+Cohesion: 0.05
+Nodes (29): AnimationBoneMapping, AnimationBoneMappingType, AnimationHeader, AnimationV8OptimizationData, BoneInfo, Frame, StringBuilder, HumanoidBoneMapper (+21 more)
 
 ### Community 124 - "UserControl"
 Cohesion: 0.04
@@ -1599,7 +1595,7 @@ Cohesion: 0.08
 Nodes (17): AssetPlayerItem, bool, float, List, ObservableCollection, SceneObject, Visibility, AnimationPlayerViewModel (+9 more)
 
 ### Community 137 - "IStandardDialogs"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (22): List, SceneManager, SelectionManager, WsMaterialViewModel, List, CapabilityMaterialFactory, CapabilityMaterialsEnum, ILogger (+14 more)
 
 ### Community 138 - "MetaDataEditorViewModel"
@@ -1651,7 +1647,7 @@ Cohesion: 0.08
 Nodes (16): bool, GameTime, Matrix, Quaternion, TargetAdapter, Vector3, CscGizmoComponent, TargetAdapter (+8 more)
 
 ### Community 150 - "glTF Skeleton Import"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (17): Dictionary, Frame, HashSet, IReadOnlyDictionary, IReadOnlyList, List, Matrix4x4, ModelRoot (+9 more)
 
 ### Community 151 - "BitWriter"
@@ -1663,7 +1659,7 @@ Cohesion: 0.07
 Nodes (26): EnablePackFileCorruptionDetectionCheckBox, OutputFolderTextBox, ProjectFolderTextBox, Window, FolderProjectSetupWindow, RoutedEventArgs, TextBox, List (+18 more)
 
 ### Community 153 - "CscAnimationComponent"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (21): CompletedLoops, Dictionary, double, Frame, GameTime, ImageSource, List, Matrix (+13 more)
 
 ### Community 154 - "AnimPackStructureCommandTests"
@@ -1698,9 +1694,9 @@ Nodes (5): FolderProjectSettings, ManualResetEventSlim, Test, BlockingDataSource
 Cohesion: 0.06
 Nodes (21): Matrix, Message, Result, AnimationCapability, Message, Result, ICapability, Message (+13 more)
 
-### Community 162 - "Getting vgmstream"
-Cohesion: 0.06
-Nodes (43): Restore-Build-Test Release Pipeline, Run-Unit-Test Workflow, AssetEditor.CN Identity Boundary, Folder Project State Separation, Git Operation Authorization Boundary, Risk-Scoped Release Validation, TheAssetEditor-CN Repository Governance, AI Domain Glossary (+35 more)
+### Community 162 - "AssetEditor.CN Project Knowledge"
+Cohesion: 0.03
+Nodes (68): Restore-Build-Test Release Pipeline, Run-Unit-Test Workflow, AssetEditor.CN Identity Boundary, Folder Project State Separation, Git Operation Authorization Boundary, Risk-Scoped Release Validation, TheAssetEditor-CN Repository Governance, AI Domain Glossary (+60 more)
 
 ### Community 163 - "RmvMeshBuilder"
 Cohesion: 0.07
@@ -1719,7 +1715,7 @@ Cohesion: 0.14
 Nodes (12): ChildId, Children, Test, CscNestedElementTests, Test, CscRealSampleTests, IReadOnlyList, Test (+4 more)
 
 ### Community 167 - "RenderEngineSelectionMaskOffscreenTests"
-Cohesion: 0.12
+Cohesion: 0.08
 Nodes (15): GameTime, Color, Func, IReadOnlyList, Test, TestCase, RenderEngineSelectionMaskOffscreenTests, RenderBuckedId (+7 more)
 
 ### Community 168 - "SaveService"
@@ -1746,9 +1742,9 @@ Nodes (43): AddEntryCommand, AnimationFile, AnimationFileName, BlendInTime, Copy
 Cohesion: 0.07
 Nodes (40): AudioProjectExplorerLabel, AudioProjectTree, CollapseOrExpandTreeCommand, DialogueEventFilterDisplayText, DialogueEventProfiles, DialogueEventTypes, IsDialogueEventFilterEnabled, IsVisible (+32 more)
 
-### Community 174 - "PackFileBrowserViewModel"
-Cohesion: 0.05
-Nodes (34): CaWemRefreshDetail, CaWemRefreshIsIndeterminate, CaWemRefreshMaximum, CaWemRefreshValue, BoolToChangedPrefixStr, SortedCollectionViewSource, DataContext.ContextMenu, DataContext.DoubleClickCommand (+26 more)
+### Community 174 - "Pack File Browser UI"
+Cohesion: 0.04
+Nodes (41): ., CaWemRefreshDetail, CaWemRefreshIsIndeterminate, CaWemRefreshMaximum, CaWemRefreshValue, ClearTextCommand, Command, ContextMenu (+33 more)
 
 ### Community 175 - "Repository"
 Cohesion: 0.08
@@ -1834,9 +1830,9 @@ Nodes (20): Orientation, TestApplication, SharedGridSplitterStyleTests, TestCase
 Cohesion: 0.09
 Nodes (15): RadioButton, Action, FontFamily, FontWeight, ResourceDictionary, SolidColorBrush, ThemesController, DependencyProperty (+7 more)
 
-### Community 196 - "UserControl"
-Cohesion: 0.06
-Nodes (33): BoneManager.Bones, BoneManager.SelectedBone, BoneVisualScale, Children, ComponentManager.SelectedComponent, ComponentManager.ToggleSelectedCommand, HasMapping, IsTechSkeleton (+25 more)
+### Community 196 - "Bone Mapping Views"
+Cohesion: 0.05
+Nodes (39): BoneManager.ApplyHumanoidMappingCommand, BoneManager.Bones, BoneManager.MappingSummary, BoneManager.SaveCharacterProfileCommand, BoneManager.SelectedBone, BoneVisualScale, Children, ComponentManager.SelectedComponent (+31 more)
 
 ### Community 197 - "MenuBarView"
 Cohesion: 0.07
@@ -1847,7 +1843,7 @@ Cohesion: 0.08
 Nodes (9): bool, GameTime, SelectionManager, AnimationBoneGizmoComponent, bool, GameTime, ILogger, SelectionManager (+1 more)
 
 ### Community 199 - "GltfImporter"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (21): Animation, ICollection, IEnumerable, ILogger, IProgress, IReadOnlyList, List, ModelRoot (+13 more)
 
 ### Community 200 - ".GetEditablePack"
@@ -1868,7 +1864,7 @@ Nodes (17): ExtentionInfo, ILogger, List, Type, EditorDatabase, IEditorDatabase,
 
 ### Community 204 - "RmvToGltfImporterViewModel"
 Cohesion: 0.07
-Nodes (34): AnimationKeysPerSecond, AutoDetectAnimationKeysPerSecond, AutoScaleHumanoid, CanEditAnimationKeysPerSecond, ConvertFromBlenderMaterialMap, ConvertNormalTextureToOrange, ImportAnimations, ImportMaterials (+26 more)
+Nodes (25): AnimationKeysPerSecond, AutoDetectAnimationKeysPerSecond, AutoScaleHumanoid, CanEditAnimationKeysPerSecond, ConvertFromBlenderMaterialMap, ConvertNormalTextureToOrange, ImportAnimations, ImportMaterials (+17 more)
 
 ### Community 205 - "MeshFitterViewModel"
 Cohesion: 0.08
@@ -1895,7 +1891,7 @@ Cohesion: 0.13
 Nodes (11): LoadedEditorHarness, AnimPackDirtyStateTests, LoadedEditorHarness, AnimationBinWh3, Func, IFileSaveService, ISkeletonAnimationLookUpHelper, Mock (+3 more)
 
 ### Community 211 - "FolderProjectTreeStateTests"
-Cohesion: 0.17
+Cohesion: 0.14
 Nodes (10): FolderProjectTreeStateTests, Apartment, IEnumerable, IFolderProjectHistoryService, List, PackFileContainer, Task, Test (+2 more)
 
 ### Community 212 - "UiModelKitbashFamilyGallery"
@@ -1911,8 +1907,8 @@ Cohesion: 0.08
 Nodes (19): ConditionalWeakTable, DwmSetWindowAttributeDelegate, MessageDialogButtonSet, DarkTitleBarHelper, Registration, DllImport, EventArgs, int (+11 more)
 
 ### Community 215 - "Scene Object Reference UI"
-Cohesion: 0.06
-Nodes (32): Data.MeshName.Value, Data.ShowMesh.Value, Data.ShowSkeleton.Value, Data.SkeletonName.Value, FragAndSlotSelection.AnimationFileName, FragAndSlotSelection.FragmentList.Filter, FragAndSlotSelection.FragmentList.SelectedItem, FragAndSlotSelection.FragmentList.Values (+24 more)
+Cohesion: 0.05
+Nodes (40): BoolToCollapsedConverter, Data.MeshName.Value, Data.ShowMesh.Value, Data.ShowSkeleton.Value, Data.SkeletonName.Value, FragAndSlotSelection.AnimationFileName, FragAndSlotSelection.FragmentList.Filter, FragAndSlotSelection.FragmentList.SelectedItem (+32 more)
 
 ### Community 216 - "SelectionListWindow"
 Cohesion: 0.07
@@ -1922,13 +1918,13 @@ Nodes (22): Window, ControllerHostWindow, EventArgs, SearchTextBox, Window, Sele
 Cohesion: 0.10
 Nodes (11): FolderProjectReattachMode, TestPackFileService, Exception, GameInformation, IReadOnlyCollection, IReadOnlyList, List, PackFile (+3 more)
 
-### Community 218 - "UiAudioEditorFamilyGallery"
-Cohesion: 0.10
-Nodes (15): AudioFilesTreeNode, SampleModel, SampleModel, UiAudioEditorFamilyGallery, AudioProjectTreeNode, DependencyObject, FrameworkElement, IEnumerable (+7 more)
+### Community 218 - "Audio Editor UI Tests"
+Cohesion: 0.08
+Nodes (17): AudioFilesTreeNode, SampleModel, AudioFilesExplorerInteractionTests, AudioFilesExplorerTestModel, SampleModel, UiAudioEditorFamilyGallery, AudioProjectTreeNode, DependencyObject (+9 more)
 
 ### Community 219 - "BoneManager"
-Cohesion: 0.10
-Nodes (16): ObservableCollection, RelayCommand, BoneManager, SkeletonInfo, bool, float, int, ObservableCollection (+8 more)
+Cohesion: 0.06
+Nodes (19): ObservableCollection, RelayCommand, BoneManager, SkeletonInfo, CharacterRetargetProfile, CharacterRetargetProfileDocument, CharacterRetargetProfileStore, bool (+11 more)
 
 ### Community 220 - "SkeletonAnimationLookUpHelperTests"
 Cohesion: 0.18
@@ -1983,7 +1979,7 @@ Cohesion: 0.12
 Nodes (11): Guid, CancellationToken, ILogger, List, Task, WSourcesWrapper, AudioEditorCompilerTests, RecordingProgress (+3 more)
 
 ### Community 233 - "glTF PBR Material Tests"
-Cohesion: 0.16
+Cohesion: 0.15
 Nodes (15): Action, Color, DXGI_FORMAT, IReadOnlyList, MaterialBuilder, ModelRoot, Scene, SetUp (+7 more)
 
 ### Community 234 - "ArcBallCamera"
@@ -2059,7 +2055,7 @@ Cohesion: 0.07
 Nodes (19): KeyFrame, AnimationPart, List, Quaternion, Vector3, KeyFrame, bool, int (+11 more)
 
 ### Community 254 - "AnimatedBone"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (11): ObservableCollection, Vector3, AnimatedBone, IEnumerable, List, ObservableCollection, Regex, AnimatedBoneHelper (+3 more)
 
 ### Community 255 - "Audio Explorer Tests"
@@ -2091,7 +2087,7 @@ Cohesion: 0.08
 Nodes (16): ResetCameraCommand, ICommand, ObservableCollection, EditorHost, ILogger, List, SceneManager, SelectionManager (+8 more)
 
 ### Community 262 - "Import Export Editor glTF Mesh"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (19): Matrix, Matrix4x4, Quaternion, Vector2, Vector3, Vector4, VecConv, Func (+11 more)
 
 ### Community 263 - "MenuBarViewModel"
@@ -2112,7 +2108,7 @@ Nodes (16): MenuItem, StackPanel, ResourceRow, UiCommonControlGallery, Border, B
 
 ### Community 267 - "Kitbash UI Theme"
 Cohesion: 0.07
-Nodes (30): IsSelected, CopyActionCommand, DeleteActionCommand, IsDecodedCorrectly, MoveDownActionCommand, MoveUpActionCommand, NewActionCommand, PasteActionCommand (+22 more)
+Nodes (34): IsSelected, CopyActionCommand, DeleteActionCommand, IsDecodedCorrectly, MoveDownActionCommand, MoveUpActionCommand, NewActionCommand, PasteActionCommand (+26 more)
 
 ### Community 268 - "AnimSetTableEditorView"
 Cohesion: 0.09
@@ -2167,7 +2163,7 @@ Cohesion: 0.09
 Nodes (26): Distance_v10, Distance_v2, Vector3, FaceFX_v2, FacePose, FacePose_v2, SoundAttackType_v3, SoundDefendType_v10 (+18 more)
 
 ### Community 281 - "Context Menu Item 2"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (16): IEnumerable, ObservableCollection, TreeNode, ContextMenuBuilder, ContextMenuFactory, ContextMenuType, IContextMenuBuilder, ICommand (+8 more)
 
 ### Community 282 - "SkinAnimationRetargeter"
@@ -2259,20 +2255,20 @@ Cohesion: 0.16
 Nodes (12): Adv, Test, LoadAndSave_AttachmentPoints, Test, LoadAndSave_RmvMaterials, Editor, Runner, LoadAndSaveBase (+4 more)
 
 ### Community 304 - "Shared Binary Parsing Test Project"
-Cohesion: 0.09
-Nodes (21): net10.0-windows, Microsoft.NET.Sdk, MonoGame.Content.Builder.Task (3.8.4.1), Serilog (4.3.1), SharpCompress (0.50.1), Libuv (1.10.0), MonoGame.Framework.WindowsDX (3.8.4.1), coverlet.collector (6.0.2) (+13 more)
+Cohesion: 0.08
+Nodes (23): net10.0-windows, Microsoft.NET.Sdk, net10.0-windows, Microsoft.NET.Sdk, MonoGame.Content.Builder.Task (3.8.4.1), Serilog (4.3.1), SharpCompress (0.50.1), Libuv (1.10.0) (+15 more)
 
 ### Community 305 - ".Execute"
 Cohesion: 0.12
 Nodes (16): CreateFolderProjectCommand, FolderProjectImportDialogs, FolderProjectProgressResult, FolderProjectProgressRunner, FolderProjectSetupDialogResult, FolderProjectSetupDialogs, IFolderProjectImportDialogs, IFolderProjectProgressRunner (+8 more)
 
-### Community 306 - "UserControl"
-Cohesion: 0.08
-Nodes (26): Command, Content.IsExpanded, Content.IsVisible, Content.Name, IconKindConverter, RadioButtonGroupConverter, DataContext, DataContext.Content (+18 more)
+### Community 306 - "Scene Explorer UI"
+Cohesion: 0.09
+Nodes (25): Command, Content.IsExpanded, Content.IsVisible, Content.Name, IconKindConverter, RadioButtonGroupConverter, DataContext, DataContext.Content (+17 more)
 
 ### Community 307 - "ShaderTextureViewModel"
-Cohesion: 0.09
-Nodes (20): AdornedElement.(Validation.Errors)[0].ErrorContent, HandleBrowseTextureCommand, HandleClearTextureCommand, HandlePreviewTextureCommand, ShouldRenderTexture, (Validation.Errors)[0].ErrorContent, UserControl, Path (+12 more)
+Cohesion: 0.10
+Nodes (15): AdornedElement.(Validation.Errors)[0].ErrorContent, HandleBrowseTextureCommand, HandleClearTextureCommand, HandlePreviewTextureCommand, ShouldRenderTexture, (Validation.Errors)[0].ErrorContent, UserControl, Path (+7 more)
 
 ### Community 308 - "AnimationFrame"
 Cohesion: 0.08
@@ -2287,11 +2283,11 @@ Cohesion: 0.14
 Nodes (12): DependencyObject, IEnumerable, IServiceProvider, OneTimeSetUp, string, Test, TestCase, TextBox (+4 more)
 
 ### Community 311 - ".CreateSkeleton"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (18): Quaternion, Vector3, Vector4, GlobalSceneTransforms, ModelRoot, RmvToGltfExporterSettings, Scene, GltfSkeletonBuilder (+10 more)
 
 ### Community 312 - "GltfExternalAnimationImportTests"
-Cohesion: 0.15
+Cohesion: 0.14
 Nodes (13): Action, Directory, ModelRoot, Node, SetUp, Skeleton, Test, TestCase (+5 more)
 
 ### Community 313 - "TransformToolViewModel"
@@ -2327,11 +2323,11 @@ Cohesion: 0.11
 Nodes (15): Shared.GameFormats.Twui.Data, Editors.Twui.Editor.Events, Shared.GameFormats.Twui, Shared.GameFormats.Twui.Data.DataTypes, RedrawTwuiEvent, List, Hierarchy, HierarchyItem (+7 more)
 
 ### Community 322 - "BoneMappingViewModel"
-Cohesion: 0.13
+Cohesion: 0.11
 Nodes (8): AssetEditorWindow, RoutedEventArgs, BoneMappingWindow, List, ReRiggingViewModel, BoneMappingViewModel, ObservableCollection, RemappedAnimatedBoneConfiguration
 
 ### Community 323 - "Import Export Editor glTF Texture"
-Cohesion: 0.16
+Cohesion: 0.12
 Nodes (10): Dictionary, List, RmvToGltfExporterSettings, GltfTextureHandler, IGltfTextureHandler, MaterialBuilderTextureInput, string, Test (+2 more)
 
 ### Community 324 - "Hotkey"
@@ -2366,9 +2362,9 @@ Nodes (19): UpdaterViewModel, CloseWindowActionCommand, ReleaseNotesItems, Updat
 Cohesion: 0.12
 Nodes (15): CheckGamePathButton, ExitButton, FailurePanel, RetryButton, Window, StartupPackLoadingWindow, Action, bool (+7 more)
 
-### Community 332 - "UserControl"
-Cohesion: 0.08
-Nodes (24): AddToAudioFilesCommand, AudioFilesExplorerLabel, FileName, FilterQuery, IsAddAudioFilesButtonEnabled, IsSetAudioFilesButtonEnabled, SetAudioFilesCommand, FilterTextBoxItem (+16 more)
+### Community 332 - "Audio Files Explorer UI"
+Cohesion: 0.09
+Nodes (22): AddToAudioFilesCommand, AudioFilesExplorerLabel, FileName, FilterQuery, IsAddAudioFilesButtonEnabled, IsSetAudioFilesButtonEnabled, SetAudioFilesCommand, FilterTextBoxItem (+14 more)
 
 ### Community 333 - "VertexDebuggerViewModel"
 Cohesion: 0.09
@@ -2475,7 +2471,7 @@ Cohesion: 0.13
 Nodes (14): Color, ContentManager, Effect, float, GraphicsDevice, int, Matrix, SetUp (+6 more)
 
 ### Community 359 - "PackFileBrowserViewModel"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (16): bool, Func, PackFileContainer, BeforePackFileContainerRemovedEvent, FolderProjectChangedEvent, PackFileContainerAddedEvent, PackFileContainerFilesAddedEvent, PackFileContainerFilesRemovedEvent (+8 more)
 
 ### Community 360 - "UserControl"
@@ -2499,7 +2495,7 @@ Cohesion: 0.09
 Nodes (21): EmissiveDirection, EmissiveDistortionTexture, EmissiveDistortStrength, EmissiveFresnelStrength, EmissivePulseSpeed, EmissivePulseStrength, EmissiveSpeed, EmissiveStrength (+13 more)
 
 ### Community 365 - "ImageInformation"
-Cohesion: 0.15
+Cohesion: 0.13
 Nodes (12): D3D10ResourceDimension, DdsPixelFormat, DxgiFormat, Texture2D, IImage, ImageInformation, GraphicsDevice, IImage (+4 more)
 
 ### Community 366 - "NotifyPropertyChangedImpl"
@@ -2539,12 +2535,12 @@ Cohesion: 0.11
 Nodes (10): ICAkSwitchPackage, List, ICAkAction, ICAkActorMixer, ICAkEvent, ICAkLayerCntr, ICAkMusicTrack, ICAkRanSeqCntr (+2 more)
 
 ### Community 375 - "WPF Popup Template Part"
-Cohesion: 0.12
-Nodes (22): Expander, HeaderSite, OverflowButton, OverflowPopup, PART_Popup, toggleButton, IsSubmenuOpen, Popup (+14 more)
+Cohesion: 0.10
+Nodes (24): Expander, HeaderSite, OverflowButton, OverflowPopup, PART_Popup, toggleButton, IsSubmenuOpen, Popup (+16 more)
 
 ### Community 376 - "Themes Collections Theme"
-Cohesion: 0.10
-Nodes (21): ItemsHost, ItemsPresenter, IsMouseOver, ItemsPresenter, Chevron, ChevronRotation, Expander, ItemsHost (+13 more)
+Cohesion: 0.06
+Nodes (28): ItemsHost, ItemsPresenter, IsMouseOver, ItemsPresenter, Chevron, ChevronRotation, Expander, ItemsHost (+20 more)
 
 ### Community 377 - "Version Checker"
 Cohesion: 0.18
@@ -2559,7 +2555,7 @@ Cohesion: 0.09
 Nodes (21): Shared UI Dependency Boundary, Kitbash Component Isolation, KitbashEditor, Persistent and Animation Metadata Documents, Metadata-Only Editing Boundary, SuperView, Agent Public Component Reuse Protocol, Preserve UI Business Semantics (+13 more)
 
 ### Community 380 - "Animation Retarget Editor"
-Cohesion: 0.18
+Cohesion: 0.14
 Nodes (10): RelayCommand, Type, AnimationRetargetEditor, string, Test, AnimationRetargeTool_ComplexUseCase, IServiceCollection, IServiceProvider (+2 more)
 
 ### Community 381 - "AudioEditorView"
@@ -2751,7 +2747,7 @@ Cohesion: 0.16
 Nodes (10): ApplicationSettingsApplier, ApplicationSettingsApplyResult, bool, GameTypeEnum, IGlobalEventHub, string, ViewportRenderSettings, RelayCommand (+2 more)
 
 ### Community 430 - "Animation Retarget Selected Bone"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (16): BoneManager.ClearRelativeSelectedBoneCommand, BoneManager.FlatBoneList, BoneManager.ResetSelectedBoneCommand, BoneManager.SelectedBone.ApplyRotation, BoneManager.SelectedBone.ApplyTranslation, BoneManager.SelectedBone.BoneLengthMult, BoneManager.SelectedBone.BoneName, BoneManager.SelectedBone.ForceSnapToWorld (+8 more)
 
 ### Community 431 - "Primitive Constructor Tests"
@@ -3011,8 +3007,8 @@ Cohesion: 0.21
 Nodes (8): byte, CommonVertex, RmvVersionEnum, Vector3, VertexFormat, Data, StaticVertexCreator, Vector2
 
 ### Community 497 - "IContextMenuCommand"
-Cohesion: 0.19
-Nodes (6): TreeNode, ClosePackContainerFileCommand, TreeNode, IContextMenuCommand, TreeNode, OpenPackInFileExplorerCommand
+Cohesion: 0.11
+Nodes (8): TreeNode, ClosePackContainerFileCommand, CopyTreeNodesCommand, TreeNode, IContextMenuCommand, TreeNode, OpenPackInFileExplorerCommand, PasteTreeNodesCommand
 
 ### Community 498 - "ExportToDirectoryCommand"
 Cohesion: 0.18
@@ -3175,7 +3171,7 @@ Cohesion: 0.27
 Nodes (4): RmvToTextReportTests, Action, IEnumerable, TestMethod
 
 ### Community 539 - "Shared UI Architecture Tests"
-Cohesion: 0.33
+Cohesion: 0.26
 Nodes (3): SharedUiArchitectureTests, TestMethod, XDocument
 
 ### Community 540 - ".GetPropertyTypeSize"
@@ -3187,8 +3183,8 @@ Cohesion: 0.23
 Nodes (6): PasswordBoxHelper, DependencyObject, DependencyProperty, DependencyPropertyChangedEventArgs, RoutedEventArgs, PasswordBox
 
 ### Community 542 - "Shared UI Optional Radio Button"
-Cohesion: 0.18
-Nodes (11): InteractionScale, ScaleTransform, InteractionScale, InteractionScale, InteractionScale, Dot, InteractionScale, ResourceDictionary (+3 more)
+Cohesion: 0.15
+Nodes (12): InteractionScale, ScaleTransform, InteractionScale, InteractionScale, InteractionScale, Dot, InteractionScale, ResourceDictionary (+4 more)
 
 ### Community 543 - "UiMainShellGallery"
 Cohesion: 0.23
@@ -3307,7 +3303,7 @@ Cohesion: 0.18
 Nodes (11): CurrentTime, CurveSeriesList, CurveStructureLocked, Duration, Playback.Loop, SelectedCurveSeries, SelectedElement.Begin, SelectedElement.End (+3 more)
 
 ### Community 574 - "UserControl"
-Cohesion: 0.18
+Cohesion: 0.16
 Nodes (9): Rendering.ShowGeneratedMesh, Rendering.ShowGeneratedSkeleton, Rendering.VisualOffset, Settings.AnimationSpeedMult, Settings.ApplyRelativeScale, Settings.SkeletonScale, Settings.ZeroUnmappedBones, UserControl (+1 more)
 
 ### Community 575 - "HircItem"
@@ -3407,7 +3403,7 @@ Cohesion: 0.51
 Nodes (3): CscSubScene, Test, ComputeSubSceneTimeTests
 
 ### Community 599 - ".GetSkeletonFileFromName"
-Cohesion: 0.29
+Cohesion: 0.24
 Nodes (6): GltfImporterSettings, ModelRoot, GltfSceneLoader, IGltfSceneLoader, Test, GltfToRmv2ImporterComponentTest
 
 ### Community 600 - "IPC Pack Path Resolver Resolve"
@@ -3607,7 +3603,7 @@ Cohesion: 0.29
 Nodes (4): ByteChunk, IDataSource, ManualResetEventSlim, BlockingDataSource
 
 ### Community 653 - "Context Menu Item 2"
-Cohesion: 0.57
+Cohesion: 0.54
 Nodes (4): ContextMenuBuilder, ContextMenuItem2, TreeNode, MainApplicationContextMenuBuilder
 
 ### Community 654 - "InverseBoolToVisibilityConverter"
@@ -4187,7 +4183,7 @@ Cohesion: 0.40
 Nodes (3): Tree, TreeEntryChanges, TreeEntry
 
 ### Community 821 - ".LoadFolderPackFile"
-Cohesion: 0.40
+Cohesion: 0.30
 Nodes (3): string, Test, PackFileBrowser
 
 ### Community 822 - ".Create"
@@ -4327,42 +4323,24 @@ Cohesion: 0.67
 Nodes (3): SuperView Audit Answer, Historical SuperView Failure Isolation Gap, Historical SuperView Timeline Support Gap
 
 ## Knowledge Gaps
-- **2119 isolated node(s):** `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `ReleaseNoteItem`, `ShowCaWemFilesChangedEvent`, `ViewportRenderSettingsChangedEvent` (+2114 more)
+- **2185 isolated node(s):** `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `ReleaseNoteItem`, `ShowCaWemFilesChangedEvent`, `ViewportRenderSettingsChangedEvent` (+2180 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **172 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
-
-## Work-memory lessons
-
-**Preferred sources** — corroborated by past sessions; start here.
-- `FolderProjectContainer` (8× useful, score=6.620331592) _(code changed — re-verify)_
-- `GltfImporter` (6× useful, score=4.606746259)
-- `FolderProjectHistoryViewModel` (5× useful, score=4.435338168)
-- `SuperViewViewModel` (5× useful, score=4.00932195)
-- `PackFileBrowserViewModel` (4× useful, score=3.528112487)
-- `AnimationRetargetEditor` (4× useful, score=3.221469543)
-- `IFolderProjectVersionControlService` (4× useful, score=3.194388071)
-- `GridSplitterStyles.xaml` (3× useful, score=2.662353558)
-- `MetaDataBuilder` (3× useful, score=2.47675754)
-- `PlaybackTimelineRow` (3× useful, score=2.47675754)
-
-**Known dead ends** — questions that led nowhere; don't re-derive.
-- "高级导入 ANIM 后文件夹工程动画搜索不实时刷新" -> `ImporterCoreViewModel`, `FolderProjectVersionControlViewModel`
-- "检查自2.4.4以来都优化和修复了哪些内容和功能" -> `AudioProjectConverterViewModel`, `FolderProjectVersionControlService`, `UpdaterWorkspaceTests`, `WaveformVisualiserViewModel`
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `IPackFileService` connect `IPackFileService` to `Shared.Core.Services`, `ParsedMetadataAttribute`, `MenuBarViewModel`, `AnimationKeyframeEditorViewModel`, `AudioFile`, `ApplicationSettings`, `CscEditorViewModel`, `SaveWindow`, `PackFile`, `SkeletonEditorViewModel`, `PackFileContainer`, `IEditorInterface`, `.Create`, `Hotkey`, `SuperViewViewModel`, `GameTypeEnum`, `PackFile`, `AnimSetTableEditorViewModel`, `ITextConverter`, `MountAnimationCreatorViewModel`, `MetaDataFileParser`, `PackFileBrowserViewModel`, `AudioProjectFile`, `SkeletonAnimationLookUpHelper`, `ExceptionInformation`, `SkeletonBoneAnimationResolverTests`, `FolderProjectGitOperationCoordinator`, `IEventHub`, `AnimationFile`, `MakeNodeEditableCommand`, `.Open`, `IStandardDialogs`, `Context Menu Item 2`, `glTF Exporter UI`, `WaveformVisualisationCacheService`, `AnimPackStructureCommandTests`, `AudioEditorFileService`, `AudioProjectMergerViewModel`, `SaveService`, `ApplicationSettingsService`, `SoundPlayer`, `SoundDatFile`, `AnimPackViewModel`, `GltfImporter`, `.GetEditablePack`, `CAVp8ExportCommandTests`, `CscElement`, `AnimPackViewModel`, `Scene Object Reference UI`, `PackFileContainer`, `SkeletonAnimationLookUpHelperTests`, `AnimationFragmentFile`, `TwuiEditor`, `SaveDialogViewModel`, `FileListReportGenerator`, `Context Menu Item 2`, `SkeletonEditorViewModel`, `AudioEditorFileService`, `SoundEngine`, `AudioEditorFileService`, `MenuBarFolderProjectRecentTests`, `.GetExistingOrAddMaterial`, `ShaderTextureViewModel`, `AudioFilesExplorerViewModel`, `.CreateSkeleton`, `Save Pack File Window`, `Import Export Editor glTF Texture`, `ResourceLibrary`, `AnimationBinFileToXmlConverter`, `GameInformation`, `TextEditorViewModel`, `ImageInformation`, `Animation Retarget Editor`, `ObservableObject`, `FolderProjectContextMenuTests`, `NewAudioProjectViewModel`, `TouchedFilesRecorder`, `FolderProjectGitOperationCoordinator`?**
-  _High betweenness centrality (0.095) - this node is a cross-community bridge._
-- **Why does `Shared.Core.Services` connect `Shared.Core.Services` to `GameWorld.Core.Services`, `Shared.GameFormats.AnimationMeta.Parsing`, `.Show`, `Shared.ByteParsing`, `Shared.GameFormats.RigidModel.MaterialHeaders`, `IWpfGame`, `Folder Project History Window Service`, `Editors.CscEditor.Data`, `GameWorld.Core.Services`, `.BuildVoActorTreesAsync`, `Editors.Ipc`, `Shared.ByteParsing`, `Shared.GameFormats.RigidModel`, `ArcBallCamera`, `Shared Core Test Version Checker`, `Shared.Core.ToolCreation`, `.Stop`, `Shared.GameFormats.Esf`, `FileEncryption`?**
-  _High betweenness centrality (0.085) - this node is a cross-community bridge._
 - **Why does `Shared.Core.PackFiles.Models` connect `Shared.Core.Services` to `GameWorld.Core.Services`, `Shared.GameFormats.AnimationMeta.Parsing`, `Shared.ByteParsing`, `Shared.GameFormats.RigidModel.MaterialHeaders`, `Folder Project History Window Service`, `IStandardDialogs`, `GameWorld.Core.Services`, `Editors.Ipc`, `Shared.ByteParsing`, `Shared.GameFormats.RigidModel`, `PackFile`, `PackFileBrowserViewModel`, `IFolderProjectVersionControlService`, `IEditorInterface`, `FolderProjectHistoryService`, `GameTypeEnum`, `Shared.GameFormats.Twui.Data`, `PackFileBrowserViewModel`, `Shared.Core.ToolCreation`, `GameInformation`, `SkeletonAnimationLookUpHelper`, `.Import`, `PackFileBrowserViewModel`?**
-  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+- **Why does `Shared.Core.Services` connect `Shared.Core.Services` to `GameWorld.Core.Services`, `Shared.GameFormats.AnimationMeta.Parsing`, `.Show`, `Shared.ByteParsing`, `Shared.GameFormats.RigidModel.MaterialHeaders`, `IWpfGame`, `Folder Project History Window Service`, `Editors.CscEditor.Data`, `GameWorld.Core.Services`, `.BuildVoActorTreesAsync`, `Editors.Ipc`, `Shared.ByteParsing`, `Shared.GameFormats.RigidModel`, `ArcBallCamera`, `Shared Core Test Version Checker`, `Shared.Core.ToolCreation`, `.Stop`, `Shared.GameFormats.Esf`, `FileEncryption`?**
+  _High betweenness centrality (0.078) - this node is a cross-community bridge._
+- **Why does `IPackFileService` connect `IPackFileService` to `Shared.Core.Services`, `ParsedMetadataAttribute`, `MenuBarViewModel`, `AnimationKeyframeEditorViewModel`, `AudioFile`, `ApplicationSettings`, `CscEditorViewModel`, `Animation Retarget Saving`, `PackFile`, `SkeletonEditorViewModel`, `PackFileContainer`, `IEditorInterface`, `glTF Import Build Tests`, `Hotkey`, `SuperViewViewModel`, `GameTypeEnum`, `PackFile`, `AnimSetTableEditorViewModel`, `ITextConverter`, `MountAnimationCreatorViewModel`, `MetaDataFileParser`, `PackFileBrowserViewModel`, `AudioProjectFile`, `SkeletonAnimationLookUpHelper`, `ExceptionInformation`, `SkeletonBoneAnimationResolverTests`, `FolderProjectGitOperationCoordinator`, `IEventHub`, `Animation Mapping Core`, `MakeNodeEditableCommand`, `.Open`, `IStandardDialogs`, `Context Menu Item 2`, `glTF Exporter UI`, `WaveformVisualisationCacheService`, `AnimPackStructureCommandTests`, `AudioEditorFileService`, `AudioProjectMergerViewModel`, `SaveService`, `ApplicationSettingsService`, `SoundPlayer`, `SoundDatFile`, `AnimPackViewModel`, `GltfImporter`, `.GetEditablePack`, `CAVp8ExportCommandTests`, `CscElement`, `AnimPackViewModel`, `Scene Object Reference UI`, `PackFileContainer`, `SkeletonAnimationLookUpHelperTests`, `AnimationFragmentFile`, `TwuiEditor`, `SaveDialogViewModel`, `FileListReportGenerator`, `Context Menu Item 2`, `SkeletonEditorViewModel`, `AudioEditorFileService`, `SoundEngine`, `AudioEditorFileService`, `MenuBarFolderProjectRecentTests`, `.GetExistingOrAddMaterial`, `ShaderTextureViewModel`, `AudioFilesExplorerViewModel`, `.CreateSkeleton`, `Save Pack File Window`, `Import Export Editor glTF Texture`, `ResourceLibrary`, `AnimationBinFileToXmlConverter`, `GameInformation`, `TextEditorViewModel`, `ImageInformation`, `Animation Retarget Editor`, `ObservableObject`, `FolderProjectContextMenuTests`, `NewAudioProjectViewModel`, `TouchedFilesRecorder`, `FolderProjectGitOperationCoordinator`?**
+  _High betweenness centrality (0.076) - this node is a cross-community bridge._
 - **What connects `OpenFolderProjectHistoryPanelEvent`, `FolderProjectCloseProgressStage`, `ReleaseNoteItem` to the rest of the system?**
-  _2119 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2185 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Shared.Core.Services` be split into smaller, more focused modules?**
-  _Cohesion score 0.020878078984539774 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.018492323615663275 - nodes in this community are weakly interconnected._
 - **Should `GameWorld.Core.Services` be split into smaller, more focused modules?**
-  _Cohesion score 0.02325876970005084 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0228266395526182 - nodes in this community are weakly interconnected._
 - **Should `Shared.GameFormats.AnimationMeta.Parsing` be split into smaller, more focused modules?**
-  _Cohesion score 0.017415470125057897 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.015019762845849802 - nodes in this community are weakly interconnected._
