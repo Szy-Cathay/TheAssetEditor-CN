@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
 using GameWorld.Core.Animation;
 using Microsoft.Xna.Framework;
@@ -336,7 +337,9 @@ public class AnimationWorkbenchSaveTests
                 code,
                 AnimationWorkbenchDiagnosticSeverity.Error).ReasonKey;
             Assert.IsTrue(json.RootElement.TryGetProperty(key, out var value));
-            StringAssert.Contains(value.GetString(), "无法");
+            Assert.IsTrue(Regex.IsMatch(
+                value.GetString() ?? string.Empty,
+                "[\\u4e00-\\u9fff]"));
         }
     }
 

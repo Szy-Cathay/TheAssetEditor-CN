@@ -1,0 +1,385 @@
+<UserControl
+    x:Class="Editors.AnimationVisualEditors.AnimationWorkbench.AnimationWorkbenchBlendView"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="680"
+    d:DesignWidth="1180"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
+    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.Title}"
+    FocusVisualStyle="{StaticResource AeFocus.Keyboard}"
+    Focusable="True"
+    Loaded="Root_Loaded"
+    PreviewKeyDown="Root_PreviewKeyDown"
+    Unloaded="Root_Unloaded"
+    mc:Ignorable="d">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border
+        Margin="12"
+        Padding="16"
+        Style="{StaticResource AeSurface.Panel}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock
+                        Style="{StaticResource AeText.PageTitle}"
+                        Text="{loc:Loc AnimationWorkbench.Blend.Title}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{loc:Loc AnimationWorkbench.Blend.Subtitle}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+                <Border
+                    Grid.Column="1"
+                    Padding="10,5"
+                    VerticalAlignment="Center"
+                    Background="{DynamicResource AeBrush.AccentSoft}"
+                    BorderBrush="{DynamicResource AeBrush.Accent}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource AeRadius.Control}">
+                    <TextBlock
+                        x:Name="HeaderStateText"
+                        Style="{StaticResource AeText.Label}"
+                        Text="{loc:Loc AnimationWorkbench.Blend.LivePreview}" />
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="0,14,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.05*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="0.95*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Padding="14" Style="{StaticResource AeSurface.Control}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc AnimationWorkbench.Blend.TransitionParameters}" />
+
+                        <Grid Grid.Row="1" Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="132" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="52" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.Blend.AnimationAOutFrame}" />
+                            <Slider
+                                x:Name="AnimationAOutSlider"
+                                Grid.Column="1"
+                                Margin="8,0"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.AnimationAOutFrame}"
+                                IsSnapToTickEnabled="True"
+                                Minimum="0"
+                                Style="{StaticResource AeEditor.PlaybackSlider}"
+                                TickFrequency="1"
+                                ValueChanged="AnimationAOutSlider_ValueChanged" />
+                            <TextBlock
+                                x:Name="AnimationAOutValue"
+                                Grid.Column="2"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Technical}" />
+                        </Grid>
+
+                        <Grid Grid.Row="2" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="132" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="52" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.Blend.AnimationBInFrame}" />
+                            <Slider
+                                x:Name="AnimationBInSlider"
+                                Grid.Column="1"
+                                Margin="8,0"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.AnimationBInFrame}"
+                                IsSnapToTickEnabled="True"
+                                Minimum="0"
+                                Style="{StaticResource AeEditor.PlaybackSlider}"
+                                TickFrequency="1"
+                                ValueChanged="AnimationBInSlider_ValueChanged" />
+                            <TextBlock
+                                x:Name="AnimationBInValue"
+                                Grid.Column="2"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Technical}" />
+                        </Grid>
+
+                        <Grid Grid.Row="3" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="132" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="72" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.Blend.OverlapDuration}" />
+                            <Slider
+                                x:Name="OverlapSlider"
+                                Grid.Column="1"
+                                Margin="8,0"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.OverlapDuration}"
+                                IsSnapToTickEnabled="False"
+                                Minimum="0"
+                                SmallChange="0.01"
+                                Style="{StaticResource AeEditor.PlaybackSlider}"
+                                ValueChanged="OverlapSlider_ValueChanged" />
+                            <TextBlock
+                                x:Name="OverlapValue"
+                                Grid.Column="2"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Technical}" />
+                        </Grid>
+
+                        <Grid Grid.Row="4" Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="132" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="132" />
+                                <ColumnDefinition Width="110" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.Blend.Curve}" />
+                            <ComboBox
+                                x:Name="CurveComboBox"
+                                Grid.Column="1"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.Curve}"
+                                SelectionChanged="CurveComboBox_SelectionChanged"
+                                Style="{StaticResource AeInput.ComboBox}">
+                                <ComboBoxItem Content="{loc:Loc AnimationWorkbench.Blend.Curve.Smooth}" />
+                                <ComboBoxItem Content="{loc:Loc AnimationWorkbench.Blend.Curve.Linear}" />
+                                <ComboBoxItem Content="{loc:Loc AnimationWorkbench.Blend.Curve.EaseInOut}" />
+                            </ComboBox>
+                            <TextBlock
+                                Grid.Column="3"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.Blend.OutputFps}" />
+                            <TextBox
+                                x:Name="OutputFpsTextBox"
+                                Grid.Column="4"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.OutputFps}"
+                                LostKeyboardFocus="OutputFpsTextBox_LostKeyboardFocus"
+                                Style="{StaticResource AeInput.TextBox}"
+                                ToolTip="{loc:Loc AnimationWorkbench.Blend.OutputFpsHint}" />
+                        </Grid>
+
+                        <Border
+                            Grid.Row="5"
+                            Margin="0,16,0,0"
+                            Padding="12"
+                            Style="{StaticResource AeSurface.Control}">
+                            <StackPanel>
+                                <TextBlock
+                                    Style="{StaticResource AeText.SectionTitle}"
+                                    Text="{loc:Loc AnimationWorkbench.Blend.RootMotion}" />
+                                <TextBlock
+                                    Margin="0,3,0,10"
+                                    Style="{StaticResource AeText.Caption}"
+                                    Text="{loc:Loc AnimationWorkbench.Blend.RootMotionHint}"
+                                    TextWrapping="Wrap" />
+                                <CheckBox
+                                    x:Name="AlignHorizontalCheckBox"
+                                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.AlignHorizontal}"
+                                    Checked="RootMotionCheckBox_Changed"
+                                    Content="{loc:Loc AnimationWorkbench.Blend.AlignHorizontal}"
+                                    Style="{StaticResource AeInput.CheckBox}"
+                                    Unchecked="RootMotionCheckBox_Changed" />
+                                <CheckBox
+                                    x:Name="AlignYawCheckBox"
+                                    Margin="0,7,0,0"
+                                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.AlignYaw}"
+                                    Checked="RootMotionCheckBox_Changed"
+                                    Content="{loc:Loc AnimationWorkbench.Blend.AlignYaw}"
+                                    Style="{StaticResource AeInput.CheckBox}"
+                                    Unchecked="RootMotionCheckBox_Changed" />
+                                <CheckBox
+                                    x:Name="PreserveHeightCheckBox"
+                                    Margin="0,7,0,0"
+                                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.PreserveHeight}"
+                                    Checked="RootMotionCheckBox_Changed"
+                                    Content="{loc:Loc AnimationWorkbench.Blend.PreserveHeight}"
+                                    Style="{StaticResource AeInput.CheckBox}"
+                                    Unchecked="RootMotionCheckBox_Changed" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border
+                    Grid.Column="2"
+                    Padding="14"
+                    Style="{StaticResource AeSurface.Control}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc AnimationWorkbench.Blend.OutputImpact}" />
+
+                        <UniformGrid Grid.Row="1" Margin="0,14,0,0" Columns="2">
+                            <Border Margin="0,0,6,6" Padding="10" Style="{StaticResource AeSurface.Control}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Blend.SourceRates}" />
+                                    <TextBlock x:Name="SourceRatesText" Margin="0,4,0,0" Style="{StaticResource AeText.Technical}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="6,0,0,6" Padding="10" Style="{StaticResource AeSurface.Control}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Blend.OutputRate}" />
+                                    <TextBlock x:Name="OutputRateText" Margin="0,4,0,0" Style="{StaticResource AeText.Technical}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="0,6,6,0" Padding="10" Style="{StaticResource AeSurface.Control}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Blend.OutputFrames}" />
+                                    <TextBlock x:Name="OutputFramesText" Margin="0,4,0,0" Style="{StaticResource AeText.Technical}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="6,6,0,0" Padding="10" Style="{StaticResource AeSurface.Control}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Blend.OutputDuration}" />
+                                    <TextBlock x:Name="OutputDurationText" Margin="0,4,0,0" Style="{StaticResource AeText.Technical}" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border
+                            Grid.Row="2"
+                            Margin="0,14,0,0"
+                            Padding="10"
+                            Background="{DynamicResource AeBrush.AccentSoft}"
+                            BorderBrush="{DynamicResource AeBrush.Accent}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource AeRadius.Control}">
+                            <TextBlock
+                                x:Name="ResampleText"
+                                Style="{StaticResource AeText.Caption}"
+                                TextWrapping="Wrap" />
+                        </Border>
+
+                        <Border
+                            Grid.Row="3"
+                            Margin="0,10,0,0"
+                            Padding="10"
+                            Style="{StaticResource AeSurface.Control}">
+                            <StackPanel>
+                                <TextBlock
+                                    Style="{StaticResource AeText.Label}"
+                                    Text="{loc:Loc AnimationWorkbench.Blend.LoopSeam}" />
+                                <TextBlock
+                                    x:Name="LoopSeamText"
+                                    Margin="0,4,0,0"
+                                    Style="{StaticResource AeText.Caption}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Grid.Row="4"
+                            Margin="0,10,0,0"
+                            Padding="10"
+                            Style="{StaticResource AeSurface.Control}">
+                            <StackPanel>
+                                <TextBlock
+                                    Style="{StaticResource AeText.Label}"
+                                    Text="{loc:Loc AnimationWorkbench.Blend.Diagnostics}" />
+                                <TextBlock
+                                    x:Name="DiagnosticText"
+                                    Margin="0,4,0,0"
+                                    Style="{StaticResource AeText.Caption}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    x:Name="StatusText"
+                    Margin="0,0,16,0"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource AeText.Caption}"
+                    Text="{loc:Loc AnimationWorkbench.Blend.ReadyHint}"
+                    TextWrapping="Wrap" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button
+                        x:Name="RefreshPreviewButton"
+                        Margin="0,0,6,0"
+                        AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.RefreshPreview}"
+                        Click="RefreshPreviewButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Blend.RefreshPreview}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        x:Name="ApplyButton"
+                        Margin="0,0,6,0"
+                        AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.Apply}"
+                        Click="ApplyButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Blend.Apply}"
+                        Style="{StaticResource AeButton.Primary}" />
+                    <Button
+                        x:Name="CancelButton"
+                        AutomationProperties.Name="{loc:Loc AnimationWorkbench.Blend.Cancel}"
+                        Click="CancelButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Blend.Cancel}"
+                        Style="{StaticResource AeButton.Quiet}" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

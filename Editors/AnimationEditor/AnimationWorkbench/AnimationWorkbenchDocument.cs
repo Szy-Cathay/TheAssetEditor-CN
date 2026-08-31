@@ -63,6 +63,24 @@ public enum AnimationWorkbenchDiagnosticCode
     TimelineStretchInvalid,
     TimelinePreviewAlreadyActive,
     TimelinePreviewMissing,
+    BlendAnimationBMissing,
+    BlendPreviewAlreadyActive,
+    BlendPreviewMissing,
+    BlendSourceEmpty,
+    BlendSourceDurationInvalid,
+    BlendSkeletonMismatch,
+    BlendOutPointInvalid,
+    BlendInPointInvalid,
+    BlendOverlapInvalid,
+    BlendOverlapExceedsAvailable,
+    BlendOutputFrameRateInvalid,
+    BlendOutputTooLarge,
+    BlendSourceTransformInvalid,
+    BlendRootBoneMissing,
+    BlendZeroOverlap,
+    BlendOverlapBelowOneFrame,
+    BlendSingleFrameSource,
+    BlendLoopSeamDiscontinuity,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
@@ -171,6 +189,7 @@ public sealed record AnimationWorkbenchDocumentState(
     bool CanRedo,
     bool HasActivePosePreview,
     bool HasActiveTimelinePreview,
+    bool HasActiveBlendPreview,
     long HistoryRevision,
     long DocumentGeneration);
 
@@ -391,6 +410,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _redoEdits.Count != 0,
             _posePreviewResult != null,
             _timelinePreviewResult != null,
+            _blendPreviewResult != null,
             _currentHistoryRevision,
             _documentGeneration);
     }
@@ -404,12 +424,18 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported));
         }
 
-        if (_posePreviewResult != null || _timelinePreviewResult != null)
+        if (_posePreviewResult != null ||
+            _timelinePreviewResult != null ||
+            _blendPreviewResult != null)
         {
             diagnostics.Add(CreateSaveDiagnostic(
                 _posePreviewResult != null
                     ? AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive
-                    : AnimationWorkbenchDiagnosticCode.TimelinePreviewAlreadyActive));
+                    : _timelinePreviewResult != null
+                        ? AnimationWorkbenchDiagnosticCode
+                            .TimelinePreviewAlreadyActive
+                        : AnimationWorkbenchDiagnosticCode
+                            .BlendPreviewAlreadyActive));
         }
 
         if (_result == null)
@@ -601,7 +627,10 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             AnimationWorkbenchPreviewKind.AnimationA => _animationA,
             AnimationWorkbenchPreviewKind.AnimationB => _animationB,
             AnimationWorkbenchPreviewKind.Result =>
-                _timelinePreviewResult ?? _posePreviewResult ?? _result,
+                _blendPreviewResult ??
+                _timelinePreviewResult ??
+                _posePreviewResult ??
+                _result,
             _ => null,
         };
 
@@ -667,6 +696,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         public int SkeletonBoneCount => skeleton.BoneCount;
 
         public AnimationWorkbenchSourceFormat? Format => format;
+
+        public GameSkeleton Skeleton => skeleton;
 
         public static SourceSnapshot? Create(
             AnimationWorkbenchSourceInput? input)
