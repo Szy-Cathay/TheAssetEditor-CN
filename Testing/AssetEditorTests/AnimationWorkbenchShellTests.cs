@@ -276,6 +276,7 @@ public class AnimationWorkbenchShellTests
                         () => { },
                         DispatcherPriority.ApplicationIdle);
                     window.UpdateLayout();
+                    SaveWindowForVisualReview(window, "shell-base");
 
                     var baseView = FindDescendants<
                             AnimationWorkbenchBaseAnimationView>(view)
@@ -418,6 +419,11 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbenchView.xaml");
         var source = File.ReadAllText(xamlPath);
         var document = XDocument.Load(xamlPath);
+        var workbenchViews = Directory.GetFiles(
+                Path.GetDirectoryName(xamlPath)!,
+                "*View.xaml")
+            .Select(File.ReadAllText)
+            .ToArray();
 
         NUnitAssert.Multiple(() =>
         {
@@ -425,6 +431,23 @@ public class AnimationWorkbenchShellTests
                 Does.Contain("AeVerticalGridSplitterStyle"));
             NUnitAssert.That(source,
                 Does.Contain("AeHorizontalGridSplitterStyle"));
+            NUnitAssert.That(
+                workbenchViews.Sum(view =>
+                    Regex.Matches(view, "AeSurface\\.Panel").Count),
+                Is.EqualTo(1));
+            NUnitAssert.That(
+                workbenchViews.All(view =>
+                    !view.Contains(
+                        "AeSurface.Control",
+                        StringComparison.Ordinal)),
+                Is.True);
+            NUnitAssert.That(source,
+                Does.Not.Contain(
+                    "HorizontalScrollBarVisibility=\"Auto\""));
+            NUnitAssert.That(source,
+                Does.Not.Contain("MinWidth=\"1060\""));
+            NUnitAssert.That(source,
+                Does.Not.Contain("MinWidth=\"1120\""));
             NUnitAssert.That(source,
                 Does.Contain("AnimationWorkbenchTimelineView"));
             NUnitAssert.That(source,
@@ -559,10 +582,15 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbench",
             "AnimationWorkbenchBaseAnimationView.xaml");
         var source = File.ReadAllText(xamlPath);
+        var document = XDocument.Load(xamlPath);
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(source, Does.Contain("AeSurface.Panel"));
+            NUnitAssert.That(source, Does.Not.Contain("AeSurface.Panel"));
+            NUnitAssert.That(source, Does.Not.Contain("AeSurface.Control"));
             NUnitAssert.That(source, Does.Contain("AeTable.Grid"));
+            NUnitAssert.That(source,
+                Does.Contain(
+                    "ScrollViewer.HorizontalScrollBarVisibility=\"Disabled\""));
             NUnitAssert.That(source,
                 Does.Contain("OperationProgressWindowHost"));
             NUnitAssert.That(source,
@@ -574,6 +602,11 @@ public class AnimationWorkbenchShellTests
             NUnitAssert.That(
                 Regex.IsMatch(source, "#[0-9a-fA-F]{3,8}"),
                 Is.False);
+            NUnitAssert.That(
+                document.Descendants().Count(element =>
+                    element.Name.LocalName is nameof(DataGridTextColumn)
+                        or nameof(DataGridTemplateColumn)),
+                Is.EqualTo(4));
         });
 
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -594,7 +627,7 @@ public class AnimationWorkbenchShellTests
                         ThemesController.SetTheme(theme);
                         var window = new Window
                         {
-                            Width = 1280,
+                            Width = 720,
                             Height = 820,
                             Content =
                                 new AnimationWorkbenchBaseAnimationView(),
@@ -669,6 +702,13 @@ public class AnimationWorkbenchShellTests
                         NUnitAssert.Multiple(() =>
                         {
                             NUnitAssert.That(grid.SelectedItem, Is.SameAs(row));
+                            NUnitAssert.That(
+                                ScrollViewer.GetHorizontalScrollBarVisibility(
+                                    grid),
+                                Is.EqualTo(ScrollBarVisibility.Disabled));
+                            NUnitAssert.That(
+                                grid.Columns.Sum(column => column.ActualWidth),
+                                Is.LessThanOrEqualTo(grid.ActualWidth + 1));
                             NUnitAssert.That(selectedCheckBox.IsChecked, Is.True);
                             NUnitAssert.That(progress.IsOperationActive, Is.True);
                             NUnitAssert.That(
@@ -711,9 +751,89 @@ public class AnimationWorkbenchShellTests
             });
     }
 
+    [Test]
+    public void BaseAnimationView_RendersDenseRecipeWithoutHorizontalScroll()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var rows = Enumerable.Range(1, 24)
+                    .Select(index => new BaseAnimationRowState
+                    {
+                        IsSelected = index % 4 == 0,
+                        Role = AnimationWorkbenchBaseAnimationRole.Death,
+                        SourcePath =
+                            $@"animations\battle\humanoid01\2handed_sword\candidate_{index:00}.anim",
+                        OutputPath =
+                            $@"animations\battle\external\base\candidate_{index:00}.anim",
+                        StatusText = index % 3 == 0 ? "候选" : "待生成",
+                        DetailText = "已匹配目标骨架，等待生成预览。",
+                    })
+                    .ToArray();
+                var selected = rows[7];
+                var state = new BaseAnimationViewState
+                {
+                    Items = rows,
+                    SelectedItem = selected,
+                    StatusText = "已选择 24 个候选动作",
+                    CanGenerate = true,
+                    CanPreview = true,
+                };
+
+                var previousTheme = ThemesController.CurrentTheme;
+                try
+                {
+                    foreach (var theme in new[]
+                             {
+                                 ThemeType.DarkTheme,
+                                 ThemeType.LightTheme,
+                                 ThemeType.HighContrastDark,
+                                 ThemeType.HighContrastLight,
+                             })
+                    {
+                        ThemesController.SetTheme(theme);
+                        RenderAndAssertBaseAnimationState(
+                            state,
+                            view =>
+                            {
+                                var grid = FindDescendants<DataGrid>(view)
+                                    .Single();
+                                NUnitAssert.Multiple(() =>
+                                {
+                                    NUnitAssert.That(
+                                        grid.Items.Count,
+                                        Is.EqualTo(24));
+                                    NUnitAssert.That(
+                                        grid.Columns,
+                                        Has.Count.EqualTo(4));
+                                    NUnitAssert.That(
+                                        ScrollViewer
+                                            .GetHorizontalScrollBarVisibility(
+                                                grid),
+                                        Is.EqualTo(
+                                            ScrollBarVisibility.Disabled));
+                                    NUnitAssert.That(
+                                        grid.Columns.Sum(column =>
+                                            column.ActualWidth),
+                                        Is.LessThanOrEqualTo(
+                                            grid.ActualWidth + 1));
+                                });
+                            },
+                            $"dense-{theme}");
+                    }
+                }
+                finally
+                {
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
     private static void RenderAndAssertBaseAnimationState(
         BaseAnimationViewState state,
-        Action<AnimationWorkbenchBaseAnimationView> assert)
+        Action<AnimationWorkbenchBaseAnimationView> assert,
+        string? captureName = null)
     {
         var view = new AnimationWorkbenchBaseAnimationView
         {
@@ -721,7 +841,7 @@ public class AnimationWorkbenchShellTests
         };
         var window = new Window
         {
-            Width = 1280,
+            Width = 720,
             Height = 820,
             Content = view,
             ShowActivated = false,
@@ -737,11 +857,44 @@ public class AnimationWorkbenchShellTests
                 DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
             assert(view);
+            SaveWindowForVisualReview(window, captureName);
         }
         finally
         {
             window.Close();
         }
+    }
+
+    private static void SaveWindowForVisualReview(
+        Window window,
+        string? captureName)
+    {
+        var outputDirectory = Environment.GetEnvironmentVariable(
+            "AE_UI_QA_OUTPUT");
+        if (string.IsNullOrWhiteSpace(outputDirectory) ||
+            string.IsNullOrWhiteSpace(captureName))
+        {
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(window);
+        var bitmap = new RenderTargetBitmap(
+            Math.Max(1, (int)Math.Ceiling(
+                window.ActualWidth * dpi.DpiScaleX)),
+            Math.Max(1, (int)Math.Ceiling(
+                window.ActualHeight * dpi.DpiScaleY)),
+            dpi.PixelsPerInchX,
+            dpi.PixelsPerInchY,
+            PixelFormats.Pbgra32);
+        bitmap.Render(window);
+
+        Directory.CreateDirectory(outputDirectory);
+        using var stream = File.Create(Path.Combine(
+            outputDirectory,
+            $"animation-workbench-{captureName}.png"));
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        encoder.Save(stream);
     }
 
     private static IEnumerable<T> FindDescendants<T>(DependencyObject root)
