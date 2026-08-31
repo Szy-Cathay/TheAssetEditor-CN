@@ -481,16 +481,19 @@ public sealed partial class AnimationWorkbenchDocument
         var prepared = _retargetPreviewResult.Clone();
         var mappings = _retargetPreviewMappings.ToArray();
         var diagnostics = _retargetPreviewDiagnostics.ToArray();
+        var metaData = RetargetMetaData(source, mappings);
         ClearRetargetPreview();
         if (source == AnimationWorkbenchSourceSlot.AnimationA)
         {
             _retargetedAnimationA = prepared;
             _result = prepared.Clone();
             ResetDocumentHistory();
+            CommitRetargetMetaData(source, metaData);
         }
         else
         {
             _retargetedAnimationB = prepared;
+            CommitRetargetMetaData(source, metaData);
         }
         RefreshSelectedResultPreview();
         return new AnimationWorkbenchRetargetResult(

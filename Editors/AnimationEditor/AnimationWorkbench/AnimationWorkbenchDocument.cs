@@ -47,6 +47,10 @@ public enum AnimationWorkbenchDiagnosticCode
     DestinationAlreadyExists,
     DestinationInvalid,
     DestinationWriteFailed,
+    MetaDataSynchronizationDisabled,
+    MetaDataResultMissing,
+    MetaDataCandidateSerializationFailed,
+    MetaDataCandidateRoundTripMismatch,
     PoseFrameIndexInvalid,
     PoseLastFrameDeleteRejected,
     PoseBoneMissing,
@@ -151,7 +155,10 @@ public sealed record AnimationWorkbenchLoadRequest(
     AnimationWorkbenchSourceInput? AnimationA,
     AnimationWorkbenchSourceInput? AnimationB,
     GameTypeEnum? TargetGame,
-    GameSkeleton? TargetSkeleton);
+    GameSkeleton? TargetSkeleton,
+    AnimationWorkbenchMetaDataSourceInput? AnimationAMetaData = null,
+    AnimationWorkbenchMetaDataSourceInput? AnimationBMetaData = null,
+    bool SynchronizeMetaData = false);
 
 public sealed record AnimationWorkbenchSourceSummary(
     string Name,
@@ -224,7 +231,12 @@ public sealed record AnimationWorkbenchDocumentState(
     AnimationWorkbenchPreviewSnapshot? CurrentPreview,
     IReadOnlyList<AnimationWorkbenchDiagnostic> Diagnostics,
     bool IsDirty,
+    bool IsAnimationDirty,
+    bool IsMetaDataDirty,
+    bool IsMetaDataSynchronizationEnabled,
+    IReadOnlyList<AnimationWorkbenchMetaDataProblem> MetaDataProblems,
     string? ProjectResourcePath,
+    string? ProjectMetaDataResourcePath,
     bool IsClosed,
     bool CanUndo,
     bool CanRedo,
@@ -293,6 +305,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
         _projectResourcePath = null;
+        LoadMetaData(request);
         _documentGeneration++;
         ResetDocumentHistory();
 
@@ -431,6 +444,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetSkeleton = null;
         _selectedPreview = null;
         _projectResourcePath = null;
+        ClearMetaData();
         ResetDocumentHistory();
         _isClosed = true;
 
@@ -455,7 +469,12 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             CreatePreview(_selectedPreview),
             CreateDiagnostics(),
             _isDirty,
+            IsAnimationDirty(),
+            IsMetaDataDirty(),
+            _isMetaDataSynchronizationEnabled,
+            GetCurrentMetaDataProblems(),
             _projectResourcePath,
+            _projectMetaDataResourcePath,
             _isClosed,
             _undoEdits.Count != 0,
             _redoEdits.Count != 0,

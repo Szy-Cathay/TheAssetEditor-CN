@@ -102,6 +102,7 @@ public sealed partial class AnimationWorkbenchDocument
             _editingAnchorFrames);
         _timelinePreviewAnchors = new SortedSet<int>(
             _editingAnchorFrames);
+        BeginMetaDataTimelinePreview();
         RefreshSelectedResultPreview();
         return CreateTimelineSuccess();
     }
@@ -204,6 +205,7 @@ public sealed partial class AnimationWorkbenchDocument
                     anchor < range.EndFrameExclusive)
                 .Select(anchor => anchor - range.StartFrame)
                 .ToArray();
+            PreviewMetaDataTrim(animation, range, next.Duration);
             return SetTimelinePreview(next, nextAnchors);
         }
 
@@ -414,6 +416,11 @@ public sealed partial class AnimationWorkbenchDocument
                     targetFrameCount - 1,
                     mappedOffset);
             }).ToArray();
+            PreviewMetaDataStretch(
+                animation,
+                range,
+                targetFrameCount,
+                next.Duration);
             return SetTimelinePreview(next, nextAnchors);
         }
 
@@ -526,6 +533,7 @@ public sealed partial class AnimationWorkbenchDocument
         var next = _timelinePreviewResult.Animation.Clone();
         var previous = _timelinePreviewStart;
         var nextAnchors = _timelinePreviewAnchors.ToArray();
+        var nextMetaData = CaptureTimelinePreviewMetaData();
         ClearTimelinePreview();
         if (AnimationsEqual(previous, next))
         {
@@ -534,7 +542,7 @@ public sealed partial class AnimationWorkbenchDocument
             return CreateTimelineSuccess();
         }
 
-        CommitResultAnimation(next, nextAnchors);
+        CommitResultAnimation(next, nextAnchors, nextMetaData);
         return CreateTimelineSuccess();
     }
 
@@ -856,6 +864,7 @@ public sealed partial class AnimationWorkbenchDocument
         _timelinePreviewStart = null;
         _timelinePreviewStartAnchors = null;
         _timelinePreviewAnchors = null;
+        ClearMetaDataTimelinePreview();
     }
 }
 
