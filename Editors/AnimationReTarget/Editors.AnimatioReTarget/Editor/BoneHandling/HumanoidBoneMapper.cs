@@ -2,25 +2,37 @@ using Shared.GameFormats.Animation;
 
 namespace Editors.AnimatioReTarget.Editor.BoneHandling;
 
+public enum HumanoidBoneMappingConfidence
+{
+    Low,
+    Medium,
+    High,
+}
+
 public sealed record HumanoidBoneMapping(
     int TargetBoneIndex,
-    int SourceBoneIndex);
+    int SourceBoneIndex,
+    HumanoidBoneMappingConfidence Confidence,
+    bool IsCoreBone);
 
 public sealed class HumanoidBoneMappingResult
 {
     public HumanoidBoneMappingResult(
         IReadOnlyList<HumanoidBoneMapping> mappings,
         int targetBoneCount,
-        IReadOnlySet<int> translationTargetBoneIndices)
+        IReadOnlySet<int> translationTargetBoneIndices,
+        IReadOnlySet<int> coreTargetBoneIndices)
     {
         Mappings = mappings;
         TargetBoneCount = targetBoneCount;
         TranslationTargetBoneIndices = translationTargetBoneIndices;
+        CoreTargetBoneIndices = coreTargetBoneIndices;
     }
 
     public IReadOnlyList<HumanoidBoneMapping> Mappings { get; }
     public int TargetBoneCount { get; }
     public IReadOnlySet<int> TranslationTargetBoneIndices { get; }
+    public IReadOnlySet<int> CoreTargetBoneIndices { get; }
     public int MatchedCount => Mappings.Count;
     public int UnmatchedCount => TargetBoneCount - MatchedCount;
 }
@@ -34,13 +46,17 @@ public static class HumanoidBoneMapper
         AnimationFile sourceSkeleton,
         AnimationFile targetSkeleton)
     {
-        var mappings = new Dictionary<int, int>();
+        var mappings = new Dictionary<int, MappingCandidate>();
         var sourceHips = FindHips(sourceSkeleton);
         var targetHips = FindHips(targetSkeleton);
 
         if (sourceHips != null && targetHips != null)
         {
-            AddMapping(mappings, targetHips.Id, sourceHips.Id);
+            AddMapping(
+                mappings,
+                targetHips.Id,
+                sourceHips.Id,
+                HumanoidBoneMappingConfidence.High);
             MapRootMotion(
                 sourceSkeleton,
                 targetSkeleton,
@@ -62,15 +78,22 @@ public static class HumanoidBoneMapper
                 translationTargetBoneIndices.Add(targetRoot.Id);
         }
 
+        var coreTargetBoneIndices = FindCoreTargetBoneIndices(
+            targetSkeleton,
+            targetHips);
+
         return new HumanoidBoneMappingResult(
             mappings
                 .OrderBy(mapping => mapping.Key)
                 .Select(mapping => new HumanoidBoneMapping(
                     mapping.Key,
-                    mapping.Value))
+                    mapping.Value.SourceBoneIndex,
+                    mapping.Value.Confidence,
+                    coreTargetBoneIndices.Contains(mapping.Key)))
                 .ToArray(),
             targetSkeleton.Bones.Length,
-            translationTargetBoneIndices);
+            translationTargetBoneIndices,
+            coreTargetBoneIndices);
     }
 
     private static void MapRootMotion(
@@ -78,21 +101,25 @@ public static class HumanoidBoneMapper
         AnimationFile targetSkeleton,
         AnimationFile.BoneInfo sourceHips,
         AnimationFile.BoneInfo targetHips,
-        IDictionary<int, int> mappings)
+        IDictionary<int, MappingCandidate> mappings)
     {
         var sourceRoot = FindTopAncestor(sourceSkeleton, sourceHips);
         var targetRoot = FindTopAncestor(targetSkeleton, targetHips);
         if (sourceRoot.Id == sourceHips.Id || targetRoot.Id == targetHips.Id)
             return;
 
-        AddMapping(mappings, targetRoot.Id, sourceRoot.Id);
+        AddMapping(
+            mappings,
+            targetRoot.Id,
+            sourceRoot.Id,
+            HumanoidBoneMappingConfidence.High);
     }
 
     private static void MapNamedChain(
         AnimationFile sourceSkeleton,
         AnimationFile targetSkeleton,
         string nameFragment,
-        IDictionary<int, int> mappings)
+        IDictionary<int, MappingCandidate> mappings)
     {
         var sourceChain = FindNamedChain(sourceSkeleton, nameFragment);
         var targetChain = FindNamedChain(targetSkeleton, nameFragment);
@@ -109,7 +136,8 @@ public static class HumanoidBoneMapper
             AddMapping(
                 mappings,
                 targetChain[targetIndex].Id,
-                sourceChain[sourceIndex].Id);
+                sourceChain[sourceIndex].Id,
+                HumanoidBoneMappingConfidence.Medium);
         }
     }
 
@@ -127,7 +155,7 @@ public static class HumanoidBoneMapper
     private static void MapAliases(
         AnimationFile sourceSkeleton,
         AnimationFile targetSkeleton,
-        IDictionary<int, int> mappings)
+        IDictionary<int, MappingCandidate> mappings)
     {
         var sourceByRole = sourceSkeleton.Bones
             .Select(bone => (Bone: bone, Role: GetAliasRole(bone.Name)))
@@ -148,15 +176,54 @@ public static class HumanoidBoneMapper
                 continue;
 
             var sourceBone = GetUniqueSourceBone(sourceByRole, role);
+            var confidence = HumanoidBoneMappingConfidence.High;
             if (sourceBone == null && TryGetOuterFingerFallback(role, out var fallbackRole))
+            {
                 sourceBone = GetUniqueSourceBone(sourceByRole, fallbackRole);
+                confidence = HumanoidBoneMappingConfidence.Low;
+            }
 
             if (sourceBone == null)
                 continue;
 
-            AddMapping(mappings, targetBone.Id, sourceBone.Id);
+            AddMapping(
+                mappings,
+                targetBone.Id,
+                sourceBone.Id,
+                confidence);
         }
     }
+
+    private static IReadOnlySet<int> FindCoreTargetBoneIndices(
+        AnimationFile targetSkeleton,
+        AnimationFile.BoneInfo? targetHips)
+    {
+        var coreBoneIndices = targetSkeleton.Bones
+            .Where(bone => IsCoreRole(GetAliasRole(bone.Name)) ||
+                           NormalizeName(bone.Name).Contains("spine") ||
+                           NormalizeName(bone.Name).Contains("neck"))
+            .Select(bone => bone.Id)
+            .ToHashSet();
+
+        if (targetHips != null)
+        {
+            coreBoneIndices.Add(targetHips.Id);
+            coreBoneIndices.Add(
+                FindTopAncestor(targetSkeleton, targetHips).Id);
+        }
+
+        return coreBoneIndices;
+    }
+
+    private static bool IsCoreRole(string? role) => role != null &&
+        role is not "jaw" &&
+        !role.StartsWith("eye_", StringComparison.Ordinal) &&
+        !role.StartsWith("thumb_", StringComparison.Ordinal) &&
+        !role.StartsWith("index_", StringComparison.Ordinal) &&
+        !role.StartsWith("middle_", StringComparison.Ordinal) &&
+        !role.StartsWith("ring_", StringComparison.Ordinal) &&
+        !role.StartsWith("pinky_", StringComparison.Ordinal) &&
+        !IsRigSpecificDeformationRole(role);
 
     private static AnimationFile.BoneInfo? GetUniqueSourceBone(
         IReadOnlyDictionary<string, AnimationFile.BoneInfo[]> sourceByRole,
@@ -247,11 +314,14 @@ public static class HumanoidBoneMapper
     }
 
     private static void AddMapping(
-        IDictionary<int, int> mappings,
+        IDictionary<int, MappingCandidate> mappings,
         int targetBoneIndex,
-        int sourceBoneIndex)
+        int sourceBoneIndex,
+        HumanoidBoneMappingConfidence confidence)
     {
-        mappings.TryAdd(targetBoneIndex, sourceBoneIndex);
+        mappings.TryAdd(
+            targetBoneIndex,
+            new MappingCandidate(sourceBoneIndex, confidence));
     }
 
     private static string? GetAliasRole(string boneName)
@@ -373,4 +443,8 @@ public static class HumanoidBoneMapper
         foreach (var name in names)
             aliases[NormalizeName(name)] = role;
     }
+
+    private sealed record MappingCandidate(
+        int SourceBoneIndex,
+        HumanoidBoneMappingConfidence Confidence);
 }

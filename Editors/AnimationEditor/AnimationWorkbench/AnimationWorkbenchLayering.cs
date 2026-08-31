@@ -282,6 +282,8 @@ public sealed partial class AnimationWorkbenchDocument
             return LayerBuildResult.Failure(CreateLayerDiagnostic(
                 AnimationWorkbenchDiagnosticCode.TargetSkeletonMissing));
         }
+        var preparedAnimationA = _retargetedAnimationA ?? _animationA;
+        var preparedAnimationB = _retargetedAnimationB ?? _animationB;
         if (double.IsFinite(request.Weight) == false ||
             request.Weight < 0 ||
             request.Weight > 1)
@@ -300,11 +302,11 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchDiagnosticCode.LayerReferencePoseInvalid));
         }
         if (TryValidateLayerSource(
-                _animationA,
+                preparedAnimationA,
                 AnimationWorkbenchSourceSlot.AnimationA,
                 out var sourceDiagnostic) == false ||
             TryValidateLayerSource(
-                _animationB,
+                preparedAnimationB,
                 AnimationWorkbenchSourceSlot.AnimationB,
                 out sourceDiagnostic) == false)
         {
@@ -347,7 +349,9 @@ public sealed partial class AnimationWorkbenchDocument
                     AnimationWorkbenchDiagnosticCode.LayerMaskBoneDuplicate,
                     boneName: boneName));
             }
-            var sourceMatches = FindBoneIndexes(_animationB.Skeleton, boneName);
+            var sourceMatches = FindBoneIndexes(
+                preparedAnimationB.Skeleton,
+                boneName);
             if (sourceMatches.Length == 0)
             {
                 return LayerBuildResult.Failure(CreateLayerDiagnostic(
@@ -365,15 +369,19 @@ public sealed partial class AnimationWorkbenchDocument
             selectedIndexes.Add(targetMatches[0]);
         }
 
-        if (SkeletonsMatch(_animationA.Skeleton, _targetSkeleton) == false ||
-            SkeletonsMatch(_animationB.Skeleton, _targetSkeleton) == false)
+        if (SkeletonsMatch(
+                preparedAnimationA.Skeleton,
+                _targetSkeleton) == false ||
+            SkeletonsMatch(
+                preparedAnimationB.Skeleton,
+                _targetSkeleton) == false)
         {
             return LayerBuildResult.Failure(CreateLayerDiagnostic(
                 AnimationWorkbenchDiagnosticCode.LayerSkeletonMismatch));
         }
 
-        var animationA = _animationA.Animation;
-        var animationB = _animationB.Animation;
+        var animationA = preparedAnimationA.Animation;
+        var animationB = preparedAnimationB.Animation;
         var output = animationA.Clone();
         for (var frameIndex = 0;
              frameIndex < output.DynamicFrames.Count;

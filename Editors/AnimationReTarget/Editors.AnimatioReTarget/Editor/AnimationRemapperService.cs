@@ -153,6 +153,7 @@ namespace Editors.AnimatioReTarget.Editor
         void TransferAnimationWorld(GameSkeleton copyFromSkeleton, GameSkeleton copyToSkeleton, AnimationClip animationToCopy, AnimationClip newAnimation)
         {
             var frameCount = animationToCopy.DynamicFrames.Count;
+            var processingOrder = GetParentFirstBoneOrder(copyToSkeleton);
             for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
             {
                 var copyFromFrame = AnimationSampler.Sample(
@@ -161,7 +162,7 @@ namespace Editors.AnimatioReTarget.Editor
                     copyFromSkeleton,
                     animationToCopy);
                 var targetFrame = newAnimation.DynamicFrames[frameIndex];
-                for (var i = 0; i < copyToSkeleton.BoneCount; i++)
+                foreach (var i in processingOrder)
                 {
                     var mappedIndex = BoneHelper_new.GetMappedIndex(_bones, i);
                     if (mappedIndex == null)
@@ -197,6 +198,38 @@ namespace Editors.AnimatioReTarget.Editor
 
                 }
             }
+        }
+
+        private static IReadOnlyList<int> GetParentFirstBoneOrder(
+            GameSkeleton skeleton)
+        {
+            var remaining = Enumerable.Range(0, skeleton.BoneCount)
+                .ToHashSet();
+            var result = new List<int>(skeleton.BoneCount);
+            while (remaining.Count > 0)
+            {
+                var ready = remaining
+                    .Where(index =>
+                    {
+                        var parent = skeleton.GetParentBoneIndex(index);
+                        return parent < 0 || !remaining.Contains(parent);
+                    })
+                    .OrderBy(index => index)
+                    .ToArray();
+                if (ready.Length == 0)
+                {
+                    result.AddRange(remaining.OrderBy(index => index));
+                    break;
+                }
+
+                foreach (var index in ready)
+                {
+                    result.Add(index);
+                    remaining.Remove(index);
+                }
+            }
+
+            return result;
         }
 
         void ApplyRelativeScale(GameSkeleton copyFromSkeleton, GameSkeleton copyToSkeleton, AnimationClip animationToScale)

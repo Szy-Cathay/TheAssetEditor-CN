@@ -687,6 +687,7 @@ public sealed partial class AnimationWorkbenchDocument
         ClearTimelinePreview();
         ClearBlendPreview();
         ClearLayerPreview();
+        ClearRetargetPreview();
         _savedResultAnimation = null;
         _currentHistoryRevision = 0;
         _nextHistoryRevision = 0;
