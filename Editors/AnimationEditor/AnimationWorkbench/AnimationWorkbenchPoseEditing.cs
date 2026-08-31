@@ -248,19 +248,11 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchPoseEditResult BeginPosePreview(int frameIndex)
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_posePreviewResult != null ||
-            _timelinePreviewResult != null ||
-            _blendPreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic();
+        if (activePreview != null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
-                _blendPreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode
-                        .BlendPreviewAlreadyActive
-                    : _timelinePreviewResult != null
-                        ? AnimationWorkbenchDiagnosticCode
-                            .TimelinePreviewAlreadyActive
-                        : AnimationWorkbenchDiagnosticCode
-                            .PosePreviewAlreadyActive));
+                activePreview.Value));
         }
 
         if (TryGetEditContext(
@@ -365,19 +357,11 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchPoseEditResult Undo()
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_posePreviewResult != null ||
-            _timelinePreviewResult != null ||
-            _blendPreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic();
+        if (activePreview != null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
-                _blendPreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode
-                        .BlendPreviewAlreadyActive
-                    : _timelinePreviewResult != null
-                        ? AnimationWorkbenchDiagnosticCode
-                            .TimelinePreviewAlreadyActive
-                        : AnimationWorkbenchDiagnosticCode
-                            .PosePreviewAlreadyActive));
+                activePreview.Value));
         }
 
         if (_undoEdits.Count == 0 || _result == null)
@@ -399,19 +383,11 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchPoseEditResult Redo()
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_posePreviewResult != null ||
-            _timelinePreviewResult != null ||
-            _blendPreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic();
+        if (activePreview != null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
-                _blendPreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode
-                        .BlendPreviewAlreadyActive
-                    : _timelinePreviewResult != null
-                        ? AnimationWorkbenchDiagnosticCode
-                            .TimelinePreviewAlreadyActive
-                        : AnimationWorkbenchDiagnosticCode
-                            .PosePreviewAlreadyActive));
+                activePreview.Value));
         }
 
         if (_redoEdits.Count == 0 || _result == null)
@@ -476,21 +452,12 @@ public sealed partial class AnimationWorkbenchDocument
         out GameSkeleton skeleton,
         out AnimationWorkbenchDiagnostic? diagnostic)
     {
-        if (_posePreviewResult != null ||
-            _timelinePreviewResult != null ||
-            _blendPreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic();
+        if (activePreview != null)
         {
             animation = null!;
             skeleton = null!;
-            diagnostic = CreatePoseDiagnostic(
-                _blendPreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode
-                        .BlendPreviewAlreadyActive
-                    : _timelinePreviewResult != null
-                        ? AnimationWorkbenchDiagnosticCode
-                            .TimelinePreviewAlreadyActive
-                        : AnimationWorkbenchDiagnosticCode
-                            .PosePreviewAlreadyActive);
+            diagnostic = CreatePoseDiagnostic(activePreview.Value);
             return false;
         }
 
@@ -719,6 +686,7 @@ public sealed partial class AnimationWorkbenchDocument
         ClearPosePreview();
         ClearTimelinePreview();
         ClearBlendPreview();
+        ClearLayerPreview();
         _savedResultAnimation = null;
         _currentHistoryRevision = 0;
         _nextHistoryRevision = 0;

@@ -73,13 +73,11 @@ public sealed partial class AnimationWorkbenchDocument
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.RootMotion);
 
-        if (_posePreviewResult != null || _timelinePreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic(
+            EditPreviewKind.Blend);
+        if (activePreview != null)
         {
-            return CreateBlendFailure(
-                _posePreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive
-                    : AnimationWorkbenchDiagnosticCode
-                        .TimelinePreviewAlreadyActive);
+            return CreateBlendFailure(activePreview.Value);
         }
 
         var build = BuildBlend(request);

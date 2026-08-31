@@ -82,16 +82,10 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchTimelineEditResult BeginTimelinePreview()
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_timelinePreviewResult != null ||
-            _posePreviewResult != null ||
-            _blendPreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic();
+        if (activePreview != null)
         {
-            return CreateTimelineFailure(
-                _blendPreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode
-                        .BlendPreviewAlreadyActive
-                    : AnimationWorkbenchDiagnosticCode
-                        .TimelinePreviewAlreadyActive);
+            return CreateTimelineFailure(activePreview.Value);
         }
 
         if (TryGetEditContext(

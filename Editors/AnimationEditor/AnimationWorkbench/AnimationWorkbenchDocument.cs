@@ -83,6 +83,29 @@ public enum AnimationWorkbenchDiagnosticCode
     BlendOverlapBelowOneFrame,
     BlendSingleFrameSource,
     BlendLoopSeamDiscontinuity,
+    LayerAnimationBMissing,
+    LayerPreviewAlreadyActive,
+    LayerPreviewMissing,
+    LayerSourceEmpty,
+    LayerSourceDurationInvalid,
+    LayerSkeletonMismatch,
+    LayerMaskEmpty,
+    LayerMaskSkeletonMismatch,
+    LayerMaskBoneMissing,
+    LayerMaskBoneDuplicate,
+    LayerMaskBoneUnmapped,
+    LayerWeightInvalid,
+    LayerModeInvalid,
+    LayerReferencePoseInvalid,
+    LayerSourceTransformInvalid,
+    LayerResultTransformInvalid,
+    LayerResultWorldTransformInvalid,
+    LayerDocumentChanged,
+    LayerMaskNameInvalid,
+    LayerMaskSavedNotFound,
+    LayerMaskSavedSkeletonMismatch,
+    LayerMaskStoreReadFailed,
+    LayerMaskStoreWriteFailed,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
@@ -192,6 +215,7 @@ public sealed record AnimationWorkbenchDocumentState(
     bool HasActivePosePreview,
     bool HasActiveTimelinePreview,
     bool HasActiveBlendPreview,
+    bool HasActiveLayerPreview,
     long HistoryRevision,
     long DocumentGeneration);
 
@@ -415,8 +439,27 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _posePreviewResult != null,
             _timelinePreviewResult != null,
             _blendPreviewResult != null,
+            _layerPreviewResult != null,
             _currentHistoryRevision,
             _documentGeneration);
+    }
+
+    private AnimationWorkbenchDiagnosticCode? GetActiveEditPreviewDiagnostic(
+        EditPreviewKind? excluded = null)
+    {
+        if (excluded != EditPreviewKind.Pose && _posePreviewResult != null)
+            return AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive;
+        if (excluded != EditPreviewKind.Timeline &&
+            _timelinePreviewResult != null)
+        {
+            return AnimationWorkbenchDiagnosticCode
+                .TimelinePreviewAlreadyActive;
+        }
+        if (excluded != EditPreviewKind.Blend && _blendPreviewResult != null)
+            return AnimationWorkbenchDiagnosticCode.BlendPreviewAlreadyActive;
+        if (excluded != EditPreviewKind.Layer && _layerPreviewResult != null)
+            return AnimationWorkbenchDiagnosticCode.LayerPreviewAlreadyActive;
+        return null;
     }
 
     private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()
@@ -428,18 +471,11 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported));
         }
 
-        if (_posePreviewResult != null ||
-            _timelinePreviewResult != null ||
-            _blendPreviewResult != null)
+        var activePreview = GetActiveEditPreviewDiagnostic();
+        if (activePreview != null)
         {
             diagnostics.Add(CreateSaveDiagnostic(
-                _posePreviewResult != null
-                    ? AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive
-                    : _timelinePreviewResult != null
-                        ? AnimationWorkbenchDiagnosticCode
-                            .TimelinePreviewAlreadyActive
-                        : AnimationWorkbenchDiagnosticCode
-                            .BlendPreviewAlreadyActive));
+                activePreview.Value));
         }
 
         if (_result == null)
@@ -549,6 +585,14 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             AnimationWorkbenchDiagnosticSeverity.Error,
             source);
 
+    private enum EditPreviewKind
+    {
+        Pose,
+        Timeline,
+        Blend,
+        Layer,
+    }
+
     private IReadOnlyList<AnimationWorkbenchDiagnostic> CreateDiagnostics()
     {
         if (_isClosed)
@@ -631,6 +675,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             AnimationWorkbenchPreviewKind.AnimationA => _animationA,
             AnimationWorkbenchPreviewKind.AnimationB => _animationB,
             AnimationWorkbenchPreviewKind.Result =>
+                _layerPreviewResult ??
                 _blendPreviewResult ??
                 _timelinePreviewResult ??
                 _posePreviewResult ??
