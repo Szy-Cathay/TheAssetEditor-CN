@@ -794,21 +794,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         {
             try
             {
-                try
-                {
-                    cancellationSource.Cancel();
-                }
-                finally
-                {
-                    try
-                    {
-                        previewSession?.Dispose();
-                    }
-                    finally
-                    {
-                        cancellationSource.Dispose();
-                    }
-                }
+                ReleasePreviewResources(
+                    cancellationSource,
+                    previewSession);
             }
             catch (Exception)
             {
@@ -827,6 +815,13 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             ref _previewSession,
             null);
 
+        ReleasePreviewResources(cancellationSource, previewSession);
+    }
+
+    private static void ReleasePreviewResources(
+        CancellationTokenSource? cancellationSource,
+        IAnimationWorkbenchPreviewSession? previewSession)
+    {
         try
         {
             cancellationSource?.Cancel();
