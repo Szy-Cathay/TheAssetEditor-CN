@@ -29,7 +29,7 @@ public class AnimationWorkbenchBlendingTests
             skeleton,
             CreateConstantClip(4, 4, Vector3.Zero, Quaternion.Identity, Vector3.One),
             CreateConstantClip(
-                4,
+                5,
                 4,
                 new Vector3(10),
                 Quaternion.CreateFromYawPitchRoll(MathHelper.PiOver2, 0, 0),
@@ -45,7 +45,7 @@ public class AnimationWorkbenchBlendingTests
             new AnimationWorkbenchRootMotionOptions(false, false, false)));
 
         Assert.IsTrue(result.Succeeded);
-        Assert.AreEqual(4, result.Impact?.OutputFrameCount);
+        Assert.AreEqual(5, result.Impact?.OutputFrameCount);
         var frames = result.State.CurrentPreview!.Animation.DynamicFrames;
         Assert.AreEqual(0, frames[0].Position[0].X, Tolerance);
         var frame = frames[1];
@@ -57,6 +57,41 @@ public class AnimationWorkbenchBlendingTests
                 Quaternion.CreateFromYawPitchRoll(MathHelper.PiOver2, 0, 0),
                 expectedAmount),
             frame.Rotation[0]);
+    }
+
+    [TestMethod]
+    public void PreviewBlend_FullyOverlappedBStartsAtAAndEndsAtB()
+    {
+        var skeleton = CreateSkeleton("shared_skeleton", "root");
+        using var document = CreateDocument(
+            skeleton,
+            CreateConstantClip(
+                4,
+                4,
+                Vector3.Zero,
+                Quaternion.Identity,
+                Vector3.One),
+            CreateConstantClip(
+                4,
+                4,
+                new Vector3(10),
+                Quaternion.Identity,
+                Vector3.One));
+        document.SelectPreview(AnimationWorkbenchPreviewKind.Result);
+
+        var result = document.PreviewBlend(new AnimationWorkbenchBlendRequest(
+            3,
+            0,
+            TimeSpan.FromSeconds(1),
+            4,
+            AnimationWorkbenchBlendCurve.Linear,
+            new AnimationWorkbenchRootMotionOptions(false, false, false)));
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(4, result.Impact?.OutputFrameCount);
+        var frames = result.State.CurrentPreview!.Animation.DynamicFrames;
+        Assert.AreEqual(0, frames[0].Position[0].X, Tolerance);
+        Assert.AreEqual(10, frames[^1].Position[0].X, Tolerance);
     }
 
     [TestMethod]

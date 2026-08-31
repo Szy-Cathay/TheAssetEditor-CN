@@ -298,9 +298,11 @@ public partial class AnimationWorkbenchBlendView : UserControl
         {
             ApplyOutputFps();
         }
-        else if (e.Key == Key.Enter &&
-                 ReferenceEquals(e.OriginalSource, this) &&
-                 Controller.CanCommit)
+        else if (ReferenceEquals(e.OriginalSource, this) == false)
+        {
+            return;
+        }
+        else if (e.Key == Key.Enter && Controller.CanCommit)
         {
             ShowResult(Controller.CommitPreview());
         }

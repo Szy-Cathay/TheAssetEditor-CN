@@ -227,7 +227,7 @@ public class AnimationWorkbenchBlendViewTests
     }
 
     [Test]
-    public void BlendView_EnterFromInteractiveChildDoesNotCommitPreview()
+    public void BlendView_EnterOrEscapeFromInteractiveChildDoesNotCommitOrCancel()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -251,6 +251,18 @@ public class AnimationWorkbenchBlendViewTests
                         PresentationSource.FromVisual(view),
                         0,
                         Key.Enter)
+                    {
+                        RoutedEvent = Keyboard.PreviewKeyDownEvent,
+                    });
+
+                    NUnitAssert.That(controller.HasActivePreview, Is.True);
+                    NUnitAssert.That(document.GetState().CanUndo, Is.False);
+
+                    cancelButton.RaiseEvent(new KeyEventArgs(
+                        Keyboard.PrimaryDevice,
+                        PresentationSource.FromVisual(view),
+                        0,
+                        Key.Escape)
                     {
                         RoutedEvent = Keyboard.PreviewKeyDownEvent,
                     });
@@ -300,12 +312,9 @@ public class AnimationWorkbenchBlendViewTests
             WpfTestApplicationHost.EmptyServices,
             () =>
             {
-                using var firstDocument = CreateLoadedDocument();
-                using var secondDocument = CreateLoadedDocument();
+                using var document = CreateLoadedDocument();
                 var firstController =
-                    new AnimationWorkbenchBlendController(firstDocument);
-                var secondController =
-                    new AnimationWorkbenchBlendController(secondDocument);
+                    new AnimationWorkbenchBlendController(document);
                 var view = new AnimationWorkbenchBlendView
                 {
                     Controller = firstController,
@@ -315,6 +324,8 @@ public class AnimationWorkbenchBlendViewTests
                 {
                     window.Show();
                     window.UpdateLayout();
+                    var secondController =
+                        new AnimationWorkbenchBlendController(document);
 
                     view.Controller = secondController;
 
@@ -325,7 +336,7 @@ public class AnimationWorkbenchBlendViewTests
                         secondController.HasActivePreview,
                         Is.True);
                     NUnitAssert.That(
-                        firstDocument.GetState().CanUndo,
+                        document.GetState().CanUndo,
                         Is.False);
                 }
                 finally

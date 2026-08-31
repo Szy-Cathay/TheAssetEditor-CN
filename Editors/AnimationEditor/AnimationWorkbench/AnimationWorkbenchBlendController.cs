@@ -15,6 +15,7 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
     private bool _alignYaw = true;
     private bool _preserveSourceHeightChanges = true;
     private AnimationWorkbenchBlendResult? _lastResult;
+    private long _ownedPreviewVersion;
 
     public AnimationWorkbenchBlendController(
         AnimationWorkbenchDocument document)
@@ -116,7 +117,9 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
         _lastResult?.Diagnostics ?? Array.Empty<AnimationWorkbenchDiagnostic>();
 
     public bool HasActivePreview =>
-        _document.GetState().HasActiveBlendPreview;
+        _document.IsClosed == false &&
+        _ownedPreviewVersion != 0 &&
+        _document.ActiveBlendPreviewVersion == _ownedPreviewVersion;
 
     public bool CanCommit => _lastResult?.Succeeded == true && HasActivePreview;
 
@@ -133,20 +136,30 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
                 _alignHorizontalPosition,
                 _alignYaw,
                 _preserveSourceHeightChanges)));
+        _ownedPreviewVersion = _lastResult.Succeeded &&
+            _lastResult.State.HasActiveBlendPreview
+            ? _document.ActiveBlendPreviewVersion
+            : 0;
         RaiseStateChanged();
         return _lastResult;
     }
 
     public AnimationWorkbenchBlendResult CommitPreview()
     {
+        if (HasActivePreview == false)
+            return CreateMissingPreviewResult();
         _lastResult = _document.CommitBlendPreview();
+        _ownedPreviewVersion = 0;
         RaiseStateChanged();
         return _lastResult;
     }
 
     public AnimationWorkbenchBlendResult CancelPreview()
     {
+        if (HasActivePreview == false)
+            return CreateMissingPreviewResult();
         _lastResult = _document.CancelBlendPreview();
+        _ownedPreviewVersion = 0;
         RaiseStateChanged();
         return _lastResult;
     }
@@ -158,6 +171,21 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
         if (HasActivePreview == false)
             return null;
         _lastResult = _document.CancelBlendPreview();
+        _ownedPreviewVersion = 0;
+        RaiseStateChanged();
+        return _lastResult;
+    }
+
+    private AnimationWorkbenchBlendResult CreateMissingPreviewResult()
+    {
+        _ownedPreviewVersion = 0;
+        _lastResult = new AnimationWorkbenchBlendResult(
+            false,
+            _document.GetState(),
+            null,
+            [new AnimationWorkbenchDiagnostic(
+                AnimationWorkbenchDiagnosticCode.BlendPreviewMissing,
+                AnimationWorkbenchDiagnosticSeverity.Error)]);
         RaiseStateChanged();
         return _lastResult;
     }

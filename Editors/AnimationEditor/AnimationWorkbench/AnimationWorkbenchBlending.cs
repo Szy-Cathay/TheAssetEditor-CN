@@ -59,8 +59,12 @@ public sealed partial class AnimationWorkbenchDocument
 
     private SourceSnapshot? _blendPreviewResult;
     private AnimationWorkbenchBlendImpact? _blendPreviewImpact;
+    private long _blendPreviewVersion;
     private IReadOnlyList<AnimationWorkbenchDiagnostic> _blendPreviewDiagnostics =
         Array.Empty<AnimationWorkbenchDiagnostic>();
+
+    internal long ActiveBlendPreviewVersion =>
+        _blendPreviewResult == null ? 0 : _blendPreviewVersion;
 
     public AnimationWorkbenchBlendResult PreviewBlend(
         AnimationWorkbenchBlendRequest request)
@@ -96,6 +100,9 @@ public sealed partial class AnimationWorkbenchDocument
         _blendPreviewResult = _result!.WithPreviewAnimation(build.Animation);
         _blendPreviewImpact = build.Impact;
         _blendPreviewDiagnostics = build.Diagnostics;
+        _blendPreviewVersion = _blendPreviewVersion == long.MaxValue
+            ? 1
+            : _blendPreviewVersion + 1;
         RefreshSelectedResultPreview();
         return CreateBlendSuccess();
     }
@@ -360,6 +367,11 @@ public sealed partial class AnimationWorkbenchDocument
             Duration = outputTimebase.Duration,
         };
         var transitionStart = framesA.Count - overlapFrames;
+        var fullyOverlapsAnimationB = overlapFrames > 1 &&
+            overlapFrames == framesB.Count;
+        var blendDenominator = fullyOverlapsAnimationB
+            ? overlapFrames - 1
+            : overlapFrames;
         for (var frameIndex = 0;
              frameIndex < transitionStart;
              frameIndex++)
@@ -373,7 +385,7 @@ public sealed partial class AnimationWorkbenchDocument
         {
             var amount = EvaluateCurve(
                 request.Curve,
-                overlapIndex / (float)overlapFrames);
+                overlapIndex / (float)blendDenominator);
             output.DynamicFrames.Add(InterpolateBlendFrame(
                 framesA[transitionStart + overlapIndex],
                 framesB[overlapIndex],
