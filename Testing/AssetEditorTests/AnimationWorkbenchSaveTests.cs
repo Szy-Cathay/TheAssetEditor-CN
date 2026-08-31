@@ -70,6 +70,43 @@ public class AnimationWorkbenchSaveTests
         packFileService.VerifyAll();
     }
 
+    [TestMethod]
+    public void SaveAsNewProjectResource_CommittedTimelineEdit_WritesEditedFrames()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var packFileService = new Mock<IPackFileService>();
+        List<NewPackFileEntry>? capturedEntries = null;
+        packFileService
+            .Setup(service => service.AddFilesToPack(
+                project,
+                It.IsAny<List<NewPackFileEntry>>(),
+                false))
+            .Callback<PackFileContainer, List<NewPackFileEntry>, bool>(
+                (_, entries, _) => capturedEntries = entries);
+        using var document = CreateLoadedDocument();
+        Assert.IsTrue(document.BeginTimelinePreview().Succeeded);
+        Assert.IsTrue(document.PreviewTrimRange(
+            new AnimationWorkbenchFrameRange(0, 1)).Succeeded);
+        Assert.IsTrue(document.CommitTimelinePreview().Succeeded);
+
+        var saveResult = document.SaveAsNewProjectResource(
+            packFileService.Object,
+            project,
+            @"animations\battle\timeline_candidate.anim");
+
+        Assert.IsTrue(saveResult.Succeeded);
+        Assert.IsNotNull(capturedEntries);
+        var candidate = AnimationFile.Create(new ByteChunk(
+            capturedEntries.Single().PackFile.DataSource.ReadData()));
+        Assert.AreEqual(
+            1,
+            candidate.AnimationParts.Single().DynamicFrames.Count);
+        packFileService.VerifyAll();
+    }
+
     [DataTestMethod]
     [DataRow(8, 1, false, AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly)]
     [DataRow(7, 2, false, AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly)]

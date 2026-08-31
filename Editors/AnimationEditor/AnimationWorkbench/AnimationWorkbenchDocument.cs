@@ -56,6 +56,13 @@ public enum AnimationWorkbenchDiagnosticCode
     PosePreviewMissing,
     PoseUndoUnavailable,
     PoseRedoUnavailable,
+    TimelineRangeInvalid,
+    TimelineSelectionInvalid,
+    TimelineMoveInvalid,
+    TimelineLoopInvalid,
+    TimelineStretchInvalid,
+    TimelinePreviewAlreadyActive,
+    TimelinePreviewMissing,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
@@ -162,7 +169,10 @@ public sealed record AnimationWorkbenchDocumentState(
     bool IsClosed,
     bool CanUndo,
     bool CanRedo,
-    bool HasActivePosePreview);
+    bool HasActivePosePreview,
+    bool HasActiveTimelinePreview,
+    long HistoryRevision,
+    long DocumentGeneration);
 
 public sealed partial class AnimationWorkbenchDocument : IDisposable
 {
@@ -178,11 +188,18 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
     private bool _isDirty;
     private string? _projectResourcePath;
     private bool _isClosed;
+    private long _documentGeneration;
 
     public AnimationWorkbenchDocument(
         IAnimationWorkbenchPreviewHost? previewHost = null)
     {
         _previewHost = previewHost ?? new EmptyPreviewHost();
+    }
+
+    public AnimationWorkbenchDocumentState GetState()
+    {
+        ObjectDisposedException.ThrowIf(_isClosed, this);
+        return CreateState();
     }
 
     public AnimationWorkbenchDocumentState Load(
@@ -208,6 +225,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
         _projectResourcePath = null;
+        _documentGeneration++;
         ResetDocumentHistory();
 
         ShowCurrentPreview();
@@ -371,7 +389,10 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _isClosed,
             _undoEdits.Count != 0,
             _redoEdits.Count != 0,
-            _posePreviewResult != null);
+            _posePreviewResult != null,
+            _timelinePreviewResult != null,
+            _currentHistoryRevision,
+            _documentGeneration);
     }
 
     private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()
@@ -383,10 +404,12 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported));
         }
 
-        if (_posePreviewResult != null)
+        if (_posePreviewResult != null || _timelinePreviewResult != null)
         {
             diagnostics.Add(CreateSaveDiagnostic(
-                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
+                _posePreviewResult != null
+                    ? AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive
+                    : AnimationWorkbenchDiagnosticCode.TimelinePreviewAlreadyActive));
         }
 
         if (_result == null)
@@ -578,7 +601,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             AnimationWorkbenchPreviewKind.AnimationA => _animationA,
             AnimationWorkbenchPreviewKind.AnimationB => _animationB,
             AnimationWorkbenchPreviewKind.Result =>
-                _posePreviewResult ?? _result,
+                _timelinePreviewResult ?? _posePreviewResult ?? _result,
             _ => null,
         };
 
@@ -673,6 +696,13 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             replacement.Clone(),
             skeleton.Clone(new AnimationPlayer()),
             format);
+
+        public SourceSnapshot WithPreviewAnimation(
+            AnimationClip replacement) => new(
+                name,
+                replacement,
+                skeleton,
+                format);
 
         public AnimationWorkbenchSourceSummary CreateSummary() => new(
             name,
