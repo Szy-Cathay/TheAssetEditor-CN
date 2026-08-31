@@ -12,6 +12,8 @@
     FontFamily="{DynamicResource AppFontFamily}"
     FontWeight="{DynamicResource AppFontWeight}"
     Foreground="{DynamicResource AeBrush.TextPrimary}"
+    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Timeline.Title}"
+    FocusVisualStyle="{StaticResource AeFocus.Keyboard}"
     Focusable="True"
     Loaded="Root_Loaded"
     PreviewKeyDown="Root_PreviewKeyDown"
@@ -256,7 +258,9 @@
                         BorderThickness="0,0,0,1">
                         <local:AnimationWorkbenchTimelineTrack
                             x:Name="RulerTrack"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.Timeline.RulerAutomationName}"
                             Controller="{Binding ElementName=Root, Path=Controller}"
+                            FocusVisualStyle="{StaticResource AeFocus.Keyboard}"
                             IsRuler="True"
                             EditResultAvailable="Track_EditResultAvailable" />
                     </Border>
@@ -308,8 +312,11 @@
                                     </Border>
                                     <local:AnimationWorkbenchTimelineTrack
                                         Grid.Column="1"
+                                        AutomationProperties.HelpText="{Binding BoneName}"
+                                        AutomationProperties.Name="{loc:Loc AnimationWorkbench.Timeline.TrackAutomationName}"
                                         BoneName="{Binding BoneName}"
                                         Controller="{Binding RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Path=Controller}"
+                                        FocusVisualStyle="{StaticResource AeFocus.Keyboard}"
                                         EditResultAvailable="Track_EditResultAvailable" />
                                 </Grid>
                             </DataTemplate>

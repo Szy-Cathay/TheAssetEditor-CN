@@ -376,10 +376,8 @@ public sealed partial class AnimationWorkbenchDocument
                  targetIndex < targetFrameCount;
                  targetIndex++)
             {
-                var sourcePosition = targetFrameCount == 1
-                    ? 0
-                    : (double)targetIndex * (range.Length - 1) /
-                      (targetFrameCount - 1);
+                var sourcePosition = (double)targetIndex * range.Length /
+                    targetFrameCount;
                 var lowerOffset = (int)Math.Floor(sourcePosition);
                 var upperOffset = Math.Min(
                     range.Length - 1,
@@ -408,11 +406,13 @@ public sealed partial class AnimationWorkbenchDocument
                     return anchor + frameCountDelta;
                 if (range.Length == 1 || targetFrameCount == 1)
                     return range.StartFrame;
-                var fraction = (double)(anchor - range.StartFrame) /
-                    (range.Length - 1);
-                return range.StartFrame + (int)Math.Round(
-                    fraction * (targetFrameCount - 1),
+                var mappedOffset = (int)Math.Round(
+                    (double)(anchor - range.StartFrame) * targetFrameCount /
+                    range.Length,
                     MidpointRounding.AwayFromZero);
+                return range.StartFrame + Math.Min(
+                    targetFrameCount - 1,
+                    mappedOffset);
             }).ToArray();
             return SetTimelinePreview(next, nextAnchors);
         }
@@ -706,34 +706,63 @@ public sealed partial class AnimationWorkbenchDocument
 
     private static string? GetMirrorCounterpart(string boneName)
     {
-        if (boneName.EndsWith("_l", StringComparison.OrdinalIgnoreCase) ||
-            boneName.EndsWith(".l", StringComparison.OrdinalIgnoreCase))
-        {
-            return boneName[..^1] +
-                (char.IsUpper(boneName[^1]) ? "R" : "r");
-        }
+        return TrySwapSideToken(boneName, "left", "right") ??
+            TrySwapSideToken(boneName, "right", "left") ??
+            TrySwapSideToken(boneName, "l", "r") ??
+            TrySwapSideToken(boneName, "r", "l");
+    }
 
-        if (boneName.EndsWith("_r", StringComparison.OrdinalIgnoreCase) ||
-            boneName.EndsWith(".r", StringComparison.OrdinalIgnoreCase))
+    private static string? TrySwapSideToken(
+        string boneName,
+        string sourceToken,
+        string targetToken)
+    {
+        var searchStart = 0;
+        while (searchStart < boneName.Length)
         {
-            return boneName[..^1] +
-                (char.IsUpper(boneName[^1]) ? "L" : "l");
-        }
+            var tokenIndex = boneName.IndexOf(
+                sourceToken,
+                searchStart,
+                StringComparison.OrdinalIgnoreCase);
+            if (tokenIndex < 0)
+                return null;
 
-        if (boneName.StartsWith("l_", StringComparison.OrdinalIgnoreCase))
-        {
-            return (char.IsUpper(boneName[0]) ? "R" : "r") +
-                boneName[1..];
-        }
+            var tokenEnd = tokenIndex + sourceToken.Length;
+            var startsAtBoundary = tokenIndex == 0 ||
+                IsBoneNameSeparator(boneName[tokenIndex - 1]);
+            var endsAtBoundary = tokenEnd == boneName.Length ||
+                IsBoneNameSeparator(boneName[tokenEnd]);
+            if (startsAtBoundary && endsAtBoundary)
+            {
+                return boneName[..tokenIndex] +
+                    MatchTokenCase(
+                        boneName.AsSpan(tokenIndex, sourceToken.Length),
+                        targetToken) +
+                    boneName[tokenEnd..];
+            }
 
-        if (boneName.StartsWith("r_", StringComparison.OrdinalIgnoreCase))
-        {
-            return (char.IsUpper(boneName[0]) ? "L" : "l") +
-                boneName[1..];
+            searchStart = tokenIndex + sourceToken.Length;
         }
 
         return null;
     }
+
+    private static string MatchTokenCase(
+        ReadOnlySpan<char> sourceToken,
+        string targetToken)
+    {
+        if (sourceToken.ToString().All(char.IsUpper))
+            return targetToken.ToUpperInvariant();
+        if (char.IsUpper(sourceToken[0]))
+        {
+            return char.ToUpperInvariant(targetToken[0]) + targetToken[1..];
+        }
+
+        return targetToken;
+    }
+
+    private static bool IsBoneNameSeparator(char value) =>
+        value is '_' or '.' or '-';
 
     private static Vector3 MirrorPosition(Vector3 value) =>
         new(-value.X, value.Y, value.Z);
@@ -833,6 +862,12 @@ public sealed class AnimationWorkbenchTimelineController :
     private int _selectionAnchorIndex = -1;
     private int[]? _moveSourceFrames;
     private int _moveSourceStart;
+    private int _lastMovePreviewDelta = int.MinValue;
+    private AnimationWorkbenchTimelineEditResult? _lastMovePreviewResult;
+    private SelectionSnapshot? _previewSelectionStart;
+    private readonly Dictionary<long, SelectionSnapshot>
+        _selectionByHistoryRevision = [];
+    private long _observedHistoryRevision;
     private IReadOnlyList<AnimationWorkbenchTimelineTrackRow> _tracks = [];
     private IReadOnlyList<int> _visibleFrameIndices = [];
 
@@ -845,6 +880,8 @@ public sealed class AnimationWorkbenchTimelineController :
     {
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _timeline = document.GetTimelineSnapshot();
+        _observedHistoryRevision = document.GetState().HistoryRevision;
+        RememberSelectionForCurrentRevision();
         RefreshTracks();
         RefreshVisibleFrames();
     }
@@ -932,9 +969,13 @@ public sealed class AnimationWorkbenchTimelineController :
 
     public int SnapFrameFromViewportX(double viewportX)
     {
-        return (int)Math.Round(
-            FramePositionFromViewportX(viewportX),
-            MidpointRounding.AwayFromZero);
+        if (_timeline.FrameCount == 0)
+            return 0;
+        return Math.Clamp(
+            (int)Math.Floor(
+                (_horizontalOffset + viewportX) / PixelsPerFrame),
+            0,
+            _timeline.FrameCount - 1);
     }
 
     public void SelectFrame(int frameIndex, bool extendRange, bool toggle)
@@ -960,6 +1001,7 @@ public sealed class AnimationWorkbenchTimelineController :
         }
 
         _focusedFrameIndex = frameIndex;
+        RememberSelectionForCurrentRevision();
         NotifyChanged();
     }
 
@@ -979,6 +1021,7 @@ public sealed class AnimationWorkbenchTimelineController :
         AddSelectionRange(startFrame, endFrame);
         _selectionAnchorIndex = startFrame;
         _focusedFrameIndex = endFrame;
+        RememberSelectionForCurrentRevision();
         NotifyChanged();
     }
 
@@ -1006,16 +1049,22 @@ public sealed class AnimationWorkbenchTimelineController :
         }
 
         _focusedFrameIndex = next;
+        RememberSelectionForCurrentRevision();
         NotifyChanged();
     }
 
     public AnimationWorkbenchTimelineEditResult BeginMoveSelection()
     {
+        _previewSelectionStart = CaptureSelection();
         _moveSourceFrames = _selectedFrames.ToArray();
         _moveSourceStart = _moveSourceFrames.Length == 0
             ? -1
             : _moveSourceFrames[0];
         var result = _document.BeginTimelinePreview();
+        if (result.Succeeded == false)
+            _previewSelectionStart = null;
+        _lastMovePreviewDelta = int.MinValue;
+        _lastMovePreviewResult = null;
         Refresh();
         return result;
     }
@@ -1026,9 +1075,16 @@ public sealed class AnimationWorkbenchTimelineController :
         var frameDelta = (int)Math.Round(
             horizontalPixels / PixelsPerFrame,
             MidpointRounding.AwayFromZero);
+        if (frameDelta == _lastMovePreviewDelta &&
+            _lastMovePreviewResult != null)
+        {
+            return _lastMovePreviewResult;
+        }
         var result = _document.PreviewMoveFrames(
             _moveSourceFrames,
             frameDelta);
+        _lastMovePreviewDelta = frameDelta;
+        _lastMovePreviewResult = result;
         if (result.Succeeded && _moveSourceFrames != null)
         {
             _selectedFrames.Clear();
@@ -1051,24 +1107,24 @@ public sealed class AnimationWorkbenchTimelineController :
     {
         var result = _document.CommitTimelinePreview();
         _moveSourceFrames = null;
+        _lastMovePreviewResult = null;
+        _previewSelectionStart = null;
         Refresh();
+        if (result.Succeeded)
+            RememberSelectionForCurrentRevision();
         return result;
     }
 
     public AnimationWorkbenchTimelineEditResult CancelMoveSelection()
     {
-        var sourceFrames = _moveSourceFrames;
+        var sourceSelection = _previewSelectionStart;
         var result = _document.CancelTimelinePreview();
-        if (result.Succeeded && sourceFrames != null)
-        {
-            _selectedFrames.Clear();
-            foreach (var frameIndex in sourceFrames)
-                _selectedFrames.Add(frameIndex);
-            _selectionAnchorIndex = sourceFrames.FirstOrDefault(-1);
-            _focusedFrameIndex = sourceFrames.LastOrDefault(-1);
-        }
         _moveSourceFrames = null;
+        _lastMovePreviewResult = null;
+        _previewSelectionStart = null;
         Refresh();
+        if (result.Succeeded && sourceSelection != null)
+            RestoreSelection(sourceSelection);
         return result;
     }
 
@@ -1076,6 +1132,17 @@ public sealed class AnimationWorkbenchTimelineController :
     {
         _timeline = _document.GetTimelineSnapshot();
         RefreshTracks();
+        var historyRevision = _document.GetState().HistoryRevision;
+        if (historyRevision != _observedHistoryRevision)
+        {
+            _observedHistoryRevision = historyRevision;
+            if (_selectionByHistoryRevision.TryGetValue(
+                    historyRevision,
+                    out var selection))
+            {
+                RestoreSelection(selection, notify: false);
+            }
+        }
         _selectedFrames.RemoveWhere(index =>
             index < 0 || index >= _timeline.FrameCount);
         if (_focusedFrameIndex >= _timeline.FrameCount)
@@ -1086,48 +1153,71 @@ public sealed class AnimationWorkbenchTimelineController :
     }
 
     public AnimationWorkbenchTimelineEditResult PreviewTrimSelection() =>
-        BeginSelectedRangePreview((document, range) =>
-            document.PreviewTrimRange(range));
+        BeginSelectedRangePreview(
+            (document, range) => document.PreviewTrimRange(range),
+            (_, timeline) => new AnimationWorkbenchFrameRange(
+                0,
+                timeline.FrameCount));
 
     public AnimationWorkbenchTimelineEditResult PreviewReverseSelection() =>
-        BeginSelectedRangePreview((document, range) =>
-            document.PreviewReverseRange(range));
+        BeginSelectedRangePreview(
+            (document, range) => document.PreviewReverseRange(range),
+            (range, _) => range);
 
     public AnimationWorkbenchTimelineEditResult PreviewLoopSelection(
-        int repeatCount) => BeginSelectedRangePreview((document, range) =>
-            document.PreviewLoopRange(range, repeatCount));
+        int repeatCount) => BeginSelectedRangePreview(
+            (document, range) => document.PreviewLoopRange(range, repeatCount),
+            (range, _) => new AnimationWorkbenchFrameRange(
+                range.StartFrame,
+                range.StartFrame + range.Length * repeatCount));
 
     public AnimationWorkbenchTimelineEditResult PreviewStretchSelection(
-        int targetFrameCount) => BeginSelectedRangePreview((document, range) =>
-            document.PreviewStretchRange(range, targetFrameCount));
+        int targetFrameCount) => BeginSelectedRangePreview(
+            (document, range) => document.PreviewStretchRange(
+                range,
+                targetFrameCount),
+            (range, _) => new AnimationWorkbenchFrameRange(
+                range.StartFrame,
+                range.StartFrame + targetFrameCount));
 
     public AnimationWorkbenchTimelineEditResult PreviewInterpolateSelection() =>
-        BeginSelectedRangePreview((document, range) =>
-            document.PreviewInterpolateRange(range));
+        BeginSelectedRangePreview(
+            (document, range) => document.PreviewInterpolateRange(range),
+            (range, _) => range);
 
     public AnimationWorkbenchTimelineEditResult PreviewMirrorSelection() =>
-        BeginSelectedRangePreview((document, range) =>
-            document.PreviewMirrorRange(range));
+        BeginSelectedRangePreview(
+            (document, range) => document.PreviewMirrorRange(range),
+            (range, _) => range);
 
     public AnimationWorkbenchTimelineEditResult PreviewSplit(
         AnimationWorkbenchSplitPart part)
     {
-        return BeginPreview(document => document.PreviewSplitAt(
-            _focusedFrameIndex,
-            part));
+        return BeginPreview(
+            document => document.PreviewSplitAt(_focusedFrameIndex, part),
+            timeline => new AnimationWorkbenchFrameRange(
+                0,
+                timeline.FrameCount));
     }
 
     public AnimationWorkbenchTimelineEditResult CommitPreview()
     {
         var result = _document.CommitTimelinePreview();
+        _previewSelectionStart = null;
         Refresh();
+        if (result.Succeeded)
+            RememberSelectionForCurrentRevision();
         return result;
     }
 
     public AnimationWorkbenchTimelineEditResult CancelPreview()
     {
         var result = _document.CancelTimelinePreview();
+        var sourceSelection = _previewSelectionStart;
+        _previewSelectionStart = null;
         Refresh();
+        if (result.Succeeded && sourceSelection != null)
+            RestoreSelection(sourceSelection);
         return result;
     }
 
@@ -1217,27 +1307,108 @@ public sealed class AnimationWorkbenchTimelineController :
     private AnimationWorkbenchTimelineEditResult BeginSelectedRangePreview(
         Func<AnimationWorkbenchDocument,
             AnimationWorkbenchFrameRange,
-            AnimationWorkbenchTimelineEditResult> preview)
+            AnimationWorkbenchTimelineEditResult> preview,
+        Func<AnimationWorkbenchFrameRange,
+            AnimationWorkbenchTimelineSnapshot,
+            AnimationWorkbenchFrameRange> mapSelection)
     {
         var range = SelectedRange;
         if (range == null || range.Value.Length != _selectedFrames.Count)
             return CreateControllerFailure(
                 AnimationWorkbenchDiagnosticCode.TimelineSelectionInvalid);
-        return BeginPreview(document => preview(document, range.Value));
+        return BeginPreview(
+            document => preview(document, range.Value),
+            timeline => mapSelection(range.Value, timeline));
     }
 
     private AnimationWorkbenchTimelineEditResult BeginPreview(
         Func<AnimationWorkbenchDocument,
-            AnimationWorkbenchTimelineEditResult> preview)
+            AnimationWorkbenchTimelineEditResult> preview,
+        Func<AnimationWorkbenchTimelineSnapshot,
+            AnimationWorkbenchFrameRange>? mapSelection = null)
     {
+        var sourceSelection = CaptureSelection();
         var begin = _document.BeginTimelinePreview();
         if (begin.Succeeded == false)
             return begin;
+        _previewSelectionStart = sourceSelection;
         var result = preview(_document);
         if (result.Succeeded == false)
+        {
             _document.CancelTimelinePreview();
+            _previewSelectionStart = null;
+        }
         Refresh();
+        if (result.Succeeded && mapSelection != null)
+            SelectRange(mapSelection(result.Timeline), notify: true);
+        else if (result.Succeeded == false)
+            RestoreSelection(sourceSelection);
         return result;
+    }
+
+    private SelectionSnapshot CaptureSelection() => new(
+        _selectedFrames.ToArray(),
+        _focusedFrameIndex,
+        _selectionAnchorIndex);
+
+    private void RestoreSelection(
+        SelectionSnapshot selection,
+        bool notify = true)
+    {
+        _selectedFrames.Clear();
+        foreach (var frameIndex in selection.FrameIndices.Where(index =>
+                     index >= 0 && index < _timeline.FrameCount))
+        {
+            _selectedFrames.Add(frameIndex);
+        }
+        _focusedFrameIndex = Math.Clamp(
+            selection.FocusedFrameIndex,
+            -1,
+            _timeline.FrameCount - 1);
+        _selectionAnchorIndex = Math.Clamp(
+            selection.SelectionAnchorIndex,
+            -1,
+            _timeline.FrameCount - 1);
+        if (notify)
+            NotifyChanged();
+    }
+
+    private void SelectRange(
+        AnimationWorkbenchFrameRange range,
+        bool notify)
+    {
+        _selectedFrames.Clear();
+        var startFrame = Math.Clamp(
+            range.StartFrame,
+            0,
+            Math.Max(0, _timeline.FrameCount - 1));
+        var endFrameExclusive = Math.Clamp(
+            range.EndFrameExclusive,
+            startFrame,
+            _timeline.FrameCount);
+        for (var frameIndex = startFrame;
+             frameIndex < endFrameExclusive;
+             frameIndex++)
+        {
+            _selectedFrames.Add(frameIndex);
+        }
+        _selectionAnchorIndex = _selectedFrames.Count == 0
+            ? -1
+            : _selectedFrames.Min;
+        _focusedFrameIndex = _selectedFrames.Count == 0
+            ? -1
+            : _selectedFrames.Max;
+        if (notify)
+            NotifyChanged();
+    }
+
+    private void RememberSelectionForCurrentRevision()
+    {
+        var state = _document.GetState();
+        if (state.HasActiveTimelinePreview || state.HasActivePosePreview)
+            return;
+        _observedHistoryRevision = state.HistoryRevision;
+        _selectionByHistoryRevision[state.HistoryRevision] = CaptureSelection();
     }
 
     private AnimationWorkbenchTimelineEditResult CreateControllerFailure(
@@ -1258,4 +1429,9 @@ public sealed class AnimationWorkbenchTimelineController :
             new PropertyChangedEventArgs(null));
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    private sealed record SelectionSnapshot(
+        IReadOnlyList<int> FrameIndices,
+        int FocusedFrameIndex,
+        int SelectionAnchorIndex);
 }

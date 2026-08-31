@@ -49,6 +49,16 @@ public class AnimationWorkbenchTimelineViewTests
                 source,
                 Does.Contain("AnimationWorkbenchTimelineTrack"));
             NUnitAssert.That(
+                source,
+                Does.Contain("AeFocus.Keyboard"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("AutomationProperties.Name"));
+            NUnitAssert.That(
+                File.ReadAllText(Path.ChangeExtension(xamlPath, ".xaml.cs")),
+                Does.Contain(
+                    "e.OriginalSource is not AnimationWorkbenchTimelineTrack"));
+            NUnitAssert.That(
                 document.Descendants().Any(element =>
                     element.Name.LocalName == nameof(ListBox)),
                 Is.True);

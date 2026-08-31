@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -16,7 +17,7 @@ public sealed class AnimationWorkbenchTimelineEditResultEventArgs : EventArgs
     public AnimationWorkbenchTimelineEditResult Result { get; }
 }
 
-public sealed class AnimationWorkbenchTimelineTrack : FrameworkElement
+public sealed class AnimationWorkbenchTimelineTrack : Control
 {
     public static readonly DependencyProperty ControllerProperty =
         DependencyProperty.Register(

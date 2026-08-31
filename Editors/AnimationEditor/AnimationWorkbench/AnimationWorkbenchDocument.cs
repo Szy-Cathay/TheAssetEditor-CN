@@ -170,7 +170,8 @@ public sealed record AnimationWorkbenchDocumentState(
     bool CanUndo,
     bool CanRedo,
     bool HasActivePosePreview,
-    bool HasActiveTimelinePreview);
+    bool HasActiveTimelinePreview,
+    long HistoryRevision);
 
 public sealed partial class AnimationWorkbenchDocument : IDisposable
 {
@@ -386,7 +387,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _undoEdits.Count != 0,
             _redoEdits.Count != 0,
             _posePreviewResult != null,
-            _timelinePreviewResult != null);
+            _timelinePreviewResult != null,
+            _currentHistoryRevision);
     }
 
     private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()

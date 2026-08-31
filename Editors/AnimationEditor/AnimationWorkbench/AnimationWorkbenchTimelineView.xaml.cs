@@ -235,7 +235,9 @@ public partial class AnimationWorkbenchTimelineView : UserControl
 
     private void Root_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Controller == null || e.OriginalSource is TextBox)
+        if (Controller == null ||
+            e.OriginalSource is not AnimationWorkbenchTimelineTrack &&
+            ReferenceEquals(e.OriginalSource, this) == false)
             return;
 
         var extendRange = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);

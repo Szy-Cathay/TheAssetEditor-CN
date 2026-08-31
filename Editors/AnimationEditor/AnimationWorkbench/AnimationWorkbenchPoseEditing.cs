@@ -46,6 +46,8 @@ public sealed partial class AnimationWorkbenchDocument
     private SourceSnapshot? _posePreviewResult;
     private AnimationClip? _posePreviewStart;
     private AnimationClip? _savedResultAnimation;
+    private long _currentHistoryRevision;
+    private long _nextHistoryRevision;
     private int _posePreviewFrameIndex = -1;
 
     public AnimationWorkbenchPoseEditResult InsertPoseFrame(
@@ -378,6 +380,7 @@ public sealed partial class AnimationWorkbenchDocument
         _redoEdits.Push(entry);
         _result = _result.WithAnimation(entry.Before);
         SetEditingAnchors(entry.BeforeAnchors);
+        _currentHistoryRevision = entry.BeforeRevision;
         UpdateDirtyState();
         RefreshSelectedResultPreview();
         return CreatePoseSuccess();
@@ -406,6 +409,7 @@ public sealed partial class AnimationWorkbenchDocument
         _undoEdits.Push(entry);
         _result = _result.WithAnimation(entry.After);
         SetEditingAnchors(entry.AfterAnchors);
+        _currentHistoryRevision = entry.AfterRevision;
         UpdateDirtyState();
         RefreshSelectedResultPreview();
         return CreatePoseSuccess();
@@ -669,15 +673,19 @@ public sealed partial class AnimationWorkbenchDocument
         AnimationClip next,
         IReadOnlyCollection<int>? nextAnchors = null)
     {
+        var nextRevision = ++_nextHistoryRevision;
         var entry = new DocumentHistoryEntry(
             _result!.Animation.Clone(),
             next.Clone(),
             _editingAnchorFrames.ToArray(),
             NormalizeEditingAnchors(
                 nextAnchors ?? _editingAnchorFrames,
-                next.DynamicFrames.Count));
+                next.DynamicFrames.Count),
+            _currentHistoryRevision,
+            nextRevision);
         _result = _result.WithAnimation(next);
         SetEditingAnchors(entry.AfterAnchors);
+        _currentHistoryRevision = nextRevision;
         _undoEdits.Push(entry);
         _redoEdits.Clear();
         UpdateDirtyState();
@@ -691,6 +699,8 @@ public sealed partial class AnimationWorkbenchDocument
         ClearPosePreview();
         ClearTimelinePreview();
         _savedResultAnimation = null;
+        _currentHistoryRevision = 0;
+        _nextHistoryRevision = 0;
         ResetEditingAnchors();
         UpdateDirtyState();
     }
@@ -810,5 +820,7 @@ public sealed partial class AnimationWorkbenchDocument
         AnimationClip Before,
         AnimationClip After,
         IReadOnlyList<int> BeforeAnchors,
-        IReadOnlyList<int> AfterAnchors);
+        IReadOnlyList<int> AfterAnchors,
+        long BeforeRevision,
+        long AfterRevision);
 }

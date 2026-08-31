@@ -1045,6 +1045,8 @@
   "AnimationWorkbench.Timeline.EditApplied": "编辑已应用，可使用撤销或重做继续调整。",
   "AnimationWorkbench.Timeline.PositiveIntegerRequired": "请输入大于零的整数。",
   "AnimationWorkbench.Timeline.BoneTrack": "骨骼轨道",
+  "AnimationWorkbench.Timeline.RulerAutomationName": "动画时间轴标尺",
+  "AnimationWorkbench.Timeline.TrackAutomationName": "动画骨骼时间轴轨道",
   "AnimationWorkbench.Timeline.InteractionHint": "键盘：←/→ 逐帧选择，Shift+←/→ 扩展范围，Ctrl+Z/Y 撤销或重做，Enter 应用预览，Esc 取消预览。",
 
   "MountAnim.RefreshTool": "刷新工具",

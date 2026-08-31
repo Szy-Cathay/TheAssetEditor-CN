@@ -68,20 +68,24 @@ public class AnimationWorkbenchTimelineEditingTests
         Assert.AreEqual(2, controller.FocusedFrameIndex);
 
         Assert.AreEqual(
+            0,
+            controller.SnapFrameFromViewportX(
+                0.5 * controller.PixelsPerFrame));
+        Assert.AreEqual(
             3,
             controller.SnapFrameFromViewportX(
-                3.49 * controller.PixelsPerFrame));
+                3.5 * controller.PixelsPerFrame));
         Assert.AreEqual(
             4,
             controller.SnapFrameFromViewportX(
-                3.51 * controller.PixelsPerFrame));
+                4.01 * controller.PixelsPerFrame));
 
         controller.BoxSelect(
             1.6 * controller.PixelsPerFrame,
             5.4 * controller.PixelsPerFrame,
             extendSelection: false);
         CollectionAssert.AreEqual(
-            new[] { 2, 3, 4, 5 },
+            new[] { 1, 2, 3, 4, 5 },
             controller.SelectedFrameIndices.ToArray());
     }
 
@@ -234,11 +238,11 @@ public class AnimationWorkbenchTimelineEditingTests
             new AnimationWorkbenchFrameRange(1, 5),
             targetFrameCount: 2).Succeeded);
         var stretched = ResultClip(stretchDocument);
-        CollectionAssert.AreEqual(
-            new[] { 0f, 1f, 4f, 5f },
-            RootPositions(stretched));
         Assert.AreEqual(4, stretched.DynamicFrames.Count);
         Assert.AreEqual(TimeSpan.FromSeconds(0.2), stretched.Duration);
+        CollectionAssert.AreEqual(
+            new[] { 0f, 1f, 3f, 5f },
+            RootPositions(stretched));
     }
 
     [TestMethod]
@@ -277,6 +281,81 @@ public class AnimationWorkbenchTimelineEditingTests
             new Vector3(2, 0, 0),
             ResultClip(mirrorDocument).DynamicFrames[0].Position[1]);
         Assert.IsTrue(mirrorDocument.Redo().Succeeded);
+    }
+
+    [TestMethod]
+    public void Mirror_RecognizesLongAndEmbeddedSideTokens()
+    {
+        using var document = CreateLoadedDocument(
+            CreateMirrorClip(),
+            CreateSkeleton(
+                ("root", AnimationFile.BoneIndexNoParent),
+                ("hand_left", 0),
+                ("hand_right", 0)));
+        Assert.IsTrue(document.BeginTimelinePreview().Succeeded);
+
+        var result = document.PreviewMirrorRange(
+            new AnimationWorkbenchFrameRange(0, 1));
+        var frame = ResultClip(document).DynamicFrames[0];
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(new Vector3(-3, 0, 0), frame.Position[1]);
+        Assert.AreEqual(new Vector3(-2, 0, 0), frame.Position[2]);
+
+        using var embeddedDocument = CreateLoadedDocument(
+            CreateMirrorClip(),
+            CreateSkeleton(
+                ("root", AnimationFile.BoneIndexNoParent),
+                ("leg_left_0", 0),
+                ("leg_right_0", 0)));
+        Assert.IsTrue(embeddedDocument.BeginTimelinePreview().Succeeded);
+        Assert.IsTrue(embeddedDocument.PreviewMirrorRange(
+            new AnimationWorkbenchFrameRange(0, 1)).Succeeded);
+        var embeddedFrame = ResultClip(embeddedDocument).DynamicFrames[0];
+        Assert.AreEqual(new Vector3(-3, 0, 0), embeddedFrame.Position[1]);
+        Assert.AreEqual(new Vector3(-2, 0, 0), embeddedFrame.Position[2]);
+    }
+
+    [TestMethod]
+    public void MovePreview_DeduplicatesMouseEventsWithinTheSameSnappedFrame()
+    {
+        using var document = CreateLoadedDocument(CreateClip(2_000));
+        var controller = new AnimationWorkbenchTimelineController(document);
+        controller.SelectFrame(20, extendRange: false, toggle: false);
+        Assert.IsTrue(controller.BeginMoveSelection().Succeeded);
+
+        var first = controller.PreviewMoveSelectionByPixels(
+            2.1 * controller.PixelsPerFrame);
+        var duplicate = controller.PreviewMoveSelectionByPixels(
+            2.4 * controller.PixelsPerFrame);
+
+        Assert.AreSame(first, duplicate);
+        Assert.IsTrue(controller.CancelMoveSelection().Succeeded);
+    }
+
+    [TestMethod]
+    public void RangeEdit_MapsSelectionAndRestoresItAcrossUndoRedo()
+    {
+        using var document = CreateLoadedDocument(CreateClip(8));
+        var controller = new AnimationWorkbenchTimelineController(document);
+        controller.SelectFrame(2, extendRange: false, toggle: false);
+        controller.SelectFrame(5, extendRange: true, toggle: false);
+
+        Assert.IsTrue(controller.PreviewStretchSelection(2).Succeeded);
+        CollectionAssert.AreEqual(
+            new[] { 2, 3 },
+            controller.SelectedFrameIndices.ToArray());
+        Assert.IsTrue(controller.CommitPreview().Succeeded);
+
+        Assert.IsTrue(controller.Undo().Succeeded);
+        CollectionAssert.AreEqual(
+            new[] { 2, 3, 4, 5 },
+            controller.SelectedFrameIndices.ToArray());
+
+        Assert.IsTrue(controller.Redo().Succeeded);
+        CollectionAssert.AreEqual(
+            new[] { 2, 3 },
+            controller.SelectedFrameIndices.ToArray());
     }
 
     [TestMethod]
