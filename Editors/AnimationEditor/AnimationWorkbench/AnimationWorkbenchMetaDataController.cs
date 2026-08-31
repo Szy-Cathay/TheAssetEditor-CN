@@ -24,6 +24,9 @@ public sealed class AnimationWorkbenchMetaDataController :
 
     public event EventHandler? Changed;
 
+    public event EventHandler<AnimationWorkbenchMetaDataNavigationLocation>?
+        NavigationRequested;
+
     public ObservableCollection<AnimationWorkbenchMetaDataProblemItem>
         Problems { get; } = [];
 
@@ -56,7 +59,10 @@ public sealed class AnimationWorkbenchMetaDataController :
         AnimationWorkbenchMetaDataProblemItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        return _document.NavigateToMetaDataProblem(item.Problem);
+        var result = _document.NavigateToMetaDataProblem(item.Problem);
+        if (result.Succeeded && result.Location != null)
+            NavigationRequested?.Invoke(this, result.Location);
+        return result;
     }
 
     public void Refresh()
@@ -70,10 +76,10 @@ public sealed class AnimationWorkbenchMetaDataController :
         foreach (var problem in state.MetaDataProblems)
             Problems.Add(new AnimationWorkbenchMetaDataProblemItem(problem));
         DirtyStateText = LocalizationManager.Instance.Get(
-            !state.IsMetaDataSynchronizationEnabled
-                ? "AnimationWorkbench.MetaData.Disabled"
-                : state.IsMetaDataDirty
-                    ? "AnimationWorkbench.MetaData.Unsaved"
+            state.IsMetaDataDirty
+                ? "AnimationWorkbench.MetaData.Unsaved"
+                : !state.IsMetaDataSynchronizationEnabled
+                    ? "AnimationWorkbench.MetaData.Disabled"
                     : "AnimationWorkbench.MetaData.Saved");
         OnPropertyChanged(nameof(IsSynchronizationEnabled));
         OnPropertyChanged(nameof(HasProblems));

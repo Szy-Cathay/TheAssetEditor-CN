@@ -1,7 +1,5 @@
-using System.IO;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
-using Shared.Core.PackFiles.Utility;
 using Shared.GameFormats.AnimationMeta.Parsing;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
@@ -121,6 +119,7 @@ public sealed partial class AnimationWorkbenchDocument
     private IReadOnlyList<AnimationWorkbenchMetaDataProblem>
         _layerPreviewMetaDataProblems = [];
     private bool _isMetaDataSynchronizationEnabled;
+    private bool _isMetaDataSaveTrackingEnabled;
     private string? _projectMetaDataResourcePath;
 
     public AnimationWorkbenchMetaDataSnapshot? GetMetaDataSnapshot(
@@ -183,43 +182,15 @@ public sealed partial class AnimationWorkbenchDocument
                     .MetaDataCandidateSerializationFailed);
         }
 
-        string normalizedPath;
-        try
-        {
-            normalizedPath = FolderProjectPathPolicy.EnsureResourcePath(
-                resourcePath);
-        }
-        catch (Exception exception)
-            when (exception is ArgumentException or
-                  InvalidDataException or
-                  NotSupportedException)
-        {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationInvalid);
-        }
-
-        var directory = Path.GetDirectoryName(normalizedPath) ?? "";
-        var fileName = Path.GetFileName(normalizedPath);
-        try
-        {
-            packFileService.AddFilesToPack(
+        if (!TryWriteNewProjectResource(
+                packFileService,
                 project,
-                [
-                    new NewPackFileEntry(
-                        directory,
-                        PackFile.CreateFromBytes(fileName, bytes)),
-                ],
-                overwriteExisting: false);
-        }
-        catch (FolderProjectFileConflictException)
+                resourcePath,
+                bytes,
+                out var normalizedPath,
+                out var writeDiagnostic))
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationAlreadyExists);
-        }
-        catch
-        {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationWriteFailed);
+            return CreateSaveFailure(writeDiagnostic);
         }
 
         _projectMetaDataResourcePath = normalizedPath;
@@ -235,6 +206,16 @@ public sealed partial class AnimationWorkbenchDocument
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
         _isMetaDataSynchronizationEnabled = enabled;
+        if (enabled)
+        {
+            _isMetaDataSaveTrackingEnabled = true;
+        }
+        else
+        {
+            ClearMetaDataTimelinePreview();
+            ClearBlendMetaDataPreview();
+            ClearLayerMetaDataPreview();
+        }
         UpdateDirtyState();
         return CreateState();
     }
@@ -253,15 +234,25 @@ public sealed partial class AnimationWorkbenchDocument
                 null);
         }
 
+        var location = new AnimationWorkbenchMetaDataNavigationLocation(
+            problem.Source,
+            problem.SourceAttributeIndex,
+            problem.ResultAttributeIndex,
+            problem.SourceStartTime,
+            problem.ResultStartTime);
+        var previewKind = problem.Source switch
+        {
+            AnimationWorkbenchSourceSlot.AnimationA =>
+                AnimationWorkbenchPreviewKind.AnimationA,
+            AnimationWorkbenchSourceSlot.AnimationB =>
+                AnimationWorkbenchPreviewKind.AnimationB,
+            _ => AnimationWorkbenchPreviewKind.Result,
+        };
+        SelectPreview(previewKind);
         return new AnimationWorkbenchMetaDataNavigationResult(
             true,
             CreateState(),
-            new AnimationWorkbenchMetaDataNavigationLocation(
-                problem.Source,
-                problem.SourceAttributeIndex,
-                problem.ResultAttributeIndex,
-                problem.SourceStartTime,
-                problem.ResultStartTime));
+            location);
     }
 
     private void LoadMetaData(AnimationWorkbenchLoadRequest request)
@@ -274,6 +265,7 @@ public sealed partial class AnimationWorkbenchDocument
             _metaDataParser);
         _resultMetaData = _animationAMetaData?.CloneAs("result.anm.meta");
         _isMetaDataSynchronizationEnabled = request.SynchronizeMetaData;
+        _isMetaDataSaveTrackingEnabled = request.SynchronizeMetaData;
         _savedResultMetaData = null;
         _projectMetaDataResourcePath = null;
         _retargetedAnimationAMetaData = null;
@@ -308,6 +300,7 @@ public sealed partial class AnimationWorkbenchDocument
         _blendPreviewMetaDataProblems = [];
         _layerPreviewMetaDataProblems = [];
         _isMetaDataSynchronizationEnabled = false;
+        _isMetaDataSaveTrackingEnabled = false;
     }
 
     private void ResetMetaDataHistory()
@@ -323,7 +316,7 @@ public sealed partial class AnimationWorkbenchDocument
     }
 
     private bool IsMetaDataDirty() =>
-        _isMetaDataSynchronizationEnabled &&
+        _isMetaDataSaveTrackingEnabled &&
         _resultMetaData != null &&
         (_savedResultMetaData == null ||
          !_resultMetaData.BytesEqual(_savedResultMetaData));
@@ -658,21 +651,23 @@ public sealed partial class AnimationWorkbenchDocument
             problems,
             _retargetedAnimationAMetaData ?? _animationAMetaData,
             AnimationWorkbenchSourceSlot.AnimationA,
-            0,
-            sourceAEndSeconds,
-            0,
-            impact.OutputFramesPerSecond,
-            impact.OutputDuration.TotalSeconds);
+            new MetaDataTimeMapping(
+                0,
+                sourceAEndSeconds,
+                0,
+                impact.OutputFramesPerSecond,
+                impact.OutputDuration.TotalSeconds));
         AppendMappedMetaData(
             mapped,
             problems,
             _retargetedAnimationBMetaData ?? _animationBMetaData,
             AnimationWorkbenchSourceSlot.AnimationB,
-            sourceBStartSeconds,
-            animationB.Duration.TotalSeconds,
-            transitionStartSeconds,
-            impact.OutputFramesPerSecond,
-            impact.OutputDuration.TotalSeconds);
+            new MetaDataTimeMapping(
+                sourceBStartSeconds,
+                animationB.Duration.TotalSeconds,
+                transitionStartSeconds,
+                impact.OutputFramesPerSecond,
+                impact.OutputDuration.TotalSeconds));
         AppendRetargetMetaDataProblems(
             mapped,
             problems,
@@ -701,12 +696,7 @@ public sealed partial class AnimationWorkbenchDocument
         ICollection<AnimationWorkbenchMetaDataProblem> problems,
         MetaDataDocumentSnapshot? source,
         AnimationWorkbenchSourceSlot slot,
-        double sourceStartSeconds,
-        double sourceEndSeconds,
-        double outputStartSeconds,
-        double outputFramesPerSecond,
-        double outputDurationSeconds,
-        double timeScale = 1)
+        MetaDataTimeMapping timeMapping)
     {
         if (source == null)
             return;
@@ -764,8 +754,8 @@ public sealed partial class AnimationWorkbenchDocument
                 else if (IsOutsideSourceRange(
                              startTime,
                              endTime,
-                             sourceStartSeconds,
-                             sourceEndSeconds))
+                             timeMapping.SourceStartSeconds,
+                             timeMapping.SourceEndSeconds))
                 {
                     problems.Add(new AnimationWorkbenchMetaDataProblem(
                         AnimationWorkbenchMetaDataProblemCode
@@ -779,20 +769,26 @@ public sealed partial class AnimationWorkbenchDocument
                 }
                 else
                 {
-                    var clippedStart = Math.Max(startTime, sourceStartSeconds);
-                    var clippedEnd = Math.Min(endTime, sourceEndSeconds);
+                    var clippedStart = Math.Max(
+                        startTime,
+                        timeMapping.SourceStartSeconds);
+                    var clippedEnd = Math.Min(
+                        endTime,
+                        timeMapping.SourceEndSeconds);
                     var mappedStart = QuantizeMetaDataTime(
-                        (clippedStart - sourceStartSeconds) * timeScale +
-                            outputStartSeconds,
-                        outputFramesPerSecond,
+                        (clippedStart - timeMapping.SourceStartSeconds) *
+                            timeMapping.TimeScale +
+                            timeMapping.OutputStartSeconds,
+                        timeMapping.OutputFramesPerSecond,
                         roundUp: false,
-                        outputDurationSeconds);
+                        timeMapping.OutputDurationSeconds);
                     var mappedEnd = QuantizeMetaDataTime(
-                        (clippedEnd - sourceStartSeconds) * timeScale +
-                            outputStartSeconds,
-                        outputFramesPerSecond,
+                        (clippedEnd - timeMapping.SourceStartSeconds) *
+                            timeMapping.TimeScale +
+                            timeMapping.OutputStartSeconds,
+                        timeMapping.OutputFramesPerSecond,
                         roundUp: true,
-                        outputDurationSeconds);
+                        timeMapping.OutputDurationSeconds);
                     SetTimeRange(attribute, mappedStart, mappedEnd);
                     startTime = mappedStart;
                     endTime = mappedEnd;
@@ -982,23 +978,25 @@ public sealed partial class AnimationWorkbenchDocument
             problems,
             _retargetedAnimationAMetaData ?? _animationAMetaData,
             AnimationWorkbenchSourceSlot.AnimationA,
-            0,
-            animationA.Duration.TotalSeconds,
-            0,
-            outputFramesPerSecond,
-            outputDurationSeconds,
-            outputDurationSeconds / animationA.Duration.TotalSeconds);
+            new MetaDataTimeMapping(
+                0,
+                outputDurationSeconds,
+                0,
+                outputFramesPerSecond,
+                outputDurationSeconds));
         AppendMappedMetaData(
             mapped,
             problems,
             _retargetedAnimationBMetaData ?? _animationBMetaData,
             AnimationWorkbenchSourceSlot.AnimationB,
-            0,
-            animationB.Duration.TotalSeconds,
-            0,
-            outputFramesPerSecond,
-            outputDurationSeconds,
-            outputDurationSeconds / animationB.Duration.TotalSeconds);
+            new MetaDataTimeMapping(
+                0,
+                Math.Min(
+                    animationB.Duration.TotalSeconds,
+                    outputDurationSeconds),
+                0,
+                outputFramesPerSecond,
+                outputDurationSeconds));
         AppendRetargetMetaDataProblems(
             mapped,
             problems,
@@ -1194,6 +1192,14 @@ public sealed partial class AnimationWorkbenchDocument
 
         public float? EndTime => ResultEndTime ?? SourceEndTime;
     }
+
+    private readonly record struct MetaDataTimeMapping(
+        double SourceStartSeconds,
+        double SourceEndSeconds,
+        double OutputStartSeconds,
+        double OutputFramesPerSecond,
+        double OutputDurationSeconds,
+        double TimeScale = 1);
 
     private sealed record MetaDataPreviewCommit(
         MetaDataDocumentSnapshot? Snapshot,

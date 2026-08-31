@@ -115,6 +115,9 @@ public sealed class AnimationWorkbenchMetaDataViewTests
             NUnitAssert.That(
                 Regex.IsMatch(source, "#[0-9a-fA-F]{3,8}"),
                 Is.False);
+            NUnitAssert.That(source, Does.Not.Contain("Padding=\"10,4\""));
+            NUnitAssert.That(source, Does.Not.Contain("Margin=\"4,3\""));
+            NUnitAssert.That(source, Does.Not.Contain("Margin=\"0,1,8,0\""));
             NUnitAssert.That(
                 document.Descendants().Count(element =>
                     element.Name.LocalName == nameof(ListBox)),

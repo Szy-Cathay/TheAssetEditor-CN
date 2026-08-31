@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 using Moq;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.AnimationMeta.Definitions;
@@ -152,6 +153,44 @@ public sealed class AnimationWorkbenchMetaSyncTests
     }
 
     [TestMethod]
+    public void DisablingSynchronization_DiscardsPreviewMetaDataBeforeCommit()
+    {
+        var parser = new MetaDataFileParser(new MetaDataDatabase());
+        var sourceBytes = CreateMetaBytes(parser, CreateTime(0.2f, 0.8f));
+        using var document = CreateLoadedDocument(sourceBytes);
+
+        Assert.IsTrue(document.BeginTimelinePreview().Succeeded);
+        Assert.IsTrue(document.PreviewTrimRange(
+            new AnimationWorkbenchFrameRange(2, 7)).Succeeded);
+
+        var disabled = document.SetMetaDataSynchronizationEnabled(false);
+        Assert.IsTrue(document.CommitTimelinePreview().Succeeded);
+
+        Assert.IsFalse(disabled.IsMetaDataSynchronizationEnabled);
+        Assert.AreEqual(
+            AnimationWorkbenchMetaDataProblemCode.SynchronizationDisabled,
+            disabled.MetaDataProblems.Single().Code);
+        document.SetMetaDataSynchronizationEnabled(true);
+        CollectionAssert.AreEqual(
+            sourceBytes,
+            document.GetMetaDataSnapshot(
+                AnimationWorkbenchMetaDataKind.Result)!.Bytes.ToArray());
+    }
+
+    [TestMethod]
+    public void DisablingSynchronization_DoesNotHideUnsavedMetaData()
+    {
+        var parser = new MetaDataFileParser(new MetaDataDatabase());
+        using var document = CreateEditedDocument(parser);
+
+        var state = document.SetMetaDataSynchronizationEnabled(false);
+
+        Assert.IsFalse(state.IsMetaDataSynchronizationEnabled);
+        Assert.IsTrue(state.IsMetaDataDirty);
+        Assert.IsTrue(state.IsDirty);
+    }
+
+    [TestMethod]
     public void Load_DoesNotUseAnimationBMetaDataAsAnimationAResult()
     {
         var parser = new MetaDataFileParser(new MetaDataDatabase());
@@ -178,6 +217,7 @@ public sealed class AnimationWorkbenchMetaSyncTests
     [TestMethod]
     public void ProblemNavigation_LocatesSourceAndResultWithoutEditing()
     {
+        new LocalizationManager().LoadLanguage();
         var parser = new MetaDataFileParser(new MetaDataDatabase());
         using var document = CreateLoadedDocument(
             CreateMetaBytes(parser, CreateTime(0.5f, 0.6f)),
@@ -197,7 +237,13 @@ public sealed class AnimationWorkbenchMetaSyncTests
             item.Code == AnimationWorkbenchMetaDataProblemCode.Conflict &&
             item.Source == AnimationWorkbenchSourceSlot.AnimationB);
 
-        var navigation = document.NavigateToMetaDataProblem(problem);
+        var controller = new AnimationWorkbenchMetaDataController(document);
+        AnimationWorkbenchMetaDataNavigationLocation? requestedLocation = null;
+        controller.NavigationRequested += (_, location) =>
+            requestedLocation = location;
+
+        var navigation = controller.Navigate(
+            controller.Problems.Single(item => item.Problem == problem));
 
         Assert.IsTrue(navigation.Succeeded);
         Assert.AreEqual(
@@ -208,6 +254,10 @@ public sealed class AnimationWorkbenchMetaSyncTests
             navigation.Location.ResultAttributeIndex);
         Assert.AreEqual(0.2f, navigation.Location.SourceTimeSeconds!.Value, 0.000001f);
         Assert.AreEqual(0.4f, navigation.Location.ResultTimeSeconds!.Value, 0.000001f);
+        Assert.AreEqual(navigation.Location, requestedLocation);
+        Assert.AreEqual(
+            AnimationWorkbenchPreviewKind.AnimationB,
+            navigation.State.SelectedPreview);
         Assert.AreEqual(
             beforeState.HistoryRevision,
             navigation.State.HistoryRevision);
@@ -317,6 +367,45 @@ public sealed class AnimationWorkbenchMetaSyncTests
         Assert.IsTrue(document.GetState().MetaDataProblems.Any(problem =>
             problem.Code == AnimationWorkbenchMetaDataProblemCode.Conflict &&
             problem.Source == AnimationWorkbenchSourceSlot.AnimationB));
+    }
+
+    [TestMethod]
+    public void Layer_UsesAbsoluteTimeForAnimationBAndReportsOutputOverflow()
+    {
+        var parser = new MetaDataFileParser(new MetaDataDatabase());
+        using var document = CreateLoadedDocument(
+            CreateMetaBytes(parser),
+            CreateMetaBytes(
+                parser,
+                CreateTime(0.7f, 0.8f),
+                CreateTime(1.5f, 1.6f)),
+            animationA: CreateClip(durationSeconds: 1),
+            animationB: CreateClip(
+                frameCount: 20,
+                durationSeconds: 2));
+        var mask = document.CreateBoneMask(["root"], false).Mask!;
+
+        Assert.IsTrue(document.PreviewLayer(new AnimationWorkbenchLayerRequest(
+            mask,
+            AnimationWorkbenchLayerMode.Override,
+            0.5,
+            AnimationWorkbenchAdditiveReferencePose.AnimationBFirstFrame))
+            .Succeeded);
+        Assert.IsTrue(document.CommitLayerPreview().Succeeded);
+
+        var events = parser.ParseFile(document.GetMetaDataSnapshot(
+                AnimationWorkbenchMetaDataKind.Result)!.Bytes.ToArray())
+            .GetItemsOfType<Time>()
+            .ToArray();
+        Assert.AreEqual(0.7f, events[0].StartTime, 0.000001f);
+        Assert.AreEqual(0.8f, events[0].EndTime, 0.000001f);
+        Assert.AreEqual(1.5f, events[1].StartTime, 0.000001f);
+        Assert.AreEqual(1.6f, events[1].EndTime, 0.000001f);
+        Assert.IsTrue(document.GetState().MetaDataProblems.Any(problem =>
+            problem.Code ==
+                AnimationWorkbenchMetaDataProblemCode.SourceOutsideResult &&
+            problem.Source == AnimationWorkbenchSourceSlot.AnimationB &&
+            problem.SourceAttributeIndex == 1));
     }
 
     [TestMethod]
@@ -678,7 +767,9 @@ public sealed class AnimationWorkbenchMetaSyncTests
         bool synchronizeMetaData = true,
         GameSkeleton? sourceSkeleton = null,
         GameSkeleton? targetSkeleton = null,
-        GameTypeEnum targetGame = GameTypeEnum.Warhammer3)
+        GameTypeEnum targetGame = GameTypeEnum.Warhammer3,
+        AnimationClip? animationA = null,
+        AnimationClip? animationB = null)
     {
         var skeleton = sourceSkeleton ?? CreateSkeleton();
         var target = targetSkeleton ?? skeleton;
@@ -686,14 +777,14 @@ public sealed class AnimationWorkbenchMetaSyncTests
         document.Load(new AnimationWorkbenchLoadRequest(
             new AnimationWorkbenchSourceInput(
                 "animation_a",
-                CreateClip(skeleton.BoneCount),
+                animationA ?? CreateClip(skeleton.BoneCount),
                 skeleton,
                 new AnimationWorkbenchSourceFormat(7, 1)),
             animationBMetaData == null
                 ? null
                 : new AnimationWorkbenchSourceInput(
                     "animation_b",
-                    CreateClip(skeleton.BoneCount),
+                    animationB ?? CreateClip(skeleton.BoneCount),
                     skeleton,
                     new AnimationWorkbenchSourceFormat(7, 1)),
             targetGame,
@@ -742,13 +833,16 @@ public sealed class AnimationWorkbenchMetaSyncTests
         EndTime = endTime,
     };
 
-    private static AnimationClip CreateClip(int boneCount = 1)
+    private static AnimationClip CreateClip(
+        int boneCount = 1,
+        int frameCount = 10,
+        double durationSeconds = 1)
     {
         var clip = new AnimationClip
         {
-            Duration = TimeSpan.FromSeconds(1),
+            Duration = TimeSpan.FromSeconds(durationSeconds),
         };
-        for (var frameIndex = 0; frameIndex < 10; frameIndex++)
+        for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
         {
             var frame = new AnimationClip.KeyFrame();
             for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)

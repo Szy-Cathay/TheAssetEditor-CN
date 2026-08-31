@@ -64,7 +64,7 @@
                         <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimationWorkbench.MetaData.Summary}" />
                         <TextBlock Margin="0,4,0,0" Style="{StaticResource AeText.Caption}" Text="{Binding SummaryText}" />
                     </StackPanel>
-                    <Border Grid.Column="1" Padding="10,4" VerticalAlignment="Center" Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
+                    <Border Grid.Column="1" Padding="8,4" VerticalAlignment="Center" Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
                         <TextBlock Style="{StaticResource AeText.Label}" Text="{Binding DirtyStateText}" />
                     </Border>
                 </Grid>
@@ -104,12 +104,12 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="4,3">
+                                <Grid Margin="4">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Margin="0,1,8,0" VerticalAlignment="Top">
+                                    <Border Margin="0,0,8,0" VerticalAlignment="Top">
                                         <Border.Style>
                                             <Style TargetType="Border" BasedOn="{StaticResource AeFeedback.Icon}">
                                                 <Style.Triggers>

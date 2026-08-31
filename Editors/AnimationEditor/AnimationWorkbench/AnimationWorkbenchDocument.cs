@@ -341,7 +341,32 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         if (!candidate.Succeeded)
             return CreateSaveResult(false, candidate.Diagnostics);
 
-        string normalizedPath;
+        if (!TryWriteNewProjectResource(
+                packFileService,
+                project,
+                resourcePath,
+                candidate.Bytes!,
+                out var normalizedPath,
+                out var writeDiagnostic))
+        {
+            return CreateSaveFailure(writeDiagnostic);
+        }
+
+        _projectResourcePath = normalizedPath;
+        MarkDocumentHistorySaved();
+        return CreateSaveResult(
+            succeeded: true,
+            Array.Empty<AnimationWorkbenchDiagnostic>());
+    }
+
+    private static bool TryWriteNewProjectResource(
+        IPackFileService packFileService,
+        FolderProjectContainer project,
+        string resourcePath,
+        byte[] bytes,
+        out string normalizedPath,
+        out AnimationWorkbenchDiagnosticCode diagnostic)
+    {
         try
         {
             normalizedPath = FolderProjectPathPolicy.EnsureResourcePath(
@@ -352,8 +377,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                   InvalidDataException or
                   NotSupportedException)
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationInvalid);
+            normalizedPath = "";
+            diagnostic = AnimationWorkbenchDiagnosticCode.DestinationInvalid;
+            return false;
         }
 
         var directory = Path.GetDirectoryName(normalizedPath) ?? "";
@@ -365,28 +391,25 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 [
                     new NewPackFileEntry(
                         directory,
-                        PackFile.CreateFromBytes(
-                            fileName,
-                            candidate.Bytes!)),
+                        PackFile.CreateFromBytes(fileName, bytes)),
                 ],
                 overwriteExisting: false);
         }
         catch (FolderProjectFileConflictException)
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationAlreadyExists);
+            diagnostic = AnimationWorkbenchDiagnosticCode
+                .DestinationAlreadyExists;
+            return false;
         }
-        catch (Exception)
+        catch
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationWriteFailed);
+            diagnostic = AnimationWorkbenchDiagnosticCode
+                .DestinationWriteFailed;
+            return false;
         }
 
-        _projectResourcePath = normalizedPath;
-        MarkDocumentHistorySaved();
-        return CreateSaveResult(
-            succeeded: true,
-            Array.Empty<AnimationWorkbenchDiagnostic>());
+        diagnostic = default;
+        return true;
     }
 
     public AnimationWorkbenchSaveResult ExportDiskCopy(
