@@ -248,11 +248,36 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchPreviewKind.AnimationB,
             _ => AnimationWorkbenchPreviewKind.Result,
         };
+        SetMetaDataNavigationPosition(
+            previewKind,
+            problem.SourceStartTime ?? problem.ResultStartTime);
+        SetMetaDataNavigationPosition(
+            AnimationWorkbenchPreviewKind.Result,
+            problem.ResultStartTime);
         SelectPreview(previewKind);
         return new AnimationWorkbenchMetaDataNavigationResult(
             true,
             CreateState(),
             location);
+    }
+
+    private void SetMetaDataNavigationPosition(
+        AnimationWorkbenchPreviewKind kind,
+        float? seconds)
+    {
+        var source = GetSource(kind);
+        if (source == null ||
+            !seconds.HasValue ||
+            !float.IsFinite(seconds.Value))
+        {
+            return;
+        }
+
+        var position = TimeSpan.FromSeconds(Math.Clamp(
+            seconds.Value,
+            0,
+            source.Animation.Duration.TotalSeconds));
+        _previewPositions[kind] = position;
     }
 
     private void LoadMetaData(AnimationWorkbenchLoadRequest request)

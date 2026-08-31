@@ -666,10 +666,13 @@ public sealed partial class AnimationWorkbenchDocument
         MetaDataPreviewCommit? metaDataCommit = null)
     {
         var nextRevision = ++_nextHistoryRevision;
-        var nextMetaData = metaDataCommit?.Snapshot?.Clone() ??
-            _resultMetaData?.Clone();
-        var nextMetaDataProblems = metaDataCommit?.Problems.ToArray() ??
-            _metaDataProblems.ToArray();
+        var hasMetaDataCommit = metaDataCommit?.Snapshot != null;
+        var nextMetaData = hasMetaDataCommit
+            ? metaDataCommit!.Snapshot!.Clone()
+            : _resultMetaData?.Clone();
+        var nextMetaDataProblems = hasMetaDataCommit
+            ? metaDataCommit!.Problems.ToArray()
+            : _metaDataProblems.ToArray();
         var entry = new DocumentHistoryEntry(
             _result!.Animation.Clone(),
             next.Clone(),

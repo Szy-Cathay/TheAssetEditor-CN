@@ -193,9 +193,14 @@ public interface IAnimationWorkbenchPreviewHost : IDisposable
     /// Creates a preview session that owns its player, scene nodes, and event
     /// subscriptions. Disposing the session must release all of them.
     /// </summary>
-    IDisposable Show(
+    IAnimationWorkbenchPreviewSession Show(
         AnimationWorkbenchPreviewSnapshot preview,
         CancellationToken cancellationToken);
+}
+
+public interface IAnimationWorkbenchPreviewSession : IDisposable
+{
+    void Seek(TimeSpan position);
 }
 
 public sealed class AnimationWorkbenchPreviewSnapshot
@@ -260,7 +265,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
     private GameSkeleton? _targetSkeleton;
     private AnimationWorkbenchPreviewKind? _selectedPreview;
     private CancellationTokenSource? _previewCancellationSource;
-    private IDisposable? _previewSession;
+    private IAnimationWorkbenchPreviewSession? _previewSession;
+    private readonly Dictionary<AnimationWorkbenchPreviewKind, TimeSpan>
+        _previewPositions = [];
     private bool _isDirty;
     private string? _projectResourcePath;
     private bool _isClosed;
@@ -304,6 +311,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetGame = request.TargetGame;
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
+        _previewPositions.Clear();
         _projectResourcePath = null;
         LoadMetaData(request);
         _documentGeneration++;
@@ -466,6 +474,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetGame = null;
         _targetSkeleton = null;
         _selectedPreview = null;
+        _previewPositions.Clear();
         _projectResourcePath = null;
         ClearMetaData();
         ResetDocumentHistory();
@@ -766,17 +775,25 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             return;
 
         var cancellationSource = new CancellationTokenSource();
+        IAnimationWorkbenchPreviewSession? previewSession = null;
         try
         {
-            var previewSession = _previewHost.Show(
+            previewSession = _previewHost.Show(
                 preview,
                 cancellationSource.Token);
+            if (_previewPositions.TryGetValue(
+                    preview.Kind,
+                    out var position))
+            {
+                previewSession.Seek(position);
+            }
             _previewCancellationSource = cancellationSource;
             _previewSession = previewSession;
         }
         catch
         {
             cancellationSource.Cancel();
+            previewSession?.Dispose();
             cancellationSource.Dispose();
             throw;
         }
@@ -885,7 +902,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
 
     private sealed class EmptyPreviewHost : IAnimationWorkbenchPreviewHost
     {
-        public IDisposable Show(
+        public IAnimationWorkbenchPreviewSession Show(
             AnimationWorkbenchPreviewSnapshot preview,
             CancellationToken cancellationToken)
         {
@@ -897,9 +914,14 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         }
     }
 
-    private sealed class EmptyPreviewSession : IDisposable
+    private sealed class EmptyPreviewSession :
+        IAnimationWorkbenchPreviewSession
     {
         public static EmptyPreviewSession Instance { get; } = new();
+
+        public void Seek(TimeSpan position)
+        {
+        }
 
         public void Dispose()
         {

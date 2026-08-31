@@ -178,6 +178,33 @@ public sealed class AnimationWorkbenchMetaSyncTests
     }
 
     [TestMethod]
+    public void DisablingSynchronization_PreservesCommittedProblemsAcrossAnimationOnlyCommit()
+    {
+        var parser = new MetaDataFileParser(new MetaDataDatabase());
+        using var document = CreateLoadedDocument(CreateMetaBytes(
+            parser,
+            CreateTime(0.8f, 0.9f)));
+        Assert.IsTrue(document.BeginTimelinePreview().Succeeded);
+        Assert.IsTrue(document.PreviewTrimRange(
+            new AnimationWorkbenchFrameRange(2, 7)).Succeeded);
+        Assert.IsTrue(document.CommitTimelinePreview().Succeeded);
+        var problem = document.GetState().MetaDataProblems.Single(item =>
+            item.Code ==
+                AnimationWorkbenchMetaDataProblemCode.SourceOutsideResult);
+
+        Assert.IsTrue(document.BeginTimelinePreview().Succeeded);
+        Assert.IsTrue(document.PreviewReverseRange(
+            new AnimationWorkbenchFrameRange(0, 5)).Succeeded);
+        document.SetMetaDataSynchronizationEnabled(false);
+        Assert.IsTrue(document.CommitTimelinePreview().Succeeded);
+        var enabled = document.SetMetaDataSynchronizationEnabled(true);
+
+        Assert.AreEqual(problem, enabled.MetaDataProblems.Single(item =>
+            item.Code ==
+                AnimationWorkbenchMetaDataProblemCode.SourceOutsideResult));
+    }
+
+    [TestMethod]
     public void DisablingSynchronization_DoesNotHideUnsavedMetaData()
     {
         var parser = new MetaDataFileParser(new MetaDataDatabase());
@@ -219,9 +246,11 @@ public sealed class AnimationWorkbenchMetaSyncTests
     {
         new LocalizationManager().LoadLanguage();
         var parser = new MetaDataFileParser(new MetaDataDatabase());
+        var previewHost = new RecordingPreviewHost();
         using var document = CreateLoadedDocument(
             CreateMetaBytes(parser, CreateTime(0.5f, 0.6f)),
-            CreateMetaBytes(parser, CreateTime(0.2f, 0.4f)));
+            CreateMetaBytes(parser, CreateTime(0.2f, 0.4f)),
+            previewHost: previewHost);
         Assert.IsTrue(document.PreviewBlend(new AnimationWorkbenchBlendRequest(
             5,
             2,
@@ -258,6 +287,9 @@ public sealed class AnimationWorkbenchMetaSyncTests
         Assert.AreEqual(
             AnimationWorkbenchPreviewKind.AnimationB,
             navigation.State.SelectedPreview);
+        Assert.AreEqual(TimeSpan.FromSeconds(0.2), previewHost.LastSeek);
+        document.SelectPreview(AnimationWorkbenchPreviewKind.Result);
+        Assert.AreEqual(TimeSpan.FromSeconds(0.4), previewHost.LastSeek);
         Assert.AreEqual(
             beforeState.HistoryRevision,
             navigation.State.HistoryRevision);
@@ -769,11 +801,12 @@ public sealed class AnimationWorkbenchMetaSyncTests
         GameSkeleton? targetSkeleton = null,
         GameTypeEnum targetGame = GameTypeEnum.Warhammer3,
         AnimationClip? animationA = null,
-        AnimationClip? animationB = null)
+        AnimationClip? animationB = null,
+        IAnimationWorkbenchPreviewHost? previewHost = null)
     {
         var skeleton = sourceSkeleton ?? CreateSkeleton();
         var target = targetSkeleton ?? skeleton;
-        var document = new AnimationWorkbenchDocument();
+        var document = new AnimationWorkbenchDocument(previewHost);
         document.Load(new AnimationWorkbenchLoadRequest(
             new AnimationWorkbenchSourceInput(
                 "animation_a",
@@ -801,6 +834,31 @@ public sealed class AnimationWorkbenchMetaSyncTests
                     animationBMetaData),
             SynchronizeMetaData: synchronizeMetaData));
         return document;
+    }
+
+    private sealed class RecordingPreviewHost :
+        IAnimationWorkbenchPreviewHost
+    {
+        public TimeSpan? LastSeek { get; private set; }
+
+        public IAnimationWorkbenchPreviewSession Show(
+            AnimationWorkbenchPreviewSnapshot preview,
+            CancellationToken cancellationToken) =>
+            new RecordingPreviewSession(position => LastSeek = position);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class RecordingPreviewSession(Action<TimeSpan> seek) :
+        IAnimationWorkbenchPreviewSession
+    {
+        public void Seek(TimeSpan position) => seek(position);
+
+        public void Dispose()
+        {
+        }
     }
 
     private static byte[] CreateMetaBytes(
