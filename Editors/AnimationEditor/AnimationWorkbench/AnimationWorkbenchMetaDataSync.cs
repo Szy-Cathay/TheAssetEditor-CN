@@ -776,15 +776,13 @@ public sealed partial class AnimationWorkbenchDocument
                         endTime,
                         timeMapping.SourceEndSeconds);
                     var mappedStart = QuantizeMetaDataTime(
-                        (clippedStart - timeMapping.SourceStartSeconds) *
-                            timeMapping.TimeScale +
+                        clippedStart - timeMapping.SourceStartSeconds +
                             timeMapping.OutputStartSeconds,
                         timeMapping.OutputFramesPerSecond,
                         roundUp: false,
                         timeMapping.OutputDurationSeconds);
                     var mappedEnd = QuantizeMetaDataTime(
-                        (clippedEnd - timeMapping.SourceStartSeconds) *
-                            timeMapping.TimeScale +
+                        clippedEnd - timeMapping.SourceStartSeconds +
                             timeMapping.OutputStartSeconds,
                         timeMapping.OutputFramesPerSecond,
                         roundUp: true,
@@ -1198,8 +1196,7 @@ public sealed partial class AnimationWorkbenchDocument
         double SourceEndSeconds,
         double OutputStartSeconds,
         double OutputFramesPerSecond,
-        double OutputDurationSeconds,
-        double TimeScale = 1);
+        double OutputDurationSeconds);
 
     private sealed record MetaDataPreviewCommit(
         MetaDataDocumentSnapshot? Snapshot,
