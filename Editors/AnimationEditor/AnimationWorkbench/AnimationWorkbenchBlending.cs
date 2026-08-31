@@ -81,6 +81,11 @@ public sealed partial class AnimationWorkbenchDocument
         var build = BuildBlend(request);
         if (build.Animation == null || build.Impact == null)
         {
+            if (_blendPreviewResult != null)
+            {
+                ClearBlendPreview();
+                RefreshSelectedResultPreview();
+            }
             return new AnimationWorkbenchBlendResult(
                 false,
                 CreateState(),
@@ -368,7 +373,7 @@ public sealed partial class AnimationWorkbenchDocument
         {
             var amount = EvaluateCurve(
                 request.Curve,
-                (overlapIndex + 1f) / overlapFrames);
+                overlapIndex / (float)overlapFrames);
             output.DynamicFrames.Add(InterpolateBlendFrame(
                 framesA[transitionStart + overlapIndex],
                 framesB[overlapIndex],
@@ -381,6 +386,16 @@ public sealed partial class AnimationWorkbenchDocument
              frameIndex++)
         {
             output.DynamicFrames.Add(framesB[frameIndex].Clone());
+        }
+
+        if (output.DynamicFrames.Any(frame =>
+                HasValidFrameTransforms(
+                    frame,
+                    _targetSkeleton.BoneCount) == false))
+        {
+            return BlendBuildResult.Failure(CreateBlendDiagnostic(
+                AnimationWorkbenchDiagnosticCode
+                    .BlendResultTransformInvalid));
         }
 
         if (request.OverlapDuration == TimeSpan.Zero)
@@ -483,10 +498,12 @@ public sealed partial class AnimationWorkbenchDocument
                  boneIndex++)
             {
                 var rotation = frame.Rotation[boneIndex];
+                var rotationLengthSquared = rotation.LengthSquared();
                 if (IsFinite(frame.Position[boneIndex]) == false ||
                     IsFinite(frame.Scale[boneIndex]) == false ||
                     IsFinite(rotation) == false ||
-                    rotation.LengthSquared() < MinimumQuaternionLengthSquared)
+                    float.IsFinite(rotationLengthSquared) == false ||
+                    rotationLengthSquared < MinimumQuaternionLengthSquared)
                 {
                     diagnostic = CreateBlendDiagnostic(
                         AnimationWorkbenchDiagnosticCode
@@ -504,8 +521,15 @@ public sealed partial class AnimationWorkbenchDocument
 
     private static bool SkeletonsMatch(GameSkeleton source, GameSkeleton target)
     {
-        if (source.BoneCount != target.BoneCount)
+        const float restPoseTolerance = 0.0001f;
+        if (source.BoneCount != target.BoneCount ||
+            string.Equals(
+                source.SkeletonName,
+                target.SkeletonName,
+                StringComparison.Ordinal) == false)
+        {
             return false;
+        }
         for (var boneIndex = 0; boneIndex < source.BoneCount; boneIndex++)
         {
             if (string.Equals(
@@ -513,13 +537,90 @@ public sealed partial class AnimationWorkbenchDocument
                     target.BoneNames[boneIndex],
                     StringComparison.Ordinal) == false ||
                 source.GetParentBoneIndex(boneIndex) !=
-                target.GetParentBoneIndex(boneIndex))
+                target.GetParentBoneIndex(boneIndex) ||
+                VectorsMatch(
+                    source.Translation[boneIndex],
+                    target.Translation[boneIndex],
+                    restPoseTolerance) == false ||
+                QuaternionsMatch(
+                    source.Rotation[boneIndex],
+                    target.Rotation[boneIndex],
+                    restPoseTolerance) == false ||
+                ScalarsMatch(
+                    source.Scale[boneIndex],
+                    target.Scale[boneIndex],
+                    restPoseTolerance) == false)
             {
                 return false;
             }
         }
         return true;
     }
+
+    private static bool HasValidFrameTransforms(
+        AnimationClip.KeyFrame frame,
+        int boneCount)
+    {
+        if (frame.Position.Count != boneCount ||
+            frame.Rotation.Count != boneCount ||
+            frame.Scale.Count != boneCount)
+        {
+            return false;
+        }
+
+        for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+        {
+            var rotation = frame.Rotation[boneIndex];
+            var lengthSquared = rotation.LengthSquared();
+            if (IsFinite(frame.Position[boneIndex]) == false ||
+                IsFinite(frame.Scale[boneIndex]) == false ||
+                IsFinite(rotation) == false ||
+                float.IsFinite(lengthSquared) == false ||
+                lengthSquared < MinimumQuaternionLengthSquared)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool VectorsMatch(
+        Vector3 first,
+        Vector3 second,
+        float tolerance) =>
+        ScalarsMatch(first.X, second.X, tolerance) &&
+        ScalarsMatch(first.Y, second.Y, tolerance) &&
+        ScalarsMatch(first.Z, second.Z, tolerance);
+
+    private static bool QuaternionsMatch(
+        Quaternion first,
+        Quaternion second,
+        float tolerance)
+    {
+        if (IsFinite(first) == false || IsFinite(second) == false)
+            return false;
+        var firstLengthSquared = first.LengthSquared();
+        var secondLengthSquared = second.LengthSquared();
+        if (float.IsFinite(firstLengthSquared) == false ||
+            float.IsFinite(secondLengthSquared) == false ||
+            firstLengthSquared < MinimumQuaternionLengthSquared ||
+            secondLengthSquared < MinimumQuaternionLengthSquared)
+        {
+            return false;
+        }
+
+        first.Normalize();
+        second.Normalize();
+        return 1 - MathF.Abs(Quaternion.Dot(first, second)) <= tolerance;
+    }
+
+    private static bool ScalarsMatch(
+        float first,
+        float second,
+        float tolerance) =>
+        float.IsFinite(first) &&
+        float.IsFinite(second) &&
+        MathF.Abs(first - second) <= tolerance;
 
     private static TimeSpan GetRangeBoundaryTime(
         AnimationTimebase timebase,

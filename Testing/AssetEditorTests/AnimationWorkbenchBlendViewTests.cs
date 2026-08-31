@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Input;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
@@ -44,6 +45,14 @@ public class AnimationWorkbenchBlendViewTests
             "AnimationWorkbench.Blend.AlignYaw",
             "AnimationWorkbench.Blend.PreserveHeight",
             "AnimationWorkbench.Blend.OutputImpact",
+            "AnimationWorkbench.Blend.SecondsFormat",
+            "AnimationWorkbench.Blend.RateFormat",
+            "AnimationWorkbench.Blend.SourceRatesFormat",
+            "AnimationWorkbench.Blend.OutputFramesFormat",
+            "AnimationWorkbench.Blend.ResamplingAppliedBoth",
+            "AnimationWorkbench.Blend.ResamplingAppliedA",
+            "AnimationWorkbench.Blend.ResamplingAppliedB",
+            "AnimationWorkbench.Blend.OverlapQuantizationFormat",
             "AnimationWorkbench.Blend.LoopSeam",
             "AnimationWorkbench.Blend.Apply",
             "AnimationWorkbench.Blend.Cancel",
@@ -137,11 +146,22 @@ public class AnimationWorkbenchBlendViewTests
                                 .Single(button => button.Name == "ApplyButton");
                             var outputFrames = FindDescendants<TextBlock>(view)
                                 .Single(text => text.Name == "OutputFramesText");
+                            var resampling = FindDescendants<TextBlock>(view)
+                                .Single(text => text.Name == "ResampleText");
                             var bitmap = Render(window);
                             NUnitAssert.Multiple(() =>
                             {
                                 NUnitAssert.That(applyButton.IsEnabled, Is.True);
                                 NUnitAssert.That(outputFrames.Text, Is.Not.Empty);
+                                NUnitAssert.That(
+                                    resampling.Text,
+                                    Does.Contain("动画 B"));
+                                NUnitAssert.That(
+                                    resampling.Text,
+                                    Does.Contain("请求重叠"));
+                                NUnitAssert.That(
+                                    resampling.Text,
+                                    Does.Contain("实际重叠"));
                                 NUnitAssert.That(
                                     bitmap.PixelWidth,
                                     Is.GreaterThan(0),
@@ -165,6 +185,152 @@ public class AnimationWorkbenchBlendViewTests
                 finally
                 {
                     ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
+    public void BlendView_InvalidFpsCannotCommitStalePreview()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                using var document = CreateLoadedDocument();
+                var controller = new AnimationWorkbenchBlendController(document);
+                var view = new AnimationWorkbenchBlendView
+                {
+                    Controller = controller,
+                };
+                var window = Host(view);
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var outputFps = FindDescendants<TextBox>(view)
+                        .Single(textBox => textBox.Name == "OutputFpsTextBox");
+                    var applyButton = FindDescendants<Button>(view)
+                        .Single(button => button.Name == "ApplyButton");
+
+                    outputFps.Text = "0";
+                    applyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                    NUnitAssert.That(controller.HasActivePreview, Is.False);
+                    NUnitAssert.That(document.GetState().CanUndo, Is.False);
+                    NUnitAssert.That(document.GetState().Result?.FrameCount, Is.EqualTo(36));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    public void BlendView_EnterFromInteractiveChildDoesNotCommitPreview()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                using var document = CreateLoadedDocument();
+                var controller = new AnimationWorkbenchBlendController(document);
+                var view = new AnimationWorkbenchBlendView
+                {
+                    Controller = controller,
+                };
+                var window = Host(view);
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var cancelButton = FindDescendants<Button>(view)
+                        .Single(button => button.Name == "CancelButton");
+                    cancelButton.RaiseEvent(new KeyEventArgs(
+                        Keyboard.PrimaryDevice,
+                        PresentationSource.FromVisual(view),
+                        0,
+                        Key.Enter)
+                    {
+                        RoutedEvent = Keyboard.PreviewKeyDownEvent,
+                    });
+
+                    NUnitAssert.That(controller.HasActivePreview, Is.True);
+                    NUnitAssert.That(document.GetState().CanUndo, Is.False);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
+    public void BlendView_UnloadReleasesOwnedPreview()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                using var document = CreateLoadedDocument();
+                var controller = new AnimationWorkbenchBlendController(document);
+                var view = new AnimationWorkbenchBlendView
+                {
+                    Controller = controller,
+                };
+                var window = Host(view);
+                window.Show();
+                window.UpdateLayout();
+
+                window.Close();
+                window.Dispatcher.Invoke(
+                    () => { },
+                    DispatcherPriority.ApplicationIdle);
+
+                NUnitAssert.That(controller.HasActivePreview, Is.False);
+                NUnitAssert.That(document.GetState().CanUndo, Is.False);
+                NUnitAssert.That(document.GetState().Result?.FrameCount, Is.EqualTo(36));
+            });
+    }
+
+    [Test]
+    public void BlendView_ControllerSwitchReleasesOldPreview()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                using var firstDocument = CreateLoadedDocument();
+                using var secondDocument = CreateLoadedDocument();
+                var firstController =
+                    new AnimationWorkbenchBlendController(firstDocument);
+                var secondController =
+                    new AnimationWorkbenchBlendController(secondDocument);
+                var view = new AnimationWorkbenchBlendView
+                {
+                    Controller = firstController,
+                };
+                var window = Host(view);
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+
+                    view.Controller = secondController;
+
+                    NUnitAssert.That(
+                        firstController.HasActivePreview,
+                        Is.False);
+                    NUnitAssert.That(
+                        secondController.HasActivePreview,
+                        Is.True);
+                    NUnitAssert.That(
+                        firstDocument.GetState().CanUndo,
+                        Is.False);
+                }
+                finally
+                {
+                    window.Close();
                 }
             });
     }

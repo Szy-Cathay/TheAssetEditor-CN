@@ -151,6 +151,17 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
         return _lastResult;
     }
 
+    public AnimationWorkbenchBlendResult? ReleasePreview()
+    {
+        if (_document.IsClosed)
+            return null;
+        if (HasActivePreview == false)
+            return null;
+        _lastResult = _document.CancelBlendPreview();
+        RaiseStateChanged();
+        return _lastResult;
+    }
+
     private static double? GetFramesPerSecond(
         AnimationWorkbenchSourceSummary? source)
     {

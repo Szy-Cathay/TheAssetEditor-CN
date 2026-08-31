@@ -35,8 +35,9 @@ public partial class AnimationWorkbenchBlendView : UserControl
         DependencyPropertyChangedEventArgs args)
     {
         var view = (AnimationWorkbenchBlendView)dependencyObject;
-        view.UnsubscribeController(
-            args.OldValue as AnimationWorkbenchBlendController);
+        var oldController = args.OldValue as AnimationWorkbenchBlendController;
+        view.UnsubscribeController(oldController);
+        oldController?.ReleasePreview();
         if (view.IsLoaded)
             view.SubscribeController();
         view.UpdateView();
@@ -49,8 +50,11 @@ public partial class AnimationWorkbenchBlendView : UserControl
         Focus();
     }
 
-    private void Root_Unloaded(object sender, RoutedEventArgs e) =>
+    private void Root_Unloaded(object sender, RoutedEventArgs e)
+    {
         UnsubscribeController(Controller);
+        Controller?.ReleasePreview();
+    }
 
     private void SubscribeController()
     {
@@ -105,7 +109,7 @@ public partial class AnimationWorkbenchBlendView : UserControl
                 .ToString(CultureInfo.CurrentCulture);
             OverlapValue.Text = string.Format(
                 CultureInfo.CurrentCulture,
-                "{0:0.###} s",
+                Localize("AnimationWorkbench.Blend.SecondsFormat"),
                 Controller.OverlapSeconds);
             OutputFpsTextBox.Text = Controller.OutputFramesPerSecond
                 .ToString("0.###", CultureInfo.CurrentCulture);
@@ -147,28 +151,40 @@ public partial class AnimationWorkbenchBlendView : UserControl
 
         SourceRatesText.Text = string.Format(
             CultureInfo.CurrentCulture,
-            "A {0:0.###} / B {1:0.###} FPS",
+            Localize("AnimationWorkbench.Blend.SourceRatesFormat"),
             impact.AnimationAFramesPerSecond,
             impact.AnimationBFramesPerSecond);
         OutputRateText.Text = string.Format(
             CultureInfo.CurrentCulture,
-            "{0:0.###} FPS",
+            Localize("AnimationWorkbench.Blend.RateFormat"),
             impact.OutputFramesPerSecond);
         OutputFramesText.Text = string.Format(
             CultureInfo.CurrentCulture,
-            "{0}  ({1} + {2} − {3})",
+            Localize("AnimationWorkbench.Blend.OutputFramesFormat"),
             impact.OutputFrameCount,
             impact.AnimationAOutputFrameCount,
             impact.AnimationBOutputFrameCount,
             impact.OverlapFrameCount);
         OutputDurationText.Text = string.Format(
             CultureInfo.CurrentCulture,
-            "{0:0.###} s",
+            Localize("AnimationWorkbench.Blend.SecondsFormat"),
             impact.OutputDuration.TotalSeconds);
-        ResampleText.Text = Localize(
-            impact.AnimationAWasResampled || impact.AnimationBWasResampled
-                ? "AnimationWorkbench.Blend.ResamplingApplied"
-                : "AnimationWorkbench.Blend.ResamplingNotNeeded");
+        var resamplingKey = (impact.AnimationAWasResampled,
+            impact.AnimationBWasResampled) switch
+        {
+            (true, true) => "AnimationWorkbench.Blend.ResamplingAppliedBoth",
+            (true, false) => "AnimationWorkbench.Blend.ResamplingAppliedA",
+            (false, true) => "AnimationWorkbench.Blend.ResamplingAppliedB",
+            _ => "AnimationWorkbench.Blend.ResamplingNotNeeded",
+        };
+        var quantization = string.Format(
+            CultureInfo.CurrentCulture,
+            Localize("AnimationWorkbench.Blend.OverlapQuantizationFormat"),
+            impact.RequestedOverlapDuration.TotalSeconds,
+            impact.QuantizedOverlapDuration.TotalSeconds,
+            (impact.QuantizedOverlapDuration -
+                impact.RequestedOverlapDuration).TotalSeconds);
+        ResampleText.Text = $"{Localize(resamplingKey)}{Environment.NewLine}{quantization}";
         LoopSeamText.Text = impact.HasLoopSeamDiscontinuity
             ? string.Format(
                 CultureInfo.CurrentCulture,
@@ -263,7 +279,7 @@ public partial class AnimationWorkbenchBlendView : UserControl
 
     private void ApplyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (Controller != null)
+        if (ApplyOutputFps() && Controller != null)
             ShowResult(Controller.CommitPreview());
     }
 
@@ -282,7 +298,9 @@ public partial class AnimationWorkbenchBlendView : UserControl
         {
             ApplyOutputFps();
         }
-        else if (e.Key == Key.Enter && Controller.CanCommit)
+        else if (e.Key == Key.Enter &&
+                 ReferenceEquals(e.OriginalSource, this) &&
+                 Controller.CanCommit)
         {
             ShowResult(Controller.CommitPreview());
         }
@@ -313,6 +331,7 @@ public partial class AnimationWorkbenchBlendView : UserControl
             return true;
         }
 
+        Controller.ReleasePreview();
         StatusText.Text = Localize(
             "AnimationWorkbench.Blend.PositiveFpsRequired");
         OutputFpsTextBox.Focus();

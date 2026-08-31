@@ -76,6 +76,7 @@ public enum AnimationWorkbenchDiagnosticCode
     BlendOutputFrameRateInvalid,
     BlendOutputTooLarge,
     BlendSourceTransformInvalid,
+    BlendResultTransformInvalid,
     BlendRootBoneMissing,
     BlendZeroOverlap,
     BlendOverlapBelowOneFrame,
@@ -208,6 +209,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
     private string? _projectResourcePath;
     private bool _isClosed;
     private long _documentGeneration;
+
+    internal bool IsClosed => _isClosed;
 
     public AnimationWorkbenchDocument(
         IAnimationWorkbenchPreviewHost? previewHost = null)

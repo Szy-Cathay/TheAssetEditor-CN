@@ -46,7 +46,9 @@ public class AnimationWorkbenchBlendingTests
 
         Assert.IsTrue(result.Succeeded);
         Assert.AreEqual(4, result.Impact?.OutputFrameCount);
-        var frame = result.State.CurrentPreview!.Animation.DynamicFrames[0];
+        var frames = result.State.CurrentPreview!.Animation.DynamicFrames;
+        Assert.AreEqual(0, frames[0].Position[0].X, Tolerance);
+        var frame = frames[1];
         Assert.AreEqual(10 * expectedAmount, frame.Position[0].X, Tolerance);
         Assert.AreEqual(1 + 2 * expectedAmount, frame.Scale[0].X, Tolerance);
         AssertRotationEqual(
@@ -250,6 +252,116 @@ public class AnimationWorkbenchBlendingTests
     }
 
     [TestMethod]
+    public void PreviewBlend_FailureClearsPreviousPreviewAndRestoresCommittedResult()
+    {
+        var skeleton = CreateSkeleton("shared_skeleton", "root");
+        using var document = CreateDocument(
+            skeleton,
+            CreateMovingClip(2, 2),
+            CreateMovingClip(2, 2));
+        var valid = document.PreviewBlend(CreateRootRequest(
+            AnimationWorkbenchRootMotionOptions.Default));
+
+        var invalid = document.PreviewBlend(new AnimationWorkbenchBlendRequest(
+            0,
+            0,
+            TimeSpan.FromSeconds(2),
+            2,
+            AnimationWorkbenchBlendCurve.Smooth,
+            AnimationWorkbenchRootMotionOptions.Default));
+
+        Assert.IsTrue(valid.Succeeded);
+        Assert.IsFalse(invalid.Succeeded);
+        Assert.IsFalse(invalid.State.HasActiveBlendPreview);
+        Assert.AreEqual(2, invalid.State.Result?.FrameCount);
+        Assert.AreEqual(
+            2,
+            invalid.State.CurrentPreview?.Animation.DynamicFrames.Count);
+        Assert.IsFalse(invalid.State.CanUndo);
+    }
+
+    [TestMethod]
+    public void PreviewBlend_SameNamesWithDifferentRestPoseAreRejected()
+    {
+        var target = CreateSkeleton("shared_skeleton", "root");
+        var differentRestPose = CreateSkeleton("shared_skeleton", "root");
+        differentRestPose.Translation[0] = new Vector3(0.25f, 0, 0);
+        differentRestPose.RebuildSkeletonMatrix();
+        using var document = CreateDocument(
+            target,
+            CreateMovingClip(2, 2),
+            CreateMovingClip(2, 2),
+            differentRestPose);
+
+        var result = document.PreviewBlend(CreateRootRequest(
+            AnimationWorkbenchRootMotionOptions.Default));
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.BlendSkeletonMismatch,
+            result.Diagnostics.Single().Code);
+        Assert.IsFalse(result.State.HasActiveBlendPreview);
+    }
+
+    [TestMethod]
+    public void PreviewBlend_ExtremeFiniteTransformsCannotCreateInvalidOutput()
+    {
+        var skeleton = CreateSkeleton("shared_skeleton", "root");
+        var extreme = CreateClip(
+            2,
+            new RootTransform(
+                new Vector3(float.MaxValue, 0, 0),
+                Quaternion.Identity),
+            new RootTransform(
+                new Vector3(-float.MaxValue, 0, 0),
+                Quaternion.Identity));
+        using var document = CreateDocument(
+            skeleton,
+            extreme,
+            CreateMovingClip(2, 2));
+
+        var result = document.PreviewBlend(new AnimationWorkbenchBlendRequest(
+            1,
+            0,
+            TimeSpan.Zero,
+            4,
+            AnimationWorkbenchBlendCurve.Linear,
+            new AnimationWorkbenchRootMotionOptions(false, false, false)));
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.BlendResultTransformInvalid,
+            result.Diagnostics.Single().Code);
+        Assert.IsFalse(result.State.HasActiveBlendPreview);
+        Assert.IsFalse(result.State.CanUndo);
+    }
+
+    [TestMethod]
+    public void PreviewBlend_OverflowingQuaternionIsRejectedAsInvalidSource()
+    {
+        var skeleton = CreateSkeleton("shared_skeleton", "root");
+        var invalidRotation = CreateMovingClip(2, 2);
+        invalidRotation.DynamicFrames[0].Rotation[0] = new Quaternion(
+            float.MaxValue,
+            float.MaxValue,
+            float.MaxValue,
+            float.MaxValue);
+        using var document = CreateDocument(
+            skeleton,
+            invalidRotation,
+            CreateMovingClip(2, 2));
+
+        var result = document.PreviewBlend(CreateRootRequest(
+            AnimationWorkbenchRootMotionOptions.Default));
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.BlendSourceTransformInvalid,
+            result.Diagnostics.Single().Code);
+        Assert.IsFalse(result.State.HasActiveBlendPreview);
+    }
+
+    [TestMethod]
     public void CommitBlend_PreviewsUndoRedoSaveAndReopenAsOneAtomicEdit()
     {
         var skeleton = CreateSkeleton("shared_skeleton", "root");
@@ -354,6 +466,25 @@ public class AnimationWorkbenchBlendingTests
         Assert.IsTrue(controller.CommitPreview().Succeeded);
         Assert.IsFalse(controller.HasActivePreview);
         Assert.IsTrue(document.GetState().CanUndo);
+    }
+
+    [TestMethod]
+    public void BlendController_ReleasePreviewRestoresCommittedResult()
+    {
+        var skeleton = CreateSkeleton("shared_skeleton", "root");
+        using var document = CreateDocument(
+            skeleton,
+            CreateMovingClip(2, 2),
+            CreateMovingClip(2, 2));
+        var controller = new AnimationWorkbenchBlendController(document);
+
+        var released = controller.ReleasePreview();
+
+        Assert.IsTrue(released?.Succeeded);
+        Assert.IsFalse(controller.HasActivePreview);
+        Assert.IsFalse(controller.CanCommit);
+        Assert.AreEqual(2, document.GetState().Result?.FrameCount);
+        Assert.IsFalse(document.GetState().CanUndo);
     }
 
     private static AnimationWorkbenchBlendRequest CreateRootRequest(
