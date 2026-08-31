@@ -55,12 +55,15 @@
                         Margin="0,4,0,0"
                         Style="{StaticResource AeText.Caption}">
                         <Run Text="{loc:Loc AnimationWorkbench.Timeline.FrameCount}" />
+                        <Run Text=" " />
                         <Run Text="{Binding ElementName=Root, Path=Controller.Timeline.FrameCount, Mode=OneWay}" />
                         <Run Text="  ·  " />
                         <Run Text="{loc:Loc AnimationWorkbench.Timeline.BoneCount}" />
+                        <Run Text=" " />
                         <Run Text="{Binding ElementName=Root, Path=Controller.Timeline.BoneNames.Count, Mode=OneWay}" />
                         <Run Text="  ·  " />
                         <Run Text="{loc:Loc AnimationWorkbench.Timeline.SelectionCount}" />
+                        <Run Text=" " />
                         <Run Text="{Binding ElementName=Root, Path=Controller.SelectionCount, Mode=OneWay}" />
                     </TextBlock>
                 </StackPanel>
