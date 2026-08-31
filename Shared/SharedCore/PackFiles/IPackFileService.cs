@@ -32,6 +32,19 @@ namespace Shared.Core.PackFiles
         IReadOnlyList<PackFile> ApplyFileWrites(
             PackFileContainer container,
             IReadOnlyCollection<PackFileWrite> writes);
+        IReadOnlyList<PackFile> ApplyFileWrites(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes,
+            bool overwriteExisting) => overwriteExisting
+                ? ApplyFileWrites(container, writes)
+                : throw new NotSupportedException(
+                    "Atomic no-overwrite writes are not supported by this service.");
+        Task<IReadOnlyList<PackFile>> ApplyFileWritesAsync(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes,
+            bool overwriteExisting,
+            CancellationToken cancellationToken) => Task.FromResult(
+                ApplyFileWrites(container, writes, overwriteExisting));
         void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target);
         PackFileContainer CreateNewPackFileContainer(
             string name,

@@ -306,6 +306,49 @@ public class FolderProjectPackFileServiceTests
     }
 
     [Test]
+    public void ApplyFileWritesAsync_NoOverwriteRejectsEntireBatch()
+    {
+        using var project = new TemporaryDirectory();
+        project.Write(@"audio\existing.wem", [9]);
+        using var container = FolderProjectContainer.Create(
+            project.Path,
+            new FolderProjectSettings { Name = "工程" });
+        var eventHub = new Mock<IGlobalEventHub>();
+        var service = CreateService(eventHub.Object);
+        service.AddContainer(container, true);
+        eventHub.Invocations.Clear();
+
+        var exception = Assert.ThrowsAsync<FolderProjectFileConflictException>(
+            async () => await service.ApplyFileWritesAsync(
+                container,
+                [
+                    new PackFileWrite(@"audio\existing.wem", [1]),
+                    new PackFileWrite(@"audio\new.wem", [2]),
+                ],
+                overwriteExisting: false,
+                CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception?.Paths,
+                Is.EqualTo(new[] { @"audio\existing.wem" }));
+            Assert.That(
+                File.ReadAllBytes(Path.Combine(
+                    project.Path,
+                    "audio",
+                    "existing.wem")),
+                Is.EqualTo(new byte[] { 9 }));
+            Assert.That(
+                File.Exists(Path.Combine(project.Path, "audio", "new.wem")),
+                Is.False);
+            Assert.That(
+                CountPublished<FolderProjectChangedEvent>(eventHub),
+                Is.Zero);
+        });
+    }
+
+    [Test]
     public void ApplyFileWrites_DuringDiskCommit_DoesNotBlockReadOnlyStateQueries()
     {
         using var project = new TemporaryDirectory();

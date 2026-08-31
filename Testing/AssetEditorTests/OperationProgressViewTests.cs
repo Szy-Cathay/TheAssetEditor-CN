@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.AudioEditor.Presentation.Settings;
@@ -31,6 +31,7 @@ public class OperationProgressViewTests
     [
         (["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"], 1),
         (["AssetEditor", "Views", "MainWindow.xaml"], 1),
+        (["Editors", "AnimationEditor", "AnimationWorkbench", "AnimationWorkbenchBaseAnimationView.xaml"], 1),
         (["Editors", "AnimationReTarget", "Editors.AnimatioReTarget", "Editor", "Saving", "SaveWindow.xaml"], 1),
         (["Editors", "Audio", "AudioEditor", "Presentation", "NewAudioProject", "NewAudioProjectWindow.xaml"], 1),
         (["Editors", "Audio", "AudioProjectConverter", "AudioProjectConverterWindow.xaml"], 1),

@@ -19,6 +19,7 @@ public enum AnimationWorkbenchPanelKind
     Blend,
     Layer,
     Retarget,
+    BaseAnimation,
     MetaData,
 }
 
@@ -49,6 +50,8 @@ public sealed partial class AnimationWorkbenchViewModel :
     private AnimationWorkbenchBlendController? _blendController;
     private AnimationWorkbenchLayerController? _layerController;
     private AnimationWorkbenchRetargetController? _retargetController;
+    private AnimationWorkbenchBaseAnimationController?
+        _baseAnimationController;
     private AnimationWorkbenchPanelKind _activePanel;
     private string _statusText;
     private string _saveUnavailableReason;
@@ -180,6 +183,12 @@ public sealed partial class AnimationWorkbenchViewModel :
         private set => SetProperty(ref _retargetController, value);
     }
 
+    public AnimationWorkbenchBaseAnimationController? BaseAnimationController
+    {
+        get => _baseAnimationController;
+        private set => SetProperty(ref _baseAnimationController, value);
+    }
+
     public void LoadFile(PackFile file)
     {
         ArgumentNullException.ThrowIfNull(file);
@@ -231,6 +240,25 @@ public sealed partial class AnimationWorkbenchViewModel :
                         _document,
                         AnimationWorkbenchSourceSlot.AnimationA);
                 RetargetController.Changed += Controller_Changed;
+                break;
+            case AnimationWorkbenchPanelKind.BaseAnimation:
+                if (_animationA == null || _targetSkeleton == null)
+                    break;
+                if (BaseAnimationController != null)
+                {
+                    BaseAnimationController.Changed -= Controller_Changed;
+                    BaseAnimationController.Dispose();
+                }
+                BaseAnimationController =
+                    new AnimationWorkbenchBaseAnimationController(
+                        _document,
+                        _viewport,
+                        _packFileService,
+                        _skeletonLookup,
+                        _dialogs,
+                        _animationA,
+                        _targetSkeleton);
+                BaseAnimationController.Changed += Controller_Changed;
                 break;
         }
         RefreshState();
@@ -342,6 +370,11 @@ public sealed partial class AnimationWorkbenchViewModel :
         _closed = true;
         ReleaseActivePanelPreview();
         _document.Dispose();
+        if (BaseAnimationController != null)
+        {
+            BaseAnimationController.Changed -= Controller_Changed;
+            BaseAnimationController.Dispose();
+        }
     }
 
     private void LoadSource(
@@ -406,6 +439,12 @@ public sealed partial class AnimationWorkbenchViewModel :
         BlendController = null;
         LayerController = null;
         RetargetController = null;
+        if (BaseAnimationController != null)
+        {
+            BaseAnimationController.Changed -= Controller_Changed;
+            BaseAnimationController.Dispose();
+            BaseAnimationController = null;
+        }
         RefreshState();
         if (selectedPanel != AnimationWorkbenchPanelKind.Issues)
             ActivatePanel(selectedPanel);
@@ -433,6 +472,7 @@ public sealed partial class AnimationWorkbenchViewModel :
         BlendController?.ReleasePreview();
         LayerController?.ReleasePreview();
         RetargetController?.ReleasePreview();
+        BaseAnimationController?.ReleasePreview();
     }
 
     private void SetShellFailure(string key)

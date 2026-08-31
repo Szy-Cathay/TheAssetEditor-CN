@@ -546,10 +546,15 @@ public sealed class FolderProjectContainer :
     }
 
     public List<PackFile> ApplyFileWrites(
-        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes)
+        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes) =>
+        ApplyFileWrites(writes, overwriteExisting: true);
+
+    public List<PackFile> ApplyFileWrites(
+        IReadOnlyCollection<Shared.Core.PackFiles.PackFileWrite> writes,
+        bool overwriteExisting)
     {
         return ExecuteSerializedMutation(
-            () => ApplyFileWritesCore(writes, overwriteExisting: true));
+            () => ApplyFileWritesCore(writes, overwriteExisting));
     }
 
     private List<PackFile> ApplyFileWritesCore(

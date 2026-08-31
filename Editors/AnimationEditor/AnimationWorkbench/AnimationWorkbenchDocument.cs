@@ -125,6 +125,14 @@ public enum AnimationWorkbenchDiagnosticCode
     RetargetProfileNotFound,
     RetargetProfileReadFailed,
     RetargetProfileWriteFailed,
+    BaseAnimationStyleReferenceMissing,
+    BaseAnimationStyleMaskEmpty,
+    BaseAnimationOutputPathInvalid,
+    BaseAnimationOutputPathDuplicate,
+    BaseAnimationGenerationCancelled,
+    BaseAnimationSourceOverwriteBlocked,
+    BaseAnimationSetIncomplete,
+    BaseAnimationSetOutputPathInvalid,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
