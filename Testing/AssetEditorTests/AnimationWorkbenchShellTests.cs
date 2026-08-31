@@ -213,6 +213,160 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
+    public void BaseAnimationTab_BindsControllerAndBrowseCommand()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var animationFile = CreateAnimationFile();
+                var animation = PackFile.CreateFromBytes(
+                    "idle.anim",
+                    AnimationFile.ConvertToBytes(animationFile));
+                var packFileService = new Mock<IPackFileService>();
+                packFileService.Setup(service => service.GetFullPath(
+                        animation,
+                        null))
+                    .Returns("animations\\idle.anim");
+                var skeletonLookup = new Mock<
+                    ISkeletonAnimationLookUpHelper>();
+                skeletonLookup.Setup(helper => helper.GetSkeletonFileFromName(
+                        "test_skeleton"))
+                    .Returns(CreateAnimationFile());
+                var viewport = new Mock<IAnimationWorkbenchViewport>();
+                viewport.Setup(candidate => candidate.Show(
+                        It.IsAny<AnimationWorkbenchPreviewSnapshot>(),
+                        It.IsAny<CancellationToken>()))
+                    .Returns(Mock.Of<IAnimationWorkbenchPreviewSession>());
+                var dialogs = new Mock<IStandardDialogs>();
+                dialogs.Setup(candidate => candidate.DisplayBrowseDialog(
+                        It.IsAny<List<string>>()))
+                    .Returns(new BrowseDialogResultFile(false, null!));
+                var viewModel = new AnimationWorkbenchViewModel(
+                    viewport.Object,
+                    packFileService.Object,
+                    skeletonLookup.Object,
+                    dialogs.Object,
+                    new ApplicationSettingsService(
+                        GameTypeEnum.Warhammer3));
+                viewModel.LoadFile(animation);
+                var view = new AnimationWorkbenchView
+                {
+                    DataContext = viewModel,
+                };
+                var window = new Window
+                {
+                    Width = 1600,
+                    Height = 940,
+                    Content = view,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.None,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    var tabs = (TabControl)view.FindName("ToolTabs");
+                    tabs.SelectedItem = tabs.Items
+                        .OfType<TabItem>()
+                        .Single(item => Equals(item.Tag, "BaseAnimation"));
+                    window.Dispatcher.Invoke(
+                        () => { },
+                        DispatcherPriority.ApplicationIdle);
+                    window.UpdateLayout();
+
+                    var baseView = FindDescendants<
+                            AnimationWorkbenchBaseAnimationView>(view)
+                        .Single();
+                    var selectButton = FindDescendants<Button>(baseView)
+                        .Single(button =>
+                            AutomationProperties.GetName(button) ==
+                            LocalizationManager.Instance.Get(
+                                "AnimationWorkbench.BaseAnimation.SelectDonor"));
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(
+                            viewModel.BaseAnimationController,
+                            Is.Not.Null);
+                        NUnitAssert.That(
+                            baseView.Controller,
+                            Is.SameAs(viewModel.BaseAnimationController));
+                        NUnitAssert.That(selectButton.Command, Is.Not.Null);
+                    });
+
+                    selectButton.Command!.Execute(null);
+                    dialogs.Verify(candidate => candidate.DisplayBrowseDialog(
+                            It.Is<List<string>>(extensions =>
+                                extensions.SequenceEqual(new[] { ".anim" }))),
+                        Times.Once);
+                }
+                finally
+                {
+                    window.Close();
+                    viewModel.Close();
+                }
+            });
+    }
+
+    [Test]
+    public void MetaDataTab_BindsController()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var viewModel = new AnimationWorkbenchViewModel(
+                    Mock.Of<IAnimationWorkbenchViewport>(),
+                    Mock.Of<IPackFileService>(),
+                    Mock.Of<ISkeletonAnimationLookUpHelper>(),
+                    Mock.Of<IStandardDialogs>(),
+                    new ApplicationSettingsService(
+                        GameTypeEnum.Warhammer3));
+                var view = new AnimationWorkbenchView
+                {
+                    DataContext = viewModel,
+                };
+                var window = new Window
+                {
+                    Width = 1600,
+                    Height = 940,
+                    Content = view,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.None,
+                };
+
+                try
+                {
+                    window.Show();
+                    var tabs = (TabControl)view.FindName("ToolTabs");
+                    tabs.SelectedItem = tabs.Items
+                        .OfType<TabItem>()
+                        .Single(item => Equals(item.Tag, "MetaData"));
+                    window.Dispatcher.Invoke(
+                        () => { },
+                        DispatcherPriority.ApplicationIdle);
+                    window.UpdateLayout();
+
+                    var metaDataView = FindDescendants<
+                            AnimationWorkbenchMetaDataView>(view)
+                        .Single();
+                    NUnitAssert.That(
+                        metaDataView.Controller,
+                        Is.SameAs(viewModel.MetaDataController));
+                }
+                finally
+                {
+                    window.Close();
+                    viewModel.Close();
+                }
+            });
+    }
+
+    [Test]
     public void Warhammer3_LoadVersionEightStaticFileEnablesEditing()
     {
         var animationFile = CreateVersionEightStaticAnimationFile();
