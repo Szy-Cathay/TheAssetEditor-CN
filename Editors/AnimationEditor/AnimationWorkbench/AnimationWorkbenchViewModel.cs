@@ -388,6 +388,7 @@ public sealed partial class AnimationWorkbenchViewModel :
 
     private void ReloadDocument()
     {
+        var selectedPanel = ActivePanel;
         ReleaseActivePanelPreview();
         _document.Load(new AnimationWorkbenchLoadRequest(
             _animationA,
@@ -406,6 +407,8 @@ public sealed partial class AnimationWorkbenchViewModel :
         LayerController = null;
         RetargetController = null;
         RefreshState();
+        if (selectedPanel != AnimationWorkbenchPanelKind.Issues)
+            ActivatePanel(selectedPanel);
     }
 
     private void SelectPreview(AnimationWorkbenchPreviewKind kind)
@@ -444,11 +447,11 @@ public sealed partial class AnimationWorkbenchViewModel :
         var state = _document.GetState();
         Sources.Clear();
         Sources.Add(CreateSourceItem(
-            "A",
+            Localize("AnimationWorkbench.Shell.SourceSlotA"),
             state.AnimationA,
             "AnimationWorkbench.Shell.AnimationAMissing"));
         Sources.Add(CreateSourceItem(
-            "B",
+            Localize("AnimationWorkbench.Shell.SourceSlotB"),
             state.AnimationB,
             "AnimationWorkbench.Shell.AnimationBOptional"));
 

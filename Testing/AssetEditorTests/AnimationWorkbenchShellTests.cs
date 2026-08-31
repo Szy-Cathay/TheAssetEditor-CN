@@ -34,7 +34,7 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
-    public void RegisterTools_EnablesWarhammer3WorkbenchForAnimFiles()
+    public void RegisterTools_EnablesWarhammer3Workbench()
     {
         var database = new EditorDatabase(null!, null!);
 
@@ -55,9 +55,7 @@ public class AnimationWorkbenchShellTests
                 Is.EqualTo("DisplayName.AnimationWorkbench"));
             NUnitAssert.That(editor.SupportedGames,
                 Is.EqualTo(new[] { GameTypeEnum.Warhammer3 }));
-            NUnitAssert.That(editor.Extensions,
-                Has.Some.Matches<EditorInfo.ExtentionInfo>(extension =>
-                    extension.Extention == ".anim"));
+            NUnitAssert.That(editor.Extensions, Is.Empty);
         });
     }
 
@@ -180,6 +178,19 @@ public class AnimationWorkbenchShellTests
             It.Is<AnimationWorkbenchPreviewSnapshot>(preview =>
                 preview.Kind == AnimationWorkbenchPreviewKind.AnimationA),
             It.IsAny<CancellationToken>()), Times.Once);
+
+        viewModel.ActivatePanel(AnimationWorkbenchPanelKind.Blend);
+        var firstBlendController = viewModel.BlendController;
+        viewModel.LoadFile(animation);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.ActivePanel,
+                Is.EqualTo(AnimationWorkbenchPanelKind.Blend));
+            NUnitAssert.That(viewModel.BlendController, Is.Not.Null);
+            NUnitAssert.That(viewModel.BlendController,
+                Is.Not.SameAs(firstBlendController));
+        });
         viewModel.Close();
     }
 
@@ -240,6 +251,8 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbench.Shell.ThreeKingdomsUnavailable",
             "AnimationWorkbench.Shell.SourceSkeletonMissing",
             "AnimationWorkbench.Shell.SaveUnavailable",
+            "AnimationWorkbench.Shell.SourceSlotA",
+            "AnimationWorkbench.Shell.SourceSlotB",
         };
 
         foreach (var key in keys)

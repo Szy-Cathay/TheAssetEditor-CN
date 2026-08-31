@@ -1000,6 +1000,8 @@
   "AnimationWorkbench.Shell.PreviewResult": "预览结果",
   "AnimationWorkbench.Shell.SaveAsNewResource": "另存为新动画",
   "AnimationWorkbench.Shell.Sources": "动画来源",
+  "AnimationWorkbench.Shell.SourceSlotA": "A",
+  "AnimationWorkbench.Shell.SourceSlotB": "B",
   "AnimationWorkbench.Shell.AnimationAMissing": "尚未加载动画 A",
   "AnimationWorkbench.Shell.AnimationBOptional": "动画 B（可选）",
   "AnimationWorkbench.Shell.TargetBones": "目标骨架骨骼",

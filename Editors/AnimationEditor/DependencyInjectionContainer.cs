@@ -52,7 +52,6 @@ namespace Editors.AnimationVisualEditors
             EditorInfoBuilder
                 .Create<AnimationWorkbenchViewModel, AnimationWorkbenchView>(
                     EditorEnums.AnimationKeyFrame_Editor)
-                .AddExtention(".anim", EditorPriorites.Default)
                 .AddToToolbar("DisplayName.AnimationWorkbench", true)
                 .ForGames(GameTypeEnum.Warhammer3)
                 .Build(database);

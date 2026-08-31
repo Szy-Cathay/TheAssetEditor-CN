@@ -55,7 +55,7 @@
                 </Grid.ColumnDefinitions>
                 <Button
                     Grid.Column="0"
-                    Margin="0,0,6,0"
+                    Margin="0,0,8,0"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.LoadAnimationA}"
                     Command="{Binding BrowseAnimationACommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.LoadAnimationA}"
@@ -63,7 +63,7 @@
                     Style="{StaticResource AeButton.Primary}" />
                 <Button
                     Grid.Column="1"
-                    Margin="0,0,6,0"
+                    Margin="0,0,8,0"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.LoadAnimationB}"
                     Command="{Binding BrowseAnimationBCommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.LoadAnimationB}"
@@ -77,14 +77,14 @@
 
                 <Button
                     Grid.Column="4"
-                    Margin="0,0,6,0"
+                    Margin="0,0,8,0"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationA}"
                     Command="{Binding SelectAnimationACommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationA}"
                     IsEnabled="{Binding CanEdit}" />
                 <Button
                     Grid.Column="5"
-                    Margin="0,0,6,0"
+                    Margin="0,0,8,0"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationB}"
                     Command="{Binding SelectAnimationBCommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationB}"
@@ -102,7 +102,7 @@
                     Orientation="Horizontal">
                     <Border
                         Margin="0,0,8,0"
-                        Padding="10,4"
+                        Padding="8,4"
                         Background="{DynamicResource AeBrush.AccentSoft}"
                         BorderBrush="{DynamicResource AeBrush.Accent}"
                         BorderThickness="1"
@@ -152,8 +152,8 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:AnimationWorkbenchSourceItem}">
                                 <Border
-                                    Margin="0,0,0,6"
-                                    Padding="10,8"
+                                    Margin="0,0,0,8"
+                                    Padding="12,8"
                                     Style="{StaticResource AeSurface.Control}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -171,7 +171,7 @@
                                                 TextTrimming="CharacterEllipsis"
                                                 ToolTip="{Binding Name}" />
                                             <TextBlock
-                                                Margin="0,3,0,0"
+                                                Margin="0,4,0,0"
                                                 Style="{StaticResource AeText.Caption}"
                                                 Text="{Binding Details}"
                                                 TextWrapping="Wrap" />
@@ -216,7 +216,7 @@
                     <Border
                         HorizontalAlignment="Left"
                         Margin="12"
-                        Padding="10,6"
+                        Padding="12,8"
                         VerticalAlignment="Top"
                         Background="{DynamicResource AeBrush.Surface2}"
                         CornerRadius="{StaticResource AeRadius.Control}">
@@ -324,7 +324,7 @@
 
         <Border
             Grid.Row="4"
-            Padding="12,6"
+            Padding="12,8"
             Background="{DynamicResource AeBrush.Surface2}"
             BorderBrush="{DynamicResource AeBrush.Border}"
             BorderThickness="0,1,0,0">
