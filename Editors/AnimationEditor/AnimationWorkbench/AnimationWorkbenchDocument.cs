@@ -56,6 +56,13 @@ public enum AnimationWorkbenchDiagnosticCode
     PosePreviewMissing,
     PoseUndoUnavailable,
     PoseRedoUnavailable,
+    TimelineRangeInvalid,
+    TimelineSelectionInvalid,
+    TimelineMoveInvalid,
+    TimelineLoopInvalid,
+    TimelineStretchInvalid,
+    TimelinePreviewAlreadyActive,
+    TimelinePreviewMissing,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
@@ -162,7 +169,8 @@ public sealed record AnimationWorkbenchDocumentState(
     bool IsClosed,
     bool CanUndo,
     bool CanRedo,
-    bool HasActivePosePreview);
+    bool HasActivePosePreview,
+    bool HasActiveTimelinePreview);
 
 public sealed partial class AnimationWorkbenchDocument : IDisposable
 {
@@ -183,6 +191,12 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         IAnimationWorkbenchPreviewHost? previewHost = null)
     {
         _previewHost = previewHost ?? new EmptyPreviewHost();
+    }
+
+    public AnimationWorkbenchDocumentState GetState()
+    {
+        ObjectDisposedException.ThrowIf(_isClosed, this);
+        return CreateState();
     }
 
     public AnimationWorkbenchDocumentState Load(
@@ -371,7 +385,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _isClosed,
             _undoEdits.Count != 0,
             _redoEdits.Count != 0,
-            _posePreviewResult != null);
+            _posePreviewResult != null,
+            _timelinePreviewResult != null);
     }
 
     private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()
@@ -383,10 +398,12 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 AnimationWorkbenchDiagnosticCode.TargetGameSaveUnsupported));
         }
 
-        if (_posePreviewResult != null)
+        if (_posePreviewResult != null || _timelinePreviewResult != null)
         {
             diagnostics.Add(CreateSaveDiagnostic(
-                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
+                _posePreviewResult != null
+                    ? AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive
+                    : AnimationWorkbenchDiagnosticCode.TimelinePreviewAlreadyActive));
         }
 
         if (_result == null)
@@ -578,7 +595,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             AnimationWorkbenchPreviewKind.AnimationA => _animationA,
             AnimationWorkbenchPreviewKind.AnimationB => _animationB,
             AnimationWorkbenchPreviewKind.Result =>
-                _posePreviewResult ?? _result,
+                _timelinePreviewResult ?? _posePreviewResult ?? _result,
             _ => null,
         };
 

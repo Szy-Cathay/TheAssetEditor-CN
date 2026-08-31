@@ -86,7 +86,9 @@ public sealed partial class AnimationWorkbenchDocument
             animation.Duration,
             animation.DynamicFrames.Count,
             next.DynamicFrames.Count);
-        CommitResultAnimation(next);
+        var nextAnchors = ShiftAnchorsForInsertion(insertionIndex);
+        nextAnchors.Add(insertionIndex);
+        CommitResultAnimation(next, nextAnchors);
         return CreatePoseSuccess();
     }
 
@@ -192,7 +194,7 @@ public sealed partial class AnimationWorkbenchDocument
             animation.Duration,
             animation.DynamicFrames.Count,
             next.DynamicFrames.Count);
-        CommitResultAnimation(next);
+        CommitResultAnimation(next, ShiftAnchorsForDeletion(frameIndex));
         return CreatePoseSuccess();
     }
 
@@ -230,7 +232,7 @@ public sealed partial class AnimationWorkbenchDocument
         var next = animation.Clone();
         ApplyTransforms(next.DynamicFrames[frameIndex], skeleton, transforms);
         if (AnimationsEqual(animation, next) == false)
-            CommitResultAnimation(next);
+            CommitResultAnimation(next, AddEditingAnchor(frameIndex));
         return CreatePoseSuccess();
     }
 
@@ -244,10 +246,14 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchPoseEditResult BeginPosePreview(int frameIndex)
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_posePreviewResult != null)
+        if (_posePreviewResult != null || _timelinePreviewResult != null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
-                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
+                _timelinePreviewResult != null
+                    ? AnimationWorkbenchDiagnosticCode
+                        .TimelinePreviewAlreadyActive
+                    : AnimationWorkbenchDiagnosticCode
+                        .PosePreviewAlreadyActive));
         }
 
         if (TryGetEditContext(
@@ -323,6 +329,7 @@ public sealed partial class AnimationWorkbenchDocument
 
         var next = _posePreviewResult.Animation.Clone();
         var previous = _posePreviewStart;
+        var editedFrameIndex = _posePreviewFrameIndex;
         ClearPosePreview();
         if (AnimationsEqual(previous, next))
         {
@@ -330,7 +337,7 @@ public sealed partial class AnimationWorkbenchDocument
             return CreatePoseSuccess();
         }
 
-        CommitResultAnimation(next);
+        CommitResultAnimation(next, AddEditingAnchor(editedFrameIndex));
         return CreatePoseSuccess();
     }
 
@@ -351,10 +358,14 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchPoseEditResult Undo()
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_posePreviewResult != null)
+        if (_posePreviewResult != null || _timelinePreviewResult != null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
-                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
+                _timelinePreviewResult != null
+                    ? AnimationWorkbenchDiagnosticCode
+                        .TimelinePreviewAlreadyActive
+                    : AnimationWorkbenchDiagnosticCode
+                        .PosePreviewAlreadyActive));
         }
 
         if (_undoEdits.Count == 0 || _result == null)
@@ -366,6 +377,7 @@ public sealed partial class AnimationWorkbenchDocument
         var entry = _undoEdits.Pop();
         _redoEdits.Push(entry);
         _result = _result.WithAnimation(entry.Before);
+        SetEditingAnchors(entry.BeforeAnchors);
         UpdateDirtyState();
         RefreshSelectedResultPreview();
         return CreatePoseSuccess();
@@ -374,10 +386,14 @@ public sealed partial class AnimationWorkbenchDocument
     public AnimationWorkbenchPoseEditResult Redo()
     {
         ObjectDisposedException.ThrowIf(_isClosed, this);
-        if (_posePreviewResult != null)
+        if (_posePreviewResult != null || _timelinePreviewResult != null)
         {
             return CreatePoseFailure(CreatePoseDiagnostic(
-                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive));
+                _timelinePreviewResult != null
+                    ? AnimationWorkbenchDiagnosticCode
+                        .TimelinePreviewAlreadyActive
+                    : AnimationWorkbenchDiagnosticCode
+                        .PosePreviewAlreadyActive));
         }
 
         if (_redoEdits.Count == 0 || _result == null)
@@ -389,6 +405,7 @@ public sealed partial class AnimationWorkbenchDocument
         var entry = _redoEdits.Pop();
         _undoEdits.Push(entry);
         _result = _result.WithAnimation(entry.After);
+        SetEditingAnchors(entry.AfterAnchors);
         UpdateDirtyState();
         RefreshSelectedResultPreview();
         return CreatePoseSuccess();
@@ -431,7 +448,7 @@ public sealed partial class AnimationWorkbenchDocument
         var next = animation.Clone();
         ApplyTransforms(next.DynamicFrames[frameIndex], skeleton, normalized);
         if (AnimationsEqual(animation, next) == false)
-            CommitResultAnimation(next);
+            CommitResultAnimation(next, AddEditingAnchor(frameIndex));
         return CreatePoseSuccess();
     }
 
@@ -440,12 +457,16 @@ public sealed partial class AnimationWorkbenchDocument
         out GameSkeleton skeleton,
         out AnimationWorkbenchDiagnostic? diagnostic)
     {
-        if (_posePreviewResult != null)
+        if (_posePreviewResult != null || _timelinePreviewResult != null)
         {
             animation = null!;
             skeleton = null!;
             diagnostic = CreatePoseDiagnostic(
-                AnimationWorkbenchDiagnosticCode.PosePreviewAlreadyActive);
+                _timelinePreviewResult != null
+                    ? AnimationWorkbenchDiagnosticCode
+                        .TimelinePreviewAlreadyActive
+                    : AnimationWorkbenchDiagnosticCode
+                        .PosePreviewAlreadyActive);
             return false;
         }
 
@@ -644,12 +665,19 @@ public sealed partial class AnimationWorkbenchDocument
         }
     }
 
-    private void CommitResultAnimation(AnimationClip next)
+    private void CommitResultAnimation(
+        AnimationClip next,
+        IReadOnlyCollection<int>? nextAnchors = null)
     {
         var entry = new DocumentHistoryEntry(
             _result!.Animation.Clone(),
-            next.Clone());
+            next.Clone(),
+            _editingAnchorFrames.ToArray(),
+            NormalizeEditingAnchors(
+                nextAnchors ?? _editingAnchorFrames,
+                next.DynamicFrames.Count));
         _result = _result.WithAnimation(next);
+        SetEditingAnchors(entry.AfterAnchors);
         _undoEdits.Push(entry);
         _redoEdits.Clear();
         UpdateDirtyState();
@@ -661,7 +689,9 @@ public sealed partial class AnimationWorkbenchDocument
         _undoEdits.Clear();
         _redoEdits.Clear();
         ClearPosePreview();
+        ClearTimelinePreview();
         _savedResultAnimation = null;
+        ResetEditingAnchors();
         UpdateDirtyState();
     }
 
@@ -778,5 +808,7 @@ public sealed partial class AnimationWorkbenchDocument
 
     private sealed record DocumentHistoryEntry(
         AnimationClip Before,
-        AnimationClip After);
+        AnimationClip After,
+        IReadOnlyList<int> BeforeAnchors,
+        IReadOnlyList<int> AfterAnchors);
 }

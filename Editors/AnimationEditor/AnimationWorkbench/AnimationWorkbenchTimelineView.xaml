@@ -1,0 +1,339 @@
+<UserControl
+    x:Class="Editors.AnimationVisualEditors.AnimationWorkbench.AnimationWorkbenchTimelineView"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:Editors.AnimationVisualEditors.AnimationWorkbench"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="680"
+    d:DesignWidth="1180"
+    FontFamily="{DynamicResource AppFontFamily}"
+    FontWeight="{DynamicResource AppFontWeight}"
+    Foreground="{DynamicResource AeBrush.TextPrimary}"
+    Focusable="True"
+    Loaded="Root_Loaded"
+    PreviewKeyDown="Root_PreviewKeyDown"
+    SizeChanged="Root_SizeChanged"
+    Unloaded="Root_Unloaded"
+    mc:Ignorable="d">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border
+        Margin="12"
+        Padding="12"
+        Style="{StaticResource AeSurface.Panel}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="180" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock
+                        Style="{StaticResource AeText.PageTitle}"
+                        Text="{loc:Loc AnimationWorkbench.Timeline.Title}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        Style="{StaticResource AeText.Caption}">
+                        <Run Text="{loc:Loc AnimationWorkbench.Timeline.FrameCount}" />
+                        <Run Text="{Binding ElementName=Root, Path=Controller.Timeline.FrameCount, Mode=OneWay}" />
+                        <Run Text="  ·  " />
+                        <Run Text="{loc:Loc AnimationWorkbench.Timeline.BoneCount}" />
+                        <Run Text="{Binding ElementName=Root, Path=Controller.Timeline.BoneNames.Count, Mode=OneWay}" />
+                        <Run Text="  ·  " />
+                        <Run Text="{loc:Loc AnimationWorkbench.Timeline.SelectionCount}" />
+                        <Run Text="{Binding ElementName=Root, Path=Controller.SelectionCount, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="16,0,16,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <RadioButton
+                        x:Name="AnchorModeButton"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.EditingAnchors}"
+                        GroupName="TimelineDisplayMode"
+                        IsChecked="True"
+                        Style="{StaticResource AeInput.RadioButton}"
+                        Checked="AnchorModeButton_Checked" />
+                    <RadioButton
+                        x:Name="SampleModeButton"
+                        Margin="12,0,0,0"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.AllSamples}"
+                        GroupName="TimelineDisplayMode"
+                        Style="{StaticResource AeInput.RadioButton}"
+                        Checked="SampleModeButton_Checked" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock
+                        Margin="0,0,0,2"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{loc:Loc AnimationWorkbench.Timeline.Zoom}" />
+                    <Slider
+                        x:Name="ZoomSlider"
+                        Minimum="0.25"
+                        Maximum="8"
+                        SmallChange="0.25"
+                        LargeChange="1"
+                        Style="{StaticResource AeEditor.PlaybackSlider}"
+                        ValueChanged="ZoomSlider_ValueChanged" />
+                </StackPanel>
+            </Grid>
+
+            <Border
+                Grid.Row="1"
+                Margin="0,10,0,0"
+                Padding="8"
+                Style="{StaticResource AeSurface.Control}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <WrapPanel VerticalAlignment="Center">
+                    <Button
+                        x:Name="UndoButton"
+                        Margin="0,0,4,4"
+                        Click="UndoButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Undo}"
+                        Style="{StaticResource AeButton.Quiet}" />
+                    <Button
+                        x:Name="RedoButton"
+                        Margin="0,0,12,4"
+                        Click="RedoButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Redo}"
+                        Style="{StaticResource AeButton.Quiet}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="TrimButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Trim}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="SplitLeadingButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.SplitLeading}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="SplitTrailingButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.SplitTrailing}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="ReverseButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Reverse}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <TextBlock
+                        Margin="8,0,4,4"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource AeText.Label}"
+                        Text="{loc:Loc AnimationWorkbench.Timeline.LoopCount}" />
+                    <TextBox
+                        x:Name="LoopCountTextBox"
+                        Width="44"
+                        Margin="0,0,4,4"
+                        Style="{StaticResource AeInput.TextBox}"
+                        ToolTip="{loc:Loc AnimationWorkbench.Timeline.LoopCountHint}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="LoopButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Loop}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <TextBlock
+                        Margin="8,0,4,4"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource AeText.Label}"
+                        Text="{loc:Loc AnimationWorkbench.Timeline.TargetFrames}" />
+                    <TextBox
+                        x:Name="TargetFrameCountTextBox"
+                        Width="52"
+                        Margin="0,0,4,4"
+                        Style="{StaticResource AeInput.TextBox}"
+                        ToolTip="{loc:Loc AnimationWorkbench.Timeline.TargetFramesHint}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="StretchButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Stretch}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        Margin="0,0,4,4"
+                        Click="InterpolateButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Interpolate}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    <Button
+                        Margin="0,0,0,4"
+                        Click="MirrorButton_Click"
+                        Content="{loc:Loc AnimationWorkbench.Timeline.Mirror}"
+                        Style="{StaticResource AeButton.Secondary}" />
+                    </WrapPanel>
+                    <StackPanel
+                        Grid.Column="1"
+                        Margin="12,0,0,4"
+                        VerticalAlignment="Top"
+                        Orientation="Horizontal">
+                        <Button
+                            x:Name="ApplyPreviewButton"
+                            Margin="0,0,4,0"
+                            Click="ApplyPreviewButton_Click"
+                            Content="{loc:Loc AnimationWorkbench.Timeline.ApplyPreview}"
+                            Style="{StaticResource AeButton.Primary}" />
+                        <Button
+                            x:Name="CancelPreviewButton"
+                            Click="CancelPreviewButton_Click"
+                            Content="{loc:Loc AnimationWorkbench.Timeline.CancelPreview}"
+                            Style="{StaticResource AeButton.Quiet}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border
+                Grid.Row="2"
+                Margin="0,8,0,0"
+                Padding="8,6"
+                Background="{DynamicResource AeBrush.AccentSoft}"
+                BorderBrush="{DynamicResource AeBrush.Accent}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource AeRadius.Control}">
+                <TextBlock
+                    x:Name="StatusText"
+                    Style="{StaticResource AeText.Caption}"
+                    Text="{loc:Loc AnimationWorkbench.Timeline.ReadyHint}"
+                    TextWrapping="Wrap" />
+            </Border>
+
+            <Border
+                Grid.Row="3"
+                Margin="0,8,0,0"
+                Background="{DynamicResource AeBrush.Surface2}"
+                BorderBrush="{DynamicResource AeBrush.Border}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource AeRadius.Control}">
+                <Grid ClipToBounds="True">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="32" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="14" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border
+                        Padding="10,0"
+                        Background="{DynamicResource AeBrush.Surface3}"
+                        BorderBrush="{DynamicResource AeBrush.Border}"
+                        BorderThickness="0,0,1,1">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.Label}"
+                            Text="{loc:Loc AnimationWorkbench.Timeline.BoneTrack}" />
+                    </Border>
+                    <Border
+                        Grid.Column="1"
+                        Background="{DynamicResource AeBrush.Surface3}"
+                        BorderBrush="{DynamicResource AeBrush.Border}"
+                        BorderThickness="0,0,0,1">
+                        <local:AnimationWorkbenchTimelineTrack
+                            x:Name="RulerTrack"
+                            Controller="{Binding ElementName=Root, Path=Controller}"
+                            IsRuler="True"
+                            EditResultAvailable="Track_EditResultAvailable" />
+                    </Border>
+
+                    <ListBox
+                        x:Name="BoneTrackList"
+                        Grid.Row="1"
+                        Grid.ColumnSpan="2"
+                        ItemsSource="{Binding ElementName=Root, Path=Controller.Tracks, Mode=OneWay}"
+                        ScrollViewer.CanContentScroll="True"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
+                        SelectionMode="Single"
+                        Style="{StaticResource AeList.View}"
+                        VirtualizingPanel.CacheLength="2"
+                        VirtualizingPanel.CacheLengthUnit="Item"
+                        VirtualizingPanel.IsVirtualizing="True"
+                        VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style
+                                BasedOn="{StaticResource AeList.Item}"
+                                TargetType="{x:Type ListBoxItem}">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Focusable" Value="False" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Height="30">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Padding="10,0"
+                                        BorderBrush="{DynamicResource AeBrush.Border}"
+                                        BorderThickness="0,0,1,0">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource AeText.Technical}"
+                                            Text="{Binding BoneName}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip="{Binding BoneName}" />
+                                    </Border>
+                                    <local:AnimationWorkbenchTimelineTrack
+                                        Grid.Column="1"
+                                        BoneName="{Binding BoneName}"
+                                        Controller="{Binding RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Path=Controller}"
+                                        EditResultAvailable="Track_EditResultAvailable" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <ScrollBar
+                        x:Name="HorizontalScroll"
+                        Grid.Row="2"
+                        Grid.Column="1"
+                        LargeChange="120"
+                        Orientation="Horizontal"
+                        SmallChange="24"
+                        Style="{StaticResource AeScrollBar.Compact}"
+                        ValueChanged="HorizontalScroll_ValueChanged" />
+                </Grid>
+            </Border>
+
+            <TextBlock
+                Grid.Row="4"
+                Margin="0,8,0,0"
+                Style="{StaticResource AeText.Caption}"
+                Text="{loc:Loc AnimationWorkbench.Timeline.InteractionHint}"
+                TextWrapping="Wrap" />
+        </Grid>
+    </Border>
+</UserControl>
