@@ -295,6 +295,14 @@
                                 Controller="{Binding RetargetController}" />
                         </ScrollViewer>
                     </TabItem>
+                    <TabItem Header="{loc:Loc AnimationWorkbench.Shell.BaseAnimation}" Tag="BaseAnimation">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <local:AnimationWorkbenchBaseAnimationView
+                                MinHeight="640"
+                                MinWidth="1120"
+                                Controller="{Binding BaseAnimationController}" />
+                        </ScrollViewer>
+                    </TabItem>
                     <TabItem Header="{loc:Loc AnimationWorkbench.Shell.MetaData}" Tag="MetaData">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                             <local:AnimationWorkbenchMetaDataView

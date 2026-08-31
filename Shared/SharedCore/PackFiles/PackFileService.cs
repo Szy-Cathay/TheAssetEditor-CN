@@ -392,7 +392,13 @@ namespace Shared.Core.PackFiles
 
         public IReadOnlyList<PackFile> ApplyFileWrites(
             PackFileContainer container,
-            IReadOnlyCollection<PackFileWrite> writes)
+            IReadOnlyCollection<PackFileWrite> writes) =>
+            ApplyFileWrites(container, writes, overwriteExisting: true);
+
+        public IReadOnlyList<PackFile> ApplyFileWrites(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes,
+            bool overwriteExisting)
         {
             EnsureWritable(container);
             if (container.IsCaPackFile)
@@ -418,7 +424,8 @@ namespace Shared.Core.PackFiles
                         .Select(write => new PackFileWrite(
                             write.Path,
                             write.Content))
-                        .ToList());
+                        .ToList(),
+                    overwriteExisting);
                 var changes = normalizedWrites
                     .Zip(
                         files,
@@ -437,6 +444,14 @@ namespace Shared.Core.PackFiles
                         folderProject,
                         changeSet));
                 return files;
+            }
+
+            if (!overwriteExisting && normalizedWrites.Any(write =>
+                    container.FileList.ContainsKey(
+                        write.Path.ToLowerInvariant())))
+            {
+                throw new InvalidOperationException(
+                    "One or more destination files already exist.");
             }
 
             var added = new List<PackFile>();
@@ -469,6 +484,52 @@ namespace Shared.Core.PackFiles
                     new PackFileContainerFilesUpdatedEvent(container, updated));
             }
             return added.Concat(updated).ToList();
+        }
+
+        public async Task<IReadOnlyList<PackFile>> ApplyFileWritesAsync(
+            PackFileContainer container,
+            IReadOnlyCollection<PackFileWrite> writes,
+            bool overwriteExisting,
+            CancellationToken cancellationToken)
+        {
+            EnsureWritable(container);
+            if (container is not FolderProjectContainer folderProject)
+            {
+                return ApplyFileWrites(
+                    container,
+                    writes,
+                    overwriteExisting);
+            }
+
+            var normalizedWrites = writes.Select(write => new PackFileWrite(
+                    FolderProjectPathPolicy.EnsureResourcePath(write.Path),
+                    write.Content))
+                .ToList();
+            var existingPaths = normalizedWrites
+                .Where(write => container.FileList.ContainsKey(
+                    write.Path.ToLowerInvariant()))
+                .Select(write => write.Path)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var files = await Task.Run(
+                () => folderProject.ApplyFileWrites(
+                    normalizedWrites,
+                    overwriteExisting),
+                cancellationToken);
+            var changes = normalizedWrites.Zip(
+                    files,
+                    (write, file) => new FolderProjectFileChange(
+                        write.Path,
+                        existingPaths.Contains(write.Path)
+                            ? FolderProjectFileChangeKind.Updated
+                            : FolderProjectFileChangeKind.Added,
+                        file))
+                .ToList();
+            var changeSet = new FolderProjectChangeSet(
+                folderProject.NextRevision(),
+                changes);
+            _globalEventHub?.PublishGlobalEvent(
+                new FolderProjectChangedEvent(folderProject, changeSet));
+            return files;
         }
 
         public void CopyFileFromOtherPackFile(PackFileContainer source, string path, PackFileContainer target)

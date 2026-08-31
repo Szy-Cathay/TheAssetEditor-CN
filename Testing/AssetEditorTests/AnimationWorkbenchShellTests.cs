@@ -1,11 +1,14 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Xml.Linq;
+using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
 using Editors.AnimationVisualEditors.ContextMenu;
 using GameWorld.Core.Services;
@@ -19,6 +22,7 @@ using Shared.Core.ToolCreation;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.Ui.BaseDialogs.PackFileTree;
+using Shared.Ui.Common.OperationProgress;
 
 using NUnitAssert = NUnit.Framework.Assert;
 
@@ -191,6 +195,20 @@ public class AnimationWorkbenchShellTests
             NUnitAssert.That(viewModel.BlendController,
                 Is.Not.SameAs(firstBlendController));
         });
+        viewModel.ActivatePanel(AnimationWorkbenchPanelKind.BaseAnimation);
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.BaseAnimationController, Is.Not.Null);
+            NUnitAssert.That(
+                viewModel.BaseAnimationController?.Items,
+                Is.Empty);
+            NUnitAssert.That(
+                viewModel.BaseAnimationController?.CanGenerate,
+                Is.False);
+            NUnitAssert.That(
+                viewModel.BaseAnimationController?.CanSave,
+                Is.False);
+        });
         viewModel.Close();
     }
 
@@ -264,6 +282,8 @@ public class AnimationWorkbenchShellTests
             NUnitAssert.That(source,
                 Does.Contain("AnimationWorkbenchMetaDataView"));
             NUnitAssert.That(source,
+                Does.Contain("AnimationWorkbenchBaseAnimationView"));
+            NUnitAssert.That(source,
                 Does.Contain("AutomationProperties.Name"));
             NUnitAssert.That(source, Does.Contain("AeFocus.Keyboard"));
             NUnitAssert.That(
@@ -293,6 +313,9 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbench.Shell.SaveUnavailable",
             "AnimationWorkbench.Shell.SourceSlotA",
             "AnimationWorkbench.Shell.SourceSlotB",
+            "AnimationWorkbench.Shell.BaseAnimation",
+            "AnimationWorkbench.BaseAnimation.Title",
+            "AnimationWorkbench.BaseAnimation.AnimationSetHint",
         };
 
         foreach (var key in keys)
@@ -369,6 +392,268 @@ public class AnimationWorkbenchShellTests
                     ThemesController.SetTheme(previousTheme);
                 }
             });
+    }
+
+    [Test]
+    public void BaseAnimationView_UsesSharedStylesAndRendersAcrossThemes()
+    {
+        var root = FindSolutionRoot();
+        var xamlPath = Path.Combine(
+            root,
+            "Editors",
+            "AnimationEditor",
+            "AnimationWorkbench",
+            "AnimationWorkbenchBaseAnimationView.xaml");
+        var source = File.ReadAllText(xamlPath);
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(source, Does.Contain("AeSurface.Panel"));
+            NUnitAssert.That(source, Does.Contain("AeTable.Grid"));
+            NUnitAssert.That(source,
+                Does.Contain("OperationProgressWindowHost"));
+            NUnitAssert.That(source,
+                Does.Contain("ActiveCancelCommand"));
+            NUnitAssert.That(source,
+                Does.Contain("IsProgressIndeterminate"));
+            NUnitAssert.That(source,
+                Does.Contain("AutomationProperties.Name"));
+            NUnitAssert.That(
+                Regex.IsMatch(source, "#[0-9a-fA-F]{3,8}"),
+                Is.False);
+        });
+
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var previousTheme = ThemesController.CurrentTheme;
+                try
+                {
+                    foreach (var theme in new[]
+                             {
+                                 ThemeType.DarkTheme,
+                                 ThemeType.LightTheme,
+                                 ThemeType.HighContrastDark,
+                                 ThemeType.HighContrastLight,
+                             })
+                    {
+                        ThemesController.SetTheme(theme);
+                        var window = new Window
+                        {
+                            Width = 1280,
+                            Height = 820,
+                            Content =
+                                new AnimationWorkbenchBaseAnimationView(),
+                            ShowActivated = false,
+                            ShowInTaskbar = false,
+                            WindowStyle = WindowStyle.None,
+                        };
+                        try
+                        {
+                            window.Show();
+                            window.UpdateLayout();
+                            NUnitAssert.That(window.ActualWidth,
+                                Is.GreaterThan(0), theme.ToString());
+                            NUnitAssert.That(window.ActualHeight,
+                                Is.GreaterThan(0), theme.ToString());
+                        }
+                        finally
+                        {
+                            window.Close();
+                        }
+                    }
+                }
+                finally
+                {
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
+    public void BaseAnimationView_RendersSelectedErrorAndProgressStates()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var row = new BaseAnimationRowState
+                {
+                    IsSelected = true,
+                    Role = AnimationWorkbenchBaseAnimationRole.Death,
+                    SourcePath = @"animations\battle\donor\death.anim",
+                    OutputPath = @"animations\battle\external\death.anim",
+                    StatusText = "失败",
+                    DetailText = "输出路径与原始动画相同",
+                };
+                ICommand cancelCommand = new RelayCommand(() => { });
+                var loadingState = new BaseAnimationViewState
+                {
+                    Items = [row],
+                    SelectedItem = row,
+                    StatusText = "正在生成基础动画",
+                    IsBusy = true,
+                    IsProgressIndeterminate = false,
+                    ProgressValue = 2,
+                    ProgressMaximum = 5,
+                    ProgressDetail = row.SourcePath,
+                    ActiveCancelCommand = cancelCommand,
+                };
+
+                RenderAndAssertBaseAnimationState(
+                    loadingState,
+                    view =>
+                    {
+                        var grid = FindDescendants<DataGrid>(view).Single();
+                        var progress = FindDescendants<
+                            OperationProgressWindowHost>(view).Single();
+                        var selectedCheckBox = FindDescendants<CheckBox>(view)
+                            .Single(checkBox =>
+                                AutomationProperties.GetName(checkBox) ==
+                                LocalizationManager.Instance.Get(
+                                    "AnimationWorkbench.BaseAnimation.Selected"));
+                        NUnitAssert.Multiple(() =>
+                        {
+                            NUnitAssert.That(grid.SelectedItem, Is.SameAs(row));
+                            NUnitAssert.That(selectedCheckBox.IsChecked, Is.True);
+                            NUnitAssert.That(progress.IsOperationActive, Is.True);
+                            NUnitAssert.That(
+                                progress.IsProgressIndeterminate,
+                                Is.False);
+                            NUnitAssert.That(
+                                progress.CancelCommand,
+                                Is.SameAs(cancelCommand));
+                            NUnitAssert.That(
+                                progress.CurrentDetailText,
+                                Is.EqualTo(row.SourcePath));
+                        });
+                    });
+
+                var savingState = new BaseAnimationViewState
+                {
+                    Items = [row],
+                    SelectedItem = row,
+                    StatusText = "正在保存基础动画",
+                    IsBusy = true,
+                    IsProgressIndeterminate = true,
+                    ProgressMaximum = 1,
+                    ActiveCancelCommand = null,
+                };
+                RenderAndAssertBaseAnimationState(
+                    savingState,
+                    view =>
+                    {
+                        var progress = FindDescendants<
+                            OperationProgressWindowHost>(view).Single();
+                        NUnitAssert.Multiple(() =>
+                        {
+                            NUnitAssert.That(progress.IsOperationActive, Is.True);
+                            NUnitAssert.That(
+                                progress.IsProgressIndeterminate,
+                                Is.True);
+                            NUnitAssert.That(progress.CancelCommand, Is.Null);
+                        });
+                    });
+            });
+    }
+
+    private static void RenderAndAssertBaseAnimationState(
+        BaseAnimationViewState state,
+        Action<AnimationWorkbenchBaseAnimationView> assert)
+    {
+        var view = new AnimationWorkbenchBaseAnimationView
+        {
+            DataContext = state,
+        };
+        var window = new Window
+        {
+            Width = 1280,
+            Height = 820,
+            Content = view,
+            ShowActivated = false,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+        };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+            window.UpdateLayout();
+            assert(view);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static IEnumerable<T> FindDescendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0;
+             index < VisualTreeHelper.GetChildrenCount(root);
+             index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+                yield return match;
+            foreach (var descendant in FindDescendants<T>(child))
+                yield return descendant;
+        }
+    }
+
+    private sealed class BaseAnimationViewState
+    {
+        public IReadOnlyList<BaseAnimationRowState> Items { get; init; } = [];
+        public BaseAnimationRowState? SelectedItem { get; init; }
+        public string DonorSummary { get; init; } = "已选择基础动画族";
+        public string OutputFolder { get; init; } =
+            @"animations\battle\external\base";
+        public string OutputPrefix { get; init; } = "ext_";
+        public string AnimationSetOutputPath { get; init; } =
+            @"animations\database\battle\bin\ext_external_base.animpack";
+        public AnimationWorkbenchBaseAnimationStyleMode StyleMode { get; init; } =
+            AnimationWorkbenchBaseAnimationStyleMode.PreserveMotion;
+        public double StyleWeight { get; init; } = 0.25;
+        public bool IncludeRootMotion { get; init; }
+        public bool OverwriteExisting { get; init; }
+        public IReadOnlyList<AnimationWorkbenchBaseAnimationStyleOption>
+            StyleOptions
+        { get; } =
+            [
+                new(
+                    AnimationWorkbenchBaseAnimationStyleMode.PreserveMotion,
+                    "仅保留动态习惯"),
+            ];
+        public IReadOnlyList<AnimationWorkbenchBaseAnimationRoleOption>
+            RoleOptions
+        { get; } =
+            [
+                new(AnimationWorkbenchBaseAnimationRole.Death, "死亡"),
+            ];
+        public string StatusText { get; init; } = string.Empty;
+        public bool CanGenerate { get; init; }
+        public bool CanPreview { get; init; }
+        public bool CanSave { get; init; }
+        public bool IsBusy { get; init; }
+        public bool IsProgressIndeterminate { get; init; }
+        public long ProgressValue { get; init; }
+        public long ProgressMaximum { get; init; } = 1;
+        public string ProgressDetail { get; init; } = string.Empty;
+        public ICommand? ActiveCancelCommand { get; init; }
+    }
+
+    private sealed class BaseAnimationRowState
+    {
+        public bool IsSelected { get; init; }
+        public AnimationWorkbenchBaseAnimationRole Role { get; init; }
+        public string SourcePath { get; init; } = string.Empty;
+        public string OutputPath { get; init; } = string.Empty;
+        public string StatusText { get; init; } = string.Empty;
+        public string DetailText { get; init; } = string.Empty;
     }
 
     private static string FindSolutionRoot()
