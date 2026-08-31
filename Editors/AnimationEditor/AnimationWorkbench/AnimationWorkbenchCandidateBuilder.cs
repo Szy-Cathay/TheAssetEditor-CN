@@ -40,7 +40,8 @@ internal static class AnimationWorkbenchCandidateBuilder
 
     public static AnimationWorkbenchCandidateBuildResult Build(
         AnimationClip result,
-        GameSkeleton targetSkeleton)
+        GameSkeleton targetSkeleton,
+        AnimationWorkbenchSourceFormat sourceFormat)
     {
         if (!HasCompleteFrames(result, targetSkeleton.BoneCount))
         {
@@ -50,9 +51,14 @@ internal static class AnimationWorkbenchCandidateBuilder
         }
 
         AnimationFile candidate;
+        var outputVersion = sourceFormat.Version == 8 ? 8u : 7u;
         try
         {
-            candidate = result.ConvertToFileFormat(targetSkeleton);
+            candidate = result.ConvertToFileFormat(
+                targetSkeleton,
+                outputVersion,
+                sourceFormat.UnknownValueV8,
+                sourceFormat.FlagVariables);
         }
         catch (Exception)
         {
@@ -63,7 +69,8 @@ internal static class AnimationWorkbenchCandidateBuilder
         if (!MatchesTargetStructure(
                 candidate,
                 result,
-                targetSkeleton))
+                targetSkeleton,
+                outputVersion))
         {
             return AnimationWorkbenchCandidateBuildResult.Failure(
                 AnimationWorkbenchDiagnosticCode.CandidateRoundTripMismatch);
@@ -136,9 +143,10 @@ internal static class AnimationWorkbenchCandidateBuilder
     private static bool MatchesTargetStructure(
         AnimationFile candidate,
         AnimationClip expectedAnimation,
-        GameSkeleton targetSkeleton)
+        GameSkeleton targetSkeleton,
+        uint expectedVersion)
     {
-        if (candidate.Header.Version != 7 ||
+        if (candidate.Header.Version != expectedVersion ||
             candidate.Header.SkeletonName != targetSkeleton.SkeletonName ||
             candidate.Bones == null ||
             candidate.Bones.Length != targetSkeleton.BoneCount ||
@@ -148,9 +156,17 @@ internal static class AnimationWorkbenchCandidateBuilder
         }
 
         var part = candidate.AnimationParts[0];
-        if (part.StaticFrame != null ||
-            part.DynamicFrames.Count !=
-                expectedAnimation.DynamicFrames.Count ||
+        var dynamicTranslationCount = part.TranslationMappings.Count(
+            mapping => mapping.MappingType ==
+                AnimationFile.AnimationBoneMappingType.Dynamic);
+        var dynamicRotationCount = part.RotationMappings.Count(
+            mapping => mapping.MappingType ==
+                AnimationFile.AnimationBoneMappingType.Dynamic);
+        var expectedDynamicFrameCount =
+            dynamicTranslationCount != 0 || dynamicRotationCount != 0
+                ? expectedAnimation.DynamicFrames.Count
+                : 0;
+        if (part.DynamicFrames.Count != expectedDynamicFrameCount ||
             part.TranslationMappings.Count != targetSkeleton.BoneCount ||
             part.RotationMappings.Count != targetSkeleton.BoneCount)
         {
@@ -168,29 +184,61 @@ internal static class AnimationWorkbenchCandidateBuilder
                 bone.Name != targetSkeleton.BoneNames[boneIndex] ||
                 bone.ParentId !=
                     targetSkeleton.GetParentBoneIndex(boneIndex) ||
-                translationMapping.MappingType !=
-                    AnimationFile.AnimationBoneMappingType.Dynamic ||
-                translationMapping.Id != boneIndex ||
-                rotationMapping.MappingType !=
-                    AnimationFile.AnimationBoneMappingType.Dynamic ||
-                rotationMapping.Id != boneIndex)
+                !IsSupportedMapping(translationMapping, expectedVersion, boneIndex) ||
+                !IsSupportedMapping(rotationMapping, expectedVersion, boneIndex))
             {
                 return false;
             }
         }
 
+        var staticTranslationCount = part.TranslationMappings.Count(
+            mapping => mapping.MappingType ==
+                AnimationFile.AnimationBoneMappingType.Static);
+        var staticRotationCount = part.RotationMappings.Count(
+            mapping => mapping.MappingType ==
+                AnimationFile.AnimationBoneMappingType.Static);
+        if (expectedVersion == 7 && part.StaticFrame != null)
+            return false;
+        if (expectedVersion == 8 &&
+            ((staticTranslationCount != 0 || staticRotationCount != 0) !=
+             (part.StaticFrame != null)))
+        {
+            return false;
+        }
+        if (part.StaticFrame != null &&
+            (part.StaticFrame.Transforms.Count != staticTranslationCount ||
+             part.StaticFrame.Quaternion.Count != staticRotationCount))
+        {
+            return false;
+        }
+
         return part.DynamicFrames.All(
             frame =>
-                frame.Transforms.Count == targetSkeleton.BoneCount &&
-                frame.Quaternion.Count == targetSkeleton.BoneCount);
+                frame.Transforms.Count == dynamicTranslationCount &&
+                frame.Quaternion.Count == dynamicRotationCount);
+    }
+
+    private static bool IsSupportedMapping(
+        AnimationFile.AnimationBoneMapping mapping,
+        uint expectedVersion,
+        int boneIndex)
+    {
+        if (expectedVersion == 7)
+        {
+            return mapping.MappingType ==
+                       AnimationFile.AnimationBoneMappingType.Dynamic &&
+                   mapping.Id == boneIndex;
+        }
+
+        return mapping.MappingType !=
+            AnimationFile.AnimationBoneMappingType.None;
     }
 
     private static bool HasEquivalentFileStructure(
         AnimationFile expected,
         AnimationFile actual)
     {
-        if (expected.Header.Version != 7 ||
-            actual.Header.Version != expected.Header.Version ||
+        if (actual.Header.Version != expected.Header.Version ||
             actual.Header.SkeletonName != expected.Header.SkeletonName ||
             MathF.Abs(actual.Header.FrameRate - expected.Header.FrameRate) >
                 VectorTolerance ||
@@ -200,6 +248,7 @@ internal static class AnimationWorkbenchCandidateBuilder
                 VectorTolerance ||
             !actual.Header.FlagVariables.SequenceEqual(
                 expected.Header.FlagVariables) ||
+            actual.Header.UnknownValue_v8 != expected.Header.UnknownValue_v8 ||
             expected.AnimationParts.Count != 1 ||
             actual.AnimationParts.Count != expected.AnimationParts.Count ||
             actual.Bones.Length != expected.Bones.Length)

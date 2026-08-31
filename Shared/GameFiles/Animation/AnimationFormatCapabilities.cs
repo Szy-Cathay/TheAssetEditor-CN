@@ -3,7 +3,6 @@
     public enum AnimationFormatBlockReason
     {
         UnsupportedVersion,
-        VersionEightIsReadOnly,
         MultiplePartsAreReadOnly,
     }
 
@@ -41,8 +40,6 @@
             }
 
             var blockingReasons = new List<AnimationFormatBlockReason>();
-            if (version == 8)
-                blockingReasons.Add(AnimationFormatBlockReason.VersionEightIsReadOnly);
             if (partCount != 1)
                 blockingReasons.Add(AnimationFormatBlockReason.MultiplePartsAreReadOnly);
 
