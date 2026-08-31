@@ -98,6 +98,7 @@ public sealed partial class AnimationWorkbenchDocument
         _blendPreviewResult = _result!.WithPreviewAnimation(build.Animation);
         _blendPreviewImpact = build.Impact;
         _blendPreviewDiagnostics = build.Diagnostics;
+        PreviewBlendMetaData(request, build.Impact);
         _blendPreviewVersion = _blendPreviewVersion == long.MaxValue
             ? 1
             : _blendPreviewVersion + 1;
@@ -117,6 +118,7 @@ public sealed partial class AnimationWorkbenchDocument
         var next = _blendPreviewResult.Animation.Clone();
         var impact = _blendPreviewImpact;
         var diagnostics = _blendPreviewDiagnostics.ToArray();
+        var metaDataCommit = CaptureBlendPreviewMetaData();
         var transitionStart = Math.Max(
             0,
             impact.AnimationAOutputFrameCount - impact.OverlapFrameCount);
@@ -126,7 +128,8 @@ public sealed partial class AnimationWorkbenchDocument
         ClearBlendPreview();
         CommitResultAnimation(
             next,
-            [0, transitionStart, transitionEnd, next.DynamicFrames.Count - 1]);
+            [0, transitionStart, transitionEnd, next.DynamicFrames.Count - 1],
+            metaDataCommit);
         return new AnimationWorkbenchBlendResult(
             true,
             CreateState(),
@@ -904,6 +907,7 @@ public sealed partial class AnimationWorkbenchDocument
         _blendPreviewResult = null;
         _blendPreviewImpact = null;
         _blendPreviewDiagnostics = Array.Empty<AnimationWorkbenchDiagnostic>();
+        ClearBlendMetaDataPreview();
     }
 
     private sealed record BlendBuildResult(

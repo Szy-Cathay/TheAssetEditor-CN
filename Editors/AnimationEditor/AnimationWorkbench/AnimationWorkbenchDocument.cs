@@ -47,6 +47,10 @@ public enum AnimationWorkbenchDiagnosticCode
     DestinationAlreadyExists,
     DestinationInvalid,
     DestinationWriteFailed,
+    MetaDataSynchronizationDisabled,
+    MetaDataResultMissing,
+    MetaDataCandidateSerializationFailed,
+    MetaDataCandidateRoundTripMismatch,
     PoseFrameIndexInvalid,
     PoseLastFrameDeleteRejected,
     PoseBoneMissing,
@@ -151,7 +155,10 @@ public sealed record AnimationWorkbenchLoadRequest(
     AnimationWorkbenchSourceInput? AnimationA,
     AnimationWorkbenchSourceInput? AnimationB,
     GameTypeEnum? TargetGame,
-    GameSkeleton? TargetSkeleton);
+    GameSkeleton? TargetSkeleton,
+    AnimationWorkbenchMetaDataSourceInput? AnimationAMetaData = null,
+    AnimationWorkbenchMetaDataSourceInput? AnimationBMetaData = null,
+    bool SynchronizeMetaData = false);
 
 public sealed record AnimationWorkbenchSourceSummary(
     string Name,
@@ -186,9 +193,14 @@ public interface IAnimationWorkbenchPreviewHost : IDisposable
     /// Creates a preview session that owns its player, scene nodes, and event
     /// subscriptions. Disposing the session must release all of them.
     /// </summary>
-    IDisposable Show(
+    IAnimationWorkbenchPreviewSession Show(
         AnimationWorkbenchPreviewSnapshot preview,
         CancellationToken cancellationToken);
+}
+
+public interface IAnimationWorkbenchPreviewSession : IDisposable
+{
+    void Seek(TimeSpan position);
 }
 
 public sealed class AnimationWorkbenchPreviewSnapshot
@@ -224,7 +236,12 @@ public sealed record AnimationWorkbenchDocumentState(
     AnimationWorkbenchPreviewSnapshot? CurrentPreview,
     IReadOnlyList<AnimationWorkbenchDiagnostic> Diagnostics,
     bool IsDirty,
+    bool IsAnimationDirty,
+    bool IsMetaDataDirty,
+    bool IsMetaDataSynchronizationEnabled,
+    IReadOnlyList<AnimationWorkbenchMetaDataProblem> MetaDataProblems,
     string? ProjectResourcePath,
+    string? ProjectMetaDataResourcePath,
     bool IsClosed,
     bool CanUndo,
     bool CanRedo,
@@ -248,7 +265,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
     private GameSkeleton? _targetSkeleton;
     private AnimationWorkbenchPreviewKind? _selectedPreview;
     private CancellationTokenSource? _previewCancellationSource;
-    private IDisposable? _previewSession;
+    private IAnimationWorkbenchPreviewSession? _previewSession;
+    private readonly Dictionary<AnimationWorkbenchPreviewKind, TimeSpan>
+        _previewPositions = [];
     private bool _isDirty;
     private string? _projectResourcePath;
     private bool _isClosed;
@@ -292,7 +311,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetGame = request.TargetGame;
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
+        _previewPositions.Clear();
         _projectResourcePath = null;
+        LoadMetaData(request);
         _documentGeneration++;
         ResetDocumentHistory();
 
@@ -328,7 +349,32 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         if (!candidate.Succeeded)
             return CreateSaveResult(false, candidate.Diagnostics);
 
-        string normalizedPath;
+        if (!TryWriteNewProjectResource(
+                packFileService,
+                project,
+                resourcePath,
+                candidate.Bytes!,
+                out var normalizedPath,
+                out var writeDiagnostic))
+        {
+            return CreateSaveFailure(writeDiagnostic);
+        }
+
+        _projectResourcePath = normalizedPath;
+        MarkDocumentHistorySaved();
+        return CreateSaveResult(
+            succeeded: true,
+            Array.Empty<AnimationWorkbenchDiagnostic>());
+    }
+
+    private static bool TryWriteNewProjectResource(
+        IPackFileService packFileService,
+        FolderProjectContainer project,
+        string resourcePath,
+        byte[] bytes,
+        out string normalizedPath,
+        out AnimationWorkbenchDiagnosticCode diagnostic)
+    {
         try
         {
             normalizedPath = FolderProjectPathPolicy.EnsureResourcePath(
@@ -339,8 +385,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                   InvalidDataException or
                   NotSupportedException)
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationInvalid);
+            normalizedPath = "";
+            diagnostic = AnimationWorkbenchDiagnosticCode.DestinationInvalid;
+            return false;
         }
 
         var directory = Path.GetDirectoryName(normalizedPath) ?? "";
@@ -352,28 +399,25 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 [
                     new NewPackFileEntry(
                         directory,
-                        PackFile.CreateFromBytes(
-                            fileName,
-                            candidate.Bytes!)),
+                        PackFile.CreateFromBytes(fileName, bytes)),
                 ],
                 overwriteExisting: false);
         }
         catch (FolderProjectFileConflictException)
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationAlreadyExists);
+            diagnostic = AnimationWorkbenchDiagnosticCode
+                .DestinationAlreadyExists;
+            return false;
         }
-        catch (Exception)
+        catch
         {
-            return CreateSaveFailure(
-                AnimationWorkbenchDiagnosticCode.DestinationWriteFailed);
+            diagnostic = AnimationWorkbenchDiagnosticCode
+                .DestinationWriteFailed;
+            return false;
         }
 
-        _projectResourcePath = normalizedPath;
-        MarkDocumentHistorySaved();
-        return CreateSaveResult(
-            succeeded: true,
-            Array.Empty<AnimationWorkbenchDiagnostic>());
+        diagnostic = default;
+        return true;
     }
 
     public AnimationWorkbenchSaveResult ExportDiskCopy(
@@ -430,7 +474,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetGame = null;
         _targetSkeleton = null;
         _selectedPreview = null;
+        _previewPositions.Clear();
         _projectResourcePath = null;
+        ClearMetaData();
         ResetDocumentHistory();
         _isClosed = true;
 
@@ -455,7 +501,12 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             CreatePreview(_selectedPreview),
             CreateDiagnostics(),
             _isDirty,
+            IsAnimationDirty(),
+            IsMetaDataDirty(),
+            _isMetaDataSynchronizationEnabled,
+            GetCurrentMetaDataProblems(),
             _projectResourcePath,
+            _projectMetaDataResourcePath,
             _isClosed,
             _undoEdits.Count != 0,
             _redoEdits.Count != 0,
@@ -724,18 +775,33 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             return;
 
         var cancellationSource = new CancellationTokenSource();
+        IAnimationWorkbenchPreviewSession? previewSession = null;
         try
         {
-            var previewSession = _previewHost.Show(
+            previewSession = _previewHost.Show(
                 preview,
                 cancellationSource.Token);
+            if (_previewPositions.TryGetValue(
+                    preview.Kind,
+                    out var position))
+            {
+                previewSession.Seek(position);
+            }
             _previewCancellationSource = cancellationSource;
             _previewSession = previewSession;
         }
         catch
         {
-            cancellationSource.Cancel();
-            cancellationSource.Dispose();
+            try
+            {
+                ReleasePreviewResources(
+                    cancellationSource,
+                    previewSession);
+            }
+            catch (Exception)
+            {
+                // Preserve the preview failure after best-effort cleanup.
+            }
             throw;
         }
     }
@@ -749,6 +815,13 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             ref _previewSession,
             null);
 
+        ReleasePreviewResources(cancellationSource, previewSession);
+    }
+
+    private static void ReleasePreviewResources(
+        CancellationTokenSource? cancellationSource,
+        IAnimationWorkbenchPreviewSession? previewSession)
+    {
         try
         {
             cancellationSource?.Cancel();
@@ -843,7 +916,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
 
     private sealed class EmptyPreviewHost : IAnimationWorkbenchPreviewHost
     {
-        public IDisposable Show(
+        public IAnimationWorkbenchPreviewSession Show(
             AnimationWorkbenchPreviewSnapshot preview,
             CancellationToken cancellationToken)
         {
@@ -855,9 +928,14 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         }
     }
 
-    private sealed class EmptyPreviewSession : IDisposable
+    private sealed class EmptyPreviewSession :
+        IAnimationWorkbenchPreviewSession
     {
         public static EmptyPreviewSession Instance { get; } = new();
+
+        public void Seek(TimeSpan position)
+        {
+        }
 
         public void Dispose()
         {

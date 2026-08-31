@@ -373,6 +373,8 @@ public sealed partial class AnimationWorkbenchDocument
         var entry = _undoEdits.Pop();
         _redoEdits.Push(entry);
         _result = _result.WithAnimation(entry.Before);
+        _resultMetaData = entry.BeforeMetaData?.Clone();
+        _metaDataProblems = entry.BeforeMetaDataProblems.ToArray();
         SetEditingAnchors(entry.BeforeAnchors);
         _currentHistoryRevision = entry.BeforeRevision;
         UpdateDirtyState();
@@ -399,6 +401,8 @@ public sealed partial class AnimationWorkbenchDocument
         var entry = _redoEdits.Pop();
         _undoEdits.Push(entry);
         _result = _result.WithAnimation(entry.After);
+        _resultMetaData = entry.AfterMetaData?.Clone();
+        _metaDataProblems = entry.AfterMetaDataProblems.ToArray();
         SetEditingAnchors(entry.AfterAnchors);
         _currentHistoryRevision = entry.AfterRevision;
         UpdateDirtyState();
@@ -658,12 +662,24 @@ public sealed partial class AnimationWorkbenchDocument
 
     private void CommitResultAnimation(
         AnimationClip next,
-        IReadOnlyCollection<int>? nextAnchors = null)
+        IReadOnlyCollection<int>? nextAnchors = null,
+        MetaDataPreviewCommit? metaDataCommit = null)
     {
         var nextRevision = ++_nextHistoryRevision;
+        var hasMetaDataCommit = metaDataCommit?.Snapshot != null;
+        var nextMetaData = hasMetaDataCommit
+            ? metaDataCommit!.Snapshot!.Clone()
+            : _resultMetaData?.Clone();
+        var nextMetaDataProblems = hasMetaDataCommit
+            ? metaDataCommit!.Problems.ToArray()
+            : _metaDataProblems.ToArray();
         var entry = new DocumentHistoryEntry(
             _result!.Animation.Clone(),
             next.Clone(),
+            _resultMetaData?.Clone(),
+            nextMetaData?.Clone(),
+            _metaDataProblems.ToArray(),
+            nextMetaDataProblems,
             _editingAnchorFrames.ToArray(),
             NormalizeEditingAnchors(
                 nextAnchors ?? _editingAnchorFrames,
@@ -671,6 +687,8 @@ public sealed partial class AnimationWorkbenchDocument
             _currentHistoryRevision,
             nextRevision);
         _result = _result.WithAnimation(next);
+        _resultMetaData = nextMetaData;
+        _metaDataProblems = nextMetaDataProblems;
         SetEditingAnchors(entry.AfterAnchors);
         _currentHistoryRevision = nextRevision;
         _undoEdits.Push(entry);
@@ -689,6 +707,7 @@ public sealed partial class AnimationWorkbenchDocument
         ClearLayerPreview();
         ClearRetargetPreview();
         _savedResultAnimation = null;
+        ResetMetaDataHistory();
         _currentHistoryRevision = 0;
         _nextHistoryRevision = 0;
         ResetEditingAnchors();
@@ -701,10 +720,13 @@ public sealed partial class AnimationWorkbenchDocument
         UpdateDirtyState();
     }
 
+    private bool IsAnimationDirty() =>
+        _result != null &&
+        (_savedResultAnimation == null ||
+         AnimationsEqual(_result.Animation, _savedResultAnimation) == false);
+
     private void UpdateDirtyState() =>
-        _isDirty = _result != null &&
-            (_savedResultAnimation == null ||
-             AnimationsEqual(_result.Animation, _savedResultAnimation) == false);
+        _isDirty = IsAnimationDirty() || IsMetaDataDirty();
 
     private void ClearPosePreview()
     {
@@ -809,6 +831,12 @@ public sealed partial class AnimationWorkbenchDocument
     private sealed record DocumentHistoryEntry(
         AnimationClip Before,
         AnimationClip After,
+        MetaDataDocumentSnapshot? BeforeMetaData,
+        MetaDataDocumentSnapshot? AfterMetaData,
+        IReadOnlyList<AnimationWorkbenchMetaDataProblem>
+            BeforeMetaDataProblems,
+        IReadOnlyList<AnimationWorkbenchMetaDataProblem>
+            AfterMetaDataProblems,
         IReadOnlyList<int> BeforeAnchors,
         IReadOnlyList<int> AfterAnchors,
         long BeforeRevision,

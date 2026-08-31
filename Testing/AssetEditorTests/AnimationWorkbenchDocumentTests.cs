@@ -360,11 +360,15 @@ public class AnimationWorkbenchDocumentTests
 
         public CancellationToken CurrentCancellationToken { get; private set; }
 
-        public IDisposable? CurrentSession { get; private set; }
+        public IAnimationWorkbenchPreviewSession? CurrentSession
+        {
+            get;
+            private set;
+        }
 
         public bool IsDisposed { get; private set; }
 
-        public IDisposable Show(
+        public IAnimationWorkbenchPreviewSession Show(
             AnimationWorkbenchPreviewSnapshot preview,
             CancellationToken cancellationToken)
         {
@@ -378,7 +382,8 @@ public class AnimationWorkbenchDocumentTests
             return CurrentSession;
         }
 
-        public bool IsSessionDisposed(IDisposable? session) =>
+        public bool IsSessionDisposed(
+            IAnimationWorkbenchPreviewSession? session) =>
             session is RecordingPreviewSession { IsDisposed: true };
 
         public void Dispose()
@@ -387,9 +392,14 @@ public class AnimationWorkbenchDocumentTests
         }
     }
 
-    private sealed class RecordingPreviewSession(Action release) : IDisposable
+    private sealed class RecordingPreviewSession(Action release) :
+        IAnimationWorkbenchPreviewSession
     {
         public bool IsDisposed { get; private set; }
+
+        public void Seek(TimeSpan position)
+        {
+        }
 
         public void Dispose()
         {

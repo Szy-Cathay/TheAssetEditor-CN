@@ -220,6 +220,7 @@ public sealed partial class AnimationWorkbenchDocument
 
         _layerPreviewResult = _result!.WithPreviewAnimation(build.Animation);
         _layerPreviewImpact = build.Impact;
+        PreviewLayerMetaData(build.Impact);
         _layerPreviewVersion = _layerPreviewVersion == long.MaxValue
             ? 1
             : _layerPreviewVersion + 1;
@@ -238,8 +239,12 @@ public sealed partial class AnimationWorkbenchDocument
 
         var next = _layerPreviewResult.Animation.Clone();
         var impact = _layerPreviewImpact;
+        var metaData = CaptureLayerPreviewMetaData();
         ClearLayerPreview();
-        CommitResultAnimation(next, [0, next.DynamicFrames.Count - 1]);
+        CommitResultAnimation(
+            next,
+            [0, next.DynamicFrames.Count - 1],
+            metaData);
         return new AnimationWorkbenchLayerResult(
             true,
             CreateState(),
@@ -677,6 +682,7 @@ public sealed partial class AnimationWorkbenchDocument
     {
         _layerPreviewResult = null;
         _layerPreviewImpact = null;
+        ClearLayerMetaDataPreview();
     }
 
     private sealed record LayerBuildResult(
