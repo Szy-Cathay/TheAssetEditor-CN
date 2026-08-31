@@ -244,57 +244,50 @@ public sealed class CharacterRetargetProfileStore
 
     internal static string ComputeSkeletonFingerprint(AnimationFile skeleton)
     {
-        var description = new StringBuilder();
         var bindSkeleton = GameSkeleton.CreateFromAnimationFile(
             skeleton,
             new AnimationPlayer());
-        foreach (var item in skeleton.Bones
-                     .Select((bone, index) => (Bone: bone, Index: index))
-                     .OrderBy(item => item.Bone.Id))
-        {
-            var name = item.Bone.Name ?? "";
-            var translation = bindSkeleton.Translation[item.Index];
-            var rotation = CanonicalizeQuaternion(
-                bindSkeleton.Rotation[item.Index]);
-            description
-                .Append(item.Bone.Id).Append(':')
-                .Append(item.Bone.ParentId).Append(':')
-                .Append(name.Length).Append(':')
-                .Append(name).Append(':');
-            AppendFloat(description, translation.X);
-            AppendFloat(description, translation.Y);
-            AppendFloat(description, translation.Z);
-            AppendFloat(description, rotation.X);
-            AppendFloat(description, rotation.Y);
-            AppendFloat(description, rotation.Z);
-            AppendFloat(description, rotation.W);
-            description.Append(';');
-        }
-
-        return Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes(description.ToString())));
+        return ComputeSkeletonFingerprint(skeleton.Bones
+            .Select((bone, index) => (Bone: bone, Index: index))
+            .OrderBy(item => item.Bone.Id)
+            .Select(item => new SkeletonFingerprintBone(
+                item.Bone.Id,
+                item.Bone.ParentId,
+                item.Bone.Name ?? "",
+                bindSkeleton.Translation[item.Index],
+                bindSkeleton.Rotation[item.Index])));
     }
 
     public static string ComputeSkeletonFingerprint(GameSkeleton skeleton)
     {
         ArgumentNullException.ThrowIfNull(skeleton);
+        return ComputeSkeletonFingerprint(Enumerable.Range(
+                0,
+                skeleton.BoneCount)
+            .Select(boneIndex => new SkeletonFingerprintBone(
+                boneIndex,
+                skeleton.GetParentBoneIndex(boneIndex),
+                skeleton.BoneNames[boneIndex] ?? "",
+                skeleton.Translation[boneIndex],
+                skeleton.Rotation[boneIndex])));
+    }
+
+    private static string ComputeSkeletonFingerprint(
+        IEnumerable<SkeletonFingerprintBone> bones)
+    {
         var description = new StringBuilder();
-        for (var boneIndex = 0;
-             boneIndex < skeleton.BoneCount;
-             boneIndex++)
+        foreach (var bone in bones)
         {
-            var name = skeleton.BoneNames[boneIndex] ?? "";
-            var translation = skeleton.Translation[boneIndex];
             var rotation = CanonicalizeQuaternion(
-                skeleton.Rotation[boneIndex]);
+                bone.Rotation);
             description
-                .Append(boneIndex).Append(':')
-                .Append(skeleton.GetParentBoneIndex(boneIndex)).Append(':')
-                .Append(name.Length).Append(':')
-                .Append(name).Append(':');
-            AppendFloat(description, translation.X);
-            AppendFloat(description, translation.Y);
-            AppendFloat(description, translation.Z);
+                .Append(bone.Id).Append(':')
+                .Append(bone.ParentId).Append(':')
+                .Append(bone.Name.Length).Append(':')
+                .Append(bone.Name).Append(':');
+            AppendFloat(description, bone.Translation.X);
+            AppendFloat(description, bone.Translation.Y);
+            AppendFloat(description, bone.Translation.Z);
             AppendFloat(description, rotation.X);
             AppendFloat(description, rotation.Y);
             AppendFloat(description, rotation.Z);
@@ -328,6 +321,13 @@ public sealed class CharacterRetargetProfileStore
             .Append(BitConverter.SingleToInt32Bits(value).ToString("X8"))
             .Append(':');
     }
+
+    private readonly record struct SkeletonFingerprintBone(
+        int Id,
+        int ParentId,
+        string Name,
+        Vector3 Translation,
+        Quaternion Rotation);
 
     private bool TryReadDocument(out CharacterRetargetProfileDocument document)
     {

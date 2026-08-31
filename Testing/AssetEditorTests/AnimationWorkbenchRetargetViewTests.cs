@@ -11,6 +11,7 @@ using Editors.AnimationVisualEditors.AnimationWorkbench;
 using Editors.AnimatioReTarget.Editor.BoneHandling;
 using GameWorld.Core.Animation;
 using NUnit.Framework;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
@@ -22,6 +23,10 @@ namespace AssetEditorTests;
 [NonParallelizable]
 public sealed class AnimationWorkbenchRetargetViewTests
 {
+    [SetUp]
+    public void InitializeLocalization() =>
+        new LocalizationManager().LoadLanguage();
+
     [Test]
     public void RetargetUiAndDiagnosticsHaveChineseLocalizationEntries()
     {

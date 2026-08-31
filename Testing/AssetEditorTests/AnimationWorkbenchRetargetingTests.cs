@@ -2,6 +2,7 @@ using Editors.AnimationVisualEditors.AnimationWorkbench;
 using Editors.AnimatioReTarget.Editor.BoneHandling;
 using GameWorld.Core.Animation;
 using Microsoft.Xna.Framework;
+using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
@@ -11,6 +12,10 @@ namespace AssetEditorTests;
 [TestClass]
 public sealed class AnimationWorkbenchRetargetingTests
 {
+    [TestInitialize]
+    public void InitializeLocalization() =>
+        new LocalizationManager().LoadLanguage();
+
     [TestMethod]
     public void CreateRetargetMapping_ReportsConfidenceAndUnmappedTargetBones()
     {

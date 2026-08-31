@@ -33,9 +33,8 @@ public sealed class AnimationWorkbenchRetargetController :
         {
             new AnimationWorkbenchRetargetSourceOption(
                 null,
-                GetLocalizedText(
-                    "AnimationWorkbench.Retarget.NoSourceBone",
-                    "未映射")),
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.Retarget.NoSourceBone")),
         }.Concat(SourceBones.Select(item =>
                 new AnimationWorkbenchRetargetSourceOption(
                     item.Index,
@@ -63,11 +62,6 @@ public sealed class AnimationWorkbenchRetargetController :
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public event EventHandler? Changed;
-
-    private static string GetLocalizedText(string key, string fallback) =>
-        LocalizationManager.Instance == null
-            ? fallback
-            : LocalizationManager.Instance.Get(key);
 
     public ObservableCollection<AnimationWorkbenchRetargetBoneMapping>
         Mappings { get; } = [];
