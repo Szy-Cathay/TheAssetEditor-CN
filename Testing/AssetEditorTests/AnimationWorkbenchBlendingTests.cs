@@ -60,7 +60,7 @@ public class AnimationWorkbenchBlendingTests
     }
 
     [TestMethod]
-    public void PreviewBlend_FullyOverlappedBStartsAtAAndEndsAtB()
+    public void PreviewBlend_FullyOverlappedMultiFrameBIsRejected()
     {
         var skeleton = CreateSkeleton("shared_skeleton", "root");
         using var document = CreateDocument(
@@ -77,8 +77,6 @@ public class AnimationWorkbenchBlendingTests
                 new Vector3(10),
                 Quaternion.Identity,
                 Vector3.One));
-        document.SelectPreview(AnimationWorkbenchPreviewKind.Result);
-
         var result = document.PreviewBlend(new AnimationWorkbenchBlendRequest(
             3,
             0,
@@ -87,11 +85,12 @@ public class AnimationWorkbenchBlendingTests
             AnimationWorkbenchBlendCurve.Linear,
             new AnimationWorkbenchRootMotionOptions(false, false, false)));
 
-        Assert.IsTrue(result.Succeeded);
-        Assert.AreEqual(4, result.Impact?.OutputFrameCount);
-        var frames = result.State.CurrentPreview!.Animation.DynamicFrames;
-        Assert.AreEqual(0, frames[0].Position[0].X, Tolerance);
-        Assert.AreEqual(10, frames[^1].Position[0].X, Tolerance);
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.BlendOverlapConsumesAnimationB,
+            result.Diagnostics.Single().Code);
+        Assert.IsFalse(result.State.HasActiveBlendPreview);
+        Assert.IsFalse(result.State.CanUndo);
     }
 
     [TestMethod]

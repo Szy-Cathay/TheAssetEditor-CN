@@ -73,6 +73,7 @@ public enum AnimationWorkbenchDiagnosticCode
     BlendInPointInvalid,
     BlendOverlapInvalid,
     BlendOverlapExceedsAvailable,
+    BlendOverlapConsumesAnimationB,
     BlendOutputFrameRateInvalid,
     BlendOutputTooLarge,
     BlendSourceTransformInvalid,

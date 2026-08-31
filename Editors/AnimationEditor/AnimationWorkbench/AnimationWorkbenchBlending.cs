@@ -292,6 +292,13 @@ public sealed partial class AnimationWorkbenchDocument
                     .BlendOverlapExceedsAvailable));
         }
 
+        if (overlapFrames == outputFramesB && outputFramesB > 1)
+        {
+            return BlendBuildResult.Failure(CreateBlendDiagnostic(
+                AnimationWorkbenchDiagnosticCode
+                    .BlendOverlapConsumesAnimationB));
+        }
+
         int outputFrameCount;
         try
         {
@@ -367,11 +374,6 @@ public sealed partial class AnimationWorkbenchDocument
             Duration = outputTimebase.Duration,
         };
         var transitionStart = framesA.Count - overlapFrames;
-        var fullyOverlapsAnimationB = overlapFrames > 1 &&
-            overlapFrames == framesB.Count;
-        var blendDenominator = fullyOverlapsAnimationB
-            ? overlapFrames - 1
-            : overlapFrames;
         for (var frameIndex = 0;
              frameIndex < transitionStart;
              frameIndex++)
@@ -385,7 +387,7 @@ public sealed partial class AnimationWorkbenchDocument
         {
             var amount = EvaluateCurve(
                 request.Curve,
-                overlapIndex / (float)blendDenominator);
+                overlapIndex / (float)overlapFrames);
             output.DynamicFrames.Add(InterpolateBlendFrame(
                 framesA[transitionStart + overlapIndex],
                 framesB[overlapIndex],

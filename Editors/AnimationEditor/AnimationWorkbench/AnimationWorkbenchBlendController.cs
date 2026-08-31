@@ -28,10 +28,7 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
             (state.AnimationA?.FrameCount ?? 1) - 1);
         _animationBInFrame = 0;
         _outputFramesPerSecond = GetFramesPerSecond(state.AnimationA) ?? 20;
-        var maximumOverlap = Math.Min(
-            state.AnimationA?.Duration.TotalSeconds ?? 0,
-            state.AnimationB?.Duration.TotalSeconds ?? 0);
-        _overlapSeconds = Math.Min(0.2, maximumOverlap);
+        _overlapSeconds = Math.Min(0.2, MaximumOverlapSeconds);
         _curve = AnimationWorkbenchBlendCurve.Smooth;
         RefreshPreview();
     }
@@ -53,11 +50,31 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
         get
         {
             var state = _document.GetState();
-            return Math.Max(
-                0,
-                Math.Min(
-                    state.AnimationA?.Duration.TotalSeconds ?? 0,
-                    state.AnimationB?.Duration.TotalSeconds ?? 0));
+            var animationAFps = GetFramesPerSecond(state.AnimationA);
+            var animationBFps = GetFramesPerSecond(state.AnimationB);
+            var animationADuration = animationAFps.HasValue
+                ? Math.Min(
+                    state.AnimationA!.Duration.TotalSeconds,
+                    (_animationAOutFrame + 1) / animationAFps.Value)
+                : 0;
+            var animationBDuration = animationBFps.HasValue
+                ? Math.Max(
+                    0,
+                    state.AnimationB!.Duration.TotalSeconds -
+                    _animationBInFrame / animationBFps.Value)
+                : 0;
+            var animationBOutputFrames = Math.Max(
+                1,
+                (int)Math.Round(
+                    animationBDuration * _outputFramesPerSecond,
+                    MidpointRounding.AwayFromZero));
+            if (animationBOutputFrames > 1)
+            {
+                animationBDuration = Math.Max(
+                    0,
+                    animationBDuration - 1 / _outputFramesPerSecond);
+            }
+            return Math.Min(animationADuration, animationBDuration);
         }
     }
 
