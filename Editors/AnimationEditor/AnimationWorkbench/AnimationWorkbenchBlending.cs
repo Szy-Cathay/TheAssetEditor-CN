@@ -173,8 +173,11 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchDiagnosticCode.TargetSkeletonMissing));
         }
 
+        var preparedAnimationA = _retargetedAnimationA ?? _animationA;
+        var preparedAnimationB = _retargetedAnimationB ?? _animationB;
+
         if (TryValidateBlendSource(
-                _animationA,
+                preparedAnimationA,
                 AnimationWorkbenchSourceSlot.AnimationA,
                 out var sourceDiagnostic) == false)
         {
@@ -182,14 +185,16 @@ public sealed partial class AnimationWorkbenchDocument
         }
 
         if (TryValidateBlendSource(
-                _animationB,
+                preparedAnimationB,
                 AnimationWorkbenchSourceSlot.AnimationB,
                 out sourceDiagnostic) == false)
         {
             return BlendBuildResult.Failure(sourceDiagnostic!);
         }
 
-        if (SkeletonsMatch(_animationA.Skeleton, _targetSkeleton) == false)
+        if (SkeletonsMatch(
+                preparedAnimationA.Skeleton,
+                _targetSkeleton) == false)
         {
             return BlendBuildResult.Failure(CreateBlendDiagnostic(
                 AnimationWorkbenchDiagnosticCode.BlendSkeletonMismatch,
@@ -197,7 +202,9 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchSourceSlot.AnimationA));
         }
 
-        if (SkeletonsMatch(_animationB.Skeleton, _targetSkeleton) == false)
+        if (SkeletonsMatch(
+                preparedAnimationB.Skeleton,
+                _targetSkeleton) == false)
         {
             return BlendBuildResult.Failure(CreateBlendDiagnostic(
                 AnimationWorkbenchDiagnosticCode.BlendSkeletonMismatch,
@@ -205,8 +212,8 @@ public sealed partial class AnimationWorkbenchDocument
                 AnimationWorkbenchSourceSlot.AnimationB));
         }
 
-        var animationA = _animationA.Animation;
-        var animationB = _animationB.Animation;
+        var animationA = preparedAnimationA.Animation;
+        var animationB = preparedAnimationB.Animation;
         if (request.AnimationAOutFrame < 0 ||
             request.AnimationAOutFrame >= animationA.DynamicFrames.Count)
         {

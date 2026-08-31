@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\GameWorld\View3D\GameWorld.Core.csproj" />
     <ProjectReference Include="..\..\Shared\SharedUI\Shared.Ui.csproj" />
+    <ProjectReference Include="..\AnimationReTarget\Editors.AnimatioReTarget\Editors.AnimatioReTarget.csproj" />
     <ProjectReference Include="..\Shared\Editors.Shared.Core\Editors.Shared.Core.csproj" />
   </ItemGroup>
 

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -24,6 +25,17 @@ public sealed record CharacterRetargetBoneSettings(
     bool ApplyTranslation,
     bool ApplyRotation,
     int? RelativeTargetBoneIndex);
+
+public enum CharacterRetargetProfileLoadStatus
+{
+    Loaded,
+    NotFound,
+    ReadFailed,
+}
+
+public sealed record CharacterRetargetProfileLoadResult(
+    CharacterRetargetProfileLoadStatus Status,
+    IReadOnlyDictionary<int, int> Mappings);
 
 public sealed class CharacterRetargetProfileStore
 {
@@ -58,10 +70,26 @@ public sealed class CharacterRetargetProfileStore
         string targetSkeletonFingerprint,
         out IReadOnlyDictionary<int, int> mappings)
     {
+        var result = Load(
+            sourceSkeletonName,
+            targetSkeletonName,
+            sourceSkeletonFingerprint,
+            targetSkeletonFingerprint);
+        mappings = result.Mappings;
+        return result.Status == CharacterRetargetProfileLoadStatus.Loaded;
+    }
+
+    public CharacterRetargetProfileLoadResult Load(
+        string sourceSkeletonName,
+        string targetSkeletonName,
+        string sourceSkeletonFingerprint,
+        string targetSkeletonFingerprint)
+    {
         if (!TryReadDocument(out var document))
         {
-            mappings = new Dictionary<int, int>();
-            return false;
+            return new CharacterRetargetProfileLoadResult(
+                CharacterRetargetProfileLoadStatus.ReadFailed,
+                new Dictionary<int, int>());
         }
 
         var profile = document.Profiles.FirstOrDefault(item =>
@@ -75,14 +103,13 @@ public sealed class CharacterRetargetProfileStore
                 StringComparison.OrdinalIgnoreCase) &&
             item.SourceSkeletonFingerprint == sourceSkeletonFingerprint &&
             item.TargetSkeletonFingerprint == targetSkeletonFingerprint);
-        if (profile == null)
-        {
-            mappings = new Dictionary<int, int>();
-            return false;
-        }
-
-        mappings = new Dictionary<int, int>(profile.Mappings);
-        return true;
+        return profile == null
+            ? new CharacterRetargetProfileLoadResult(
+                CharacterRetargetProfileLoadStatus.NotFound,
+                new Dictionary<int, int>())
+            : new CharacterRetargetProfileLoadResult(
+                CharacterRetargetProfileLoadStatus.Loaded,
+                new Dictionary<int, int>(profile.Mappings));
     }
 
     public bool TryLoadSettings(
@@ -128,6 +155,7 @@ public sealed class CharacterRetargetProfileStore
         IReadOnlyDictionary<int, int> mappings,
         IReadOnlyDictionary<int, CharacterRetargetBoneSettings>? boneSettings = null)
     {
+        string? temporaryPath = null;
         try
         {
             if (!TryReadDocument(out var document))
@@ -169,7 +197,7 @@ public sealed class CharacterRetargetProfileStore
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            var temporaryPath = _filePath + ".tmp";
+            temporaryPath = $"{_filePath}.{Guid.NewGuid():N}.tmp";
             File.WriteAllText(
                 temporaryPath,
                 JsonSerializer.Serialize(document, SerializerOptions));
@@ -183,6 +211,34 @@ public sealed class CharacterRetargetProfileStore
         catch (UnauthorizedAccessException)
         {
             return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+        catch (SecurityException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (temporaryPath != null)
+            {
+                try
+                {
+                    File.Delete(temporaryPath);
+                }
+                catch (Exception exception)
+                    when (exception is IOException or
+                          UnauthorizedAccessException or
+                          SecurityException)
+                {
+                }
+            }
         }
     }
 
@@ -203,6 +259,37 @@ public sealed class CharacterRetargetProfileStore
             description
                 .Append(item.Bone.Id).Append(':')
                 .Append(item.Bone.ParentId).Append(':')
+                .Append(name.Length).Append(':')
+                .Append(name).Append(':');
+            AppendFloat(description, translation.X);
+            AppendFloat(description, translation.Y);
+            AppendFloat(description, translation.Z);
+            AppendFloat(description, rotation.X);
+            AppendFloat(description, rotation.Y);
+            AppendFloat(description, rotation.Z);
+            AppendFloat(description, rotation.W);
+            description.Append(';');
+        }
+
+        return Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes(description.ToString())));
+    }
+
+    public static string ComputeSkeletonFingerprint(GameSkeleton skeleton)
+    {
+        ArgumentNullException.ThrowIfNull(skeleton);
+        var description = new StringBuilder();
+        for (var boneIndex = 0;
+             boneIndex < skeleton.BoneCount;
+             boneIndex++)
+        {
+            var name = skeleton.BoneNames[boneIndex] ?? "";
+            var translation = skeleton.Translation[boneIndex];
+            var rotation = CanonicalizeQuaternion(
+                skeleton.Rotation[boneIndex]);
+            description
+                .Append(boneIndex).Append(':')
+                .Append(skeleton.GetParentBoneIndex(boneIndex)).Append(':')
                 .Append(name.Length).Append(':')
                 .Append(name).Append(':');
             AppendFloat(description, translation.X);
@@ -276,6 +363,21 @@ public sealed class CharacterRetargetProfileStore
             return false;
         }
         catch (UnauthorizedAccessException)
+        {
+            document = new CharacterRetargetProfileDocument();
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            document = new CharacterRetargetProfileDocument();
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            document = new CharacterRetargetProfileDocument();
+            return false;
+        }
+        catch (SecurityException)
         {
             document = new CharacterRetargetProfileDocument();
             return false;

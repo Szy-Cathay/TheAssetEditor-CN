@@ -106,6 +106,21 @@ public enum AnimationWorkbenchDiagnosticCode
     LayerMaskSavedSkeletonMismatch,
     LayerMaskStoreReadFailed,
     LayerMaskStoreWriteFailed,
+    RetargetNonCoreBoneUnmapped,
+    RetargetSourceMissing,
+    RetargetMappingTargetDuplicate,
+    RetargetMappingIndexInvalid,
+    RetargetCoreBoneUnmapped,
+    RetargetParentConflict,
+    RetargetBindPoseIncompatible,
+    RetargetSourceTransformInvalid,
+    RetargetResultTransformInvalid,
+    RetargetPreviewAlreadyActive,
+    RetargetPreviewMissing,
+    RetargetDocumentChanged,
+    RetargetProfileNotFound,
+    RetargetProfileReadFailed,
+    RetargetProfileWriteFailed,
 }
 
 public sealed record AnimationWorkbenchSourceFormat(
@@ -216,6 +231,9 @@ public sealed record AnimationWorkbenchDocumentState(
     bool HasActiveTimelinePreview,
     bool HasActiveBlendPreview,
     bool HasActiveLayerPreview,
+    bool HasActiveRetargetPreview,
+    bool HasRetargetedAnimationA,
+    bool HasRetargetedAnimationB,
     long HistoryRevision,
     long DocumentGeneration);
 
@@ -267,6 +285,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         ReleasePreview();
         _animationA = animationA;
         _animationB = animationB;
+        _retargetedAnimationA = null;
+        _retargetedAnimationB = null;
         _result = result;
         _targetGame = request.TargetGame;
         _targetSkeleton = targetSkeleton;
@@ -403,6 +423,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _previewHost.Dispose();
         _animationA = null;
         _animationB = null;
+        _retargetedAnimationA = null;
+        _retargetedAnimationB = null;
         _result = null;
         _targetGame = null;
         _targetSkeleton = null;
@@ -440,6 +462,9 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _timelinePreviewResult != null,
             _blendPreviewResult != null,
             _layerPreviewResult != null,
+            _retargetPreviewResult != null,
+            _retargetedAnimationA != null,
+            _retargetedAnimationB != null,
             _currentHistoryRevision,
             _documentGeneration);
     }
@@ -459,6 +484,12 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             return AnimationWorkbenchDiagnosticCode.BlendPreviewAlreadyActive;
         if (excluded != EditPreviewKind.Layer && _layerPreviewResult != null)
             return AnimationWorkbenchDiagnosticCode.LayerPreviewAlreadyActive;
+        if (excluded != EditPreviewKind.Retarget &&
+            _retargetPreviewResult != null)
+        {
+            return AnimationWorkbenchDiagnosticCode
+                .RetargetPreviewAlreadyActive;
+        }
         return null;
     }
 
@@ -591,6 +622,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         Timeline,
         Blend,
         Layer,
+        Retarget,
     }
 
     private IReadOnlyList<AnimationWorkbenchDiagnostic> CreateDiagnostics()
@@ -675,6 +707,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             AnimationWorkbenchPreviewKind.AnimationA => _animationA,
             AnimationWorkbenchPreviewKind.AnimationB => _animationB,
             AnimationWorkbenchPreviewKind.Result =>
+                _retargetPreviewResult ??
                 _layerPreviewResult ??
                 _blendPreviewResult ??
                 _timelinePreviewResult ??
@@ -782,6 +815,14 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 name,
                 replacement,
                 skeleton,
+            format);
+
+        public SourceSnapshot WithAnimationAndSkeleton(
+            AnimationClip replacement,
+            GameSkeleton replacementSkeleton) => new(
+                name,
+                replacement.Clone(),
+                replacementSkeleton.Clone(new AnimationPlayer()),
                 format);
 
         public AnimationWorkbenchSourceSummary CreateSummary() => new(
