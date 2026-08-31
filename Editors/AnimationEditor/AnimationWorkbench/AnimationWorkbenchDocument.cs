@@ -171,7 +171,8 @@ public sealed record AnimationWorkbenchDocumentState(
     bool CanRedo,
     bool HasActivePosePreview,
     bool HasActiveTimelinePreview,
-    long HistoryRevision);
+    long HistoryRevision,
+    long DocumentGeneration);
 
 public sealed partial class AnimationWorkbenchDocument : IDisposable
 {
@@ -187,6 +188,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
     private bool _isDirty;
     private string? _projectResourcePath;
     private bool _isClosed;
+    private long _documentGeneration;
 
     public AnimationWorkbenchDocument(
         IAnimationWorkbenchPreviewHost? previewHost = null)
@@ -223,6 +225,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         _targetSkeleton = targetSkeleton;
         _selectedPreview = selectedPreview;
         _projectResourcePath = null;
+        _documentGeneration++;
         ResetDocumentHistory();
 
         ShowCurrentPreview();
@@ -388,7 +391,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             _redoEdits.Count != 0,
             _posePreviewResult != null,
             _timelinePreviewResult != null,
-            _currentHistoryRevision);
+            _currentHistoryRevision,
+            _documentGeneration);
     }
 
     private AnimationWorkbenchCandidateBuildResult PrepareSaveCandidate()
@@ -692,6 +696,13 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
             replacement.Clone(),
             skeleton.Clone(new AnimationPlayer()),
             format);
+
+        public SourceSnapshot WithPreviewAnimation(
+            AnimationClip replacement) => new(
+                name,
+                replacement,
+                skeleton,
+                format);
 
         public AnimationWorkbenchSourceSummary CreateSummary() => new(
             name,

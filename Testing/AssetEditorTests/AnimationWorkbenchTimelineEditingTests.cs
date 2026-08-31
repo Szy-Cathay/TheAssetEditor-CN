@@ -314,6 +314,19 @@ public class AnimationWorkbenchTimelineEditingTests
         var embeddedFrame = ResultClip(embeddedDocument).DynamicFrames[0];
         Assert.AreEqual(new Vector3(-3, 0, 0), embeddedFrame.Position[1]);
         Assert.AreEqual(new Vector3(-2, 0, 0), embeddedFrame.Position[2]);
+
+        using var caDocument = CreateLoadedDocument(
+            CreateMirrorClip(),
+            CreateSkeleton(
+                ("root", AnimationFile.BoneIndexNoParent),
+                ("bn_leftarm", 0),
+                ("bn_rightarm", 0)));
+        Assert.IsTrue(caDocument.BeginTimelinePreview().Succeeded);
+        Assert.IsTrue(caDocument.PreviewMirrorRange(
+            new AnimationWorkbenchFrameRange(0, 1)).Succeeded);
+        var caFrame = ResultClip(caDocument).DynamicFrames[0];
+        Assert.AreEqual(new Vector3(-3, 0, 0), caFrame.Position[1]);
+        Assert.AreEqual(new Vector3(-2, 0, 0), caFrame.Position[2]);
     }
 
     [TestMethod]
@@ -327,10 +340,39 @@ public class AnimationWorkbenchTimelineEditingTests
         var first = controller.PreviewMoveSelectionByPixels(
             2.1 * controller.PixelsPerFrame);
         var duplicate = controller.PreviewMoveSelectionByPixels(
-            2.4 * controller.PixelsPerFrame);
+            20.4 * controller.PixelsPerFrame);
 
         Assert.AreSame(first, duplicate);
-        Assert.IsTrue(controller.CancelMoveSelection().Succeeded);
+        CollectionAssert.AreEqual(
+            new[] { 40 },
+            controller.SelectedFrameIndices.ToArray());
+        Assert.IsTrue(controller.CommitMoveSelection().Succeeded);
+        Assert.AreEqual(
+            20f,
+            ResultClip(document).DynamicFrames[40].Position[0].X);
+    }
+
+    [TestMethod]
+    public void Reload_ClearsSelectionHistoryFromThePreviousDocumentGeneration()
+    {
+        using var document = CreateLoadedDocument(CreateClip(8));
+        var controller = new AnimationWorkbenchTimelineController(document);
+        controller.SelectFrame(1, extendRange: false, toggle: false);
+
+        var skeleton = CreateSkeleton();
+        document.Load(new AnimationWorkbenchLoadRequest(
+            new AnimationWorkbenchSourceInput(
+                "replacement",
+                CreateClip(4),
+                skeleton,
+                new AnimationWorkbenchSourceFormat(7, 1)),
+            null,
+            GameTypeEnum.Warhammer3,
+            skeleton));
+        controller.Refresh();
+
+        Assert.AreEqual(0, controller.SelectionCount);
+        Assert.AreEqual(-1, controller.FocusedFrameIndex);
     }
 
     [TestMethod]
