@@ -31,7 +31,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Margin="12" Padding="16" Style="{StaticResource AeSurface.Panel}">
+    <Border Margin="12" Padding="16" Background="Transparent">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -48,19 +48,23 @@
                     <TextBlock Style="{StaticResource AeText.PageTitle}" Text="{loc:Loc AnimationWorkbench.Layer.Title}" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Layer.Subtitle}" TextWrapping="Wrap" />
                 </StackPanel>
-                <Border Grid.Column="1" Padding="12,4" VerticalAlignment="Center" Background="{DynamicResource AeBrush.AccentSoft}" BorderBrush="{DynamicResource AeBrush.Accent}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
-                    <TextBlock x:Name="HeaderStateText" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.Layer.LivePreview}" />
-                </Border>
+                <TextBlock
+                    x:Name="HeaderStateText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource AeBrush.Accent}"
+                    Style="{StaticResource AeText.Label}"
+                    Text="{loc:Loc AnimationWorkbench.Layer.LivePreview}" />
             </Grid>
 
             <Grid Grid.Row="1" Margin="0,16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.1*" MinWidth="360" />
+                    <ColumnDefinition Width="1.1*" />
                     <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="0.9*" MinWidth="340" />
+                    <ColumnDefinition Width="0.9*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Padding="16" Style="{StaticResource AeSurface.Control}">
+                <Border Padding="16" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -84,7 +88,7 @@
                             AutomationProperties.Name="{loc:Loc AnimationWorkbench.Layer.SearchBones}"
                             Style="{StaticResource AeInput.TextBox}"
                             TextChanged="SearchTextBox_TextChanged" />
-                        <Border Grid.Row="2" Padding="4" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
+                        <Border Grid.Row="2" Padding="4" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1">
                             <TreeView
                                 x:Name="BoneTree"
                                 AutomationProperties.Name="{loc:Loc AnimationWorkbench.Layer.BoneTree}"
@@ -124,7 +128,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="2" Padding="16" Style="{StaticResource AeSurface.Control}">
+                <Border Grid.Column="2" Padding="16" Background="Transparent">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimationWorkbench.Layer.LayerParameters}" />

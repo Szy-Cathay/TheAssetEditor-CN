@@ -78,8 +78,8 @@ public sealed class AnimationWorkbenchRetargetViewTests
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(source, Does.Contain("AeSurface.Panel"));
-            NUnitAssert.That(source, Does.Contain("AeSurface.Control"));
+            NUnitAssert.That(source, Does.Not.Contain("AeSurface.Panel"));
+            NUnitAssert.That(source, Does.Not.Contain("AeSurface.Control"));
             NUnitAssert.That(source, Does.Contain("AeInput.TextBox"));
             NUnitAssert.That(source, Does.Contain("AeInput.ComboBox"));
             NUnitAssert.That(source, Does.Contain("AeInput.CheckBox"));

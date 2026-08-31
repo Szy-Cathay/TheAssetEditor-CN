@@ -101,8 +101,8 @@ public sealed class AnimationWorkbenchMetaDataViewTests
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(source, Does.Contain("AeSurface.Panel"));
-            NUnitAssert.That(source, Does.Contain("AeSurface.Control"));
+            NUnitAssert.That(source, Does.Not.Contain("AeSurface.Panel"));
+            NUnitAssert.That(source, Does.Not.Contain("AeSurface.Control"));
             NUnitAssert.That(source, Does.Contain("AeInput.Switch"));
             NUnitAssert.That(source, Does.Contain("AeList.View"));
             NUnitAssert.That(source, Does.Contain("AeList.Item"));

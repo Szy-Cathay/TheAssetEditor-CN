@@ -28,7 +28,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Margin="12" Padding="16" Style="{StaticResource AeSurface.Panel}">
+    <Border Margin="12" Padding="16" Background="Transparent">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -45,19 +45,23 @@
                     <TextBlock Style="{StaticResource AeText.PageTitle}" Text="{loc:Loc AnimationWorkbench.Retarget.Title}" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.Subtitle}" TextWrapping="Wrap" />
                 </StackPanel>
-                <Border Grid.Column="1" Padding="12,4" VerticalAlignment="Center" Background="{DynamicResource AeBrush.AccentSoft}" BorderBrush="{DynamicResource AeBrush.Accent}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
-                    <TextBlock x:Name="HeaderStateText" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.Retarget.LivePreview}" />
-                </Border>
+                <TextBlock
+                    x:Name="HeaderStateText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Foreground="{DynamicResource AeBrush.Accent}"
+                    Style="{StaticResource AeText.Label}"
+                    Text="{loc:Loc AnimationWorkbench.Retarget.LivePreview}" />
             </Grid>
 
             <Grid Grid.Row="1" Margin="0,16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.6*" MinWidth="560" />
+                    <ColumnDefinition Width="1.6*" />
                     <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="0.7*" MinWidth="280" />
+                    <ColumnDefinition Width="0.7*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Padding="16" Style="{StaticResource AeSurface.Control}">
+                <Border Padding="16" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -104,7 +108,7 @@
                             <TextBlock Grid.Column="1" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.SourceBone}" />
                             <TextBlock Grid.Column="2" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.Confidence}" />
                         </Grid>
-                        <Border Grid.Row="3" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
+                        <Border Grid.Row="3" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1">
                             <ListBox
                                 x:Name="MappingList"
                                 ScrollViewer.CanContentScroll="True"
@@ -122,9 +126,12 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                                                         <TextBlock Style="{StaticResource AeText.Label}" Text="{Binding TargetBoneName}" />
-                                                        <Border Margin="8,0,0,0" Padding="4,1" Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Warning}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}" Visibility="{Binding IsCoreBone, Converter={StaticResource BooleanToVisibility}}">
-                                                            <TextBlock Foreground="{DynamicResource AeBrush.Warning}" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.CoreBone}" />
-                                                        </Border>
+                                                        <TextBlock
+                                                            Margin="8,0,0,0"
+                                                            Foreground="{DynamicResource AeBrush.Warning}"
+                                                            Style="{StaticResource AeText.Caption}"
+                                                            Text="{loc:Loc AnimationWorkbench.Retarget.CoreBone}"
+                                                            Visibility="{Binding IsCoreBone, Converter={StaticResource BooleanToVisibility}}" />
                                                     </StackPanel>
                                                     <ComboBox
                                                         Grid.Column="1"
@@ -166,7 +173,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="2" Padding="16" Style="{StaticResource AeSurface.Control}">
+                <Border Grid.Column="2" Padding="16" Background="Transparent">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimationWorkbench.Retarget.Summary}" />

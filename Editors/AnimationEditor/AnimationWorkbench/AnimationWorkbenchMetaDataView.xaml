@@ -25,7 +25,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Margin="12" Padding="16" Style="{StaticResource AeSurface.Panel}">
+    <Border Margin="12" Padding="16" Background="Transparent">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -54,7 +54,7 @@
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Row="1" Margin="0,16,0,12" Padding="12" Style="{StaticResource AeSurface.Control}">
+            <Border Grid.Row="1" Margin="0,16,0,12" Padding="12" Background="Transparent">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -64,13 +64,16 @@
                         <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimationWorkbench.MetaData.Summary}" />
                         <TextBlock Margin="0,4,0,0" Style="{StaticResource AeText.Caption}" Text="{Binding SummaryText}" />
                     </StackPanel>
-                    <Border Grid.Column="1" Padding="8,4" VerticalAlignment="Center" Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
-                        <TextBlock Style="{StaticResource AeText.Label}" Text="{Binding DirtyStateText}" />
-                    </Border>
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource AeBrush.TextSecondary}"
+                        Style="{StaticResource AeText.Label}"
+                        Text="{Binding DirtyStateText}" />
                 </Grid>
             </Border>
 
-            <Border Grid.Row="2" Padding="12" Style="{StaticResource AeSurface.Control}">
+            <Border Grid.Row="2" Padding="12" Background="Transparent">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

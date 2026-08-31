@@ -42,12 +42,12 @@
 
         <Grid Grid.Row="1" Margin="0,16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
-                <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="*" MinWidth="720" />
+                <ColumnDefinition Width="240" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Padding="16" Style="{StaticResource AeSurface.Panel}">
+            <Border Background="Transparent">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.DonorTitle}" />
@@ -115,7 +115,6 @@
                                 <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.OutputTitle}" />
                                 <Grid Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="104" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
@@ -124,23 +123,34 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Label HorizontalContentAlignment="Right" Content="{loc:Loc AnimationWorkbench.BaseAnimation.OutputFolder}" Style="{StaticResource AeForm.Label}" />
-                                    <TextBox Grid.Column="1" AutomationProperties.Name="{loc:Loc AnimationWorkbench.BaseAnimation.OutputFolder}" Style="{StaticResource AeInput.TextBox}" Text="{Binding OutputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Grid.ColumnSpan="2" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.OutputFolder}" />
+                                    <TextBox Grid.Row="1" Margin="0,4,0,0" AutomationProperties.Name="{loc:Loc AnimationWorkbench.BaseAnimation.OutputFolder}" Style="{StaticResource AeInput.TextBox}" Text="{Binding OutputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding OutputFolder}" />
                                     <Button
-                                        Grid.Column="2"
-                                        Margin="8,0,0,0"
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        Margin="8,4,0,0"
                                         AutomationProperties.Name="{loc:Loc AnimationWorkbench.BaseAnimation.BrowseOutputFolder}"
                                         Command="{Binding BrowseOutputFolderCommand}"
                                         Content="{loc:Loc AnimationWorkbench.BaseAnimation.BrowseOutputFolder}"
                                         Style="{StaticResource AeButton.Secondary}" />
-                                    <Label Grid.Row="1" Margin="0,8,0,0" HorizontalContentAlignment="Right" Content="{loc:Loc AnimationWorkbench.BaseAnimation.OutputPrefix}" Style="{StaticResource AeForm.Label}" />
-                                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,8,0,0" AutomationProperties.Name="{loc:Loc AnimationWorkbench.BaseAnimation.OutputPrefix}" Style="{StaticResource AeInput.TextBox}" Text="{Binding OutputPrefix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Label Grid.Row="2" Margin="0,8,0,0" HorizontalContentAlignment="Right" Content="{loc:Loc AnimationWorkbench.BaseAnimation.AnimationSetOutput}" Style="{StaticResource AeForm.Label}" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,8,0,0" VerticalAlignment="Center" Style="{StaticResource AeText.Technical}" Text="{Binding AnimationSetOutputPath}" TextWrapping="Wrap" ToolTip="{loc:Loc AnimationWorkbench.BaseAnimation.AnimationSetHint}" />
+                                    <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.OutputPrefix}" />
+                                    <TextBox Grid.Row="3" Grid.ColumnSpan="2" Margin="0,4,0,0" AutomationProperties.Name="{loc:Loc AnimationWorkbench.BaseAnimation.OutputPrefix}" Style="{StaticResource AeInput.TextBox}" Text="{Binding OutputPrefix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,0" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.AnimationSetOutput}" />
+                                    <TextBlock
+                                        Grid.Row="5"
+                                        Grid.ColumnSpan="2"
+                                        Margin="0,4,0,0"
+                                        AutomationProperties.HelpText="{loc:Loc AnimationWorkbench.BaseAnimation.AnimationSetHint}"
+                                        Style="{StaticResource AeText.Technical}"
+                                        Text="{Binding AnimationSetOutputPath}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTip="{Binding AnimationSetOutputPath}" />
                                     <CheckBox
-                                        Grid.Row="3"
-                                        Grid.Column="1"
+                                        Grid.Row="6"
                                         Grid.ColumnSpan="2"
                                         Margin="0,8,0,0"
                                         AutomationProperties.Name="{loc:Loc AnimationWorkbench.BaseAnimation.OverwriteExisting}"
@@ -154,7 +164,12 @@
                 </ScrollViewer>
             </Border>
 
-            <Border Grid.Column="2" Padding="16" Style="{StaticResource AeSurface.Panel}">
+            <Border
+                Grid.Column="2"
+                Padding="12,0,0,0"
+                Background="Transparent"
+                BorderBrush="{DynamicResource AeBrush.Border}"
+                BorderThickness="1,0,0,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -170,11 +185,12 @@
                         CanUserDeleteRows="False"
                         IsReadOnly="False"
                         ItemsSource="{Binding Items}"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                         SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                         SelectionMode="Single"
                         Style="{StaticResource AeTable.Grid}">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="56" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Selected}">
+                            <DataGridTemplateColumn Width="44" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Selected}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <CheckBox
@@ -185,7 +201,7 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="120" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Role}">
+                            <DataGridTemplateColumn Width="112" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Role}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox
@@ -198,13 +214,46 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Width="2*" Binding="{Binding SourcePath}" Header="{loc:Loc AnimationWorkbench.BaseAnimation.SourcePath}" IsReadOnly="True" />
-                            <DataGridTextColumn Width="2*" Binding="{Binding OutputPath}" Header="{loc:Loc AnimationWorkbench.BaseAnimation.OutputPath}" IsReadOnly="True" />
-                            <DataGridTextColumn Width="100" Binding="{Binding StatusText}" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Status}" IsReadOnly="True" />
-                            <DataGridTextColumn Width="2*" Binding="{Binding DetailText}" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Details}" IsReadOnly="True" />
+                            <DataGridTemplateColumn Width="*" Header="{loc:Loc AnimationWorkbench.BaseAnimation.SourcePath}" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource AeText.Technical}"
+                                            Text="{Binding SourcePath}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip="{Binding SourcePath}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Width="88" Binding="{Binding StatusText}" Header="{loc:Loc AnimationWorkbench.BaseAnimation.Status}" IsReadOnly="True" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <TextBlock Grid.Row="2" Margin="0,12,0,0" Style="{StaticResource AeText.Caption}" Text="{Binding StatusText}" TextWrapping="Wrap" />
+                    <Border
+                        Grid.Row="2"
+                        Margin="0,8,0,0"
+                        Padding="0,8,0,0"
+                        Background="Transparent"
+                        BorderBrush="{DynamicResource AeBrush.Border}"
+                        BorderThickness="0,1,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.SourcePath}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource AeText.Technical}" Text="{Binding SelectedItem.SourcePath}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedItem.SourcePath}" />
+                            <TextBlock Grid.Row="1" Margin="0,4,0,0" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.OutputPath}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,0,0" Style="{StaticResource AeText.Technical}" Text="{Binding SelectedItem.OutputPath}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedItem.OutputPath}" />
+                            <TextBlock Grid.Row="2" Margin="0,4,0,0" Style="{StaticResource AeText.Label}" Text="{loc:Loc AnimationWorkbench.BaseAnimation.Details}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,0,0" Style="{StaticResource AeText.Caption}" Text="{Binding SelectedItem.DetailText}" TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>
