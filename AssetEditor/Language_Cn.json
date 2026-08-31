@@ -1027,7 +1027,7 @@
   "AnimationWorkbench.Diagnostic.BlendInPointInvalid": "无法融合：动画 B 的入点超出可用帧范围。",
   "AnimationWorkbench.Diagnostic.BlendOverlapInvalid": "无法融合：重叠时长不能为负数。",
   "AnimationWorkbench.Diagnostic.BlendOverlapExceedsAvailable": "无法融合：重叠时长超过出点前或入点后的可用动画范围。",
-  "AnimationWorkbench.Diagnostic.BlendOverlapConsumesAnimationB": "无法融合：重叠时长覆盖了动画 B 的全部多帧采样。请至少缩短一个输出采样间隔，为纯动画 B 留出一帧。",
+  "AnimationWorkbench.Diagnostic.BlendOverlapConsumesAnimationB": "无法融合：重叠时长覆盖了动画 B 的全部输出采样。请至少缩短一个输出采样间隔，为纯动画 B 留出一帧。",
   "AnimationWorkbench.Diagnostic.BlendOutputFrameRateInvalid": "无法融合：输出帧率必须是大于零的有限数值。",
   "AnimationWorkbench.Diagnostic.BlendOutputTooLarge": "无法融合：所选参数会生成过多帧，请缩短范围或降低输出帧率。",
   "AnimationWorkbench.Diagnostic.BlendSourceTransformInvalid": "无法融合：来源动画含有无效的位置、旋转或缩放数据。",

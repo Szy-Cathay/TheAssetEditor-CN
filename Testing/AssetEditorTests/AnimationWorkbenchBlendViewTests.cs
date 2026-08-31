@@ -227,6 +227,46 @@ public class AnimationWorkbenchBlendViewTests
     }
 
     [Test]
+    public void BlendView_DependencyChangeClampsOverlapValueAndDisplay()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                using var document = CreateLoadedDocument();
+                var controller = new AnimationWorkbenchBlendController(document);
+                var view = new AnimationWorkbenchBlendView
+                {
+                    Controller = controller,
+                };
+                var window = Host(view);
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    controller.OverlapSeconds = 0.1;
+
+                    controller.AnimationBInFrame = 23;
+
+                    var overlapSlider = FindDescendants<Slider>(view)
+                        .Single(slider => slider.Name == "OverlapSlider");
+                    var overlapValue = FindDescendants<TextBlock>(view)
+                        .Single(text => text.Name == "OverlapValue");
+                    NUnitAssert.That(controller.MaximumOverlapSeconds, Is.Zero);
+                    NUnitAssert.That(controller.OverlapSeconds, Is.Zero);
+                    NUnitAssert.That(overlapSlider.Maximum, Is.Zero);
+                    NUnitAssert.That(overlapSlider.Value, Is.Zero);
+                    NUnitAssert.That(overlapValue.Text, Is.EqualTo("0 秒"));
+                    NUnitAssert.That(controller.LastResult?.Succeeded, Is.True);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+    }
+
+    [Test]
     public void BlendView_EnterOrEscapeFromInteractiveChildDoesNotCommitOrCancel()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(

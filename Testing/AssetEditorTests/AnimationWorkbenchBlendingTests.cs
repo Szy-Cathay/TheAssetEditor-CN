@@ -94,6 +94,31 @@ public class AnimationWorkbenchBlendingTests
     }
 
     [TestMethod]
+    public void PreviewBlend_PositiveOverlapThatConsumesSingleFrameBIsRejected()
+    {
+        var skeleton = CreateSkeleton("shared_skeleton", "root");
+        using var document = CreateDocument(
+            skeleton,
+            CreateMovingClip(2, 1),
+            CreateMovingClip(1, 1));
+
+        var result = document.PreviewBlend(new AnimationWorkbenchBlendRequest(
+            1,
+            0,
+            TimeSpan.FromSeconds(0.5),
+            1,
+            AnimationWorkbenchBlendCurve.Linear,
+            new AnimationWorkbenchRootMotionOptions(false, false, false)));
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual(
+            AnimationWorkbenchDiagnosticCode.BlendOverlapConsumesAnimationB,
+            result.Diagnostics.Single().Code);
+        Assert.IsFalse(result.State.HasActiveBlendPreview);
+        Assert.IsFalse(result.State.CanUndo);
+    }
+
+    [TestMethod]
     public void PreviewBlend_RootMotionStrategiesCanBeDisabledIndependently()
     {
         var skeleton = CreateSkeleton("shared_skeleton", "root");
@@ -497,6 +522,13 @@ public class AnimationWorkbenchBlendingTests
             Tolerance);
         Assert.IsTrue(controller.Impact.AnimationAWasResampled);
         Assert.IsTrue(controller.Impact.AnimationBWasResampled);
+
+        controller.OverlapSeconds = 0.1;
+        controller.AnimationBInFrame = 3;
+
+        Assert.AreEqual(0, controller.MaximumOverlapSeconds, Tolerance);
+        Assert.AreEqual(0, controller.OverlapSeconds, Tolerance);
+        Assert.IsTrue(controller.LastResult?.Succeeded);
         Assert.IsTrue(controller.CommitPreview().Succeeded);
         Assert.IsFalse(controller.HasActivePreview);
         Assert.IsTrue(document.GetState().CanUndo);

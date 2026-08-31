@@ -49,6 +49,11 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
     {
         get
         {
+            if (double.IsFinite(_outputFramesPerSecond) == false ||
+                _outputFramesPerSecond <= 0)
+            {
+                return 0;
+            }
             var state = _document.GetState();
             var animationAFps = GetFramesPerSecond(state.AnimationA);
             var animationBFps = GetFramesPerSecond(state.AnimationB);
@@ -68,13 +73,19 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
                 (int)Math.Round(
                     animationBDuration * _outputFramesPerSecond,
                     MidpointRounding.AwayFromZero));
-            if (animationBOutputFrames > 1)
+            if (animationBOutputFrames == 1)
+            {
+                animationBDuration = 0;
+            }
+            else
             {
                 animationBDuration = Math.Max(
                     0,
                     animationBDuration - 1 / _outputFramesPerSecond);
             }
-            return Math.Min(animationADuration, animationBDuration);
+            return Math.Max(
+                0,
+                Math.Min(animationADuration, animationBDuration));
         }
     }
 
@@ -228,6 +239,21 @@ public sealed class AnimationWorkbenchBlendController : INotifyPropertyChanged
             return;
         field = value;
         OnPropertyChanged(propertyName);
+        if (propertyName == nameof(AnimationAOutFrame) ||
+            propertyName == nameof(AnimationBInFrame) ||
+            propertyName == nameof(OutputFramesPerSecond))
+        {
+            OnPropertyChanged(nameof(MaximumOverlapSeconds));
+            var clampedOverlap = Math.Clamp(
+                _overlapSeconds,
+                0,
+                MaximumOverlapSeconds);
+            if (clampedOverlap != _overlapSeconds)
+            {
+                _overlapSeconds = clampedOverlap;
+                OnPropertyChanged(nameof(OverlapSeconds));
+            }
+        }
         RefreshPreview();
     }
 

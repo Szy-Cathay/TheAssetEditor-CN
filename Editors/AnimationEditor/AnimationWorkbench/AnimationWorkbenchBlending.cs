@@ -292,7 +292,7 @@ public sealed partial class AnimationWorkbenchDocument
                     .BlendOverlapExceedsAvailable));
         }
 
-        if (overlapFrames == outputFramesB && outputFramesB > 1)
+        if (overlapFrames == outputFramesB)
         {
             return BlendBuildResult.Failure(CreateBlendDiagnostic(
                 AnimationWorkbenchDiagnosticCode
