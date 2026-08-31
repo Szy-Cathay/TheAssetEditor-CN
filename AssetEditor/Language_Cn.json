@@ -1033,7 +1033,6 @@
   "AnimationWorkbench.Diagnostic.TargetSkeletonMissing": "无法继续：尚未选择目标骨架。",
   "AnimationWorkbench.Diagnostic.SourceFormatUnknown": "无法保存：来源动画缺少可验证的格式信息，请重新从文件加载。",
   "AnimationWorkbench.Diagnostic.SourceFormatUnsupported": "无法保存：来源动画的文件版本不受支持。",
-  "AnimationWorkbench.Diagnostic.SourceVersionEightReadOnly": "无法保存：v8 动画目前只允许查看，不能静默转换或写回。",
   "AnimationWorkbench.Diagnostic.SourceMultiplePartsReadOnly": "无法保存：多 Part 动画目前只允许查看，不能静默合并或写回。",
   "AnimationWorkbench.Diagnostic.SourceStaticFrameReadOnly": "无法保存：包含 Static Frame 的来源动画目前只允许查看，不能静默展开为全动态帧。",
   "AnimationWorkbench.Diagnostic.TargetGameSaveUnsupported": "无法保存：当前仅开放经过验证的战锤 3 动画写入。",

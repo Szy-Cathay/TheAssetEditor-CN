@@ -108,8 +108,57 @@ public class AnimationWorkbenchSaveTests
         packFileService.VerifyAll();
     }
 
+    [TestMethod]
+    public void SaveAsNewProjectResource_VersionEightSource_WritesVersionEightCandidate()
+    {
+        using var projectRoot = new TemporaryDirectory();
+        using var project = FolderProjectContainer.Create(
+            projectRoot.Path,
+            new FolderProjectSettings { Name = "测试工程" });
+        var packFileService = new Mock<IPackFileService>();
+        List<NewPackFileEntry>? capturedEntries = null;
+        packFileService
+            .Setup(service => service.AddFilesToPack(
+                project,
+                It.IsAny<List<NewPackFileEntry>>(),
+                false))
+            .Callback<PackFileContainer, List<NewPackFileEntry>, bool>(
+                (_, entries, _) => capturedEntries = entries);
+        using var document = CreateLoadedDocument(
+            new AnimationWorkbenchSourceFormat(
+                8,
+                1,
+                true,
+                6,
+                ["flag_a"]));
+
+        var saveResult = document.SaveAsNewProjectResource(
+            packFileService.Object,
+            project,
+            @"animations\battle\v8_candidate.anim");
+
+        Assert.IsTrue(saveResult.Succeeded);
+        Assert.IsNotNull(capturedEntries);
+        var candidate = AnimationFile.Create(new ByteChunk(
+            capturedEntries.Single().PackFile.DataSource.ReadData()));
+        Assert.AreEqual(8u, candidate.Header.Version);
+        Assert.AreEqual(6u, candidate.Header.UnknownValue_v8);
+        CollectionAssert.AreEqual(
+            new[] { "flag_a" },
+            candidate.Header.FlagVariables);
+        Assert.AreEqual(1, candidate.AnimationParts.Count);
+        Assert.IsNotNull(candidate.AnimationParts[0].StaticFrame);
+        Assert.AreEqual(2, candidate.AnimationParts[0].DynamicFrames.Count);
+        Assert.AreEqual(
+            AnimationFile.AnimationBoneMappingType.Dynamic,
+            candidate.AnimationParts[0].TranslationMappings[0].MappingType);
+        Assert.AreEqual(
+            AnimationFile.AnimationBoneMappingType.Static,
+            candidate.AnimationParts[0].RotationMappings[0].MappingType);
+        packFileService.VerifyAll();
+    }
+
     [DataTestMethod]
-    [DataRow(8, 1, false, AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly)]
     [DataRow(7, 2, false, AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly)]
     [DataRow(7, 1, true, AnimationWorkbenchDiagnosticCode.SourceStaticFrameReadOnly)]
     [DataRow(9, 1, false, AnimationWorkbenchDiagnosticCode.SourceFormatUnsupported)]

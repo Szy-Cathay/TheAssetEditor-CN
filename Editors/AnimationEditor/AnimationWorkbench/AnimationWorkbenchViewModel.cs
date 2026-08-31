@@ -502,14 +502,12 @@ public sealed partial class AnimationWorkbenchViewModel :
             {
                 AnimationFormatBlockReason.UnsupportedVersion =>
                     "AnimationWorkbench.Diagnostic.SourceFormatUnsupported",
-                AnimationFormatBlockReason.VersionEightIsReadOnly =>
-                    "AnimationWorkbench.Diagnostic.SourceVersionEightReadOnly",
                 AnimationFormatBlockReason.MultiplePartsAreReadOnly =>
                     "AnimationWorkbench.Diagnostic.SourceMultiplePartsReadOnly",
                 _ => throw new ArgumentOutOfRangeException(),
             }));
         }
-        if (source.Format.HasStaticFrame)
+        if (source.Format.HasStaticFrame && source.Format.Version != 8)
         {
             Diagnostics.Add(Localize(
                 "AnimationWorkbench.Diagnostic.SourceStaticFrameReadOnly"));
@@ -549,7 +547,8 @@ public sealed partial class AnimationWorkbenchViewModel :
     private static bool CanEditSource(
         AnimationWorkbenchSourceInput source)
     {
-        if (source.Format == null || source.Format.HasStaticFrame)
+        if (source.Format == null ||
+            (source.Format.HasStaticFrame && source.Format.Version != 8))
             return false;
         return AnimationFormatCapabilities.Evaluate(
             source.Format.Version,

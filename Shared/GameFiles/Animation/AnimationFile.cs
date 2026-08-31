@@ -11,6 +11,11 @@ namespace Shared.GameFormats.Animation
     [DebuggerDisplay("AnimationFile - {Header.SkeletonName}[{DynamicFrames.Count}]")]
     public class AnimationFile
     {
+        private const sbyte VersionEightFullTranslationBitRate = 12;
+        private const sbyte VersionEightFullRotationBitRate = 8;
+        private const sbyte VersionEightStaticTranslationBitRate = -12;
+        private const sbyte VersionEightStaticRotationBitRate = -8;
+
         public const int InvalidBoneIndex = -1;
         public const int BoneIndexNoParent = InvalidBoneIndex;
 
@@ -407,8 +412,8 @@ namespace Shared.GameFormats.Animation
 
         static byte[] ConvertToBytesInvernal(AnimationFile input)
         {
-            if (input.AnimationParts.Count != 1 || input.Header.Version == 8)
-                throw new Exception("Animations with multiple parts or version 8 can not be saved!");
+            if (input.Header.Version != 8 && input.AnimationParts.Count != 1)
+                throw new Exception("Animations before version 8 must contain exactly one part.");
 
             using var memoryStream = new MemoryStream();
             using var writer = new BinaryWriter(memoryStream);
@@ -421,9 +426,9 @@ namespace Shared.GameFormats.Animation
             for (var i = 0; i < input.Header.SkeletonName.Length; i++)
                 writer.Write(input.Header.SkeletonName[i]);
 
-            if (input.Header.Version == 7)
+            if (input.Header.Version > 6)
             {
-                writer.Write(input.Header.FlagCount);
+                writer.Write((uint)input.Header.FlagVariables.Count);
                 foreach (var flag in input.Header.FlagVariables)
                     writer.Write(ByteParsers.String.WriteCaString(flag));
             }
@@ -439,6 +444,12 @@ namespace Shared.GameFormats.Animation
                 for (var i = 0; i < bone.Name.Length; i++)
                     writer.Write(bone.Name[i]);
                 writer.Write(bone.ParentId);
+            }
+
+            if (input.Header.Version == 8)
+            {
+                WriteVersionEight(writer, input);
+                return memoryStream.ToArray();
             }
 
             foreach (var animationPart in input.AnimationParts)
@@ -484,6 +495,154 @@ namespace Shared.GameFormats.Animation
             }
 
             return memoryStream.ToArray();
+        }
+
+        static void WriteVersionEight(
+            BinaryWriter writer,
+            AnimationFile input)
+        {
+            writer.Write(input.Header.UnknownValue_v8);
+            writer.Write((uint)input.AnimationParts.Count);
+
+            foreach (var animationPart in input.AnimationParts)
+            {
+                ValidateVersionEightPart(animationPart, input.Bones.Length);
+
+                foreach (var mapping in animationPart.TranslationMappings)
+                {
+                    writer.Write(mapping.MappingType switch
+                    {
+                        AnimationBoneMappingType.Dynamic =>
+                            VersionEightFullTranslationBitRate,
+                        AnimationBoneMappingType.Static =>
+                            VersionEightStaticTranslationBitRate,
+                        AnimationBoneMappingType.None => (sbyte)0,
+                        _ => throw new ArgumentOutOfRangeException(),
+                    });
+                }
+
+                foreach (var mapping in animationPart.RotationMappings)
+                {
+                    writer.Write(mapping.MappingType switch
+                    {
+                        AnimationBoneMappingType.Dynamic =>
+                            VersionEightFullRotationBitRate,
+                        AnimationBoneMappingType.Static =>
+                            VersionEightStaticRotationBitRate,
+                        AnimationBoneMappingType.None => (sbyte)0,
+                        _ => throw new ArgumentOutOfRangeException(),
+                    });
+                }
+
+                writer.Write(0u);
+                writer.Write(0u);
+
+                var staticFrame = animationPart.StaticFrame;
+                writer.Write((uint)(staticFrame?.Transforms.Count ?? 0));
+                writer.Write((uint)(staticFrame?.Quaternion.Count ?? 0));
+                if (staticFrame != null)
+                    WriteFrame(writer, staticFrame);
+
+                var dynamicTransformCount = animationPart.TranslationMappings.Count(
+                    mapping => mapping.MappingType == AnimationBoneMappingType.Dynamic);
+                var dynamicQuaternionCount = animationPart.RotationMappings.Count(
+                    mapping => mapping.MappingType == AnimationBoneMappingType.Dynamic);
+                writer.Write((uint)dynamicTransformCount);
+                writer.Write((uint)dynamicQuaternionCount);
+                writer.Write((uint)animationPart.DynamicFrames.Count);
+                foreach (var frame in animationPart.DynamicFrames)
+                    WriteFrame(writer, frame);
+            }
+        }
+
+        static void ValidateVersionEightPart(
+            AnimationPart animationPart,
+            int boneCount)
+        {
+            if (animationPart.TranslationMappings.Count != boneCount ||
+                animationPart.RotationMappings.Count != boneCount)
+            {
+                throw new InvalidDataException(
+                    "Version 8 animation mappings must match the bone count.");
+            }
+
+            var staticTransformCount = ValidateMappingIds(
+                animationPart.TranslationMappings,
+                AnimationBoneMappingType.Static);
+            var staticQuaternionCount = ValidateMappingIds(
+                animationPart.RotationMappings,
+                AnimationBoneMappingType.Static);
+            var dynamicTransformCount = ValidateMappingIds(
+                animationPart.TranslationMappings,
+                AnimationBoneMappingType.Dynamic);
+            var dynamicQuaternionCount = ValidateMappingIds(
+                animationPart.RotationMappings,
+                AnimationBoneMappingType.Dynamic);
+
+            if ((staticTransformCount != 0 || staticQuaternionCount != 0) &&
+                animationPart.StaticFrame == null)
+            {
+                throw new InvalidDataException(
+                    "Version 8 static mappings require a static frame.");
+            }
+
+            if (animationPart.StaticFrame != null &&
+                (animationPart.StaticFrame.Transforms.Count != staticTransformCount ||
+                 animationPart.StaticFrame.Quaternion.Count != staticQuaternionCount))
+            {
+                throw new InvalidDataException(
+                    "Version 8 static frame data does not match its mappings.");
+            }
+            if (animationPart.StaticFrame != null &&
+                staticTransformCount == 0 &&
+                staticQuaternionCount == 0)
+            {
+                throw new InvalidDataException(
+                    "Version 8 static frame must contain a mapped track.");
+            }
+            if ((dynamicTransformCount != 0 || dynamicQuaternionCount != 0) &&
+                animationPart.DynamicFrames.Count == 0)
+            {
+                throw new InvalidDataException(
+                    "Version 8 dynamic mappings require at least one frame.");
+            }
+            if (dynamicTransformCount == 0 &&
+                dynamicQuaternionCount == 0 &&
+                animationPart.DynamicFrames.Count != 0)
+            {
+                throw new InvalidDataException(
+                    "Version 8 dynamic frames must contain a mapped track.");
+            }
+
+            foreach (var frame in animationPart.DynamicFrames)
+            {
+                if (frame.Transforms.Count != dynamicTransformCount ||
+                    frame.Quaternion.Count != dynamicQuaternionCount)
+                {
+                    throw new InvalidDataException(
+                        "Version 8 dynamic frame data does not match its mappings.");
+                }
+            }
+        }
+
+        static int ValidateMappingIds(
+            IReadOnlyList<AnimationBoneMapping> mappings,
+            AnimationBoneMappingType mappingType)
+        {
+            var expectedId = 0;
+            foreach (var mapping in mappings)
+            {
+                if (mapping.MappingType != mappingType)
+                    continue;
+                if (mapping.Id != expectedId)
+                {
+                    throw new InvalidDataException(
+                        "Version 8 animation mapping ids must follow bone order.");
+                }
+                expectedId++;
+            }
+
+            return expectedId;
         }
 
         public static byte[] ConvertToBytes(AnimationFile input)

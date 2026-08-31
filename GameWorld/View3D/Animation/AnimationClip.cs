@@ -11,6 +11,8 @@ namespace GameWorld.Core.Animation
 {
     public class AnimationClip
     {
+        private const int StaticMappingOffset = 10000;
+
         public class KeyFrame
         {
             public List<Vector3> Position { get; set; } = new List<Vector3>();
@@ -133,15 +135,29 @@ namespace GameWorld.Core.Animation
 
         public AnimationFile ConvertToFileFormat(GameSkeleton skeleton)
         {
+            return ConvertToFileFormat(skeleton, 7);
+        }
+
+        public AnimationFile ConvertToFileFormat(
+            GameSkeleton skeleton,
+            uint version,
+            uint unknownValueV8 = 0,
+            IReadOnlyList<string>? flagVariables = null)
+        {
+            if (version is not 7 and not 8)
+                throw new ArgumentOutOfRangeException(nameof(version));
+
             var output = new AnimationFile();
 
             output.Header.FrameRate = (float)(Timebase?.FramesPerSecond ?? 20);
 
-            output.Header.Version = 7;
+            output.Header.Version = version;
             output.Header.AnimationTotalPlayTimeInSec =
                 (float)Duration.TotalSeconds;
             output.Header.SkeletonName = skeleton.SkeletonName;
-            output.AnimationParts.Add(new AnimationPart());
+            output.Header.UnknownValue_v8 = unknownValueV8;
+            output.Header.FlagVariables = flagVariables?.ToList() ?? [];
+            output.Header.FlagCount = (uint)output.Header.FlagVariables.Count;
 
             output.Bones = new BoneInfo[skeleton.BoneCount];
             for (var i = 0; i < skeleton.BoneCount; i++)
@@ -152,16 +168,141 @@ namespace GameWorld.Core.Animation
                     Name = skeleton.BoneNames[i],
                     ParentId = skeleton.GetParentBoneIndex(i)
                 };
-
-                output.AnimationParts[0].RotationMappings.Add(new AnimationBoneMapping(i));
-                output.AnimationParts[0].TranslationMappings.Add(new AnimationBoneMapping(i));
             }
 
-
+            var frames = new List<Frame>();
             for (var i = 0; i < DynamicFrames.Count; i++)
-                output.AnimationParts[0].DynamicFrames.Add(CreateFrameFromKeyFrame(i, skeleton));
+                frames.Add(CreateFrameFromKeyFrame(i, skeleton));
+
+            output.AnimationParts.Add(version == 8
+                ? CreateVersionEightPart(frames, skeleton.BoneCount)
+                : CreateVersionSevenPart(frames, skeleton.BoneCount));
 
             return output;
+        }
+
+        private static AnimationPart CreateVersionSevenPart(
+            IReadOnlyList<Frame> frames,
+            int boneCount)
+        {
+            var part = new AnimationPart();
+            for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+            {
+                part.RotationMappings.Add(new AnimationBoneMapping(boneIndex));
+                part.TranslationMappings.Add(new AnimationBoneMapping(boneIndex));
+            }
+
+            part.DynamicFrames.AddRange(frames);
+            return part;
+        }
+
+        private static AnimationPart CreateVersionEightPart(
+            IReadOnlyList<Frame> frames,
+            int boneCount)
+        {
+            if (frames.Count == 0)
+                throw new InvalidOperationException("Version 8 animation requires at least one frame.");
+
+            var staticTranslations = new bool[boneCount];
+            var staticRotations = new bool[boneCount];
+            for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+            {
+                staticTranslations[boneIndex] = frames
+                    .Skip(1)
+                    .All(frame => NearlyEqual(
+                        frames[0].Transforms[boneIndex],
+                        frame.Transforms[boneIndex]));
+                staticRotations[boneIndex] = frames
+                    .Skip(1)
+                    .All(frame => NearlyEqual(
+                        frames[0].Quaternion[boneIndex],
+                        frame.Quaternion[boneIndex]));
+            }
+
+            if (frames.Count > 1 &&
+                staticTranslations.All(value => value) &&
+                staticRotations.All(value => value) &&
+                boneCount != 0)
+            {
+                staticTranslations[0] = false;
+            }
+
+            var part = new AnimationPart();
+            var hasStaticTracks = staticTranslations.Any(value => value) ||
+                                  staticRotations.Any(value => value);
+            if (hasStaticTracks)
+                part.StaticFrame = new Frame();
+
+            var hasDynamicTracks = staticTranslations.Any(value => !value) ||
+                                   staticRotations.Any(value => !value);
+            if (hasDynamicTracks)
+            {
+                for (var frameIndex = 0; frameIndex < frames.Count; frameIndex++)
+                    part.DynamicFrames.Add(new Frame());
+            }
+
+            for (var boneIndex = 0; boneIndex < boneCount; boneIndex++)
+            {
+                if (staticTranslations[boneIndex])
+                {
+                    part.TranslationMappings.Add(new AnimationBoneMapping(
+                        StaticMappingOffset + part.StaticFrame!.Transforms.Count));
+                    part.StaticFrame.Transforms.Add(
+                        frames[0].Transforms[boneIndex]);
+                }
+                else
+                {
+                    var mappingId = part.DynamicFrames[0].Transforms.Count;
+                    part.TranslationMappings.Add(new AnimationBoneMapping(mappingId));
+                    for (var frameIndex = 0; frameIndex < frames.Count; frameIndex++)
+                    {
+                        part.DynamicFrames[frameIndex].Transforms.Add(
+                            frames[frameIndex].Transforms[boneIndex]);
+                    }
+                }
+
+                if (staticRotations[boneIndex])
+                {
+                    part.RotationMappings.Add(new AnimationBoneMapping(
+                        StaticMappingOffset + part.StaticFrame!.Quaternion.Count));
+                    part.StaticFrame.Quaternion.Add(
+                        frames[0].Quaternion[boneIndex]);
+                }
+                else
+                {
+                    var mappingId = part.DynamicFrames[0].Quaternion.Count;
+                    part.RotationMappings.Add(new AnimationBoneMapping(mappingId));
+                    for (var frameIndex = 0; frameIndex < frames.Count; frameIndex++)
+                    {
+                        part.DynamicFrames[frameIndex].Quaternion.Add(
+                            frames[frameIndex].Quaternion[boneIndex]);
+                    }
+                }
+            }
+
+            return part;
+        }
+
+        private static bool NearlyEqual(RmvVector3 first, RmvVector3 second)
+        {
+            const float tolerance = 0.000001f;
+            return MathF.Abs(first.X - second.X) <= tolerance &&
+                   MathF.Abs(first.Y - second.Y) <= tolerance &&
+                   MathF.Abs(first.Z - second.Z) <= tolerance;
+        }
+
+        private static bool NearlyEqual(RmvVector4 first, RmvVector4 second)
+        {
+            const float tolerance = 0.000001f;
+            var sameSign = MathF.Abs(first.X - second.X) <= tolerance &&
+                           MathF.Abs(first.Y - second.Y) <= tolerance &&
+                           MathF.Abs(first.Z - second.Z) <= tolerance &&
+                           MathF.Abs(first.W - second.W) <= tolerance;
+            var oppositeSign = MathF.Abs(first.X + second.X) <= tolerance &&
+                               MathF.Abs(first.Y + second.Y) <= tolerance &&
+                               MathF.Abs(first.Z + second.Z) <= tolerance &&
+                               MathF.Abs(first.W + second.W) <= tolerance;
+            return sameSign || oppositeSign;
         }
 
         private Frame CreateFrameFromKeyFrame(int frameIndex, GameSkeleton skeleton)

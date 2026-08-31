@@ -36,7 +36,6 @@ public enum AnimationWorkbenchDiagnosticCode
     TargetSkeletonMissing,
     SourceFormatUnknown,
     SourceFormatUnsupported,
-    SourceVersionEightReadOnly,
     SourceMultiplePartsReadOnly,
     SourceStaticFrameReadOnly,
     TargetGameSaveUnsupported,
@@ -131,7 +130,9 @@ public enum AnimationWorkbenchDiagnosticCode
 public sealed record AnimationWorkbenchSourceFormat(
     uint Version,
     int PartCount,
-    bool HasStaticFrame = false)
+    bool HasStaticFrame = false,
+    uint UnknownValueV8 = 0,
+    IReadOnlyList<string>? FlagVariables = null)
 {
     public static AnimationWorkbenchSourceFormat FromFile(
         AnimationFile file)
@@ -141,7 +142,9 @@ public sealed record AnimationWorkbenchSourceFormat(
             file.Header.Version,
             file.AnimationParts.Count,
             file.AnimationParts.Any(
-                part => part.StaticFrame != null));
+                part => part.StaticFrame != null),
+            file.Header.UnknownValue_v8,
+            file.Header.FlagVariables.ToArray());
     }
 }
 
@@ -590,7 +593,8 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
 
         return AnimationWorkbenchCandidateBuilder.Build(
             _result!.Animation,
-            _targetSkeleton!);
+            _targetSkeleton!,
+            _animationA!.Format!);
     }
 
     private static void AddSaveSourceDiagnostics(
@@ -629,8 +633,6 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 {
                     AnimationFormatBlockReason.UnsupportedVersion =>
                         AnimationWorkbenchDiagnosticCode.SourceFormatUnsupported,
-                    AnimationFormatBlockReason.VersionEightIsReadOnly =>
-                        AnimationWorkbenchDiagnosticCode.SourceVersionEightReadOnly,
                     AnimationFormatBlockReason.MultiplePartsAreReadOnly =>
                         AnimationWorkbenchDiagnosticCode.SourceMultiplePartsReadOnly,
                     _ => throw new ArgumentOutOfRangeException(
@@ -641,7 +643,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 slot));
         }
 
-        if (source.Format.HasStaticFrame)
+        if (source.Format.HasStaticFrame && source.Format.Version != 8)
         {
             diagnostics.Add(CreateSaveDiagnostic(
                 AnimationWorkbenchDiagnosticCode.SourceStaticFrameReadOnly,

@@ -9,6 +9,7 @@ internal class AnimationFormatCapabilitiesTests
     [TestCase(5u)]
     [TestCase(6u)]
     [TestCase(7u)]
+    [TestCase(8u)]
     public void Evaluate_SupportedSinglePartFormat_AllowsReadEditAndSave(uint version)
     {
         var capabilities = AnimationFormatCapabilities.Evaluate(version, partCount: 1);
@@ -19,22 +20,6 @@ internal class AnimationFormatCapabilitiesTests
             Assert.That(capabilities.CanEdit, Is.True);
             Assert.That(capabilities.CanSave, Is.True);
             Assert.That(capabilities.BlockingReasons, Is.Empty);
-        });
-    }
-
-    [Test]
-    public void Evaluate_VersionEight_IsReadableButReadOnly()
-    {
-        var capabilities = AnimationFormatCapabilities.Evaluate(version: 8, partCount: 1);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(capabilities.CanRead, Is.True);
-            Assert.That(capabilities.CanEdit, Is.False);
-            Assert.That(capabilities.CanSave, Is.False);
-            Assert.That(
-                capabilities.BlockingReasons,
-                Is.EqualTo(new[] { AnimationFormatBlockReason.VersionEightIsReadOnly }));
         });
     }
 
@@ -71,7 +56,7 @@ internal class AnimationFormatCapabilitiesTests
     }
 
     [Test]
-    public void Evaluate_VersionEightWithMultipleParts_ReportsBothReadOnlyReasons()
+    public void Evaluate_VersionEightWithMultipleParts_ReportsPartReason()
     {
         var capabilities = AnimationFormatCapabilities.Evaluate(version: 8, partCount: 2);
 
@@ -79,7 +64,6 @@ internal class AnimationFormatCapabilitiesTests
             capabilities.BlockingReasons,
             Is.EqualTo(new[]
             {
-                AnimationFormatBlockReason.VersionEightIsReadOnly,
                 AnimationFormatBlockReason.MultiplePartsAreReadOnly,
             }));
     }

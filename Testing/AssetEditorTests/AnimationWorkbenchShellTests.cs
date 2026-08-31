@@ -195,6 +195,46 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
+    public void Warhammer3_LoadVersionEightStaticFileEnablesEditing()
+    {
+        var animationFile = CreateVersionEightStaticAnimationFile();
+        var animation = PackFile.CreateFromBytes(
+            "idle_v8.anim",
+            AnimationFile.ConvertToBytes(animationFile));
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetFullPath(
+                animation,
+                null))
+            .Returns("animations\\idle_v8.anim");
+        var skeletonLookup = new Mock<ISkeletonAnimationLookUpHelper>();
+        skeletonLookup.Setup(helper => helper.GetSkeletonFileFromName(
+                "test_skeleton"))
+            .Returns(CreateAnimationFile());
+        var previewSession = new Mock<IAnimationWorkbenchPreviewSession>();
+        var viewport = new Mock<IAnimationWorkbenchViewport>();
+        viewport.Setup(candidate => candidate.Show(
+                It.IsAny<AnimationWorkbenchPreviewSnapshot>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(previewSession.Object);
+        var viewModel = new AnimationWorkbenchViewModel(
+            viewport.Object,
+            packFileService.Object,
+            skeletonLookup.Object,
+            Mock.Of<IStandardDialogs>(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3));
+
+        viewModel.LoadFile(animation);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.IsWorkbenchEnabled, Is.True);
+            NUnitAssert.That(viewModel.CanEdit, Is.True);
+            NUnitAssert.That(viewModel.Diagnostics, Is.Empty);
+        });
+        viewModel.Close();
+    }
+
+    [Test]
     public void Xaml_UsesFourZoneWorkspaceAndSharedSplitterStyles()
     {
         var root = FindSolutionRoot();
@@ -379,6 +419,21 @@ public class AnimationWorkbenchShellTests
             new AnimationFile.AnimationBoneMapping(0));
         part.DynamicFrames.Add(frame);
         file.AnimationParts.Add(part);
+        return file;
+    }
+
+    private static AnimationFile CreateVersionEightStaticAnimationFile()
+    {
+        var file = CreateAnimationFile();
+        file.Header.Version = 8;
+        file.Header.UnknownValue_v8 = 6;
+        var part = file.AnimationParts.Single();
+        part.TranslationMappings[0] =
+            new AnimationFile.AnimationBoneMapping(10000);
+        part.RotationMappings[0] =
+            new AnimationFile.AnimationBoneMapping(10000);
+        part.StaticFrame = part.DynamicFrames.Single();
+        part.DynamicFrames.Clear();
         return file;
     }
 }
