@@ -301,6 +301,40 @@ public sealed class AnimationWorkbenchMetaSyncTests
     }
 
     [TestMethod]
+    public void ProblemNavigation_WhenSeekFails_ReleasesSessionAndPreservesFailure()
+    {
+        new LocalizationManager().LoadLanguage();
+        var parser = new MetaDataFileParser(new MetaDataDatabase());
+        var previewHost = new RecordingPreviewHost();
+        using var document = CreateLoadedDocument(
+            CreateMetaBytes(parser, CreateTime(0.5f, 0.6f)),
+            CreateMetaBytes(parser, CreateTime(0.2f, 0.4f)),
+            previewHost: previewHost);
+        Assert.IsTrue(document.PreviewBlend(new AnimationWorkbenchBlendRequest(
+            5,
+            2,
+            TimeSpan.FromSeconds(0.2),
+            10,
+            AnimationWorkbenchBlendCurve.Smooth,
+            AnimationWorkbenchRootMotionOptions.Default)).Succeeded);
+        Assert.IsTrue(document.CommitBlendPreview().Succeeded);
+        var controller = new AnimationWorkbenchMetaDataController(document);
+        var problem = controller.Problems.Single(item =>
+            item.Problem.Code ==
+                AnimationWorkbenchMetaDataProblemCode.Conflict &&
+            item.Problem.Source == AnimationWorkbenchSourceSlot.AnimationB);
+        previewHost.ThrowOnSeek = true;
+        previewHost.ThrowOnDispose = true;
+
+        var exception = Assert.ThrowsException<InvalidOperationException>(() =>
+            controller.Navigate(problem));
+
+        Assert.AreEqual("seek failed", exception.Message);
+        Assert.IsTrue(previewHost.LastCancellationToken.IsCancellationRequested);
+        Assert.IsTrue(previewHost.LastSession!.IsDisposed);
+    }
+
+    [TestMethod]
     public void Trim_PreservesUnsafeAttributesAndReportsProblems()
     {
         var parser = new MetaDataFileParser(new MetaDataDatabase());
@@ -841,23 +875,51 @@ public sealed class AnimationWorkbenchMetaSyncTests
     {
         public TimeSpan? LastSeek { get; private set; }
 
+        public CancellationToken LastCancellationToken { get; private set; }
+
+        public RecordingPreviewSession? LastSession { get; private set; }
+
+        public bool ThrowOnSeek { get; set; }
+
+        public bool ThrowOnDispose { get; set; }
+
         public IAnimationWorkbenchPreviewSession Show(
             AnimationWorkbenchPreviewSnapshot preview,
-            CancellationToken cancellationToken) =>
-            new RecordingPreviewSession(position => LastSeek = position);
+            CancellationToken cancellationToken)
+        {
+            LastCancellationToken = cancellationToken;
+            LastSession = new RecordingPreviewSession(
+                position => LastSeek = position,
+                ThrowOnSeek,
+                ThrowOnDispose);
+            return LastSession;
+        }
 
         public void Dispose()
         {
         }
     }
 
-    private sealed class RecordingPreviewSession(Action<TimeSpan> seek) :
+    private sealed class RecordingPreviewSession(
+        Action<TimeSpan> seek,
+        bool throwOnSeek,
+        bool throwOnDispose) :
         IAnimationWorkbenchPreviewSession
     {
-        public void Seek(TimeSpan position) => seek(position);
+        public bool IsDisposed { get; private set; }
+
+        public void Seek(TimeSpan position)
+        {
+            seek(position);
+            if (throwOnSeek)
+                throw new InvalidOperationException("seek failed");
+        }
 
         public void Dispose()
         {
+            IsDisposed = true;
+            if (throwOnDispose)
+                throw new ApplicationException("dispose failed");
         }
     }
 

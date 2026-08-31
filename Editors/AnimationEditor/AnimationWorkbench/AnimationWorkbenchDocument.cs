@@ -792,9 +792,28 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
         }
         catch
         {
-            cancellationSource.Cancel();
-            previewSession?.Dispose();
-            cancellationSource.Dispose();
+            try
+            {
+                try
+                {
+                    cancellationSource.Cancel();
+                }
+                finally
+                {
+                    try
+                    {
+                        previewSession?.Dispose();
+                    }
+                    finally
+                    {
+                        cancellationSource.Dispose();
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Preserve the preview failure after best-effort cleanup.
+            }
             throw;
         }
     }
