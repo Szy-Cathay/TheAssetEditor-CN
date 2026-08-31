@@ -11,6 +11,8 @@ namespace GameWorld.Core.Animation
 {
     public class AnimationClip
     {
+        private const int StaticMappingOffset = 10000;
+
         public class KeyFrame
         {
             public List<Vector3> Position { get; set; } = new List<Vector3>();
@@ -244,7 +246,7 @@ namespace GameWorld.Core.Animation
                 if (staticTranslations[boneIndex])
                 {
                     part.TranslationMappings.Add(new AnimationBoneMapping(
-                        10000 + part.StaticFrame!.Transforms.Count));
+                        StaticMappingOffset + part.StaticFrame!.Transforms.Count));
                     part.StaticFrame.Transforms.Add(
                         frames[0].Transforms[boneIndex]);
                 }
@@ -262,7 +264,7 @@ namespace GameWorld.Core.Animation
                 if (staticRotations[boneIndex])
                 {
                     part.RotationMappings.Add(new AnimationBoneMapping(
-                        10000 + part.StaticFrame!.Quaternion.Count));
+                        StaticMappingOffset + part.StaticFrame!.Quaternion.Count));
                     part.StaticFrame.Quaternion.Add(
                         frames[0].Quaternion[boneIndex]);
                 }

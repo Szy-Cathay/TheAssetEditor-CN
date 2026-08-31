@@ -11,6 +11,11 @@ namespace Shared.GameFormats.Animation
     [DebuggerDisplay("AnimationFile - {Header.SkeletonName}[{DynamicFrames.Count}]")]
     public class AnimationFile
     {
+        private const sbyte VersionEightFullTranslationBitRate = 12;
+        private const sbyte VersionEightFullRotationBitRate = 8;
+        private const sbyte VersionEightStaticTranslationBitRate = -12;
+        private const sbyte VersionEightStaticRotationBitRate = -8;
+
         public const int InvalidBoneIndex = -1;
         public const int BoneIndexNoParent = InvalidBoneIndex;
 
@@ -507,8 +512,10 @@ namespace Shared.GameFormats.Animation
                 {
                     writer.Write(mapping.MappingType switch
                     {
-                        AnimationBoneMappingType.Dynamic => (sbyte)12,
-                        AnimationBoneMappingType.Static => (sbyte)-12,
+                        AnimationBoneMappingType.Dynamic =>
+                            VersionEightFullTranslationBitRate,
+                        AnimationBoneMappingType.Static =>
+                            VersionEightStaticTranslationBitRate,
                         AnimationBoneMappingType.None => (sbyte)0,
                         _ => throw new ArgumentOutOfRangeException(),
                     });
@@ -518,8 +525,10 @@ namespace Shared.GameFormats.Animation
                 {
                     writer.Write(mapping.MappingType switch
                     {
-                        AnimationBoneMappingType.Dynamic => (sbyte)8,
-                        AnimationBoneMappingType.Static => (sbyte)-8,
+                        AnimationBoneMappingType.Dynamic =>
+                            VersionEightFullRotationBitRate,
+                        AnimationBoneMappingType.Static =>
+                            VersionEightStaticRotationBitRate,
                         AnimationBoneMappingType.None => (sbyte)0,
                         _ => throw new ArgumentOutOfRangeException(),
                     });
@@ -590,6 +599,12 @@ namespace Shared.GameFormats.Animation
             {
                 throw new InvalidDataException(
                     "Version 8 static frame must contain a mapped track.");
+            }
+            if ((dynamicTransformCount != 0 || dynamicQuaternionCount != 0) &&
+                animationPart.DynamicFrames.Count == 0)
+            {
+                throw new InvalidDataException(
+                    "Version 8 dynamic mappings require at least one frame.");
             }
             if (dynamicTransformCount == 0 &&
                 dynamicQuaternionCount == 0 &&

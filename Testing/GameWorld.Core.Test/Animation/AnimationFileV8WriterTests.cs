@@ -1,4 +1,4 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using Microsoft.Xna.Framework;
 using Shared.ByteParsing;
 using Shared.GameFormats.Animation;
@@ -79,6 +79,17 @@ internal class AnimationFileV8WriterTests
             17,
             18,
             19);
+    }
+
+    [Test]
+    public void ConvertToBytes_VersionEightWithDynamicMappingAndNoFrames_Throws()
+    {
+        var source = CreateAnimation();
+        source.AnimationParts.Single().DynamicFrames.Clear();
+
+        Assert.That(
+            () => AnimationFile.ConvertToBytes(source),
+            Throws.TypeOf<InvalidDataException>());
     }
 
     [Test]
