@@ -300,7 +300,7 @@
                             <local:AnimationWorkbenchBaseAnimationView
                                 MinHeight="640"
                                 MinWidth="1120"
-                                Controller="{Binding BaseAnimationController}" />
+                                Controller="{Binding DataContext.BaseAnimationController, ElementName=Root}" />
                         </ScrollViewer>
                     </TabItem>
                     <TabItem Header="{loc:Loc AnimationWorkbench.Shell.MetaData}" Tag="MetaData">
@@ -308,7 +308,7 @@
                             <local:AnimationWorkbenchMetaDataView
                                 MinHeight="480"
                                 MinWidth="720"
-                                Controller="{Binding MetaDataController}" />
+                                Controller="{Binding DataContext.MetaDataController, ElementName=Root}" />
                         </ScrollViewer>
                     </TabItem>
                 </TabControl>
