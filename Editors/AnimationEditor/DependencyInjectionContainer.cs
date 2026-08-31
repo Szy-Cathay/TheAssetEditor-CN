@@ -2,12 +2,15 @@
 using AnimationEditor.CampaignAnimationCreator.Commands;
 using AnimationEditor.Common.BaseControl;
 using AnimationEditor.MountAnimationCreator;
-using Editors.AnimationVisualEditors.AnimationKeyframeEditor;
+using Editors.AnimationVisualEditors.AnimationWorkbench;
+using Editors.AnimationVisualEditors.ContextMenu;
 using Editors.Shared.Core.Common.BaseControl;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.DependencyInjection;
 using Shared.Core.DevConfig;
+using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
+using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.External;
 
 namespace Editors.AnimationVisualEditors
 {
@@ -23,10 +26,13 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddScoped<MountAnimationCreatorViewModel>();
             serviceCollection.AddScoped<MountVertexSelectionComponent>();
 
-            serviceCollection.AddScoped<EditorHost<AnimationKeyframeEditorViewModel>>();
-            serviceCollection.AddScoped<AnimationKeyframeEditorViewModel>();
-            serviceCollection.AddScoped<AnimationBoneSelectionComponent>();
-            serviceCollection.AddScoped<AnimationBoneGizmoComponent>();
+            serviceCollection.AddScoped<AnimationWorkbenchViewModel>();
+            serviceCollection.AddScoped<
+                IAnimationWorkbenchViewport,
+                AnimationWorkbenchViewport>();
+            serviceCollection.AddTransient<
+                IOpenAnimationWorkbenchCommand,
+                OpenAnimationWorkbenchCommand>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
         }
@@ -44,9 +50,12 @@ namespace Editors.AnimationVisualEditors
               .Build(database);
 
             EditorInfoBuilder
-              .Create<EditorHost<AnimationKeyframeEditorViewModel>, EditorHostView>(EditorEnums.AnimationKeyFrame_Editor)
-              .AddToToolbar("DisplayName.KeyFrameTool", false)
-              .Build(database);
+                .Create<AnimationWorkbenchViewModel, AnimationWorkbenchView>(
+                    EditorEnums.AnimationKeyFrame_Editor)
+                .AddExtention(".anim", EditorPriorites.Default)
+                .AddToToolbar("DisplayName.AnimationWorkbench", true)
+                .ForGames(GameTypeEnum.Warhammer3)
+                .Build(database);
         }
     }
 }
