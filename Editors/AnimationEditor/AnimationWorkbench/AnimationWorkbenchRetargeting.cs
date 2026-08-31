@@ -588,6 +588,22 @@ public sealed partial class AnimationWorkbenchDocument
                 CreateMappingSkeleton(source.Skeleton),
                 CreateMappingSkeleton(targetSkeleton))
             .CoreTargetBoneIndices;
+        foreach (var duplicate in validMappings.Values
+                     .Where(item => item.SourceBoneIndex is >= 0 &&
+                                    item.SourceBoneIndex <
+                                        source.Skeleton.BoneCount &&
+                                    coreIndices.Contains(
+                                        item.TargetBoneIndex))
+                     .GroupBy(item => item.SourceBoneIndex!.Value)
+                     .Where(group => group.Count() > 1))
+        {
+            diagnostics.Add(new AnimationWorkbenchDiagnostic(
+                AnimationWorkbenchDiagnosticCode
+                    .RetargetMappingSourceDuplicate,
+                AnimationWorkbenchDiagnosticSeverity.Error,
+                request.Source,
+                BoneName: source.Skeleton.BoneNames[duplicate.Key]));
+        }
         for (var targetIndex = 0;
              targetIndex < targetSkeleton.BoneCount;
              targetIndex++)

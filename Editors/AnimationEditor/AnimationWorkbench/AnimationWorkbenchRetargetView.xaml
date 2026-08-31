@@ -105,11 +105,15 @@
                             <TextBlock Grid.Column="2" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.Confidence}" />
                         </Grid>
                         <Border Grid.Row="3" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="MappingList">
-                                    <ItemsControl.ItemTemplate>
+                            <ListBox
+                                x:Name="MappingList"
+                                ScrollViewer.CanContentScroll="True"
+                                Style="{StaticResource AeList.View}"
+                                VirtualizingPanel.IsVirtualizing="True"
+                                VirtualizingPanel.VirtualizationMode="Recycling">
+                                    <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Padding="8,4" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="0,0,0,1">
+                                            <Border Padding="0,4" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="0,0,0,1">
                                                 <Grid MinHeight="36">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="1.1*" />
@@ -118,8 +122,8 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                                                         <TextBlock Style="{StaticResource AeText.Label}" Text="{Binding TargetBoneName}" />
-                                                        <Border Margin="8,0,0,0" Padding="4,1" Background="{DynamicResource AeBrush.WarningSoft}" CornerRadius="{StaticResource AeRadius.Control}" Visibility="{Binding IsCoreBone, Converter={StaticResource BooleanToVisibility}}">
-                                                            <TextBlock Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.CoreBone}" />
+                                                        <Border Margin="8,0,0,0" Padding="4,1" Background="{DynamicResource AeBrush.Surface2}" BorderBrush="{DynamicResource AeBrush.Warning}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Control}" Visibility="{Binding IsCoreBone, Converter={StaticResource BooleanToVisibility}}">
+                                                            <TextBlock Foreground="{DynamicResource AeBrush.Warning}" Style="{StaticResource AeText.Caption}" Text="{loc:Loc AnimationWorkbench.Retarget.CoreBone}" />
                                                         </Border>
                                                     </StackPanel>
                                                     <ComboBox
@@ -156,9 +160,8 @@
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                                    </ListBox.ItemTemplate>
+                            </ListBox>
                         </Border>
                     </Grid>
                 </Border>

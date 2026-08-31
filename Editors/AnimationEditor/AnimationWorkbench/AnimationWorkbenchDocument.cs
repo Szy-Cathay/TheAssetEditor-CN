@@ -109,6 +109,7 @@ public enum AnimationWorkbenchDiagnosticCode
     RetargetNonCoreBoneUnmapped,
     RetargetSourceMissing,
     RetargetMappingTargetDuplicate,
+    RetargetMappingSourceDuplicate,
     RetargetMappingIndexInvalid,
     RetargetCoreBoneUnmapped,
     RetargetParentConflict,
@@ -815,7 +816,7 @@ public sealed partial class AnimationWorkbenchDocument : IDisposable
                 name,
                 replacement,
                 skeleton,
-            format);
+                format);
 
         public SourceSnapshot WithAnimationAndSkeleton(
             AnimationClip replacement,

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Editors.AnimatioReTarget.Editor.BoneHandling;
+using Shared.Core.Services;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
 
@@ -30,7 +31,11 @@ public sealed class AnimationWorkbenchRetargetController :
         SourceBones = document.GetRetargetSourceBones(sourceSlot);
         SourceOptions = new[]
         {
-            new AnimationWorkbenchRetargetSourceOption(null, "—"),
+            new AnimationWorkbenchRetargetSourceOption(
+                null,
+                GetLocalizedText(
+                    "AnimationWorkbench.Retarget.NoSourceBone",
+                    "未映射")),
         }.Concat(SourceBones.Select(item =>
                 new AnimationWorkbenchRetargetSourceOption(
                     item.Index,
@@ -58,6 +63,11 @@ public sealed class AnimationWorkbenchRetargetController :
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public event EventHandler? Changed;
+
+    private static string GetLocalizedText(string key, string fallback) =>
+        LocalizationManager.Instance == null
+            ? fallback
+            : LocalizationManager.Instance.Get(key);
 
     public ObservableCollection<AnimationWorkbenchRetargetBoneMapping>
         Mappings { get; } = [];

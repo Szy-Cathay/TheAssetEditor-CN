@@ -115,6 +115,45 @@ public sealed class AnimationWorkbenchRetargetingTests
     }
 
     [TestMethod]
+    public void PreviewRetarget_DuplicateCoreSourceMapping_BlocksGeneration()
+    {
+        var sourceSkeleton = CreateSkeleton(
+            "source_skeleton",
+            ("root", -1),
+            ("spine_0", 0),
+            ("hand_left", 1));
+        var targetSkeleton = CreateSkeleton(
+            "target_skeleton",
+            ("root", -1),
+            ("spine_01", 0),
+            ("hand_l", 1));
+        using var document = CreateDocument(sourceSkeleton, targetSkeleton);
+        var automatic = document.CreateRetargetMapping(
+            AnimationWorkbenchSourceSlot.AnimationA);
+        var duplicated = automatic.Mappings
+            .Select(item => item.TargetBoneName == "hand_l"
+                ? item with
+                {
+                    SourceBoneIndex = 1,
+                    SourceBoneName = "spine_0",
+                    Confidence = AnimationWorkbenchRetargetConfidence.Manual,
+                }
+                : item)
+            .ToArray();
+
+        var result = document.PreviewRetarget(
+            new AnimationWorkbenchRetargetRequest(
+                AnimationWorkbenchSourceSlot.AnimationA,
+                duplicated));
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(result.Diagnostics.Any(item =>
+            item.Code == AnimationWorkbenchDiagnosticCode
+                .RetargetMappingSourceDuplicate &&
+            item.BoneName == "spine_0"));
+    }
+
+    [TestMethod]
     public void PreviewRetarget_ParentOrderConflicts_BlocksGeneration()
     {
         var sourceSkeleton = CreateSkeleton(
@@ -416,7 +455,7 @@ public sealed class AnimationWorkbenchRetargetingTests
     }
 
     [TestMethod]
-    public void PreviewRetarget_TargetChildPrecedesParent_GeneratesPreview()
+    public void PreviewRetarget_TargetChildPrecedesParent_UsesAnimatedParent()
     {
         var sourceSkeleton = CreateSkeleton(
             "source_skeleton",
@@ -426,7 +465,15 @@ public sealed class AnimationWorkbenchRetargetingTests
             "target_skeleton",
             ("hand_l", 1),
             ("root", -1));
-        using var document = CreateDocument(sourceSkeleton, targetSkeleton);
+        var sourceClip = CreateClip(sourceSkeleton);
+        var parentRotation = Quaternion.CreateFromAxisAngle(
+            Vector3.UnitZ,
+            MathHelper.PiOver2);
+        sourceClip.DynamicFrames[0].Rotation[1] = parentRotation;
+        using var document = CreateDocument(
+            sourceSkeleton,
+            targetSkeleton,
+            sourceClip);
         var mapping = document.CreateRetargetMapping(
             AnimationWorkbenchSourceSlot.AnimationA);
 
@@ -437,6 +484,15 @@ public sealed class AnimationWorkbenchRetargetingTests
 
         Assert.IsTrue(result.Succeeded);
         Assert.IsTrue(result.State.HasActiveRetargetPreview);
+        var frame = result.State.CurrentPreview!.Animation.DynamicFrames[0];
+        var childWorld = Matrix.CreateFromQuaternion(frame.Rotation[0]) *
+            Matrix.CreateTranslation(frame.Position[0]) *
+            Matrix.CreateFromQuaternion(frame.Rotation[1]) *
+            Matrix.CreateTranslation(frame.Position[1]);
+        childWorld.Decompose(out _, out var childWorldRotation, out _);
+        Assert.IsTrue(MathF.Abs(Quaternion.Dot(
+            Quaternion.Normalize(parentRotation),
+            Quaternion.Normalize(childWorldRotation))) > 0.9999f);
     }
 
     [TestMethod]

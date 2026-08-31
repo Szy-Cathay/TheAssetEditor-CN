@@ -36,6 +36,7 @@ public sealed class AnimationWorkbenchRetargetViewTests
             "AnimationWorkbench.Retarget.Subtitle",
             "AnimationWorkbench.Retarget.Search",
             "AnimationWorkbench.Retarget.UnmappedOnly",
+            "AnimationWorkbench.Retarget.NoSourceBone",
             "AnimationWorkbench.Retarget.TargetBone",
             "AnimationWorkbench.Retarget.SourceBone",
             "AnimationWorkbench.Retarget.Confidence",
@@ -77,14 +78,19 @@ public sealed class AnimationWorkbenchRetargetViewTests
             NUnitAssert.That(source, Does.Contain("AeInput.TextBox"));
             NUnitAssert.That(source, Does.Contain("AeInput.ComboBox"));
             NUnitAssert.That(source, Does.Contain("AeInput.CheckBox"));
+            NUnitAssert.That(source, Does.Contain("AeList.View"));
             NUnitAssert.That(source, Does.Contain("AeFocus.Keyboard"));
+            NUnitAssert.That(
+                source,
+                Does.Contain("VirtualizingPanel.IsVirtualizing=\"True\""));
+            NUnitAssert.That(source, Does.Not.Contain("AeBrush.WarningSoft"));
             NUnitAssert.That(source, Does.Contain("AutomationProperties.Name"));
             NUnitAssert.That(
                 Regex.IsMatch(source, "#[0-9a-fA-F]{3,8}"),
                 Is.False);
             NUnitAssert.That(
                 document.Descendants().Count(element =>
-                    element.Name.LocalName == nameof(ItemsControl)),
+                    element.Name.LocalName == nameof(ListBox)),
                 Is.EqualTo(1));
         });
     }
