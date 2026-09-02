@@ -26,10 +26,10 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddScoped<MountAnimationCreatorViewModel>();
             serviceCollection.AddScoped<MountVertexSelectionComponent>();
 
-            serviceCollection.AddScoped<AnimationWorkbenchViewModel>();
+            serviceCollection.AddScoped<TrustedAnimationPreviewViewModel>();
             serviceCollection.AddScoped<
-                IAnimationWorkbenchViewport,
-                AnimationWorkbenchViewport>();
+                ITrustedAnimationPreviewViewport,
+                TrustedAnimationPreviewViewport>();
             serviceCollection.AddTransient<
                 IOpenAnimationWorkbenchCommand,
                 OpenAnimationWorkbenchCommand>();
@@ -50,9 +50,10 @@ namespace Editors.AnimationVisualEditors
               .Build(database);
 
             EditorInfoBuilder
-                .Create<AnimationWorkbenchViewModel, AnimationWorkbenchView>(
+                .Create<
+                    TrustedAnimationPreviewViewModel,
+                    TrustedAnimationPreviewView>(
                     EditorEnums.AnimationKeyFrame_Editor)
-                .AddToToolbar("DisplayName.AnimationWorkbench", true)
                 .ForGames(GameTypeEnum.Warhammer3)
                 .Build(database);
         }

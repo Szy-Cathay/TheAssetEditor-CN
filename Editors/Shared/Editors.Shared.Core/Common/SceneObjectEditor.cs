@@ -156,9 +156,12 @@ namespace Editors.Shared.Core.Common
                     return;
                 assetViewModel.SkeletonName.Value = "";
                 assetViewModel.Skeleton = null;
+                assetViewModel.SkeletonSceneNode.Skeleton = null;
                 assetViewModel.AnimationClip = null;
                 assetViewModel.Player.SetAnimation(null, assetViewModel.Skeleton);
             }
+
+            WireAttachmentResolvers(assetViewModel);
 
             if(sendUpdateEvent)
                 _eventHub.Publish(new SceneObjectUpdateEvent(assetViewModel, false, true, true, false));

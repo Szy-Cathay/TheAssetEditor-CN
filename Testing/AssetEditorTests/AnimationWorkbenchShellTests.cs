@@ -11,15 +11,21 @@ using System.Xml.Linq;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
 using Editors.AnimationVisualEditors.ContextMenu;
+using Editors.Shared.Core.Common;
+using GameWorld.Core.Animation;
+using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
 using Moq;
 using NUnit.Framework;
+using Shared.ByteParsing;
+using Shared.Core.Events;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
 using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.Common.OperationProgress;
@@ -38,7 +44,7 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
-    public void RegisterTools_EnablesWarhammer3Workbench()
+    public void RegisterTools_EnablesWarhammer3TrustedPreview()
     {
         var database = new EditorDatabase(null!, null!);
 
@@ -50,13 +56,12 @@ public class AnimationWorkbenchShellTests
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(editor.ViewModel,
-                Is.EqualTo(typeof(AnimationWorkbenchViewModel)));
+                Is.EqualTo(typeof(TrustedAnimationPreviewViewModel)));
             NUnitAssert.That(editor.View,
-                Is.EqualTo(typeof(AnimationWorkbenchView)));
-            NUnitAssert.That(editor.AddToolbarButton, Is.True);
-            NUnitAssert.That(editor.IsToolbarButtonEnabled, Is.True);
-            NUnitAssert.That(editor.ToolbarName,
-                Is.EqualTo("DisplayName.AnimationWorkbench"));
+                Is.EqualTo(typeof(TrustedAnimationPreviewView)));
+            NUnitAssert.That(editor.AddToolbarButton, Is.False);
+            NUnitAssert.That(editor.IsToolbarButtonEnabled, Is.False);
+            NUnitAssert.That(editor.ToolbarName, Is.Empty);
             NUnitAssert.That(editor.SupportedGames,
                 Is.EqualTo(new[] { GameTypeEnum.Warhammer3 }));
             NUnitAssert.That(editor.Extensions, Is.Empty);
@@ -64,7 +69,7 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
-    public void OpenCommand_OnlyTargetsAnimFilesAndSelectsWorkbench()
+    public void OpenCommand_OnlyTargetsRigidModelsAndSelectsTrustedPreview()
     {
         var editorCreator = new Mock<IEditorCreator>();
         var workbench = new Mock<IEditorInterface>();
@@ -76,8 +81,21 @@ public class AnimationWorkbenchShellTests
                 (_, initialize) => initialize?.Invoke(workbench.Object))
             .Returns(workbench.Object);
         var command = new OpenAnimationWorkbenchCommand(
-            editorCreator.Object);
+            editorCreator.Object,
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3));
+        var threeKingdomsCommand = new OpenAnimationWorkbenchCommand(
+            editorCreator.Object,
+            new ApplicationSettingsService(GameTypeEnum.ThreeKingdoms));
         var owner = new PackFileContainer("test.pack");
+        var model = PackFile.CreateFromBytes(
+            "character.rigid_model_v2",
+            [1]);
+        var modelNode = new TreeNode(
+            model.Name,
+            NodeType.File,
+            owner,
+            null,
+            model);
         var animation = PackFile.CreateFromBytes("idle.anim", [1]);
         var animationNode = new TreeNode(
             animation.Name,
@@ -85,27 +103,231 @@ public class AnimationWorkbenchShellTests
             owner,
             null,
             animation);
-        var text = PackFile.CreateFromBytes("notes.txt", [1]);
-        var textNode = new TreeNode(
-            text.Name,
-            NodeType.File,
-            owner,
-            null,
-            text);
 
-        command.Execute(animationNode);
+        command.Execute(modelNode);
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(command.IsEnabled(animationNode), Is.True);
-            NUnitAssert.That(command.IsEnabled(textNode), Is.False);
-            NUnitAssert.That(command.GetDisplayName(animationNode),
-                Is.EqualTo("在动画工作台中打开"));
+            NUnitAssert.That(command.IsEnabled(modelNode), Is.True);
+            NUnitAssert.That(command.IsEnabled(animationNode), Is.False);
+            NUnitAssert.That(
+                threeKingdomsCommand.IsEnabled(modelNode),
+                Is.False);
+            NUnitAssert.That(command.GetDisplayName(modelNode),
+                Is.EqualTo("在可信动画预览中打开"));
         });
         editorCreator.Verify(creator => creator.Create(
             EditorEnums.AnimationKeyFrame_Editor,
             It.IsAny<Action<IEditorInterface>>()), Times.Once);
-        fileEditor.Verify(editor => editor.LoadFile(animation), Times.Once);
+        fileEditor.Verify(editor => editor.LoadFile(model), Times.Once);
+    }
+
+    [Test]
+    public void TrustedSession_ModelDeterminesConcreteSkeletonAndPageState()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile("humanoid01.anim", "humanoid01");
+        var modelOwner = new PackFileContainer("my_mod.pack");
+        var skeletonOwner = new PackFileContainer("data.pack")
+        {
+            IsCaPackFile = true,
+        };
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetFullPath(model, null))
+            .Returns("variantmeshes\\wh_variantmodels\\character.rigid_model_v2");
+        packFileService.Setup(service => service.GetPackFileContainer(model))
+            .Returns(modelOwner);
+        packFileService.Setup(service => service.FindFile(
+                "animations\\skeletons\\humanoid01.anim",
+                null))
+            .Returns(skeleton);
+        packFileService.Setup(service => service.GetFullPath(skeleton, null))
+            .Returns("animations\\skeletons\\humanoid01.anim");
+        packFileService.Setup(service => service.GetPackFileContainer(skeleton))
+            .Returns(skeletonOwner);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(candidate => candidate.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.IsReady, Is.True);
+            NUnitAssert.That(session.State.Model.Path, Is.EqualTo(
+                "variantmeshes\\wh_variantmodels\\character.rigid_model_v2"));
+            NUnitAssert.That(session.State.Model.Source, Is.EqualTo("my_mod.pack"));
+            NUnitAssert.That(session.State.Skeleton.Path, Is.EqualTo(
+                "animations\\skeletons\\humanoid01.anim"));
+            NUnitAssert.That(session.State.Skeleton.Source, Is.EqualTo("data.pack"));
+            NUnitAssert.That(session.State.Animation.IsResolved, Is.False);
+            NUnitAssert.That(session.State.MeshCount, Is.EqualTo(3));
+        });
+        viewport.Verify(candidate => candidate.Load(model, skeleton), Times.Once);
+    }
+
+    [Test]
+    public void TrustedSession_UnreadableSkeletonReportsDetailsOnSkeletonRow()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = PackFile.CreateFromBytes("humanoid01.anim", [1]);
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.IsReady, Is.False);
+            NUnitAssert.That(session.State.Model.Diagnostic, Is.Empty);
+            NUnitAssert.That(session.State.Skeleton.Diagnostic,
+                Does.Contain("技术详情"));
+        });
+        viewport.Verify(candidate => candidate.Load(
+            It.IsAny<PackFile>(),
+            It.IsAny<PackFile>()), Times.Never);
+    }
+
+    [Test]
+    public void TrustedSession_MismatchedSkeletonIdentityBlocksViewport()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "different_skeleton");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.IsReady, Is.False);
+            NUnitAssert.That(session.State.Model.Diagnostic, Is.Empty);
+            NUnitAssert.That(session.State.Skeleton.Diagnostic,
+                Does.Contain("different_skeleton"));
+        });
+        viewport.Verify(candidate => candidate.Load(
+            It.IsAny<PackFile>(),
+            It.IsAny<PackFile>()), Times.Never);
+    }
+
+    [Test]
+    public void TrustedSession_ViewportSkeletonFailureStaysOnSkeletonRow()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile("humanoid01.anim", "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(candidate => candidate.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Failure(
+                TrustedAnimationPreviewResourceKind.Skeleton,
+                "骨架详细错误"));
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.Model.Diagnostic, Is.Empty);
+            NUnitAssert.That(session.State.Skeleton.Diagnostic,
+                Is.EqualTo("骨架详细错误"));
+        });
+    }
+
+    [Test]
+    public void SceneObjectEditor_ClearSkeletonAlsoClearsSkeletonNode()
+    {
+        var player = new AnimationPlayer();
+        var skeleton = new GameSkeleton(CreateAnimationFile(), player);
+        var sceneObject = new SceneObject("trusted-preview")
+        {
+            ParentNode = new GroupNode("preview"),
+            Player = player,
+            Skeleton = skeleton,
+            SkeletonSceneNode = new SkeletonNode(skeleton),
+        };
+        var editor = new SceneObjectEditor(
+            null!,
+            null!,
+            Mock.Of<IPackFileService>(),
+            null!,
+            null!,
+            Mock.Of<IEventHub>());
+
+        editor.SetSkeleton(sceneObject, null!);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(sceneObject.Skeleton, Is.Null);
+            NUnitAssert.That(sceneObject.SkeletonSceneNode.Skeleton, Is.Null);
+        });
+    }
+
+    [Test]
+    public void TrustedSession_MissingSkeletonBlocksViewportWithRowDiagnostic()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "missing_skeleton");
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetFullPath(model, null))
+            .Returns("models\\character.rigid_model_v2");
+        packFileService.Setup(service => service.GetPackFileContainer(model))
+            .Returns(new PackFileContainer("my_mod.pack"));
+        packFileService.Setup(service => service.FindFile(
+                "animations\\skeletons\\missing_skeleton.anim",
+                null))
+            .Returns((PackFile?)null);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.IsReady, Is.False);
+            NUnitAssert.That(session.State.Model.IsResolved, Is.True);
+            NUnitAssert.That(session.State.Skeleton.Path, Is.EqualTo(
+                "animations\\skeletons\\missing_skeleton.anim"));
+            NUnitAssert.That(session.State.Skeleton.IsResolved, Is.False);
+            NUnitAssert.That(session.State.Skeleton.Diagnostic,
+                Is.Not.Empty);
+        });
+        viewport.Verify(candidate => candidate.Clear(), Times.Once);
+        viewport.Verify(candidate => candidate.Load(
+            It.IsAny<PackFile>(),
+            It.IsAny<PackFile>()), Times.Never);
     }
 
     [Test]
@@ -522,8 +744,7 @@ public class AnimationWorkbenchShellTests
             NUnitAssert.That(source,
                 Does.Contain("AeHorizontalGridSplitterStyle"));
             NUnitAssert.That(
-                workbenchViews.Sum(view =>
-                    Regex.Matches(view, "AeSurface\\.Panel").Count),
+                Regex.Matches(source, "AeSurface\\.Panel").Count,
                 Is.EqualTo(1));
             NUnitAssert.That(
                 workbenchViews.All(view =>
@@ -567,6 +788,125 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
+    public void TrustedPreviewXaml_IsFlatModelFirstWorkspace()
+    {
+        var xamlPath = Path.Combine(
+            FindSolutionRoot(),
+            "Editors",
+            "AnimationEditor",
+            "AnimationWorkbench",
+            "TrustedAnimationPreviewView.xaml");
+        var source = File.ReadAllText(xamlPath);
+        var document = XDocument.Load(xamlPath);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(
+                Regex.Matches(source, "AeSurface\\.Panel").Count,
+                Is.EqualTo(1));
+            NUnitAssert.That(source, Does.Contain(
+                "AnimationWorkbench.TrustedPreview.Model"));
+            NUnitAssert.That(source, Does.Contain(
+                "AnimationWorkbench.TrustedPreview.Skeleton"));
+            NUnitAssert.That(source, Does.Contain(
+                "AnimationWorkbench.TrustedPreview.Animation"));
+            NUnitAssert.That(source, Does.Contain(
+                "Content=\"{Binding GameWorld}\""));
+            NUnitAssert.That(
+                Regex.Matches(source, "AeButton\\.VisibilityToggle").Count,
+                Is.EqualTo(2));
+            NUnitAssert.That(source, Does.Contain(
+                "AeEditor.PlaybackSlider"));
+            NUnitAssert.That(source, Does.Contain("AeSurface.Overlay"));
+            NUnitAssert.That(source, Does.Not.Contain("▶"));
+            NUnitAssert.That(source, Does.Not.Contain("TabControl"));
+            NUnitAssert.That(source, Does.Not.Contain("GridSplitter"));
+            NUnitAssert.That(source, Does.Not.Contain(
+                "AnimationWorkbenchBlendView"));
+            NUnitAssert.That(source, Does.Not.Contain(
+                "AnimationWorkbenchBaseAnimationView"));
+            NUnitAssert.That(source, Does.Not.Contain(
+                "SaveAsNewResource"));
+            NUnitAssert.That(document.Descendants().Count(element =>
+                element.Name.LocalName == nameof(Expander)),
+                Is.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public void TrustedPreview_RendersAcrossRequiredThemes()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var previousTheme = ThemesController.CurrentTheme;
+                try
+                {
+                    foreach (var theme in new[]
+                             {
+                                 ThemeType.DarkTheme,
+                                 ThemeType.LightTheme,
+                                 ThemeType.HighContrastDark,
+                                 ThemeType.HighContrastLight,
+                             })
+                    {
+                        ThemesController.SetTheme(theme);
+                        var view = new TrustedAnimationPreviewView
+                        {
+                            DataContext = new TrustedPreviewShellState(),
+                        };
+                        var window = new Window
+                        {
+                            Width = 1280,
+                            Height = 820,
+                            Content = view,
+                            ShowActivated = false,
+                            ShowInTaskbar = false,
+                            WindowStyle = WindowStyle.None,
+                        };
+                        try
+                        {
+                            window.Show();
+                            window.UpdateLayout();
+                            window.Dispatcher.Invoke(
+                                () => { },
+                                DispatcherPriority.ApplicationIdle);
+                            window.UpdateLayout();
+
+                            var bitmap = new RenderTargetBitmap(
+                                (int)window.ActualWidth,
+                                (int)window.ActualHeight,
+                                96,
+                                96,
+                                PixelFormats.Pbgra32);
+                            bitmap.Render(window);
+                            NUnitAssert.That(
+                                bitmap.PixelWidth,
+                                Is.GreaterThan(0),
+                                theme.ToString());
+                            NUnitAssert.That(
+                                bitmap.PixelHeight,
+                                Is.GreaterThan(0),
+                                theme.ToString());
+                            SaveWindowForVisualReview(
+                                window,
+                                $"trusted-{theme}");
+                        }
+                        finally
+                        {
+                            window.Close();
+                        }
+                    }
+                }
+                finally
+                {
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
     public void ShellLocalization_ExplainsWarhammer3PreviewBoundary()
     {
         var languagePath = Path.Combine(
@@ -578,6 +918,26 @@ public class AnimationWorkbenchShellTests
         {
             "DisplayName.AnimationWorkbench",
             "ContextMenu.OpenAnimationWorkbench",
+            "AnimationWorkbench.TrustedPreview.Model",
+            "AnimationWorkbench.TrustedPreview.Skeleton",
+            "AnimationWorkbench.TrustedPreview.Animation",
+            "AnimationWorkbench.TrustedPreview.NotSelected",
+            "AnimationWorkbench.TrustedPreview.Diagnostic",
+            "AnimationWorkbench.TrustedPreview.ShowModel",
+            "AnimationWorkbench.TrustedPreview.ShowSkeleton",
+            "AnimationWorkbench.TrustedPreview.Viewport",
+            "AnimationWorkbench.TrustedPreview.FocusModel",
+            "AnimationWorkbench.TrustedPreview.FrontView",
+            "AnimationWorkbench.TrustedPreview.ResetCamera",
+            "AnimationWorkbench.TrustedPreview.NoAnimation",
+            "AnimationWorkbench.TrustedPreview.ReadOnlyTimeline",
+            "AnimationWorkbench.TrustedPreview.SourceUnknown",
+            "AnimationWorkbench.TrustedPreview.ModelTypeInvalid",
+            "AnimationWorkbench.TrustedPreview.ModelUnreadableDetails",
+            "AnimationWorkbench.TrustedPreview.SkeletonUndeclared",
+            "AnimationWorkbench.TrustedPreview.SkeletonMissing",
+            "AnimationWorkbench.TrustedPreview.ViewportLoadFailed",
+            "AnimationWorkbench.TrustedPreview.ViewportLoadFailedDetails",
             "AnimationWorkbench.Shell.Warhammer3Only",
             "AnimationWorkbench.Shell.ThreeKingdomsUnavailable",
             "AnimationWorkbench.Shell.SourceSkeletonMissing",
@@ -1093,6 +1453,32 @@ public class AnimationWorkbenchShellTests
         public IReadOnlyList<string> Diagnostics { get; } = [];
     }
 
+    private sealed class TrustedPreviewShellState
+    {
+        public TrustedAnimationPreviewResourceState Model { get; } = new(
+            @"variantmeshes\wh_variantmodels\character.rigid_model_v2",
+            "my_mod.pack",
+            true,
+            string.Empty);
+        public TrustedAnimationPreviewResourceState Skeleton { get; } = new(
+            @"animations\skeletons\humanoid01.anim",
+            "data.pack",
+            true,
+            string.Empty);
+        public TrustedAnimationPreviewResourceState Animation { get; } =
+            TrustedAnimationPreviewResourceState.Empty;
+        public bool ShowModel { get; set; } = true;
+        public bool ShowSkeleton { get; set; } = true;
+        public bool IsReady => true;
+        public bool HasModelDiagnostic => false;
+        public bool HasSkeletonDiagnostic => false;
+        public bool HasAnimationDiagnostic => false;
+        public object? GameWorld => null;
+        public ICommand? FocusModelCommand => null;
+        public ICommand? ShowFrontCommand => null;
+        public ICommand? ResetCameraCommand => null;
+    }
+
     private sealed class BaseAnimationRowState
     {
         public bool IsSelected { get; init; }
@@ -1121,14 +1507,59 @@ public class AnimationWorkbenchShellTests
             "Unable to locate the solution root.");
     }
 
-    private static AnimationFile CreateAnimationFile()
+    private static PackFile CreateRigidModelHeaderFile(
+        string fileName,
+        string skeletonName)
+    {
+        var header = new RmvFileHeader
+        {
+            _fileType = "RMV2"u8.ToArray(),
+            Version = RmvVersionEnum.RMV2_V8,
+            LodCount = 0,
+            SkeletonName = skeletonName,
+        };
+        return PackFile.CreateFromBytes(
+            fileName,
+            ByteHelper.GetBytes(header));
+    }
+
+    private static Mock<IPackFileService> CreateTrustedPreviewPackService(
+        PackFile model,
+        PackFile skeleton,
+        string skeletonName)
+    {
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetFullPath(model, null))
+            .Returns("models\\character.rigid_model_v2");
+        packFileService.Setup(service => service.GetPackFileContainer(model))
+            .Returns(new PackFileContainer("my_mod.pack"));
+        packFileService.Setup(service => service.FindFile(
+                $"animations\\skeletons\\{skeletonName}.anim",
+                null))
+            .Returns(skeleton);
+        packFileService.Setup(service => service.GetFullPath(skeleton, null))
+            .Returns($"animations\\skeletons\\{skeletonName}.anim");
+        packFileService.Setup(service => service.GetPackFileContainer(skeleton))
+            .Returns(new PackFileContainer("data.pack"));
+        return packFileService;
+    }
+
+    private static PackFile CreateSkeletonPackFile(
+        string fileName,
+        string skeletonName) =>
+        PackFile.CreateFromBytes(
+            fileName,
+            AnimationFile.ConvertToBytes(CreateAnimationFile(skeletonName)));
+
+    private static AnimationFile CreateAnimationFile(
+        string skeletonName = "test_skeleton")
     {
         var file = new AnimationFile
         {
             Header = new AnimationFile.AnimationHeader
             {
                 Version = 7,
-                SkeletonName = "test_skeleton",
+                SkeletonName = skeletonName,
                 AnimationTotalPlayTimeInSec = 0.05f,
             },
             Bones =
