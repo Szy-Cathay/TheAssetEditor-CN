@@ -25,6 +25,7 @@ namespace Shared.GameFormats.WsModel
     {
         public bool Alpha { get; set; } = false;
         public Dictionary<TextureType, string> Textures { get; set; } = [];
+        public List<string> ReferencedTexturePaths { get; set; } = [];
         public UiVertexFormat VertexType { get; set; } = UiVertexFormat.Unknown;
         public string Name { get; set; } = string.Empty;
 
@@ -131,6 +132,9 @@ namespace Shared.GameFormats.WsModel
                     texturePath = node.InnerText;
                 else
                     texturePath = pathNode.InnerText;
+
+                if (!string.IsNullOrWhiteSpace(texturePath))
+                    ReferencedTexturePaths.Add(texturePath);
 
                 var textureSlotName = slotNode.InnerText;
 

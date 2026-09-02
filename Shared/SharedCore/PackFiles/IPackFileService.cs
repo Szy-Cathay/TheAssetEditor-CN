@@ -55,6 +55,11 @@ namespace Shared.Core.PackFiles
         void DeleteFolder(PackFileContainer pf, string folder);
         PackFile? FindFile(string path, PackFileContainer? container = null);
         List<PackFileContainer> GetAllPackfileContainers();
+        IReadOnlyList<KeyValuePair<string, PackFile>>
+            GetFileEntriesSnapshot(PackFileContainer container) =>
+            container is FolderProjectContainer folderProject
+                ? folderProject.GetFileEntriesSnapshot()
+                : container.FileList.ToArray();
         PackFileContainer? GetEditablePack();
         string GetFullPath(PackFile file, PackFileContainer? container = null);
         PackFileContainer? GetPackFileContainer(PackFile file);

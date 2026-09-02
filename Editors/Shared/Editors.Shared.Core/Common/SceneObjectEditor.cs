@@ -61,11 +61,19 @@ namespace Editors.Shared.Core.Common
             return _mainScene.AddComponent(instance);
         }
 
-        public void SetMesh(SceneObject sceneObject, PackFile file, bool updateSkeleton = true)
+        public void SetMesh(
+            SceneObject sceneObject,
+            PackFile file,
+            bool updateSkeleton = true,
+            bool onlyLoadFirstMesh = true)
         {
             _logger.Here().Information($"Loading reference model - {_packFileService.GetFullPath(file)}");
 
-            var loadedNode = _complexMeshLoader.Load(file, sceneObject.Player, true, true);
+            var loadedNode = _complexMeshLoader.Load(
+                file,
+                sceneObject.Player,
+                true,
+                onlyLoadFirstMesh);
             if (loadedNode == null)
             {
                 _logger.Here().Error("Unable to load model");
@@ -156,9 +164,12 @@ namespace Editors.Shared.Core.Common
                     return;
                 assetViewModel.SkeletonName.Value = "";
                 assetViewModel.Skeleton = null;
+                assetViewModel.SkeletonSceneNode.Skeleton = null;
                 assetViewModel.AnimationClip = null;
                 assetViewModel.Player.SetAnimation(null, assetViewModel.Skeleton);
             }
+
+            WireAttachmentResolvers(assetViewModel);
 
             if(sendUpdateEvent)
                 _eventHub.Publish(new SceneObjectUpdateEvent(assetViewModel, false, true, true, false));

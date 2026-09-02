@@ -56,7 +56,7 @@ namespace GameWorld.Core.Services
                         break;
 
                     case ".wsmodel":
-                        LoadWsModel(file, ref parent, player, attachmentPointName, onlyLoadRootNode);
+                        LoadWsModel(file, ref parent, player, attachmentPointName, onlyLoadRootNode, onlyLoadFirstMesh);
                         break;
                     default:
                         throw new Exception("Unknown mesh extention");
@@ -181,7 +181,7 @@ namespace GameWorld.Core.Services
             return modelNode;
         }
 
-        void LoadWsModel(PackFile file, ref SceneNode parent, AnimationPlayer player, string attachmentPointName, bool onlyLoadRootNode)
+        void LoadWsModel(PackFile file, ref SceneNode parent, AnimationPlayer player, string attachmentPointName, bool onlyLoadRootNode, bool onlyLoadFirstMesh)
         {
             var wsModelNode = new WsModelGroup("WsModel - " + file.Name);
             if (parent == null)
@@ -189,12 +189,39 @@ namespace GameWorld.Core.Services
             else
                 parent.AddObject(wsModelNode);
 
-            var wsMaterial = new WsModelFile(file);
-            if (string.IsNullOrWhiteSpace(wsMaterial.GeometryPath) == false)
+            var wsModel = new WsModelFile(file);
+            var geometryPaths = wsModel.GeometryPaths.Count != 0
+                ? wsModel.GeometryPaths
+                : [wsModel.GeometryPath];
+            foreach (var geometryPath in geometryPaths.Where(path =>
+                         !string.IsNullOrWhiteSpace(path)))
             {
-                var modelFile = _packFileService.FindFile(wsMaterial.GeometryPath);
+                var modelFile = _packFileService.FindFile(geometryPath) ??
+                    throw new FileNotFoundException(
+                        $"Referenced model not found: {geometryPath}");
                 var modelAsBase = wsModelNode as SceneNode;
-                var loadedModelNode = LoadRigidMesh(modelFile, ref modelAsBase, player, attachmentPointName, onlyLoadRootNode, wsMaterial);
+                if (modelFile.Extension.Equals(
+                        ".rigid_model_v2",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    LoadRigidMesh(
+                        modelFile,
+                        ref modelAsBase,
+                        player,
+                        attachmentPointName,
+                        onlyLoadRootNode,
+                        wsModel);
+                }
+                else
+                {
+                    Load(
+                        modelFile,
+                        wsModelNode,
+                        player,
+                        attachmentPointName,
+                        onlyLoadRootNode,
+                        onlyLoadFirstMesh);
+                }
             }
         }
     }

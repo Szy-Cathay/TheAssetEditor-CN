@@ -169,6 +169,8 @@ namespace AssetEditorTests
                     "{StaticResource AeVerticalGridSplitterStyle}",
                     "{StaticResource AeHorizontalGridSplitterStyle}",
                 ],
+                ["Editors/AnimationEditor/AnimationWorkbench/TrustedAnimationPreviewView.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/BoneSettingsView.xaml"] =
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/CscEditor/Editors.CscEditor/Views/CscEditorView.xaml"] =
