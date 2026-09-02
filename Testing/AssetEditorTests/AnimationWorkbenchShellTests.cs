@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -13,9 +14,11 @@ using System.Windows.Threading;
 using System.Windows.Data;
 using System.Xml.Linq;
 using CommunityToolkit.Mvvm.Input;
+using AnimationEditor.Common.AnimationPlayer;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
 using Editors.AnimationVisualEditors.ContextMenu;
 using Editors.Shared.Core.Common;
+using Editors.Shared.Core.Common.AnimationPlayer;
 using GameWorld.Core.Animation;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
@@ -1296,7 +1299,62 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
-    public void TrustedPreviewXaml_IsFlatModelFirstWorkspace()
+    public async Task TrustedPreview_SelectionCommandsUseStandardPackBrowser()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(item => item.DisplayBrowseDialog(
+                It.Is<List<string>>(extensions =>
+                    extensions.Contains(".rigid_model_v2"))))
+            .Returns(new BrowseDialogResultFile(true, model));
+        dialogs.Setup(item => item.DisplayBrowseDialog(
+                It.Is<List<string>>(extensions =>
+                    extensions.SequenceEqual(new[] { ".anim" }))))
+            .Returns(new BrowseDialogResultFile(false, null!));
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        var viewModel = new TrustedAnimationPreviewViewModel(
+            viewport.Object,
+            packFileService.Object,
+            Mock.Of<ITrustedAnimationModelDiscovery>(),
+            Mock.Of<ITrustedAnimationDiscovery>(),
+            Mock.Of<ITrustedWsModelResolver>(),
+            dialogs.Object);
+
+        await viewModel.OpenModelPickerCommand.ExecuteAsync(null);
+        await viewModel.OpenAnimationPickerCommand.ExecuteAsync(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            dialogs.Verify(item => item.DisplayBrowseDialog(
+                It.Is<List<string>>(extensions =>
+                    extensions.SequenceEqual(new[]
+                    {
+                        ".variantmeshdefinition",
+                        ".wsmodel",
+                        ".rigid_model_v2",
+                    }))), Times.Once);
+            dialogs.Verify(item => item.DisplayBrowseDialog(
+                It.Is<List<string>>(extensions =>
+                    extensions.SequenceEqual(new[] { ".anim" }))),
+                Times.Once);
+            NUnitAssert.That(viewModel.IsReady, Is.True);
+        });
+        viewModel.Close();
+    }
+
+    [Test]
+    public void TrustedPreviewXaml_UsesStandardEditorLayoutAndControls()
     {
         var xamlPath = Path.Combine(
             FindSolutionRoot(),
@@ -1324,17 +1382,23 @@ public class AnimationWorkbenchShellTests
                 Regex.Matches(source, "AeButton\\.VisibilityToggle").Count,
                 Is.EqualTo(2));
             NUnitAssert.That(source, Does.Contain(
+                "<player:AnimationPlayerView"));
+            NUnitAssert.That(source, Does.Contain(
+                "x:Name=\"ResourceInspector\""));
+            NUnitAssert.That(source, Does.Contain(
+                "OpenModelPickerCommand"));
+            NUnitAssert.That(source, Does.Contain(
+                "OpenAnimationPickerCommand"));
+            NUnitAssert.That(source, Does.Not.Contain(
                 "AeEditor.PlaybackSlider"));
-            NUnitAssert.That(source, Does.Contain(
-                "PreviousFrameCommand"));
-            NUnitAssert.That(source, Does.Contain(
-                "NextFrameCommand"));
-            NUnitAssert.That(source, Does.Contain(
-                "AnimationWorkbench.TrustedPreview.Loop"));
-            NUnitAssert.That(source, Does.Contain("AeSurface.Overlay"));
+            NUnitAssert.That(source, Does.Not.Contain(
+                "AeSurface.Overlay"));
+            NUnitAssert.That(source, Does.Not.Contain(
+                "ModelCandidatesView"));
+            NUnitAssert.That(source, Does.Not.Contain(
+                "AnimationCandidatesView"));
             NUnitAssert.That(source, Does.Not.Contain("▶"));
             NUnitAssert.That(source, Does.Not.Contain("TabControl"));
-            NUnitAssert.That(source, Does.Not.Contain("GridSplitter"));
             NUnitAssert.That(source, Does.Not.Contain(
                 "AnimationWorkbenchBlendView"));
             NUnitAssert.That(source, Does.Not.Contain(
@@ -1344,6 +1408,15 @@ public class AnimationWorkbenchShellTests
             NUnitAssert.That(document.Descendants().Count(element =>
                 element.Name.LocalName == nameof(Expander)),
                 Is.EqualTo(3));
+            NUnitAssert.That(document.Descendants().Count(element =>
+                element.Name.LocalName == nameof(GridSplitter)),
+                Is.EqualTo(1));
+            NUnitAssert.That(document.Descendants().Count(element =>
+                element.Name.LocalName == nameof(ListBox)),
+                Is.EqualTo(0));
+            NUnitAssert.That(document.Descendants().Count(element =>
+                element.Name.LocalName == nameof(ProgressBar)),
+                Is.EqualTo(0));
         });
     }
 
@@ -1421,7 +1494,145 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
-    public void TrustedPreview_AnimationPickerRendersFlatMetadataRows()
+    public void TrustedPreview_RendersAtReleaseResolutionsAndScales()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var previousTheme = ThemesController.CurrentTheme;
+                try
+                {
+                    ThemesController.SetTheme(ThemeType.DarkTheme);
+                    var cases = new[]
+                    {
+                        (1366, 768, 1.0),
+                        (1366, 768, 1.5),
+                        (1920, 1080, 1.0),
+                        (1920, 1080, 1.5),
+                        (2560, 1440, 1.0),
+                        (2560, 1440, 1.5),
+                    };
+                    foreach (var (pixelWidth, pixelHeight, scale) in cases)
+                    {
+                        var view = new TrustedAnimationPreviewView
+                        {
+                            DataContext = new TrustedPreviewShellState(
+                                showPickers: false),
+                        };
+                        var window = new Window
+                        {
+                            Width = pixelWidth / scale,
+                            Height = pixelHeight / scale,
+                            Content = view,
+                            ShowActivated = false,
+                            ShowInTaskbar = false,
+                            WindowStyle = WindowStyle.None,
+                        };
+                        try
+                        {
+                            window.Show();
+                            window.UpdateLayout();
+                            window.Dispatcher.Invoke(
+                                () => { },
+                                DispatcherPriority.ApplicationIdle);
+                            window.UpdateLayout();
+
+                            var viewport = FindDescendants<ContentControl>(view)
+                                .Single(control =>
+                                    AutomationProperties.GetName(control) ==
+                                    LocalizationManager.Instance.Get(
+                                        "AnimationWorkbench.TrustedPreview.Viewport"));
+                            var timeline = FindDescendants<Slider>(view)
+                                .Single();
+                            var resourceFields = FindDescendants<TextBox>(view)
+                                .Where(field => field.IsReadOnly &&
+                                                field.IsVisible &&
+                                                field.ActualHeight > 0)
+                                .ToArray();
+                            var toggles = FindDescendants<ToggleButton>(view)
+                                .Where(toggle => toggle.IsVisible &&
+                                    (AutomationProperties.GetName(toggle) ==
+                                     LocalizationManager.Instance.Get(
+                                         "AnimationWorkbench.TrustedPreview.ShowModel") ||
+                                     AutomationProperties.GetName(toggle) ==
+                                     LocalizationManager.Instance.Get(
+                                         "AnimationWorkbench.TrustedPreview.ShowSkeleton")))
+                                .ToArray();
+                            var resourceInspectorScrollViewer =
+                                (ScrollViewer)view.FindName(
+                                    "ResourceInspectorScrollViewer");
+                            var bitmap = new RenderTargetBitmap(
+                                pixelWidth,
+                                pixelHeight,
+                                96 * scale,
+                                96 * scale,
+                                PixelFormats.Pbgra32);
+                            bitmap.Render(window);
+
+                            NUnitAssert.Multiple(() =>
+                            {
+                                var caseName =
+                                    $"{pixelWidth}x{pixelHeight} @{scale:P0}";
+                                NUnitAssert.That(resourceFields.Length,
+                                    Is.GreaterThanOrEqualTo(3),
+                                    caseName);
+                                NUnitAssert.That(toggles.Length,
+                                    Is.EqualTo(2),
+                                    caseName);
+                                NUnitAssert.That(
+                                    IsFullyVisible(view, viewport),
+                                    Is.True,
+                                    $"viewport {caseName}");
+                                NUnitAssert.That(
+                                    IsFullyVisible(view, timeline),
+                                    Is.True,
+                                    $"timeline {caseName}");
+                                NUnitAssert.That(viewport.ActualHeight,
+                                    Is.GreaterThan(200),
+                                    caseName);
+                                NUnitAssert.That(timeline.ActualWidth,
+                                    Is.GreaterThan(200),
+                                    caseName);
+                                NUnitAssert.That(
+                                    resourceInspectorScrollViewer.ScrollableWidth,
+                                    Is.LessThanOrEqualTo(0.5),
+                                    $"horizontal scroll {caseName}");
+                                NUnitAssert.That(
+                                    resourceInspectorScrollViewer
+                                        .ComputedHorizontalScrollBarVisibility,
+                                    Is.Not.EqualTo(Visibility.Visible),
+                                    $"horizontal scroll {caseName}");
+                                NUnitAssert.That(bitmap.PixelWidth,
+                                    Is.EqualTo(pixelWidth));
+                                NUnitAssert.That(bitmap.PixelHeight,
+                                    Is.EqualTo(pixelHeight));
+                            });
+                        }
+                        finally
+                        {
+                            window.Close();
+                        }
+                    }
+                }
+                finally
+                {
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
+    public void TrustedPreview_DoesNotExposeSaveableEditorState()
+    {
+        NUnitAssert.That(
+            typeof(ISaveableEditor).IsAssignableFrom(
+                typeof(TrustedAnimationPreviewViewModel)),
+            Is.False);
+    }
+
+    [Test]
+    public void TrustedPreview_RendersResourceInspectorOnTheRight()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -1433,7 +1644,7 @@ public class AnimationWorkbenchShellTests
                     ThemesController.SetTheme(ThemeType.DarkTheme);
                     var view = new TrustedAnimationPreviewView
                     {
-                        DataContext = new TrustedPreviewShellState(true),
+                        DataContext = new TrustedPreviewShellState(),
                     };
                     var window = new Window
                     {
@@ -1452,24 +1663,41 @@ public class AnimationWorkbenchShellTests
                             () => { },
                             DispatcherPriority.ApplicationIdle);
                         window.UpdateLayout();
-                        var animationList = FindDescendants<ListBox>(view)
-                            .Single(list => AutomationProperties.GetName(list) ==
+                        var inspector = (FrameworkElement)view.FindName(
+                            "ResourceInspector");
+                        var viewport = FindDescendants<ContentControl>(view)
+                            .Single(control =>
+                                AutomationProperties.GetName(control) ==
                                 LocalizationManager.Instance.Get(
-                                    "AnimationWorkbench.AnimationPicker.Results"));
+                                    "AnimationWorkbench.TrustedPreview.Viewport"));
+                        var player = FindDescendants<AnimationPlayerView>(view)
+                            .Single();
+                        var inspectorOrigin = inspector.TranslatePoint(
+                            new Point(),
+                            view);
+                        var viewportOrigin = viewport.TranslatePoint(
+                            new Point(),
+                            view);
                         NUnitAssert.Multiple(() =>
                         {
-                            NUnitAssert.That(animationList.Items.Count,
-                                Is.EqualTo(2));
+                            NUnitAssert.That(inspectorOrigin.X,
+                                Is.GreaterThanOrEqualTo(
+                                    viewportOrigin.X +
+                                    viewport.ActualWidth));
+                            NUnitAssert.That(inspector.ActualWidth,
+                                Is.GreaterThanOrEqualTo(280));
+                            NUnitAssert.That(player.IsVisible, Is.True);
+                            NUnitAssert.That(player.ActualWidth,
+                                Is.GreaterThan(400));
                             NUnitAssert.That(
-                                ScrollViewer.GetHorizontalScrollBarVisibility(
-                                    animationList),
-                                Is.EqualTo(ScrollBarVisibility.Disabled));
+                                FindDescendants<ListBox>(view),
+                                Is.Empty);
                             NUnitAssert.That(window.ActualWidth,
                                 Is.EqualTo(1280).Within(1));
                         });
                         SaveWindowForVisualReview(
                             window,
-                            "trusted-animation-picker");
+                            "trusted-standard-layout");
                     }
                     finally
                     {
@@ -1973,6 +2201,25 @@ public class AnimationWorkbenchShellTests
         }
     }
 
+    private static bool IsFullyVisible(
+        FrameworkElement ancestor,
+        FrameworkElement element)
+    {
+        if (!element.IsVisible ||
+            element.ActualWidth <= 0 ||
+            element.ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        var bounds = element.TransformToAncestor(ancestor).TransformBounds(
+            new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+        return bounds.Left >= -0.5 &&
+               bounds.Top >= -0.5 &&
+               bounds.Right <= ancestor.ActualWidth + 0.5 &&
+               bounds.Bottom <= ancestor.ActualHeight + 0.5;
+    }
+
     private sealed class BaseAnimationViewState
     {
         public IReadOnlyList<BaseAnimationRowState> Items { get; init; } = [];
@@ -2050,7 +2297,8 @@ public class AnimationWorkbenchShellTests
     private sealed class TrustedPreviewShellState
     {
         public TrustedPreviewShellState(
-            bool showAnimationPicker = false)
+            bool showAnimationPicker = false,
+            bool showPickers = true)
         {
             var candidates = new ObservableCollection<
                 TrustedAnimationModelCandidate>
@@ -2113,8 +2361,9 @@ public class AnimationWorkbenchShellTests
             };
             AnimationCandidatesView = CollectionViewSource.GetDefaultView(
                 animations);
-            IsModelPickerOpen = !showAnimationPicker;
-            IsAnimationPickerOpen = showAnimationPicker;
+            IsModelPickerOpen = showPickers && !showAnimationPicker;
+            IsAnimationPickerOpen = showPickers && showAnimationPicker;
+            Player.IsEnabled.Value = true;
         }
 
         public TrustedAnimationPreviewResourceState Model { get; } = new(
@@ -2159,6 +2408,7 @@ public class AnimationWorkbenchShellTests
             set;
         }
         public object? GameWorld => null;
+        public AnimationPlayerViewModel Player { get; } = new();
         public bool HasAnimation => true;
         public bool IsPlaying => false;
         public double PlaybackMaximum => 4;

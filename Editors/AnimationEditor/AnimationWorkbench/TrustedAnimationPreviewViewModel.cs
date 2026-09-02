@@ -1,8 +1,10 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Editors.Shared.Core.Common.AnimationPlayer;
 using GameWorld.Core.Services;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -23,6 +25,8 @@ public partial class TrustedAnimationPreviewViewModel :
     private readonly ITrustedAnimationModelDiscovery _modelDiscovery;
     private readonly ITrustedAnimationDiscovery _animationDiscovery;
     private readonly ITrustedWsModelResolver _wsModelResolver;
+    private readonly IPackFileService _packFileService;
+    private readonly IStandardDialogs? _dialogs;
     private CancellationTokenSource? _modelScanCancellation;
     private CancellationTokenSource? _animationCancellation;
     private int _modelScanGeneration;
@@ -36,7 +40,7 @@ public partial class TrustedAnimationPreviewViewModel :
     private bool _showSkeleton = true;
 
     [ObservableProperty]
-    private bool _isModelPickerOpen = true;
+    private bool _isModelPickerOpen;
 
     [ObservableProperty]
     private bool _isModelScanRunning;
@@ -103,9 +107,12 @@ public partial class TrustedAnimationPreviewViewModel :
         IPackFileService packFileService,
         ITrustedAnimationModelDiscovery modelDiscovery,
         ITrustedAnimationDiscovery animationDiscovery,
-        ITrustedWsModelResolver wsModelResolver)
+        ITrustedWsModelResolver wsModelResolver,
+        IStandardDialogs? dialogs = null)
     {
         _viewport = viewport;
+        _packFileService = packFileService;
+        _dialogs = dialogs;
         _modelDiscovery = modelDiscovery;
         _animationDiscovery = animationDiscovery;
         _wsModelResolver = wsModelResolver;
@@ -136,6 +143,8 @@ public partial class TrustedAnimationPreviewViewModel :
     public PackFile CurrentFile { get; private set; } = null!;
 
     public IWpfGame GameWorld => _viewport.GameWorld;
+
+    public AnimationPlayerViewModel Player => _viewport.Player;
 
     public TrustedAnimationPreviewResourceState Model =>
         _session.State.Model;
@@ -289,11 +298,8 @@ public partial class TrustedAnimationPreviewViewModel :
                     return;
                 }
 
-                using (ModelCandidatesView.DeferRefresh())
-                {
-                    foreach (var candidate in batch)
-                        ModelCandidates.Add(candidate);
-                }
+                foreach (var candidate in batch)
+                    ModelCandidates.Add(candidate);
                 ModelScanStatus = FormatModelScanStatus(
                     "AnimationWorkbench.ModelPicker.Scanning",
                     ModelCandidates.Count);
@@ -366,8 +372,15 @@ public partial class TrustedAnimationPreviewViewModel :
     {
         CancelAnimationWork(false);
         IsAnimationPickerOpen = false;
-        IsModelPickerOpen = true;
-        await StartModelDiscoveryAsync();
+        CancelModelDiscovery(false);
+        IsModelPickerOpen = false;
+        if (_dialogs == null)
+            return;
+
+        var result = _dialogs.DisplayBrowseDialog(
+            [".variantmeshdefinition", ".wsmodel", ".rigid_model_v2"]);
+        if (result.Result && result.File != null)
+            await LoadFileAsync(result.File);
     }
 
     [RelayCommand]
@@ -515,11 +528,8 @@ public partial class TrustedAnimationPreviewViewModel :
                     return;
                 }
 
-                using (AnimationCandidatesView.DeferRefresh())
-                {
-                    foreach (var candidate in batch)
-                        AnimationCandidates.Add(candidate);
-                }
+                foreach (var candidate in batch)
+                    AnimationCandidates.Add(candidate);
                 AnimationScanStatus = FormatAnimationScanStatus(
                     "AnimationWorkbench.AnimationPicker.Scanning",
                     AnimationCandidates.Count);
@@ -571,8 +581,14 @@ public partial class TrustedAnimationPreviewViewModel :
     {
         CancelModelDiscovery(false);
         IsModelPickerOpen = false;
-        IsAnimationPickerOpen = true;
-        await StartAnimationDiscoveryAsync();
+        CancelAnimationWork(false);
+        IsAnimationPickerOpen = false;
+        if (_dialogs == null || !IsReady)
+            return;
+
+        var result = _dialogs.DisplayBrowseDialog([".anim"]);
+        if (result.Result && result.File != null)
+            await LoadAnimationAsync(result.File, null);
     }
 
     [RelayCommand]
@@ -592,9 +608,21 @@ public partial class TrustedAnimationPreviewViewModel :
     private async Task UseSelectedAnimation()
     {
         var candidate = SelectedAnimationCandidate;
-        var skeleton = _session.SkeletonIdentity;
-        if (candidate == null || skeleton == null)
+        if (candidate == null)
             return;
+
+        await LoadAnimationAsync(candidate.File, candidate);
+    }
+
+    private async Task LoadAnimationAsync(
+        PackFile file,
+        TrustedAnimationCandidate? candidate)
+    {
+        var skeleton = _session.SkeletonIdentity;
+        if (skeleton == null)
+            return;
+        var updateCandidateMetadata = candidate == null;
+        candidate ??= CreateAnimationCandidate(file, null);
 
         var generation = Interlocked.Increment(
             ref _animationGeneration);
@@ -612,7 +640,7 @@ public partial class TrustedAnimationPreviewViewModel :
                 () =>
                 {
                     cancellation.Token.ThrowIfCancellationRequested();
-                    return AnimationFile.Create(candidate.File);
+                    return AnimationFile.Create(file);
                 },
                 cancellation.Token);
             if (generation != _animationGeneration ||
@@ -623,6 +651,8 @@ public partial class TrustedAnimationPreviewViewModel :
                 return;
             }
 
+            if (updateCandidateMetadata)
+                candidate = CreateAnimationCandidate(file, animation);
             _session.LoadAnimation(candidate, animation);
             IsAnimationPickerOpen = !_session.State.Animation.IsResolved;
             NotifyPlaybackChanged();
@@ -633,9 +663,7 @@ public partial class TrustedAnimationPreviewViewModel :
         }
         catch (Exception exception)
         {
-            _session.ReportAnimationFailure(
-                candidate,
-                exception.Message);
+            _session.ReportAnimationFailure(candidate, exception.Message);
             AnimationScanStatus = string.Format(
                 LocalizationManager.Instance.Get(
                     "AnimationWorkbench.AnimationPicker.Failed"),
@@ -653,6 +681,47 @@ public partial class TrustedAnimationPreviewViewModel :
             }
             cancellation.Dispose();
         }
+    }
+
+    private TrustedAnimationCandidate CreateAnimationCandidate(
+        PackFile file,
+        AnimationFile? animation)
+    {
+        var container = _packFileService.GetPackFileContainer(file);
+        var path = _packFileService.GetFullPath(file, container);
+        var partCount = animation?.AnimationParts.Count ?? 0;
+        var hasStaticFrame = animation?.AnimationParts.Any(part =>
+            part.StaticFrame != null) == true;
+        var isStaticPose = partCount > 0 && hasStaticFrame &&
+            animation!.AnimationParts.All(part =>
+                part.DynamicFrames.Count == 0);
+        return new TrustedAnimationCandidate(
+            file,
+            Path.GetFileNameWithoutExtension(path),
+            path,
+            container?.Name ?? string.Empty,
+            container?.SystemFilePath ?? string.Empty,
+            GetSourceRole(container),
+            animation?.Header.Version ?? 0,
+            partCount == 0
+                ? 0
+                : animation!.AnimationParts.Max(part =>
+                    part.DynamicFrames.Count),
+            animation?.Header.AnimationTotalPlayTimeInSec ?? 0,
+            animation?.Header.FrameRate ?? 0,
+            partCount,
+            hasStaticFrame,
+            isStaticPose);
+    }
+
+    private static TrustedAnimationModelSourceRole GetSourceRole(
+        PackFileContainer? container)
+    {
+        if (container?.Role == PackFileContainerRole.ProjectWorkspace)
+            return TrustedAnimationModelSourceRole.FolderProject;
+        if (container?.Role == PackFileContainerRole.Reference)
+            return TrustedAnimationModelSourceRole.ReferencePack;
+        return TrustedAnimationModelSourceRole.CaPack;
     }
 
     [RelayCommand]

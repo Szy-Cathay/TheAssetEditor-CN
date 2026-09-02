@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using GameWorld.Core.Services;
+using Editors.Shared.Core.Common.AnimationPlayer;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
@@ -89,6 +90,8 @@ public enum TrustedAnimationPreviewResourceKind
 public interface ITrustedAnimationPreviewViewport : IDisposable
 {
     IWpfGame GameWorld { get; }
+
+    AnimationPlayerViewModel Player { get; }
 
     TrustedAnimationPlaybackState PlaybackState { get; }
 

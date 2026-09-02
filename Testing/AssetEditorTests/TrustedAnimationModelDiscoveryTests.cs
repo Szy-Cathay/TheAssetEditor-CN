@@ -1,5 +1,7 @@
 ﻿using System.Threading.Channels;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
+using System.Windows;
+using System.Windows.Threading;
 using Moq;
 using NUnit.Framework;
 using Shared.Core.PackFiles;
@@ -211,6 +213,74 @@ public class TrustedAnimationModelDiscoveryTests
         viewport.Verify(candidate => candidate.Dispose(), Times.Once);
     }
 
+    [Test]
+    public void View_LoadedScanDoesNotFailWhileResultsAreBound()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var discovery = new ImmediateDiscovery();
+                var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+                var viewModel = new TrustedAnimationPreviewViewModel(
+                    viewport.Object,
+                    Mock.Of<IPackFileService>(),
+                    discovery);
+                var results = new System.Windows.Controls.ListBox
+                {
+                    DataContext = viewModel,
+                    ItemsSource = viewModel.ModelCandidatesView,
+                };
+                results.SetBinding(
+                    System.Windows.Controls.Primitives.Selector
+                        .SelectedItemProperty,
+                    new System.Windows.Data.Binding(
+                        nameof(TrustedAnimationPreviewViewModel
+                            .SelectedModelCandidate))
+                    {
+                        Mode = System.Windows.Data.BindingMode.TwoWay,
+                    });
+                var window = new Window
+                {
+                    Width = 1280,
+                    Height = 820,
+                    Content = results,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.None,
+                };
+
+                try
+                {
+                    window.Show();
+                    window.UpdateLayout();
+                    window.Dispatcher.Invoke(
+                        () => { },
+                        DispatcherPriority.ApplicationIdle);
+                    viewModel.StartModelDiscoveryAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    window.UpdateLayout();
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(discovery.InvocationCount,
+                            Is.EqualTo(1));
+                        NUnitAssert.That(viewModel.ModelCandidates.Count,
+                            Is.EqualTo(2));
+                        NUnitAssert.That(viewModel.ModelScanStatus,
+                            Does.Not.Contain(
+                                "CollectionView").IgnoreCase);
+                    });
+                }
+                finally
+                {
+                    window.Close();
+                    viewModel.Close();
+                }
+            });
+    }
+
     private static PackFileContainer CreateContainer(
         string name,
         TrustedAnimationModelSourceRole role)
@@ -315,6 +385,27 @@ public class TrustedAnimationModelDiscoveryTests
         {
             await foreach (var batch in reader.ReadAllAsync())
                 yield return batch;
+        }
+    }
+
+    private sealed class ImmediateDiscovery :
+        ITrustedAnimationModelDiscovery
+    {
+        public int InvocationCount { get; private set; }
+
+        public async IAsyncEnumerable<
+            IReadOnlyList<TrustedAnimationModelCandidate>> DiscoverAsync(
+                [System.Runtime.CompilerServices.EnumeratorCancellation]
+                CancellationToken cancellationToken)
+        {
+            InvocationCount++;
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return
+            [
+                Candidate("first.rigid_model_v2"),
+                Candidate("second.wsmodel"),
+            ];
+            await Task.CompletedTask;
         }
     }
 }

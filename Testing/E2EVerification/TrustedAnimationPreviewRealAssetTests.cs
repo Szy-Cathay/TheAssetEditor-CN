@@ -4,10 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.PackFiles.Utility;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.GameFormats.RigidModel.Types;
+using System.Diagnostics;
 using System.Text;
 using System.Security.Cryptography;
 using Test.TestingUtility.Shared;
@@ -17,6 +19,168 @@ namespace Test.E2EVerification;
 [NonParallelizable]
 public class TrustedAnimationPreviewRealAssetTests
 {
+    [Test]
+    [Explicit]
+    public void CaTerracottaSentinel_CompositePreviewIsCompleteAndReadOnly()
+    {
+        var dataRoot = Environment.GetEnvironmentVariable(
+            "AE_TRUSTED_PREVIEW_GAME_DATA_ROOT");
+        Assert.That(dataRoot, Is.Not.Null.And.Not.Empty);
+        Assert.That(Directory.Exists(dataRoot), Is.True);
+
+        var sourcePackNames = new[]
+        {
+            "variants.pack",
+            "variants_dds11.pack",
+            "anim2.pack",
+            "commontextures.pack",
+        };
+        var sourcePackState = sourcePackNames.ToDictionary(
+            name => name,
+            name => GetFileState(Path.Combine(dataRoot!, name)));
+        var runner = new AssetEditorTestRunner();
+        runner.PackFileService.EnforceGameFilesMustBeLoaded = false;
+        var container = LoadCaAcceptanceContainer(
+            runner,
+            dataRoot!,
+            sourcePackNames);
+        runner.PackFileService.AddContainer(container);
+
+        const string modelPath =
+            @"variantmeshes\variantmeshdefinitions\cth_terracotta_sentinel.variantmeshdefinition";
+        const string animationPath =
+            @"animations\battle\giant01b\terracota_sentinel\idles\gi1b_terracota_stand_idle_01_look_around.anim";
+        var model = runner.PackFileService.FindFile(modelPath);
+        var animation = runner.PackFileService.FindFile(animationPath);
+        Assert.Multiple(() =>
+        {
+            Assert.That(model, Is.Not.Null);
+            Assert.That(animation, Is.Not.Null);
+        });
+        var originalResourceHashes = new[]
+        {
+            HashPackFile(model!),
+            HashPackFile(animation!),
+        };
+
+        var resolver = new TrustedWsModelResolver(
+            runner.PackFileService,
+            new TrustedRigidModelInspector());
+        var resolutionResult = resolver.ResolveAsync(
+                model!,
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert.That(
+            resolutionResult.IsSuccess,
+            Is.True,
+            resolutionResult.Diagnostic);
+        var resolution = resolutionResult.Resolution!;
+        var dependencySourcePacks = resolution.Dependencies
+            .Select(dependency => GetSourcePackName(dependency.File))
+            .Append(GetSourcePackName(model!))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        using var viewport = runner.ServiceProvider
+            .GetRequiredService<ITrustedAnimationPreviewViewport>();
+        var modelResult = viewport.Load(model!, resolution.Skeleton);
+        Assert.That(modelResult.IsSuccess, Is.True, modelResult.Diagnostic);
+        var game = (WpfGameMock)viewport.GameWorld;
+        viewport.SetModelVisible(false);
+        viewport.SetSkeletonVisible(false);
+        var hidden = RenderFrame(game);
+        viewport.SetModelVisible(true);
+        viewport.SetSkeletonVisible(true);
+        viewport.ShowFront();
+        var defaultPose = RenderFrame(game);
+
+        var sourceAnimation = AnimationFile.Create(animation!);
+        var animationResult = viewport.LoadAnimation(
+            sourceAnimation,
+            animationPath);
+        Assert.That(
+            animationResult.IsSuccess,
+            Is.True,
+            animationResult.Diagnostic);
+        var frameZeroState = viewport.PlaybackState;
+        var frameZero = RenderFrame(game);
+        viewport.NextFrame();
+        var nextFrameState = viewport.PlaybackState;
+        viewport.PreviousFrame();
+        viewport.SetLooping(false);
+        viewport.Seek(frameZeroState.DurationSeconds / 2);
+        var middleState = viewport.PlaybackState;
+        var middle = RenderFrame(game);
+        viewport.ResetCamera();
+        var resetCameraFrame = RenderFrame(game);
+        viewport.Seek(0);
+        viewport.Play();
+        for (var index = 0; index < 8; index++)
+            RenderFrame(game);
+        viewport.Pause();
+        var pausedState = viewport.PlaybackState;
+        viewport.SetSkeletonVisible(false);
+        var modelOnly = RenderFrame(game);
+        viewport.SetModelVisible(false);
+        viewport.SetSkeletonVisible(true);
+        var skeletonOnly = RenderFrame(game);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.GeometryCount, Is.EqualTo(2));
+            Assert.That(resolution.StaticAttachmentCount, Is.EqualTo(1));
+            Assert.That(resolution.Dependencies.Count(dependency =>
+                    dependency.Kind == TrustedModelDependencyKind.Material),
+                Is.GreaterThan(0));
+            Assert.That(resolution.Dependencies.Count(dependency =>
+                    dependency.Kind == TrustedModelDependencyKind.Texture),
+                Is.GreaterThan(0));
+            Assert.That(dependencySourcePacks, Does.Contain("variants.pack"));
+            Assert.That(
+                dependencySourcePacks,
+                Does.Contain("variants_dds11.pack"));
+            Assert.That(dependencySourcePacks, Does.Contain("anim2.pack"));
+            Assert.That(
+                dependencySourcePacks,
+                Does.Contain("commontextures.pack"));
+            Assert.That(GetSourcePackName(animation!), Is.EqualTo("anim2.pack"));
+            Assert.That(modelResult.MeshCount, Is.GreaterThan(1));
+            Assert.That(frameZeroState.HasAnimation, Is.True);
+            Assert.That(frameZeroState.CurrentFrame, Is.Zero);
+            Assert.That(frameZeroState.FrameCount, Is.GreaterThan(1));
+            Assert.That(frameZeroState.DurationSeconds, Is.GreaterThan(0));
+            Assert.That(nextFrameState.CurrentFrame, Is.EqualTo(1));
+            Assert.That(middleState.CurrentFrame, Is.GreaterThan(0));
+            Assert.That(pausedState.IsPlaying, Is.False);
+            Assert.That(pausedState.CurrentTimeSeconds, Is.GreaterThan(0));
+            Assert.That(
+                CountDifferentPixels(hidden, defaultPose),
+                Is.GreaterThan(100),
+                "The real CA composite default pose was not visible.");
+            Assert.That(
+                CountDifferentPixels(frameZero, middle),
+                Is.GreaterThan(100),
+                "The real CA composite did not animate.");
+            Assert.That(
+                CountDifferentPixels(hidden, resetCameraFrame),
+                Is.GreaterThan(100),
+                "Camera reset lost the real CA composite.");
+            Assert.That(
+                CountDifferentPixels(modelOnly, skeletonOnly),
+                Is.GreaterThan(100));
+            Assert.That(new[]
+            {
+                HashPackFile(model!),
+                HashPackFile(animation!),
+            }, Is.EqualTo(originalResourceHashes));
+            Assert.That(
+                sourcePackNames.ToDictionary(
+                    name => name,
+                    name => GetFileState(Path.Combine(dataRoot!, name))),
+                Is.EqualTo(sourcePackState));
+        });
+    }
+
     [Test]
     [Explicit]
     public void Yangjian_DefaultPoseRendersModelAndSkeletonIndependently()
@@ -104,6 +268,8 @@ public class TrustedAnimationPreviewRealAssetTests
             assetRoot,
             "test",
             "yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        var originalProjectSnapshot = HashFolderProjectFiles(assetRoot);
+        var originalGitStatus = GetGitStatus(assetRoot);
         var originalHashes = new[]
         {
             HashFile(modelDiskPath),
@@ -113,8 +279,14 @@ public class TrustedAnimationPreviewRealAssetTests
 
         var runner = new AssetEditorTestRunner();
         runner.PackFileService.EnforceGameFilesMustBeLoaded = false;
-        runner.PackFileService.AddContainer(
-            CreateAcceptanceAssetContainer(assetRoot));
+        var container = CreateAcceptanceAssetContainer(assetRoot);
+        var memorySentinel = PackFile.CreateFromBytes(
+            "trusted-preview-read-only-sentinel.bin",
+            [12, 34, 56, 78]);
+        container.FileList[
+            @"test\trusted-preview-read-only-sentinel.bin"] = memorySentinel;
+        var originalMemoryHash = HashPackFile(memorySentinel);
+        runner.PackFileService.AddContainer(container);
         var model = runner.PackFileService.FindFile(
             @"test\yangjian.rigid_model_v2");
         var skeleton = runner.PackFileService.FindFile(
@@ -146,6 +318,21 @@ public class TrustedAnimationPreviewRealAssetTests
             animationResult.Diagnostic);
         var frameZeroState = viewport.PlaybackState;
         var frameZero = RenderFrame(game);
+
+        Assert.That(viewport.Player.PlayerItems, Has.Count.EqualTo(1));
+        viewport.Player.SetAnimationNextFrame();
+        var sharedPlayerNextFrame = viewport.PlaybackState;
+        viewport.Player.SetAnimationPrivFrame();
+        var sharedPlayerReturnedFrame = viewport.PlaybackState;
+        Assert.Multiple(() =>
+        {
+            Assert.That(sharedPlayerNextFrame.CurrentFrame,
+                Is.GreaterThan(frameZeroState.CurrentFrame));
+            Assert.That(sharedPlayerReturnedFrame.CurrentFrame,
+                Is.EqualTo(frameZeroState.CurrentFrame));
+            Assert.That(viewport.Player.PlayerItems[0].MaxFrames.Value,
+                Is.EqualTo(frameZeroState.FrameCount));
+        });
 
         viewport.NextFrame();
         var nextFrameState = viewport.PlaybackState;
@@ -220,6 +407,16 @@ public class TrustedAnimationPreviewRealAssetTests
                 HashFile(skeletonDiskPath),
                 HashFile(animationDiskPath),
             }, Is.EqualTo(originalHashes));
+            Assert.That(
+                HashPackFile(memorySentinel),
+                Is.EqualTo(originalMemoryHash));
+            Assert.That(
+                HashFolderProjectFiles(assetRoot),
+                Is.EqualTo(originalProjectSnapshot));
+            Assert.That(originalGitStatus, Is.Empty);
+            Assert.That(
+                GetGitStatus(assetRoot),
+                Is.EqualTo(originalGitStatus));
         });
     }
 
@@ -803,6 +1000,93 @@ public class TrustedAnimationPreviewRealAssetTests
 
     private static string HashFile(string path) =>
         Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+
+    private static string HashPackFile(PackFile file) =>
+        Convert.ToHexString(SHA256.HashData(file.DataSource.ReadData()));
+
+    private static IReadOnlyList<string> HashFolderProjectFiles(
+        string projectRoot)
+    {
+        var gitRoot = Path.Combine(projectRoot, ".git") +
+                      Path.DirectorySeparatorChar;
+        return Directory.EnumerateFiles(
+                projectRoot,
+                "*",
+                SearchOption.AllDirectories)
+            .Where(path => !path.StartsWith(
+                gitRoot,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(path =>
+                $"{Path.GetRelativePath(projectRoot, path)}|{HashFile(path)}")
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string GetGitStatus(string projectRoot)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = projectRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        startInfo.ArgumentList.Add("status");
+        startInfo.ArgumentList.Add("--porcelain=v1");
+        startInfo.ArgumentList.Add("--untracked-files=all");
+        using var process = Process.Start(startInfo) ??
+                            throw new InvalidOperationException(
+                                "Unable to start git status.");
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git status failed: {error}");
+        }
+        return output.Trim();
+    }
+
+    private static (long Length, DateTime LastWriteTimeUtc) GetFileState(
+        string path)
+    {
+        var info = new FileInfo(path);
+        return (info.Length, info.LastWriteTimeUtc);
+    }
+
+    private static string GetSourcePackName(PackFile file) =>
+        Path.GetFileName(((PackedFileSource)file.DataSource).Parent.FilePath);
+
+    private static PackFileContainer LoadCaAcceptanceContainer(
+        AssetEditorTestRunner runner,
+        string dataRoot,
+        IReadOnlyList<string> sourcePackNames)
+    {
+        var loader = runner.ServiceProvider
+            .GetRequiredService<IPackFileContainerLoader>();
+        PackFileContainer? merged = null;
+        foreach (var sourcePackName in sourcePackNames)
+        {
+            var sourcePath = Path.Combine(dataRoot, sourcePackName);
+            var source = loader.Load(sourcePath);
+            Assert.That(source, Is.Not.Null);
+            if (merged is null)
+            {
+                merged = source;
+            }
+            else
+            {
+                merged.MergePackFileContainer(source!);
+            }
+            merged!.SourcePackFilePaths.Add(sourcePath);
+        }
+        merged!.IsCaPackFile = true;
+        merged.SystemFilePath = dataRoot;
+        return merged;
+    }
 
     private static Color[] RenderFrame(WpfGameMock game)
     {

@@ -1,5 +1,6 @@
 ﻿using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
+using Editors.Shared.Core.Common.AnimationPlayer;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
@@ -42,6 +43,7 @@ public sealed class TrustedAnimationPreviewViewport :
         GameWorld = parameters.GameWorld;
         _sceneObjectBuilder = parameters.SceneObjectViewModelBuilder;
         _sceneObjectEditor = parameters.SceneObjectEditor;
+        Player = parameters.AnimationPlayerViewModel;
         _focusService = parameters.FocusSelectableObjectService;
         _camera = parameters.CoreComponents.Components
             .OfType<ArcBallCamera>()
@@ -53,6 +55,8 @@ public sealed class TrustedAnimationPreviewViewport :
     }
 
     public IWpfGame GameWorld { get; }
+
+    public AnimationPlayerViewModel Player { get; }
 
     public TrustedAnimationPlaybackState PlaybackState
     {
@@ -105,6 +109,11 @@ public sealed class TrustedAnimationPreviewViewport :
                     "AnimationWorkbench.TrustedPreview.Viewport"),
                 Color.LightSkyBlue,
                 null!);
+            if (!Player.PlayerItems.Any(item =>
+                    ReferenceEquals(item.Asset, _previewAsset.Data)))
+            {
+                Player.RegisterAsset(_previewAsset.Data);
+            }
             _previewAsset.Data.Player.OnFrameChanged -= OnFrameChanged;
             _previewAsset.Data.Player.OnFrameChanged += OnFrameChanged;
             var asset = _previewAsset.Data;

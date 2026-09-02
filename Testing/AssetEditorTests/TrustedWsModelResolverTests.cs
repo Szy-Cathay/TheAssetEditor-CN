@@ -100,6 +100,45 @@ public class TrustedWsModelResolverTests
     }
 
     [Test]
+    public async Task Resolve_ParsesCompositeResourcesOffCallerThread()
+    {
+        var callerThread = Environment.CurrentManagedThreadId;
+        var inspectionThread = callerThread;
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"models\body.wsmodel",
+            CreateWsModel(
+                [@"models\body.rigid_model_v2"],
+                [(0, 0, @"materials\body.xml")]));
+        var geometry = Add(project, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        Add(project, @"materials\body.xml", CreateMaterial());
+        Add(project, @"animations\skeletons\humanoid.anim",
+            CreateSkeleton("humanoid"));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(geometry))
+            .Callback(() => inspectionThread =
+                Environment.CurrentManagedThreadId)
+            .Returns(CreateInspection("humanoid"));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.True,
+                result.Diagnostic);
+            NUnitAssert.That(inspectionThread,
+                Is.Not.EqualTo(callerThread));
+        });
+    }
+
+    [Test]
     public async Task Resolve_MissingGeometryNamesParentAndRequestedPath()
     {
         var project = CreateContainer(

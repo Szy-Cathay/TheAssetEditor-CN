@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:player="clr-namespace:AnimationEditor.Common.AnimationPlayer;assembly=Editors.Shared.Core"
     d:DesignHeight="900"
     d:DesignWidth="1500"
     AutomationProperties.Name="{loc:Loc DisplayName.AnimationWorkbench}"
@@ -17,6 +18,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToCollapsedConverter" />
             <Style BasedOn="{StaticResource AeInput.TextBox}" TargetType="{x:Type TextBox}" />
@@ -24,493 +26,205 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid Margin="12">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="5" />
+            <ColumnDefinition Width="320" MinWidth="280" />
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="320" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="76" />
-                <ColumnDefinition Width="*" MinWidth="260" />
-                <ColumnDefinition Width="180" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <TextBlock
-                Grid.Row="0"
-                Margin="0,0,8,8"
-                VerticalAlignment="Center"
-                Style="{StaticResource AeText.Label}"
-                Text="{loc:Loc AnimationWorkbench.TrustedPreview.Model}" />
-            <TextBox
-                Grid.Row="0"
-                Grid.Column="1"
-                Margin="0,0,8,8"
-                IsReadOnly="True"
-                Text="{Binding Model.Path}"
-                ToolTip="{Binding Model.Path}" />
-            <TextBox
-                Grid.Row="0"
-                Grid.Column="2"
-                Margin="0,0,8,8"
-                IsReadOnly="True"
-                Text="{Binding Model.Source}"
-                ToolTip="{Binding Model.Source}" />
-            <Expander
-                Grid.Row="0"
-                Grid.Column="3"
-                Margin="0,0,8,8"
-                Header="{loc:Loc AnimationWorkbench.TrustedPreview.Diagnostic}"
-                Style="{StaticResource AeInput.ExpandableField}"
-                Visibility="{Binding HasModelDiagnostic, Converter={StaticResource BoolToCollapsedConverter}}">
-                <TextBox
-                    MinWidth="320"
-                    IsReadOnly="True"
-                    Text="{Binding Model.Diagnostic}"
-                    TextWrapping="Wrap" />
-            </Expander>
-            <ToggleButton
-                Grid.Row="0"
-                Grid.Column="4"
-                Margin="0,0,0,8"
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.ShowModel}"
-                IsChecked="{Binding ShowModel, Mode=TwoWay}"
-                IsEnabled="{Binding IsReady}"
-                Style="{StaticResource AeButton.VisibilityToggle}"
-                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.ShowModel}" />
-
-            <TextBlock
-                Grid.Row="1"
-                Margin="0,0,8,8"
-                VerticalAlignment="Center"
-                Style="{StaticResource AeText.Label}"
-                Text="{loc:Loc AnimationWorkbench.TrustedPreview.Skeleton}" />
-            <TextBox
-                Grid.Row="1"
-                Grid.Column="1"
-                Margin="0,0,8,8"
-                IsReadOnly="True"
-                Text="{Binding Skeleton.Path}"
-                ToolTip="{Binding Skeleton.Path}" />
-            <TextBox
-                Grid.Row="1"
-                Grid.Column="2"
-                Margin="0,0,8,8"
-                IsReadOnly="True"
-                Text="{Binding Skeleton.Source}"
-                ToolTip="{Binding Skeleton.Source}" />
-            <Expander
-                Grid.Row="1"
-                Grid.Column="3"
-                Margin="0,0,8,8"
-                Header="{loc:Loc AnimationWorkbench.TrustedPreview.Diagnostic}"
-                Style="{StaticResource AeInput.ExpandableField}"
-                Visibility="{Binding HasSkeletonDiagnostic, Converter={StaticResource BoolToCollapsedConverter}}">
-                <TextBox
-                    MinWidth="320"
-                    IsReadOnly="True"
-                    Text="{Binding Skeleton.Diagnostic}"
-                    TextWrapping="Wrap" />
-            </Expander>
-            <ToggleButton
-                Grid.Row="1"
-                Grid.Column="4"
-                Margin="0,0,0,8"
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.ShowSkeleton}"
-                IsChecked="{Binding ShowSkeleton, Mode=TwoWay}"
-                IsEnabled="{Binding IsReady}"
-                Style="{StaticResource AeButton.VisibilityToggle}"
-                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.ShowSkeleton}" />
-
-            <TextBlock
-                Grid.Row="2"
-                Margin="0,0,8,0"
-                VerticalAlignment="Center"
-                Style="{StaticResource AeText.Label}"
-                Text="{loc:Loc AnimationWorkbench.TrustedPreview.Animation}" />
-            <TextBox
-                Grid.Row="2"
-                Grid.Column="1"
-                Margin="0,0,8,0"
-                IsReadOnly="True"
-                Text="{Binding AnimationPathText, Mode=OneWay}"
-                ToolTip="{Binding Animation.Path}" />
-            <TextBox
-                Grid.Row="2"
-                Grid.Column="2"
-                Margin="0,0,8,0"
-                IsReadOnly="True"
-                Text="{Binding Animation.Source}" />
-            <Expander
-                Grid.Row="2"
-                Grid.Column="3"
-                Margin="0,0,8,0"
-                Header="{loc:Loc AnimationWorkbench.TrustedPreview.Diagnostic}"
-                Style="{StaticResource AeInput.ExpandableField}"
-                Visibility="{Binding HasAnimationDiagnostic, Converter={StaticResource BoolToCollapsedConverter}}">
-                <TextBox
-                    MinWidth="320"
-                    IsReadOnly="True"
-                    Text="{Binding Animation.Diagnostic}"
-                    TextWrapping="Wrap" />
-            </Expander>
-            <Button
-                Grid.Row="2"
-                Grid.Column="4"
-                Command="{Binding OpenAnimationPickerCommand}"
-                Content="{loc:Loc AnimationWorkbench.AnimationPicker.Open}"
-                IsEnabled="{Binding IsReady}" />
-        </Grid>
-
         <Border
-            Grid.Row="1"
-            Margin="0,12,0,0"
+            Grid.Row="0"
+            Grid.Column="0"
+            Margin="12,12,0,0"
             ClipToBounds="True"
             Style="{StaticResource AeSurface.Panel}">
-            <Grid>
-                <ContentControl
-                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.Viewport}"
-                    Content="{Binding GameWorld}" />
-                <Border
-                    Padding="8"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Top"
-                    Style="{StaticResource AeSurface.Overlay}">
-                    <StackPanel Orientation="Horizontal">
+            <ContentControl
+                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.Viewport}"
+                Content="{Binding GameWorld}" />
+        </Border>
+
+        <player:AnimationPlayerView
+            Grid.Row="1"
+            Grid.Column="0"
+            DataContext="{Binding Player, Mode=OneWay}" />
+
+        <GridSplitter
+            Grid.RowSpan="2"
+            Grid.Column="1"
+            AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.RightSplitter}"
+            Style="{StaticResource AeVerticalGridSplitterStyle}" />
+
+        <Border
+            x:Name="ResourceInspector"
+            Grid.RowSpan="2"
+            Grid.Column="2"
+            Background="{DynamicResource AeBrush.Surface1}"
+            BorderBrush="{DynamicResource AeBrush.Border}"
+            BorderThickness="1,0,0,0">
+            <ScrollViewer
+                x:Name="ResourceInspectorScrollViewer"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc AnimationWorkbench.TrustedPreview.Model}" />
                         <Button
+                            Grid.Column="1"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.ModelPicker.Open}"
                             Command="{Binding OpenModelPickerCommand}"
-                            Content="{loc:Loc AnimationWorkbench.ModelPicker.Open}" />
+                            Content="{loc:Loc AnimationWorkbench.ModelPicker.Open}"
+                            Style="{StaticResource AeButton.Primary}" />
+                    </Grid>
+                    <TextBox
+                        Margin="0,8,0,0"
+                        IsReadOnly="True"
+                        Text="{Binding Model.Path}"
+                        ToolTip="{Binding Model.Path}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{Binding Model.Source}"
+                        TextTrimming="CharacterEllipsis"
+                        ToolTip="{Binding Model.Source}" />
+                    <Expander
+                        Margin="0,6,0,0"
+                        Header="{loc:Loc AnimationWorkbench.TrustedPreview.Diagnostic}"
+                        Style="{StaticResource AeInput.ExpandableField}"
+                        Visibility="{Binding HasModelDiagnostic, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <TextBox
+                            IsReadOnly="True"
+                            Text="{Binding Model.Diagnostic}"
+                            TextWrapping="Wrap" />
+                    </Expander>
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.Caption}"
+                            Text="{loc:Loc AnimationWorkbench.TrustedPreview.ShowModel}" />
+                        <ToggleButton
+                            Margin="6,0,0,0"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.ShowModel}"
+                            IsChecked="{Binding ShowModel, Mode=TwoWay}"
+                            IsEnabled="{Binding IsReady}"
+                            Style="{StaticResource AeButton.VisibilityToggle}"
+                            ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.ShowModel}" />
+                    </StackPanel>
+
+                    <Border Height="1" Margin="0,12" Background="{DynamicResource AeBrush.Border}" />
+
+                    <TextBlock
+                        Style="{StaticResource AeText.SectionTitle}"
+                        Text="{loc:Loc AnimationWorkbench.TrustedPreview.Skeleton}" />
+                    <TextBox
+                        Margin="0,8,0,0"
+                        IsReadOnly="True"
+                        Text="{Binding Skeleton.Path}"
+                        ToolTip="{Binding Skeleton.Path}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{Binding Skeleton.Source}"
+                        TextTrimming="CharacterEllipsis"
+                        ToolTip="{Binding Skeleton.Source}" />
+                    <Expander
+                        Margin="0,6,0,0"
+                        Header="{loc:Loc AnimationWorkbench.TrustedPreview.Diagnostic}"
+                        Style="{StaticResource AeInput.ExpandableField}"
+                        Visibility="{Binding HasSkeletonDiagnostic, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <TextBox
+                            IsReadOnly="True"
+                            Text="{Binding Skeleton.Diagnostic}"
+                            TextWrapping="Wrap" />
+                    </Expander>
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.Caption}"
+                            Text="{loc:Loc AnimationWorkbench.TrustedPreview.ShowSkeleton}" />
+                        <ToggleButton
+                            Margin="6,0,0,0"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.ShowSkeleton}"
+                            IsChecked="{Binding ShowSkeleton, Mode=TwoWay}"
+                            IsEnabled="{Binding IsReady}"
+                            Style="{StaticResource AeButton.VisibilityToggle}"
+                            ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.ShowSkeleton}" />
+                    </StackPanel>
+
+                    <Border Height="1" Margin="0,12" Background="{DynamicResource AeBrush.Border}" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource AeText.SectionTitle}"
+                            Text="{loc:Loc AnimationWorkbench.TrustedPreview.Animation}" />
                         <Button
-                            Margin="8,0,0,0"
+                            Grid.Column="1"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.AnimationPicker.Open}"
+                            Command="{Binding OpenAnimationPickerCommand}"
+                            Content="{loc:Loc AnimationWorkbench.AnimationPicker.Open}"
+                            IsEnabled="{Binding IsReady}" />
+                    </Grid>
+                    <TextBox
+                        Margin="0,8,0,0"
+                        IsReadOnly="True"
+                        Text="{Binding AnimationPathText, Mode=OneWay}"
+                        ToolTip="{Binding Animation.Path}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        Style="{StaticResource AeText.Caption}"
+                        Text="{Binding Animation.Source}"
+                        TextTrimming="CharacterEllipsis"
+                        ToolTip="{Binding Animation.Source}" />
+                    <Expander
+                        Margin="0,6,0,0"
+                        Header="{loc:Loc AnimationWorkbench.TrustedPreview.Diagnostic}"
+                        Style="{StaticResource AeInput.ExpandableField}"
+                        Visibility="{Binding HasAnimationDiagnostic, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <TextBox
+                            IsReadOnly="True"
+                            Text="{Binding Animation.Diagnostic}"
+                            TextWrapping="Wrap" />
+                    </Expander>
+
+                    <Border Height="1" Margin="0,12" Background="{DynamicResource AeBrush.Border}" />
+
+                    <TextBlock
+                        Style="{StaticResource AeText.SectionTitle}"
+                        Text="{loc:Loc EditorHost.Menu.Camera}" />
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button
                             Command="{Binding FocusModelCommand}"
                             Content="{loc:Loc AnimationWorkbench.TrustedPreview.FocusModel}"
                             IsEnabled="{Binding IsReady}" />
                         <Button
-                            Margin="8,0,0,0"
+                            Margin="6,0,0,0"
                             Command="{Binding ShowFrontCommand}"
                             Content="{loc:Loc AnimationWorkbench.TrustedPreview.FrontView}"
                             IsEnabled="{Binding IsReady}" />
                         <Button
-                            Margin="8,0,0,0"
+                            Margin="6,0,0,0"
                             Command="{Binding ResetCameraCommand}"
                             Content="{loc:Loc AnimationWorkbench.TrustedPreview.ResetCamera}"
                             IsEnabled="{Binding IsReady}" />
-                    </StackPanel>
-                </Border>
-                <Border
-                    Width="420"
-                    Margin="8"
-                    Padding="12"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Stretch"
-                    Panel.ZIndex="10"
-                    Style="{StaticResource AeSurface.Overlay}"
-                    Visibility="{Binding IsModelPickerOpen, Converter={StaticResource BoolToCollapsedConverter}}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                VerticalAlignment="Center"
-                                Style="{StaticResource AeText.SectionTitle}"
-                                Text="{loc:Loc AnimationWorkbench.ModelPicker.Title}" />
-                            <Button
-                                Grid.Column="1"
-                                Command="{Binding CloseModelPickerCommand}"
-                                Content="{loc:Loc AnimationWorkbench.ModelPicker.Close}" />
-                        </Grid>
-
-                        <Grid Grid.Row="1" Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                Margin="0,0,8,0"
-                                VerticalAlignment="Center"
-                                Style="{StaticResource AeText.Label}"
-                                Text="{loc:Loc AnimationWorkbench.ModelPicker.Search}" />
-                            <TextBox
-                                Grid.Column="1"
-                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.ModelPicker.Search}"
-                                Text="{Binding ModelSearchText, UpdateSourceTrigger=PropertyChanged}" />
-                        </Grid>
-
-                        <StackPanel Grid.Row="2" Margin="0,8,0,8">
-                            <TextBlock
-                                Style="{StaticResource AeText.Caption}"
-                                Text="{Binding ModelScanStatus}"
-                                TextWrapping="Wrap" />
-                            <ProgressBar
-                                Margin="0,6,0,0"
-                                IsIndeterminate="True"
-                                Visibility="{Binding IsModelScanRunning, Converter={StaticResource BoolToCollapsedConverter}}" />
-                        </StackPanel>
-
-                        <ListBox
-                            Grid.Row="3"
-                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.ModelPicker.Results}"
-                            ItemsSource="{Binding ModelCandidatesView}"
-                            SelectedItem="{Binding SelectedModelCandidate, Mode=TwoWay}"
-                            ScrollViewer.CanContentScroll="True"
-                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                            VirtualizingPanel.IsVirtualizing="True"
-                            VirtualizingPanel.IsVirtualizingWhenGrouping="True"
-                            VirtualizingPanel.VirtualizationMode="Recycling">
-                            <ListBox.GroupStyle>
-                                <GroupStyle>
-                                    <GroupStyle.HeaderTemplate>
-                                        <DataTemplate>
-                                            <TextBlock
-                                                Margin="8,10,8,4"
-                                                Style="{StaticResource AeText.Label}"
-                                                Text="{Binding Name}" />
-                                        </DataTemplate>
-                                    </GroupStyle.HeaderTemplate>
-                                </GroupStyle>
-                            </ListBox.GroupStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="4,6">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock
-                                            Text="{Binding Path}"
-                                            TextTrimming="CharacterEllipsis"
-                                            ToolTip="{Binding Path}" />
-                                        <TextBlock
-                                            Grid.Row="1"
-                                            Margin="0,3,0,0"
-                                            Style="{StaticResource AeText.Caption}"
-                                            Text="{Binding SourcePack}"
-                                            TextTrimming="CharacterEllipsis"
-                                            ToolTip="{Binding SourceLocation}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <Grid Grid.Row="4" Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Button
-                                Command="{Binding CancelModelScanCommand}"
-                                Content="{loc:Loc AnimationWorkbench.ModelPicker.Cancel}"
-                                IsEnabled="{Binding IsModelScanRunning}" />
-                            <Button
-                                Grid.Column="1"
-                                Command="{Binding UseSelectedModelCommand}"
-                                Content="{loc:Loc AnimationWorkbench.ModelPicker.UseSelected}"
-                                Style="{StaticResource AeButton.Primary}" />
-                        </Grid>
-                    </Grid>
-                </Border>
-                <Border
-                    Width="500"
-                    Margin="8"
-                    Padding="12"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Stretch"
-                    Panel.ZIndex="10"
-                    Style="{StaticResource AeSurface.Overlay}"
-                    Visibility="{Binding IsAnimationPickerOpen, Converter={StaticResource BoolToCollapsedConverter}}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                VerticalAlignment="Center"
-                                Style="{StaticResource AeText.SectionTitle}"
-                                Text="{loc:Loc AnimationWorkbench.AnimationPicker.Title}" />
-                            <Button
-                                Grid.Column="1"
-                                Command="{Binding CloseAnimationPickerCommand}"
-                                Content="{loc:Loc AnimationWorkbench.AnimationPicker.Close}" />
-                        </Grid>
-
-                        <Grid Grid.Row="1" Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                Margin="0,0,8,0"
-                                VerticalAlignment="Center"
-                                Style="{StaticResource AeText.Label}"
-                                Text="{loc:Loc AnimationWorkbench.AnimationPicker.Search}" />
-                            <TextBox
-                                Grid.Column="1"
-                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.AnimationPicker.Search}"
-                                Text="{Binding AnimationSearchText, UpdateSourceTrigger=PropertyChanged}" />
-                        </Grid>
-
-                        <StackPanel Grid.Row="2" Margin="0,8,0,8">
-                            <TextBlock
-                                Style="{StaticResource AeText.Caption}"
-                                Text="{Binding AnimationScanStatus}"
-                                TextWrapping="Wrap" />
-                            <ProgressBar
-                                Margin="0,6,0,0"
-                                IsIndeterminate="True"
-                                Visibility="{Binding IsAnimationScanRunning, Converter={StaticResource BoolToCollapsedConverter}}" />
-                        </StackPanel>
-
-                        <ListBox
-                            Grid.Row="3"
-                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.AnimationPicker.Results}"
-                            ItemsSource="{Binding AnimationCandidatesView}"
-                            SelectedItem="{Binding SelectedAnimationCandidate, Mode=TwoWay}"
-                            ScrollViewer.CanContentScroll="True"
-                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                            VirtualizingPanel.IsVirtualizing="True"
-                            VirtualizingPanel.VirtualizationMode="Recycling">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="4,6">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock
-                                            Style="{StaticResource AeText.Label}"
-                                            Text="{Binding Name}"
-                                            TextTrimming="CharacterEllipsis" />
-                                        <TextBlock
-                                            Grid.Row="1"
-                                            Margin="0,3,0,0"
-                                            Text="{Binding Path}"
-                                            TextTrimming="CharacterEllipsis"
-                                            ToolTip="{Binding Path}" />
-                                        <StackPanel
-                                            Grid.Row="2"
-                                            Margin="0,3,0,0"
-                                            Orientation="Horizontal">
-                                            <TextBlock
-                                                Style="{StaticResource AeText.Caption}"
-                                                Text="{Binding SourcePack}"
-                                                ToolTip="{Binding SourceLocation}" />
-                                            <TextBlock
-                                                Margin="10,0,0,0"
-                                                Style="{StaticResource AeText.Caption}"
-                                                Text="{Binding Metadata}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <Grid Grid.Row="4" Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Button
-                                Command="{Binding CancelAnimationScanCommand}"
-                                Content="{loc:Loc AnimationWorkbench.AnimationPicker.Cancel}"
-                                IsEnabled="{Binding IsAnimationScanRunning}" />
-                            <Button
-                                Grid.Column="1"
-                                Command="{Binding UseSelectedAnimationCommand}"
-                                Content="{loc:Loc AnimationWorkbench.AnimationPicker.UseSelected}"
-                                Style="{StaticResource AeButton.Primary}" />
-                        </Grid>
-                    </Grid>
-                </Border>
-            </Grid>
+                    </WrapPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
-
-        <Grid Grid.Row="2" Margin="0,12,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <ToggleButton
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.PlayPause}"
-                Command="{Binding TogglePlaybackCommand}"
-                IsChecked="{Binding IsPlaying, Mode=OneWay}"
-                IsEnabled="{Binding HasAnimation}"
-                Style="{StaticResource AeEditor.PlaybackToggle}"
-                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.PlayPause}">
-                <Canvas Width="16" Height="16">
-                    <Path
-                        Data="M 4,2 L 14,8 L 4,14 Z"
-                        Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
-                </Canvas>
-            </ToggleButton>
-            <Button
-                Grid.Column="1"
-                Margin="8,0,0,0"
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.PreviousFrame}"
-                Command="{Binding PreviousFrameCommand}"
-                Content="{loc:Loc AnimationWorkbench.TrustedPreview.PreviousFrame}"
-                IsEnabled="{Binding HasAnimation}"
-                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.PreviousFrame}" />
-            <Button
-                Grid.Column="2"
-                Margin="6,0,0,0"
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.NextFrame}"
-                Command="{Binding NextFrameCommand}"
-                Content="{loc:Loc AnimationWorkbench.TrustedPreview.NextFrame}"
-                IsEnabled="{Binding HasAnimation}"
-                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.NextFrame}" />
-            <CheckBox
-                Grid.Column="3"
-                Margin="10,0,0,0"
-                VerticalAlignment="Center"
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.Loop}"
-                Content="{loc:Loc AnimationWorkbench.TrustedPreview.Loop}"
-                IsChecked="{Binding IsLooping, Mode=TwoWay}"
-                IsEnabled="{Binding HasAnimation}" />
-            <Slider
-                Grid.Column="4"
-                Margin="8,0"
-                IsEnabled="{Binding HasAnimation}"
-                Maximum="{Binding PlaybackMaximum}"
-                Style="{StaticResource AeEditor.PlaybackSlider}"
-                Value="{Binding CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBlock
-                Grid.Column="5"
-                VerticalAlignment="Center"
-                Style="{StaticResource AeText.Caption}"
-                Text="{Binding PlaybackSummary}" />
-        </Grid>
     </Grid>
 </UserControl>
