@@ -1113,6 +1113,120 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
+    public void TrustedSession_LoadsResolvedWsModelRootWithConcreteSkeleton()
+    {
+        var root = PackFile.CreateFromBytes(
+            "character.wsmodel",
+            [1]);
+        var geometry = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            geometry,
+            skeleton,
+            "humanoid01");
+        var rootOwner = new PackFileContainer("my_mod.pack")
+        {
+            Role = PackFileContainerRole.ProjectWorkspace,
+        };
+        rootOwner.FileList["models\\character.wsmodel"] = root;
+        packFileService.Setup(service => service.GetFullPath(root, null))
+            .Returns("models\\character.wsmodel");
+        packFileService.Setup(service => service.GetPackFileContainer(root))
+            .Returns(rootOwner);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(root, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(5));
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(root, geometry, skeleton);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.IsReady, Is.True);
+            NUnitAssert.That(session.State.Model.Path,
+                Is.EqualTo("models\\character.wsmodel"));
+            NUnitAssert.That(session.State.MeshCount, Is.EqualTo(5));
+            NUnitAssert.That(session.SkeletonIdentity?.Name,
+                Is.EqualTo("humanoid01"));
+        });
+        viewport.Verify(item => item.Load(root, skeleton), Times.Once);
+    }
+
+    [Test]
+    public async Task TrustedViewModel_RejectsLateWsModelResolution()
+    {
+        var root = PackFile.CreateFromBytes(
+            "character.wsmodel",
+            [1]);
+        var directModel = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            directModel,
+            skeleton,
+            "humanoid01");
+        var rootOwner = new PackFileContainer("my_mod.pack")
+        {
+            Role = PackFileContainerRole.ProjectWorkspace,
+        };
+        rootOwner.FileList["models\\character.wsmodel"] = root;
+        packFileService.Setup(service => service.GetFullPath(root, null))
+            .Returns("models\\character.wsmodel");
+        packFileService.Setup(service => service.GetPackFileContainer(root))
+            .Returns(rootOwner);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(directModel, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        viewport.SetupGet(item => item.PlaybackState)
+            .Returns(TrustedAnimationPlaybackState.Empty);
+        var completion = new TaskCompletionSource<
+            TrustedWsModelResolutionResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var resolver = new Mock<ITrustedWsModelResolver>();
+        resolver.Setup(item => item.ResolveAsync(
+                root,
+                It.IsAny<CancellationToken>()))
+            .Returns(completion.Task);
+        var viewModel = new TrustedAnimationPreviewViewModel(
+            viewport.Object,
+            packFileService.Object,
+            Mock.Of<ITrustedAnimationModelDiscovery>(),
+            Mock.Of<ITrustedAnimationDiscovery>(),
+            resolver.Object);
+
+        var lateLoad = viewModel.LoadFileAsync(root);
+        await viewModel.LoadFileAsync(directModel);
+        completion.SetResult(TrustedWsModelResolutionResult.Success(
+            new TrustedWsModelResolution(
+                root,
+                directModel,
+                skeleton,
+                [],
+                1,
+                0)));
+        await lateLoad;
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.Model.Path,
+                Is.EqualTo("models\\character.rigid_model_v2"));
+            NUnitAssert.That(viewModel.IsReady, Is.True);
+        });
+        viewport.Verify(item => item.Load(root, skeleton), Times.Never);
+        viewport.Verify(item => item.Load(directModel, skeleton), Times.Once);
+        viewModel.Close();
+    }
+
+    [Test]
     public void TrustedPreviewXaml_IsFlatModelFirstWorkspace()
     {
         var xamlPath = Path.Combine(
@@ -1344,6 +1458,8 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbench.ModelPicker.Complete",
             "AnimationWorkbench.ModelPicker.Cancelled",
             "AnimationWorkbench.ModelPicker.Failed",
+            "AnimationWorkbench.ModelPicker.Loading",
+            "AnimationWorkbench.ModelPicker.Loaded",
             "AnimationWorkbench.ModelPicker.SourceProject",
             "AnimationWorkbench.ModelPicker.SourceReference",
             "AnimationWorkbench.ModelPicker.SourceCa",

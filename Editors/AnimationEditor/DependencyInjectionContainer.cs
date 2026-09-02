@@ -36,6 +36,12 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddScoped<
                 ITrustedAnimationDiscovery,
                 TrustedAnimationDiscovery>();
+            serviceCollection.AddScoped<
+                ITrustedRigidModelInspector,
+                TrustedRigidModelInspector>();
+            serviceCollection.AddScoped<
+                ITrustedWsModelResolver,
+                TrustedWsModelResolver>();
             serviceCollection.AddTransient<
                 IOpenAnimationWorkbenchCommand,
                 OpenAnimationWorkbenchCommand>();

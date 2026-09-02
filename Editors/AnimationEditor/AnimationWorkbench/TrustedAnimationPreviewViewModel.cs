@@ -22,6 +22,7 @@ public partial class TrustedAnimationPreviewViewModel :
     private readonly TrustedAnimationPreviewFeatureSession _session;
     private readonly ITrustedAnimationModelDiscovery _modelDiscovery;
     private readonly ITrustedAnimationDiscovery _animationDiscovery;
+    private readonly ITrustedWsModelResolver _wsModelResolver;
     private CancellationTokenSource? _modelScanCancellation;
     private CancellationTokenSource? _animationCancellation;
     private int _modelScanGeneration;
@@ -74,7 +75,10 @@ public partial class TrustedAnimationPreviewViewModel :
             viewport,
             packFileService,
             modelDiscovery,
-            new TrustedAnimationDiscovery(packFileService))
+            new TrustedAnimationDiscovery(packFileService),
+            new TrustedWsModelResolver(
+                packFileService,
+                new TrustedRigidModelInspector()))
     {
     }
 
@@ -83,10 +87,28 @@ public partial class TrustedAnimationPreviewViewModel :
         IPackFileService packFileService,
         ITrustedAnimationModelDiscovery modelDiscovery,
         ITrustedAnimationDiscovery animationDiscovery)
+        : this(
+            viewport,
+            packFileService,
+            modelDiscovery,
+            animationDiscovery,
+            new TrustedWsModelResolver(
+                packFileService,
+                new TrustedRigidModelInspector()))
+    {
+    }
+
+    public TrustedAnimationPreviewViewModel(
+        ITrustedAnimationPreviewViewport viewport,
+        IPackFileService packFileService,
+        ITrustedAnimationModelDiscovery modelDiscovery,
+        ITrustedAnimationDiscovery animationDiscovery,
+        ITrustedWsModelResolver wsModelResolver)
     {
         _viewport = viewport;
         _modelDiscovery = modelDiscovery;
         _animationDiscovery = animationDiscovery;
+        _wsModelResolver = wsModelResolver;
         _session = new TrustedAnimationPreviewFeatureSession(
             viewport,
             packFileService);
@@ -203,7 +225,10 @@ public partial class TrustedAnimationPreviewViewModel :
     public bool HasAnimationDiagnostic =>
         !string.IsNullOrWhiteSpace(Animation.Diagnostic);
 
-    public void LoadFile(PackFile file)
+    public void LoadFile(PackFile file) =>
+        _ = LoadFileAsync(file);
+
+    public async Task LoadFileAsync(PackFile file)
     {
         CancelModelDiscovery(false);
         CancelAnimationWork(false);
@@ -213,8 +238,16 @@ public partial class TrustedAnimationPreviewViewModel :
         SelectedAnimationCandidate = null;
         AnimationCandidates.Clear();
         CurrentFile = file;
-        _session.LoadModel(file);
-        NotifyPlaybackChanged();
+        if (!file.Name.EndsWith(
+                ".wsmodel",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _session.LoadModel(file);
+            NotifyPlaybackChanged();
+            return;
+        }
+
+        await LoadWsModelAsync(file);
     }
 
     public void Close()
@@ -353,12 +386,91 @@ public partial class TrustedAnimationPreviewViewModel :
         SelectedModelCandidate != null;
 
     [RelayCommand(CanExecute = nameof(CanUseSelectedModel))]
-    private void UseSelectedModel()
+    private async Task UseSelectedModel()
     {
         var candidate = SelectedModelCandidate;
         if (candidate == null)
             return;
-        LoadFile(candidate.File);
+        await LoadFileAsync(candidate.File);
+    }
+
+    private async Task LoadWsModelAsync(PackFile file)
+    {
+        var generation = Interlocked.Increment(
+            ref _modelScanGeneration);
+        var cancellation = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(
+            ref _modelScanCancellation,
+            cancellation);
+        previous?.Cancel();
+        _session.BeginModelLoad(file);
+        IsModelScanRunning = true;
+        ModelScanStatus = LocalizationManager.Instance.Get(
+            "AnimationWorkbench.ModelPicker.Loading");
+        try
+        {
+            var result = await _wsModelResolver.ResolveAsync(
+                file,
+                cancellation.Token);
+            if (generation != _modelScanGeneration ||
+                cancellation.IsCancellationRequested ||
+                _closed ||
+                !ReferenceEquals(file, CurrentFile))
+            {
+                return;
+            }
+
+            if (!result.IsSuccess || result.Resolution == null)
+            {
+                _session.ReportModelFailure(
+                    file,
+                    result.Diagnostic);
+                ModelScanStatus = result.Diagnostic;
+                IsModelPickerOpen = true;
+                return;
+            }
+
+            _session.LoadModel(
+                file,
+                result.Resolution.SkeletonGeometry,
+                result.Resolution.Skeleton);
+            ModelScanStatus = string.Format(
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.ModelPicker.Loaded"),
+                result.Resolution.GeometryCount,
+                result.Resolution.StaticAttachmentCount);
+            IsModelPickerOpen = !_session.State.IsReady;
+            NotifyPlaybackChanged();
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (generation == _modelScanGeneration && !_closed)
+            {
+                var diagnostic = string.Format(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.TrustedPreview.WsModelUnexpectedFailure"),
+                    exception.Message);
+                _session.ReportModelFailure(file, diagnostic);
+                ModelScanStatus = diagnostic;
+                IsModelPickerOpen = true;
+            }
+        }
+        finally
+        {
+            if (generation == _modelScanGeneration)
+            {
+                Interlocked.CompareExchange(
+                    ref _modelScanCancellation,
+                    null,
+                    cancellation);
+                IsModelScanRunning = false;
+            }
+            cancellation.Dispose();
+        }
     }
 
     public async Task StartAnimationDiscoveryAsync()

@@ -3,9 +3,13 @@ using GameWorld.Core.Animation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.Transforms;
+using Shared.GameFormats.RigidModel.Types;
+using System.Text;
 using System.Security.Cryptography;
 using Test.TestingUtility.Shared;
 
@@ -330,6 +334,185 @@ public class TrustedAnimationPreviewRealAssetTests
         });
     }
 
+    [Test]
+    [Explicit]
+    public void Yangjian_WsModelResolvesMaterialsTexturesAndAnimates()
+    {
+        var assetRoot = Environment.GetEnvironmentVariable(
+            "AE_TRUSTED_PREVIEW_ASSET_ROOT");
+        Assert.That(assetRoot, Is.Not.Null.And.Not.Empty);
+        var modelDiskPath = Path.Combine(
+            assetRoot!,
+            "test",
+            "yangjian.rigid_model_v2");
+        var skeletonDiskPath = Path.Combine(
+            assetRoot,
+            "animations",
+            "skeletons",
+            "yangjian_skeleton.anim");
+        var animationDiskPath = Path.Combine(
+            assetRoot,
+            "test",
+            "yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        var originalHashes = new[]
+        {
+            HashFile(modelDiskPath),
+            HashFile(skeletonDiskPath),
+            HashFile(animationDiskPath),
+        };
+
+        TestContext.Progress.WriteLine("Creating real wsmodel fixture.");
+        var runner = new AssetEditorTestRunner();
+        runner.PackFileService.EnforceGameFilesMustBeLoaded = false;
+        var container = CreateAcceptanceAssetContainer(assetRoot);
+        var model = container.FileList[@"test\yangjian.rigid_model_v2"];
+        var wsModel = AddWsModelResources(container, model);
+        runner.PackFileService.AddContainer(container);
+        var skeleton = runner.PackFileService.FindFile(
+            @"animations\skeletons\yangjian_skeleton.anim");
+        var animation = runner.PackFileService.FindFile(
+            @"test\yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        Assert.Multiple(() =>
+        {
+            Assert.That(skeleton, Is.Not.Null);
+            Assert.That(animation, Is.Not.Null);
+        });
+
+        var resolver = new TrustedWsModelResolver(
+            runner.PackFileService,
+            new TrustedRigidModelInspector());
+        TestContext.Progress.WriteLine("Resolving complete wsmodel graph.");
+        var resolutionResult = resolver.ResolveAsync(
+                wsModel,
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert.That(
+            resolutionResult.IsSuccess,
+            Is.True,
+            resolutionResult.Diagnostic);
+        var resolution = resolutionResult.Resolution!;
+        var parsedModel = ModelFactory.Create().Load(
+            model.DataSource.ReadData());
+        var expectedMaterialCount = parsedModel.ModelList.Sum(
+            lod => lod.Length);
+
+        TestContext.Progress.WriteLine("Loading complete wsmodel viewport.");
+        using var viewport = runner.ServiceProvider
+            .GetRequiredService<ITrustedAnimationPreviewViewport>();
+        var modelResult = viewport.Load(wsModel, resolution.Skeleton);
+        Assert.That(modelResult.IsSuccess, Is.True, modelResult.Diagnostic);
+        viewport.SetModelVisible(true);
+        viewport.SetSkeletonVisible(false);
+        viewport.ShowFront();
+        var frameZero = RenderFrame((WpfGameMock)viewport.GameWorld);
+
+        TestContext.Progress.WriteLine("Animating complete wsmodel.");
+        var sourceAnimation = AnimationFile.Create(animation!);
+        var animationResult = viewport.LoadAnimation(
+            sourceAnimation,
+            @"test\yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        Assert.That(
+            animationResult.IsSuccess,
+            Is.True,
+            animationResult.Diagnostic);
+        viewport.Seek(sourceAnimation.Header.AnimationTotalPlayTimeInSec / 2);
+        var middle = RenderFrame((WpfGameMock)viewport.GameWorld);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.GeometryCount, Is.EqualTo(1));
+            Assert.That(resolution.StaticAttachmentCount, Is.Zero);
+            Assert.That(resolution.Dependencies.Count(item =>
+                    item.Kind == TrustedModelDependencyKind.Material),
+                Is.EqualTo(expectedMaterialCount));
+            Assert.That(resolution.Dependencies.Count(item =>
+                    item.Kind == TrustedModelDependencyKind.Texture),
+                Is.GreaterThan(0));
+            Assert.That(modelResult.MeshCount,
+                Is.EqualTo(parsedModel.ModelList[0].Length));
+            Assert.That(
+                CountDifferentPixels(frameZero, middle),
+                Is.GreaterThan(100),
+                "The complete wsmodel did not animate in the real viewport.");
+            Assert.That(new[]
+            {
+                HashFile(modelDiskPath),
+                HashFile(skeletonDiskPath),
+                HashFile(animationDiskPath),
+            }, Is.EqualTo(originalHashes));
+        });
+    }
+
+    private static PackFile AddWsModelResources(
+        PackFileContainer container,
+        PackFile modelFile)
+    {
+        var model = ModelFactory.Create().Load(
+            modelFile.DataSource.ReadData());
+        var materialEntries = new StringBuilder();
+        for (var lodIndex = 0;
+             lodIndex < model.ModelList.Length;
+             lodIndex++)
+        {
+            for (var partIndex = 0;
+                 partIndex < model.ModelList[lodIndex].Length;
+                 partIndex++)
+            {
+                var materialPath =
+                    $@"test\ws_materials\yangjian_{lodIndex}_{partIndex}.xml";
+                var textures = new StringBuilder();
+                foreach (var texture in model.ModelList[lodIndex][partIndex]
+                             .Material.GetAllTextures()
+                             .Where(texture =>
+                                 !string.IsNullOrWhiteSpace(texture.Path))
+                             .DistinctBy(texture =>
+                                 (texture.TexureType, texture.Path)))
+                {
+                    textures.Append("<texture><slot>")
+                        .Append(GetTextureSlot(texture.TexureType))
+                        .Append("</slot><source>")
+                        .Append(System.Security.SecurityElement.Escape(
+                            texture.Path))
+                        .Append("</source></texture>");
+                }
+                var materialXml =
+                    "<material><name>weighted_standard_4</name>" +
+                    $"<textures>{textures}</textures></material>";
+                container.FileList[materialPath.ToLowerInvariant()] =
+                    PackFile.CreateFromBytes(
+                        Path.GetFileName(materialPath),
+                        Encoding.UTF8.GetBytes(materialXml));
+                materialEntries
+                    .Append($"<material lod_index=\"{lodIndex}\" ")
+                    .Append($"part_index=\"{partIndex}\">")
+                    .Append(materialPath)
+                    .Append("</material>");
+            }
+        }
+
+        var wsModelXml =
+            "<model><geometry>test\\yangjian.rigid_model_v2</geometry>" +
+            $"<materials>{materialEntries}</materials></model>";
+        var wsModel = PackFile.CreateFromBytes(
+            "yangjian.wsmodel",
+            Encoding.UTF8.GetBytes(wsModelXml));
+        container.FileList[@"test\yangjian.wsmodel"] = wsModel;
+        return wsModel;
+    }
+
+    private static string GetTextureSlot(TextureType type) => type switch
+    {
+        TextureType.BaseColour => "base_colour",
+        TextureType.MaterialMap => "material_map",
+        TextureType.Blood => "xml_blood_map",
+        TextureType.EmissiveDistortion => "t_xml_emissive_distortion",
+        TextureType.Emissive => "t_xml_emissive_texture",
+        TextureType.Distortion => "t_xml_distortion",
+        TextureType.DistortionNoise => "t_xml_distortion_noise",
+        _ => type.ToString(),
+    };
+
     private static PackFileContainer CreateAcceptanceAssetContainer(
         string assetRoot)
     {
@@ -352,6 +535,7 @@ public class TrustedAnimationPreviewRealAssetTests
         var container = new PackFileContainer("trusted-preview-real-assets")
         {
             SystemFilePath = assetRoot,
+            IsCaPackFile = true,
         };
         foreach (var relativePath in relativePaths)
         {

@@ -14,6 +14,7 @@ namespace Shared.GameFormats.WsModel
     public class WsModelFile
     {
         public string GeometryPath { get; set; } = "";
+        public List<string> GeometryPaths { get; set; } = [];
         public List<WsModelFileEntry> MaterialList { get; set; } = [];
 
         public WsModelFile(PackFile file)
@@ -24,8 +25,13 @@ namespace Shared.GameFormats.WsModel
             doc.LoadXml(xmlString);
 
             var geometryNodes = doc.SelectNodes(@"/model/geometry");
-            if (geometryNodes.Count != 0)
-                GeometryPath = geometryNodes.Item(0).InnerText;
+            if (geometryNodes != null)
+            {
+                foreach (XmlNode geometryNode in geometryNodes)
+                    GeometryPaths.Add(geometryNode.InnerText);
+            }
+            if (GeometryPaths.Count != 0)
+                GeometryPath = GeometryPaths[0];
 
             var materialNodes = doc.SelectNodes(@"/model/materials/material");
             if (materialNodes == null)

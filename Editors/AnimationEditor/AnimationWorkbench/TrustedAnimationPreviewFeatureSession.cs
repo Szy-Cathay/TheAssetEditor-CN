@@ -142,14 +142,60 @@ public sealed class TrustedAnimationPreviewFeatureSession(
         private set;
     }
 
-    public void LoadModel(PackFile model)
+    public void BeginModelLoad(PackFile model)
     {
         ArgumentNullException.ThrowIfNull(model);
         viewport.Clear();
         SkeletonIdentity = null;
+        SetFailure(CreateResourceState(model) with
+        {
+            IsResolved = false,
+        });
+    }
+
+    public void ReportModelFailure(
+        PackFile model,
+        string diagnostic)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        viewport.Clear();
+        SkeletonIdentity = null;
+        SetFailure(CreateResourceState(model) with
+        {
+            IsResolved = false,
+            Diagnostic = diagnostic,
+        });
+    }
+
+    public void LoadModel(PackFile model) =>
+        LoadModelCore(model, model, null, true);
+
+    public void LoadModel(
+        PackFile model,
+        PackFile skeletonGeometry,
+        PackFile skeleton) =>
+        LoadModelCore(
+            model,
+            skeletonGeometry,
+            skeleton,
+            false);
+
+    private void LoadModelCore(
+        PackFile model,
+        PackFile skeletonGeometry,
+        PackFile? resolvedSkeleton,
+        bool requireDirectModel)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(skeletonGeometry);
+        viewport.Clear();
+        SkeletonIdentity = null;
 
         var modelState = CreateResourceState(model);
-        if (!model.Name.EndsWith(
+        if ((requireDirectModel && !model.Name.EndsWith(
+                ".rigid_model_v2",
+                StringComparison.OrdinalIgnoreCase)) ||
+            !skeletonGeometry.Name.EndsWith(
                 ".rigid_model_v2",
                 StringComparison.OrdinalIgnoreCase))
         {
@@ -166,7 +212,7 @@ public sealed class TrustedAnimationPreviewFeatureSession(
         try
         {
             var header = ModelFactory.Create().LoadOnlyHeaders(
-                model.DataSource.ReadData()).Header;
+                skeletonGeometry.DataSource.ReadData()).Header;
             if (!string.Equals(
                     header.FileType,
                     "RMV2",
@@ -202,7 +248,8 @@ public sealed class TrustedAnimationPreviewFeatureSession(
 
         var skeletonPath =
             $"animations\\skeletons\\{skeletonName}.anim";
-        var skeleton = TrustedAnimationEffectiveResources.Find(
+        var skeleton = resolvedSkeleton ??
+            TrustedAnimationEffectiveResources.Find(
                 packFileService,
                 skeletonPath)?.File ??
             packFileService.FindFile(skeletonPath);
