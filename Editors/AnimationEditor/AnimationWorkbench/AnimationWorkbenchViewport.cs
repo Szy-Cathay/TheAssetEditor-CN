@@ -3,10 +3,18 @@ using Editors.Shared.Core.Common.AnimationPlayer;
 using Editors.Shared.Core.Common.BaseControl;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Animation;
+using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
+
+public sealed record AnimationWorkbenchPreviewModelState(
+    string ModelSkeletonName,
+    string TargetSkeletonName,
+    bool HasSkeletonMismatch,
+    int MeshCount = 0);
 
 public interface IAnimationWorkbenchViewport :
     IAnimationWorkbenchPreviewHost
@@ -14,6 +22,16 @@ public interface IAnimationWorkbenchViewport :
     IWpfGame GameWorld { get; }
 
     AnimationPlayerViewModel Player { get; }
+
+    AnimationWorkbenchPreviewModelState? CurrentModel { get; }
+
+    AnimationWorkbenchPreviewModelState? LoadModel(PackFile file);
+
+    void ClearModel();
+
+    void SetModelVisible(bool isVisible);
+
+    void SetSkeletonVisible(bool isVisible);
 }
 
 public sealed class AnimationWorkbenchViewport :
@@ -23,6 +41,8 @@ public sealed class AnimationWorkbenchViewport :
     private readonly SceneObjectEditor _sceneObjectEditor;
     private SceneObjectViewModel? _previewAsset;
     private PreviewSession? _activeSession;
+    private bool _showModel = true;
+    private bool _showSkeleton = true;
     private bool _disposed;
 
     public AnimationWorkbenchViewport(IEditorHostParameters parameters)
@@ -38,6 +58,8 @@ public sealed class AnimationWorkbenchViewport :
     public IWpfGame GameWorld { get; }
 
     public AnimationPlayerViewModel Player { get; }
+
+    public AnimationWorkbenchPreviewModelState? CurrentModel { get; private set; }
 
     public IAnimationWorkbenchPreviewSession Show(
         AnimationWorkbenchPreviewSnapshot preview,
@@ -65,7 +87,11 @@ public sealed class AnimationWorkbenchViewport :
             asset,
             preview.Animation.Clone(),
             preview.Name);
-        asset.ShowSkeleton.Value = true;
+        asset.ShowMesh.Value = _showModel;
+        asset.ShowSkeleton.Value = _showSkeleton;
+        CurrentModel = asset.ModelNode == null
+            ? null
+            : CreateModelState(asset);
         Player.IsEnabled.Value = true;
 
         var session = new PreviewSession(
@@ -74,6 +100,58 @@ public sealed class AnimationWorkbenchViewport :
             cancellationToken);
         _activeSession = session;
         return session;
+    }
+
+    public AnimationWorkbenchPreviewModelState? LoadModel(PackFile file)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(file);
+        if (_previewAsset == null)
+            return null;
+
+        var asset = _previewAsset.Data;
+        var previousModel = asset.ModelNode;
+        _sceneObjectEditor.SetMesh(asset, file, updateSkeleton: false);
+        if (asset.ModelNode == null ||
+            ReferenceEquals(asset.ModelNode, previousModel))
+        {
+            return null;
+        }
+
+        asset.ShowMesh.Value = _showModel;
+        asset.ShowSkeleton.Value = _showSkeleton;
+        CurrentModel = CreateModelState(asset);
+        return CurrentModel;
+    }
+
+    public void ClearModel()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_previewAsset?.Data.ModelNode == null)
+            return;
+
+        var asset = _previewAsset.Data;
+        asset.ParentNode.RemoveObject(asset.ModelNode);
+        asset.ModelNode = null!;
+        asset.MeshName.Value = string.Empty;
+        asset.TriggerMeshChanged();
+        CurrentModel = null;
+    }
+
+    public void SetModelVisible(bool isVisible)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _showModel = isVisible;
+        if (_previewAsset != null)
+            _previewAsset.Data.ShowMesh.Value = isVisible;
+    }
+
+    public void SetSkeletonVisible(bool isVisible)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _showSkeleton = isVisible;
+        if (_previewAsset != null)
+            _previewAsset.Data.ShowSkeleton.Value = isVisible;
     }
 
     public void Dispose()
@@ -92,6 +170,29 @@ public sealed class AnimationWorkbenchViewport :
         asset.ParentNode.Parent?.RemoveObject(asset.ParentNode);
         GameWorld.RemoveComponent(asset);
         _previewAsset = null;
+        CurrentModel = null;
+    }
+
+    private static AnimationWorkbenchPreviewModelState CreateModelState(
+        SceneObject asset)
+    {
+        var meshes = SceneNodeHelper
+            .GetChildrenOfType<Rmv2MeshNode>(asset.ModelNode);
+        var modelSkeletons = meshes
+            .Select(mesh => mesh.Geometry.SkeletonName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var targetSkeleton = asset.Skeleton?.SkeletonName ?? string.Empty;
+        var hasMismatch = modelSkeletons.Length != 0 &&
+            !modelSkeletons.Contains(
+                targetSkeleton,
+                StringComparer.OrdinalIgnoreCase);
+        return new AnimationWorkbenchPreviewModelState(
+            string.Join(", ", modelSkeletons),
+            targetSkeleton,
+            hasMismatch,
+            meshes.Count);
     }
 
     private void EndSession(PreviewSession session, SceneObject asset)

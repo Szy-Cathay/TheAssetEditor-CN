@@ -51,6 +51,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -79,30 +80,37 @@
                     Command="{Binding BrowseTargetSkeletonCommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.LoadTargetSkeleton}"
                     IsEnabled="{Binding IsWorkbenchEnabled}" />
+                <Button
+                    Grid.Column="3"
+                    Margin="8,0,0,0"
+                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.LoadPreviewModel}"
+                    Command="{Binding BrowsePreviewModelCommand}"
+                    Content="{loc:Loc AnimationWorkbench.Shell.LoadPreviewModel}"
+                    IsEnabled="{Binding CanBrowsePreviewModel}" />
 
                 <Button
-                    Grid.Column="4"
+                    Grid.Column="5"
                     Margin="0,0,8,0"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationA}"
                     Command="{Binding SelectAnimationACommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationA}"
                     IsEnabled="{Binding CanEdit}" />
                 <Button
-                    Grid.Column="5"
+                    Grid.Column="6"
                     Margin="0,0,8,0"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationB}"
                     Command="{Binding SelectAnimationBCommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.PreviewAnimationB}"
                     IsEnabled="{Binding CanSelectAnimationB}" />
                 <Button
-                    Grid.Column="6"
+                    Grid.Column="7"
                     AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewResult}"
                     Command="{Binding SelectResultCommand}"
                     Content="{loc:Loc AnimationWorkbench.Shell.PreviewResult}"
                     IsEnabled="{Binding CanSelectResult}" />
 
                 <StackPanel
-                    Grid.Column="8"
+                    Grid.Column="9"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
                     <TextBlock
@@ -157,7 +165,7 @@
                                     BorderThickness="0,0,0,1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="44" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock
@@ -169,7 +177,7 @@
                                                 Style="{StaticResource AeText.Body}"
                                                 Text="{Binding Name}"
                                                 TextTrimming="CharacterEllipsis"
-                                                ToolTip="{Binding Name}" />
+                                                ToolTip="{Binding FullPath}" />
                                             <TextBlock
                                                 Margin="0,4,0,0"
                                                 Style="{StaticResource AeText.Caption}"
@@ -218,11 +226,44 @@
                         Padding="8,4"
                         VerticalAlignment="Top"
                         Background="{DynamicResource AeBrush.Surface2}">
-                        <TextBlock
-                            MaxWidth="520"
-                            Style="{StaticResource AeText.Caption}"
-                            Text="{Binding StatusText}"
-                            TextWrapping="Wrap" />
+                        <StackPanel>
+                            <TextBlock
+                                MaxWidth="520"
+                                Style="{StaticResource AeText.Caption}"
+                                Text="{Binding StatusText}"
+                                TextWrapping="Wrap" />
+                            <StackPanel
+                                Margin="0,4,0,0"
+                                Orientation="Horizontal">
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource AeText.Caption}"
+                                    Text="{loc:Loc AnimationWorkbench.Shell.PreviewModelVisibility}" />
+                                <ToggleButton
+                                    Margin="2,0,8,0"
+                                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewModelVisibility}"
+                                    IsChecked="{Binding ShowPreviewModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    IsEnabled="{Binding HasPreviewModel}"
+                                    Style="{StaticResource AeButton.VisibilityToggle}"
+                                    ToolTip="{loc:Loc AnimationWorkbench.Shell.PreviewModelVisibility}" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource AeText.Caption}"
+                                    Text="{loc:Loc AnimationWorkbench.Shell.PreviewSkeletonVisibility}" />
+                                <ToggleButton
+                                    Margin="2,0,8,0"
+                                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.PreviewSkeletonVisibility}"
+                                    IsChecked="{Binding ShowPreviewSkeleton, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    IsEnabled="{Binding CanBrowsePreviewModel}"
+                                    Style="{StaticResource AeButton.VisibilityToggle}"
+                                    ToolTip="{loc:Loc AnimationWorkbench.Shell.PreviewSkeletonVisibility}" />
+                                <Button
+                                    AutomationProperties.Name="{loc:Loc AnimationWorkbench.Shell.ClearPreviewModel}"
+                                    Command="{Binding ClearPreviewModelCommand}"
+                                    Content="{loc:Loc AnimationWorkbench.Shell.ClearPreviewModel}"
+                                    IsEnabled="{Binding CanClearPreviewModel}" />
+                            </StackPanel>
+                        </StackPanel>
                     </Border>
                     <player:AnimationPlayerView
                         Grid.Row="1"

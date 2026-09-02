@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.Shared.Core.Common.AnimationPlayer;
@@ -27,7 +28,8 @@ public sealed record AnimationWorkbenchSourceItem(
     string Slot,
     string Name,
     string Details,
-    bool IsLoaded);
+    bool IsLoaded,
+    string FullPath);
 
 public sealed partial class AnimationWorkbenchViewModel :
     ObservableObject,
@@ -45,6 +47,8 @@ public sealed partial class AnimationWorkbenchViewModel :
     private AnimationWorkbenchSourceInput? _animationA;
     private AnimationWorkbenchSourceInput? _animationB;
     private GameSkeleton? _targetSkeleton;
+    private AnimationWorkbenchPreviewModelState? _previewModelState;
+    private string _previewModelPath = string.Empty;
     private AnimationWorkbenchTimelineController _timelineController;
     private AnimationWorkbenchMetaDataController _metaDataController;
     private AnimationWorkbenchBlendController? _blendController;
@@ -56,6 +60,8 @@ public sealed partial class AnimationWorkbenchViewModel :
     private string _statusText;
     private string _saveUnavailableReason;
     private bool _hasUnsavedChanges;
+    private bool _showPreviewModel = true;
+    private bool _showPreviewSkeleton = true;
     private bool _closed;
 
     public AnimationWorkbenchViewModel(
@@ -107,6 +113,13 @@ public sealed partial class AnimationWorkbenchViewModel :
     public bool CanBrowseAnimationB =>
         IsWarhammer3 && _animationA != null;
 
+    public bool CanBrowsePreviewModel =>
+        IsWarhammer3 && _targetSkeleton != null;
+
+    public bool HasPreviewModel => _previewModelState != null;
+
+    public bool CanClearPreviewModel => HasPreviewModel;
+
     public bool CanSelectAnimationB => _animationB != null;
 
     public bool CanSelectResult =>
@@ -115,6 +128,26 @@ public sealed partial class AnimationWorkbenchViewModel :
     public bool CanSave => CanEdit &&
         !HasActiveEditPreview(_document.GetState()) &&
         _packFileService.GetEditablePack() is FolderProjectContainer;
+
+    public bool ShowPreviewModel
+    {
+        get => _showPreviewModel;
+        set
+        {
+            if (SetProperty(ref _showPreviewModel, value))
+                _viewport.SetModelVisible(value);
+        }
+    }
+
+    public bool ShowPreviewSkeleton
+    {
+        get => _showPreviewSkeleton;
+        set
+        {
+            if (SetProperty(ref _showPreviewSkeleton, value))
+                _viewport.SetSkeletonVisible(value);
+        }
+    }
 
     public string StatusText
     {
@@ -316,6 +349,56 @@ public sealed partial class AnimationWorkbenchViewModel :
     }
 
     [RelayCommand]
+    private void BrowsePreviewModel()
+    {
+        if (!CanBrowsePreviewModel)
+            return;
+        var result = _dialogs.DisplayBrowseDialog(
+            [".variantmeshdefinition", ".wsmodel", ".rigid_model_v2"]);
+        if (!result.Result || result.File == null)
+            return;
+
+        try
+        {
+            var modelState = _viewport.LoadModel(result.File);
+            if (modelState == null)
+            {
+                SetShellFailure(
+                    "AnimationWorkbench.Shell.PreviewModelLoadFailed");
+                return;
+            }
+
+            _previewModelState = modelState;
+            _previewModelPath = _packFileService.GetFullPath(result.File);
+            _shellDiagnostics.Clear();
+            RefreshState();
+            if (!modelState.HasSkeletonMismatch)
+            {
+                StatusText = Localize(
+                    "AnimationWorkbench.Shell.PreviewModelLoaded");
+            }
+        }
+        catch (Exception)
+        {
+            SetShellFailure(
+                "AnimationWorkbench.Shell.PreviewModelLoadFailed");
+        }
+    }
+
+    [RelayCommand]
+    private void ClearPreviewModel()
+    {
+        if (!HasPreviewModel)
+            return;
+
+        _viewport.ClearModel();
+        _previewModelState = null;
+        _previewModelPath = string.Empty;
+        _shellDiagnostics.Clear();
+        RefreshState();
+    }
+
+    [RelayCommand]
     private void SelectAnimationA() => SelectPreview(
         AnimationWorkbenchPreviewKind.AnimationA);
 
@@ -428,6 +511,7 @@ public sealed partial class AnimationWorkbenchViewModel :
             _animationB,
             GameTypeEnum.Warhammer3,
             _targetSkeleton));
+        _previewModelState = _viewport.CurrentModel;
         TimelineController.Changed -= Controller_Changed;
         MetaDataController.Changed -= Controller_Changed;
         TimelineController = new AnimationWorkbenchTimelineController(
@@ -494,6 +578,7 @@ public sealed partial class AnimationWorkbenchViewModel :
             Localize("AnimationWorkbench.Shell.SourceSlotB"),
             state.AnimationB,
             "AnimationWorkbench.Shell.AnimationBOptional"));
+        Sources.Add(CreatePreviewModelItem());
 
         BoneNames.Clear();
         if (_targetSkeleton != null)
@@ -513,6 +598,13 @@ public sealed partial class AnimationWorkbenchViewModel :
             Diagnostics.Add(Localize(diagnostic.ReasonKey));
         AddFormatDiagnostics(_animationA);
         AddFormatDiagnostics(_animationB);
+        if (_previewModelState?.HasSkeletonMismatch == true)
+        {
+            Diagnostics.Add(LocalizationManager.Instance.GetFormat(
+                "AnimationWorkbench.Shell.PreviewModelSkeletonMismatch",
+                _previewModelState.ModelSkeletonName,
+                _previewModelState.TargetSkeletonName));
+        }
 
         HasUnsavedChanges = state.IsDirty;
         SaveUnavailableReason = GetSaveUnavailableReason(state);
@@ -524,6 +616,9 @@ public sealed partial class AnimationWorkbenchViewModel :
         OnPropertyChanged(nameof(IsWorkbenchEnabled));
         OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanBrowseAnimationB));
+        OnPropertyChanged(nameof(CanBrowsePreviewModel));
+        OnPropertyChanged(nameof(HasPreviewModel));
+        OnPropertyChanged(nameof(CanClearPreviewModel));
         OnPropertyChanged(nameof(CanSelectAnimationB));
         OnPropertyChanged(nameof(CanSelectResult));
         OnPropertyChanged(nameof(CanSave));
@@ -611,7 +706,8 @@ public sealed partial class AnimationWorkbenchViewModel :
                 slot,
                 Localize(emptyKey),
                 "",
-                false)
+                false,
+                "")
             : new AnimationWorkbenchSourceItem(
                 slot,
                 summary.Name,
@@ -620,7 +716,37 @@ public sealed partial class AnimationWorkbenchViewModel :
                     summary.FrameCount,
                     summary.Duration.TotalSeconds,
                     summary.SkeletonName),
-                true);
+                true,
+                summary.Name);
+
+    private AnimationWorkbenchSourceItem CreatePreviewModelItem()
+    {
+        if (_previewModelState == null)
+        {
+            return new AnimationWorkbenchSourceItem(
+                Localize("AnimationWorkbench.Shell.PreviewModelSlot"),
+                Localize("AnimationWorkbench.Shell.PreviewModelMissing"),
+                string.Empty,
+                false,
+                string.Empty);
+        }
+
+        var modelSkeleton = string.IsNullOrWhiteSpace(
+            _previewModelState.ModelSkeletonName)
+                ? Localize(
+                    "AnimationWorkbench.Shell.PreviewModelSkeletonUnknown")
+                : _previewModelState.ModelSkeletonName;
+        return new AnimationWorkbenchSourceItem(
+            Localize("AnimationWorkbench.Shell.PreviewModelSlot"),
+            Path.GetFileName(_previewModelPath),
+            LocalizationManager.Instance.GetFormat(
+                "AnimationWorkbench.Shell.PreviewModelDetailsFormat",
+                modelSkeleton,
+                _previewModelState.TargetSkeletonName,
+                _previewModelState.MeshCount),
+            true,
+            _previewModelPath);
+    }
 
     private static string Localize(string key) =>
         LocalizationManager.Instance.Get(key);

@@ -213,6 +213,96 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
+    public void PreviewModel_LoadsTogglesAndClearsWithoutReplacingSkeleton()
+    {
+        var animationFile = CreateAnimationFile();
+        var animation = PackFile.CreateFromBytes(
+            "idle.anim",
+            AnimationFile.ConvertToBytes(animationFile));
+        var model = PackFile.CreateFromBytes(
+            "yangjian.rigid_model_v2",
+            [1]);
+        var packFileService = new Mock<IPackFileService>();
+        packFileService.Setup(service => service.GetFullPath(
+                animation,
+                null))
+            .Returns("animations\\idle.anim");
+        packFileService.Setup(service => service.GetFullPath(
+                model,
+                null))
+            .Returns("test\\yangjian.rigid_model_v2");
+        var skeletonLookup = new Mock<ISkeletonAnimationLookUpHelper>();
+        skeletonLookup.Setup(helper => helper.GetSkeletonFileFromName(
+                "test_skeleton"))
+            .Returns(CreateAnimationFile());
+        var viewport = new Mock<IAnimationWorkbenchViewport>();
+        viewport.Setup(candidate => candidate.Show(
+                It.IsAny<AnimationWorkbenchPreviewSnapshot>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Mock.Of<IAnimationWorkbenchPreviewSession>());
+        viewport.Setup(candidate => candidate.LoadModel(model))
+            .Returns(new AnimationWorkbenchPreviewModelState(
+                "other_skeleton",
+                "test_skeleton",
+                true));
+        var dialogs = new Mock<IStandardDialogs>();
+        dialogs.Setup(candidate => candidate.DisplayBrowseDialog(
+                It.IsAny<List<string>>()))
+            .Returns(new BrowseDialogResultFile(true, model));
+        var viewModel = new AnimationWorkbenchViewModel(
+            viewport.Object,
+            packFileService.Object,
+            skeletonLookup.Object,
+            dialogs.Object,
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3));
+        viewModel.LoadFile(animation);
+
+        viewModel.BrowsePreviewModelCommand.Execute(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.HasPreviewModel, Is.True);
+            NUnitAssert.That(viewModel.CanClearPreviewModel, Is.True);
+            NUnitAssert.That(viewModel.Sources, Has.Count.EqualTo(3));
+            NUnitAssert.That(viewModel.Sources[2].Name,
+                Is.EqualTo("yangjian.rigid_model_v2"));
+            NUnitAssert.That(viewModel.Sources[2].FullPath,
+                Is.EqualTo("test\\yangjian.rigid_model_v2"));
+            NUnitAssert.That(viewModel.Sources[2].Details,
+                Does.Contain("other_skeleton"));
+            NUnitAssert.That(viewModel.Diagnostics,
+                Has.Some.Contains("不匹配"));
+        });
+        dialogs.Verify(candidate => candidate.DisplayBrowseDialog(
+                It.Is<List<string>>(extensions => extensions.SequenceEqual(
+                    new[]
+                    {
+                        ".variantmeshdefinition",
+                        ".wsmodel",
+                        ".rigid_model_v2",
+                    }))),
+            Times.Once);
+
+        viewModel.ShowPreviewModel = false;
+        viewModel.ShowPreviewSkeleton = false;
+        viewport.Verify(candidate => candidate.SetModelVisible(false),
+            Times.Once);
+        viewport.Verify(candidate => candidate.SetSkeletonVisible(false),
+            Times.Once);
+
+        viewModel.ClearPreviewModelCommand.Execute(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.HasPreviewModel, Is.False);
+            NUnitAssert.That(viewModel.CanClearPreviewModel, Is.False);
+            NUnitAssert.That(viewModel.Sources[2].IsLoaded, Is.False);
+        });
+        viewport.Verify(candidate => candidate.ClearModel(), Times.Once);
+        viewModel.Close();
+    }
+
+    [Test]
     public void BaseAnimationTab_BindsControllerAndBrowseCommand()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -461,6 +551,10 @@ public class AnimationWorkbenchShellTests
             NUnitAssert.That(source,
                 Does.Contain("AnimationWorkbenchBaseAnimationView"));
             NUnitAssert.That(source,
+                Does.Contain("AnimationWorkbench.Shell.LoadPreviewModel"));
+            NUnitAssert.That(source,
+                Does.Contain("AeButton.VisibilityToggle"));
+            NUnitAssert.That(source,
                 Does.Contain("AutomationProperties.Name"));
             NUnitAssert.That(source, Does.Contain("AeFocus.Keyboard"));
             NUnitAssert.That(
@@ -490,6 +584,13 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbench.Shell.SaveUnavailable",
             "AnimationWorkbench.Shell.SourceSlotA",
             "AnimationWorkbench.Shell.SourceSlotB",
+            "AnimationWorkbench.Shell.LoadPreviewModel",
+            "AnimationWorkbench.Shell.PreviewModelSlot",
+            "AnimationWorkbench.Shell.PreviewModelLoadFailed",
+            "AnimationWorkbench.Shell.PreviewModelSkeletonMismatch",
+            "AnimationWorkbench.Shell.PreviewModelVisibility",
+            "AnimationWorkbench.Shell.PreviewSkeletonVisibility",
+            "AnimationWorkbench.Shell.ClearPreviewModel",
             "AnimationWorkbench.Shell.BaseAnimation",
             "AnimationWorkbench.BaseAnimation.Title",
             "AnimationWorkbench.BaseAnimation.AnimationSetHint",
@@ -524,7 +625,10 @@ public class AnimationWorkbenchShellTests
                              })
                     {
                         ThemesController.SetTheme(theme);
-                        var view = new AnimationWorkbenchView();
+                        var view = new AnimationWorkbenchView
+                        {
+                            DataContext = new WorkbenchShellPreviewState(),
+                        };
                         var window = new Window
                         {
                             Width = 1600,
@@ -557,6 +661,9 @@ public class AnimationWorkbenchShellTests
                                 Is.GreaterThan(0), theme.ToString());
                             NUnitAssert.That(bitmap.PixelHeight,
                                 Is.GreaterThan(0), theme.ToString());
+                            SaveWindowForVisualReview(
+                                window,
+                                $"shell-{theme}");
                         }
                         finally
                         {
@@ -951,6 +1058,39 @@ public class AnimationWorkbenchShellTests
         public long ProgressMaximum { get; init; } = 1;
         public string ProgressDetail { get; init; } = string.Empty;
         public ICommand? ActiveCancelCommand { get; init; }
+    }
+
+    private sealed class WorkbenchShellPreviewState
+    {
+        public bool IsWorkbenchEnabled => true;
+        public bool CanBrowseAnimationB => true;
+        public bool CanBrowsePreviewModel => true;
+        public bool CanEdit => true;
+        public bool CanSelectAnimationB => true;
+        public bool CanSelectResult => true;
+        public bool CanSave => true;
+        public bool HasPreviewModel => true;
+        public bool CanClearPreviewModel => true;
+        public bool ShowPreviewModel { get; set; } = true;
+        public bool ShowPreviewSkeleton { get; set; } = true;
+        public string StatusText =>
+            "预览模型已加载，现在可以直接观察动画在模型上的实际效果。";
+        public string SaveUnavailableReason => "可以另存为新动画。";
+        public IReadOnlyList<AnimationWorkbenchSourceItem> Sources { get; } =
+        [
+            new("A", "yangjian_idle.anim",
+                "241 帧 · 4.017 秒 · yangjian_skeleton",
+                true,
+                @"test\yangjian_idle.anim"),
+            new("B", "动画 B（可选）", string.Empty, false, string.Empty),
+            new("模型", "yangjian.rigid_model_v2",
+                "模型骨架 yangjian_skeleton · 动画骨架 yangjian_skeleton · 8 个网格",
+                true,
+                @"test\yangjian.rigid_model_v2"),
+        ];
+        public IReadOnlyList<string> BoneNames { get; } =
+            ["root", "pelvis", "spine_01", "spine_02", "head"];
+        public IReadOnlyList<string> Diagnostics { get; } = [];
     }
 
     private sealed class BaseAnimationRowState
