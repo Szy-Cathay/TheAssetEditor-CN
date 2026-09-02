@@ -8,6 +8,8 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
+using Shared.GameFormats.Animation;
+using System.Windows;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
 
@@ -19,8 +21,11 @@ public partial class TrustedAnimationPreviewViewModel :
     private readonly ITrustedAnimationPreviewViewport _viewport;
     private readonly TrustedAnimationPreviewFeatureSession _session;
     private readonly ITrustedAnimationModelDiscovery _modelDiscovery;
+    private readonly ITrustedAnimationDiscovery _animationDiscovery;
     private CancellationTokenSource? _modelScanCancellation;
+    private CancellationTokenSource? _animationCancellation;
     private int _modelScanGeneration;
+    private int _animationGeneration;
     private bool _closed;
 
     [ObservableProperty]
@@ -45,27 +50,63 @@ public partial class TrustedAnimationPreviewViewModel :
     [NotifyCanExecuteChangedFor(nameof(UseSelectedModelCommand))]
     private TrustedAnimationModelCandidate? _selectedModelCandidate;
 
+    [ObservableProperty]
+    private bool _isAnimationPickerOpen;
+
+    [ObservableProperty]
+    private bool _isAnimationScanRunning;
+
+    [ObservableProperty]
+    private string _animationSearchText = string.Empty;
+
+    [ObservableProperty]
+    private string _animationScanStatus;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UseSelectedAnimationCommand))]
+    private TrustedAnimationCandidate? _selectedAnimationCandidate;
+
     public TrustedAnimationPreviewViewModel(
         ITrustedAnimationPreviewViewport viewport,
         IPackFileService packFileService,
         ITrustedAnimationModelDiscovery modelDiscovery)
+        : this(
+            viewport,
+            packFileService,
+            modelDiscovery,
+            new TrustedAnimationDiscovery(packFileService))
+    {
+    }
+
+    public TrustedAnimationPreviewViewModel(
+        ITrustedAnimationPreviewViewport viewport,
+        IPackFileService packFileService,
+        ITrustedAnimationModelDiscovery modelDiscovery,
+        ITrustedAnimationDiscovery animationDiscovery)
     {
         _viewport = viewport;
         _modelDiscovery = modelDiscovery;
+        _animationDiscovery = animationDiscovery;
         _session = new TrustedAnimationPreviewFeatureSession(
             viewport,
             packFileService);
         _session.StateChanged += OnStateChanged;
+        _viewport.PlaybackChanged += OnPlaybackChanged;
         DisplayName = LocalizationManager.Instance.Get(
             "DisplayName.AnimationWorkbench");
         ModelScanStatus = LocalizationManager.Instance.Get(
             "AnimationWorkbench.ModelPicker.Ready");
+        AnimationScanStatus = LocalizationManager.Instance.Get(
+            "AnimationWorkbench.AnimationPicker.Ready");
         ModelCandidatesView = CollectionViewSource.GetDefaultView(
             ModelCandidates);
         ModelCandidatesView.GroupDescriptions.Add(
             new PropertyGroupDescription(
                 nameof(TrustedAnimationModelCandidate.SourceGroup)));
         ModelCandidatesView.Filter = MatchesModelSearch;
+        AnimationCandidatesView = CollectionViewSource.GetDefaultView(
+            AnimationCandidates);
+        AnimationCandidatesView.Filter = MatchesAnimationSearch;
     }
 
     public string DisplayName { get; set; }
@@ -83,6 +124,12 @@ public partial class TrustedAnimationPreviewViewModel :
     public TrustedAnimationPreviewResourceState Animation =>
         _session.State.Animation;
 
+    public string AnimationPathText =>
+        string.IsNullOrWhiteSpace(Animation.Path)
+            ? LocalizationManager.Instance.Get(
+                "AnimationWorkbench.TrustedPreview.NotSelected")
+            : Animation.Path;
+
     public bool IsReady => _session.State.IsReady;
 
     public int MeshCount => _session.State.MeshCount;
@@ -91,6 +138,45 @@ public partial class TrustedAnimationPreviewViewModel :
         ModelCandidates { get; } = [];
 
     public ICollectionView ModelCandidatesView { get; }
+
+    public ObservableCollection<TrustedAnimationCandidate>
+        AnimationCandidates { get; } = [];
+
+    public ICollectionView AnimationCandidatesView { get; }
+
+    public TrustedAnimationPlaybackState PlaybackState =>
+        _viewport.PlaybackState ?? TrustedAnimationPlaybackState.Empty;
+
+    public bool HasAnimation => PlaybackState.HasAnimation;
+
+    public bool IsPlaying => PlaybackState.IsPlaying;
+
+    public double PlaybackMaximum =>
+        Math.Max(0, PlaybackState.DurationSeconds);
+
+    public double CurrentTimeSeconds
+    {
+        get => PlaybackState.CurrentTimeSeconds;
+        set
+        {
+            if (!HasAnimation ||
+                Math.Abs(value - PlaybackState.CurrentTimeSeconds) < 0.0001)
+            {
+                return;
+            }
+            _viewport.Seek(value);
+            NotifyPlaybackChanged();
+        }
+    }
+
+    public string PlaybackSummary => string.Format(
+        LocalizationManager.Instance.Get(
+            "AnimationWorkbench.TrustedPreview.PlaybackSummary"),
+        PlaybackState.CurrentTimeSeconds,
+        PlaybackState.DurationSeconds,
+        PlaybackState.CurrentFrame,
+        PlaybackState.FrameCount,
+        PlaybackState.FramesPerSecond);
 
     public bool HasModelDiagnostic =>
         !string.IsNullOrWhiteSpace(Model.Diagnostic);
@@ -104,17 +190,24 @@ public partial class TrustedAnimationPreviewViewModel :
     public void LoadFile(PackFile file)
     {
         CancelModelDiscovery(false);
+        CancelAnimationWork(false);
         IsModelPickerOpen = false;
+        IsAnimationPickerOpen = false;
         SelectedModelCandidate = null;
+        SelectedAnimationCandidate = null;
+        AnimationCandidates.Clear();
         CurrentFile = file;
         _session.LoadModel(file);
+        NotifyPlaybackChanged();
     }
 
     public void Close()
     {
         _closed = true;
         CancelModelDiscovery(false);
+        CancelAnimationWork(false);
         _session.StateChanged -= OnStateChanged;
+        _viewport.PlaybackChanged -= OnPlaybackChanged;
         _viewport.Dispose();
     }
 
@@ -209,6 +302,9 @@ public partial class TrustedAnimationPreviewViewModel :
     partial void OnModelSearchTextChanged(string value) =>
         ModelCandidatesView.Refresh();
 
+    partial void OnAnimationSearchTextChanged(string value) =>
+        AnimationCandidatesView.Refresh();
+
     [RelayCommand]
     private void FocusModel() => _viewport.FocusModel();
 
@@ -221,6 +317,8 @@ public partial class TrustedAnimationPreviewViewModel :
     [RelayCommand]
     private async Task OpenModelPicker()
     {
+        CancelAnimationWork(false);
+        IsAnimationPickerOpen = false;
         IsModelPickerOpen = true;
         await StartModelDiscoveryAsync();
     }
@@ -247,16 +345,226 @@ public partial class TrustedAnimationPreviewViewModel :
         LoadFile(candidate.File);
     }
 
+    public async Task StartAnimationDiscoveryAsync()
+    {
+        var skeleton = _session.SkeletonIdentity;
+        if (_closed || !IsReady || skeleton == null)
+            return;
+
+        var generation = Interlocked.Increment(
+            ref _animationGeneration);
+        var cancellation = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(
+            ref _animationCancellation,
+            cancellation);
+        previous?.Cancel();
+        AnimationCandidates.Clear();
+        SelectedAnimationCandidate = null;
+        IsAnimationScanRunning = true;
+        AnimationScanStatus = FormatAnimationScanStatus(
+            "AnimationWorkbench.AnimationPicker.Scanning",
+            0);
+
+        try
+        {
+            await foreach (var batch in _animationDiscovery.DiscoverAsync(
+                               skeleton,
+                               cancellation.Token))
+            {
+                if (generation != _animationGeneration ||
+                    cancellation.IsCancellationRequested ||
+                    _closed ||
+                    !ReferenceEquals(
+                        skeleton,
+                        _session.SkeletonIdentity))
+                {
+                    return;
+                }
+
+                using (AnimationCandidatesView.DeferRefresh())
+                {
+                    foreach (var candidate in batch)
+                        AnimationCandidates.Add(candidate);
+                }
+                AnimationScanStatus = FormatAnimationScanStatus(
+                    "AnimationWorkbench.AnimationPicker.Scanning",
+                    AnimationCandidates.Count);
+            }
+
+            if (generation == _animationGeneration && !_closed)
+            {
+                AnimationScanStatus = FormatAnimationScanStatus(
+                    "AnimationWorkbench.AnimationPicker.Complete",
+                    AnimationCandidates.Count);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+            if (generation == _animationGeneration && !_closed)
+            {
+                AnimationScanStatus = FormatAnimationScanStatus(
+                    "AnimationWorkbench.AnimationPicker.Cancelled",
+                    AnimationCandidates.Count);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (generation == _animationGeneration && !_closed)
+            {
+                AnimationScanStatus = string.Format(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.AnimationPicker.Failed"),
+                    exception.Message);
+            }
+        }
+        finally
+        {
+            if (generation == _animationGeneration)
+            {
+                Interlocked.CompareExchange(
+                    ref _animationCancellation,
+                    null,
+                    cancellation);
+                IsAnimationScanRunning = false;
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenAnimationPicker()
+    {
+        CancelModelDiscovery(false);
+        IsModelPickerOpen = false;
+        IsAnimationPickerOpen = true;
+        await StartAnimationDiscoveryAsync();
+    }
+
+    [RelayCommand]
+    private void CancelAnimationScan() => CancelAnimationWork(true);
+
+    [RelayCommand]
+    private void CloseAnimationPicker()
+    {
+        CancelAnimationWork(false);
+        IsAnimationPickerOpen = false;
+    }
+
+    private bool CanUseSelectedAnimation() =>
+        SelectedAnimationCandidate != null;
+
+    [RelayCommand(CanExecute = nameof(CanUseSelectedAnimation))]
+    private async Task UseSelectedAnimation()
+    {
+        var candidate = SelectedAnimationCandidate;
+        var skeleton = _session.SkeletonIdentity;
+        if (candidate == null || skeleton == null)
+            return;
+
+        var generation = Interlocked.Increment(
+            ref _animationGeneration);
+        var cancellation = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(
+            ref _animationCancellation,
+            cancellation);
+        previous?.Cancel();
+        IsAnimationScanRunning = true;
+        AnimationScanStatus = LocalizationManager.Instance.Get(
+            "AnimationWorkbench.AnimationPicker.Loading");
+        try
+        {
+            var animation = await Task.Run(
+                () =>
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    return AnimationFile.Create(candidate.File);
+                },
+                cancellation.Token);
+            if (generation != _animationGeneration ||
+                cancellation.IsCancellationRequested ||
+                _closed ||
+                !ReferenceEquals(skeleton, _session.SkeletonIdentity))
+            {
+                return;
+            }
+
+            _session.LoadAnimation(candidate, animation);
+            IsAnimationPickerOpen = !_session.State.Animation.IsResolved;
+            NotifyPlaybackChanged();
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            _session.ReportAnimationFailure(
+                candidate,
+                exception.Message);
+            AnimationScanStatus = string.Format(
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.AnimationPicker.Failed"),
+                exception.Message);
+        }
+        finally
+        {
+            if (generation == _animationGeneration)
+            {
+                Interlocked.CompareExchange(
+                    ref _animationCancellation,
+                    null,
+                    cancellation);
+                IsAnimationScanRunning = false;
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    [RelayCommand]
+    private void TogglePlayback()
+    {
+        if (!HasAnimation)
+            return;
+        if (IsPlaying)
+            _viewport.Pause();
+        else
+            _viewport.Play();
+        NotifyPlaybackChanged();
+    }
+
     private void OnStateChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(Model));
         OnPropertyChanged(nameof(Skeleton));
         OnPropertyChanged(nameof(Animation));
+        OnPropertyChanged(nameof(AnimationPathText));
         OnPropertyChanged(nameof(IsReady));
         OnPropertyChanged(nameof(MeshCount));
         OnPropertyChanged(nameof(HasModelDiagnostic));
         OnPropertyChanged(nameof(HasSkeletonDiagnostic));
         OnPropertyChanged(nameof(HasAnimationDiagnostic));
+    }
+
+    private void OnPlaybackChanged(object? sender, EventArgs e)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(NotifyPlaybackChanged);
+            return;
+        }
+        NotifyPlaybackChanged();
+    }
+
+    private void NotifyPlaybackChanged()
+    {
+        OnPropertyChanged(nameof(PlaybackState));
+        OnPropertyChanged(nameof(HasAnimation));
+        OnPropertyChanged(nameof(IsPlaying));
+        OnPropertyChanged(nameof(PlaybackMaximum));
+        OnPropertyChanged(nameof(CurrentTimeSeconds));
+        OnPropertyChanged(nameof(PlaybackSummary));
     }
 
     private void CancelModelDiscovery(bool showCancelledStatus)
@@ -275,6 +583,22 @@ public partial class TrustedAnimationPreviewViewModel :
         }
     }
 
+    private void CancelAnimationWork(bool showCancelledStatus)
+    {
+        Interlocked.Increment(ref _animationGeneration);
+        var cancellation = Interlocked.Exchange(
+            ref _animationCancellation,
+            null);
+        cancellation?.Cancel();
+        IsAnimationScanRunning = false;
+        if (showCancelledStatus)
+        {
+            AnimationScanStatus = FormatAnimationScanStatus(
+                "AnimationWorkbench.AnimationPicker.Cancelled",
+                AnimationCandidates.Count);
+        }
+    }
+
     private bool MatchesModelSearch(object item)
     {
         if (item is not TrustedAnimationModelCandidate candidate)
@@ -289,7 +613,30 @@ public partial class TrustedAnimationPreviewViewModel :
                 StringComparison.OrdinalIgnoreCase);
     }
 
+    private bool MatchesAnimationSearch(object item)
+    {
+        if (item is not TrustedAnimationCandidate candidate)
+            return false;
+        var query = AnimationSearchText.Trim();
+        return query.Length == 0 ||
+            candidate.Name.Contains(
+                query,
+                StringComparison.OrdinalIgnoreCase) ||
+            candidate.Path.Contains(
+                query,
+                StringComparison.OrdinalIgnoreCase) ||
+            candidate.SourcePack.Contains(
+                query,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FormatModelScanStatus(
+        string key,
+        int count) => string.Format(
+            LocalizationManager.Instance.Get(key),
+            count);
+
+    private static string FormatAnimationScanStatus(
         string key,
         int count) => string.Format(
             LocalizationManager.Instance.Get(key),

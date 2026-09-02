@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Threading.Channels;
 using System.Windows.Threading;
 using System.Windows.Data;
 using System.Xml.Linq;
@@ -810,6 +811,177 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
+    public void TrustedSession_LoadsExactVersionEightAnimationOnCurrentSkeleton()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var animationFile = CreateAnimationFile("humanoid01");
+        animationFile.Header.Version = 8;
+        var animation = PackFile.CreateFromBytes(
+            "idle.anim",
+            AnimationFile.ConvertToBytes(animationFile));
+        var parsedAnimation = AnimationFile.Create(animation);
+        var candidate = new TrustedAnimationCandidate(
+            animation,
+            "idle",
+            @"animations\battle\idle.anim",
+            "my_mod.pack",
+            @"C:\mods\my_mod.pack",
+            TrustedAnimationModelSourceRole.FolderProject,
+            8,
+            1,
+            0.05,
+            20);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        viewport.Setup(item => item.LoadAnimation(
+                parsedAnimation,
+                candidate.Path))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+        session.LoadAnimation(candidate, parsedAnimation);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.Animation.IsResolved, Is.True);
+            NUnitAssert.That(session.State.Animation.Path,
+                Is.EqualTo(candidate.Path));
+            NUnitAssert.That(session.State.Animation.Source,
+                Is.EqualTo(candidate.SourcePack));
+            NUnitAssert.That(session.SkeletonIdentity, Is.Not.Null);
+        });
+        viewport.Verify(item => item.LoadAnimation(
+            parsedAnimation,
+            candidate.Path), Times.Once);
+    }
+
+    [Test]
+    public void TrustedSession_RejectsHelperBoneWithActionableAnimationDiagnostic()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var animationFile = CreateAnimationFile("humanoid01");
+        animationFile.Header.Version = 8;
+        animationFile.Bones =
+        [
+            .. animationFile.Bones,
+            new AnimationFile.BoneInfo
+            {
+                Id = 1,
+                Name = "helper",
+                ParentId = 0,
+            },
+        ];
+        var candidate = new TrustedAnimationCandidate(
+            PackFile.CreateFromBytes("helper.anim", [1]),
+            "helper",
+            @"animations\battle\helper.anim",
+            "reference.pack",
+            @"C:\packs\reference.pack",
+            TrustedAnimationModelSourceRole.ReferencePack,
+            8,
+            1,
+            0.05,
+            20);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+
+        session.LoadModel(model);
+        session.LoadAnimation(candidate, animationFile);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(session.State.Animation.IsResolved, Is.False);
+            NUnitAssert.That(session.State.Animation.Diagnostic,
+                Does.Contain(candidate.Path));
+            NUnitAssert.That(session.State.Animation.Diagnostic,
+                Does.Contain(candidate.SourcePack));
+            NUnitAssert.That(session.State.Animation.Diagnostic,
+                Does.Contain("2 个骨骼"));
+            NUnitAssert.That(session.State.Animation.Diagnostic,
+                Does.Contain("1 个骨骼"));
+        });
+        viewport.Verify(item => item.LoadAnimation(
+            It.IsAny<AnimationFile>(),
+            It.IsAny<string>()), Times.Never);
+    }
+
+    [Test]
+    public async Task TrustedViewModel_ModelReloadRejectsLateAnimationResults()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        viewport.SetupGet(item => item.PlaybackState)
+            .Returns(TrustedAnimationPlaybackState.Empty);
+        var discovery = new ControllableAnimationDiscovery();
+        var viewModel = new TrustedAnimationPreviewViewModel(
+            viewport.Object,
+            packFileService.Object,
+            Mock.Of<ITrustedAnimationModelDiscovery>(),
+            discovery);
+        viewModel.LoadFile(model);
+
+        var scan = viewModel.StartAnimationDiscoveryAsync();
+        await discovery.Started;
+        viewModel.LoadFile(model);
+        await discovery.Writer.WriteAsync(new[]
+        {
+            new TrustedAnimationCandidate(
+                PackFile.CreateFromBytes("late.anim", [1]),
+                "late",
+                @"animations\battle\late.anim",
+                "data.pack",
+                @"C:\packs\data.pack",
+                TrustedAnimationModelSourceRole.CaPack,
+                8,
+                10,
+                0.5,
+                20),
+        });
+        discovery.Writer.TryComplete();
+        await scan;
+
+        NUnitAssert.That(viewModel.AnimationCandidates, Is.Empty);
+        viewModel.Close();
+    }
+
+    [Test]
     public void TrustedPreviewXaml_IsFlatModelFirstWorkspace()
     {
         var xamlPath = Path.Combine(
@@ -919,6 +1091,69 @@ public class AnimationWorkbenchShellTests
                         {
                             window.Close();
                         }
+                    }
+                }
+                finally
+                {
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+    }
+
+    [Test]
+    public void TrustedPreview_AnimationPickerRendersFlatMetadataRows()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices,
+            () =>
+            {
+                var previousTheme = ThemesController.CurrentTheme;
+                try
+                {
+                    ThemesController.SetTheme(ThemeType.DarkTheme);
+                    var view = new TrustedAnimationPreviewView
+                    {
+                        DataContext = new TrustedPreviewShellState(true),
+                    };
+                    var window = new Window
+                    {
+                        Width = 1280,
+                        Height = 820,
+                        Content = view,
+                        ShowActivated = false,
+                        ShowInTaskbar = false,
+                        WindowStyle = WindowStyle.None,
+                    };
+                    try
+                    {
+                        window.Show();
+                        window.UpdateLayout();
+                        window.Dispatcher.Invoke(
+                            () => { },
+                            DispatcherPriority.ApplicationIdle);
+                        window.UpdateLayout();
+                        var animationList = FindDescendants<ListBox>(view)
+                            .Single(list => AutomationProperties.GetName(list) ==
+                                LocalizationManager.Instance.Get(
+                                    "AnimationWorkbench.AnimationPicker.Results"));
+                        NUnitAssert.Multiple(() =>
+                        {
+                            NUnitAssert.That(animationList.Items.Count,
+                                Is.EqualTo(2));
+                            NUnitAssert.That(
+                                ScrollViewer.GetHorizontalScrollBarVisibility(
+                                    animationList),
+                                Is.EqualTo(ScrollBarVisibility.Disabled));
+                            NUnitAssert.That(window.ActualWidth,
+                                Is.EqualTo(1280).Within(1));
+                        });
+                        SaveWindowForVisualReview(
+                            window,
+                            "trusted-animation-picker");
+                    }
+                    finally
+                    {
+                        window.Close();
                     }
                 }
                 finally
@@ -1492,7 +1727,8 @@ public class AnimationWorkbenchShellTests
 
     private sealed class TrustedPreviewShellState
     {
-        public TrustedPreviewShellState()
+        public TrustedPreviewShellState(
+            bool showAnimationPicker = false)
         {
             var candidates = new ObservableCollection<
                 TrustedAnimationModelCandidate>
@@ -1527,6 +1763,36 @@ public class AnimationWorkbenchShellTests
             ModelCandidatesView.GroupDescriptions.Add(
                 new PropertyGroupDescription(
                     nameof(TrustedAnimationModelCandidate.SourceGroup)));
+            var animations = new ObservableCollection<
+                TrustedAnimationCandidate>
+            {
+                new(
+                    PackFile.CreateFromBytes("idle.anim", [1]),
+                    "humanoid_idle",
+                    @"animations\battle\humanoid_idle.anim",
+                    "my_mod.pack",
+                    @"E:\mods\my_mod.pack",
+                    TrustedAnimationModelSourceRole.FolderProject,
+                    8,
+                    120,
+                    4,
+                    30),
+                new(
+                    PackFile.CreateFromBytes("attack.anim", [1]),
+                    "humanoid_attack",
+                    @"animations\battle\humanoid_attack.anim",
+                    "data.pack",
+                    @"E:\games\data.pack",
+                    TrustedAnimationModelSourceRole.CaPack,
+                    8,
+                    72,
+                    2.4,
+                    30),
+            };
+            AnimationCandidatesView = CollectionViewSource.GetDefaultView(
+                animations);
+            IsModelPickerOpen = !showAnimationPicker;
+            IsAnimationPickerOpen = showAnimationPicker;
         }
 
         public TrustedAnimationPreviewResourceState Model { get; } = new(
@@ -1541,31 +1807,81 @@ public class AnimationWorkbenchShellTests
             string.Empty);
         public TrustedAnimationPreviewResourceState Animation { get; } =
             TrustedAnimationPreviewResourceState.Empty;
+        public string AnimationPathText => "未选择动画";
         public bool ShowModel { get; set; } = true;
         public bool ShowSkeleton { get; set; } = true;
         public bool IsReady => true;
         public bool HasModelDiagnostic => false;
         public bool HasSkeletonDiagnostic => false;
         public bool HasAnimationDiagnostic => false;
-        public bool IsModelPickerOpen => true;
+        public bool IsModelPickerOpen { get; }
+        public bool IsAnimationPickerOpen { get; }
         public bool IsModelScanRunning => true;
+        public bool IsAnimationScanRunning => true;
         public string ModelSearchText { get; set; } = string.Empty;
+        public string AnimationSearchText { get; set; } = string.Empty;
         public string ModelScanStatus =>
             "正在后台扫描，已找到 3 个有效模型。结果可立即搜索和选择。";
         public ICollectionView ModelCandidatesView { get; }
+        public ICollectionView AnimationCandidatesView { get; }
+        public string AnimationScanStatus =>
+            "正在后台扫描，已找到 2 个严格兼容动画。";
         public TrustedAnimationModelCandidate? SelectedModelCandidate
         {
             get;
             set;
         }
+        public TrustedAnimationCandidate? SelectedAnimationCandidate
+        {
+            get;
+            set;
+        }
         public object? GameWorld => null;
+        public bool HasAnimation => true;
+        public bool IsPlaying => false;
+        public double PlaybackMaximum => 4;
+        public double CurrentTimeSeconds { get; set; }
+        public string PlaybackSummary =>
+            "只读 · 0.00/4.00 秒 · 第 0/120 帧 · 30.00 FPS";
         public ICommand? OpenModelPickerCommand => null;
+        public ICommand? OpenAnimationPickerCommand => null;
         public ICommand? CloseModelPickerCommand => null;
+        public ICommand? CloseAnimationPickerCommand => null;
         public ICommand? CancelModelScanCommand => null;
+        public ICommand? CancelAnimationScanCommand => null;
         public ICommand? UseSelectedModelCommand => null;
+        public ICommand? UseSelectedAnimationCommand => null;
+        public ICommand? TogglePlaybackCommand => null;
         public ICommand? FocusModelCommand => null;
         public ICommand? ShowFrontCommand => null;
         public ICommand? ResetCameraCommand => null;
+    }
+
+    private sealed class ControllableAnimationDiscovery :
+        ITrustedAnimationDiscovery
+    {
+        private readonly Channel<
+            IReadOnlyList<TrustedAnimationCandidate>> _channel =
+            Channel.CreateUnbounded<
+                IReadOnlyList<TrustedAnimationCandidate>>();
+        private readonly TaskCompletionSource _started = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Started => _started.Task;
+
+        public ChannelWriter<IReadOnlyList<TrustedAnimationCandidate>>
+            Writer => _channel.Writer;
+
+        public async IAsyncEnumerable<
+            IReadOnlyList<TrustedAnimationCandidate>> DiscoverAsync(
+                TrustedAnimationSkeletonIdentity requiredSkeleton,
+                [System.Runtime.CompilerServices.EnumeratorCancellation]
+                CancellationToken cancellationToken)
+        {
+            _started.TrySetResult();
+            await foreach (var batch in _channel.Reader.ReadAllAsync())
+                yield return batch;
+        }
     }
 
     private sealed class BaseAnimationRowState
@@ -1617,11 +1933,22 @@ public class AnimationWorkbenchShellTests
         PackFile skeleton,
         string skeletonName)
     {
+        var modelOwner = new PackFileContainer("my_mod.pack")
+        {
+            Role = PackFileContainerRole.ProjectWorkspace,
+        };
+        modelOwner.FileList["models\\character.rigid_model_v2"] = model;
+        var skeletonOwner = new PackFileContainer("data.pack")
+        {
+            IsCaPackFile = true,
+        };
+        skeletonOwner.FileList[
+            $"animations\\skeletons\\{skeletonName}.anim"] = skeleton;
         var packFileService = new Mock<IPackFileService>();
         packFileService.Setup(service => service.GetFullPath(model, null))
             .Returns("models\\character.rigid_model_v2");
         packFileService.Setup(service => service.GetPackFileContainer(model))
-            .Returns(new PackFileContainer("my_mod.pack"));
+            .Returns(modelOwner);
         packFileService.Setup(service => service.FindFile(
                 $"animations\\skeletons\\{skeletonName}.anim",
                 null))
@@ -1629,7 +1956,13 @@ public class AnimationWorkbenchShellTests
         packFileService.Setup(service => service.GetFullPath(skeleton, null))
             .Returns($"animations\\skeletons\\{skeletonName}.anim");
         packFileService.Setup(service => service.GetPackFileContainer(skeleton))
-            .Returns(new PackFileContainer("data.pack"));
+            .Returns(skeletonOwner);
+        packFileService.Setup(service => service.GetAllPackfileContainers())
+            .Returns([skeletonOwner, modelOwner]);
+        packFileService.Setup(service => service.GetFileEntriesSnapshot(
+                It.IsAny<PackFileContainer>()))
+            .Returns((PackFileContainer container) =>
+                container.FileList.ToArray());
         return packFileService;
     }
 

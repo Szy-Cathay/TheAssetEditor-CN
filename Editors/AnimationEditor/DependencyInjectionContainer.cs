@@ -33,6 +33,9 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddScoped<
                 ITrustedAnimationModelDiscovery,
                 TrustedAnimationModelDiscovery>();
+            serviceCollection.AddScoped<
+                ITrustedAnimationDiscovery,
+                TrustedAnimationDiscovery>();
             serviceCollection.AddTransient<
                 IOpenAnimationWorkbenchCommand,
                 OpenAnimationWorkbenchCommand>();

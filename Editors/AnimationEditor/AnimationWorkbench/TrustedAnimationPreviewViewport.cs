@@ -10,6 +10,8 @@ using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using Shared.GameFormats.Animation;
+using System.IO;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
 
@@ -24,6 +26,7 @@ public sealed class TrustedAnimationPreviewViewport :
     private SceneObjectViewModel? _previewAsset;
     private bool _showModel = true;
     private bool _showSkeleton = true;
+    private float _defaultLargestDimension;
     private bool _disposed;
 
     public TrustedAnimationPreviewViewport(IEditorHostParameters parameters)
@@ -45,6 +48,26 @@ public sealed class TrustedAnimationPreviewViewport :
 
     public IWpfGame GameWorld { get; }
 
+    public TrustedAnimationPlaybackState PlaybackState
+    {
+        get
+        {
+            var player = _previewAsset?.Data.Player;
+            if (player?.AnimationClip == null)
+                return TrustedAnimationPlaybackState.Empty;
+            return new TrustedAnimationPlaybackState(
+                true,
+                player.IsPlaying,
+                player.CurrentFrame,
+                player.FrameCount,
+                player.CurrentTime.TotalSeconds,
+                player.Duration.TotalSeconds,
+                player.FramesPerSecond);
+        }
+    }
+
+    public event EventHandler? PlaybackChanged;
+
     public TrustedAnimationPreviewViewportResult Load(
         PackFile model,
         PackFile skeleton)
@@ -63,6 +86,8 @@ public sealed class TrustedAnimationPreviewViewport :
                     "AnimationWorkbench.TrustedPreview.Viewport"),
                 Color.LightSkyBlue,
                 null!);
+            _previewAsset.Data.Player.OnFrameChanged -= OnFrameChanged;
+            _previewAsset.Data.Player.OnFrameChanged += OnFrameChanged;
             var asset = _previewAsset.Data;
             _sceneObjectEditor.SetMesh(
                 asset,
@@ -151,9 +176,87 @@ public sealed class TrustedAnimationPreviewViewport :
                 exception.Message);
         }
 
+        _defaultLargestDimension = meshes.Max(GetLargestPoseDimension);
         FocusModel();
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
         return TrustedAnimationPreviewViewportResult.Success(
             meshes.Count);
+    }
+
+    public TrustedAnimationPreviewViewportResult LoadAnimation(
+        AnimationFile animation,
+        string path)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(animation);
+        var asset = _previewAsset?.Data;
+        if (asset?.Skeleton == null || asset.ModelNode == null)
+        {
+            return TrustedAnimationPreviewViewportResult.Failure(
+                TrustedAnimationPreviewResourceKind.Animation,
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.AnimationPicker.ModelRequired"));
+        }
+
+        var skeleton = asset.Skeleton;
+        try
+        {
+            var clip = new AnimationClip(animation, skeleton);
+            if (!TrustedAnimationCompatibility.HasFiniteClip(
+                    clip,
+                    skeleton.BoneCount,
+                    out var conflict))
+            {
+                throw new InvalidDataException(conflict);
+            }
+
+            _sceneObjectEditor.SetAnimationClip(asset, clip, path);
+            if (!ReferenceEquals(asset.Skeleton, skeleton) ||
+                !ReferenceEquals(
+                    asset.SkeletonSceneNode.Skeleton,
+                    skeleton))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.TrustedPreview.AnimationSkeletonChanged"));
+            }
+
+            asset.Player.IsEnabled = true;
+            asset.Player.Pause();
+            asset.Player.SeekToTimeSeconds(0);
+            if (asset.AnimationClip == null)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.TrustedPreview.AnimationPlayerRejected"));
+            }
+
+            var meshes = SceneNodeHelper
+                .GetChildrenOfType<Rmv2MeshNode>(asset.ModelNode);
+            if (meshes.Any(mesh =>
+                    !ReferenceEquals(mesh.AnimationPlayer, asset.Player) ||
+                    !HasFinitePose(mesh) ||
+                    IsAbnormalGrowth(mesh)))
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.TrustedPreview.AnimationPoseUnsafe"));
+            }
+
+            PlaybackChanged?.Invoke(this, EventArgs.Empty);
+            return TrustedAnimationPreviewViewportResult.Success(
+                meshes.Count);
+        }
+        catch (Exception exception)
+        {
+            ClearAnimation();
+            return TrustedAnimationPreviewViewportResult.Failure(
+                TrustedAnimationPreviewResourceKind.Animation,
+                string.Format(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.TrustedPreview.AnimationViewportFailed"),
+                    exception.Message));
+        }
     }
 
     public void Clear()
@@ -168,7 +271,9 @@ public sealed class TrustedAnimationPreviewViewport :
         asset.ModelNode = null!;
         asset.MeshName.Value = string.Empty;
         _sceneObjectEditor.SetSkeleton(asset, null!);
+        _defaultLargestDimension = 0;
         asset.TriggerMeshChanged();
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetModelVisible(bool isVisible)
@@ -220,6 +325,48 @@ public sealed class TrustedAnimationPreviewViewport :
         FocusModel();
     }
 
+    public void Play()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var player = _previewAsset?.Data.Player;
+        if (player?.AnimationClip == null)
+            return;
+        player.Play();
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void Pause()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var player = _previewAsset?.Data.Player;
+        if (player?.AnimationClip == null)
+            return;
+        player.Pause();
+        player.Refresh();
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void Seek(double timeSeconds)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!double.IsFinite(timeSeconds))
+            throw new ArgumentOutOfRangeException(nameof(timeSeconds));
+        var asset = _previewAsset?.Data;
+        if (asset?.Player.AnimationClip == null)
+            return;
+        asset.Player.SeekToTimeSeconds((float)timeSeconds);
+        var meshes = SceneNodeHelper
+            .GetChildrenOfType<Rmv2MeshNode>(asset.ModelNode);
+        if (meshes.Any(mesh => !HasFinitePose(mesh) ||
+                               IsAbnormalGrowth(mesh)))
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.TrustedPreview.AnimationSeekUnsafe"));
+        }
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -228,6 +375,7 @@ public sealed class TrustedAnimationPreviewViewport :
         if (_previewAsset != null)
         {
             var asset = _previewAsset.Data;
+            asset.Player.OnFrameChanged -= OnFrameChanged;
             asset.Player.MarkedForRemoval = true;
             asset.ParentNode.Parent?.RemoveObject(asset.ParentNode);
             GameWorld.RemoveComponent(asset);
@@ -236,6 +384,19 @@ public sealed class TrustedAnimationPreviewViewport :
         _grid.SetVisibilityOverride(null);
         _disposed = true;
     }
+
+    private void ClearAnimation()
+    {
+        var asset = _previewAsset?.Data;
+        if (asset == null)
+            return;
+        _sceneObjectEditor.SetAnimationClip(asset, null, string.Empty);
+        asset.Player.Stop();
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnFrameChanged(int _) =>
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
 
     private TrustedAnimationPreviewViewportResult FailAndClear(
         TrustedAnimationPreviewResourceKind resource,
@@ -340,6 +501,24 @@ public sealed class TrustedAnimationPreviewViewport :
             size.Z >= 0 &&
             largestDimension > 0 &&
             largestDimension < 1_000_000;
+    }
+
+    private bool IsAbnormalGrowth(Rmv2MeshNode mesh)
+    {
+        if (_defaultLargestDimension <= 0)
+            return true;
+        var current = GetLargestPoseDimension(mesh);
+        return !float.IsFinite(current) ||
+            current <= 0 ||
+            current > _defaultLargestDimension * 100;
+    }
+
+    private static float GetLargestPoseDimension(Rmv2MeshNode mesh)
+    {
+        var bounds = MeshPoseSnapshot.Capture(mesh)
+            .GetConservativeAnimatedBounds();
+        var size = bounds.Max - bounds.Min;
+        return Math.Max(size.X, Math.Max(size.Y, size.Z));
     }
 
     private static bool IsFinite(Vector3 value) =>

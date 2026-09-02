@@ -142,7 +142,8 @@
                 Grid.Column="1"
                 Margin="0,0,8,0"
                 IsReadOnly="True"
-                Text="{loc:Loc AnimationWorkbench.TrustedPreview.NotSelected}" />
+                Text="{Binding AnimationPathText, Mode=OneWay}"
+                ToolTip="{Binding Animation.Path}" />
             <TextBox
                 Grid.Row="2"
                 Grid.Column="2"
@@ -162,6 +163,12 @@
                     Text="{Binding Animation.Diagnostic}"
                     TextWrapping="Wrap" />
             </Expander>
+            <Button
+                Grid.Row="2"
+                Grid.Column="4"
+                Command="{Binding OpenAnimationPickerCommand}"
+                Content="{loc:Loc AnimationWorkbench.AnimationPicker.Open}"
+                IsEnabled="{Binding IsReady}" />
         </Grid>
 
         <Border
@@ -265,6 +272,7 @@
                             ItemsSource="{Binding ModelCandidatesView}"
                             SelectedItem="{Binding SelectedModelCandidate, Mode=TwoWay}"
                             ScrollViewer.CanContentScroll="True"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                             VirtualizingPanel.IsVirtualizing="True"
                             VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                             VirtualizingPanel.VirtualizationMode="Recycling">
@@ -320,6 +328,128 @@
                         </Grid>
                     </Grid>
                 </Border>
+                <Border
+                    Width="500"
+                    Margin="8"
+                    Padding="12"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Stretch"
+                    Panel.ZIndex="10"
+                    Style="{StaticResource AeSurface.Overlay}"
+                    Visibility="{Binding IsAnimationPickerOpen, Converter={StaticResource BoolToCollapsedConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.SectionTitle}"
+                                Text="{loc:Loc AnimationWorkbench.AnimationPicker.Title}" />
+                            <Button
+                                Grid.Column="1"
+                                Command="{Binding CloseAnimationPickerCommand}"
+                                Content="{loc:Loc AnimationWorkbench.AnimationPicker.Close}" />
+                        </Grid>
+
+                        <Grid Grid.Row="1" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.AnimationPicker.Search}" />
+                            <TextBox
+                                Grid.Column="1"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.AnimationPicker.Search}"
+                                Text="{Binding AnimationSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <StackPanel Grid.Row="2" Margin="0,8,0,8">
+                            <TextBlock
+                                Style="{StaticResource AeText.Caption}"
+                                Text="{Binding AnimationScanStatus}"
+                                TextWrapping="Wrap" />
+                            <ProgressBar
+                                Margin="0,6,0,0"
+                                IsIndeterminate="True"
+                                Visibility="{Binding IsAnimationScanRunning, Converter={StaticResource BoolToCollapsedConverter}}" />
+                        </StackPanel>
+
+                        <ListBox
+                            Grid.Row="3"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.AnimationPicker.Results}"
+                            ItemsSource="{Binding AnimationCandidatesView}"
+                            SelectedItem="{Binding SelectedAnimationCandidate, Mode=TwoWay}"
+                            ScrollViewer.CanContentScroll="True"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                            VirtualizingPanel.IsVirtualizing="True"
+                            VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,6">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock
+                                            Style="{StaticResource AeText.Label}"
+                                            Text="{Binding Name}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            Grid.Row="1"
+                                            Margin="0,3,0,0"
+                                            Text="{Binding Path}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip="{Binding Path}" />
+                                        <StackPanel
+                                            Grid.Row="2"
+                                            Margin="0,3,0,0"
+                                            Orientation="Horizontal">
+                                            <TextBlock
+                                                Style="{StaticResource AeText.Caption}"
+                                                Text="{Binding SourcePack}"
+                                                ToolTip="{Binding SourceLocation}" />
+                                            <TextBlock
+                                                Margin="10,0,0,0"
+                                                Style="{StaticResource AeText.Caption}"
+                                                Text="{Binding Metadata}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Grid Grid.Row="4" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                Command="{Binding CancelAnimationScanCommand}"
+                                Content="{loc:Loc AnimationWorkbench.AnimationPicker.Cancel}"
+                                IsEnabled="{Binding IsAnimationScanRunning}" />
+                            <Button
+                                Grid.Column="1"
+                                Command="{Binding UseSelectedAnimationCommand}"
+                                Content="{loc:Loc AnimationWorkbench.AnimationPicker.UseSelected}"
+                                Style="{StaticResource AeButton.Primary}" />
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
 
@@ -330,10 +460,12 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <ToggleButton
-                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.NoAnimation}"
-                IsEnabled="False"
+                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.PlayPause}"
+                Command="{Binding TogglePlaybackCommand}"
+                IsChecked="{Binding IsPlaying, Mode=OneWay}"
+                IsEnabled="{Binding HasAnimation}"
                 Style="{StaticResource AeEditor.PlaybackToggle}"
-                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.NoAnimation}">
+                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.PlayPause}">
                 <Canvas Width="16" Height="16">
                     <Path
                         Data="M 4,2 L 14,8 L 4,14 Z"
@@ -343,15 +475,15 @@
             <Slider
                 Grid.Column="1"
                 Margin="8,0"
-                IsEnabled="False"
-                Maximum="1"
+                IsEnabled="{Binding HasAnimation}"
+                Maximum="{Binding PlaybackMaximum}"
                 Style="{StaticResource AeEditor.PlaybackSlider}"
-                Value="0" />
+                Value="{Binding CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Style="{StaticResource AeText.Caption}"
-                Text="{loc:Loc AnimationWorkbench.TrustedPreview.ReadOnlyTimeline}" />
+                Text="{Binding PlaybackSummary}" />
         </Grid>
     </Grid>
 </UserControl>

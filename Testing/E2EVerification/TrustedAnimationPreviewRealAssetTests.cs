@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Shared.Core.PackFiles.Models;
+using Shared.GameFormats.Animation;
+using System.Security.Cryptography;
 using Test.TestingUtility.Shared;
 
 namespace Test.E2EVerification;
@@ -77,6 +79,128 @@ public class TrustedAnimationPreviewRealAssetTests
         });
     }
 
+    [Test]
+    [Explicit]
+    public void Yangjian_RealMotionThroughVersionEightCodecIsStableAndReadOnly()
+    {
+        var assetRoot = Environment.GetEnvironmentVariable(
+            "AE_TRUSTED_PREVIEW_ASSET_ROOT");
+        Assert.That(assetRoot, Is.Not.Null.And.Not.Empty);
+        var modelDiskPath = Path.Combine(
+            assetRoot!,
+            "test",
+            "yangjian.rigid_model_v2");
+        var skeletonDiskPath = Path.Combine(
+            assetRoot,
+            "animations",
+            "skeletons",
+            "yangjian_skeleton.anim");
+        var animationDiskPath = Path.Combine(
+            assetRoot,
+            "test",
+            "yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        var originalHashes = new[]
+        {
+            HashFile(modelDiskPath),
+            HashFile(skeletonDiskPath),
+            HashFile(animationDiskPath),
+        };
+
+        var runner = new AssetEditorTestRunner();
+        runner.PackFileService.EnforceGameFilesMustBeLoaded = false;
+        runner.PackFileService.AddContainer(
+            CreateAcceptanceAssetContainer(assetRoot));
+        var model = runner.PackFileService.FindFile(
+            @"test\yangjian.rigid_model_v2");
+        var skeleton = runner.PackFileService.FindFile(
+            @"animations\skeletons\yangjian_skeleton.anim");
+        var animation = runner.PackFileService.FindFile(
+            @"test\yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        Assert.Multiple(() =>
+        {
+            Assert.That(model, Is.Not.Null);
+            Assert.That(skeleton, Is.Not.Null);
+            Assert.That(animation, Is.Not.Null);
+        });
+
+        using var viewport = runner.ServiceProvider
+            .GetRequiredService<ITrustedAnimationPreviewViewport>();
+        var modelResult = viewport.Load(model!, skeleton!);
+        Assert.That(modelResult.IsSuccess, Is.True, modelResult.Diagnostic);
+        var game = (WpfGameMock)viewport.GameWorld;
+        var defaultPose = RenderFrame(game);
+
+        var sourceAnimation = AnimationFile.Create(animation!);
+        sourceAnimation.Header.Version = 8;
+        var versionEightPackFile = PackFile.CreateFromBytes(
+            "yangjian_bstd_v8_in_memory.anim",
+            AnimationFile.ConvertToBytes(sourceAnimation));
+        var parsedAnimation = AnimationFile.Create(versionEightPackFile);
+        Assert.That(parsedAnimation.Header.Version, Is.EqualTo(8));
+        var animationResult = viewport.LoadAnimation(
+            parsedAnimation,
+            @"test\yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        Assert.That(
+            animationResult.IsSuccess,
+            Is.True,
+            animationResult.Diagnostic);
+        var frameZeroState = viewport.PlaybackState;
+        var frameZero = RenderFrame(game);
+
+        viewport.Seek(frameZeroState.DurationSeconds / 2);
+        var middleState = viewport.PlaybackState;
+        var middle = RenderFrame(game);
+        viewport.Seek(frameZeroState.DurationSeconds / 2);
+        var repeatedMiddle = RenderFrame(game);
+
+        viewport.Seek(0);
+        viewport.Play();
+        for (var index = 0; index < 8; index++)
+            RenderFrame(game);
+        viewport.Pause();
+        var pausedState = viewport.PlaybackState;
+        var paused = RenderFrame(game);
+
+        viewport.SetSkeletonVisible(false);
+        var modelOnly = RenderFrame(game);
+        viewport.SetModelVisible(false);
+        viewport.SetSkeletonVisible(true);
+        var skeletonOnly = RenderFrame(game);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frameZeroState.HasAnimation, Is.True);
+            Assert.That(frameZeroState.IsPlaying, Is.False);
+            Assert.That(frameZeroState.CurrentFrame, Is.Zero);
+            Assert.That(frameZeroState.FrameCount, Is.GreaterThan(1));
+            Assert.That(frameZeroState.DurationSeconds, Is.GreaterThan(0));
+            Assert.That(middleState.CurrentFrame, Is.GreaterThan(0));
+            Assert.That(pausedState.IsPlaying, Is.False);
+            Assert.That(pausedState.CurrentTimeSeconds, Is.GreaterThan(0));
+            Assert.That(
+                CountDifferentPixels(frameZero, middle),
+                Is.GreaterThan(100),
+                "Seeking did not change the real skinned pose.");
+            Assert.That(
+                CountDifferentPixels(middle, repeatedMiddle),
+                Is.LessThan(500),
+                "Repeated seeking changed a visible part of the pose.");
+            Assert.That(
+                CountDifferentPixels(defaultPose, paused),
+                Is.GreaterThan(100),
+                "Play then pause did not produce a real animated pose.");
+            Assert.That(
+                CountDifferentPixels(modelOnly, skeletonOnly),
+                Is.GreaterThan(100));
+            Assert.That(new[]
+            {
+                HashFile(modelDiskPath),
+                HashFile(skeletonDiskPath),
+                HashFile(animationDiskPath),
+            }, Is.EqualTo(originalHashes));
+        });
+    }
+
     private static PackFileContainer CreateAcceptanceAssetContainer(
         string assetRoot)
     {
@@ -89,6 +213,11 @@ public class TrustedAnimationPreviewRealAssetTests
                 Path.Combine(assetRoot, "test", "tex"),
                 "*",
                 SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(assetRoot, path)));
+        relativePaths.AddRange(Directory.EnumerateFiles(
+                Path.Combine(assetRoot, "test"),
+                "*.anim",
+                SearchOption.TopDirectoryOnly)
             .Select(path => Path.GetRelativePath(assetRoot, path)));
 
         var container = new PackFileContainer("trusted-preview-real-assets")
@@ -108,6 +237,9 @@ public class TrustedAnimationPreviewRealAssetTests
         }
         return container;
     }
+
+    private static string HashFile(string path) =>
+        Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
 
     private static Color[] RenderFrame(WpfGameMock game)
     {
