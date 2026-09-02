@@ -238,16 +238,14 @@ public partial class TrustedAnimationPreviewViewModel :
         SelectedAnimationCandidate = null;
         AnimationCandidates.Clear();
         CurrentFile = file;
-        if (!file.Name.EndsWith(
-                ".wsmodel",
-                StringComparison.OrdinalIgnoreCase))
+        if (!IsCompositeModel(file))
         {
             _session.LoadModel(file);
             NotifyPlaybackChanged();
             return;
         }
 
-        await LoadWsModelAsync(file);
+        await LoadCompositeModelAsync(file);
     }
 
     public void Close()
@@ -394,7 +392,7 @@ public partial class TrustedAnimationPreviewViewModel :
         await LoadFileAsync(candidate.File);
     }
 
-    private async Task LoadWsModelAsync(PackFile file)
+    private async Task LoadCompositeModelAsync(PackFile file)
     {
         var generation = Interlocked.Increment(
             ref _modelScanGeneration);
@@ -472,6 +470,14 @@ public partial class TrustedAnimationPreviewViewModel :
             cancellation.Dispose();
         }
     }
+
+    private static bool IsCompositeModel(PackFile file) =>
+        file.Name.EndsWith(
+            ".wsmodel",
+            StringComparison.OrdinalIgnoreCase) ||
+        file.Name.EndsWith(
+            ".variantmeshdefinition",
+            StringComparison.OrdinalIgnoreCase);
 
     public async Task StartAnimationDiscoveryAsync()
     {

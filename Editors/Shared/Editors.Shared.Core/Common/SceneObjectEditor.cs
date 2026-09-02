@@ -61,11 +61,19 @@ namespace Editors.Shared.Core.Common
             return _mainScene.AddComponent(instance);
         }
 
-        public void SetMesh(SceneObject sceneObject, PackFile file, bool updateSkeleton = true)
+        public void SetMesh(
+            SceneObject sceneObject,
+            PackFile file,
+            bool updateSkeleton = true,
+            bool onlyLoadFirstMesh = true)
         {
             _logger.Here().Information($"Loading reference model - {_packFileService.GetFullPath(file)}");
 
-            var loadedNode = _complexMeshLoader.Load(file, sceneObject.Player, true, true);
+            var loadedNode = _complexMeshLoader.Load(
+                file,
+                sceneObject.Player,
+                true,
+                onlyLoadFirstMesh);
             if (loadedNode == null)
             {
                 _logger.Here().Error("Unable to load model");

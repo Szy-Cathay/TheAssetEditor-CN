@@ -1158,11 +1158,13 @@ public class AnimationWorkbenchShellTests
         viewport.Verify(item => item.Load(root, skeleton), Times.Once);
     }
 
-    [Test]
-    public async Task TrustedViewModel_RejectsLateWsModelResolution()
+    [TestCase("character.wsmodel")]
+    [TestCase("character.variantmeshdefinition")]
+    public async Task TrustedViewModel_RejectsLateCompositeModelResolution(
+        string rootName)
     {
         var root = PackFile.CreateFromBytes(
-            "character.wsmodel",
+            rootName,
             [1]);
         var directModel = CreateRigidModelHeaderFile(
             "character.rigid_model_v2",
@@ -1178,9 +1180,10 @@ public class AnimationWorkbenchShellTests
         {
             Role = PackFileContainerRole.ProjectWorkspace,
         };
-        rootOwner.FileList["models\\character.wsmodel"] = root;
+        var rootPath = $"models\\{rootName}";
+        rootOwner.FileList[rootPath] = root;
         packFileService.Setup(service => service.GetFullPath(root, null))
-            .Returns("models\\character.wsmodel");
+            .Returns(rootPath);
         packFileService.Setup(service => service.GetPackFileContainer(root))
             .Returns(rootOwner);
         var viewport = new Mock<ITrustedAnimationPreviewViewport>();
@@ -1223,6 +1226,72 @@ public class AnimationWorkbenchShellTests
         });
         viewport.Verify(item => item.Load(root, skeleton), Times.Never);
         viewport.Verify(item => item.Load(directModel, skeleton), Times.Once);
+        viewModel.Close();
+    }
+
+    [Test]
+    public async Task TrustedViewModel_LoadsResolvedVariantMeshRoot()
+    {
+        var root = PackFile.CreateFromBytes(
+            "character.variantmeshdefinition",
+            [1]);
+        var geometry = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            geometry,
+            skeleton,
+            "humanoid01");
+        var rootOwner = new PackFileContainer("my_mod.pack")
+        {
+            Role = PackFileContainerRole.ProjectWorkspace,
+        };
+        rootOwner.FileList[
+            "variants\\character.variantmeshdefinition"] = root;
+        packFileService.Setup(service => service.GetFullPath(root, null))
+            .Returns("variants\\character.variantmeshdefinition");
+        packFileService.Setup(service => service.GetPackFileContainer(root))
+            .Returns(rootOwner);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(root, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(6));
+        viewport.SetupGet(item => item.PlaybackState)
+            .Returns(TrustedAnimationPlaybackState.Empty);
+        var resolver = new Mock<ITrustedWsModelResolver>();
+        resolver.Setup(item => item.ResolveAsync(
+                root,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TrustedWsModelResolutionResult.Success(
+                new TrustedWsModelResolution(
+                    root,
+                    geometry,
+                    skeleton,
+                    [],
+                    2,
+                    1)));
+        var viewModel = new TrustedAnimationPreviewViewModel(
+            viewport.Object,
+            packFileService.Object,
+            Mock.Of<ITrustedAnimationModelDiscovery>(),
+            Mock.Of<ITrustedAnimationDiscovery>(),
+            resolver.Object);
+
+        await viewModel.LoadFileAsync(root);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.IsReady, Is.True);
+            NUnitAssert.That(viewModel.Model.Path,
+                Is.EqualTo("variants\\character.variantmeshdefinition"));
+            NUnitAssert.That(viewModel.MeshCount, Is.EqualTo(6));
+        });
+        resolver.Verify(item => item.ResolveAsync(
+            root,
+            It.IsAny<CancellationToken>()), Times.Once);
+        viewport.Verify(item => item.Load(root, skeleton), Times.Once);
         viewModel.Close();
     }
 

@@ -325,6 +325,335 @@ public class TrustedWsModelResolverTests
         });
     }
 
+    [Test]
+    public async Task ResolveVariantMesh_UsesEffectiveNestedGraphAndStaticParts()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var reference = CreateContainer(
+            "reference.pack",
+            TrustedAnimationModelSourceRole.ReferencePack);
+        var ca = CreateContainer(
+            "data.pack",
+            TrustedAnimationModelSourceRole.CaPack);
+        var root = Add(reference, @"variants\root.variantmeshdefinition",
+            CreateVariantMesh(
+                @"models\body.wsmodel",
+                [(@"models\weapon.rigid_model_v2", "root")],
+                [@"variants\gear.variantmeshdefinition"]));
+        Add(reference, @"models\body.wsmodel",
+            CreateWsModel(
+                [@"models\body.rigid_model_v2"],
+                [(0, 0, @"materials\body.xml")]));
+        var body = Add(ca, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        var weapon = Add(ca, @"models\weapon.rigid_model_v2",
+            PackFile.CreateFromBytes("weapon.rigid_model_v2", [2]));
+        var effectiveGear = Add(project,
+            @"variants\gear.variantmeshdefinition",
+            CreateVariantMesh(@"models\cape.rigid_model_v2", [], []));
+        var shadowedGear = Add(ca,
+            @"variants\gear.variantmeshdefinition",
+            CreateVariantMesh(@"models\wrong.rigid_model_v2", [], []));
+        var cape = Add(reference, @"models\cape.rigid_model_v2",
+            PackFile.CreateFromBytes("cape.rigid_model_v2", [3]));
+        Add(reference, @"materials\body.xml", CreateMaterial());
+        Add(ca, @"animations\skeletons\humanoid.anim",
+            CreateSkeleton("humanoid"));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(body))
+            .Returns(CreateInspection("humanoid"));
+        inspector.Setup(item => item.Inspect(weapon))
+            .Returns(CreateInspection(string.Empty));
+        inspector.Setup(item => item.Inspect(cape))
+            .Returns(CreateInspection(string.Empty));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([ca, reference, project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.True,
+                result.Diagnostic);
+            NUnitAssert.That(result.Resolution?.GeometryCount,
+                Is.EqualTo(3));
+            NUnitAssert.That(result.Resolution?.StaticAttachmentCount,
+                Is.EqualTo(2));
+            NUnitAssert.That(result.Resolution?.Dependencies.Any(item =>
+                ReferenceEquals(item.File, effectiveGear)), Is.True);
+            NUnitAssert.That(result.Resolution?.Dependencies.Any(item =>
+                ReferenceEquals(item.File, shadowedGear)), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_MissingChildNamesParentAndSource()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\root.variantmeshdefinition",
+            CreateVariantMesh(
+                string.Empty,
+                [],
+                [@"variants\missing.variantmeshdefinition"]));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            Mock.Of<ITrustedRigidModelInspector>());
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Resolution, Is.Null);
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"variants\root.variantmeshdefinition"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"variants\missing.variantmeshdefinition"));
+            NUnitAssert.That(result.Diagnostic, Does.Contain("project"));
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_MissingAttachmentPointBlocksGraph()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\root.variantmeshdefinition",
+            CreateVariantMesh(
+                @"models\body.rigid_model_v2",
+                [(@"models\weapon.rigid_model_v2", "missing_socket")],
+                []));
+        var body = Add(project, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        var weapon = Add(project, @"models\weapon.rigid_model_v2",
+            PackFile.CreateFromBytes("weapon.rigid_model_v2", [2]));
+        Add(project, @"animations\skeletons\humanoid.anim",
+            CreateSkeleton("humanoid"));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(body))
+            .Returns(CreateInspection("humanoid"));
+        inspector.Setup(item => item.Inspect(weapon))
+            .Returns(CreateInspection(string.Empty));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Resolution, Is.Null);
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain("missing_socket"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"variants\root.variantmeshdefinition#SLOT"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"animations\skeletons\humanoid.anim"));
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_ReportsCompleteReferenceCycle()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\first.variantmeshdefinition",
+            CreateVariantMesh(
+                string.Empty,
+                [],
+                [@"variants\second.variantmeshdefinition"]));
+        Add(project, @"variants\second.variantmeshdefinition",
+            CreateVariantMesh(
+                string.Empty,
+                [],
+                [@"variants\first.variantmeshdefinition"]));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            Mock.Of<ITrustedRigidModelInspector>());
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"variants\first.variantmeshdefinition"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"variants\second.variantmeshdefinition"));
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_RejectsSkeletonConflict()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\conflict.variantmeshdefinition",
+            CreateVariantMesh(
+                @"models\body.rigid_model_v2",
+                [(@"models\mount.rigid_model_v2", "root")],
+                []));
+        var body = Add(project, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        var mount = Add(project, @"models\mount.rigid_model_v2",
+            PackFile.CreateFromBytes("mount.rigid_model_v2", [2]));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(body))
+            .Returns(CreateInspection("humanoid"));
+        inspector.Setup(item => item.Inspect(mount))
+            .Returns(CreateInspection("horse"));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Diagnostic, Does.Contain("humanoid"));
+            NUnitAssert.That(result.Diagnostic, Does.Contain("horse"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"models\body.rigid_model_v2"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"models\mount.rigid_model_v2"));
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_ValidatesEmbeddedMaterialTextures()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\body.variantmeshdefinition",
+            CreateVariantMesh(
+                @"models\body.rigid_model_v2",
+                [],
+                []));
+        var body = Add(project, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        Add(project, @"animations\skeletons\humanoid.anim",
+            CreateSkeleton("humanoid"));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(body))
+            .Returns(new TrustedRigidModelInspection(
+                "humanoid",
+                [new TrustedRigidModelMeshSlot(0, 0)],
+                [@"textures\missing.dds"]));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Resolution, Is.Null);
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"textures\missing.dds"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"models\body.rigid_model_v2"));
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_BlankSkeletonDoesNotHideSkinnedMesh()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\body.variantmeshdefinition",
+            CreateVariantMesh(
+                @"models\body.rigid_model_v2",
+                [],
+                []));
+        var body = Add(project, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(body))
+            .Returns(new TrustedRigidModelInspection(
+                string.Empty,
+                [new TrustedRigidModelMeshSlot(0, 0)],
+                [],
+                true));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Resolution, Is.Null);
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"models\body.rigid_model_v2"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain("顶点类型与骨架声明不一致"));
+        });
+    }
+
+    [Test]
+    public async Task ResolveVariantMesh_MissingWsModelMaterialBlocksGraph()
+    {
+        var project = CreateContainer(
+            "project",
+            TrustedAnimationModelSourceRole.FolderProject);
+        var root = Add(project, @"variants\body.variantmeshdefinition",
+            CreateVariantMesh(@"models\body.wsmodel", [], []));
+        Add(project, @"models\body.wsmodel",
+            CreateWsModel(
+                [@"models\body.rigid_model_v2"],
+                [(0, 0, @"materials\missing.xml")]));
+        var geometry = Add(project, @"models\body.rigid_model_v2",
+            PackFile.CreateFromBytes("body.rigid_model_v2", [1]));
+        var inspector = new Mock<ITrustedRigidModelInspector>();
+        inspector.Setup(item => item.Inspect(geometry))
+            .Returns(CreateInspection("humanoid"));
+        var resolver = new TrustedWsModelResolver(
+            CreateService([project]).Object,
+            inspector.Object);
+
+        var result = await resolver.ResolveAsync(
+            root,
+            CancellationToken.None);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(result.IsSuccess, Is.False);
+            NUnitAssert.That(result.Resolution, Is.Null);
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"materials\missing.xml"));
+            NUnitAssert.That(result.Diagnostic,
+                Does.Contain(@"models\body.wsmodel"));
+        });
+    }
+
     private static TrustedRigidModelInspection CreateInspection(
         string skeletonName) => new(
             skeletonName,
@@ -343,6 +672,29 @@ public class TrustedWsModelResolverTests
                   $"{materialXml}</materials></model>";
         return PackFile.CreateFromBytes(
             "model.wsmodel",
+            Encoding.UTF8.GetBytes(xml));
+    }
+
+    private static PackFile CreateVariantMesh(
+        string model,
+        IReadOnlyList<(string Model, string AttachPoint)> inlineChildren,
+        IReadOnlyList<string> references)
+    {
+        var modelAttribute = string.IsNullOrWhiteSpace(model)
+            ? string.Empty
+            : $" model=\"{model}\"";
+        var childXml = string.Concat(inlineChildren.Select((item, index) =>
+            $"<SLOT name=\"inline_{index}\" " +
+            $"attach_point=\"{item.AttachPoint}\">" +
+            $"<VARIANT_MESH model=\"{item.Model}\" /></SLOT>"));
+        var referenceXml = string.Concat(references.Select((path, index) =>
+            $"<SLOT name=\"reference_{index}\" attach_point=\"root\">" +
+            $"<VARIANT_MESH_REFERENCE definition=\"{path}\" /></SLOT>"));
+        var slotXml = childXml + referenceXml;
+        var xml = $"<VARIANT_MESH{modelAttribute}>{slotXml}" +
+                  "</VARIANT_MESH>";
+        return PackFile.CreateFromBytes(
+            "model.variantmeshdefinition",
             Encoding.UTF8.GetBytes(xml));
     }
 

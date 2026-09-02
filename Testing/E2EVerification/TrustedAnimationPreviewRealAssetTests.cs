@@ -3,7 +3,6 @@ using GameWorld.Core.Animation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel;
@@ -444,6 +443,124 @@ public class TrustedAnimationPreviewRealAssetTests
         });
     }
 
+    [Test]
+    [Explicit]
+    public void Yangjian_VariantMeshRendersNestedStaticAttachments()
+    {
+        var assetRoot = Environment.GetEnvironmentVariable(
+            "AE_TRUSTED_PREVIEW_ASSET_ROOT");
+        Assert.That(assetRoot, Is.Not.Null.And.Not.Empty);
+        var modelDiskPath = Path.Combine(
+            assetRoot!,
+            "test",
+            "yangjian.rigid_model_v2");
+        var skeletonDiskPath = Path.Combine(
+            assetRoot,
+            "animations",
+            "skeletons",
+            "yangjian_skeleton.anim");
+        var animationDiskPath = Path.Combine(
+            assetRoot,
+            "test",
+            "yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        var originalHashes = new[]
+        {
+            HashFile(modelDiskPath),
+            HashFile(skeletonDiskPath),
+            HashFile(animationDiskPath),
+        };
+
+        TestContext.Progress.WriteLine("Creating nested real VMD fixture.");
+        var runner = new AssetEditorTestRunner();
+        runner.PackFileService.EnforceGameFilesMustBeLoaded = false;
+        var container = CreateAcceptanceAssetContainer(assetRoot);
+        var model = container.FileList[@"test\yangjian.rigid_model_v2"];
+        AddWsModelResources(container, model);
+        AddVariantMeshResources(container, model);
+        runner.PackFileService.AddContainer(container);
+        var root = runner.PackFileService.FindFile(
+            @"test\yangjian.variantmeshdefinition");
+        var animation = runner.PackFileService.FindFile(
+            @"test\yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        Assert.Multiple(() =>
+        {
+            Assert.That(root, Is.Not.Null);
+            Assert.That(animation, Is.Not.Null);
+        });
+
+        TestContext.Progress.WriteLine("Resolving complete VMD graph.");
+        var resolver = new TrustedWsModelResolver(
+            runner.PackFileService,
+            new TrustedRigidModelInspector());
+        var resolutionResult = resolver.ResolveAsync(
+                root!,
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert.That(
+            resolutionResult.IsSuccess,
+            Is.True,
+            resolutionResult.Diagnostic);
+        var resolution = resolutionResult.Resolution!;
+
+        TestContext.Progress.WriteLine("Loading nested VMD viewport.");
+        using var viewport = runner.ServiceProvider
+            .GetRequiredService<ITrustedAnimationPreviewViewport>();
+        var modelResult = viewport.Load(root!, resolution.Skeleton);
+        Assert.That(modelResult.IsSuccess, Is.True, modelResult.Diagnostic);
+        var game = (WpfGameMock)viewport.GameWorld;
+        viewport.SetModelVisible(false);
+        viewport.SetSkeletonVisible(false);
+        var hidden = RenderFrame(game);
+        viewport.SetModelVisible(true);
+        viewport.ShowFront();
+        var defaultPose = RenderFrame(game);
+
+        TestContext.Progress.WriteLine("Animating nested VMD viewport.");
+        var sourceAnimation = AnimationFile.Create(animation!);
+        var animationResult = viewport.LoadAnimation(
+            sourceAnimation,
+            @"test\yangjian_as_mgd_yangjian_01_bstd_01.anim");
+        Assert.That(
+            animationResult.IsSuccess,
+            Is.True,
+            animationResult.Diagnostic);
+        var frameZero = RenderFrame(game);
+        viewport.Seek(sourceAnimation.Header.AnimationTotalPlayTimeInSec / 2);
+        var middle = RenderFrame(game);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.GeometryCount, Is.EqualTo(3));
+            Assert.That(resolution.StaticAttachmentCount, Is.EqualTo(2));
+            Assert.That(resolution.Dependencies.Count(item =>
+                    item.Kind ==
+                    TrustedModelDependencyKind.VariantMeshDefinition),
+                Is.EqualTo(2));
+            Assert.That(resolution.Dependencies.Count(item =>
+                    item.Kind == TrustedModelDependencyKind.Material),
+                Is.GreaterThan(0));
+            Assert.That(resolution.Dependencies.Count(item =>
+                    item.Kind == TrustedModelDependencyKind.Texture),
+                Is.GreaterThan(0));
+            Assert.That(modelResult.MeshCount, Is.GreaterThan(2));
+            Assert.That(
+                CountDifferentPixels(hidden, defaultPose),
+                Is.GreaterThan(100),
+                "The complete VMD default pose was not visible.");
+            Assert.That(
+                CountDifferentPixels(frameZero, middle),
+                Is.GreaterThan(100),
+                "The complete VMD did not animate in the real viewport.");
+            Assert.That(new[]
+            {
+                HashFile(modelDiskPath),
+                HashFile(skeletonDiskPath),
+                HashFile(animationDiskPath),
+            }, Is.EqualTo(originalHashes));
+        });
+    }
+
     private static PackFile AddWsModelResources(
         PackFileContainer container,
         PackFile modelFile)
@@ -499,6 +616,59 @@ public class TrustedAnimationPreviewRealAssetTests
             Encoding.UTF8.GetBytes(wsModelXml));
         container.FileList[@"test\yangjian.wsmodel"] = wsModel;
         return wsModel;
+    }
+
+    private static void AddVariantMeshResources(
+        PackFileContainer container,
+        PackFile sourceModel)
+    {
+        var staticModel = ModelFactory.Create().Load(
+            sourceModel.DataSource.ReadData());
+        var staticHeader = staticModel.Header;
+        staticHeader.SkeletonName = string.Empty;
+        staticModel.Header = staticHeader;
+        for (var lodIndex = 0;
+             lodIndex < staticModel.ModelList.Length;
+             lodIndex++)
+        {
+            staticModel.ModelList[lodIndex] =
+                [staticModel.ModelList[lodIndex][0]];
+            staticModel.ModelList[lodIndex][0].Material
+                .UpdateInternalState(UiVertexFormat.Static);
+            foreach (var vertex in
+                     staticModel.ModelList[lodIndex][0].Mesh.VertexList)
+            {
+                vertex.WeightCount = 0;
+                vertex.BoneIndex = [];
+                vertex.BoneWeight = [];
+            }
+        }
+        staticModel.RecalculateOffsets();
+        var staticPackFile = PackFile.CreateFromBytes(
+            "yangjian_static.rigid_model_v2",
+            ModelFactory.Create().Save(staticModel));
+        container.FileList[
+            @"test\yangjian_static.rigid_model_v2"] = staticPackFile;
+
+        var childXml =
+            "<VARIANT_MESH model=\"test\\yangjian_static.rigid_model_v2\" />";
+        container.FileList[
+            @"test\yangjian_child.variantmeshdefinition"] =
+            PackFile.CreateFromBytes(
+                "yangjian_child.variantmeshdefinition",
+                Encoding.UTF8.GetBytes(childXml));
+        var rootXml =
+            "<VARIANT_MESH model=\"test\\yangjian.wsmodel\">" +
+            "<SLOT name=\"head_attachment\" attach_point=\"head\">" +
+            "<VARIANT_MESH model=\"test\\yangjian_static.rigid_model_v2\" />" +
+            "</SLOT>" +
+            "<SLOT name=\"root_attachment\" attach_point=\"root\">" +
+            "<VARIANT_MESH_REFERENCE definition=\"test\\yangjian_child.variantmeshdefinition\" />" +
+            "</SLOT></VARIANT_MESH>";
+        container.FileList[@"test\yangjian.variantmeshdefinition"] =
+            PackFile.CreateFromBytes(
+                "yangjian.variantmeshdefinition",
+                Encoding.UTF8.GetBytes(rootXml));
     }
 
     private static string GetTextureSlot(TextureType type) => type switch

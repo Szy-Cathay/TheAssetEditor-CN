@@ -111,7 +111,8 @@ public sealed class TrustedAnimationPreviewViewport :
             _sceneObjectEditor.SetMesh(
                 asset,
                 model,
-                updateSkeleton: false);
+                updateSkeleton: false,
+                onlyLoadFirstMesh: false);
             if (asset.ModelNode == null)
             {
                 return FailAndClear(

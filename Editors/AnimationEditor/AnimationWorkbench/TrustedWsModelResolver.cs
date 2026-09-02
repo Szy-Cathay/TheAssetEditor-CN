@@ -3,12 +3,15 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.GameFormats.RigidModel;
+using Shared.GameFormats.Vmd;
 using Shared.GameFormats.WsModel;
+using static Shared.GameFormats.Vmd.VariantMeshDefinition;
 
 namespace Editors.AnimationVisualEditors.AnimationWorkbench;
 
 public enum TrustedModelDependencyKind
 {
+    VariantMeshDefinition,
     WsModel,
     Geometry,
     Material,
@@ -30,7 +33,33 @@ public sealed record TrustedRigidModelMeshSlot(
 
 public sealed record TrustedRigidModelInspection(
     string SkeletonName,
-    IReadOnlyList<TrustedRigidModelMeshSlot> MeshSlots);
+    IReadOnlyList<TrustedRigidModelMeshSlot> MeshSlots,
+    IReadOnlyList<string> EmbeddedTexturePaths,
+    bool HasSkinnedVertices)
+{
+    public TrustedRigidModelInspection(
+        string skeletonName,
+        IReadOnlyList<TrustedRigidModelMeshSlot> meshSlots)
+        : this(
+            skeletonName,
+            meshSlots,
+            [],
+            !string.IsNullOrWhiteSpace(skeletonName))
+    {
+    }
+
+    public TrustedRigidModelInspection(
+        string skeletonName,
+        IReadOnlyList<TrustedRigidModelMeshSlot> meshSlots,
+        IReadOnlyList<string> embeddedTexturePaths)
+        : this(
+            skeletonName,
+            meshSlots,
+            embeddedTexturePaths,
+            !string.IsNullOrWhiteSpace(skeletonName))
+    {
+    }
+}
 
 public interface ITrustedRigidModelInspector
 {
@@ -70,7 +99,18 @@ public sealed class TrustedRigidModelInspector :
 
         return new TrustedRigidModelInspection(
             model.Header.SkeletonName.Trim(),
-            slots);
+            slots,
+            model.ModelList
+                .SelectMany(lod => lod)
+                .SelectMany(mesh => mesh.Material.GetAllTextures())
+                .Select(texture => texture.Path)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            model.ModelList
+                .SelectMany(lod => lod)
+                .Any(mesh => mesh.Material.BinaryVertexFormat is
+                    VertexFormat.Weighted or VertexFormat.Cinematic));
     }
 }
 
@@ -125,9 +165,13 @@ public sealed class TrustedWsModelResolver(
         {
             cancellationToken.ThrowIfCancellationRequested();
             var rootResource = CreateRootResource(root);
-            if (!rootResource.Path.EndsWith(
-                    ".wsmodel",
-                    StringComparison.OrdinalIgnoreCase))
+            var isWsModel = rootResource.Path.EndsWith(
+                ".wsmodel",
+                StringComparison.OrdinalIgnoreCase);
+            var isVariantMesh = rootResource.Path.EndsWith(
+                ".variantmeshdefinition",
+                StringComparison.OrdinalIgnoreCase);
+            if (!isWsModel && !isVariantMesh)
             {
                 return Failure(
                     "AnimationWorkbench.TrustedPreview.WsModelRootRequired",
@@ -136,10 +180,20 @@ public sealed class TrustedWsModelResolver(
             }
 
             var context = new ResolutionContext();
-            ResolveWsModel(
-                rootResource,
-                context,
-                cancellationToken);
+            if (isWsModel)
+            {
+                ResolveWsModel(
+                    rootResource,
+                    context,
+                    cancellationToken);
+            }
+            else
+            {
+                ResolveVariantMeshDefinition(
+                    rootResource,
+                    context,
+                    cancellationToken);
+            }
 
             if (context.SkinnedGeometries.Count == 0)
             {
@@ -205,6 +259,23 @@ public sealed class TrustedWsModelResolver(
                     skeletonIdentity.Name);
             }
 
+            var missingAttachment = context.Attachments.FirstOrDefault(item =>
+                !skeletonIdentity.Bones.Any(bone =>
+                    string.Equals(
+                        bone.Name,
+                        item.AttachmentPoint,
+                        StringComparison.OrdinalIgnoreCase)));
+            if (missingAttachment.Parent != null)
+            {
+                return Failure(
+                    "AnimationWorkbench.TrustedPreview.VariantMeshAttachmentMissing",
+                    missingAttachment.AttachmentPoint,
+                    missingAttachment.Parent.Path,
+                    missingAttachment.Parent.Source,
+                    skeletonResource.Path,
+                    skeletonResource.Source);
+            }
+
             context.Dependencies.Add(CreateDependency(
                 TrustedModelDependencyKind.Skeleton,
                 skeletonResource,
@@ -241,14 +312,14 @@ public sealed class TrustedWsModelResolver(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var cycleStart = context.ActiveWsModels.FindIndex(path =>
+        var cycleStart = context.ActiveModels.FindIndex(path =>
             string.Equals(
                 path,
                 resource.Path,
                 StringComparison.OrdinalIgnoreCase));
         if (cycleStart >= 0)
         {
-            var cycle = context.ActiveWsModels
+            var cycle = context.ActiveModels
                 .Skip(cycleStart)
                 .Append(resource.Path);
             throw ResolutionFailure(
@@ -256,7 +327,7 @@ public sealed class TrustedWsModelResolver(
                 string.Join(" -> ", cycle));
         }
 
-        context.ActiveWsModels.Add(resource.Path);
+        context.ActiveModels.Add(resource.Path);
         try
         {
             WsModelFile model;
@@ -343,9 +414,294 @@ public sealed class TrustedWsModelResolver(
         }
         finally
         {
-            context.ActiveWsModels.RemoveAt(
-                context.ActiveWsModels.Count - 1);
+            context.ActiveModels.RemoveAt(
+                context.ActiveModels.Count - 1);
         }
+    }
+
+    private void ResolveVariantMeshDefinition(
+        Resource resource,
+        ResolutionContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var cycleStart = context.ActiveModels.FindIndex(path =>
+            string.Equals(
+                path,
+                resource.Path,
+                StringComparison.OrdinalIgnoreCase));
+        if (cycleStart >= 0)
+        {
+            var cycle = context.ActiveModels
+                .Skip(cycleStart)
+                .Append(resource.Path);
+            throw ResolutionFailure(
+                "AnimationWorkbench.TrustedPreview.WsModelCycle",
+                string.Join(" -> ", cycle));
+        }
+
+        context.ActiveModels.Add(resource.Path);
+        try
+        {
+            VariantMesh model;
+            try
+            {
+                model = VariantMeshDefinitionLoader.Load(
+                    resource.File,
+                    strict: true);
+            }
+            catch (Exception exception)
+            {
+                throw ResolutionFailure(
+                    "AnimationWorkbench.TrustedPreview.WsModelReferenceUnreadable",
+                    resource.Path,
+                    resource.Source,
+                    resource.ParentPath,
+                    resource.ParentSource,
+                    exception.Message);
+            }
+
+            context.Dependencies.Add(new TrustedModelDependency(
+                TrustedModelDependencyKind.VariantMeshDefinition,
+                resource.File,
+                resource.Path,
+                resource.Source,
+                resource.ParentPath,
+                resource.ParentSource));
+            ResolveVariantMesh(
+                model,
+                resource,
+                context,
+                cancellationToken);
+        }
+        finally
+        {
+            context.ActiveModels.RemoveAt(
+                context.ActiveModels.Count - 1);
+        }
+    }
+
+    private void ResolveVariantMesh(
+        VariantMesh model,
+        Resource node,
+        ResolutionContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var hasContent = false;
+        if (!string.IsNullOrWhiteSpace(model.ModelReference))
+        {
+            ResolveModelReference(
+                model.ModelReference,
+                node,
+                context,
+                cancellationToken);
+            hasContent = true;
+        }
+
+        foreach (var decalPath in new[]
+                 {
+                     model.DecalDiffuse,
+                     model.DecalNormal,
+                 }.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            var texture = FindRequired(
+                decalPath,
+                node,
+                TrustedModelDependencyKind.Texture);
+            context.Dependencies.Add(CreateDependency(
+                TrustedModelDependencyKind.Texture,
+                texture,
+                node));
+        }
+
+        var slots = model.ChildSlots ?? [];
+        for (var slotIndex = 0; slotIndex < slots.Count; slotIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var slot = slots[slotIndex];
+            var slotName = string.IsNullOrWhiteSpace(slot.Name)
+                ? slotIndex.ToString()
+                : slot.Name;
+            var slotPath = $"{node.Path}#SLOT[{slotName}]";
+            var slotResource = new Resource(
+                node.File,
+                slotPath,
+                node.Source,
+                node.Path,
+                node.Source);
+            var inlineChildren = slot.ChildMeshes ?? [];
+            var childReferences = slot.ChildReferences ?? [];
+            if ((inlineChildren.Count > 0 || childReferences.Count > 0) &&
+                !string.IsNullOrWhiteSpace(slot.AttachmentPoint))
+            {
+                context.Attachments.Add((
+                    slot.AttachmentPoint.Trim(),
+                    slotResource));
+            }
+            for (var childIndex = 0;
+                 childIndex < inlineChildren.Count;
+                 childIndex++)
+            {
+                var childResource = slotResource with
+                {
+                    Path = $"{slotPath}/VARIANT_MESH[{childIndex}]",
+                    ParentPath = slotPath,
+                };
+                ResolveVariantMesh(
+                    inlineChildren[childIndex],
+                    childResource,
+                    context,
+                    cancellationToken);
+                hasContent = true;
+            }
+
+            foreach (var childReference in childReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(childReference.Reference))
+                {
+                    throw ResolutionFailure(
+                        "AnimationWorkbench.TrustedPreview.VariantMeshReferenceEmpty",
+                        slotResource.Path,
+                        slotResource.Source);
+                }
+                var reference = FindRequired(
+                    childReference.Reference,
+                    slotResource,
+                    TrustedModelDependencyKind.VariantMeshDefinition);
+                if (!reference.Path.EndsWith(
+                        ".variantmeshdefinition",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw ResolutionFailure(
+                        "AnimationWorkbench.TrustedPreview.WsModelGeometryTypeUnsupported",
+                        reference.Path,
+                        slotResource.Path,
+                        slotResource.Source);
+                }
+                ResolveVariantMeshDefinition(
+                    reference,
+                    context,
+                    cancellationToken);
+                hasContent = true;
+            }
+        }
+
+        if (!hasContent)
+        {
+            throw ResolutionFailure(
+                "AnimationWorkbench.TrustedPreview.VariantMeshNodeEmpty",
+                node.Path,
+                node.Source);
+        }
+    }
+
+    private void ResolveModelReference(
+        string path,
+        Resource parent,
+        ResolutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var normalizedPath = TrustedAnimationEffectiveResources.NormalizePath(
+            path);
+        var kind = normalizedPath.EndsWith(
+            ".wsmodel",
+            StringComparison.OrdinalIgnoreCase)
+                ? TrustedModelDependencyKind.WsModel
+                : normalizedPath.EndsWith(
+                    ".variantmeshdefinition",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? TrustedModelDependencyKind.VariantMeshDefinition
+                    : TrustedModelDependencyKind.Geometry;
+        var resource = FindRequired(normalizedPath, parent, kind);
+        if (normalizedPath.EndsWith(
+                ".wsmodel",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            ResolveWsModel(resource, context, cancellationToken);
+        }
+        else if (normalizedPath.EndsWith(
+                     ".variantmeshdefinition",
+                     StringComparison.OrdinalIgnoreCase))
+        {
+            ResolveVariantMeshDefinition(
+                resource,
+                context,
+                cancellationToken);
+        }
+        else if (normalizedPath.EndsWith(
+                     ".rigid_model_v2",
+                     StringComparison.OrdinalIgnoreCase))
+        {
+            ResolveEmbeddedRigidModel(
+                resource,
+                parent,
+                context,
+                cancellationToken);
+        }
+        else
+        {
+            throw ResolutionFailure(
+                "AnimationWorkbench.TrustedPreview.WsModelGeometryTypeUnsupported",
+                normalizedPath,
+                parent.Path,
+                parent.Source);
+        }
+    }
+
+    private void ResolveEmbeddedRigidModel(
+        Resource geometry,
+        Resource parent,
+        ResolutionContext context,
+        CancellationToken cancellationToken)
+    {
+        TrustedRigidModelInspection inspection;
+        try
+        {
+            inspection = rigidModelInspector.Inspect(geometry.File);
+        }
+        catch (Exception exception)
+        {
+            throw ResolutionFailure(
+                "AnimationWorkbench.TrustedPreview.WsModelReferenceUnreadable",
+                geometry.Path,
+                geometry.Source,
+                parent.Path,
+                parent.Source,
+                exception.Message);
+        }
+
+        if (inspection.MeshSlots.Count == 0)
+        {
+            throw ResolutionFailure(
+                "AnimationWorkbench.TrustedPreview.WsModelGeometryEmpty",
+                geometry.Path,
+                geometry.Source,
+                parent.Path,
+                parent.Source);
+        }
+
+        foreach (var texturePath in inspection.EmbeddedTexturePaths
+                     .Where(path => !string.IsNullOrWhiteSpace(path))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var texture = FindRequired(
+                texturePath,
+                geometry,
+                TrustedModelDependencyKind.Texture);
+            context.Dependencies.Add(CreateDependency(
+                TrustedModelDependencyKind.Texture,
+                texture,
+                geometry));
+        }
+
+        context.Dependencies.Add(CreateDependency(
+            TrustedModelDependencyKind.Geometry,
+            geometry,
+            parent));
+        AddGeometry(geometry, inspection, context);
     }
 
     private void ResolveRigidModel(
@@ -391,15 +747,28 @@ public sealed class TrustedWsModelResolver(
             TrustedModelDependencyKind.Geometry,
             geometry,
             wsModel));
+        AddGeometry(geometry, inspection, context);
+    }
+
+    private static void AddGeometry(
+        Resource geometry,
+        TrustedRigidModelInspection inspection,
+        ResolutionContext context)
+    {
         context.GeometryCount++;
-        if (string.IsNullOrWhiteSpace(inspection.SkeletonName))
+        var hasDeclaredSkeleton =
+            !string.IsNullOrWhiteSpace(inspection.SkeletonName);
+        if (inspection.HasSkinnedVertices != hasDeclaredSkeleton)
         {
+            throw ResolutionFailure(
+                "AnimationWorkbench.TrustedPreview.GeometrySkinningIdentityInvalid",
+                geometry.Path,
+                geometry.Source);
+        }
+        if (!inspection.HasSkinnedVertices)
             context.StaticAttachmentCount++;
-        }
         else
-        {
             context.SkinnedGeometries.Add((geometry, inspection));
-        }
     }
 
     private void ValidateMaterials(
@@ -563,6 +932,8 @@ public sealed class TrustedWsModelResolver(
     private static string GetDependencyKindText(
         TrustedModelDependencyKind kind) => Localize(kind switch
         {
+            TrustedModelDependencyKind.VariantMeshDefinition =>
+                "AnimationWorkbench.TrustedPreview.DependencyVariantMesh",
             TrustedModelDependencyKind.WsModel =>
                 "AnimationWorkbench.TrustedPreview.DependencyWsModel",
             TrustedModelDependencyKind.Geometry =>
@@ -599,12 +970,15 @@ public sealed class TrustedWsModelResolver(
 
     private sealed class ResolutionContext
     {
-        public List<string> ActiveWsModels { get; } = [];
+        public List<string> ActiveModels { get; } = [];
 
         public List<TrustedModelDependency> Dependencies { get; } = [];
 
         public List<(Resource Resource,
             TrustedRigidModelInspection Inspection)> SkinnedGeometries
+            { get; } = [];
+
+        public List<(string AttachmentPoint, Resource Parent)> Attachments
             { get; } = [];
 
         public int GeometryCount { get; set; }
