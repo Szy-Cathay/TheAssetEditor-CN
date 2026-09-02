@@ -456,6 +456,9 @@
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -472,15 +475,39 @@
                         Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
                 </Canvas>
             </ToggleButton>
-            <Slider
+            <Button
                 Grid.Column="1"
+                Margin="8,0,0,0"
+                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.PreviousFrame}"
+                Command="{Binding PreviousFrameCommand}"
+                Content="{loc:Loc AnimationWorkbench.TrustedPreview.PreviousFrame}"
+                IsEnabled="{Binding HasAnimation}"
+                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.PreviousFrame}" />
+            <Button
+                Grid.Column="2"
+                Margin="6,0,0,0"
+                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.NextFrame}"
+                Command="{Binding NextFrameCommand}"
+                Content="{loc:Loc AnimationWorkbench.TrustedPreview.NextFrame}"
+                IsEnabled="{Binding HasAnimation}"
+                ToolTip="{loc:Loc AnimationWorkbench.TrustedPreview.NextFrame}" />
+            <CheckBox
+                Grid.Column="3"
+                Margin="10,0,0,0"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{loc:Loc AnimationWorkbench.TrustedPreview.Loop}"
+                Content="{loc:Loc AnimationWorkbench.TrustedPreview.Loop}"
+                IsChecked="{Binding IsLooping, Mode=TwoWay}"
+                IsEnabled="{Binding HasAnimation}" />
+            <Slider
+                Grid.Column="4"
                 Margin="8,0"
                 IsEnabled="{Binding HasAnimation}"
                 Maximum="{Binding PlaybackMaximum}"
                 Style="{StaticResource AeEditor.PlaybackSlider}"
                 Value="{Binding CurrentTimeSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock
-                Grid.Column="2"
+                Grid.Column="5"
                 VerticalAlignment="Center"
                 Style="{StaticResource AeText.Caption}"
                 Text="{Binding PlaybackSummary}" />

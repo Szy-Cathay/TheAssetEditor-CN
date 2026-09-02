@@ -140,15 +140,58 @@ public sealed record TrustedAnimationCandidate(
     uint Version,
     int FrameCount,
     double DurationSeconds,
-    double FramesPerSecond)
+    double FramesPerSecond,
+    int PartCount = 1,
+    bool HasStaticFrame = false,
+    bool IsStaticPose = false)
 {
     public string Metadata => string.Format(
         LocalizationManager.Instance.Get(
             "AnimationWorkbench.AnimationPicker.Metadata"),
         Version,
+        TrustedAnimationFormatText.Get(
+            PartCount,
+            HasStaticFrame,
+            IsStaticPose),
         FrameCount,
         DurationSeconds,
         FramesPerSecond);
+}
+
+internal static class TrustedAnimationFormatText
+{
+    public static string Get(
+        int partCount,
+        bool hasStaticFrame,
+        bool isStaticPose)
+    {
+        if (isStaticPose)
+        {
+            return LocalizationManager.Instance.Get(
+                "AnimationWorkbench.AnimationPicker.FormatStaticPose");
+        }
+        if (partCount > 1 && hasStaticFrame)
+        {
+            return string.Format(
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.AnimationPicker.FormatMultipartStatic"),
+                partCount);
+        }
+        if (partCount > 1)
+        {
+            return string.Format(
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.AnimationPicker.FormatMultipart"),
+                partCount);
+        }
+        if (hasStaticFrame)
+        {
+            return LocalizationManager.Instance.Get(
+                "AnimationWorkbench.AnimationPicker.FormatStaticTracks");
+        }
+        return LocalizationManager.Instance.Get(
+            "AnimationWorkbench.AnimationPicker.FormatDynamic");
+    }
 }
 
 public interface ITrustedAnimationDiscovery
@@ -286,7 +329,9 @@ public sealed class TrustedAnimationDiscovery(
         try
         {
             var animation = AnimationFile.Create(file);
-            if (animation.Header.Version != 8 ||
+            if (animation.Header.Version is not 7 and not 8 ||
+                !float.IsFinite(animation.Header.FrameRate) ||
+                animation.Header.FrameRate < 0 ||
                 !TrustedAnimationCompatibility.HasExactBoneIdentity(
                     animation,
                     requiredSkeleton,
@@ -314,7 +359,15 @@ public sealed class TrustedAnimationDiscovery(
                 animation.Header.Version,
                 clip.DynamicFrames.Count,
                 clip.Duration.TotalSeconds,
-                clip.Timebase?.FramesPerSecond ?? 0);
+                animation.Header.FrameRate,
+                animation.AnimationParts.Count,
+                animation.AnimationParts.Any(part =>
+                    part.StaticFrame != null),
+                animation.AnimationParts.Count > 0 &&
+                animation.AnimationParts.All(part =>
+                    part.DynamicFrames.Count == 0) &&
+                animation.AnimationParts.Any(part =>
+                    part.StaticFrame != null));
             return true;
         }
         catch
@@ -467,7 +520,7 @@ internal static class TrustedAnimationCompatibility
         out string conflict)
     {
         if (clip.DynamicFrames.Count == 0 ||
-            clip.Duration <= TimeSpan.Zero ||
+            clip.Duration < TimeSpan.Zero ||
             !double.IsFinite(clip.Duration.TotalSeconds))
         {
             conflict = LocalizationManager.Instance.Get(

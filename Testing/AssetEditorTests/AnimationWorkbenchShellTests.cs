@@ -810,8 +810,10 @@ public class AnimationWorkbenchShellTests
         });
     }
 
-    [Test]
-    public void TrustedSession_LoadsExactVersionEightAnimationOnCurrentSkeleton()
+    [TestCase(7u)]
+    [TestCase(8u)]
+    public void TrustedSession_LoadsExactReadOnlyAnimationOnCurrentSkeleton(
+        uint version)
     {
         var model = CreateRigidModelHeaderFile(
             "character.rigid_model_v2",
@@ -824,7 +826,7 @@ public class AnimationWorkbenchShellTests
             skeleton,
             "humanoid01");
         var animationFile = CreateAnimationFile("humanoid01");
-        animationFile.Header.Version = 8;
+        animationFile.Header.Version = version;
         var animation = PackFile.CreateFromBytes(
             "idle.anim",
             AnimationFile.ConvertToBytes(animationFile));
@@ -836,7 +838,7 @@ public class AnimationWorkbenchShellTests
             "my_mod.pack",
             @"C:\mods\my_mod.pack",
             TrustedAnimationModelSourceRole.FolderProject,
-            8,
+            version,
             1,
             0.05,
             20);
@@ -866,6 +868,135 @@ public class AnimationWorkbenchShellTests
         viewport.Verify(item => item.LoadAnimation(
             parsedAnimation,
             candidate.Path), Times.Once);
+    }
+
+    [Test]
+    public void TrustedSession_DoesNotBlockStaticOrMultipartReadOnlyFormats()
+    {
+        var model = CreateRigidModelHeaderFile(
+            "character.rigid_model_v2",
+            "humanoid01");
+        var skeleton = CreateSkeletonPackFile(
+            "humanoid01.anim",
+            "humanoid01");
+        var packFileService = CreateTrustedPreviewPackService(
+            model,
+            skeleton,
+            "humanoid01");
+        var staticAnimation = CreateVersionEightStaticAnimationFile();
+        staticAnimation.Header.SkeletonName = "humanoid01";
+        var multipartAnimation = CreateAnimationFile("humanoid01");
+        multipartAnimation.Header.Version = 8;
+        multipartAnimation.AnimationParts.Add(
+            multipartAnimation.AnimationParts.Single());
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.Setup(item => item.Load(model, skeleton))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        viewport.Setup(item => item.LoadAnimation(
+                It.IsAny<AnimationFile>(),
+                It.IsAny<string>()))
+            .Returns(TrustedAnimationPreviewViewportResult.Success(3));
+        var session = new TrustedAnimationPreviewFeatureSession(
+            viewport.Object,
+            packFileService.Object);
+        session.LoadModel(model);
+
+        foreach (var (animation, path, partCount, hasStatic) in new[]
+                 {
+                     (staticAnimation,
+                         @"animations\battle\static.anim",
+                         1,
+                         true),
+                     (multipartAnimation,
+                         @"animations\battle\multipart.anim",
+                         2,
+                         false),
+                 })
+        {
+            var candidate = new TrustedAnimationCandidate(
+                PackFile.CreateFromBytes(
+                    Path.GetFileName(path),
+                    [1]),
+                Path.GetFileNameWithoutExtension(path),
+                path,
+                "my_mod.pack",
+                @"C:\mods\my_mod.pack",
+                TrustedAnimationModelSourceRole.FolderProject,
+                8,
+                1,
+                animation.Header.AnimationTotalPlayTimeInSec,
+                animation.Header.FrameRate,
+                partCount,
+                hasStatic,
+                hasStatic);
+
+            session.LoadAnimation(candidate, animation);
+            NUnitAssert.That(
+                session.State.Animation.IsResolved,
+                Is.True,
+                path);
+        }
+
+        viewport.Verify(item => item.LoadAnimation(
+            It.IsAny<AnimationFile>(),
+            It.IsAny<string>()), Times.Exactly(2));
+    }
+
+    [Test]
+    public void TrustedViewModel_ExposesFrameStepAndLoopControls()
+    {
+        var playback = new TrustedAnimationPlaybackState(
+            true,
+            false,
+            1,
+            3,
+            1d / 30,
+            0.1,
+            30,
+            true,
+            false,
+            false,
+            2);
+        var viewport = new Mock<ITrustedAnimationPreviewViewport>();
+        viewport.SetupGet(item => item.PlaybackState)
+            .Returns(() => playback);
+        viewport.Setup(item => item.PreviousFrame())
+            .Callback(() => playback = playback with
+            {
+                CurrentFrame = 0,
+                CurrentTimeSeconds = 0,
+                IsPlaying = false,
+            });
+        viewport.Setup(item => item.NextFrame())
+            .Callback(() => playback = playback with
+            {
+                CurrentFrame = 1,
+                CurrentTimeSeconds = 1d / 30,
+                IsPlaying = false,
+            });
+        viewport.Setup(item => item.SetLooping(false))
+            .Callback(() => playback = playback with
+            {
+                IsLooping = false,
+            });
+        var viewModel = new TrustedAnimationPreviewViewModel(
+            viewport.Object,
+            Mock.Of<IPackFileService>(),
+            Mock.Of<ITrustedAnimationModelDiscovery>(),
+            Mock.Of<ITrustedAnimationDiscovery>());
+
+        viewModel.PreviousFrameCommand.Execute(null);
+        viewModel.NextFrameCommand.Execute(null);
+        viewModel.IsLooping = false;
+
+        NUnitAssert.Multiple(() =>
+        {
+            viewport.Verify(item => item.PreviousFrame(), Times.Once);
+            viewport.Verify(item => item.NextFrame(), Times.Once);
+            viewport.Verify(item => item.SetLooping(false), Times.Once);
+            NUnitAssert.That(viewModel.IsLooping, Is.False);
+        });
+        viewModel.Close();
     }
 
     [Test]
@@ -1011,6 +1142,12 @@ public class AnimationWorkbenchShellTests
                 Is.EqualTo(2));
             NUnitAssert.That(source, Does.Contain(
                 "AeEditor.PlaybackSlider"));
+            NUnitAssert.That(source, Does.Contain(
+                "PreviousFrameCommand"));
+            NUnitAssert.That(source, Does.Contain(
+                "NextFrameCommand"));
+            NUnitAssert.That(source, Does.Contain(
+                "AnimationWorkbench.TrustedPreview.Loop"));
             NUnitAssert.That(source, Does.Contain("AeSurface.Overlay"));
             NUnitAssert.That(source, Does.Not.Contain("▶"));
             NUnitAssert.That(source, Does.Not.Contain("TabControl"));

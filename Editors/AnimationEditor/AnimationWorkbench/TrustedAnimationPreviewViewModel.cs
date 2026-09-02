@@ -151,6 +151,18 @@ public partial class TrustedAnimationPreviewViewModel :
 
     public bool IsPlaying => PlaybackState.IsPlaying;
 
+    public bool IsLooping
+    {
+        get => PlaybackState.IsLooping;
+        set
+        {
+            if (!HasAnimation || value == PlaybackState.IsLooping)
+                return;
+            _viewport.SetLooping(value);
+            NotifyPlaybackChanged();
+        }
+    }
+
     public double PlaybackMaximum =>
         Math.Max(0, PlaybackState.DurationSeconds);
 
@@ -176,7 +188,11 @@ public partial class TrustedAnimationPreviewViewModel :
         PlaybackState.DurationSeconds,
         PlaybackState.CurrentFrame,
         PlaybackState.FrameCount,
-        PlaybackState.FramesPerSecond);
+        PlaybackState.FramesPerSecond,
+        TrustedAnimationFormatText.Get(
+            PlaybackState.PartCount,
+            PlaybackState.HasStaticFrame,
+            PlaybackState.IsStaticPose));
 
     public bool HasModelDiagnostic =>
         !string.IsNullOrWhiteSpace(Model.Diagnostic);
@@ -533,6 +549,24 @@ public partial class TrustedAnimationPreviewViewModel :
         NotifyPlaybackChanged();
     }
 
+    [RelayCommand]
+    private void PreviousFrame()
+    {
+        if (!HasAnimation)
+            return;
+        _viewport.PreviousFrame();
+        NotifyPlaybackChanged();
+    }
+
+    [RelayCommand]
+    private void NextFrame()
+    {
+        if (!HasAnimation)
+            return;
+        _viewport.NextFrame();
+        NotifyPlaybackChanged();
+    }
+
     private void OnStateChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(Model));
@@ -562,6 +596,7 @@ public partial class TrustedAnimationPreviewViewModel :
         OnPropertyChanged(nameof(PlaybackState));
         OnPropertyChanged(nameof(HasAnimation));
         OnPropertyChanged(nameof(IsPlaying));
+        OnPropertyChanged(nameof(IsLooping));
         OnPropertyChanged(nameof(PlaybackMaximum));
         OnPropertyChanged(nameof(CurrentTimeSeconds));
         OnPropertyChanged(nameof(PlaybackSummary));

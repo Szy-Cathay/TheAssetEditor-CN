@@ -58,7 +58,11 @@ public sealed record TrustedAnimationPlaybackState(
     int FrameCount,
     double CurrentTimeSeconds,
     double DurationSeconds,
-    double FramesPerSecond)
+    double FramesPerSecond,
+    bool IsLooping = true,
+    bool HasStaticFrame = false,
+    bool IsStaticPose = false,
+    int PartCount = 1)
 {
     public static TrustedAnimationPlaybackState Empty { get; } = new(
         false,
@@ -67,6 +71,10 @@ public sealed record TrustedAnimationPlaybackState(
         0,
         0,
         0,
+        0,
+        true,
+        false,
+        false,
         0);
 }
 
@@ -109,6 +117,12 @@ public interface ITrustedAnimationPreviewViewport : IDisposable
     void Play();
 
     void Pause();
+
+    void PreviousFrame();
+
+    void NextFrame();
+
+    void SetLooping(bool isLooping);
 
     void Seek(double timeSeconds);
 }
@@ -348,7 +362,7 @@ public sealed class TrustedAnimationPreviewFeatureSession(
                 return;
             }
 
-            if (animation.Header.Version != 8)
+            if (animation.Header.Version is not 7 and not 8)
             {
                 SetAnimationFailure(
                     candidate,

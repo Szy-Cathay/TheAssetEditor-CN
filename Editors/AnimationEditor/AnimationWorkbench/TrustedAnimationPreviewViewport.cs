@@ -27,6 +27,12 @@ public sealed class TrustedAnimationPreviewViewport :
     private bool _showModel = true;
     private bool _showSkeleton = true;
     private float _defaultLargestDimension;
+    private int _sourceFrameCount;
+    private double _sourceDurationSeconds;
+    private double _sourceFramesPerSecond;
+    private int _sourcePartCount;
+    private bool _sourceHasStaticFrame;
+    private bool _sourceIsStaticPose;
     private bool _disposed;
 
     public TrustedAnimationPreviewViewport(IEditorHostParameters parameters)
@@ -55,14 +61,27 @@ public sealed class TrustedAnimationPreviewViewport :
             var player = _previewAsset?.Data.Player;
             if (player?.AnimationClip == null)
                 return TrustedAnimationPlaybackState.Empty;
+            var currentFrame = _sourceFrameCount == 0
+                ? 0
+                : Math.Clamp(
+                    player.CurrentFrame,
+                    0,
+                    _sourceFrameCount - 1);
             return new TrustedAnimationPlaybackState(
                 true,
                 player.IsPlaying,
-                player.CurrentFrame,
-                player.FrameCount,
-                player.CurrentTime.TotalSeconds,
-                player.Duration.TotalSeconds,
-                player.FramesPerSecond);
+                currentFrame,
+                _sourceFrameCount,
+                Math.Clamp(
+                    player.CurrentTime.TotalSeconds,
+                    0,
+                    _sourceDurationSeconds),
+                _sourceDurationSeconds,
+                _sourceFramesPerSecond,
+                player.LoopAnimation,
+                _sourceHasStaticFrame,
+                _sourceIsStaticPose,
+                _sourcePartCount);
         }
     }
 
@@ -201,6 +220,13 @@ public sealed class TrustedAnimationPreviewViewport :
         var skeleton = asset.Skeleton;
         try
         {
+            if (!float.IsFinite(animation.Header.FrameRate) ||
+                animation.Header.FrameRate < 0)
+            {
+                throw new InvalidDataException(
+                    LocalizationManager.Instance.Get(
+                        "AnimationWorkbench.TrustedPreview.AnimationNoPlayableSamples"));
+            }
             var clip = new AnimationClip(animation, skeleton);
             if (!TrustedAnimationCompatibility.HasFiniteClip(
                     clip,
@@ -243,6 +269,19 @@ public sealed class TrustedAnimationPreviewViewport :
                         "AnimationWorkbench.TrustedPreview.AnimationPoseUnsafe"));
             }
 
+            _sourceFrameCount = clip.DynamicFrames.Count;
+            _sourceDurationSeconds =
+                animation.Header.AnimationTotalPlayTimeInSec;
+            _sourceFramesPerSecond = animation.Header.FrameRate;
+            _sourcePartCount = animation.AnimationParts.Count;
+            _sourceHasStaticFrame = animation.AnimationParts.Any(part =>
+                part.StaticFrame != null);
+            _sourceIsStaticPose =
+                animation.AnimationParts.Count > 0 &&
+                animation.AnimationParts.All(part =>
+                    part.DynamicFrames.Count == 0) &&
+                _sourceHasStaticFrame;
+
             PlaybackChanged?.Invoke(this, EventArgs.Empty);
             return TrustedAnimationPreviewViewportResult.Success(
                 meshes.Count);
@@ -262,6 +301,7 @@ public sealed class TrustedAnimationPreviewViewport :
     public void Clear()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ResetAnimationMetadata();
         if (_previewAsset == null)
             return;
 
@@ -346,6 +386,20 @@ public sealed class TrustedAnimationPreviewViewport :
         PlaybackChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void PreviousFrame() => StepFrame(-1);
+
+    public void NextFrame() => StepFrame(1);
+
+    public void SetLooping(bool isLooping)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var player = _previewAsset?.Data.Player;
+        if (player?.AnimationClip == null)
+            return;
+        player.LoopAnimation = isLooping;
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public void Seek(double timeSeconds)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -355,15 +409,7 @@ public sealed class TrustedAnimationPreviewViewport :
         if (asset?.Player.AnimationClip == null)
             return;
         asset.Player.SeekToTimeSeconds((float)timeSeconds);
-        var meshes = SceneNodeHelper
-            .GetChildrenOfType<Rmv2MeshNode>(asset.ModelNode);
-        if (meshes.Any(mesh => !HasFinitePose(mesh) ||
-                               IsAbnormalGrowth(mesh)))
-        {
-            throw new InvalidDataException(
-                LocalizationManager.Instance.Get(
-                    "AnimationWorkbench.TrustedPreview.AnimationSeekUnsafe"));
-        }
+        EnsureCurrentPoseSafe(asset);
         PlaybackChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -387,12 +433,59 @@ public sealed class TrustedAnimationPreviewViewport :
 
     private void ClearAnimation()
     {
+        ResetAnimationMetadata();
         var asset = _previewAsset?.Data;
         if (asset == null)
             return;
         _sceneObjectEditor.SetAnimationClip(asset, null, string.Empty);
         asset.Player.Stop();
         PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void StepFrame(int offset)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var asset = _previewAsset?.Data;
+        if (asset?.Player.AnimationClip == null ||
+            _sourceFrameCount == 0)
+        {
+            return;
+        }
+
+        asset.Player.Pause();
+        var currentFrame = Math.Clamp(
+            asset.Player.CurrentFrame,
+            0,
+            _sourceFrameCount - 1);
+        asset.Player.CurrentFrame = Math.Clamp(
+            currentFrame + offset,
+            0,
+            _sourceFrameCount - 1);
+        EnsureCurrentPoseSafe(asset);
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void EnsureCurrentPoseSafe(SceneObject asset)
+    {
+        var meshes = SceneNodeHelper
+            .GetChildrenOfType<Rmv2MeshNode>(asset.ModelNode);
+        if (meshes.Any(mesh => !HasFinitePose(mesh) ||
+                               IsAbnormalGrowth(mesh)))
+        {
+            throw new InvalidDataException(
+                LocalizationManager.Instance.Get(
+                    "AnimationWorkbench.TrustedPreview.AnimationSeekUnsafe"));
+        }
+    }
+
+    private void ResetAnimationMetadata()
+    {
+        _sourceFrameCount = 0;
+        _sourceDurationSeconds = 0;
+        _sourceFramesPerSecond = 0;
+        _sourcePartCount = 0;
+        _sourceHasStaticFrame = false;
+        _sourceIsStaticPose = false;
     }
 
     private void OnFrameChanged(int _) =>

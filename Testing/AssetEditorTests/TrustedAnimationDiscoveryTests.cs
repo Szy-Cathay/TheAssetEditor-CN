@@ -19,7 +19,7 @@ public class TrustedAnimationDiscoveryTests
         new LocalizationManager().LoadLanguage();
 
     [Test]
-    public async Task Discovery_ReturnsOnlyExactVersionEightAnimationsWithMetadata()
+    public async Task Discovery_ReturnsExactReadOnlyFormatsWithOriginalMetadata()
     {
         var project = CreateContainer(
             "project",
@@ -36,12 +36,16 @@ public class TrustedAnimationDiscoveryTests
             CreateAnimation("humanoid", 8, 2, 1));
         Add(reference, @"animations\battle\attack.anim",
             CreateAnimation("humanoid", 8, 4, 2));
+        Add(reference, @"animations\battle\legacy.anim",
+            CreateAnimation("humanoid", 7, 3, 3));
+        Add(project, @"animations\battle\static_pose.anim",
+            CreateStaticAnimation("humanoid", 8, 24));
+        Add(ca, @"animations\battle\multipart.anim",
+            CreateMultipartAnimation("humanoid", 8, 2, 2, 48));
         Add(ca, @"animations\battle\prefix.anim",
             CreateAnimation("human", 8, 2, 1));
         Add(ca, @"animations\battle\helper.anim",
             CreateAnimation("humanoid", 8, 2, 1, true));
-        Add(ca, @"animations\battle\legacy.anim",
-            CreateAnimation("humanoid", 7, 2, 1));
         var service = CreateService([ca, reference, project]);
         var identity = TrustedAnimationSkeletonIdentity.Create(
             skeleton,
@@ -66,18 +70,31 @@ public class TrustedAnimationDiscoveryTests
                 {
                     @"animations\battle\idle.anim",
                     @"animations\battle\attack.anim",
+                    @"animations\battle\legacy.anim",
+                    @"animations\battle\static_pose.anim",
+                    @"animations\battle\multipart.anim",
                 }));
             NUnitAssert.That(results, Has.All.Matches<TrustedAnimationCandidate>(
-                candidate => candidate.Version == 8));
+                candidate => candidate.Version is 7 or 8));
             NUnitAssert.That(results, Has.All.Matches<TrustedAnimationCandidate>(
                 candidate => candidate.FrameCount > 0));
             NUnitAssert.That(results, Has.All.Matches<TrustedAnimationCandidate>(
-                candidate => candidate.DurationSeconds > 0));
+                candidate => candidate.DurationSeconds >= 0));
             NUnitAssert.That(results, Has.All.Matches<TrustedAnimationCandidate>(
                 candidate => !string.IsNullOrWhiteSpace(
                     candidate.SourcePack)));
             NUnitAssert.That(results, Has.All.Matches<TrustedAnimationCandidate>(
                 candidate => !string.IsNullOrWhiteSpace(candidate.Name)));
+            var staticPose = results.Single(candidate =>
+                candidate.Path.EndsWith("static_pose.anim"));
+            NUnitAssert.That(staticPose.HasStaticFrame, Is.True);
+            NUnitAssert.That(staticPose.FrameCount, Is.EqualTo(1));
+            NUnitAssert.That(staticPose.FramesPerSecond, Is.EqualTo(24));
+            var multipart = results.Single(candidate =>
+                candidate.Path.EndsWith("multipart.anim"));
+            NUnitAssert.That(multipart.PartCount, Is.EqualTo(2));
+            NUnitAssert.That(multipart.FrameCount, Is.EqualTo(4));
+            NUnitAssert.That(multipart.FramesPerSecond, Is.EqualTo(48));
         });
     }
 
@@ -245,6 +262,66 @@ public class TrustedAnimationDiscoveryTests
             includeHelperBone);
         return PackFile.CreateFromBytes(
             $"{skeletonName}_{version}.anim",
+            AnimationFile.ConvertToBytes(file));
+    }
+
+    private static PackFile CreateStaticAnimation(
+        string skeletonName,
+        uint version,
+        float frameRate)
+    {
+        var file = CreateAnimationFile(
+            skeletonName,
+            version,
+            1,
+            4,
+            false);
+        file.Header.FrameRate = frameRate;
+        file.Header.AnimationTotalPlayTimeInSec = 0;
+        var part = file.AnimationParts.Single();
+        part.TranslationMappings[0] =
+            new AnimationFile.AnimationBoneMapping(10000);
+        part.TranslationMappings[1] =
+            new AnimationFile.AnimationBoneMapping(10001);
+        part.RotationMappings[0] =
+            new AnimationFile.AnimationBoneMapping(10000);
+        part.RotationMappings[1] =
+            new AnimationFile.AnimationBoneMapping(10001);
+        part.StaticFrame = part.DynamicFrames.Single();
+        part.DynamicFrames.Clear();
+        return PackFile.CreateFromBytes(
+            $"{skeletonName}_static.anim",
+            AnimationFile.ConvertToBytes(file));
+    }
+
+    private static PackFile CreateMultipartAnimation(
+        string skeletonName,
+        uint version,
+        int framesPerPart,
+        int partCount,
+        float frameRate)
+    {
+        var file = CreateAnimationFile(
+            skeletonName,
+            version,
+            framesPerPart,
+            5,
+            false);
+        for (var partIndex = 1; partIndex < partCount; partIndex++)
+        {
+            var extra = CreateAnimationFile(
+                skeletonName,
+                version,
+                framesPerPart,
+                5 + partIndex,
+                false);
+            file.AnimationParts.Add(extra.AnimationParts.Single());
+        }
+        file.Header.FrameRate = frameRate;
+        file.Header.AnimationTotalPlayTimeInSec =
+            framesPerPart * partCount / frameRate;
+        return PackFile.CreateFromBytes(
+            $"{skeletonName}_multipart.anim",
             AnimationFile.ConvertToBytes(file));
     }
 
