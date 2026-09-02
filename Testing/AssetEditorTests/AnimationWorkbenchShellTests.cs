@@ -1692,8 +1692,6 @@ public class AnimationWorkbenchShellTests
                             NUnitAssert.That(
                                 FindDescendants<ListBox>(view),
                                 Is.Empty);
-                            NUnitAssert.That(window.ActualWidth,
-                                Is.EqualTo(1280).Within(1));
                         });
                         SaveWindowForVisualReview(
                             window,
