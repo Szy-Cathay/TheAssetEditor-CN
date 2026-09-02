@@ -90,6 +90,10 @@ public sealed class FolderProjectContainer :
     public event EventHandler<FolderProjectReconciledEventArgs>?
         FilesReconciled;
 
+    public IReadOnlyList<KeyValuePair<string, PackFile>>
+        GetFileEntriesSnapshot() => ExecuteSynchronized(
+            () => FileList.ToArray());
+
     internal long NextRevision() => Interlocked.Increment(ref _revision);
 
     private FolderProjectContainer(

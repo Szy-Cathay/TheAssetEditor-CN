@@ -30,6 +30,9 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddScoped<
                 ITrustedAnimationPreviewViewport,
                 TrustedAnimationPreviewViewport>();
+            serviceCollection.AddScoped<
+                ITrustedAnimationModelDiscovery,
+                TrustedAnimationModelDiscovery>();
             serviceCollection.AddTransient<
                 IOpenAnimationWorkbenchCommand,
                 OpenAnimationWorkbenchCommand>();
@@ -54,6 +57,7 @@ namespace Editors.AnimationVisualEditors
                     TrustedAnimationPreviewViewModel,
                     TrustedAnimationPreviewView>(
                     EditorEnums.AnimationKeyFrame_Editor)
+                .AddToToolbar("DisplayName.AnimationWorkbench", true)
                 .ForGames(GameTypeEnum.Warhammer3)
                 .Build(database);
         }

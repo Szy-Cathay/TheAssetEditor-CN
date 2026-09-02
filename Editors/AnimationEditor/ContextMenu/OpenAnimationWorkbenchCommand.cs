@@ -18,9 +18,7 @@ public sealed class OpenAnimationWorkbenchCommand(
         settings.CurrentSettings.CurrentGame == GameTypeEnum.Warhammer3 &&
         node.NodeType == NodeType.File &&
         node.Item != null &&
-        node.Name.EndsWith(
-            ".rigid_model_v2",
-            StringComparison.OrdinalIgnoreCase);
+        IsSupportedModel(node.Name);
 
     public void Execute(TreeNode node)
     {
@@ -32,4 +30,15 @@ public sealed class OpenAnimationWorkbenchCommand(
             EditorEnums.AnimationKeyFrame_Editor,
             editor => ((IFileEditor)editor).LoadFile(model));
     }
+
+    private static bool IsSupportedModel(string name) =>
+        name.EndsWith(
+            ".rigid_model_v2",
+            StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith(
+            ".wsmodel",
+            StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith(
+            ".variantmeshdefinition",
+            StringComparison.OrdinalIgnoreCase);
 }

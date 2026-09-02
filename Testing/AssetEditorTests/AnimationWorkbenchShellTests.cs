@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -7,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Windows.Data;
 using System.Xml.Linq;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationVisualEditors.AnimationWorkbench;
@@ -59,9 +62,10 @@ public class AnimationWorkbenchShellTests
                 Is.EqualTo(typeof(TrustedAnimationPreviewViewModel)));
             NUnitAssert.That(editor.View,
                 Is.EqualTo(typeof(TrustedAnimationPreviewView)));
-            NUnitAssert.That(editor.AddToolbarButton, Is.False);
-            NUnitAssert.That(editor.IsToolbarButtonEnabled, Is.False);
-            NUnitAssert.That(editor.ToolbarName, Is.Empty);
+            NUnitAssert.That(editor.AddToolbarButton, Is.True);
+            NUnitAssert.That(editor.IsToolbarButtonEnabled, Is.True);
+            NUnitAssert.That(editor.ToolbarName,
+                Is.EqualTo("DisplayName.AnimationWorkbench"));
             NUnitAssert.That(editor.SupportedGames,
                 Is.EqualTo(new[] { GameTypeEnum.Warhammer3 }));
             NUnitAssert.That(editor.Extensions, Is.Empty);
@@ -69,7 +73,7 @@ public class AnimationWorkbenchShellTests
     }
 
     [Test]
-    public void OpenCommand_OnlyTargetsRigidModelsAndSelectsTrustedPreview()
+    public void OpenCommand_TargetsSupportedModelsAndSelectsTrustedPreview()
     {
         var editorCreator = new Mock<IEditorCreator>();
         var workbench = new Mock<IEditorInterface>();
@@ -103,12 +107,30 @@ public class AnimationWorkbenchShellTests
             owner,
             null,
             animation);
+        var wsModel = PackFile.CreateFromBytes("character.wsmodel", [1]);
+        var wsModelNode = new TreeNode(
+            wsModel.Name,
+            NodeType.File,
+            owner,
+            null,
+            wsModel);
+        var variantMesh = PackFile.CreateFromBytes(
+            "character.variantmeshdefinition",
+            [1]);
+        var variantMeshNode = new TreeNode(
+            variantMesh.Name,
+            NodeType.File,
+            owner,
+            null,
+            variantMesh);
 
         command.Execute(modelNode);
 
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(command.IsEnabled(modelNode), Is.True);
+            NUnitAssert.That(command.IsEnabled(wsModelNode), Is.True);
+            NUnitAssert.That(command.IsEnabled(variantMeshNode), Is.True);
             NUnitAssert.That(command.IsEnabled(animationNode), Is.False);
             NUnitAssert.That(
                 threeKingdomsCommand.IsEnabled(modelNode),
@@ -938,6 +960,21 @@ public class AnimationWorkbenchShellTests
             "AnimationWorkbench.TrustedPreview.SkeletonMissing",
             "AnimationWorkbench.TrustedPreview.ViewportLoadFailed",
             "AnimationWorkbench.TrustedPreview.ViewportLoadFailedDetails",
+            "AnimationWorkbench.ModelPicker.Open",
+            "AnimationWorkbench.ModelPicker.Title",
+            "AnimationWorkbench.ModelPicker.Close",
+            "AnimationWorkbench.ModelPicker.Search",
+            "AnimationWorkbench.ModelPicker.Results",
+            "AnimationWorkbench.ModelPicker.Cancel",
+            "AnimationWorkbench.ModelPicker.UseSelected",
+            "AnimationWorkbench.ModelPicker.Ready",
+            "AnimationWorkbench.ModelPicker.Scanning",
+            "AnimationWorkbench.ModelPicker.Complete",
+            "AnimationWorkbench.ModelPicker.Cancelled",
+            "AnimationWorkbench.ModelPicker.Failed",
+            "AnimationWorkbench.ModelPicker.SourceProject",
+            "AnimationWorkbench.ModelPicker.SourceReference",
+            "AnimationWorkbench.ModelPicker.SourceCa",
             "AnimationWorkbench.Shell.Warhammer3Only",
             "AnimationWorkbench.Shell.ThreeKingdomsUnavailable",
             "AnimationWorkbench.Shell.SourceSkeletonMissing",
@@ -1455,6 +1492,43 @@ public class AnimationWorkbenchShellTests
 
     private sealed class TrustedPreviewShellState
     {
+        public TrustedPreviewShellState()
+        {
+            var candidates = new ObservableCollection<
+                TrustedAnimationModelCandidate>
+            {
+                new(
+                    PackFile.CreateFromBytes(
+                        "project.rigid_model_v2",
+                        [1]),
+                    @"models\project.rigid_model_v2",
+                    "test",
+                    @"E:\mods\test",
+                    TrustedAnimationModelSourceRole.FolderProject),
+                new(
+                    PackFile.CreateFromBytes(
+                        "reference.wsmodel",
+                        [1]),
+                    @"variantmeshes\reference.wsmodel",
+                    "reference.pack",
+                    @"E:\packs\reference.pack",
+                    TrustedAnimationModelSourceRole.ReferencePack),
+                new(
+                    PackFile.CreateFromBytes(
+                        "ca.variantmeshdefinition",
+                        [1]),
+                    @"variantmeshes\ca.variantmeshdefinition",
+                    "data.pack",
+                    @"E:\games\data.pack",
+                    TrustedAnimationModelSourceRole.CaPack),
+            };
+            ModelCandidatesView = CollectionViewSource.GetDefaultView(
+                candidates);
+            ModelCandidatesView.GroupDescriptions.Add(
+                new PropertyGroupDescription(
+                    nameof(TrustedAnimationModelCandidate.SourceGroup)));
+        }
+
         public TrustedAnimationPreviewResourceState Model { get; } = new(
             @"variantmeshes\wh_variantmodels\character.rigid_model_v2",
             "my_mod.pack",
@@ -1473,7 +1547,22 @@ public class AnimationWorkbenchShellTests
         public bool HasModelDiagnostic => false;
         public bool HasSkeletonDiagnostic => false;
         public bool HasAnimationDiagnostic => false;
+        public bool IsModelPickerOpen => true;
+        public bool IsModelScanRunning => true;
+        public string ModelSearchText { get; set; } = string.Empty;
+        public string ModelScanStatus =>
+            "正在后台扫描，已找到 3 个有效模型。结果可立即搜索和选择。";
+        public ICollectionView ModelCandidatesView { get; }
+        public TrustedAnimationModelCandidate? SelectedModelCandidate
+        {
+            get;
+            set;
+        }
         public object? GameWorld => null;
+        public ICommand? OpenModelPickerCommand => null;
+        public ICommand? CloseModelPickerCommand => null;
+        public ICommand? CancelModelScanCommand => null;
+        public ICommand? UseSelectedModelCommand => null;
         public ICommand? FocusModelCommand => null;
         public ICommand? ShowFrontCommand => null;
         public ICommand? ResetCameraCommand => null;

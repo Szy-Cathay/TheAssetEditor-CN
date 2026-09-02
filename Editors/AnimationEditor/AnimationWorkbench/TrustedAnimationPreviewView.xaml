@@ -180,6 +180,10 @@
                     Style="{StaticResource AeSurface.Overlay}">
                     <StackPanel Orientation="Horizontal">
                         <Button
+                            Command="{Binding OpenModelPickerCommand}"
+                            Content="{loc:Loc AnimationWorkbench.ModelPicker.Open}" />
+                        <Button
+                            Margin="8,0,0,0"
                             Command="{Binding FocusModelCommand}"
                             Content="{loc:Loc AnimationWorkbench.TrustedPreview.FocusModel}"
                             IsEnabled="{Binding IsReady}" />
@@ -194,6 +198,127 @@
                             Content="{loc:Loc AnimationWorkbench.TrustedPreview.ResetCamera}"
                             IsEnabled="{Binding IsReady}" />
                     </StackPanel>
+                </Border>
+                <Border
+                    Width="420"
+                    Margin="8"
+                    Padding="12"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Stretch"
+                    Panel.ZIndex="10"
+                    Style="{StaticResource AeSurface.Overlay}"
+                    Visibility="{Binding IsModelPickerOpen, Converter={StaticResource BoolToCollapsedConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.SectionTitle}"
+                                Text="{loc:Loc AnimationWorkbench.ModelPicker.Title}" />
+                            <Button
+                                Grid.Column="1"
+                                Command="{Binding CloseModelPickerCommand}"
+                                Content="{loc:Loc AnimationWorkbench.ModelPicker.Close}" />
+                        </Grid>
+
+                        <Grid Grid.Row="1" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource AeText.Label}"
+                                Text="{loc:Loc AnimationWorkbench.ModelPicker.Search}" />
+                            <TextBox
+                                Grid.Column="1"
+                                AutomationProperties.Name="{loc:Loc AnimationWorkbench.ModelPicker.Search}"
+                                Text="{Binding ModelSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <StackPanel Grid.Row="2" Margin="0,8,0,8">
+                            <TextBlock
+                                Style="{StaticResource AeText.Caption}"
+                                Text="{Binding ModelScanStatus}"
+                                TextWrapping="Wrap" />
+                            <ProgressBar
+                                Margin="0,6,0,0"
+                                IsIndeterminate="True"
+                                Visibility="{Binding IsModelScanRunning, Converter={StaticResource BoolToCollapsedConverter}}" />
+                        </StackPanel>
+
+                        <ListBox
+                            Grid.Row="3"
+                            AutomationProperties.Name="{loc:Loc AnimationWorkbench.ModelPicker.Results}"
+                            ItemsSource="{Binding ModelCandidatesView}"
+                            SelectedItem="{Binding SelectedModelCandidate, Mode=TwoWay}"
+                            ScrollViewer.CanContentScroll="True"
+                            VirtualizingPanel.IsVirtualizing="True"
+                            VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                            VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <TextBlock
+                                                Margin="8,10,8,4"
+                                                Style="{StaticResource AeText.Label}"
+                                                Text="{Binding Name}" />
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ListBox.GroupStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,6">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock
+                                            Text="{Binding Path}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip="{Binding Path}" />
+                                        <TextBlock
+                                            Grid.Row="1"
+                                            Margin="0,3,0,0"
+                                            Style="{StaticResource AeText.Caption}"
+                                            Text="{Binding SourcePack}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip="{Binding SourceLocation}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Grid Grid.Row="4" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                Command="{Binding CancelModelScanCommand}"
+                                Content="{loc:Loc AnimationWorkbench.ModelPicker.Cancel}"
+                                IsEnabled="{Binding IsModelScanRunning}" />
+                            <Button
+                                Grid.Column="1"
+                                Command="{Binding UseSelectedModelCommand}"
+                                Content="{loc:Loc AnimationWorkbench.ModelPicker.UseSelected}"
+                                Style="{StaticResource AeButton.Primary}" />
+                        </Grid>
+                    </Grid>
                 </Border>
             </Grid>
         </Border>
