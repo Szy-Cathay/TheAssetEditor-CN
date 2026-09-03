@@ -93,7 +93,6 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu
             var openFolder = AddChildMenu(
                 LocalizationManager.Instance.Get("ContextMenu.Open"),
                 rootNode);
-            Add<IOpenAnimationWorkbenchCommand>(selectedNode, openFolder);
             Add<OpenNodeInHxDCommand>(selectedNode, openFolder);
             Add<OpenNodeInNotepadCommand>(selectedNode, openFolder);
 

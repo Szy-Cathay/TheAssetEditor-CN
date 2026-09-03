@@ -2,15 +2,12 @@
 using AnimationEditor.CampaignAnimationCreator.Commands;
 using AnimationEditor.Common.BaseControl;
 using AnimationEditor.MountAnimationCreator;
-using Editors.AnimationVisualEditors.AnimationWorkbench;
-using Editors.AnimationVisualEditors.ContextMenu;
+using Editors.AnimationVisualEditors.AnimationKeyframeEditor;
 using Editors.Shared.Core.Common.BaseControl;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.DependencyInjection;
 using Shared.Core.DevConfig;
-using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
-using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.External;
 
 namespace Editors.AnimationVisualEditors
 {
@@ -26,25 +23,10 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddScoped<MountAnimationCreatorViewModel>();
             serviceCollection.AddScoped<MountVertexSelectionComponent>();
 
-            serviceCollection.AddScoped<TrustedAnimationPreviewViewModel>();
-            serviceCollection.AddScoped<
-                ITrustedAnimationPreviewViewport,
-                TrustedAnimationPreviewViewport>();
-            serviceCollection.AddScoped<
-                ITrustedAnimationModelDiscovery,
-                TrustedAnimationModelDiscovery>();
-            serviceCollection.AddScoped<
-                ITrustedAnimationDiscovery,
-                TrustedAnimationDiscovery>();
-            serviceCollection.AddScoped<
-                ITrustedRigidModelInspector,
-                TrustedRigidModelInspector>();
-            serviceCollection.AddScoped<
-                ITrustedWsModelResolver,
-                TrustedWsModelResolver>();
-            serviceCollection.AddTransient<
-                IOpenAnimationWorkbenchCommand,
-                OpenAnimationWorkbenchCommand>();
+            serviceCollection.AddScoped<EditorHost<AnimationKeyframeEditorViewModel>>();
+            serviceCollection.AddScoped<AnimationKeyframeEditorViewModel>();
+            serviceCollection.AddScoped<AnimationBoneSelectionComponent>();
+            serviceCollection.AddScoped<AnimationBoneGizmoComponent>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
         }
@@ -62,13 +44,9 @@ namespace Editors.AnimationVisualEditors
               .Build(database);
 
             EditorInfoBuilder
-                .Create<
-                    TrustedAnimationPreviewViewModel,
-                    TrustedAnimationPreviewView>(
-                    EditorEnums.AnimationKeyFrame_Editor)
-                .AddToToolbar("DisplayName.AnimationWorkbench", true)
-                .ForGames(GameTypeEnum.Warhammer3)
-                .Build(database);
+              .Create<EditorHost<AnimationKeyframeEditorViewModel>, EditorHostView>(EditorEnums.AnimationKeyFrame_Editor)
+              .AddToToolbar("DisplayName.KeyFrameTool", false)
+              .Build(database);
         }
     }
 }
