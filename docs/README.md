@@ -11,7 +11,6 @@
 | 新增、修改、审查或验收任何 WPF 界面、窗口、控件、主题、图标、动画或加载进度 | [`ui-design-system.md`](ui-design-system.md) | 唯一长期 UI 规范与实施门禁 |
 | 文件夹工程、本地 Git、状态语义、路径安全或大型工程性能 | [`folder-project-version-control.md`](folder-project-version-control.md) | 非显然状态模型和高风险契约 |
 | 外部进程通过命名管道打开资源 | [`asseteditor-ipc.md`](asseteditor-ipc.md) | IPC 协议和限制 |
-| Issue、标签或领域文档维护流程 | [`agents/issue-tracker.md`](agents/issue-tracker.md)、[`agents/triage-labels.md`](agents/triage-labels.md)、[`agents/domain.md`](agents/domain.md) | Agent 工作流配置，不是运行时架构 |
 
 ## 事实优先级
 
