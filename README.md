@@ -91,7 +91,6 @@ Asset Editor 国区版是一款运行在 Windows 上的《全面战争》系列�
 | [`docs/ui-design-system.md`](docs/ui-design-system.md) | 国区版 WPF 界面设计系统与公共组件规则 |
 | [`docs/folder-project-version-control.md`](docs/folder-project-version-control.md) | 文件夹工程、本地 Git、路径安全和大型工程约束 |
 | [`docs/asseteditor-ipc.md`](docs/asseteditor-ipc.md) | 外部工具打开资源时使用的 IPC 协议 |
-| [`docs/agents/`](docs/agents/) | Issue、标签和领域文档维护规则 |
 
 ### 项目结构
 
