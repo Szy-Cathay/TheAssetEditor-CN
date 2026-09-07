@@ -203,7 +203,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
                 }
             }
 
-            var outputCount = Math.Min(4, boneCount);
+            var outputCount = Math.Min(_weightSlotCount, boneCount);
             var totalWeight = 0f;
             for (var index = 0; index < outputCount; index++)
                 totalWeight += boneWeights[index];

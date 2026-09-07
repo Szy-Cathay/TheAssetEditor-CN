@@ -41,7 +41,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
         }
 
         public bool CanApply => AffectedMeshCollection.Count > 0 && (SelectedRiggingMode == RiggingMode.Pin
-            ? PinMode.SelectedMesh != null && PinMode.SelectedVertex.Count > 0 && !AffectedMeshCollection.Contains(PinMode.SelectedMesh)
+            ? PinMode.SelectedMesh?.Geometry?.WeightCount > 0 && PinMode.SelectedVertex.Count > 0 && !AffectedMeshCollection.Contains(PinMode.SelectedMesh)
             : SkinWrapMode.TakeAnimationFromMesh != null && !AffectedMeshCollection.Contains(SkinWrapMode.TakeAnimationFromMesh));
 
         public string SetupHint => LocalizationManager.Instance.Get(AffectedMeshCollection.Count == 0

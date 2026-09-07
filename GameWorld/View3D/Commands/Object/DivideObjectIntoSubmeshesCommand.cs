@@ -10,7 +10,7 @@ using Shared.Ui.Common;
 
 namespace GameWorld.Core.Commands.Object
 {
-    public class DivideObjectIntoSubmeshesCommand : ICommand
+    public class DivideObjectIntoSubmeshesCommand : IRedoableCommand
     {
         readonly ILogger _logger = Logging.Create<FaceSelectionCommand>();
 
@@ -18,6 +18,7 @@ namespace GameWorld.Core.Commands.Object
         private readonly SelectionManager _selectionManager;
 
         ISelectionState _originalSelectionState;
+        ISelectionState _splitSelectionState;
         IEditableGeometry _objectToSplit;
         bool _combineOverlappingVertexes;
 
@@ -88,7 +89,16 @@ namespace GameWorld.Core.Commands.Object
                 var newState = (ObjectSelectionState)_selectionManager.CreateSelectionSate(GeometrySelectionMode.Object, null);
                 if (_newGroupNodes.Count == 1)
                     newState.ModifySelection(createdMeshes, false);
+                _splitSelectionState = newState.Clone();
             }
+        }
+
+        public void Redo()
+        {
+            foreach (var item in _newGroupNodes)
+                item.Parent.AddObject(item);
+            _objectToSplit.Parent.RemoveObject(_objectToSplit as SceneNode);
+            _selectionManager.SetState(_splitSelectionState.Clone());
         }
 
         public void Undo()

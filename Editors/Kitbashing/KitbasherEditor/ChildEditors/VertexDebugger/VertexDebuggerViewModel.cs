@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using GameWorld.Core.Components;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
@@ -107,24 +108,25 @@ namespace Editors.KitbasherEditor.ChildEditors.VertexDebugger
             {
                 var mesh = selection.GetSingleSelectedObject() as Rmv2MeshNode;
 
+                if (mesh == null)
+                    return;
+                var pose = MeshPoseSnapshot.Capture(mesh);
                 if (SelectedVertex != null)
                 {
-                    var bb = BoundingBox.CreateFromSphere(new BoundingSphere(mesh.Geometry.GetVertexById(SelectedVertex.Id), 0.05f));
+                    var bb = BoundingBox.CreateFromSphere(new BoundingSphere(pose.GetWorldPosition(SelectedVertex.Id), 0.05f));
                     _renderEngineComponent.AddRenderLines(LineHelper.AddBoundingBox(bb, Color.Black, Vector3.Zero));
                 }
 
-                var modelMatrix = mesh.ModelMatrix * Matrix.CreateTranslation(mesh.PivotPoint);
                 var vertexList = selection.SelectedVertices;
                 foreach (var vertexIndex in vertexList)
                 {
                     var vertexInfo = mesh.Geometry.GetVertexExtented(vertexIndex);
                     var scale = (float)DebugScale.Value;
-                    var pos = vertexInfo.Position3();
-
-                    var transformedPos = Vector3.Transform(pos, modelMatrix);
-                    var transformedNormal = Vector3.Transform(pos + vertexInfo.Normal * scale, modelMatrix);
-                    var transformedBiNormal = Vector3.Transform(pos + vertexInfo.BiNormal * scale, modelMatrix);
-                    var transformedTangent = Vector3.Transform(pos + vertexInfo.Tangent * scale, modelMatrix);
+                    var transformedPos = pose.GetWorldPosition(vertexIndex);
+                    var normalMatrix = pose.GetVertexToWorldTransform(vertexIndex);
+                    var transformedNormal = transformedPos + Vector3.TransformNormal(vertexInfo.Normal, normalMatrix) * scale;
+                    var transformedBiNormal = transformedPos + Vector3.TransformNormal(vertexInfo.BiNormal, normalMatrix) * scale;
+                    var transformedTangent = transformedPos + Vector3.TransformNormal(vertexInfo.Tangent, normalMatrix) * scale;
 
                     _renderEngineComponent.AddRenderLines(LineHelper.AddLine(transformedPos, transformedNormal, Color.Red));
                     _renderEngineComponent.AddRenderLines(LineHelper.AddLine(transformedPos, transformedBiNormal, Color.Green));

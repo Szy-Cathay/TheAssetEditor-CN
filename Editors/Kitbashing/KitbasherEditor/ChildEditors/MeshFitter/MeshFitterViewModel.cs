@@ -25,6 +25,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
         List<Rmv2MeshNode> _meshNodes;
         SkeletonNode _currentSkeletonNode;
         bool _isDisposed;
+        bool _hasCommitted;
 
         public NotifyAttr<bool> RelativeScale { get; set; } = new NotifyAttr<bool>(false);
         public DoubleViewModel ScaleFactor { get; set; } = new DoubleViewModel(1);
@@ -45,6 +46,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         public void Initialize(RemappedAnimatedBoneConfiguration configuration, List<Rmv2MeshNode> meshNodes, GameSkeleton targetSkeleton, AnimationFile currentSkeletonFile)
         {
+            _hasCommitted = false;
             ShowApplyButton.Value = false;
             ShowTransformSection.Value = true;
             Initialize(configuration);
@@ -320,8 +322,11 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         protected override void ApplyChanges()
         {
+            if (_hasCommitted)
+                return;
             var frame = AnimationSampler.Sample(0, _fromSkeleton, _animationClip);
-            _commandFactory.Create<CreateAnimatedMeshPoseCommand>().Configure(x => x.Configure(_meshNodes, frame)).BuildAndExecute();
+            _hasCommitted = _commandFactory.Create<CreateAnimatedMeshPoseCommand>().Configure(x => x.Configure(_meshNodes, frame)).BuildAndExecute();
         }
+
     }
 }

@@ -7,9 +7,10 @@ using System.Collections.Generic;
 
 namespace GameWorld.Core.Commands.Object
 {
-    public class CreateAnimatedMeshPoseCommand : ICommand
+    public class CreateAnimatedMeshPoseCommand : IRedoableCommand
     {
         List<MeshObject> _originalGeometries;
+        List<MeshObject> _posedGeometries;
 
         List<Rmv2MeshNode> _meshNodes;
         AnimationFrame _frame;
@@ -28,33 +29,44 @@ namespace GameWorld.Core.Commands.Object
 
         public void Execute()
         {
-            _originalGeometries = new List<MeshObject>();
-            foreach (var node in _meshNodes)
-                _originalGeometries.Add(node.Geometry.Clone());
+            _originalGeometries = _meshNodes.Select(x => x.Geometry).ToList();
+            _posedGeometries = _originalGeometries.Select(x => x.Clone()).ToList();
+            for (var i = 0; i < _meshNodes.Count; i++)
+                ApplyFrame(_meshNodes[i], _posedGeometries[i], _frame, _convertToStaticFrame);
+            Redo();
+        }
 
-            ApplyFrame(_meshNodes, _frame, _convertToStaticFrame);
+        public void Redo()
+        {
+            for (var i = 0; i < _meshNodes.Count; i++)
+                _meshNodes[i].Geometry = _posedGeometries[i];
         }
 
         internal static void ApplyFrame(IEnumerable<Rmv2MeshNode> meshNodes, AnimationFrame frame, bool convertToStaticFrame)
         {
             foreach (var node in meshNodes)
+                ApplyFrame(node, node.Geometry, frame, convertToStaticFrame);
+        }
+
+        static void ApplyFrame(Rmv2MeshNode node, MeshObject geometry, AnimationFrame frame, bool convertToStaticFrame)
+        {
+            if (geometry.WeightCount == 0)
+                return;
+            var meshHelper = new MeshAnimationHelper(node, Matrix.Identity);
+
+            for (var i = 0; i < geometry.VertexCount(); i++)
             {
-                var meshHelper = new MeshAnimationHelper(node, Matrix.Identity);
-
-                for (var i = 0; i < node.Geometry.VertexCount(); i++)
-                {
-                    var vert = meshHelper.GetVertexTransform(frame, i);
-                    node.Geometry.TransformVertex(i, vert);
-                }
-
-                if (convertToStaticFrame)
-                {
-                    node.Geometry.ChangeVertexType(UiVertexFormat.Static);
-                    node.Geometry.UpdateSkeletonName(string.Empty);
-                }
-
-                node.Geometry.RebuildVertexBuffer();
+                var vert = meshHelper.GetVertexTransform(frame, i);
+                geometry.TransformVertex(i, vert);
             }
+
+            if (convertToStaticFrame)
+            {
+                geometry.ChangeVertexType(UiVertexFormat.Static);
+                geometry.UpdateSkeletonName(string.Empty);
+            }
+
+            geometry.RebuildVertexBuffer();
         }
 
         public void Undo()

@@ -671,6 +671,37 @@ public class KitbashUiRegressionTests
 
     [TestCase(ThemeType.VSCodeDark)]
     [TestCase(ThemeType.VSCodeLight)]
+    public void MeshFitter_OnlyOffersOneCommitAction(ThemeType theme)
+    {
+        WithTheme(theme, () =>
+        {
+            var scene = new GameWorld.Core.Components.SceneManager(null!, null!, Mock.Of<IEventHub>());
+            using var model = new Editors.KitbasherEditor.ChildEditors.MeshFitter.MeshFitterViewModel(null!, null!, scene);
+            var dialog = new Editors.KitbasherEditor.ChildEditors.MeshFitter.MeshFitterWindow(model)
+            {
+                ShowActivated = false, ShowInTaskbar = false, Left = -10000, Top = -10000,
+            };
+            try
+            {
+                dialog.Show();
+                dialog.UpdateLayout();
+                var buttons = Descendants<Button>(dialog).Where(x => x.IsVisible).ToArray();
+                NUnitAssert.That(buttons.Count(x => Equals(x.Content, LocalizationManager.Instance.Get("General.Ok"))), Is.EqualTo(1));
+                NUnitAssert.That(buttons.Count(x => Equals(x.Content, LocalizationManager.Instance.Get("General.Cancel"))), Is.EqualTo(1));
+                NUnitAssert.That(buttons.Any(x => Equals(x.Content, LocalizationManager.Instance.Get("General.Apply"))), Is.False);
+                var bitmap = new RenderTargetBitmap((int)dialog.ActualWidth, (int)dialog.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(dialog);
+                NUnitAssert.That(bitmap.PixelWidth, Is.GreaterThan(900));
+            }
+            finally
+            {
+                dialog.Close();
+            }
+        });
+    }
+
+    [TestCase(ThemeType.VSCodeDark)]
+    [TestCase(ThemeType.VSCodeLight)]
     public void BoneSearch_ClearButtonFollowsEmptyAndEnteredText(ThemeType theme)
     {
         WithTheme(theme, () =>

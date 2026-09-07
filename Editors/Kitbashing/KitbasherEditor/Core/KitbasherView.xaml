@@ -30,6 +30,8 @@
     <Grid>
         <Grid.Style>
             <Style TargetType="{x:Type Grid}">
+                <EventSetter Event="DragEnter" Handler="treeView_DragOver"/>
+                <EventSetter Event="DragOver" Handler="treeView_DragOver"/>
                 <EventSetter Event="TreeViewItem.Drop" Handler="treeView_Drop"/>
             </Style>
         </Grid.Style>

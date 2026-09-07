@@ -6,7 +6,7 @@ using Shared.Core.ErrorHandling;
 
 namespace GameWorld.Core.Commands.Object
 {
-    public class DuplicateObjectCommand : ICommand
+    public class DuplicateObjectCommand : IRedoableCommand
     {
         readonly ILogger _logger = Logging.Create<FaceSelectionCommand>();
         List<ISceneNode> _objectsToCopy;
@@ -34,19 +34,25 @@ namespace GameWorld.Core.Commands.Object
 
             _oldState = _selectionManager.GetStateCopy();
 
-            var state = _selectionManager.CreateSelectionSate(GeometrySelectionMode.Object, null);
-            var objectState = state as ObjectSelectionState;
-
             foreach (var item in _objectsToCopy)
             {
                 var clonedItem = SceneNodeHelper.CloneNode(item);
                 clonedItem.Id = item.Id + Guid.NewGuid().ToString();
                 _clonedObjects.Add(clonedItem);
-                item.Parent.AddObject(clonedItem);
-                if (clonedItem is ISelectable selectableNode)
-                    objectState.ModifySelectionSingleObject(selectableNode, false);
             }
 
+            Redo();
+        }
+
+        public void Redo()
+        {
+            var objectState = new ObjectSelectionState();
+            foreach (var item in _clonedObjects)
+            {
+                item.Parent.AddObject(item);
+                if (item is ISelectable selectableNode)
+                    objectState.ModifySelectionSingleObject(selectableNode, false);
+            }
             _selectionManager.SetState(objectState);
         }
 

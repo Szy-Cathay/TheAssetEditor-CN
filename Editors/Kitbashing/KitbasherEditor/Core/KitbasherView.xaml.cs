@@ -52,20 +52,43 @@ namespace KitbasherEditor.Views
 
         private void treeView_Drop(object sender, DragEventArgs e)
         {
-            var dropTarget = DataContext as IDropTarget<TreeNode>;
-            if (dropTarget != null)
-            {
-                var formats = e.Data.GetFormats();
-                object droppedObject = e.Data.GetData(formats[0]);
-                var node = droppedObject as TreeNode;
+            if (DataContext is not IDropTarget<TreeNode> dropTarget)
+                return;
 
-                if (dropTarget.AllowDrop(node))
-                {
-                    dropTarget.Drop(node);
-                    e.Effects = DragDropEffects.None;
-                    e.Handled = true;
-                }
+            foreach (var node in GetDraggedNodes(e.Data).Distinct().Where(node => dropTarget.AllowDrop(node)))
+            {
+                dropTarget.Drop(node);
+                e.Handled = true;
             }
+
+            // Import references without moving files in the source tree.
+            e.Effects = DragDropEffects.None;
+        }
+
+        private void treeView_DragOver(object sender, DragEventArgs e)
+        {
+            e.Effects = DragDropEffects.None;
+            if (DataContext is IDropTarget<TreeNode> dropTarget &&
+                GetDraggedNodes(e.Data).Any(node => dropTarget.AllowDrop(node)))
+            {
+                if ((e.AllowedEffects & DragDropEffects.Copy) != 0)
+                    e.Effects = DragDropEffects.Copy;
+                else if ((e.AllowedEffects & DragDropEffects.Move) != 0)
+                    e.Effects = DragDropEffects.Move;
+            }
+            e.Handled = true;
+        }
+
+        private static IEnumerable<TreeNode> GetDraggedNodes(IDataObject data)
+        {
+            // The file tree sends a selection list, including for a single file.
+            if (data.GetData(typeof(List<TreeNode>)) is List<TreeNode> nodes)
+                return nodes;
+            if (data.GetData(typeof(TreeNode[])) is TreeNode[] nodeArray)
+                return nodeArray;
+            if (data.GetData(typeof(TreeNode)) is TreeNode node)
+                return [node];
+            return [];
         }
     }
 

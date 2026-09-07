@@ -51,7 +51,19 @@ namespace GameWorld.Core.SceneNodes
         public bool ReduceMeshOnLodGeneration { get; set; } = true;
 
         public override Matrix ModelMatrix { get => base.ModelMatrix; set => UpdateModelMatrix(value); }
-        public CapabilityMaterial Material { get; set; }
+        CapabilityMaterial _material;
+        public CapabilityMaterial Material
+        {
+            get => _material;
+            set
+            {
+                if (_material != value)
+                {
+                    _material = value;
+                    _pooledRenderItem = null;
+                }
+            }
+        }
        
 
         bool _isSelectable = true;

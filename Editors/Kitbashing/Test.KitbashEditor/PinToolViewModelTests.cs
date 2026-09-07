@@ -12,6 +12,31 @@ namespace Test.KitbashEditor
     [TestFixture]
     public class PinToolViewModelTests
     {
+        [OneTimeSetUp]
+        public void LoadLocalization() => new LocalizationManager().LoadLanguage();
+
+        [Test]
+        public void StaticPinSource_ShowsAnErrorAndCannotBeApplied()
+        {
+            var source = CreateRiggedMesh();
+            source.Geometry.ChangeVertexType(Shared.GameFormats.RigidModel.UiVertexFormat.Static, false);
+            var selection = CreateSelectionManager(new ObjectSelectionState());
+            var state = new VertexSelectionState(source, 0);
+            state.ModifySelection([0], false);
+            selection.SetState(state);
+            var dialogs = new Mock<IStandardDialogs>();
+            using var model = CreateViewModel(selection, dialogs.Object);
+            model.AffectedMeshCollection.Add(CreateRiggedMesh());
+            model.PinMode.SetSelectionCommand.Execute(null);
+            Assert.That(model.PinMode.SelectedMesh, Is.Null);
+            Assert.That(model.CanApply, Is.False);
+            dialogs.Verify(x => x.ShowDialogBox(LocalizationManager.Instance.Get("Msg.Kitbash.PinSourceMustBeAnimated"),
+                It.IsAny<string>()), Times.Once);
+            model.PinMode.SelectedMesh = source;
+            model.PinMode.SelectedVertex = [0];
+            Assert.That(model.CanApply, Is.False);
+        }
+
         [Test]
         public void AddSelectionToAffectedMeshes_EmptySelection_ShowsError()
         {
@@ -45,7 +70,7 @@ namespace Test.KitbashEditor
         {
             using var viewModel = CreateViewModel(CreateSelectionManager(new ObjectSelectionState()), Mock.Of<IStandardDialogs>());
             var target = new Rmv2MeshNode(null!, Mock.Of<Shared.GameFormats.RigidModel.MaterialHeaders.IRmvMaterial>(), null!, null!);
-            var source = new Rmv2MeshNode(null!, Mock.Of<Shared.GameFormats.RigidModel.MaterialHeaders.IRmvMaterial>(), null!, null!);
+            var source = CreateRiggedMesh();
             Assert.That(viewModel.CanApply, Is.False);
             Assert.That(viewModel.ClearAffectedMeshCollectionCommand.CanExecute(null), Is.False);
 
@@ -103,6 +128,21 @@ namespace Test.KitbashEditor
             var selectionManager = new SelectionManager(Mock.Of<IEventHub>());
             selectionManager.SetState(state);
             return selectionManager;
+        }
+
+        static Rmv2MeshNode CreateRiggedMesh()
+        {
+            var geometry = new MeshObject(Mock.Of<IGraphicsCardGeometry>(), "skeleton")
+            {
+                VertexArray = [new GameWorld.Core.Rendering.VertexPositionNormalTextureCustom
+                {
+                    Position = new Microsoft.Xna.Framework.Vector4(0, 0, 0, 1),
+                    BlendWeights = new Microsoft.Xna.Framework.Vector4(1, 0, 0, 0)
+                }],
+                IndexArray = []
+            };
+            geometry.ChangeVertexType(Shared.GameFormats.RigidModel.UiVertexFormat.Cinematic, false);
+            return new Rmv2MeshNode(geometry, Mock.Of<Shared.GameFormats.RigidModel.MaterialHeaders.IRmvMaterial>(), null!, null!);
         }
 
         static PinToolViewModel CreateViewModel(

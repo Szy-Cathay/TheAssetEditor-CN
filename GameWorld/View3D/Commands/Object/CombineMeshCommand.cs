@@ -8,7 +8,7 @@ using Shared.Ui.Common;
 
 namespace GameWorld.Core.Commands.Object
 {
-    public class CombineMeshCommand : ICommand
+    public class CombineMeshCommand : IRedoableCommand
     {
         List<ISelectable> _objectsToCombine;
         List<Rmv2MeshNode> _combinedMeshes = new List<Rmv2MeshNode>();
@@ -45,30 +45,29 @@ namespace GameWorld.Core.Commands.Object
                     .Cast<Rmv2MeshNode>()
                     .ToList();
                 _combinedMeshes = ModelCombiner.CombineMeshes(geometriesToCombine);
-
-                // Remove all
-                foreach (var item in _objectsToCombine)
-                    item.Parent.RemoveObject(item);
-
-                // Add all
-                foreach (var item in _combinedMeshes)
-                    item.Parent.AddObject(item);
-
-                // Select all new 
-                var currentState = _selectionManager.GetState() as ObjectSelectionState;
-                currentState.Clear();
-                currentState.ModifySelection(_combinedMeshes.Cast<ISelectable>(), false);
-
+                Redo();
             }
+        }
+
+        public void Redo()
+        {
+            foreach (var item in _objectsToCombine)
+                item.Parent.RemoveObject(item);
+            foreach (var item in _combinedMeshes)
+                item.Parent.AddObject(item);
+
+            var state = new ObjectSelectionState();
+            state.ModifySelection(_combinedMeshes.Cast<ISelectable>(), false);
+            _selectionManager.SetState(state);
         }
 
         public void Undo()
         {
-            foreach (var item in _objectsToCombine)
-                item.Parent.AddObject(item);
-
             foreach (var item in _combinedMeshes)
                 item.Parent.RemoveObject(item);
+
+            foreach (var item in _objectsToCombine)
+                item.Parent.AddObject(item);
 
             _selectionManager.SetState(_originalSelectionState);
         }

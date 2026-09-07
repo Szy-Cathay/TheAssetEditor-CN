@@ -7,7 +7,7 @@ using Shared.Core.ErrorHandling;
 
 namespace Editors.KitbasherEditor.Commands
 {
-    internal class AssignMaterialFromOtherMeshCommand : ICommand
+    internal class AssignMaterialFromOtherMeshCommand : IRedoableCommand
     {
         record MeshMaterialHistory(Rmv2MeshNode Mesh, CapabilityMaterial Material);
 
@@ -17,14 +17,21 @@ namespace Editors.KitbasherEditor.Commands
 
         
         readonly List<MeshMaterialHistory> _history = [];
+        List<CapabilityMaterial> _assignedMaterials = [];
         CapabilityMaterial? _newMaterial;
 
         public void Execute()
         {
             Guard.IsNotNull(_newMaterial, "New material cannot be null when executing AssignMaterialFromOtherMeshCommand"); 
 
-            foreach (var historyItem in _history)
-                historyItem.Mesh.Material = _newMaterial.Clone();
+            _assignedMaterials = _history.Select(_ => _newMaterial.Clone()).ToList();
+            Redo();
+        }
+
+        public void Redo()
+        {
+            for (var i = 0; i < _history.Count; i++)
+                _history[i].Mesh.Material = _assignedMaterials[i];
         }
 
         public void Configure(CapabilityMaterial materialToAssign, List<Rmv2MeshNode> meshesToAssignTo)

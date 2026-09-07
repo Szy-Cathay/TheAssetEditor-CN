@@ -5,13 +5,14 @@ using Shared.Ui.Editors.BoneMapping;
 
 namespace Editors.KitbasherEditor.ChildEditors.ReRiggingTool
 {
-    public class RemapBoneIndexesCommand : ICommand
+    public class RemapBoneIndexesCommand : IRedoableCommand
     {
         List<IndexRemapping> _mapping;
         string _newSkeletonName;
 
         List<Rmv2MeshNode> _meshNodeList;
         List<MeshObject> _originalGeometry;
+        List<MeshObject> _remappedGeometry;
 
         public void Configure(List<Rmv2MeshNode> meshNodeList, List<IndexRemapping> mapping, string newSkeletonName)
         {
@@ -26,12 +27,20 @@ namespace Editors.KitbasherEditor.ChildEditors.ReRiggingTool
 
         public void Execute()
         {
-            _originalGeometry = _meshNodeList.Select(x => x.Geometry.Clone()).ToList();
-            foreach (var node in _meshNodeList)
+            _originalGeometry = _meshNodeList.Select(x => x.Geometry).ToList();
+            _remappedGeometry = _originalGeometry.Select(x => x.Clone()).ToList();
+            foreach (var geometry in _remappedGeometry)
             {
-                node.Geometry.UpdateAnimationIndecies(_mapping);
-                node.Geometry.UpdateSkeletonName(_newSkeletonName);
+                geometry.UpdateAnimationIndecies(_mapping);
+                geometry.UpdateSkeletonName(_newSkeletonName);
             }
+            Redo();
+        }
+
+        public void Redo()
+        {
+            for (var i = 0; i < _meshNodeList.Count; i++)
+                _meshNodeList[i].Geometry = _remappedGeometry[i];
         }
 
         public void Undo()
