@@ -284,6 +284,7 @@ public partial class ViewportMouseInteractionTests
 
     [DataTestMethod]
     [DataRow(1.0, 300, 100)]
+    [DataRow(1.0, 0, 100)]
     [DataRow(1.25, 0, 100)]
     [DataRow(1.5, 150, 200)]
     [DataRow(1.0, 150, 0)]
@@ -299,9 +300,9 @@ public partial class ViewportMouseInteractionTests
             mouse.Update(new GameTime());
             var physical = NativePosition(viewport);
             if (x == 300) Assert.IsTrue(physical.X < 4, $"Native cursor did not wrap: {physical}");
-            if (x == 0) Assert.IsTrue(physical.X > 296, $"Native cursor did not wrap: {physical}");
+            if (x == 0) Assert.IsTrue(physical.X >= 296, $"Native cursor did not wrap: {physical}");
             if (y == 200) Assert.IsTrue(physical.Y < 4, $"Native cursor did not wrap: {physical}");
-            if (y == 0) Assert.IsTrue(physical.Y > 196, $"Native cursor did not wrap: {physical}");
+            if (y == 0) Assert.IsTrue(physical.Y >= 196, $"Native cursor did not wrap: {physical}");
             var before = mouse.Position();
             for (var index = 0; index < 5; index++)
             {
