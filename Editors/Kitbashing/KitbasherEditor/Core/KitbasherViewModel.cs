@@ -1,5 +1,6 @@
 ﻿using System;
 ﻿using System.IO;
+using Editors.KitbasherEditor.Core;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.EventHandlers;
@@ -42,6 +43,7 @@ namespace Editors.KitbasherEditor.ViewModels
         public SceneExplorerViewModel SceneExplorer { get; set; }
         public SceneNodeEditorViewModel SceneNodeEditor { get; set; }
         public MenuBarViewModel MenuBar { get; set; }
+        public OperationFeedbackViewModel OperationFeedback { get; }
         public AnimationControllerViewModel Animation { get; set; }
 
         [ObservableProperty] string _displayName = "Kitbash Tool";
@@ -68,7 +70,8 @@ namespace Editors.KitbasherEditor.ViewModels
             View3DCoreComponentSet coreComponents,
             KitbashSceneComponentSet kitbashComponents,
             SkeletonChangedHandler skeletonChangedHandler, 
-            SceneNodeEditorViewModel sceneNodeEditorView)
+            SceneNodeEditorViewModel sceneNodeEditorView,
+            OperationFeedbackViewModel operationFeedback)
         {
             _dropHandler = dropHandler;
             _kitbashSceneCreator = kitbashSceneCreator;
@@ -81,12 +84,17 @@ namespace Editors.KitbasherEditor.ViewModels
             SceneExplorer = sceneExplorerViewModel;
             MenuBar = menuBarViewModel;
             SceneNodeEditor = sceneNodeEditorView;
+            OperationFeedback = operationFeedback;
             // Events
             eventHub.Register<ScopedFileSavedEvent>(this, OnFileSaved);
             eventHub.Register<CommandStackChangedEvent>(this, OnCommandStackChanged);
             eventHub.Register<CommandStackUndoEvent>(this, OnCommandStackUndo);
             skeletonChangedHandler.Subscribe(eventHub);
             
+            // Kitbash presents command feedback in its themed WPF overlay.
+            foreach (var renderer in coreComponents.Components.OfType<CommandStackRenderer>())
+                renderer.Visible = false;
+
             // Ensure all game components are added to the editor
             componentInserter.Execute(
                 coreComponents,
@@ -119,7 +127,7 @@ namespace Editors.KitbasherEditor.ViewModels
             return command.Result?.Status == true;
         }
 
-        public void Close() { }
+        public void Close() => OperationFeedback.Dispose();
 
         public bool HasUnsavedChanges
         {

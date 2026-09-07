@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton" 
              xmlns:colorpicker="clr-namespace:ColorPicker;assembly=ColorPicker" 
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:loc="clr-namespace:Shared.Ui.Common"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800"
              Background="Transparent"
@@ -13,26 +14,40 @@
              FontFamily="{DynamicResource AppFontFamily}"
              FontWeight="{DynamicResource AppFontWeight}">
     <UserControl.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
-                <ResourceDictionary
-                    Source="pack://application:,,,/ColorPicker;component/Styles/DefaultColorPickerStyle.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
+        <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml"/>
     </UserControl.Resources>
-    
-    <colorpicker:PortableColorPicker Style="{StaticResource DefaultColorPickerStyle}" 
-                                                SmallChange="5"
-                                                UseHintColor="True" HintColor="Transparent"
-                                                SelectedColor="{Binding PickedColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                ShowFractionalPart="False"
-                                                ShowAlpha="false" >
-        <i:Interaction.Triggers>
-            <i:EventTrigger EventName="ColorChanged">
-                <i:InvokeCommandAction Command="{Binding HandleColourChangedCommand}" />
-            </i:EventTrigger>
-        </i:Interaction.Triggers>
-    </colorpicker:PortableColorPicker>
-
+    <Grid>
+        <ToggleButton x:Name="PickerButton" Style="{StaticResource AeEditor.ToggleIcon}"
+                      ToolTip="{loc:Loc Shared.ColourPicker.Choose}" AutomationProperties.Name="{loc:Loc Shared.ColourPicker.Choose}">
+            <Border Width="18" Height="18" BorderBrush="{DynamicResource AeBrush.BorderStrong}" BorderThickness="1">
+                <Border.Background><SolidColorBrush Color="{Binding PickedColor}"/></Border.Background>
+            </Border>
+        </ToggleButton>
+        <Popup x:Name="PickerPopup" Opened="PickerOpened" Placement="Bottom" PlacementTarget="{Binding ElementName=PickerButton}"
+               IsOpen="{Binding IsChecked, ElementName=PickerButton, Mode=TwoWay}" StaysOpen="False" AllowsTransparency="True">
+            <Border Style="{StaticResource AeSurface.Overlay}" Padding="8" Focusable="True" PreviewKeyDown="PickerPreviewKeyDown">
+                <colorpicker:StandardColorPicker x:Name="Picker" Width="240" Height="420"
+                    Foreground="{DynamicResource AeBrush.TextPrimary}"
+                    SmallChange="5" UseHintColor="True" HintColor="Transparent"
+                    SelectedColor="{Binding PickedColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    ShowFractionalPart="False" ShowAlpha="False">
+                    <colorpicker:StandardColorPicker.Resources>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource AeInput.TextBox}">
+                            <Setter Property="MinHeight" Value="0"/>
+                            <Setter Property="Padding" Value="2,0"/>
+                        </Style>
+                        <Style TargetType="ComboBox" BasedOn="{StaticResource AeInput.ComboBox}">
+                            <Setter Property="MinHeight" Value="0"/>
+                            <Setter Property="Padding" Value="4,0"/>
+                        </Style>
+                    </colorpicker:StandardColorPicker.Resources>
+                    <i:Interaction.Triggers>
+                        <i:EventTrigger EventName="ColorChanged">
+                            <i:InvokeCommandAction Command="{Binding HandleColourChangedCommand}"/>
+                        </i:EventTrigger>
+                    </i:Interaction.Triggers>
+                </colorpicker:StandardColorPicker>
+            </Border>
+        </Popup>
+    </Grid>
 </UserControl>

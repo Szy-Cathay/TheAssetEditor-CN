@@ -11,67 +11,58 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
-        <System:Double x:Key="labelWidth">150</System:Double>
         <converters:SceneNodeEditorDisplayConverter x:Key="SceneNodeDisplayConverter"/>
     </UserControl.Resources>
 
-    <DockPanel  LastChildFill="False">
-
-        <DockPanel DockPanel.Dock="Top">
-            <TextBlock Text="{loc:Loc MainNode.Header}"
-                       Style="{DynamicResource Kitbash.PropertyTitle}"/>
-        </DockPanel>
-        <Expander IsExpanded="True" Header="{loc:Loc MainNode.General}" DockPanel.Dock="Top">
-            <DockPanel DockPanel.Dock="Top">
-                <DockPanel DockPanel.Dock="Top">
-                    <filterdialog:CollapsableFilterControl  VerticalContentAlignment="Center"
-                                SelectedItem="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                                SearchItems="{Binding SkeletonNameList, UpdateSourceTrigger=PropertyChanged}"     
-                                OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"   
-                                IsManipulationEnabled="False"
-                                LabelTotalWidth="150"
-                                DockPanel.Dock="top"
-                                MaxHeight="400"
-                                ShowLabel="true"
-                                LabelText="{loc:Loc MainNode.Skeleton}"/>
+    <StackPanel>
+        <TextBlock Text="{loc:Loc MainNode.Header}" Style="{DynamicResource Kitbash.PropertyTitle}"/>
+        <Expander IsExpanded="True" Header="{loc:Loc MainNode.General}">
+            <StackPanel>
+                <filterdialog:CollapsableFilterControl
+                    SelectedItem="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                    SearchItems="{Binding SkeletonNameList, UpdateSourceTrigger=PropertyChanged}"
+                    OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"
+                    IsManipulationEnabled="False"
+                    LabelTotalWidth="96"
+                    MaxHeight="320"
+                    ShowLabel="True"
+                    LabelText="{loc:Loc MainNode.Skeleton}"
+                    ToolTip="{Binding SkeletonName}"/>
+                <DockPanel Margin="0,4,0,0">
+                    <Label Style="{StaticResource AeForm.Label}" Width="96" DockPanel.Dock="Left"
+                           Content="{loc:Loc MainNode.CopyTexturesToPack}"/>
+                    <Button Content="{loc:Loc General.Copy}" HorizontalAlignment="Left"
+                            Click="{s:MethodBinding CopyTexturesToOutputPack}"
+                            ToolTip="{loc:Loc MainNode.CopyTextures.ToolTip}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" Content="{loc:Loc MainNode.CopyTexturesToPack}" />
-                    <Button HorizontalAlignment="Right" Content="{loc:Loc General.Copy}" Click="{s:MethodBinding CopyTexturesToOutputPack}" Margin="0,2,2,2" Width="50"/>
-                    <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc MainNode.Conversion}" Visibility="Collapsed"/>
-                    <ComboBox SelectedValue="None" VerticalAlignment="Center" Visibility="Collapsed"/>
-                </DockPanel>
-
-                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MainNode.AttachmentPoints}"/>
-
-                    <Expander>
-                        <Expander.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Loc WeightedMaterial.Count}"/>
-                                <TextBlock Text="{Binding AttachmentPointList.Count, UpdateSourceTrigger=PropertyChanged}"/>
-                            </StackPanel>
-                        </Expander.Header>
-                        <StackPanel>
-                        <ListView ItemsSource="{Binding AttachmentPointList, UpdateSourceTrigger=PropertyChanged}">
-                                
-                            <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="{loc:Loc MainNode.BoneId}" DisplayMemberBinding="{Binding BoneIndex}" Width="auto"/>
-                                        <GridViewColumn Header="{loc:Loc MainNode.Name}" DisplayMemberBinding="{Binding Name}" Width="auto"/>
-                                        <GridViewColumn Header="{loc:Loc MainNode.UseBoneOrientation}" DisplayMemberBinding="{Binding IsIdentiy, Converter={StaticResource SceneNodeDisplayConverter}}" Width="auto"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-
-                            <Button Content="{loc:Loc MainNode.CreateAttachmentPointsFromSkeleton}" Margin="2" Height="25" Command="{Binding ResetAttachmentPointListCommand }"/>
-                        </StackPanel>
-
-                    </Expander>
-                </DockPanel>
-            </DockPanel>
+            </StackPanel>
         </Expander>
 
-    </DockPanel>
+        <Expander Margin="0,4,0,0">
+            <Expander.Header>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{loc:Loc MainNode.AttachmentPoints}" FontWeight="Bold" Margin="3"/>
+                    <TextBlock Text="{Binding AttachmentPointList.Count, StringFormat={loc:Loc Kitbash.Sidebar.ItemCountFormat}}"
+                               Style="{StaticResource AeText.Caption}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                </StackPanel>
+            </Expander.Header>
+            <StackPanel>
+                <DataGrid ItemsSource="{Binding AttachmentPointList, UpdateSourceTrigger=PropertyChanged}"
+                          Style="{StaticResource AeTable.Grid}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
+                          SelectionMode="Single" HeadersVisibility="Column" MaxHeight="240"
+                          AutomationProperties.Name="{loc:Loc MainNode.AttachmentPoints}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="{loc:Loc MainNode.BoneId}" Binding="{Binding BoneIndex}" Width="64"/>
+                        <DataGridTextColumn Header="{loc:Loc MainNode.Name}" Binding="{Binding Name}" Width="*" MinWidth="100"/>
+                        <DataGridTextColumn Header="{loc:Loc MainNode.UseBoneOrientation}"
+                                            Binding="{Binding IsIdentiy, Converter={StaticResource SceneNodeDisplayConverter}}" Width="100"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Button Content="{loc:Loc MainNode.CreateAttachmentPointsFromSkeleton}" Margin="0,4,0,0"
+                        HorizontalAlignment="Right" Command="{Binding ResetAttachmentPointListCommand}"/>
+            </StackPanel>
+        </Expander>
+    </StackPanel>
 </UserControl>

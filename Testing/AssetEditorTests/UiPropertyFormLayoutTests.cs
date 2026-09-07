@@ -284,7 +284,8 @@ public partial class UiPropertyFormLayoutTests
                 Expander = XDocument.Load(path)
                     .Descendants()
                     .SingleOrDefault(element =>
-                        element.Name.LocalName == "Expander"),
+                        element.Name.LocalName == "Expander" &&
+                        !element.Ancestors().Any(ancestor => ancestor.Name.LocalName == "Expander")),
             })
             .Where(item =>
                 item.Expander is null ||
@@ -322,14 +323,10 @@ public partial class UiPropertyFormLayoutTests
                 Path.GetFileName(path),
                 "ModelMaterialView.xaml",
                 StringComparison.OrdinalIgnoreCase))
-            .Select(path => new
-            {
-                Path = path,
-                Expander = XDocument.Load(path)
-                    .Descendants()
-                    .Single(element =>
-                        element.Name.LocalName == "Expander"),
-            })
+            .SelectMany(path => XDocument.Load(path)
+                .Descendants()
+                .Where(element => element.Name.LocalName == "Expander")
+                .Select(expander => new { Path = path, Expander = expander }))
             .Where(item =>
                 !HasAttribute(item.Expander, "Background", "Transparent") ||
                 !HasAttribute(item.Expander, "BorderThickness", "0") ||
@@ -370,17 +367,13 @@ public partial class UiPropertyFormLayoutTests
                 Path.GetFileName(path),
                 "ModelMaterialView.xaml",
                 StringComparison.OrdinalIgnoreCase))
-            .Select(path => new
-            {
-                Path = path,
-                Title = XDocument.Load(path)
-                    .Descendants()
-                    .Where(element =>
-                        element.Ancestors().Any(ancestor =>
-                            ancestor.Name.LocalName == "Expander.Header"))
-                    .SingleOrDefault(element =>
-                        element.Name.LocalName == "TextBlock"),
-            })
+            .SelectMany(path => XDocument.Load(path)
+                .Descendants()
+                .Where(element =>
+                    element.Name.LocalName == "TextBlock" &&
+                    element.Ancestors().Any(ancestor => ancestor.Name.LocalName == "Expander.Header"))
+                .DefaultIfEmpty()
+                .Select(title => new { Path = path, Title = title }))
             .Where(item =>
                 item.Title is null ||
                 item.Title.Attributes().Any(attribute =>

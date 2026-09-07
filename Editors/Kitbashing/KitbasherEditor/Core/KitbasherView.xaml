@@ -5,7 +5,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:KitbasherEditor.Views"
              xmlns:editorviews="clr-namespace:KitbasherEditor.Views.EditorViews" 
-             xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
              xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
@@ -24,6 +23,7 @@
                 <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <local:ViewportToolbarBrushConverter x:Key="ViewportToolbarBrushConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -36,7 +36,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{Binding LeftColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="{Binding RightColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <ColumnDefinition MinWidth="400" Width="{Binding RightColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid.ColumnDefinitions>
 
         <Grid.RowDefinitions>
@@ -56,51 +56,84 @@
                 <RowDefinition Height="auto"/>
             </Grid.RowDefinitions>
 
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="34"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+            <ContentControl x:Name="ViewportScene" Grid.Row="0" Content="{Binding Scene, Mode=OneTime}"/>
 
             <!-- Left sidebar: Blender-style tool icons (vertical toolbar) -->
-            <ToolBarTray Grid.Row="0" Grid.Column="0" Orientation="Vertical" Background="{DynamicResource AeBrush.Surface1}">
-                <ToolBar Band="0" BandIndex="0" ItemsSource="{Binding MenuBar.SidebarButtons, Mode=OneTime}">
-                    <ToolBar.Resources>
+            <StackPanel x:Name="SidebarOverlay" SizeChanged="SidebarOverlay_SizeChanged" Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4">
+                <TextElement.Foreground>
+                    <MultiBinding Converter="{StaticResource ViewportToolbarBrushConverter}">
+                        <Binding Path="MenuBar.ViewportBackground.Value" />
+                        <Binding Path="Foreground" RelativeSource="{RelativeSource AncestorType={x:Type local:KitbasherView}}" />
+                        <Binding Path="Background" RelativeSource="{RelativeSource AncestorType={x:Type local:KitbasherView}}" />
+                    </MultiBinding>
+                </TextElement.Foreground>
+                <ToggleButton x:Name="SidebarToggle" IsChecked="True" Width="{StaticResource AeSize.CompactRowHeight}" Height="{StaticResource AeSize.CompactRowHeight}" HorizontalAlignment="Center"
+                              Focusable="False" Click="SelectionTool_Click"
+                              Foreground="{Binding (TextElement.Foreground), RelativeSource={RelativeSource AncestorType={x:Type StackPanel}}}"
+                              AutomationProperties.Name="{Binding ToolTip, RelativeSource={RelativeSource Self}}">
+                    <ToggleButton.Style>
+                        <Style TargetType="ToggleButton" BasedOn="{StaticResource AeButton.DropdownArrow}">
+                            <Setter Property="ToolTip" Value="{loc:Loc Kitbash.Toolbar.ExpandSidebar}" />
+                            <Setter Property="LayoutTransform"><Setter.Value><RotateTransform Angle="-90" /></Setter.Value></Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="ToolTip" Value="{loc:Loc Kitbash.Toolbar.CollapseSidebar}" />
+                                    <Setter Property="LayoutTransform"><Setter.Value><RotateTransform Angle="90" /></Setter.Value></Setter>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+                <ItemsControl x:Name="SidebarTools" ItemsSource="{Binding MenuBar.SidebarButtons, Mode=OneTime}"
+                              Visibility="{Binding IsChecked, ElementName=SidebarToggle, Converter={StaticResource BoolToCollapsedConverter}}">
+                    <ItemsControl.Resources>
                         <Style x:Key="SidebarSeparatorStyle" TargetType="Separator">
                             <Setter Property="Margin" Value="3,4"/>
                             <Setter Property="Background" Value="{DynamicResource AeBrush.Border}"/>
                         </Style>
                         <DataTemplate x:Key="sidebarDefaultTemplate">
                             <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1" Padding="3"
+                                    AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
+                                    Focusable="False" Click="SelectionTool_Click"
                                     Style="{StaticResource AeButton.Icon}"
                                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}"
                                     Command="{Binding Path=Action.Command}"
                                     Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                                <Image Height="20" Width="20" Source="{Binding Image}"/>
+                                <Rectangle Style="{StaticResource Kitbash.ViewportToolbarGlyph}">
+                                    <Rectangle.OpacityMask>
+                                        <ImageBrush ImageSource="{Binding Image}" />
+                                    </Rectangle.OpacityMask>
+                                </Rectangle>
                             </Button>
                         </DataTemplate>
                         <DataTemplate x:Key="sidebarRadioTemplate">
                             <RadioButton ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1"
+                                         AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
+                                         Focusable="False" Click="SelectionTool_Click"
                                          IsChecked="{Binding IsChecked.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                                          Command="{Binding Path=Action.Command}"
                                          GroupName="{Binding GroupName}"
-                                         Style="{StaticResource Kitbash.ToolRadioButton}"
+                                         Style="{StaticResource Kitbash.ViewportToolRadioButton}"
                                          IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}"
                                          Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                                <Image Height="20" Width="20" Source="{Binding Image}"/>
+                                <Rectangle Style="{StaticResource Kitbash.ViewportToolbarGlyph}">
+                                    <Rectangle.OpacityMask>
+                                        <ImageBrush ImageSource="{Binding Image}" />
+                                    </Rectangle.OpacityMask>
+                                </Rectangle>
                             </RadioButton>
                         </DataTemplate>
                         <DataTemplate x:Key="sidebarSelectionTemplate">
                             <StackPanel>
                                 <ContentControl Content="{Binding}" ContentTemplate="{StaticResource sidebarRadioTemplate}" />
-                                <ToggleButton x:Name="CircleSelectionButton" Width="28" Height="28" Padding="4" Margin="1"
+                                <ToggleButton x:Name="CircleSelectionButton" Width="28" Height="28" Padding="4" Margin="1" Background="Transparent" BorderBrush="Transparent"
                                               DataContext="{Binding DataContext.MenuBar, RelativeSource={RelativeSource AncestorType={x:Type local:KitbasherView}}}"
-                                              Style="{DynamicResource AeEditor.ToggleIcon}"
                                               IsEnabled="{Binding CanUseMeshSelectionTools.Value}"
                                               IsChecked="{Binding SelectionSettings.IsCircleSelection, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                               ToolTip="{loc:Loc Kitbash.Selection.Circle}"
                                               AutomationProperties.Name="{loc:Loc Kitbash.Selection.Circle}"
                                               ToolTipService.ShowOnDisabled="True"
-                                              Focusable="False" Click="CircleSelection_Click">
+                                              Focusable="False" Click="SelectionTool_Click">
                                     <ToggleButton.Resources>
                                         <ResourceDictionary>
                                             <ResourceDictionary.MergedDictionaries>
@@ -108,10 +141,19 @@
                                             </ResourceDictionary.MergedDictionaries>
                                         </ResourceDictionary>
                                     </ToggleButton.Resources>
+                                    <ToggleButton.Style>
+                                        <Style TargetType="ToggleButton" BasedOn="{StaticResource AeEditor.ToggleIcon}">
+                                            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" />
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" /></Trigger>
+                                                <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" /></Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ToggleButton.Style>
                                     <Viewbox Width="18" Height="18">
                                         <Grid Width="20" Height="20">
-                                            <Ellipse Margin="2" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeThickness="1.5" StrokeDashArray="2,2" />
-                                            <Ellipse Width="4" Height="4" Fill="{DynamicResource AeBrush.TextPrimary}" />
+                                            <Ellipse Margin="2" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" StrokeThickness="1.5" StrokeDashArray="2,2" />
+                                            <Ellipse Width="4" Height="4" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                         </Grid>
                                     </Viewbox>
                                 </ToggleButton>
@@ -125,26 +167,54 @@
                             RadioTemplate="{StaticResource sidebarRadioTemplate}"
                             SelectionTemplate="{StaticResource sidebarSelectionTemplate}"
                             SeparatorTemplate="{StaticResource sidebarSeparatorTemplate}"/>
-                    </ToolBar.Resources>
-                    <ToolBar.ItemTemplateSelector>
+                    </ItemsControl.Resources>
+                    <ItemsControl.ItemTemplateSelector>
                         <StaticResource ResourceKey="sidebarTemplateSelector"/>
-                    </ToolBar.ItemTemplateSelector>
-                </ToolBar>
-            </ToolBarTray>
+                    </ItemsControl.ItemTemplateSelector>
+                </ItemsControl>
+            </StackPanel>
 
-            <ContentControl Grid.Row="0" Grid.Column="1"  Content="{Binding Scene, Mode=OneTime}"/>
-            <editorviews:AnimationPlayerView DataContext="{Binding Animation}" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"/>
+            <Grid x:Name="OperationNoticeHost" Grid.Row="0" Margin="16" VerticalAlignment="Bottom"
+                  IsHitTestVisible="False"
+                  Visibility="{Binding OperationFeedback.IsVisible, Converter={StaticResource BoolToCollapsedConverter}, FallbackValue=Collapsed}">
+                <Border x:Name="OperationNotice" HorizontalAlignment="Center" MaxWidth="480"
+                        Style="{StaticResource AeSurface.Overlay}" Padding="12,8"
+                        AutomationProperties.LiveSetting="Polite"
+                        AutomationProperties.Name="{Binding OperationFeedback.Text}">
+                    <TextBlock x:Name="OperationNoticeText" Text="{Binding OperationFeedback.Text}"
+                               Style="{StaticResource AeText.Body}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource AeBrush.TextPrimary}"/>
+                </Border>
+            </Grid>
 
-            <Grid Grid.Row="0" Grid.Column="1" 
+            <editorviews:AnimationPlayerView DataContext="{Binding Animation}" Grid.Row="1"/>
+
+            <Grid Grid.Row="0"
                   Visibility="{Binding MenuBar.TransformTool.IsVisible, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                <DockPanel HorizontalAlignment="Right" VerticalAlignment="Top" >
+                <DockPanel HorizontalAlignment="Right" VerticalAlignment="Top" Background="{DynamicResource AeBrush.Surface1}">
                     <Rectangle Fill="{DynamicResource AeBrush.Border}" DockPanel.Dock="Left" Width="2"/>
                     <Rectangle Fill="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom" Height="2"/>
 
                     <StackPanel Orientation="Vertical">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding MenuBar.TransformTool.Text, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="2,0,2,0"/>
-                            <mathviews:Vector3View Width="200" Vector3="{Binding MenuBar.TransformTool.Vector3, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        <StackPanel Orientation="Horizontal" Margin="6,4" ToolTip="{Binding MenuBar.TransformTool.Description}">
+                            <TextBlock Text="{Binding MenuBar.TransformTool.Text}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" DataContext="{Binding MenuBar.TransformTool.Vector3}">
+                                <TextBlock Text="X" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource AeBrush.TextSecondary}" />
+                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Right"
+                                         Text="{Binding X.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Kitbasher.Transform.AxisX}">
+                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                                </TextBox>
+                                <TextBlock Text="Y" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource AeBrush.TextSecondary}" />
+                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Right"
+                                         Text="{Binding Y.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Kitbasher.Transform.AxisY}">
+                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                                </TextBox>
+                                <TextBlock Text="Z" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource AeBrush.TextSecondary}" />
+                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Right"
+                                         Text="{Binding Z.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Kitbasher.Transform.AxisZ}">
+                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                                </TextBox>
+                            </StackPanel>
                             <Button Content="{loc:Loc Kitbasher.Apply}"
                                     Width="50"
                                     Style="{StaticResource AeButton.Primary}"

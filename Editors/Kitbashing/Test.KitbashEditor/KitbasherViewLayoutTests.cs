@@ -86,10 +86,10 @@ namespace Test.KitbashEditor
                     element.Name == presentation + "Button" ||
                     element.Name == presentation + "RadioButton")
                 .Where(element =>
-                    element.Descendants(presentation + "Image").Any())
+                    (string?)element.Attribute("Command") == "{Binding Path=Action.Command}")
                 .ToList();
 
-            Assert.That(toolbarButtons, Is.Not.Empty);
+            Assert.That(toolbarButtons, Has.Count.EqualTo(2));
             Assert.That(
                 toolbarButtons.All(element =>
                     (string?)element.Attribute("Focusable") == "False"),
@@ -474,55 +474,44 @@ namespace Test.KitbashEditor
         }
 
         [Test]
-        public void GuidanceTooltips_AppearOnlyOnSectionHeaders()
+        public void GuidanceTooltips_TargetTheirSectionOrRelevantField()
         {
             var sceneNodeEditorDirectory = GetRepositoryFilePath(
-                "Editors",
-                "Kitbashing",
-                "KitbasherEditor",
-                "Core",
-                "SceneNodeEditor");
-            XNamespace presentation =
-                "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-            var tooltipValues = new List<string>();
-
-            foreach (var filePath in Directory.GetFiles(
-                sceneNodeEditorDirectory,
-                "*.xaml",
-                SearchOption.AllDirectories))
+                "Editors", "Kitbashing", "KitbasherEditor", "Core", "SceneNodeEditor");
+            XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+            var sectionGuidance = new[]
             {
-                var document = XDocument.Load(filePath);
-                var tooltipOwners = document
-                    .Descendants()
-                    .Where(element => element.Attribute("ToolTip") != null);
+                "{loc:Loc AdvancedRmvMaterial.ToolTip}",
+                "{loc:Loc Emissive.ToolTip}",
+                "{loc:Loc Mesh.Advanced.ToolTip}",
+                "{loc:Loc MetalRough.ToolTip}",
+                "{loc:Loc ModelMaterial.SelectedShader.ToolTip}",
+                "{loc:Loc SpecGloss.ToolTip}",
+                "{loc:Loc Tint.ToolTip}",
+                "{loc:Loc WeightedMaterial.ToolTip}"
+            };
+            var tooltipOwners = Directory.GetFiles(sceneNodeEditorDirectory, "*.xaml", SearchOption.AllDirectories)
+                .SelectMany(path => XDocument.Load(path).Descendants())
+                .Where(element => element.Attribute("ToolTip") != null)
+                .ToArray();
+            var sectionOwners = tooltipOwners
+                .Where(element => sectionGuidance.Contains((string)element.Attribute("ToolTip")!))
+                .ToArray();
 
-                foreach (var tooltipOwner in tooltipOwners)
-                {
-                    tooltipValues.Add(
-                        (string)tooltipOwner.Attribute("ToolTip")!);
-                    Assert.That(
-                        tooltipOwner
-                            .Ancestors(presentation + "Expander.Header")
-                            .Any(),
-                        Is.True,
-                        $"{Path.GetRelativePath(sceneNodeEditorDirectory, filePath)}: {tooltipOwner.Name.LocalName}");
-                }
-            }
+            Assert.That(sectionOwners.Select(element => (string)element.Attribute("ToolTip")!),
+                Is.EquivalentTo(sectionGuidance));
+            foreach (var owner in sectionOwners)
+                Assert.That(owner.Ancestors(presentation + "Expander.Header").Any(), Is.True);
 
-            Assert.That(
-                tooltipValues,
-                Is.EquivalentTo(new[]
-                {
-                    "{loc:Loc AdvancedRmvMaterial.ToolTip}",
-                    "{loc:Loc Emissive.ToolTip}",
-                    "{loc:Loc Mesh.Advanced.ToolTip}",
-                    "{loc:Loc MeshAnim.AnimationMatrix.ToolTip}",
-                    "{loc:Loc MetalRough.ToolTip}",
-                    "{loc:Loc ModelMaterial.SelectedShader.ToolTip}",
-                    "{loc:Loc SpecGloss.ToolTip}",
-                    "{loc:Loc Tint.ToolTip}",
-                    "{loc:Loc WeightedMaterial.ToolTip}"
-                }));
+            var matrixHelp = tooltipOwners
+                .Where(element => (string)element.Attribute("ToolTip")! == "{loc:Loc MeshAnim.AnimationMatrix.ToolTip}")
+                .ToArray();
+            Assert.That(matrixHelp, Has.Length.EqualTo(2));
+            Assert.That(matrixHelp.Any(element => element.Name == presentation + "Label" &&
+                (string?)element.Attribute("Content") == "{loc:Loc MeshAnim.AnimationMatrix}"), Is.True);
+            Assert.That(matrixHelp.Any(element => element.Name == presentation + "TextBox" &&
+                ((string?)element.Attribute("Text"))?.Contains("Animation.AnimationMatrixOverride") == true), Is.True);
+            Assert.That(matrixHelp.All(element => !element.Ancestors(presentation + "Expander.Header").Any()), Is.True);
         }
 
         private static string GetRepositoryFilePath(params string[] pathParts)

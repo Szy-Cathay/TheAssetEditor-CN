@@ -32,10 +32,22 @@
                     <CheckBox Margin="2,0,2,0" IsChecked="{Binding UseBlood, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
                 </DockPanel>
 
-                <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.BloodUvScale}"/>
-                    <mathviews1:Vector2View DataContext="{Binding BloodUvScale}" />
-                </DockPanel>
+                <Grid DockPanel.Dock="Top" ToolTip="{loc:Loc Blood.BloodUvScale.ToolTip}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Label Grid.Row="1" Width="{StaticResource labelWidth}" Content="{loc:Loc Blood.BloodUvScale}" Style="{StaticResource AeForm.Label}"/>
+                    <UniformGrid Grid.Column="1" Columns="2">
+                        <TextBlock Text="{loc:Loc Ui.Axis.U}" Style="{StaticResource AeText.Caption}"/>
+                        <TextBlock Text="{loc:Loc Ui.Axis.V}" Style="{StaticResource AeText.Caption}"/>
+                    </UniformGrid>
+                    <mathviews1:Vector2View Grid.Row="1" Grid.Column="1" DataContext="{Binding BloodUvScale}"/>
+                </Grid>
 
                 <DockPanel DockPanel.Dock="Top">
                     <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc Blood.TextureBloodMap}"/>

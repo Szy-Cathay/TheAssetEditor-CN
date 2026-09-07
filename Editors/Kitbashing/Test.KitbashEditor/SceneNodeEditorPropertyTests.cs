@@ -167,6 +167,57 @@ namespace Test.KitbashEditor
             });
         }
 
+
+        [Test]
+        public void AnimationAttachment_NoneIsVisibleAndRestoredByUndoWithoutChangingInitialData()
+        {
+            var commandExecutor = new CommandExecutor(Mock.Of<IEventHub>());
+            var propertyEditor = new SceneNodePropertyEditor(commandExecutor);
+            var rootScene = new KitbasherRootScene(
+                new AnimationsContainerComponent(),
+                Mock.Of<IPackFileService>(),
+                Mock.Of<IEventHub>());
+            var meshNode = CreateMeshNode();
+            var modelNode = new MainEditableNode("Model", new SkeletonNode(null), Mock.Of<IPackFileService>());
+            modelNode.AddObject(new Rmv2LodNode("Lod 0", 0)).AddObject(meshNode);
+            using var viewModel = new AnimationViewModel(
+                rootScene, Mock.Of<ISkeletonAnimationLookUpHelper>(), propertyEditor);
+
+            viewModel.Initialize(meshNode);
+            var none = viewModel.AttachableBones.SelectedItem!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(none.BoneIndex.Value, Is.EqualTo(-1));
+                Assert.That(meshNode.AttachmentPointName, Is.Null.Or.Empty);
+                Assert.That(commandExecutor.CurrentDocumentStateId, Is.Zero);
+            });
+
+            var bone = new Shared.Ui.Editors.BoneMapping.AnimatedBone(7, "bip_spine_1");
+            viewModel.AttachableBones.PossibleValues.Add(bone);
+            viewModel.AttachableBones.Values.Add(bone);
+            viewModel.AttachableBones.Filter = none.Name.Value;
+            Assert.That(viewModel.AttachableBones.Values, Has.Count.EqualTo(2));
+            viewModel.AttachableBones.Filter = "spine";
+            Assert.That(viewModel.AttachableBones.Values, Is.EqualTo(new[] { bone }));
+            viewModel.AttachableBones.SelectedItem = null;
+            Assert.That(commandExecutor.CurrentDocumentStateId, Is.Zero);
+            viewModel.AttachableBones.SelectedItem = bone;
+            viewModel.AttachableBones.Filter = bone.Name.Value;
+            Assert.That(viewModel.AttachableBones.Values, Has.Count.EqualTo(2));
+            Assert.That(meshNode.AttachmentPointName, Is.EqualTo("bip_spine_1"));
+
+            commandExecutor.Undo();
+            Assert.Multiple(() =>
+            {
+                Assert.That(meshNode.AttachmentPointName, Is.Null.Or.Empty);
+                Assert.That(viewModel.AttachableBones.SelectedItem, Is.SameAs(none));
+                Assert.That(commandExecutor.CurrentDocumentStateId, Is.Zero);
+            });
+            commandExecutor.Redo();
+            Assert.That(viewModel.AttachableBones.SelectedItem, Is.SameAs(bone));
+            Assert.That(meshNode.AttachmentPointName, Is.EqualTo("bip_spine_1"));
+        }
+
         [Test]
         public void MeshName_TracksDocumentStateAndUndoUpdatesSidebar()
         {

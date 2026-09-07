@@ -31,10 +31,12 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="{loc:Loc BoneMapping.PairHint}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,0,0,12"/>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1*"/>
-            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="16"/>
             <ColumnDefinition Width="1*"/>
         </Grid.ColumnDefinitions>
 
@@ -59,13 +61,22 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel  Grid.Row="0" Orientation="Horizontal">
-                <TextBlock  Text="{loc:Loc BoneMapping.CurrentModelBones}" FontWeight="Bold" FontSize="16" TextDecorations="Underline"/>
-                <TextBlock  Text="{Binding MeshSkeletonName.Value, UpdateSourceTrigger=PropertyChanged}" FontWeight="Bold" FontSize="16" TextDecorations="Underline"/>
+                <TextBlock  Text="{loc:Loc BoneMapping.CurrentModelBones}" Style="{StaticResource AeText.SectionTitle}"/>
+                <TextBlock  Text="{Binding MeshSkeletonName.Value, UpdateSourceTrigger=PropertyChanged}" Margin="8,0,0,0" Style="{StaticResource AeText.SectionTitle}"/>
             </StackPanel>
 
 
-            <TextBox Grid.Row="1" Text="{Binding MeshBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-            <Button Grid.Row="1" Grid.Column ="1"  Content="{loc:Loc AnimReTarget.Clear}" IsEnabled="False" />
+            <TextBox Grid.Row="1" Margin="0,8,8,4" behaviors:TextBoxExtensions.Watermark="{loc:Loc BoneMapping.SearchHint}" Text="{Binding MeshBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <Button Grid.Row="1" Grid.Column="1" Content="{loc:Loc AnimReTarget.Clear}" Click="{s:MethodBinding ClearMeshFilter}" Margin="0,8,0,4">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource AeButton.Quiet}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MeshBones.Filter}" Value=""><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+                            <DataTrigger Binding="{Binding MeshBones.Filter}" Value="{x:Null}"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
 
 
             <CheckBox Grid.Row="2" VerticalContentAlignment="Center"
@@ -111,7 +122,18 @@
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <TextBlock Text="{Binding MappedBoneName.Value}"/>
                                 <TextBlock Text="["/>
-                                <TextBlock Text="{Binding MappedBoneIndex.Value}"/>
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding MappedBoneIndex.Value}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding MappedBoneIndex.Value}" Value="-1">
+                                                    <Setter Property="Text" Value="{loc:Loc BoneMapping.Unmapped}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                                 <TextBlock Text="]"/>
                             </StackPanel>
                         </Grid>
@@ -153,12 +175,21 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel  Grid.Row="0" Orientation="Horizontal">
-                <TextBlock  Text="{loc:Loc BoneMapping.TargetModelBones}" FontWeight="Bold" FontSize="16" TextDecorations="Underline"/>
-                <TextBlock  Text="{Binding ParentSkeletonName.Value, UpdateSourceTrigger=PropertyChanged}" FontWeight="Bold" FontSize="16" TextDecorations="Underline"/>
+                <TextBlock  Text="{loc:Loc BoneMapping.TargetModelBones}" Style="{StaticResource AeText.SectionTitle}"/>
+                <TextBlock  Text="{Binding ParentSkeletonName.Value, UpdateSourceTrigger=PropertyChanged}" Margin="8,0,0,0" Style="{StaticResource AeText.SectionTitle}"/>
             </StackPanel>
 
-            <TextBox Grid.Row="1" Text="{Binding ParentModelBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-            <Button Grid.Row="1" Grid.Column ="1"  Content="{loc:Loc AnimReTarget.Clear}" IsEnabled="False"/>
+            <TextBox Grid.Row="1" Margin="0,8,8,4" behaviors:TextBoxExtensions.Watermark="{loc:Loc BoneMapping.SearchHint}" Text="{Binding ParentModelBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            <Button Grid.Row="1" Grid.Column="1" Content="{loc:Loc AnimReTarget.Clear}" Click="{s:MethodBinding ClearParentFilter}" Margin="0,8,0,4">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource AeButton.Quiet}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ParentModelBones.Filter}" Value=""><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+                            <DataTrigger Binding="{Binding ParentModelBones.Filter}" Value="{x:Null}"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
             <TreeView 
                 Grid.Row="2"
                 Grid.ColumnSpan="2"
@@ -181,4 +212,5 @@
         </Grid>
 
     </Grid>
+    </DockPanel>
 </UserControl>

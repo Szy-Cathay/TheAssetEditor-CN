@@ -13,7 +13,10 @@ namespace Editors.KitbasherEditor.ViewModels.PinTool
             InitializeComponent();
             DataContext = viewModel;
             _viewModel = viewModel;
+            Closed += (_, _) => _viewModel?.Dispose();
         }
+
+        private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
         private void OnApplyClick(object sender, RoutedEventArgs e)
         {

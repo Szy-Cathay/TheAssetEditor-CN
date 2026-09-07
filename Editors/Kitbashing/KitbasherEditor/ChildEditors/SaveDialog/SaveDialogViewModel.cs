@@ -42,15 +42,21 @@ namespace KitbasherEditor.ViewModels.SaveDialog
             _saveService = saveService;
             _pfs = pfs;
             _packFileUiProvider = packFileUiProvider;
-            MeshStrategies = _saveService.GetGeometryStrategies().Select(x => new ComboBoxItem<GeometryStrategy>(x.StrategyId, x.Name, x.Description)).ToList();
-            WsStrategies = _saveService.GetMaterialStrategies().Select(x => new ComboBoxItem<MaterialStrategy>(x.StrategyId, x.Name, x.Description)).ToList();
-            LodStrategies = _saveService.GetLodStrategies().Select(x => new ComboBoxItem<LodStrategy>(x.StrategyId, x.Name, x.Description)).ToList();
+            MeshStrategies = _saveService.GetGeometryStrategies().Select(x => new ComboBoxItem<GeometryStrategy>(
+                x.StrategyId, x.StrategyId == GeometryStrategy.None ? LocalizeStrategy("Geometry.None") : x.Name,
+                LocalizeStrategy($"Geometry.{x.StrategyId}.Help"))).ToList();
+            WsStrategies = _saveService.GetMaterialStrategies().Select(x => new ComboBoxItem<MaterialStrategy>(
+                x.StrategyId, LocalizeStrategy($"Material.{x.StrategyId}"), LocalizeStrategy($"Material.{x.StrategyId}.Help"))).ToList();
+            LodStrategies = _saveService.GetLodStrategies().Select(x => new ComboBoxItem<LodStrategy>(
+                x.StrategyId, LocalizeStrategy($"Lod.{x.StrategyId}"), LocalizeStrategy($"Lod.{x.StrategyId}.Help"))).ToList();
 
             OutputPath = "";
             SelectedMeshStrategy = MeshStrategies.First();
             SelectedWsModelStrategy = WsStrategies.First();
             SelectedLodStrategy = LodStrategies.First();
         }
+
+        private static string LocalizeStrategy(string key) => LocalizationManager.Instance.Get($"SaveDialog.Strategy.{key}");
 
         internal void Initialize(GeometrySaveSettings saveSettings)
         {

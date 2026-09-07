@@ -17,9 +17,34 @@ namespace KitbasherEditor.Views
         public KitbasherView()
         {
             InitializeComponent();
+            Loaded += (_, _) =>
+            {
+                UpdateStatisticsPosition();
+                (DataContext as KitbasherViewModel)?.OperationFeedback.Activate();
+            };
+            Unloaded += (_, _) => (DataContext as KitbasherViewModel)?.OperationFeedback.Deactivate();
+            DataContextChanged += (_, e) =>
+            {
+                (e.OldValue as KitbasherViewModel)?.OperationFeedback.Deactivate();
+                if (IsLoaded)
+                    (e.NewValue as KitbasherViewModel)?.OperationFeedback.Activate();
+            };
         }
 
-        private void CircleSelection_Click(object sender, RoutedEventArgs e)
+        private void SidebarOverlay_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateStatisticsPosition();
+
+        private void UpdateStatisticsPosition()
+        {
+            if (DataContext is KitbasherViewModel viewModel)
+            {
+                var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+                viewModel.MenuBar.SetStatisticsPosition(
+                    (float)((SidebarOverlay.ActualWidth + 12) * dpi.DpiScaleX),
+                    (float)(8 * dpi.DpiScaleY));
+            }
+        }
+
+        private void SelectionTool_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is KitbasherViewModel viewModel)
                 viewModel.MenuBar.FocusScene();

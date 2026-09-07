@@ -9,7 +9,7 @@
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
                                 
-        Title="{loc:Loc PinTool.Title}" Height="600" Width="440"
+        Title="{loc:Loc PinTool.Title}" Height="620" Width="520" MinHeight="460" MinWidth="460"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AeBrush.Canvas}"
         Foreground="{DynamicResource AeBrush.TextPrimary}"
@@ -18,131 +18,69 @@
     <windowhandling:AssetEditorWindow.Resources>
         <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
     </windowhandling:AssetEditorWindow.Resources>
-    <DockPanel Margin="12" LastChildFill="False">
-
-        <Expander Header="{loc:Loc PinTool.Instructions}" DockPanel.Dock="Top">
-            <TextBlock Margin="10,0,0,10">
-                <Run Text="{loc:Loc PinTool.Step1}"/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.PinDesc}"/>
-                <LineBreak/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.SkinWrapDesc}"/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.Step2}"/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.Step3}"/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.Step3Pin}"/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.Step3SkinWrap}"/>
-                <LineBreak/>
-                <Run Text="{loc:Loc PinTool.Step4}"/>
-            </TextBlock>
-        </Expander>
-
-        <DockPanel DockPanel.Dock="Top">
-            <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc PinTool.AnimationTransferMode}"/>
-            <ComboBox Margin="10,0,0,0"
-                      SelectedValue="{Binding SelectedRiggingMode, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                      SelectedValuePath="Tag">
-                <ComboBoxItem Tag="{x:Static pintool:RiggingMode.Pin}" Content="{loc:Loc PinTool.Mode.Pin}"/>
-                <ComboBoxItem Tag="{x:Static pintool:RiggingMode.SkinWrap}" Content="{loc:Loc PinTool.Mode.SkinWrap}"/>
-            </ComboBox>
-        </DockPanel>
-
-        <GroupBox Header="{loc:Loc PinTool.ApplyAnimationTo}" Margin="0,5,0,0" DockPanel.Dock="Top">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="0.5*"/>
-                    <ColumnDefinition Width="0.5*"/>
-                </Grid.ColumnDefinitions>
-
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="100"/>
-                    <RowDefinition Height="auto"/>
-                </Grid.RowDefinitions>
-
-                <ListView Grid.Row="0" Grid.ColumnSpan="2" ItemsSource="{Binding AffectedMeshCollection, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Name" >
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="Height" Value="30"/>
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16">
+            <TextBlock Text="{Binding SetupHint}" TextWrapping="Wrap" Style="{StaticResource AeText.Body}" Margin="0,0,0,12"/>
+            <DockPanel>
+                <Label Content="{loc:Loc PinTool.AnimationTransferMode}" Style="{StaticResource AeForm.Label}" Width="100"/>
+                <ComboBox SelectedValue="{Binding SelectedRiggingMode, Mode=TwoWay}" SelectedValuePath="Tag">
+                    <ComboBoxItem Tag="{x:Static pintool:RiggingMode.Pin}" Content="{loc:Loc PinTool.Mode.Pin}"/>
+                    <ComboBoxItem Tag="{x:Static pintool:RiggingMode.SkinWrap}" Content="{loc:Loc PinTool.Mode.SkinWrap}"/>
+                </ComboBox>
+            </DockPanel>
+            <TextBlock Text="{loc:Loc PinTool.ApplyAnimationTo}" Style="{StaticResource AeText.SectionTitle}" Margin="0,16,0,8"/>
+            <Grid Height="120">
+                <ListView ItemsSource="{Binding AffectedMeshCollection}" DisplayMemberPath="Name" Style="{StaticResource AeList.View}"/>
+                <TextBlock Text="{loc:Loc PinTool.NoTargets}" TextWrapping="Wrap" Margin="12" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource AeEmptyState.Description}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers><DataTrigger Binding="{Binding AffectedMeshCollection.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
                         </Style>
-                    </ListView.ItemContainerStyle>
-                </ListView>
-
-                <Button Content="{loc:Loc PinTool.AddSelectedMeshes}" Grid.Row="1" Grid.Column="0" Margin="2,2,2,0" Command="{Binding AddSelectionToAffectMeshCollectionCommand}" />
-                <Button Content="{loc:Loc PinTool.RemoveAll}" Grid.Row="1" Grid.Column="1" Margin="2,2,2,0" Command="{Binding ClearAffectedMeshCollectionCommand}" Style="{StaticResource AeButton.Danger}" />
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
-        </GroupBox>
-
-        <ContentControl DockPanel.Dock="Top">
-            <ContentControl.Style>
-                <Style TargetType="ContentControl">
-                    <Style.Triggers>
-                        <!-- Pin -->
-                        <DataTrigger Binding="{Binding SelectedRiggingMode, UpdateSourceTrigger=PropertyChanged}" Value="Pin">
-                            <Setter Property="Content">
-                                <Setter.Value>
-                                    <GroupBox Header="{loc:Loc PinTool.TakeAnimationFromPinMode}" Margin="0,5,0,0">
-                                        <Grid >
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="auto"/>
-                                                <RowDefinition Height="auto"/>
-                                            </Grid.RowDefinitions>
-
-                                            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="0" Content="{loc:Loc PinTool.Source}"/>
-                                            <TextBox Grid.Column="1" Grid.Row="0" IsReadOnly="true" VerticalContentAlignment="Center" Margin="2" Text="{Binding PinMode.Description, UpdateSourceTrigger=PropertyChanged}"/>
-
-                                            <Button Grid.Column="1" Grid.Row="1" Content="{loc:Loc PinTool.SetFromSelectedVertex}" Margin="2" Command="{Binding PinMode.SetSelectionCommand}" />
-                                        </Grid>
-                                    </GroupBox>
-                                </Setter.Value>
-                            </Setter>
-                        </DataTrigger>
-
-                        <!-- Skin Wrap -->
-                        <DataTrigger Binding="{Binding SelectedRiggingMode, UpdateSourceTrigger=PropertyChanged}" Value="SkinWrap">
-                            <Setter Property="Content">
-                                <Setter.Value>
-                                    <GroupBox Header="{loc:Loc PinTool.TakeAnimationFromSkinWrapMode}" Margin="0,5,0,0">
-                                        <Grid >
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="auto"/>
-                                                <RowDefinition Height="auto"/>
-                                            </Grid.RowDefinitions>
-
-                                            <Label Style="{StaticResource AeForm.Label}" Grid.Column="0" Grid.Row="0" Content="{loc:Loc PinTool.Mesh}"/>
-                                            <TextBox Grid.Column="1" Grid.Row="0" IsReadOnly="true" VerticalContentAlignment="Center" Margin="2" Text="{Binding SkinWrapMode.Description, UpdateSourceTrigger=PropertyChanged}"/>
-                                            <Button Grid.Column="1" Grid.Row="1" Content="{loc:Loc PinTool.SetFromSelection}" Margin="2" Command="{Binding SkinWrapMode.SetSelectionCommand}" />
-
-                                        </Grid>
-                                    </GroupBox>
-                                </Setter.Value>
-                            </Setter>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </ContentControl.Style>
-        </ContentControl>
-
-
-
-
-
-
-
-        <Button Content="{loc:Loc General.Apply}" Margin="2,8,2,2" Click="OnApplyClick" DockPanel.Dock="Top" Style="{StaticResource AeButton.Primary}"/>
-
-    </DockPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="{loc:Loc PinTool.AddSelectedMeshes}" Command="{Binding AddSelectionToAffectMeshCollectionCommand}" Margin="0,0,8,0"/>
+                <Button Content="{loc:Loc PinTool.RemoveAll}" Command="{Binding ClearAffectedMeshCollectionCommand}" Style="{StaticResource AeButton.Quiet}"/>
+            </StackPanel>
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers><DataTrigger Binding="{Binding SelectedRiggingMode}" Value="Pin"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Text="{loc:Loc PinTool.TakeAnimationFromPinMode}" Style="{StaticResource AeText.SectionTitle}" Margin="0,16,0,8"/>
+                <TextBox IsReadOnly="True" Text="{Binding PinMode.Description}" ToolTip="{Binding PinMode.Description}"/>
+                <Button Content="{loc:Loc PinTool.SetFromSelectedVertex}" Command="{Binding PinMode.SetSelectionCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+            </StackPanel>
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers><DataTrigger Binding="{Binding SelectedRiggingMode}" Value="SkinWrap"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Text="{loc:Loc PinTool.TakeAnimationFromSkinWrapMode}" Style="{StaticResource AeText.SectionTitle}" Margin="0,16,0,8"/>
+                <TextBox IsReadOnly="True" Text="{Binding SkinWrapMode.Description}" ToolTip="{Binding SkinWrapMode.Description}"/>
+                <Button Content="{loc:Loc PinTool.SetFromSelection}" Command="{Binding SkinWrapMode.SetSelectionCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+            </StackPanel>
+            <Expander Header="{loc:Loc PinTool.Instructions}" Margin="0,16,0,0">
+                <TextBlock TextWrapping="Wrap" Margin="0,8,0,0" Style="{StaticResource AeText.Body}">
+                    <Run Text="{loc:Loc PinTool.PinDesc}"/><LineBreak/><LineBreak/>
+                    <Run Text="{loc:Loc PinTool.SkinWrapDesc}"/>
+                </TextBlock>
+            </Expander>
+        </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="{loc:Loc General.Close}" Click="OnCloseClick" MinWidth="88" Margin="0,0,8,0" Style="{StaticResource AeButton.Secondary}"/>
+                <Button Content="{loc:Loc General.Apply}" Click="OnApplyClick" IsEnabled="{Binding CanApply}" ToolTip="{Binding SetupHint}" MinWidth="88" Style="{StaticResource AeButton.Primary}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
 </windowhandling:AssetEditorWindow>

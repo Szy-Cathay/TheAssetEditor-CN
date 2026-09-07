@@ -7,6 +7,7 @@ using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Shared.Core.Events;
 using Shared.Core.Misc;
+using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.MathViews;
 using System.Runtime.ExceptionServices;
 
@@ -39,6 +40,9 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 
         string _text;
         public string Text { get { return _text; } set { SetAndNotify(ref _text, value); } }
+
+        string _description;
+        public string Description { get => _description; private set => SetAndNotify(ref _description, value); }
 
         Vector3ViewModel _vector3 = new Vector3ViewModel(0, 0, 0);
         public Vector3ViewModel Vector3 { get { return _vector3; } set { SetAndNotify(ref _vector3, value); } }
@@ -95,11 +99,13 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             IsVisible = _activeMode != TransformMode.None;
 
             if (_activeMode == TransformMode.Rotate)
-                Text = "Rotate:";
+                Text = LocalizationManager.Instance.Get("Kitbasher.Transform.Rotate");
             else if (_activeMode == TransformMode.Scale)
-                Text = "Scale:";
+                Text = LocalizationManager.Instance.Get("Kitbasher.Transform.Scale");
             else if (_activeMode == TransformMode.Translate)
-                Text = "Translate:";
+                Text = LocalizationManager.Instance.Get("Kitbasher.Transform.Translate");
+
+            Description = mode == TransformMode.None ? "" : LocalizationManager.Instance.Get($"Kitbasher.Transform.{mode}.Help");
 
             SetDefaultValue();
         }

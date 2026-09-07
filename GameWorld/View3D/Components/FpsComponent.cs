@@ -11,6 +11,8 @@ namespace GameWorld.Core.Components
 {
     public class FpsComponent : BaseComponent
     {
+        public Vector2 OverlayPosition { get; set; } = new(5, 5);
+
         private const float OverlayFontScale = 0.5f;
         private int _frames;
         private int _liveFrames;
@@ -68,7 +70,7 @@ namespace GameWorld.Core.Components
             var fpsItem = new FontRenderItem(
                 _renderEngineComponent,
                 _localizationManager.GetFormat("Viewport.Stats.FrameRate", _frames),
-                new Vector2(5, 5),
+                OverlayPosition,
                 Color.White,
                 _renderEngineComponent.ViewportOverlayFont,
                 OverlayFontScale);
@@ -77,7 +79,7 @@ namespace GameWorld.Core.Components
             var statsItem = new FontRenderItem(
                 _renderEngineComponent,
                 _localizationManager.GetFormat("Viewport.Stats.Scene", _objectCount, _vertexCount, _faceCount),
-                new Vector2(5, 25),
+                OverlayPosition + new Vector2(0, 20),
                 Color.LightGray,
                 _renderEngineComponent.ViewportOverlayFont,
                 OverlayFontScale);

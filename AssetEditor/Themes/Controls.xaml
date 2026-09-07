@@ -4080,6 +4080,10 @@
                         <Trigger Property="IsOverflowOpen" Value="true">
                             <Setter Property="IsEnabled" TargetName="ToolBarThumb" Value="false"/>
                         </Trigger>
+                        <Trigger Property="HasOverflowItems" Value="false">
+                            <Setter Property="Visibility" TargetName="OverflowGrid" Value="Collapsed"/>
+                            <Setter Property="IsOpen" TargetName="OverflowPopup" Value="false"/>
+                        </Trigger>
                         <Trigger Property="Header" Value="{x:Null}">
                             <Setter Property="Visibility" TargetName="ToolBarHeader" Value="Collapsed"/>
                         </Trigger>

@@ -5,6 +5,11 @@ using Shared.Ui.Common.MenuSystem;
 
 namespace KitbasherEditor.ViewModels.MenuBarViews.Helpers
 {
+    public sealed class KitbashMenuBarButton(MenuAction action) : MenuBarButton(action)
+    {
+        public string Label { get; init; } = "";
+    }
+
     public class ButtonBuilder
     {
         private readonly ObservableCollection<MenuBarButton> _menuBarButtons = new ObservableCollection<MenuBarButton>();
@@ -17,10 +22,10 @@ namespace KitbasherEditor.ViewModels.MenuBarViews.Helpers
 
         public ObservableCollection<MenuBarButton> Build() => _menuBarButtons;
 
-        public void CreateButton<T>(BitmapImage image, ButtonVisibilityRule buttonVisibilityRule = ButtonVisibilityRule.Always) where T : IKitbasherUiCommand
+        public void CreateButton<T>(BitmapImage image, ButtonVisibilityRule buttonVisibilityRule = ButtonVisibilityRule.Always, string label = "") where T : IKitbasherUiCommand
         {
             var action = GetMenuAction<T>();
-            _menuBarButtons.Add(new MenuBarButton(action) { Image = image, ShowRule = buttonVisibilityRule });
+            _menuBarButtons.Add(new KitbashMenuBarButton(action) { Image = image, ShowRule = buttonVisibilityRule, Label = label });
         }
 
         public void CreateGroupedButton<T>(string groupName, bool isChecked, BitmapImage image, ButtonVisibilityRule buttonVisibilityRule = ButtonVisibilityRule.Always) where T : IKitbasherUiCommand

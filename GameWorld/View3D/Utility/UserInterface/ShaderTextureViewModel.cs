@@ -25,8 +25,12 @@ namespace GameWorld.Core.Utility.UserInterface
         private readonly IStandardDialogs _packFileUiProvider;
         private readonly IDocumentPropertyEditor? _propertyEditor;
 
-        [ObservableProperty] string _path;
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FileName))]
+        string _path;
         [ObservableProperty] bool _shouldRenderTexture;
+
+        public string FileName => System.IO.Path.GetFileName(Path);
 
         public ShaderTextureViewModel(
             TextureInput shaderTextureReference,

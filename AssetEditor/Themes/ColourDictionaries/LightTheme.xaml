@@ -226,19 +226,20 @@
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Selected.Inactive"         Color="{StaticResource AColour.Tone9.Border.Selected.Inactive}"/>
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Disabled"                  Color="{StaticResource AColour.Tone9.Border.Disabled}"/>
     <!-- AE UI design-system semantic brushes -->
-    <SolidColorBrush x:Key="AeBrush.Canvas" Color="{StaticResource AColour.Tone1.Background.Static}" />
-    <SolidColorBrush x:Key="AeBrush.Surface1" Color="{StaticResource AColour.Tone2.Background.Static}" />
-    <SolidColorBrush x:Key="AeBrush.Surface2" Color="{StaticResource AColour.Tone3.Background.Static}" />
-    <SolidColorBrush x:Key="AeBrush.Surface3" Color="{StaticResource AColour.Tone4.Background.Static}" />
-    <SolidColorBrush x:Key="AeBrush.SurfaceHover" Color="{StaticResource AColour.Tone4.Background.MouseOver}" />
-    <SolidColorBrush x:Key="AeBrush.Border" Color="{StaticResource AColour.Tone3.Border.Static}" />
-    <SolidColorBrush x:Key="AeBrush.BorderStrong" Color="{StaticResource AColour.Tone5.Border.Static}" />
-    <SolidColorBrush x:Key="AeBrush.TextPrimary" Color="{StaticResource AColour.Foreground.Static}" />
-    <SolidColorBrush x:Key="AeBrush.TextSecondary" Color="{StaticResource AColour.Foreground.Deeper}" />
-    <SolidColorBrush x:Key="AeBrush.TextMuted" Color="{StaticResource AColour.Foreground.Disabled}" />
-    <SolidColorBrush x:Key="AeBrush.Accent" Color="{StaticResource AColour.ColourfulGlyph.Static}" />
-    <SolidColorBrush x:Key="AeBrush.AccentHover" Color="{StaticResource AColour.ColourfulGlyph.MouseOver}" />
-    <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="{StaticResource AColour.Tone4.Background.Selected}" />
+    <SolidColorBrush x:Key="AeBrush.Canvas" Color="#F1F3F5" />
+    <SolidColorBrush x:Key="AeBrush.OnAccent" Color="#F1F3F5" />
+    <SolidColorBrush x:Key="AeBrush.Surface1" Color="#F8F9FA" />
+    <SolidColorBrush x:Key="AeBrush.Surface2" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AeBrush.Surface3" Color="#E8EBEF" />
+    <SolidColorBrush x:Key="AeBrush.SurfaceHover" Color="#DDE6EE" />
+    <SolidColorBrush x:Key="AeBrush.Border" Color="#C7CFD8" />
+    <SolidColorBrush x:Key="AeBrush.BorderStrong" Color="#929FAC" />
+    <SolidColorBrush x:Key="AeBrush.TextPrimary" Color="#20262D" />
+    <SolidColorBrush x:Key="AeBrush.TextSecondary" Color="#4C5763" />
+    <SolidColorBrush x:Key="AeBrush.TextMuted" Color="#66727E" />
+    <SolidColorBrush x:Key="AeBrush.Accent" Color="#1268AA" />
+    <SolidColorBrush x:Key="AeBrush.AccentHover" Color="#0B5D9C" />
+    <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="#DCEBFA" />
     <SolidColorBrush x:Key="AeBrush.Success" Color="#267A42" />
     <SolidColorBrush x:Key="AeBrush.Warning" Color="#8A5A00" />
     <SolidColorBrush x:Key="AeBrush.Danger" Color="#B23B3B" />

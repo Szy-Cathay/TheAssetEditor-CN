@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.Core;
@@ -17,6 +19,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
         private readonly ISkeletonAnimationLookUpHelper _animLookUp;
         private readonly SceneNodePropertyEditor _propertyEditor;
         Rmv2MeshNode? _meshNode;
+        private bool _isFilteringAttachments;
 
         [ObservableProperty] public partial string SkeletonName { get; set; } = string.Empty;
         [ObservableProperty] public partial List<AnimatedBone> AnimatedBones { get; set; } = [];
@@ -78,27 +81,24 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
                     StringComparison.OrdinalIgnoreCase)
                 ? skeletonFile
                 : _animLookUp.GetSkeletonFileFromName(existingSkeltonName);
-            if (existingSkeletonFile != null)
-                AttachableBones.UpdatePossibleValues(
-                    AnimatedBoneHelper.CreateFlatSkeletonList(existingSkeletonFile),
-                    new AnimatedBone(-1, GetText("Kitbash.Sidebar.None")));
+            AttachableBones.UpdatePossibleValues(
+                existingSkeletonFile == null ? [] : AnimatedBoneHelper.CreateFlatSkeletonList(existingSkeletonFile),
+                new AnimatedBone(-1, GetText("Kitbash.Sidebar.None")));
 
-            AttachableBones.SearchFilter = (value, rx) => rx.Match(value.Name.Value).Success;
-            AttachableBones.SelectedItem = AttachableBones.PossibleValues.FirstOrDefault(
-                x => x.Name.Value == _meshNode.AttachmentPointName);
+            AttachableBones.SearchFilterExtended = FilterAttachments;
+            AttachableBones.SelectedItem = FindAttachment(_meshNode.AttachmentPointName);
             AttachableBones.SelectedItemChanged += ModelBoneList_SelectedItemChanged;
         }
 
         private void ModelBoneList_SelectedItemChanged(AnimatedBone newValue)
         {
-            if (_meshNode?.GetParentModel() is not MainEditableNode)
+            if (_isFilteringAttachments || newValue == null || _meshNode?.GetParentModel() is not MainEditableNode)
                 return;
 
             var oldState = new AttachmentState(
                 _meshNode.AttachmentPointName,
                 _meshNode.AttachmentBoneResolver,
-                AttachableBones.PossibleValues.FirstOrDefault(
-                    value => value.Name.Value == _meshNode.AttachmentPointName));
+                FindAttachment(_meshNode.AttachmentPointName));
             var newState = newValue != null && newValue.BoneIndex.Value != -1
                 ? new AttachmentState(
                     newValue.Name.Value,
@@ -116,6 +116,34 @@ namespace Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2
                 },
                 state => AttachableBones.SelectedItem = state.SelectedBone);
         }
+
+        private void FilterAttachments(FilterCollection<AnimatedBone> collection, Regex regex)
+        {
+            if (_isFilteringAttachments)
+                return;
+
+            var showAll = string.Equals(collection.Filter, collection.SelectedItem?.Name.Value, StringComparison.Ordinal);
+            var matches = collection.PossibleValues
+                .Where(bone => showAll || regex.IsMatch(bone.Name.Value))
+                .ToList();
+            if (collection.Values.SequenceEqual(matches))
+                return;
+
+            // Replacing combo items also updates its text and selection synchronously.
+            _isFilteringAttachments = true;
+            try
+            {
+                collection.Values = new ObservableCollection<AnimatedBone>(matches);
+            }
+            finally
+            {
+                _isFilteringAttachments = false;
+            }
+        }
+
+        private AnimatedBone? FindAttachment(string? name) =>
+            AttachableBones.PossibleValues.FirstOrDefault(bone =>
+                string.IsNullOrEmpty(name) ? bone.BoneIndex.Value == -1 : bone.Name.Value == name);
 
         partial void OnAnimationMatrixOverrideChanged(int value)
         {

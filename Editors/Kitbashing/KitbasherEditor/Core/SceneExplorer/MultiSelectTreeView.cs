@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Runtime.Intrinsics.Arm;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -13,6 +14,7 @@ using GameWorld.Core.SceneNodes;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.Services;
 
 namespace KitbasherEditor.Views
 {
@@ -21,6 +23,22 @@ namespace KitbasherEditor.Views
         public ObservableCollection<SceneExplorerNode> Children { get; set; } = [];
 
         public ISceneNode Content { get; set; }
+        public string DisplayName
+        {
+            get
+            {
+                if (ReferenceEquals(Content, Content.SceneManager?.RootNode))
+                    return LocalizationManager.Instance.Get("Kitbash.Scene.Root");
+                if (Content is MainEditableNode)
+                    return LocalizationManager.Instance.Get("Kitbash.Scene.EditableModel");
+                if (Content is GroupNode && Content.Parent != null &&
+                    ReferenceEquals(Content.Parent, Content.SceneManager?.RootNode) && Content.Name == SpecialNodes.ReferenceMeshs)
+                    return LocalizationManager.Instance.Get("Kitbash.Scene.References");
+                if (Content is Rmv2LodNode lod && Content.Name == $"Lod {lod.LodValue}")
+                    return LocalizationManager.Instance.GetFormat("Kitbash.Scene.Lod", lod.LodValue);
+                return Content.Name;
+            }
+        }
         [ObservableProperty] bool _isSelected;
         [ObservableProperty] bool _isReference;
 
@@ -28,7 +46,11 @@ namespace KitbasherEditor.Views
         {
             Content = content;
             _isReference = isReference;
+            if (content is INotifyPropertyChanged observable)
+                PropertyChangedEventManager.AddHandler(observable, OnContentNameChanged, nameof(ISceneNode.Name));
         }
+
+        private void OnContentNameChanged(object? sender, PropertyChangedEventArgs e) => OnPropertyChanged(nameof(DisplayName));
     }
 
     public class MultiSelectTreeView : TreeView, IDisposable

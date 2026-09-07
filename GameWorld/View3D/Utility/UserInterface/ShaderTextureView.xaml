@@ -12,6 +12,7 @@
              FontWeight="{DynamicResource AppFontWeight}"
              d:DesignHeight="40" d:DesignWidth="800">
     <UserControl.Resources>
+        <local:TextureFileNameConverter x:Key="TextureFileNameConverter" />
         <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Icon}" />
         <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}" />
         <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource AeInput.CheckBox}" />
@@ -41,14 +42,32 @@
     </UserControl.Resources>
     <DockPanel>
         <CheckBox Margin="2,0,2,0"  IsChecked="{Binding ShouldRenderTexture, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}"/>
-        <Button Content="{materialIcons:MaterialIconExt Kind=Delete}" Margin="1" Command="{Binding HandleClearTextureCommand}" DockPanel.Dock="Right" ToolTip="{loc:Loc ShaderTexture.RemoveTexture}"/>
-        <Button Content="{materialIcons:MaterialIconExt Kind=Folder}" Margin="1" Command="{Binding HandleBrowseTextureCommand}" DockPanel.Dock="Right" ToolTip="{loc:Loc ShaderTexture.BrowseFile}" />
-        <Button Content="{materialIcons:MaterialIconExt Kind=Eye}" Margin="1" Command="{Binding HandlePreviewTextureCommand}" DockPanel.Dock="Right" ToolTip="{loc:Loc ShaderTexture.PreviewTexture}"/>
-        <TextBox Margin="2,2,2,2" Text="{Binding Path, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center">
+        <Button Margin="1" Command="{Binding HandleClearTextureCommand}" DockPanel.Dock="Right"
+                ToolTip="{loc:Loc ShaderTexture.RemoveTexture}" AutomationProperties.Name="{loc:Loc ShaderTexture.RemoveTexture}">
+            <materialIcons:MaterialIcon Kind="DeleteOutline" Width="16" Height="16"
+                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </Button>
+        <Button Margin="1" Command="{Binding HandleBrowseTextureCommand}" DockPanel.Dock="Right"
+                ToolTip="{loc:Loc ShaderTexture.BrowseFile}" AutomationProperties.Name="{loc:Loc ShaderTexture.BrowseFile}">
+            <materialIcons:MaterialIcon Kind="FolderOutline" Width="16" Height="16"
+                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </Button>
+        <Button Margin="1" Command="{Binding HandlePreviewTextureCommand}" DockPanel.Dock="Right"
+                ToolTip="{loc:Loc ShaderTexture.PreviewTexture}" AutomationProperties.Name="{loc:Loc ShaderTexture.PreviewTexture}">
+            <materialIcons:MaterialIcon Kind="EyeOutline" Width="16" Height="16"
+                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </Button>
+        <Grid Margin="2">
+        <TextBox x:Name="PathEditor" Text="{Binding Path, UpdateSourceTrigger=LostFocus, Mode=TwoWay}" VerticalContentAlignment="Center"
+                 AutomationProperties.Name="{loc:Loc ShaderTexture.Path}">
             <TextBox.Style>
                 <Style TargetType="TextBox" BasedOn="{StaticResource AeInput.TextBox}">
                     <Setter Property="Validation.ErrorTemplate" Value="{StaticResource ValidationErrorTemplate}"/>
+                    <Setter Property="ToolTip" Value="{Binding Path}" />
                     <Style.Triggers>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="False">
+                            <Setter Property="Foreground" Value="Transparent" />
+                        </Trigger>
                         <Trigger Property="Validation.HasError" Value="true">
                             <Setter Property="ToolTip" Value="{Binding (Validation.Errors)[0].ErrorContent, RelativeSource={RelativeSource Self}}"/>
                         </Trigger>
@@ -56,5 +75,25 @@
                 </Style>
             </TextBox.Style>
         </TextBox>
+        <TextBlock x:Name="PathFileName" Margin="8,0" VerticalAlignment="Center"
+                   Foreground="{DynamicResource AeBrush.TextPrimary}" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
+            <TextBlock.Text>
+                <MultiBinding Converter="{StaticResource TextureFileNameConverter}" Mode="OneWay">
+                    <Binding Path="FileName" />
+                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource Self}" />
+                    <Binding RelativeSource="{RelativeSource Self}" />
+                </MultiBinding>
+            </TextBlock.Text>
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=PathEditor}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        </Grid>
     </DockPanel>
 </UserControl>

@@ -21,6 +21,7 @@ public class UiModelKitbashFamilyTests
     [
         "Editors/Kitbashing/KitbasherEditor/ChildEditors/BmiEditor/BmiView.xaml",
         "Editors/Kitbashing/KitbasherEditor/ChildEditors/MeshFitter/MeshFitterWindow.xaml",
+        "Editors/Kitbashing/KitbasherEditor/ChildEditors/MaterialSelection/MaterialSourceWindow.xaml",
         "Editors/Kitbashing/KitbasherEditor/ChildEditors/PhotoStudio/PhotoStudioWindow.xaml",
         "Editors/Kitbashing/KitbasherEditor/ChildEditors/PinTool/Presentation/PinToolWindow.xaml",
         "Editors/Kitbashing/KitbasherEditor/ChildEditors/ReRiggingTool/ReRiggingWindow.xaml",
@@ -67,7 +68,7 @@ public class UiModelKitbashFamilyTests
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(sources.Count, Is.EqualTo(30));
+            NUnitAssert.That(sources.Count, Is.EqualTo(ProductXamlPaths.Length));
             NUnitAssert.That(combined, Does.Contain("AeBrush."));
             NUnitAssert.That(combined, Does.Contain("AppFontFamily"));
             NUnitAssert.That(combined, Does.Contain("AppFontWeight"));
@@ -272,7 +273,7 @@ public class UiModelKitbashFamilyTests
                         NUnitAssert.That(
                             window.SizeToContent,
                             Is.EqualTo(SizeToContent.Height));
-                        NUnitAssert.That(window.Width, Is.EqualTo(474));
+                        NUnitAssert.That(window.Width, Is.EqualTo(560));
                         NUnitAssert.That(source, Does.Not.Contain("DllImport"));
                         NUnitAssert.That(
                             source,
@@ -380,6 +381,13 @@ public class UiModelKitbashFamilyTests
             Environment.NewLine,
             kitbasherView,
             menuBarView);
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var glyphStyle = XDocument.Parse(styles).Descendants()
+            .Single(element => (string?)element.Attribute(xaml + "Key") == "Kitbash.ToolbarGlyph");
+        var glyphSize = glyphStyle.Elements()
+            .Where(element => element.Name.LocalName == "Setter")
+            .ToDictionary(element => (string)element.Attribute("Property")!,
+                element => (string?)element.Attribute("Value"));
 
         NUnitAssert.Multiple(() =>
         {
@@ -405,10 +413,12 @@ public class UiModelKitbashFamilyTests
             NUnitAssert.That(menuBarView, Does.Not.Contain("Content=\"▾\""));
             NUnitAssert.That(
                 kitbasherView,
-                Does.Contain("<ColumnDefinition Width=\"34\"/>"));
+                Does.Not.Contain("<ColumnDefinition Width=\"34\"/>"));
             NUnitAssert.That(
                 combinedViews,
-                Does.Contain("Height=\"20\" Width=\"20\""));
+                Does.Contain("Style=\"{StaticResource Kitbash.ToolbarGlyph}\""));
+            NUnitAssert.That(glyphSize["Width"], Is.EqualTo("20"));
+            NUnitAssert.That(glyphSize["Height"], Is.EqualTo("20"));
             NUnitAssert.That(
                 sceneNodeEditor,
                 Does.Contain(
@@ -816,7 +826,7 @@ public class UiModelKitbashFamilyTests
                     var window = new Window
                     {
                         Content = view,
-                        Width = 640,
+                        Width = 400,
                         Height = 720,
                         ShowActivated = false,
                         ShowInTaskbar = false,
@@ -853,8 +863,8 @@ public class UiModelKitbashFamilyTests
                         NUnitAssert.Multiple(() =>
                         {
                             NUnitAssert.That(selector.ShowLabel, Is.True);
-                            NUnitAssert.That(selector.LabelTotalWidth,
-                                Is.EqualTo(150));
+                            NUnitAssert.That(selectedFileName.ActualWidth,
+                                Is.GreaterThanOrEqualTo(160));
                             NUnitAssert.That(visibleLabels,
                                 Has.Length.EqualTo(1));
                             NUnitAssert.That(selectorLabel.Visibility,

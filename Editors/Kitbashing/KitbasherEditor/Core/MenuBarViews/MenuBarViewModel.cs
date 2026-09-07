@@ -10,12 +10,15 @@ using Editors.KitbasherEditor.ChildEditors.VertexDebugger;
 using Editors.KitbasherEditor.Core.MenuBarViews;
 using Editors.KitbasherEditor.UiCommands;
 using GameWorld.Core.Components.Rendering;
+using GameWorld.Core.Components;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using KitbasherEditor.ViewModels.MenuBarViews.Helpers;
 using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.Misc;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.EmbeddedResources;
 using Shared.Ui.Common.MenuSystem;
 
@@ -35,14 +38,20 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         public ViewportShadingViewModel ViewportShading { get; set; }
         public Editors.KitbasherEditor.Components.KitbashSelectionSettings SelectionSettings { get; }
         public NotifyAttr<bool> CanUseMeshSelectionTools { get; } = new(false);
+        public NotifyAttr<System.Windows.Media.Color> ViewportBackground { get; } = new(default);
 
         private readonly IUiCommandFactory _uiCommandFactory;
+        private readonly SelectionManager _selectionManager;
+        private readonly ViewOnlySelectedService? _isolation;
+        private ToolbarItem? _groupMenuItem;
+        private ToolbarItem? _isolateMenuItem;
         private readonly CommandExecutor _commandExecutor;
         private readonly MenuItemVisibilityRuleEngine _menuItemVisibilityRuleEngine;
         private readonly ActionHotkeyHandler _hotKeyHandler = new ActionHotkeyHandler();
         private readonly WindowKeyboard _keyboard;
         private readonly IWpfGame _scene;
         private readonly Editors.KitbasherEditor.Components.KitbashSceneComponentSet _components;
+        private readonly FpsComponent? _viewportStatistics;
         private readonly Dictionary<Type, MenuAction> _uiCommands = new();
 
         public MenuBarViewModel(
@@ -56,20 +65,29 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             RenderEngineComponent renderEngine,
             IWpfGame scene,
             Editors.KitbasherEditor.Components.KitbashSceneComponentSet components = null,
-            SceneRenderParametersStore sceneLighting = null)
+            SceneRenderParametersStore sceneLighting = null,
+            FpsComponent? viewportStatistics = null,
+            ApplicationSettingsService? applicationSettings = null,
+            ViewOnlySelectedService? isolation = null)
         {
             _commandExecutor = commandExecutor;
+            _selectionManager = selectionManager;
+            _isolation = isolation;
             _menuItemVisibilityRuleEngine = menuItemVisibilityRuleEngine;
             _uiCommandFactory = uiCommandFactory;
             _keyboard = windowKeyboard;
             _scene = scene;
             _components = components;
+            _viewportStatistics = viewportStatistics;
+            if (_viewportStatistics != null)
+                _viewportStatistics.Visible = false;
             SelectionSettings = components?.SelectionSettings ?? new();
             CanUseMeshSelectionTools.Value = selectionManager.GetState().Mode is
                 GeometrySelectionMode.Vertex or GeometrySelectionMode.Edge or GeometrySelectionMode.Face;
             TransformTool = transformToolViewModel;
             ProportionalEditing = new ProportionalEditingViewModel(selectionManager, eventHub);
             ViewportShading = new ViewportShadingViewModel(renderEngine, sceneLighting);
+            UpdateViewportBackground(ViewportRenderSettings.From(applicationSettings?.CurrentSettings ?? new ApplicationSettings()));
 
             RegisterActions();
             RegisterHotkeys();
@@ -77,11 +95,28 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             SidebarButtons = CreateSidebarButtons();
             SelectionSettings.PropertyChanged += OnSelectionToolChanged;
             MenuItems = CreateToolbarMenu();
+            RefreshActionStates();
+            UpdateUndoRedoActions();
 
             eventHub.Register<CommandStackChangedEvent>(this, OnUndoStackChanged);
             eventHub.Register<CommandStackUndoEvent>(this, OnUndoStackChanged);
             eventHub.Register<SelectionChangedEvent>(this, OnSelectionChanged);
+            eventHub.Register<ViewportRenderSettingsChangedEvent>(this, changed => UpdateViewportBackground(changed.Settings));
 
+        }
+
+        public void SetStatisticsPosition(float x, float y)
+        {
+            if (_viewportStatistics != null)
+                _viewportStatistics.OverlayPosition = new Microsoft.Xna.Framework.Vector2(x, y);
+        }
+
+        private void UpdateViewportBackground(ViewportRenderSettings settings)
+        {
+            var color = settings.BackgroundColour == BackgroundColour.Custom
+                ? ApplicationSettingsHelper.ParseCustomBackgroundColour(settings.CustomBackgroundColour)
+                : ApplicationSettingsHelper.GetEnumAsColour(settings.BackgroundColour);
+            ViewportBackground.Value = System.Windows.Media.Color.FromRgb(color.R, color.G, color.B);
         }
 
         void RegisterActions()
@@ -156,8 +191,28 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 #endif
 
             var toolsToolbar = builder.CreateRootToolBar(LocalizationManager.Instance.Get("Kitbash.Menu.Tools"));
-            builder.CreateToolBarItem<GroupItemsCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.GroupSelection"));
-            builder.CreateToolBarItem<ReduceMeshCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.ReduceMesh"));
+            var meshToolbar = new ToolbarItem { Name = LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Mesh") };
+            toolsToolbar.Children.Add(meshToolbar);
+            builder.CreateToolBarItem<DivideSubMeshCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Split"));
+            builder.CreateToolBarItem<MergeObjectsCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Merge"));
+            builder.CreateToolBarItem<DuplicateObjectCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Duplicate"));
+            builder.CreateToolBarItem<DeleteObjectCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Delete"));
+            builder.CreateToolBarItem<CreateStaticMeshCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.StaticMesh"));
+            builder.CreateToolBarItem<ReduceMeshCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.ReduceMesh"));
+            builder.CreateToolBarItem<AssignMaterialFromOtherMeshUiCommand>(meshToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.CopyMaterial"));
+            var skeletonToolbar = new ToolbarItem { Name = LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Skeleton") };
+            toolsToolbar.Children.Add(skeletonToolbar);
+            builder.CreateToolBarItem<OpenSkeletonReshaperToolCommand>(skeletonToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.MeshFitter"));
+            builder.CreateToolBarItem<OpenReriggingToolCommand>(skeletonToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Rerig"));
+            builder.CreateToolBarItem<OpenPinToolCommand>(skeletonToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Pin"));
+            var selectionToolbar = new ToolbarItem { Name = LocalizationManager.Instance.Get("Kitbash.Menu.Tools.Selection") };
+            toolsToolbar.Children.Add(selectionToolbar);
+            builder.CreateToolBarItem<ConvertFaceToVertexCommand>(selectionToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.FaceToVertex"));
+            builder.CreateToolBarItem<ExpandFaceSelectionCommand>(selectionToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.ExpandSelection"));
+            builder.CreateToolBarItem<OpenVertexDebuggerCommand>(selectionToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.VertexDetails"));
+            builder.CreateToolBarSeparator(toolsToolbar);
+            _groupMenuItem = new ToolbarItem { Name = LocalizationManager.Instance.Get("Kitbash.Menu.Tools.GroupSelection"), Action = GetMenuAction<GroupItemsCommand>() };
+            toolsToolbar.Children.Add(_groupMenuItem);
             builder.CreateToolBarItem<SortMeshesCommand>(toolsToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Tools.SortModels"));
             var primitiveToolbar = new ToolbarItem
             {
@@ -181,8 +236,24 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
                 renderingToolbar,
                 LocalizationManager.Instance.Get(
                     "Kitbash.Menu.Rendering.PhotoStudio"));
-
-
+            _isolateMenuItem = new ToolbarItem { Name = LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.Isolate"), Action = GetMenuAction<ToggleViewSelectedCommand>() };
+            renderingToolbar.Children.Add(_isolateMenuItem);
+            if (_viewportStatistics != null)
+            {
+                var statisticsItem = new ToolbarItem { Name = LocalizationManager.Instance.Get("Kitbash.Menu.Rendering.ShowStatistics") };
+                statisticsItem.Action = new MenuAction
+                {
+                    ActionTriggeredCallback = () =>
+                    {
+                        _viewportStatistics.Visible = !_viewportStatistics.Visible;
+                        statisticsItem.Name = LocalizationManager.Instance.Get(_viewportStatistics.Visible
+                            ? "Kitbash.Menu.Rendering.HideStatistics" : "Kitbash.Menu.Rendering.ShowStatistics");
+                    }
+                };
+                renderingToolbar.Children.Add(statisticsItem);
+            }
+            var helpToolbar = builder.CreateRootToolBar(LocalizationManager.Instance.Get("Kitbash.Menu.Help"));
+            builder.CreateToolBarItem<OpenBlenderShortcutsHelpCommand>(helpToolbar, LocalizationManager.Instance.Get("Kitbash.Menu.Help.Shortcuts"));
             return builder.Build();
         }
 
@@ -191,8 +262,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             var builder = new ButtonBuilder(_uiCommands);
 
             // General
-            builder.CreateButton<SaveCommand>(IconLibrary.SaveFileIcon);
-            builder.CreateButton<BrowseForReferenceCommand>(IconLibrary.OpenReferenceMeshIcon);
+            builder.CreateButton<SaveCommand>(IconLibrary.SaveFileIcon, label: LocalizationManager.Instance.Get("Kitbash.Menu.File.Save"));
+            builder.CreateButton<BrowseForReferenceCommand>(IconLibrary.OpenReferenceMeshIcon, label: LocalizationManager.Instance.Get("Kitbash.Toolbar.ImportReference"));
             builder.CreateButton<UndoCommand>(IconLibrary.UndoIcon);
             builder.CreateButton<RedoCommand>(IconLibrary.RedoIcon);
             builder.CreateButtonSeparator();
@@ -211,9 +282,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             builder.CreateButton<OpenReriggingToolCommand>(IconLibrary.ReRiggingIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<OpenPinToolCommand>(IconLibrary.PinIcon, ButtonVisibilityRule.ObjectMode);
             builder.CreateButton<AssignMaterialFromOtherMeshUiCommand>(IconLibrary.AssignTextureFromOtherIcon, ButtonVisibilityRule.ObjectMode);
-            builder.CreateButton<OpenPhotoStudioCommand>(
-                IconLibrary.CameraTool,
-                ButtonVisibilityRule.Always);
+            builder.CreateButton<OpenPhotoStudioCommand>(IconLibrary.CameraTool);
 
             // Face buttons
             builder.CreateButton<ConvertFaceToVertexCommand>(IconLibrary.FaceToVertexIcon, ButtonVisibilityRule.FaceMode);
@@ -352,6 +421,26 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             else
                 throw new NotImplementedException("Unknown state");
 
+            RefreshActionStates();
+        }
+
+        public void RefreshMenuLabels()
+        {
+            var parents = _selectionManager.GetState().SelectedObjects().Select(node => node.Parent).Distinct().ToList();
+            var canUngroup = parents.Count == 1 && parents[0] is GameWorld.Core.SceneNodes.GroupNode { IsUngroupable: true };
+            if (_groupMenuItem != null)
+                _groupMenuItem.Name = LocalizationManager.Instance.Get(canUngroup
+                    ? "Kitbash.Menu.Tools.UngroupSelection" : "Kitbash.Menu.Tools.GroupSelection");
+            GetMenuAction<GroupItemsCommand>().ToolTip = _groupMenuItem?.Name ?? "";
+            if (_isolateMenuItem != null)
+                _isolateMenuItem.Name = LocalizationManager.Instance.Get(_isolation?.IsActive == true
+                    ? "Kitbash.Menu.Rendering.RestoreVisibility" : "Kitbash.Menu.Rendering.Isolate");
+            GetMenuAction<ToggleViewSelectedCommand>().ToolTip = _isolateMenuItem?.Name ?? "";
+        }
+
+        private void RefreshActionStates()
+        {
+            RefreshMenuLabels();
             // Validate if tool button is visible
             foreach (var button in CustomButtons)
                 _menuItemVisibilityRuleEngine.Validate(button);
