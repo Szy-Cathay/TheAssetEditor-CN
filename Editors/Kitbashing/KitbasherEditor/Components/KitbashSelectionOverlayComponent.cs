@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Rendering;
@@ -33,8 +34,8 @@ namespace Editors.KitbasherEditor.Components
         private static readonly Vector3 ActiveColour = Vector3.One;
 
         private const float WireHalfWidth = 0.75f;
-        private const float SelectedEdgeHalfWidth = 2.0f;
-        private const float ActiveEdgeHalfWidth = 2.25f;
+        private const float SelectedEdgeHalfWidth = 1.0f;
+        private const float ActiveEdgeHalfWidth = 1.25f;
         private const float WireDepthBias = 0.00002f;
         private const float SelectedEdgeDepthBias = 0.00004f;
         private const float ActiveEdgeDepthBias = 0.00006f;
@@ -48,9 +49,14 @@ namespace Editors.KitbasherEditor.Components
         private readonly RenderEngineComponent _renderEngine;
         private readonly IScopedResourceLibrary _resourceLibrary;
         private readonly IDeviceResolver _deviceResolver;
+        private readonly KitbashSelectionSettings _settings;
         private readonly HashSet<Rmv2MeshNode> _outlinedMeshes = [];
 
         private VertexInstanceMesh? _vertexRenderer;
+        private VertexRenderItem? _faceDots;
+        private Vector3[] _faceCenters = [];
+        private VertexSelectionState? _faceDotSelection;
+        private (MeshObject? Mesh, int Vertices, int Topology, Matrix World) _faceDotVersion;
         private EdgeQuadInstanceMesh? _edgeQuadRenderer;
         private EdgeQuadRenderItem? _edgeQuadRenderItem;
         private VertexRenderItem? _vertexRenderItem;
@@ -66,6 +72,12 @@ namespace Editors.KitbasherEditor.Components
             _faceSelectionRenderItem;
         private AnimatedSelectionRenderItem?
             _activeFaceSelectionRenderItem;
+        private readonly List<int> _selectedFillFaces = [];
+        private readonly HashSet<(int v0, int v1)> _selectedFaceEdges = [];
+        private readonly List<(int v0, int v1)> _activeFaceEdges = [];
+        private (ISelectionState? Selection, MeshObject? Geometry, ushort[]? Indices, int Topology)
+            _faceOverlayVersion;
+        private bool _faceOverlayDirty = true;
 
         private (int v0, int v1)[] _cachedEdgeIndices = [];
         private Rmv2MeshNode? _cachedEdgeMesh;
@@ -90,12 +102,14 @@ namespace Editors.KitbasherEditor.Components
             SelectionManager selectionManager,
             RenderEngineComponent renderEngine,
             IScopedResourceLibrary resourceLibrary,
-            IDeviceResolver deviceResolver)
+            IDeviceResolver deviceResolver,
+            KitbashSelectionSettings? settings = null)
         {
             _selectionManager = selectionManager;
             _renderEngine = renderEngine;
             _resourceLibrary = resourceLibrary;
             _deviceResolver = deviceResolver;
+            _settings = settings ?? new();
             _selectionManager.SelectionChanged +=
                 SelectionManager_SelectionChanged;
         }
@@ -106,7 +120,8 @@ namespace Editors.KitbasherEditor.Components
                 _deviceResolver,
                 _resourceLibrary)
             {
-                SelectedColour = SelectedVertexColour
+                SelectedColour = SelectedVertexColour,
+                FadeSelectedWithDensity = false
             };
             _edgeQuadRenderer = new EdgeQuadInstanceMesh(
                 _deviceResolver,
@@ -126,6 +141,16 @@ namespace Editors.KitbasherEditor.Components
         public override void Draw(GameTime gameTime)
         {
             var selectionState = _selectionManager.GetState();
+            var xray = _settings.IsXRay && selectionState.Mode is
+                GeometrySelectionMode.Vertex or GeometrySelectionMode.Edge or GeometrySelectionMode.Face;
+            var objectSelection = selectionState.Mode == GeometrySelectionMode.Object;
+            if (_renderEngine.ShadingSettings.XRay != xray ||
+                _renderEngine.ShadingSettings.WireframeObjectSelection != objectSelection)
+                _renderEngine.ShadingSettings = _renderEngine.ShadingSettings with
+                {
+                    XRay = xray,
+                    WireframeObjectSelection = objectSelection
+                };
 
             DrawSelectionOutline(selectionState);
             DrawFaceSelection(selectionState);
@@ -135,6 +160,11 @@ namespace Editors.KitbasherEditor.Components
             base.Draw(gameTime);
         }
 
+        private void AddOverlayItem(RenderBuckedId bucket, IRenderItem item)
+        {
+            _renderEngine.AddRenderItem(_settings.IsXRay ? RenderBuckedId.Selection : bucket,
+                _settings.IsXRay ? new OcclusionOverlayRenderItem(item) : item);
+        }
         private void DrawSelectionOutline(
             ISelectionState selectionState)
         {
@@ -161,7 +191,7 @@ namespace Editors.KitbasherEditor.Components
             }
 
             if (_outlinedMeshes.Count > 0)
-                _renderEngine.RequestSelectionOutline();
+            _renderEngine.RequestSelectionOutline();
         }
 
         private void ClearSelectionOutline()
@@ -174,33 +204,144 @@ namespace Editors.KitbasherEditor.Components
         private void DrawFaceSelection(
             ISelectionState selectionState)
         {
-            if (selectionState is not
-                    FaceSelectionState faceSelection ||
-                faceSelection.RenderObject is not
+            if (selectionState.Mode is not (GeometrySelectionMode.Vertex or
+                    GeometrySelectionMode.Edge or GeometrySelectionMode.Face) ||
+                selectionState.GetSingleSelectedObject() is not
                     Rmv2MeshNode meshNode)
             {
                 return;
             }
 
             var pose = MeshPoseSnapshot.Capture(meshNode);
-            _renderEngine.AddRenderItem(
-                RenderBuckedId.Selection,
-                GetFaceSelectionRenderItem(
-                    pose,
-                    faceSelection.SelectedFaces));
+            UpdateFaceOverlaySelection(selectionState, pose.Geometry);
+            if (_selectedFillFaces.Count > 0)
+            {
+                AddOverlayItem(
+                    RenderBuckedId.Selection,
+                    GetFaceSelectionRenderItem(pose, _selectedFillFaces));
+            }
+            if (selectionState is not FaceSelectionState faceSelection)
+                return;
+
             if (faceSelection.ActiveFace is { } activeFace &&
                 faceSelection.SelectedFaces.Contains(activeFace))
             {
-                _renderEngine.AddRenderItem(
+                AddOverlayItem(
                     RenderBuckedId.Selection,
                     GetActiveFaceSelectionRenderItem(
                         pose,
                         activeFace));
             }
 
-            _renderEngine.AddRenderItem(
+            AddOverlayItem(
                 RenderBuckedId.Wireframe,
                 GetWireframeRenderItem(meshNode, pose));
+            if (_selectedFaceEdges.Count > 0)
+            {
+                AddOverlayItem(RenderBuckedId.Selection,
+                    GetSelectedEdgeWireframeRenderItem(meshNode, pose, _selectedFaceEdges));
+            }
+            if (_activeFaceEdges.Count > 0)
+            {
+                AddOverlayItem(RenderBuckedId.Selection,
+                    GetActiveEdgeWireframeRenderItem(meshNode, pose, _activeFaceEdges));
+            }
+            if (_settings.IsXRay || _renderEngine.ShadingMode == ViewportShadingMode.Wireframe)
+                DrawFaceCenters(meshNode, pose, faceSelection);
+        }
+
+        private void UpdateFaceOverlaySelection(ISelectionState selectionState, MeshObject geometry)
+        {
+            var version = (selectionState, geometry, geometry.IndexArray, geometry.TopologyVersion);
+            if (!_faceOverlayDirty && _faceOverlayVersion == version)
+                return;
+
+            _faceOverlayDirty = false;
+            _faceOverlayVersion = version;
+            _selectedFillFaces.Clear();
+            _selectedFaceEdges.Clear();
+            _activeFaceEdges.Clear();
+            var indices = geometry.IndexArray;
+            if (selectionState is FaceSelectionState faces)
+            {
+                foreach (var face in faces.SelectedFaces)
+                {
+                    if (face < 0 || face + 2 >= indices.Length)
+                        continue;
+                    _selectedFillFaces.Add(face);
+                    var first = OrderedEdge(indices[face], indices[face + 1]);
+                    var second = OrderedEdge(indices[face + 1], indices[face + 2]);
+                    var third = OrderedEdge(indices[face + 2], indices[face]);
+                    _selectedFaceEdges.Add(first);
+                    _selectedFaceEdges.Add(second);
+                    _selectedFaceEdges.Add(third);
+                    if (faces.ActiveFace == face)
+                    {
+                        _activeFaceEdges.Add(first);
+                        _activeFaceEdges.Add(second);
+                        _activeFaceEdges.Add(third);
+                    }
+                }
+                _selectedFillFaces.Sort();
+                _selectedEdgeDataDirty = true;
+                _activeEdgeDataDirty = true;
+                return;
+            }
+
+            var selectedVertices = (selectionState as VertexSelectionState)?.SelectedVertices.ToHashSet();
+            var selectedEdges = (selectionState as EdgeSelectionState)?.SelectedEdges;
+            for (var face = 0; face + 2 < indices.Length; face += 3)
+            {
+                var first = indices[face];
+                var second = indices[face + 1];
+                var third = indices[face + 2];
+                var complete = selectedVertices != null
+                    ? selectedVertices.Contains(first) && selectedVertices.Contains(second) &&
+                        selectedVertices.Contains(third)
+                    : selectedEdges != null && selectedEdges.Contains(OrderedEdge(first, second)) &&
+                        selectedEdges.Contains(OrderedEdge(second, third)) &&
+                        selectedEdges.Contains(OrderedEdge(third, first));
+                if (complete)
+                    _selectedFillFaces.Add(face);
+            }
+        }
+
+        private static (int v0, int v1) OrderedEdge(int first, int second)
+        {
+            return first < second ? (first, second) : (second, first);
+        }
+
+        private void DrawFaceCenters(Rmv2MeshNode mesh, MeshPoseSnapshot pose, FaceSelectionState faces)
+        {
+            _faceDots ??= new VertexRenderItem { VertexRenderer = _vertexRenderer, PointSizeScale = 0.45f };
+            var geometry = mesh.Geometry;
+            var version = (geometry, geometry.VertexDataVersion, geometry.TopologyVersion, pose.WorldTransform);
+            if (_faceDotVersion != version || pose.ApplyAnimation)
+            {
+                _faceDotVersion = version;
+                var positions = pose.GetWorldPositions();
+                var indices = geometry.IndexArray;
+                if (_faceCenters.Length != indices.Length / 3) _faceCenters = new Vector3[indices.Length / 3];
+                for (var i = 0; i < _faceCenters.Length; i++)
+                    _faceCenters[i] = (positions[indices[i * 3]] + positions[indices[i * 3 + 1]] + positions[indices[i * 3 + 2]]) / 3;
+                _faceDots.WorldPositions = _faceCenters;
+                _faceDots.MarkDirty();
+            }
+            var selected = faces.SelectedFaces.Select(face => face / 3).ToList();
+            if (_faceDotSelection?.RenderObject != mesh || _faceDotSelection.VertexWeights.Count != _faceCenters.Length ||
+                !_faceDotSelection.SelectedVertices.SequenceEqual(selected) || _faceDotSelection.ActiveVertex != faces.ActiveFace / 3)
+            {
+                _faceDotSelection = new VertexSelectionState(mesh, 0)
+                {
+                    SelectedVertices = selected,
+                    ActiveVertex = faces.ActiveFace / 3,
+                    VertexWeights = Enumerable.Repeat(0f, _faceCenters.Length).ToList()
+                };
+                foreach (var index in selected)
+                    if (index >= 0 && index < _faceCenters.Length) _faceDotSelection.VertexWeights[index] = 1;
+                _faceDots.SelectedVertices = _faceDotSelection;
+            }
+            AddOverlayItem(RenderBuckedId.Selection, _faceDots);
         }
 
         private void DrawVertexSelection(
@@ -221,7 +362,7 @@ namespace Editors.KitbasherEditor.Components
             if (pose.ApplyAnimation)
             {
                 _edgeDataDirty = true;
-                _renderEngine.AddRenderItem(
+                AddOverlayItem(
                     RenderBuckedId.Wireframe,
                     GetWireframeRenderItem(
                         meshNode,
@@ -232,8 +373,8 @@ namespace Editors.KitbasherEditor.Components
                 _vertexRenderItem.WorldPositions = null;
                 _vertexRenderItem.SelectedVertices =
                     vertexSelection;
-                _renderEngine.AddRenderItem(
-                    RenderBuckedId.Normal,
+                AddOverlayItem(
+                    RenderBuckedId.Selection,
                     _vertexRenderItem);
                 return;
             }
@@ -242,7 +383,7 @@ namespace Editors.KitbasherEditor.Components
                 meshNode,
                 pose,
                 vertexSelection);
-            _renderEngine.AddRenderItem(
+            AddOverlayItem(
                 RenderBuckedId.Normal,
                 _edgeQuadRenderItem);
             _vertexRenderItem.Node = meshNode;
@@ -252,8 +393,8 @@ namespace Editors.KitbasherEditor.Components
                 _cachedVertexWorldPositions;
             _vertexRenderItem.SelectedVertices =
                 vertexSelection;
-            _renderEngine.AddRenderItem(
-                RenderBuckedId.Normal,
+            AddOverlayItem(
+                RenderBuckedId.Selection,
                 _vertexRenderItem);
         }
 
@@ -329,6 +470,7 @@ namespace Editors.KitbasherEditor.Components
 
             pose.FillWorldPositions(_cachedVertexWorldPositions);
             _vertexRenderItem?.MarkDirty();
+            _faceDots?.MarkDirty();
             FillEdgeData(
                 _edgeDataCache,
                 _cachedVertexWorldPositions,
@@ -425,13 +567,13 @@ namespace Editors.KitbasherEditor.Components
             }
 
             var pose = MeshPoseSnapshot.Capture(meshNode);
-            _renderEngine.AddRenderItem(
+            AddOverlayItem(
                 RenderBuckedId.Wireframe,
                 GetWireframeRenderItem(meshNode, pose));
 
             if (edgeSelection.SelectedEdges.Count > 0)
             {
-                _renderEngine.AddRenderItem(
+                AddOverlayItem(
                     RenderBuckedId.Selection,
                     GetSelectedEdgeWireframeRenderItem(
                         meshNode,
@@ -442,12 +584,12 @@ namespace Editors.KitbasherEditor.Components
             if (edgeSelection.ActiveEdge is { } activeEdge &&
                 edgeSelection.SelectedEdges.Contains(activeEdge))
             {
-                _renderEngine.AddRenderItem(
+                AddOverlayItem(
                     RenderBuckedId.Selection,
                     GetActiveEdgeWireframeRenderItem(
                         meshNode,
                         pose,
-                        activeEdge));
+                        [activeEdge]));
             }
         }
 
@@ -514,6 +656,7 @@ namespace Editors.KitbasherEditor.Components
                         0)
                     {
                         DepthBias = SelectedEdgeDepthBias,
+                        IsSelectionOverlay = true,
                         EdgeHalfWidth = SelectedEdgeHalfWidth
                     };
                 _selectedEdgeDataDirty = true;
@@ -537,7 +680,7 @@ namespace Editors.KitbasherEditor.Components
             GetActiveEdgeWireframeRenderItem(
                 Rmv2MeshNode meshNode,
                 MeshPoseSnapshot pose,
-                (int v0, int v1) activeEdge)
+                IEnumerable<(int v0, int v1)> activeEdges)
         {
             if (_activeEdgeWireframeRenderItem == null ||
                 _activeEdgeWireframeMesh != meshNode)
@@ -552,6 +695,7 @@ namespace Editors.KitbasherEditor.Components
                         0)
                     {
                         DepthBias = ActiveEdgeDepthBias,
+                        IsSelectionOverlay = true,
                         EdgeHalfWidth = ActiveEdgeHalfWidth
                     };
                 _activeEdgeDataDirty = true;
@@ -564,7 +708,7 @@ namespace Editors.KitbasherEditor.Components
             if (_activeEdgeDataDirty)
             {
                 _activeEdgeWireframeRenderItem.UpdateEdges(
-                    [activeEdge]);
+                    activeEdges);
                 _activeEdgeDataDirty = false;
             }
 
@@ -587,7 +731,8 @@ namespace Editors.KitbasherEditor.Components
                             SelectedFaceOpacity),
                         selectedFaces)
                     {
-                        DepthBias = SelectedFaceDepthBias
+                        DepthBias = SelectedFaceDepthBias,
+                        FadeWithDensity = false
                     };
             }
             else
@@ -616,7 +761,8 @@ namespace Editors.KitbasherEditor.Components
                             ActiveFaceOpacity),
                         [activeFace])
                     {
-                        DepthBias = ActiveFaceDepthBias
+                        DepthBias = ActiveFaceDepthBias,
+                        FadeWithDensity = false
                     };
             }
             else
@@ -637,7 +783,9 @@ namespace Editors.KitbasherEditor.Components
             _selectedEdgeDataDirty = true;
             _activeEdgeDataDirty = true;
             _vertexWireframeSelectionDirty = true;
+            _faceOverlayDirty = true;
             _vertexRenderItem?.MarkDirty();
+            _faceDots?.MarkDirty();
         }
 
         private void ResetEdgeCache()

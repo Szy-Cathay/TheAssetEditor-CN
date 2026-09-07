@@ -1,4 +1,4 @@
-using GameWorld.Core.Services;
+﻿using GameWorld.Core.Services;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
@@ -151,7 +151,7 @@ namespace GameWorld.Core.Rendering
                 SetDataOptions.Discard);
         }
 
-        public void Draw(Matrix view, Matrix projection, float viewportHeight, float viewportWidth, GraphicsDevice device)
+        public void Draw(Matrix view, Matrix projection, float viewportHeight, float viewportWidth, GraphicsDevice device, float opacity = 1)
         {
             if (_currentInstanceCount == 0)
                 return;
@@ -160,7 +160,7 @@ namespace GameWorld.Core.Rendering
             _effect.Parameters["ViewProjection"].SetValue(view * projection);
             _effect.Parameters["ViewportHeight"].SetValue(viewportHeight);
             _effect.Parameters["ViewportWidth"].SetValue(viewportWidth);
-            _effect.Parameters["BaseOpacity"].SetValue(1.0f);
+            _effect.Parameters["BaseOpacity"].SetValue(opacity);
             _effect.Parameters["EdgeDepthBias"].SetValue(0.0f);
             _effect.Parameters["OverlayOpacity"].SetValue(
                 EditOverlayVisibility.CalculateDetailOpacity(

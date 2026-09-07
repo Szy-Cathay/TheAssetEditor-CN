@@ -1,4 +1,4 @@
-using GameWorld.Core.Rendering;
+﻿using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Materials.Capabilities;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
@@ -8,7 +8,7 @@ using Test.TestingUtility.Shared;
 namespace GameWorld.Core.Test.Rendering.Shaders;
 
 [NonParallelizable]
-public class ViewportSolidShadingPixelTests
+public partial class ViewportSolidShadingPixelTests
 {
     private const int RenderTargetSize = 32;
 
@@ -58,7 +58,9 @@ public class ViewportSolidShadingPixelTests
     private static Vector3 Render(
         GraphicsDevice device,
         Effect effect,
-        Texture2D diffuseTexture)
+        Texture2D diffuseTexture,
+        Action<Effect>? configure = null,
+        string technique = "SolidDrawing")
     {
         using var renderTarget = new RenderTarget2D(
             device,
@@ -68,6 +70,7 @@ public class ViewportSolidShadingPixelTests
             SurfaceFormat.Color,
             DepthFormat.Depth24);
         ConfigureEffect(effect, diffuseTexture);
+        configure?.Invoke(effect);
 
         device.SetRenderTarget(renderTarget);
         device.Clear(
@@ -79,7 +82,7 @@ public class ViewportSolidShadingPixelTests
         device.DepthStencilState = DepthStencilState.Default;
         device.RasterizerState = RasterizerState.CullNone;
         effect.CurrentTechnique =
-            effect.Techniques["SolidDrawing"];
+            effect.Techniques[technique];
         effect.CurrentTechnique.Passes[0].Apply();
         device.DrawUserPrimitives(
             PrimitiveType.TriangleStrip,

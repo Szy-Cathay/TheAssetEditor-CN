@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Test.TestingUtility.TestUtility;
 
 namespace GameWorld.Core.Test.Rendering.Shaders
@@ -17,7 +17,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders
 
         [TestCase(MetalRoughnessMain)]
         [TestCase(SpecGlossMain)]
-        public void MainShader_UsesSharedCameraFollowingLightingFlow(string relativePath)
+        public void MainShader_UsesSharedCameraLightUnlessLocalEnvironmentIsEnabled(string relativePath)
         {
             var source = ReadNormalizedSource(relativePath);
 
@@ -36,7 +36,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders
                     Does.Contain("lightCol_main, L_main, normalizedViewDirection"));
                 Assert.That(
                     source,
-                    Does.Contain("float3 hdr_linear_col = env_light + combined_dir_light;"));
+                    Does.Contain("float3 hdr_linear_col = env_light + (ViewportEnvironmentEnabled ? 0 : combined_dir_light);"));
                 Assert.That(source, Does.Contain("hdr_linear_col *= Constant_LightColour;"));
                 Assert.That(
                     source,
@@ -51,7 +51,7 @@ namespace GameWorld.Core.Test.Rendering.Shaders
                 "standard_lighting_model_directional_light_SM4_private");
             var combineIndex = RequiredIndexOf(
                 source,
-                "float3 hdr_linear_col = env_light + combined_dir_light;");
+                "float3 hdr_linear_col = env_light + (ViewportEnvironmentEnabled ? 0 : combined_dir_light);");
             var lightColourIndex = RequiredIndexOf(
                 source,
                 "hdr_linear_col *= Constant_LightColour;");

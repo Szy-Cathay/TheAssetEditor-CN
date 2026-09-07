@@ -20,7 +20,7 @@ float adjust_linear_smoothness(in const float linear_smoothness)
 
 float3 get_environment_colour(in float3 direction, in float lod)
 {
-    return (tex_cube_specular.SampleLevel(SampleType, direction, lod).rgb);
+    return SampleEnvironmentSpecular(SampleType, direction, lod).rgb;
 }
 
 float get_env_map_lod(in float roughness_in)

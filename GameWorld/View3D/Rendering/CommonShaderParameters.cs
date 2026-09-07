@@ -16,7 +16,16 @@ namespace GameWorld.Core.Rendering
         Vector3[] FactionColours,
         float ViewportHeight = 0,
         float ViewportWidth = 0,
-        bool FactionColoursEnabled = true
+        bool FactionColoursEnabled = true,
+        float SurfaceOpacity = 1,
+        float OverlayOpacity = 1,
+        float SelectedOverlayOpacity = 1,
+        Components.Rendering.ViewportShadingSettings? ViewportShading = null,
+        bool ViewportWireframe = false,
+        Microsoft.Xna.Framework.Graphics.Texture2D? ViewportMatcap = null,
+        Microsoft.Xna.Framework.Graphics.Texture2D? ViewportGeometry = null,
+        Microsoft.Xna.Framework.Graphics.TextureCube? ViewportDiffuse = null,
+        Microsoft.Xna.Framework.Graphics.TextureCube? ViewportSpecular = null
         );
 
 }

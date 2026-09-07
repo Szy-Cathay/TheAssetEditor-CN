@@ -1,4 +1,4 @@
-using Test.TestingUtility.Shared;
+﻿using Test.TestingUtility.Shared;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -6,6 +6,21 @@ namespace GameWorld.Core.Test.Rendering;
 
 public class DefaultFontTests
 {
+    [Test]
+    public void ModalTransformLabels_RenderChineseAndDegreeGlyphs()
+    {
+        var game = new WpfGameMock();
+        var device = game.GraphicsDevice;
+        var font = game.Content.Load<SpriteFont>("Fonts//DefaultFont");
+        var fallback = RenderText(device, font, "?");
+        foreach (var character in "世界局部移动旋转缩放°自由表达式未完成或无效圈选：左键添加Ctrl+移除·中键/滚轮操作视图·小键盘+/-调整大小·W切换鼠标".Distinct())
+        {
+            var pixels = RenderText(device, font, character.ToString());
+            Assert.That(pixels.Any(pixel => pixel.A > 0), Is.True, character.ToString());
+            Assert.That(pixels.SequenceEqual(fallback), Is.False, character.ToString());
+        }
+    }
+
     [Test]
     public void MeasureString_UnsupportedCharacters_UsesFallbackGlyph()
     {

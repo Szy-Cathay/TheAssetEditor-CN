@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using CommunityToolkit.Diagnostics;
 using GameWorld.Core.Components.Selection;
@@ -17,7 +17,7 @@ using GameWorld.Core.Components;
 
 namespace GameWorld.Core.Components.Rendering
 {
-    public class RenderEngineComponent : BaseComponent, IDisposable
+    public partial class RenderEngineComponent : BaseComponent, IDisposable
     {
         private readonly Serilog.ILogger _logger =
             Logging.Create<RenderEngineComponent>();
@@ -70,6 +70,7 @@ namespace GameWorld.Core.Components.Rendering
             ViewportShadingMode.MaterialPreview;
 
         public event Action<ViewportShadingMode>? ShadingModeChanged;
+        public ViewportShadingSettings ShadingSettings { get; set; } = new();
 
         /// <summary>
         /// Viewport shading mode - controls how 3D objects are rendered
@@ -278,6 +279,7 @@ namespace GameWorld.Core.Components.Rendering
             }
 
             var commonShaderParameters = CommonShaderParameterBuilder.Build(_camera, _sceneLightParameters, screenHeight, screenWidth);
+            commonShaderParameters = PrepareViewportShading(device, commonShaderParameters);
 
             _defaultRenderTarget = RenderTargetHelper.GetRenderTarget(device, _defaultRenderTarget, enableMsaa: true);
             _glowRenderTarget = RenderTargetHelper.GetRenderTarget(device, _glowRenderTarget, enableMsaa: false);
@@ -692,8 +694,10 @@ namespace GameWorld.Core.Components.Rendering
                 else
                     device.RasterizerState = _rasterStates[RasterizerStateEnum.Normal];
 
+                DrawViewportSurfaces(device, commonShaderParameters, renderingTechnique);
                 foreach (var item in _renderItems[RenderBuckedId.Normal])
-                    item.Draw(device, commonShaderParameters, renderingTechnique);
+                    if (!item.IsMeshSurface)
+                        item.Draw(device, commonShaderParameters, renderingTechnique);
 
                 // Draw depth-tested helpers after meshes so they cannot punch
                 // holes into the selection mask before selected geometry renders.
@@ -973,6 +977,11 @@ namespace GameWorld.Core.Components.Rendering
             _transparentCaptureTarget = null;
             _whiteTexture.Dispose();
             _previewEdgeRenderer?.Dispose();
+            _surfaceDepthBlend.Dispose();
+            _surfaceColourBlend.Dispose();
+            _occludedSurfaceDepth.Dispose();
+            _viewportLightingResources?.Dispose();
+            _surfaceGeometryTarget?.Dispose();
 
             _renderLines.Clear();
             _renderItems.Clear();

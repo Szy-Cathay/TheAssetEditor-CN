@@ -41,6 +41,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
             _effect.Projection = commonShaderParameters.Projection;
             _effect.View = commonShaderParameters.View;
             _effect.World = modelMatrix;
+            _effect.Alpha = commonShaderParameters.SurfaceOpacity;
 
             _effect.DiffuseColor = DiffuseColour;
             _effect.SpecularColor = SpecularColour;

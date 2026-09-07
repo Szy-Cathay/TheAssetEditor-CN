@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 
 namespace GameWorld.Core.Commands.Bone
@@ -19,13 +19,15 @@ namespace GameWorld.Core.Commands.Bone
             Vector3 translation,
             Quaternion rotation,
             Vector3 scaleFactor,
-            Vector3 pivot)
+            Vector3 pivot,
+            Matrix? scaleOrientation = null)
         {
             Kind = kind;
             Translation = translation;
             Rotation = rotation;
             ScaleFactor = scaleFactor;
             Pivot = pivot;
+            ScaleOrientation = scaleOrientation ?? Matrix.Identity;
         }
 
         public BoneTransformDeltaKind Kind { get; }
@@ -33,6 +35,7 @@ namespace GameWorld.Core.Commands.Bone
         public Quaternion Rotation { get; }
         public Vector3 ScaleFactor { get; }
         public Vector3 Pivot { get; }
+        public Matrix ScaleOrientation { get; }
 
         public static bool TryCreateTranslation(
             Vector3 translation,
@@ -101,7 +104,8 @@ namespace GameWorld.Core.Commands.Bone
         public static bool TryCreateScale(
             Vector3 scaleFactor,
             Vector3 pivot,
-            out BoneTransformDelta delta)
+            out BoneTransformDelta delta,
+            Matrix? orientation = null)
         {
             if (!IsFinite(scaleFactor) ||
                 !IsFinite(pivot) ||
@@ -118,7 +122,8 @@ namespace GameWorld.Core.Commands.Bone
                 Vector3.Zero,
                 Quaternion.Identity,
                 scaleFactor,
-                pivot);
+                pivot,
+                orientation);
             return true;
         }
 
@@ -144,7 +149,7 @@ namespace GameWorld.Core.Commands.Bone
                 BoneTransformDeltaKind.Rotation =>
                     Matrix.CreateFromQuaternion(Rotation),
                 BoneTransformDeltaKind.Scale =>
-                    Matrix.CreateScale(ScaleFactor),
+                    Matrix.Transpose(ScaleOrientation) * Matrix.CreateScale(ScaleFactor) * ScaleOrientation,
                 _ => Matrix.Identity
             };
 

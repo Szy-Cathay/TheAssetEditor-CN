@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Input;
+﻿using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Navigation;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -224,14 +224,14 @@ namespace GameWorld.Core.Test.BlenderFeatures
         [Test]
         public void ViewPresets_DetectViewPreset_Right()
         {
-            var result = ViewPresets.DetectViewPreset(-MathHelper.PiOver2, 0f);
+            var result = ViewPresets.DetectViewPreset(MathHelper.PiOver2, 0f);
             Assert.That(result, Is.EqualTo(ViewPresetType.Right), "Should detect Right view");
         }
 
         [Test]
         public void ViewPresets_DetectViewPreset_Left()
         {
-            var result = ViewPresets.DetectViewPreset(MathHelper.PiOver2, 0f);
+            var result = ViewPresets.DetectViewPreset(-MathHelper.PiOver2, 0f);
             Assert.That(result, Is.EqualTo(ViewPresetType.Left), "Should detect Left view");
         }
 

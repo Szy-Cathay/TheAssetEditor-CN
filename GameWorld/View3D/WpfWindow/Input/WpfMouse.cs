@@ -19,12 +19,18 @@ namespace GameWorld.Core.WpfWindow.Input
     /// Helper class that converts WPF mouse input to the XNA/MonoGame <see cref="_mouseState"/>.
     /// Required for any WPF hosted control.
     /// </summary>
-    public class WpfMouse : IDisposable
+    public partial class WpfMouse : IDisposable
     {
         private FrameworkElement _focusElement;
 
         private MouseState _mouseState;
         private bool _captureMouseWithin = true;
+        private int _pendingPressedButtons;
+        private int _pendingReleasedButtons;
+        private Microsoft.Xna.Framework.Vector2?[] _pendingButtonOrigins = new Microsoft.Xna.Framework.Vector2?[3];
+        private Microsoft.Xna.Framework.Vector2?[] _buttonOrigins = new Microsoft.Xna.Framework.Vector2?[3];
+        internal int PressedButtons { get; private set; }
+        internal int ReleasedButtons { get; private set; }
 
         // Cache window Z-order enumeration (expensive P/Invoke + VisualTree per mouse move)
         private List<Window> _cachedWindowOrder;
@@ -47,12 +53,13 @@ namespace GameWorld.Core.WpfWindow.Input
             _focusElement.MouseEnter += HandleMouse;
             _focusElement.MouseLeave += HandleMouse;
             // clicks
-            _focusElement.MouseLeftButtonDown += HandleMouse;
-            _focusElement.MouseLeftButtonUp += HandleMouse;
-            _focusElement.MouseRightButtonDown += HandleMouse;
-            _focusElement.MouseRightButtonUp += HandleMouse;
+            _focusElement.MouseDown += HandleMouse;
+            _focusElement.MouseUp += HandleMouse;
 
             _captureMouseWithin = captureMouseWithin;
+            _focusElement.LostMouseCapture += OnCaptureLost;
+            _focusElement.LostKeyboardFocus += OnInputFocusLost;
+            _focusElement.Unloaded += OnInputUnloaded;
         }
 
 
@@ -79,10 +86,67 @@ namespace GameWorld.Core.WpfWindow.Input
                 _captureMouseWithin = value;
             }
         }
-        public MouseState GetState() => _mouseState;
+        public MouseState GetState()
+        {
+            if (_continuousDrag)
+            {
+                var position = Position;
+                _mouseState = new MouseState((int)position.X, (int)position.Y, _mouseState.ScrollWheelValue,
+                    _mouseState.LeftButton, _mouseState.MiddleButton, _mouseState.RightButton,
+                    _mouseState.XButton1, _mouseState.XButton2);
+            }
+            PressedButtons = _pendingPressedButtons;
+            ReleasedButtons = _pendingReleasedButtons;
+            _pendingPressedButtons = _pendingReleasedButtons = 0;
+            (_buttonOrigins, _pendingButtonOrigins) = (_pendingButtonOrigins, _buttonOrigins);
+            Array.Clear(_pendingButtonOrigins);
+            return _mouseState;
+        }
+
+        internal Microsoft.Xna.Framework.Vector2? GetPressPosition(int button) => _buttonOrigins[button];
+
+        internal void ClearButtonTransitions()
+        {
+            PressedButtons = ReleasedButtons = _pendingPressedButtons = _pendingReleasedButtons = 0;
+            Array.Clear(_buttonOrigins);
+            Array.Clear(_pendingButtonOrigins);
+        }
+
+        private void RecordButtonTransition(MouseEventArgs e, Microsoft.Xna.Framework.Vector2 position)
+        {
+            if (e is not MouseButtonEventArgs button)
+                return;
+            var index = button.ChangedButton switch
+            {
+                MouseButton.Left => 0,
+                MouseButton.Right => 1,
+                MouseButton.Middle => 2,
+                _ => -1
+            };
+            if (index < 0)
+                return;
+            if (e.RoutedEvent == System.Windows.Input.Mouse.MouseDownEvent)
+            {
+                _pendingPressedButtons |= 1 << index;
+                _pendingButtonOrigins[index] = position;
+            }
+            else if (e.RoutedEvent == System.Windows.Input.Mouse.MouseUpEvent)
+                _pendingReleasedButtons |= 1 << index;
+        }
         private void HandleMouse(object sender, MouseEventArgs e)
         {
-            if (e.Handled)
+            if (_continuousDrag)
+            {
+                RecordButtonTransition(e, _continuousPosition);
+                var wheel = e as MouseWheelEventArgs;
+                _mouseState = new MouseState((int)_continuousPosition.X, (int)_continuousPosition.Y,
+                    _mouseState.ScrollWheelValue + (wheel?.Delta ?? 0), (ButtonState)e.LeftButton,
+                    (ButtonState)e.MiddleButton, (ButtonState)e.RightButton, (ButtonState)e.XButton1, (ButtonState)e.XButton2);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Handled || PresentationSource.FromVisual(_focusElement) is not HwndSource focusSource || focusSource.IsDisposed)
                 return;
 
             // Detect if there is a window that is on top of the main application. If so, we dont want to capture the mouse
@@ -97,15 +161,18 @@ namespace GameWorld.Core.WpfWindow.Input
             var topToBottom = _cachedWindowOrder;
             foreach (var window in topToBottom)
             {
+                if (PresentationSource.FromVisual(window) is not HwndSource source || source.IsDisposed)
+                    continue;
                 var hitPoint = window.PointFromScreen(new Point() { X = p.X, Y = p.Y });
                 var hitResult = VisualTreeHelper.HitTest(window, hitPoint);
                 if (hitResult?.VisualHit != null)
                 {
-                    if (window.ToString() != "AssetEditor.Views.MainWindow")
+                    if (source.Handle != focusSource.Handle)
                     {
                         _focusElement.ReleaseMouseCapture();
                         return;
                     }
+                    break;
                 }
             }
 
@@ -171,6 +238,8 @@ namespace GameWorld.Core.WpfWindow.Input
             e.Handled = true;
             var m = _mouseState;
             var w = e as MouseWheelEventArgs;
+            _physicalPosition = new Microsoft.Xna.Framework.Vector2((float)pos.X, (float)pos.Y);
+            RecordButtonTransition(e, _physicalPosition);
             _mouseState = new MouseState((int)pos.X, (int)pos.Y, m.ScrollWheelValue + (w?.Delta ?? 0), (ButtonState)e.LeftButton, (ButtonState)e.MiddleButton, (ButtonState)e.RightButton, (ButtonState)e.XButton1, (ButtonState)e.XButton2);
 
             if (ShouldReleaseMouseCapture(
@@ -218,6 +287,9 @@ namespace GameWorld.Core.WpfWindow.Input
         {
             var p = _focusElement.PointToScreen(new Point(x, y));
             SetCursorPos((int)p.X, (int)p.Y);
+            if (_continuousDrag)
+                return;
+            _physicalPosition = new Microsoft.Xna.Framework.Vector2(x, y);
 
             // Immediately update mouse state to prevent stale position in next frame
             // This is critical for infinite drag to work smoothly at high frame rates
@@ -308,16 +380,18 @@ namespace GameWorld.Core.WpfWindow.Input
 
         public void Dispose()
         {
+            EndContinuousDrag();
+            _focusElement.LostMouseCapture -= OnCaptureLost;
+            _focusElement.LostKeyboardFocus -= OnInputFocusLost;
+            _focusElement.Unloaded -= OnInputUnloaded;
             _focusElement.MouseWheel -= HandleMouse;
             // movement
             _focusElement.MouseMove -= HandleMouse;
             _focusElement.MouseEnter -= HandleMouse;
             _focusElement.MouseLeave -= HandleMouse;
             // clicks
-            _focusElement.MouseLeftButtonDown -= HandleMouse;
-            _focusElement.MouseLeftButtonUp -= HandleMouse;
-            _focusElement.MouseRightButtonDown -= HandleMouse;
-            _focusElement.MouseRightButtonUp -= HandleMouse;
+            _focusElement.MouseDown -= HandleMouse;
+            _focusElement.MouseUp -= HandleMouse;
             _focusElement = null;
         }
     }

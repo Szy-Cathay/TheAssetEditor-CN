@@ -1,5 +1,8 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using Editors.KitbasherEditor.Core.MenuBarViews;
+using Editors.KitbasherEditor.UiCommands;
+using Editors.KitbasherEditor.ViewModels;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.Common;
 using Shared.Ui.Common.MenuSystem;
@@ -14,6 +17,12 @@ namespace KitbasherEditor.Views
         public KitbasherView()
         {
             InitializeComponent();
+        }
+
+        private void CircleSelection_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is KitbasherViewModel viewModel)
+                viewModel.MenuBar.FocusScene();
         }
 
         private void treeView_Drop(object sender, DragEventArgs e)
@@ -42,6 +51,7 @@ namespace KitbasherEditor.Views
     {
         public DataTemplate DefaultTemplate { get; set; }
         public DataTemplate RadioTemplate { get; set; }
+        public DataTemplate? SelectionTemplate { get; set; }
         public DataTemplate SeparatorTemplate { get; set; }
 
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
@@ -50,6 +60,8 @@ namespace KitbasherEditor.Views
             {
                 if (button.IsSeperator)
                     return SeparatorTemplate;
+                if (button.Action is KitbasherMenuItem<SelectGizmoModeCommand> && SelectionTemplate != null)
+                    return SelectionTemplate;
                 if (button is MenuBarGroupButton)
                     return RadioTemplate;
                 return DefaultTemplate;

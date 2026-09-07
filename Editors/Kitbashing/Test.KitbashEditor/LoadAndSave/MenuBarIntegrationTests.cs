@@ -2,6 +2,7 @@
 using Editors.KitbasherEditor.Components;
 using Editors.KitbasherEditor.UiCommands;
 using Editors.KitbasherEditor.ViewModels;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
@@ -77,6 +78,38 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
             Assert.That(increasedScale, Is.EqualTo(initialScale + 0.5f));
             Assert.That(restoredScale, Is.EqualTo(initialScale));
         });
+    }
+
+    [Test]
+    public void CircleTool_PreservesGizmoToolsAndOnlyChangesSelectionShape()
+    {
+        var components = _runner.GetRequiredServiceInCurrentEditorScope<KitbashSceneComponentSet>();
+        var tools = _editor.MenuBar.SidebarButtons.OfType<MenuBarGroupButton>()
+            .Where(button => button.GroupName == "Gizmo").ToList();
+        SelectionManager.SetState(new VertexSelectionState(_meshNode, 0));
+        Assert.That(_editor.MenuBar.CanUseMeshSelectionTools.Value, Is.True);
+        Assert.That(_editor.MenuBar.SelectionSettings, Is.SameAs(components.SelectionInput.Settings));
+        foreach (var tool in tools.Skip(1))
+        {
+            tool.Action.TriggerAction();
+            var gizmoMode = components.ModelGizmo.Gizmo.ActiveMode;
+            var transformVisible = _editor.MenuBar.TransformTool.IsVisible;
+            components.SelectionSettings.IsCircleSelection = true;
+            Assert.That(tool.IsChecked.Value, Is.True);
+            Assert.That(components.ModelGizmo.Gizmo.ActiveMode, Is.EqualTo(gizmoMode));
+            Assert.That(_editor.MenuBar.TransformTool.IsVisible, Is.EqualTo(transformVisible));
+            tool.Action.TriggerAction();
+            Assert.That(components.SelectionInput.Settings.IsCircleSelection, Is.True);
+            Assert.That(tool.IsChecked.Value, Is.True);
+            components.SelectionSettings.IsCircleSelection = false;
+            Assert.That(tool.IsChecked.Value, Is.True);
+            Assert.That(_editor.MenuBar.TransformTool.IsVisible, Is.EqualTo(transformVisible));
+        }
+        components.SelectionSettings.IsCircleSelection = true;
+        SelectionManager.SetState(CreateObjectSelection());
+        Assert.That(_editor.MenuBar.CanUseMeshSelectionTools.Value, Is.False);
+        Assert.That(components.SelectionInput.Settings.IsCircleSelection, Is.False);
+        tools[0].Action.TriggerAction();
     }
 
     [Test]
@@ -254,13 +287,9 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
         var focusService =
             _runner.GetRequiredServiceInCurrentEditorScope<
                 FocusSelectableObjectService>();
-        var sceneManager = _editor.SceneExplorer.SceneManager;
-        var objectPosition =
-            sceneManager.GetWorldPosition(_meshNode).Translation;
+        var pose = MeshPoseSnapshot.Capture(_meshNode);
         var expected =
-            (_meshNode.Geometry.GetVertexById(0) +
-             _meshNode.Geometry.GetVertexById(1)) / 2 +
-            objectPosition;
+            (pose.GetWorldPosition(0) + pose.GetWorldPosition(1)) / 2;
         camera.LookAt = new Microsoft.Xna.Framework.Vector3(
             123,
             456,

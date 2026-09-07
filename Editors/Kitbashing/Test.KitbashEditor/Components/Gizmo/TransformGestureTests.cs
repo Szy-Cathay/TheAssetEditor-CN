@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Reflection;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Commands;
@@ -30,7 +30,7 @@ namespace Testing.GameWorld.Core.Components.Gizmo
 {
     [TestFixture]
     [Apartment(ApartmentState.STA)]
-    public class TransformGestureTests
+    public partial class TransformGestureTests
     {
         [Test]
         public void MouseGizmoStartEvent_CapturesBaselineBeforeFirstPreview()
@@ -1581,7 +1581,8 @@ namespace Testing.GameWorld.Core.Components.Gizmo
                 mouse,
                 keyboard,
                 mesh,
-                graphics);
+                graphics,
+                camera);
         }
 
         private static DirectContext CreateDirectContext(params MeshObject[] meshes)
@@ -2020,7 +2021,8 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             Mock<IMouseComponent> Mouse,
             Mock<IKeyboardComponent> Keyboard,
             MeshObject Mesh,
-            TestGraphicsCardGeometry Graphics) : IDisposable
+            TestGraphicsCardGeometry Graphics,
+            ArcBallCamera Camera) : IDisposable
         {
             public void Dispose() => Component.Dispose();
         }

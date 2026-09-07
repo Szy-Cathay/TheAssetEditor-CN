@@ -33,6 +33,8 @@ namespace GameWorld.Core.Components.Rendering
             _deviceResolverComponent = deviceResolverComponent;
             _mouse = mouseComponent;
             _keyboard = keyboardComponent;
+            if (_mouse != null)
+                _mouse.CaptureInterrupted += OnCaptureInterrupted;
         }
 
         public override void Initialize()
@@ -48,13 +50,14 @@ namespace GameWorld.Core.Components.Rendering
         private void ReCreateViewMatrix()
         {
             //Calculate the relative position of the camera                        
-            position = Vector3.Transform(Vector3.Backward, Matrix.CreateFromYawPitchRoll(yaw, pitch, 0));
+            var orientation = Matrix.CreateFromYawPitchRoll(yaw, pitch, 0);
+            position = Vector3.Transform(Vector3.Backward, orientation);
             //Convert the relative position to the absolute position
             position *= _zoom;
             position += _lookAt;
 
             //Calculate a new viewmatrix
-            viewMatrix = Matrix.CreateLookAt(position, _lookAt, Vector3.Up);
+            viewMatrix = Matrix.CreateLookAt(position, _lookAt, Vector3.Transform(Vector3.Up, orientation));
             viewMatrixDirty = false;
         }
 
@@ -126,7 +129,7 @@ namespace GameWorld.Core.Components.Rendering
         }
 
         /// <summary>
-        /// Orthographic view size (half-height of the view)
+        /// Orthographic view height in world units
         /// </summary>
         public float OrthoSize
         {
@@ -138,8 +141,11 @@ namespace GameWorld.Core.Components.Rendering
             }
         }
 
-        public float MinPitch = -MathHelper.PiOver2 + 0.3f;
-        public float MaxPitch = MathHelper.PiOver2 - 0.3f;
+        public float MinPitch = -MathHelper.Pi;
+        public float MaxPitch = MathHelper.Pi;
+        private float _orbitDirection = 1;
+        private (float Yaw, float Pitch, float Zoom, float OrthoSize, Vector3 LookAt, ProjectionType Projection, bool AutoPerspective)? _middleNavigationStart;
+        private bool _suppressMiddleUntilRelease;
         private float pitch;
         public float Pitch
         {
@@ -263,61 +269,95 @@ namespace GameWorld.Core.Components.Rendering
 
         public void Update(IMouseComponent mouse, IKeyboardComponent keyboard)
         {
+            if (!mouse.IsMouseOwner(this) && mouse.MouseOwner != null)
+                return;
             var deltaMouseX = -mouse.DeltaPosition().X;
             var deltaMouseY = mouse.DeltaPosition().Y;
             var deltaMouseWheel = mouse.DeletaScrollWheel();
+            var isMiddleMouseDown = mouse.IsMouseButtonDown(MouseButton.Middle) || mouse.IsMouseButtonPressed(MouseButton.Middle);
+            var isShiftDown = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift);
+            var isCtrlDown = keyboard.IsKeyDown(Keys.LeftControl) || keyboard.IsKeyDown(Keys.RightControl);
 
-            // Scroll wheel zoom works even without mouse ownership (Blender-style)
+            if (_suppressMiddleUntilRelease)
+            {
+                if (isMiddleMouseDown && !mouse.IsMouseButtonPressed(MouseButton.Middle))
+                    return;
+                _suppressMiddleUntilRelease = false;
+            }
+            if (mouse.MouseOwner != this)
+                _middleNavigationStart = null;
+            if (isMiddleMouseDown)
+                _middleNavigationStart ??= (Yaw, Pitch, Zoom, OrthoSize, LookAt, CurrentProjectionType, AutoPerspectiveOnOrbit);
+            if (_middleNavigationStart is { } start &&
+                (keyboard.IsKeyPressed(Keys.Escape) || mouse.IsMouseButtonPressed(MouseButton.Right)))
+            {
+                Yaw = start.Yaw;
+                Pitch = start.Pitch;
+                Zoom = start.Zoom;
+                OrthoSize = start.OrthoSize;
+                LookAt = start.LookAt;
+                CurrentProjectionType = start.Projection;
+                AutoPerspectiveOnOrbit = start.AutoPerspective;
+                _middleNavigationStart = null;
+                _suppressMiddleUntilRelease = true;
+                mouse.MouseOwner = null;
+                mouse.ClearStates();
+                return;
+            }
+            if (!isMiddleMouseDown)
+                _middleNavigationStart = null;
+
             if (deltaMouseWheel != 0)
             {
-                if (Math.Abs(deltaMouseWheel) > 250)   // Weird bug, sometimes this value is very large, probably related to state clearing. Temp fix
-                    deltaMouseWheel = 250 * Math.Sign(deltaMouseWheel);
-
-                // In orthographic mode, adjust OrthoSize instead of Zoom
+                var zoomFactor = MathF.Pow(1.2f, Math.Clamp(deltaMouseWheel / 120f, -20, 20));
                 if (_projectionType == ProjectionType.Orthographic)
-                {
-                    // Slower zoom in ortho mode for better control
-                    _orthoSize += deltaMouseWheel * 0.001f * _orthoSize;
-                    _orthoSize = Math.Max(0.1f, _orthoSize);  // Prevent zero or negative
-                    projectionMatrixDirty = true;
-                }
+                    OrthoSize *= zoomFactor;
                 else
-                {
-                    var oldZoom = Zoom / 10;
-                    Zoom += deltaMouseWheel * 0.005f * oldZoom;
-                }
+                    Zoom *= zoomFactor;
             }
-
-            // Check for middle mouse button (Blender-style navigation)
-            var isMiddleMouseDown = mouse.IsMouseButtonDown(MouseButton.Middle);
-            var isShiftDown = keyboard.IsKeyDown(Keys.LeftShift);
 
             // Blender-style: Middle mouse button navigation (no Alt required)
             if (isMiddleMouseDown)
             {
+                if (mouse.IsMouseButtonPressed(MouseButton.Middle) && mouse.GetPressPosition(MouseButton.Middle) is Vector2 origin)
+                {
+                    var displacement = mouse.Position() - origin;
+                    deltaMouseX = displacement.X;
+                    deltaMouseY = -displacement.Y;
+                }
                 // Wait until the component handling the previous click releases the mouse.
                 if (!mouse.IsMouseOwner(this) && mouse.MouseOwner != null)
                     return;
 
                 mouse.MouseOwner = this;
+                mouse.BeginContinuousDrag();
+                if (mouse.IsMouseButtonPressed(MouseButton.Middle))
+                    _orbitDirection = MathF.Cos(Pitch) < 0 ? -1 : 1;
 
                 if (isShiftDown)
                 {
                     // Shift + Middle mouse = Pan view
-                    MoveCameraRight(deltaMouseX * 0.01f * Zoom * .1f);
-                    MoveCameraUp(-deltaMouseY * 0.01f * Zoom * .1f);
+                    Pan(mouse, new Vector2(deltaMouseX, -deltaMouseY));
+                }
+                else if (isCtrlDown)
+                {
+                    var factor = MathF.Exp(Math.Clamp(deltaMouseY * 0.01f, -10, 10));
+                    if (_projectionType == ProjectionType.Orthographic)
+                        OrthoSize *= factor;
+                    else
+                        Zoom *= factor;
                 }
                 else
                 {
                     // Middle mouse only = Rotate view
                     if (_projectionType == ProjectionType.Orthographic && AutoPerspectiveOnOrbit)
                     {
-                        CurrentProjectionType = ProjectionType.Perspective;
+                        SetProjectionTypePreservingScale(ProjectionType.Perspective);
                         AutoPerspectiveOnOrbit = false;
                     }
 
-                    Yaw += deltaMouseX * 0.01f;
-                    Pitch += deltaMouseY * 0.01f;
+                    Yaw = MathHelper.WrapAngle(Yaw + deltaMouseX * 0.01f * _orbitDirection);
+                    Pitch = MathHelper.WrapAngle(Pitch + deltaMouseY * 0.01f);
                 }
                 return; // Exit early - middle mouse handled
             }
@@ -329,12 +369,14 @@ namespace GameWorld.Core.Components.Rendering
             if (keyboard.IsKeyReleased(Keys.F4))
             {
                 Zoom = 10;
+                OrthoSize = PerspectiveViewHeight;
                 _lookAt = Vector3.Zero;
             }
 
             // Original Alt+Left/Right mouse navigation (kept for compatibility)
             var ownsMouse = mouse.MouseOwner;
-            if (keyboard.IsKeyDown(Keys.LeftAlt))
+            var isAltDown = keyboard.IsKeyDown(Keys.LeftAlt) || keyboard.IsKeyDown(Keys.RightAlt);
+            if (isAltDown)
             {
                 mouse.MouseOwner = this;
             }
@@ -349,20 +391,81 @@ namespace GameWorld.Core.Components.Rendering
                 }
             }
 
-            if (keyboard.IsKeyDown(Keys.LeftAlt))
+            if (isAltDown)
             {
                 mouse.MouseOwner = this;
                 if (mouse.IsMouseButtonDown(MouseButton.Left))
                 {
-                    Yaw += deltaMouseX * 0.01f;
-                    Pitch += deltaMouseY * 0.01f;
+                    mouse.BeginContinuousDrag();
+                    if (mouse.IsMouseButtonPressed(MouseButton.Left))
+                        _orbitDirection = MathF.Cos(Pitch) < 0 ? -1 : 1;
+                    Yaw = MathHelper.WrapAngle(Yaw + deltaMouseX * 0.01f * _orbitDirection);
+                    Pitch = MathHelper.WrapAngle(Pitch + deltaMouseY * 0.01f);
                 }
                 if (mouse.IsMouseButtonDown(MouseButton.Right))
                 {
-                    MoveCameraRight(deltaMouseX * 0.01f * Zoom * .1f);
-                    MoveCameraUp(-deltaMouseY * 0.01f * Zoom * .1f);
+                    mouse.BeginContinuousDrag();
+                    Pan(mouse, new Vector2(deltaMouseX, -deltaMouseY));
                 }
+                if (!mouse.IsMouseButtonDown(MouseButton.Left) && !mouse.IsMouseButtonDown(MouseButton.Right))
+                    mouse.EndContinuousDrag();
             }
+        }
+
+        internal void Pan(IMouseComponent mouse, Vector2 displacement)
+        {
+            var size = mouse.GetScreenSize();
+            if (size.X <= 0 || size.Y <= 0)
+                return;
+            var viewport = new Viewport(0, 0, (int)size.X, (int)size.Y);
+            var center = viewport.Project(LookAt, ProjectionMatrix, ViewMatrix, Matrix.Identity);
+            var start = viewport.Unproject(center, ProjectionMatrix, ViewMatrix, Matrix.Identity);
+            var end = viewport.Unproject(center + new Vector3(displacement, 0), ProjectionMatrix, ViewMatrix, Matrix.Identity);
+            LookAt += start - end;
+        }
+
+        public float PerspectiveViewHeight => Zoom * 2 * MathF.Tan(MathHelper.PiOver4 / 2);
+
+        public void FrameBounds(BoundingBox bounds)
+        {
+            var center = (bounds.Min + bounds.Max) * 0.5f;
+            LookAt = center;
+            // Keep the current scale when framing a single vertex or bone.
+            if (Vector3.DistanceSquared(bounds.Min, bounds.Max) < 0.00000001f)
+                return;
+
+            var size = _mouse.GetScreenSize();
+            var aspect = size.X > 0 && size.Y > 0 ? size.X / size.Y : _graphicsDevice?.Viewport.AspectRatio ?? 1;
+            var tanHalfFov = MathF.Tan(MathHelper.PiOver4 / 2);
+            var distance = MinZoom;
+            var viewHeight = 0f;
+            var depth = 0f;
+            foreach (var corner in bounds.GetCorners())
+            {
+                var point = Vector3.TransformNormal(corner - center, ViewMatrix);
+                var halfHeight = Math.Max(Math.Abs(point.Y), Math.Abs(point.X) / aspect) * 1.2f;
+                viewHeight = Math.Max(viewHeight, halfHeight * 2);
+                distance = Math.Max(distance, point.Z + halfHeight / tanHalfFov);
+                depth = Math.Max(depth, point.Z);
+            }
+            if (CurrentProjectionType == ProjectionType.Orthographic)
+            {
+                OrthoSize = viewHeight;
+                Zoom = Math.Max(OrthoSize / (2 * tanHalfFov), depth + 0.02f);
+            }
+            else
+                Zoom = Math.Max(distance, depth + 0.02f);
+        }
+
+        public void SetProjectionTypePreservingScale(ProjectionType type)
+        {
+            if (type == CurrentProjectionType)
+                return;
+            if (type == ProjectionType.Orthographic)
+                OrthoSize = PerspectiveViewHeight;
+            else
+                Zoom = OrthoSize / (2 * MathF.Tan(MathHelper.PiOver4 / 2));
+            CurrentProjectionType = type;
         }
 
 
@@ -393,17 +496,26 @@ namespace GameWorld.Core.Components.Rendering
             ) * Matrix.CreateScale(-1, 1, 1);
         }
 
+        public Viewport InputViewport
+        {
+            get
+            {
+                var size = _mouse.GetScreenSize();
+                return size.X > 0 && size.Y > 0 ? new Viewport(0, 0, (int)size.X, (int)size.Y) : _graphicsDevice.Viewport;
+            }
+        }
+
         public Ray CreateCameraRay(Vector2 mouseLocation)
         {
             var projection = ProjectionMatrix;
 
-            var nearPoint = _graphicsDevice.Viewport.Unproject(new Vector3(mouseLocation.X,
+            var nearPoint = InputViewport.Unproject(new Vector3(mouseLocation.X,
                    mouseLocation.Y, 0.0f),
                    projection,
                    ViewMatrix,
                    Matrix.Identity);
 
-            var farPoint = _graphicsDevice.Viewport.Unproject(new Vector3(mouseLocation.X,
+            var farPoint = InputViewport.Unproject(new Vector3(mouseLocation.X,
                     mouseLocation.Y, 1.0f),
                     projection,
                     ViewMatrix,
@@ -417,31 +529,33 @@ namespace GameWorld.Core.Components.Rendering
 
         public BoundingFrustum UnprojectRectangle(Rectangle source)
         {
-            //http://forums.create.msdn.com/forums/p/6690/35401.aspx , by "The Friggm"
-            // Many many thanks to him...
-
-            // Point in screen space of the center of the region selected
-            var regionCenterScreen = new Vector2(source.Center.X, source.Center.Y);
-
-            // Generate the projection matrix for the screen region
-            var regionProjMatrix = ProjectionMatrix;
-
-            // Calculate the region dimensions in the projection matrix. M11 is inverse of width, M22 is inverse of height.
-            regionProjMatrix.M11 /= source.Width / (float)_graphicsDevice.Viewport.Width;
-            regionProjMatrix.M22 /= source.Height / (float)_graphicsDevice.Viewport.Height;
-
-            // Calculate the region center in the projection matrix. M31 is horizonatal center.
-            regionProjMatrix.M31 = (regionCenterScreen.X - _graphicsDevice.Viewport.Width / 2f) / (source.Width / 2f);
-
-            // M32 is vertical center. Notice that the screen has low Y on top, projection has low Y on bottom.
-            regionProjMatrix.M32 = -(regionCenterScreen.Y - _graphicsDevice.Viewport.Height / 2f) / (source.Height / 2f);
-
-            return new BoundingFrustum(ViewMatrix * regionProjMatrix);
+            var viewport = InputViewport;
+            var width = Math.Max(1, source.Width);
+            var height = Math.Max(1, source.Height);
+            var centerX = (source.X + source.Width * 0.5f) / viewport.Width * 2 - 1;
+            var centerY = 1 - (source.Y + source.Height * 0.5f) / viewport.Height * 2;
+            // Crop in clip space so perspective, orthographic and mirrored projections agree.
+            var crop = Matrix.CreateScale((float)viewport.Width / width, (float)viewport.Height / height, 1);
+            crop.M41 = -centerX * crop.M11;
+            crop.M42 = -centerY * crop.M22;
+            return new BoundingFrustum(ViewMatrix * ProjectionMatrix * crop);
         }
 
         public void Dispose()
         {
+            if (_mouse != null)
+            {
+                _mouse.CaptureInterrupted -= OnCaptureInterrupted;
+                if (_mouse.MouseOwner == this)
+                    _mouse.MouseOwner = null;
+            }
             _graphicsDevice = null;
+        }
+
+        private void OnCaptureInterrupted()
+        {
+            _middleNavigationStart = null;
+            _suppressMiddleUntilRelease = true;
         }
     }
 }

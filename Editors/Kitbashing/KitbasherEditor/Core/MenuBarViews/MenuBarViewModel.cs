@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows.Input;
 using Editors.KitbasherEditor.ChildEditors.MeshFitter;
@@ -13,6 +14,7 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
 using KitbasherEditor.ViewModels.MenuBarViews.Helpers;
 using Shared.Core.Events;
+using Shared.Core.Misc;
 using Shared.Core.Services;
 using Shared.EmbeddedResources;
 using Shared.Ui.Common.MenuSystem;
@@ -31,6 +33,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         public TransformToolViewModel TransformTool { get; set; }
         public ProportionalEditingViewModel ProportionalEditing { get; set; }
         public ViewportShadingViewModel ViewportShading { get; set; }
+        public Editors.KitbasherEditor.Components.KitbashSelectionSettings SelectionSettings { get; }
+        public NotifyAttr<bool> CanUseMeshSelectionTools { get; } = new(false);
 
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly CommandExecutor _commandExecutor;
@@ -38,6 +42,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         private readonly ActionHotkeyHandler _hotKeyHandler = new ActionHotkeyHandler();
         private readonly WindowKeyboard _keyboard;
         private readonly IWpfGame _scene;
+        private readonly Editors.KitbasherEditor.Components.KitbashSceneComponentSet _components;
         private readonly Dictionary<Type, MenuAction> _uiCommands = new();
 
         public MenuBarViewModel(
@@ -49,21 +54,28 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             WindowKeyboard windowKeyboard,
             SelectionManager selectionManager,
             RenderEngineComponent renderEngine,
-            IWpfGame scene)
+            IWpfGame scene,
+            Editors.KitbasherEditor.Components.KitbashSceneComponentSet components = null,
+            SceneRenderParametersStore sceneLighting = null)
         {
             _commandExecutor = commandExecutor;
             _menuItemVisibilityRuleEngine = menuItemVisibilityRuleEngine;
             _uiCommandFactory = uiCommandFactory;
             _keyboard = windowKeyboard;
             _scene = scene;
+            _components = components;
+            SelectionSettings = components?.SelectionSettings ?? new();
+            CanUseMeshSelectionTools.Value = selectionManager.GetState().Mode is
+                GeometrySelectionMode.Vertex or GeometrySelectionMode.Edge or GeometrySelectionMode.Face;
             TransformTool = transformToolViewModel;
             ProportionalEditing = new ProportionalEditingViewModel(selectionManager, eventHub);
-            ViewportShading = new ViewportShadingViewModel(renderEngine);
+            ViewportShading = new ViewportShadingViewModel(renderEngine, sceneLighting);
 
             RegisterActions();
             RegisterHotkeys();
             CustomButtons = CreateButtons();
             SidebarButtons = CreateSidebarButtons();
+            SelectionSettings.PropertyChanged += OnSelectionToolChanged;
             MenuItems = CreateToolbarMenu();
 
             eventHub.Register<CommandStackChangedEvent>(this, OnUndoStackChanged);
@@ -262,6 +274,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         public bool OnKeyReleased(Key key, Key systemKey, ModifierKeys modifierKeys)
         {
             ClearKeyState(key, systemKey);
+            if (_components?.SelectionInput.IsCircleSelecting == true || _components?.ModelGizmo.Gizmo?.IsInModalTransform == true)
+                return true;
             return _hotKeyHandler.TriggerCommand(key, modifierKeys);
         }
 
@@ -278,6 +292,14 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         }
 
         public void FocusScene() => _scene.GetFocusElement().Focus();
+
+        private void OnSelectionToolChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(SelectionSettings.IsCircleSelection))
+                return;
+            var tools = SidebarButtons.OfType<MenuBarGroupButton>().Where(button => button.GroupName == "Gizmo").ToList();
+            tools[0].IsChecked.Value = !SelectionSettings.IsCircleSelection && tools.Skip(1).All(tool => !tool.IsChecked.Value);
+        }
 
         void OnUndoStackChanged(CommandStackChangedEvent notification)
         {
@@ -310,6 +332,10 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         void OnSelectionChanged(SelectionChangedEvent notification)
         {
             var state = notification.NewState;
+            CanUseMeshSelectionTools.Value = state.Mode is
+                GeometrySelectionMode.Vertex or GeometrySelectionMode.Edge or GeometrySelectionMode.Face;
+            if (!CanUseMeshSelectionTools.Value)
+                SelectionSettings.IsCircleSelection = false;
 
             if (state.Mode == GeometrySelectionMode.Object)
                 GetMenuAction<ObjectSelectionModeCommand>().TriggerAction();

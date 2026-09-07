@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace GameWorld.Core.Utility
 {
-    public static class IntersectionMath
+    public static partial class IntersectionMath
     {
         const float ElementSelectionDistancePixels = 25.0f;
         // Blender gives already selected elements a small disadvantage when picking nearby items.
@@ -50,7 +50,7 @@ namespace GameWorld.Core.Utility
 
         public static float? IntersectVertex(Vector2 mouseScreenPos, MeshObject geometry, Matrix modelMatrix,
             Matrix viewProjection, float viewportWidth, float viewportHeight, out int selectedVertex,
-            IReadOnlySet<int>? selectedVertices = null)
+            IReadOnlySet<int>? selectedVertices = null, bool includeOccluded = false)
         {
             var projectedVertices = ProjectVertices(
                 geometry,
@@ -65,7 +65,7 @@ namespace GameWorld.Core.Utility
                 viewportWidth,
                 viewportHeight,
                 out selectedVertex,
-                selectedVertices);
+                selectedVertices, includeOccluded);
         }
 
         public static float? IntersectVertex(
@@ -76,7 +76,7 @@ namespace GameWorld.Core.Utility
             float viewportWidth,
             float viewportHeight,
             out int selectedVertex,
-            IReadOnlySet<int>? selectedVertices = null)
+            IReadOnlySet<int>? selectedVertices = null, bool includeOccluded = false)
         {
             ValidateWorldPositions(geometry, worldPositions);
             return IntersectVertex(
@@ -90,7 +90,7 @@ namespace GameWorld.Core.Utility
                 viewportWidth,
                 viewportHeight,
                 out selectedVertex,
-                selectedVertices);
+                selectedVertices, includeOccluded);
         }
 
         static float? IntersectVertex(
@@ -100,9 +100,9 @@ namespace GameWorld.Core.Utility
             float viewportWidth,
             float viewportHeight,
             out int selectedVertex,
-            IReadOnlySet<int>? selectedVertices)
+            IReadOnlySet<int>? selectedVertices, bool includeOccluded)
         {
-            var depthBuffer = BuildLocalDepthBuffer(
+            var depthBuffer = includeOccluded ? LocalDepthBuffer.Empty : BuildLocalDepthBuffer(
                 mouseScreenPos,
                 ElementSelectionDistancePixels,
                 projectedVertices,
@@ -502,7 +502,7 @@ namespace GameWorld.Core.Utility
         /// </summary>
         public static float? IntersectEdge(Vector2 mouseScreenPos, MeshObject geometry, Matrix modelMatrix,
             Matrix viewProjection, float viewportWidth, float viewportHeight, out (int v0, int v1) selectedEdge,
-            IReadOnlySet<(int v0, int v1)>? selectedEdges = null)
+            IReadOnlySet<(int v0, int v1)>? selectedEdges = null, bool includeOccluded = false)
         {
             var projectedVertices = ProjectVertices(
                 geometry,
@@ -517,7 +517,7 @@ namespace GameWorld.Core.Utility
                 viewportWidth,
                 viewportHeight,
                 out selectedEdge,
-                selectedEdges);
+                selectedEdges, includeOccluded);
         }
 
         public static float? IntersectEdge(
@@ -528,7 +528,7 @@ namespace GameWorld.Core.Utility
             float viewportWidth,
             float viewportHeight,
             out (int v0, int v1) selectedEdge,
-            IReadOnlySet<(int v0, int v1)>? selectedEdges = null)
+            IReadOnlySet<(int v0, int v1)>? selectedEdges = null, bool includeOccluded = false)
         {
             ValidateWorldPositions(geometry, worldPositions);
             return IntersectEdge(
@@ -542,7 +542,7 @@ namespace GameWorld.Core.Utility
                 viewportWidth,
                 viewportHeight,
                 out selectedEdge,
-                selectedEdges);
+                selectedEdges, includeOccluded);
         }
 
         /// <summary>
@@ -709,9 +709,9 @@ namespace GameWorld.Core.Utility
             float viewportWidth,
             float viewportHeight,
             out (int v0, int v1) selectedEdge,
-            IReadOnlySet<(int v0, int v1)>? selectedEdges)
+            IReadOnlySet<(int v0, int v1)>? selectedEdges, bool includeOccluded)
         {
-            var depthBuffer = BuildLocalDepthBuffer(
+            var depthBuffer = includeOccluded ? LocalDepthBuffer.Empty : BuildLocalDepthBuffer(
                 mouseScreenPos,
                 ElementSelectionDistancePixels,
                 projectedVertices,
@@ -907,8 +907,9 @@ namespace GameWorld.Core.Utility
             readonly int _width;
             readonly int _height;
             readonly float[] _depths;
+            readonly int[]? _faces;
 
-            public LocalDepthBuffer(int left, int top, int width, int height)
+            public LocalDepthBuffer(int left, int top, int width, int height, bool trackFaces = false)
             {
                 _left = left;
                 _top = top;
@@ -916,12 +917,18 @@ namespace GameWorld.Core.Utility
                 _height = height;
                 _depths = new float[width * height];
                 Array.Fill(_depths, float.PositiveInfinity);
+                if (trackFaces)
+                {
+                    _faces = new int[width * height];
+                    Array.Fill(_faces, -1);
+                }
             }
 
             public void RasterizeTriangle(
                 ProjectedVertex first,
                 ProjectedVertex second,
-                ProjectedVertex third)
+                ProjectedVertex third,
+                int face = -1)
             {
                 var area = EdgeFunction(
                     first.ScreenPosition,
@@ -976,7 +983,11 @@ namespace GameWorld.Core.Utility
                             third.Depth * thirdWeight;
                         var bufferIndex = (y - _top) * _width + x - _left;
                         if (depth < _depths[bufferIndex])
+                        {
                             _depths[bufferIndex] = depth;
+                            if (_faces != null)
+                                _faces[bufferIndex] = face;
+                        }
                     }
                 }
             }
@@ -1007,6 +1018,19 @@ namespace GameWorld.Core.Utility
 
                 return !float.IsFinite(farthestSurfaceDepth) ||
                        depth <= farthestSurfaceDepth + DepthComparisonEpsilon;
+            }
+
+            public List<int> VisibleFaces(Vector2? circleCenter = null, float circleRadius = 0, Vector2? circleStart = null) => _faces == null
+                ? []
+                : _faces.Where((face, index) => face >= 0 && InCircle(new Vector2(_left + index % _width + 0.5f,
+                    _top + index / _width + 0.5f), circleCenter, circleRadius, circleStart)).Distinct().Order().ToList();
+
+            public void WriteDepth(Vector2 point, float depth)
+            {
+                var x = (int)MathF.Floor(point.X) - _left;
+                var y = (int)MathF.Floor(point.Y) - _top;
+                if (x >= 0 && x < _width && y >= 0 && y < _height)
+                    _depths[y * _width + x] = MathF.Min(_depths[y * _width + x], depth);
             }
 
             static float EdgeFunction(Vector2 first, Vector2 second, Vector2 point)

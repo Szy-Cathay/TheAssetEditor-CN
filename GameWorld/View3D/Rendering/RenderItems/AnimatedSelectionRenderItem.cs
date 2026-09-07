@@ -1,4 +1,4 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
@@ -15,6 +15,7 @@ namespace GameWorld.Core.Rendering.RenderItems
         IReadOnlyList<int>? _selectedFaces;
         public float DepthBias { get; set; } =
             EditOverlayStyle.SelectedFaceDepthBias;
+        public bool FadeWithDensity { get; set; } = true;
 
         public AnimatedSelectionRenderItem(
             MeshPoseSnapshot pose,
@@ -67,16 +68,17 @@ namespace GameWorld.Core.Rendering.RenderItems
                 parameters.Projection);
             var primitiveCount = _selectedFaces?.Count ??
                 _pose.Geometry.GetIndexCount() / 3;
-            var detailOpacity =
-                EditOverlayVisibility.CalculateDetailOpacity(
+            var detailOpacity = FadeWithDensity
+                ? EditOverlayVisibility.CalculateDetailOpacity(
                     _pose.GetConservativeAnimatedBounds(),
                     _pose.WorldTransform,
                     parameters.View,
                     parameters.Projection,
                     device.Viewport.Width,
                     device.Viewport.Height,
-                    primitiveCount);
-            var alpha = _colour.W * detailOpacity;
+                    primitiveCount)
+                : 1.0f;
+            var alpha = _colour.W * detailOpacity * parameters.SelectedOverlayOpacity;
             effect.Parameters["SelectionColour"].SetValue(
                 new Vector4(
                     _colour.X * alpha,

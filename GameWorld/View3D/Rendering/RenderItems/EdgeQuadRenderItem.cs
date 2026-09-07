@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using GameWorld.Core.Components.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -42,7 +42,7 @@ namespace GameWorld.Core.Rendering.RenderItems
             var viewportHeight = device.Viewport.Height;
             var viewportWidth = device.Viewport.Width;
 
-            EdgeQuadRenderer.Draw(parameters.View, parameters.Projection, viewportHeight, viewportWidth, device);
+            EdgeQuadRenderer.Draw(parameters.View, parameters.Projection, viewportHeight, viewportWidth, device, parameters.OverlayOpacity);
         }
     }
 }

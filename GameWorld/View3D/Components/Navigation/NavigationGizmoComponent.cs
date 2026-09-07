@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Input;
+﻿using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
@@ -84,14 +84,14 @@ namespace GameWorld.Core.Components.Navigation
                 _releaseMouseOnNextUpdate = true;
             }
 
-            // Update camera transition animation
-            _cameraTransition.Update(gameTime);
+            // The camera updates first; animation must not overwrite fresh navigation input.
+            if ((_mouse.MouseOwner != null && _mouse.MouseOwner != this) ||
+                _mouse.DeletaScrollWheel() != 0)
+                _cameraTransition.CancelTransition();
+            else
+                _cameraTransition.Update(gameTime);
 
-            // If transitioning, skip other processing
-            if (_cameraTransition.IsTransitioning)
-                return;
-
-            if (_isInOrthoView &&
+            if (!_cameraTransition.IsTransitioning && _isInOrthoView &&
                 _currentOrthoView != ViewPresetType.Perspective &&
                 _camera.CurrentProjectionType == ProjectionType.Perspective)
             {
@@ -105,13 +105,13 @@ namespace GameWorld.Core.Components.Navigation
                 HandleNumpadShortcuts();
 
             // Update gizmo hover state
-            _navigationGizmo.Update(gameTime);
+            _navigationGizmo?.Update(gameTime);
 
             // Handle mouse click on navigation gizmo
             if (_mouse.IsMouseButtonPressed(MouseButton.Left) &&
                 (_mouse.MouseOwner == null || _mouse.MouseOwner == this))
             {
-                if (_navigationGizmo.HandleClick(_mouse.Position()))
+                if (_navigationGizmo?.HandleClick(_mouse.GetPressPosition(MouseButton.Left) ?? _mouse.Position()) == true)
                 {
                     _mouse.MouseOwner = this;
                     _ownsMouseClick = true;
@@ -129,9 +129,7 @@ namespace GameWorld.Core.Components.Navigation
                 var view = isCtrlDown
                     ? ViewPresetType.Back
                     : ViewPresetType.Front;
-                SwitchToView(isCtrlDown
-                    ? view
-                    : ViewPresets.ResolveRepeatedAxisView(view, _currentOrthoView));
+                SwitchToView(view);
             }
 
             // Numpad 3 - Right view / Ctrl+Numpad3 - Left view
@@ -141,9 +139,7 @@ namespace GameWorld.Core.Components.Navigation
                 var view = isCtrlDown
                     ? ViewPresetType.Left
                     : ViewPresetType.Right;
-                SwitchToView(isCtrlDown
-                    ? view
-                    : ViewPresets.ResolveRepeatedAxisView(view, _currentOrthoView));
+                SwitchToView(view);
             }
 
             // Numpad 7 - Top view / Ctrl+Numpad7 - Bottom view
@@ -153,9 +149,7 @@ namespace GameWorld.Core.Components.Navigation
                 var view = isCtrlDown
                     ? ViewPresetType.Bottom
                     : ViewPresetType.Top;
-                SwitchToView(isCtrlDown
-                    ? view
-                    : ViewPresets.ResolveRepeatedAxisView(view, _currentOrthoView));
+                SwitchToView(view);
             }
 
             // Numpad 5 - Toggle perspective/orthographic
@@ -167,13 +161,14 @@ namespace GameWorld.Core.Components.Navigation
             // Numpad . (Decimal) - Focus on selection (Blender style)
             if (_keyboard.IsKeyReleased(Keys.Decimal))
             {
+                _cameraTransition.CancelTransition();
                 _focusService?.FocusSelection();
             }
         }
 
         private bool IsCtrlDown()
         {
-            return _keyboard.IsKeyDown(Keys.LeftControl) || _keyboard.IsKeyDown(Keys.RightControl);
+            return _keyboard.IsKeyDownOrReleased(Keys.LeftControl) || _keyboard.IsKeyDownOrReleased(Keys.RightControl);
         }
 
         private void SwitchToView(ViewPresetType view)
@@ -186,13 +181,14 @@ namespace GameWorld.Core.Components.Navigation
 
         private void ToggleProjectionType()
         {
-            if (_isInOrthoView)
+            _cameraTransition.CancelTransition();
+            if (_camera.CurrentProjectionType == ProjectionType.Orthographic)
             {
                 // Exit ortho: switch to perspective, keep current camera angles (Blender behavior)
                 _isInOrthoView = false;
                 _currentOrthoView = ViewPresetType.Perspective;
                 _camera.AutoPerspectiveOnOrbit = false;
-                _camera.CurrentProjectionType = ProjectionType.Perspective;
+                _camera.SetProjectionTypePreservingScale(ProjectionType.Perspective);
             }
             else
             {
@@ -201,8 +197,7 @@ namespace GameWorld.Core.Components.Navigation
                 _isInOrthoView = true;
                 _currentOrthoView = ViewPresetType.Perspective; // No specific axis view
                 _camera.AutoPerspectiveOnOrbit = false;
-                _camera.CurrentProjectionType = ProjectionType.Orthographic;
-                _camera.OrthoSize = _camera.Zoom * 0.5f;
+                _camera.SetProjectionTypePreservingScale(ProjectionType.Orthographic);
             }
         }
 

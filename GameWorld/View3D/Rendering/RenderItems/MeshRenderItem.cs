@@ -8,6 +8,7 @@ namespace GameWorld.Core.Rendering.RenderItems
 {
     public class GeometryRenderItem : IRenderItem
     {
+        public bool IsMeshSurface => true;
         private readonly MeshObject _geometry;
         private readonly IShader _shader;
         private Matrix _modelMatrix;

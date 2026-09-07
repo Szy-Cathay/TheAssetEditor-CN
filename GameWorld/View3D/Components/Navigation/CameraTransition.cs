@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Rendering;
+﻿using GameWorld.Core.Components.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 
@@ -23,7 +23,12 @@ namespace GameWorld.Core.Components.Navigation
         private float _startYaw, _startPitch, _startZoom;
         private float _targetYaw, _targetPitch, _targetZoom;
         private Vector3 _startLookAt, _targetLookAt;
+        private float _viewHeight;
         private ProjectionType _startProjection, _targetProjection;
+        private (float Yaw, float Pitch, float Zoom, float OrthoSize, Vector3 LookAt, ProjectionType Projection) _lastAppliedState;
+
+        private (float, float, float, float, Vector3, ProjectionType) CurrentState =>
+            (_camera.Yaw, _camera.Pitch, _camera.Zoom, _camera.OrthoSize, _camera.LookAt, _camera.CurrentProjectionType);
 
         public bool IsTransitioning => _isTransitioning;
 
@@ -43,6 +48,7 @@ namespace GameWorld.Core.Components.Navigation
             _startZoom = _camera.Zoom;
             _startLookAt = _camera.LookAt;
             _startProjection = _camera.CurrentProjectionType;
+            _viewHeight = _startProjection == ProjectionType.Orthographic ? _camera.OrthoSize : _camera.PerspectiveViewHeight;
 
             // Calculate target state
             if (targetView == ViewPresetType.Perspective)
@@ -61,21 +67,13 @@ namespace GameWorld.Core.Components.Navigation
             }
 
             _targetLookAt = customLookAt ?? _startLookAt;
-            _targetZoom = CalculateOrthoZoom();
+            _targetZoom = _viewHeight / (2 * MathF.Tan(MathHelper.PiOver4 / 2));
 
             // Reset transition state
             _transitionProgress = 0f;
             _elapsedTime = 0f;
             _isTransitioning = true;
-        }
-
-        /// <summary>
-        /// Calculate appropriate zoom for orthographic view
-        /// </summary>
-        private float CalculateOrthoZoom()
-        {
-            // Use current zoom as base, scale for orthographic view
-            return _camera.Zoom;
+            _lastAppliedState = CurrentState;
         }
 
         /// <summary>
@@ -86,6 +84,13 @@ namespace GameWorld.Core.Components.Navigation
             if (!_isTransitioning)
                 return;
 
+            // Focus/reset commands and manual navigation take precedence over animation.
+            if (CurrentState != _lastAppliedState)
+            {
+                CancelTransition();
+                return;
+            }
+
             _elapsedTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
             _transitionProgress = Math.Min(1f, _elapsedTime / _transitionDuration);
 
@@ -94,12 +99,12 @@ namespace GameWorld.Core.Components.Navigation
 
             // Interpolate camera parameters
             _camera.Yaw = LerpAngle(_startYaw, _targetYaw, t);
-            _camera.Pitch = MathHelper.Lerp(_startPitch, _targetPitch, t);
+            _camera.Pitch = MathHelper.WrapAngle(LerpAngle(_startPitch, _targetPitch, t));
             _camera.Zoom = MathHelper.Lerp(_startZoom, _targetZoom, t);
             _camera.LookAt = Vector3.Lerp(_startLookAt, _targetLookAt, t);
 
             // Update ortho size based on zoom
-            _camera.OrthoSize = _camera.Zoom * 0.5f;
+            _camera.OrthoSize = _viewHeight;
 
             // Switch projection type at midpoint
             if (_transitionProgress >= 0.5f && _camera.CurrentProjectionType != _targetProjection)
@@ -116,8 +121,9 @@ namespace GameWorld.Core.Components.Navigation
                 _camera.Zoom = _targetZoom;
                 _camera.LookAt = _targetLookAt;
                 _camera.CurrentProjectionType = _targetProjection;
-                _camera.OrthoSize = _targetZoom * 0.5f;
+                _camera.OrthoSize = _viewHeight;
             }
+            _lastAppliedState = CurrentState;
         }
 
         /// <summary>

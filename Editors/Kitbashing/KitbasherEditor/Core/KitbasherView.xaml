@@ -89,12 +89,41 @@
                                 <Image Height="20" Width="20" Source="{Binding Image}"/>
                             </RadioButton>
                         </DataTemplate>
+                        <DataTemplate x:Key="sidebarSelectionTemplate">
+                            <StackPanel>
+                                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource sidebarRadioTemplate}" />
+                                <ToggleButton x:Name="CircleSelectionButton" Width="28" Height="28" Padding="4" Margin="1"
+                                              DataContext="{Binding DataContext.MenuBar, RelativeSource={RelativeSource AncestorType={x:Type local:KitbasherView}}}"
+                                              Style="{DynamicResource AeEditor.ToggleIcon}"
+                                              IsEnabled="{Binding CanUseMeshSelectionTools.Value}"
+                                              IsChecked="{Binding SelectionSettings.IsCircleSelection, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              ToolTip="{loc:Loc Kitbash.Selection.Circle}"
+                                              AutomationProperties.Name="{loc:Loc Kitbash.Selection.Circle}"
+                                              ToolTipService.ShowOnDisabled="True"
+                                              Focusable="False" Click="CircleSelection_Click">
+                                    <ToggleButton.Resources>
+                                        <ResourceDictionary>
+                                            <ResourceDictionary.MergedDictionaries>
+                                                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                                            </ResourceDictionary.MergedDictionaries>
+                                        </ResourceDictionary>
+                                    </ToggleButton.Resources>
+                                    <Viewbox Width="18" Height="18">
+                                        <Grid Width="20" Height="20">
+                                            <Ellipse Margin="2" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeThickness="1.5" StrokeDashArray="2,2" />
+                                            <Ellipse Width="4" Height="4" Fill="{DynamicResource AeBrush.TextPrimary}" />
+                                        </Grid>
+                                    </Viewbox>
+                                </ToggleButton>
+                            </StackPanel>
+                        </DataTemplate>
                         <DataTemplate x:Key="sidebarSeparatorTemplate">
                             <Separator Style="{StaticResource SidebarSeparatorStyle}"/>
                         </DataTemplate>
                         <local:SidebarTemplateSelector x:Key="sidebarTemplateSelector"
                             DefaultTemplate="{StaticResource sidebarDefaultTemplate}"
                             RadioTemplate="{StaticResource sidebarRadioTemplate}"
+                            SelectionTemplate="{StaticResource sidebarSelectionTemplate}"
                             SeparatorTemplate="{StaticResource sidebarSeparatorTemplate}"/>
                     </ToolBar.Resources>
                     <ToolBar.ItemTemplateSelector>

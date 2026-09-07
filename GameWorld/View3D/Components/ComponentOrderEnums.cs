@@ -4,6 +4,7 @@
     {
         RenderEngine,
         Input,
+        InputCapture,
         Camera,
         NavigationGizmo,
         Animation,
