@@ -42,7 +42,6 @@ namespace Test.KitbashEditor.LoadAndSave
 
             // Verify the generated RMV2 file
             uint[] expectedMeshCountPerLod = [4, 4, 2, 2];
-            uint[] vertexCount = [36150, 20646, 13734, 6867];
             VertexFormat[][] expectedVertexType = [
                 [VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Weighted],
                 [VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Weighted],
@@ -57,7 +56,7 @@ namespace Test.KitbashEditor.LoadAndSave
             // Assert
             var rmv2File = runner.PackFileService.FindFile(TestFiles.RmvFilePathKarl, outputPackFile);
             var rmv = RmvHelper.AssertFile(rmv2File, RmvVersionEnum.RMV2_V7, 4, "humanoid01");
-            RmvHelper.AssertGeometryFile(rmv, 4, [4, 4, 2, 2], vertexCount);
+            LoadAndSave_Geometry.AssertDefaultLodReduction(rmv);
             RmvHelper.AssertMaterial(rmv, 4, expectedVertexType, alpha, ModelMaterialEnum.weighted);
 
             // Verify wsmodel

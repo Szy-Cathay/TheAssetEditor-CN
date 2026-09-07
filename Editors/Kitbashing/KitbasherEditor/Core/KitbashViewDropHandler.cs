@@ -16,7 +16,7 @@ namespace Editors.KitbasherEditor.ViewModels
 
         public bool AllowDrop(TreeNode node, TreeNode targeNode = null)
         {
-            if (node != null && node.NodeType == NodeType.File)
+            if (node?.Item != null && node.NodeType == NodeType.File)
             {
                 var extension = Path.GetExtension(node.Name).ToLower();
                 if (extension == ".rigid_model_v2" || extension == ".wsmodel" || extension == ".variantmeshdefinition")
@@ -27,6 +27,9 @@ namespace Editors.KitbasherEditor.ViewModels
 
         public bool Drop(TreeNode node)
         {
+            if (!AllowDrop(node))
+                return false;
+
             _uiCommandFactory.Create<ImportReferenceMeshCommand>().Execute(node.Item);
             return true;
         }

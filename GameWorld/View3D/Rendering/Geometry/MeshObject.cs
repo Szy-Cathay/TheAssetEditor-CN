@@ -9,6 +9,8 @@ namespace GameWorld.Core.Rendering.Geometry
 {
     public class MeshObject : IDisposable
     {
+        public const int MaxVertexCount = ushort.MaxValue + 1;
+
         IGraphicsCardGeometry Context;
 
         public VertexPositionNormalTextureCustom[] VertexArray; // Vector3 for pos at some point
@@ -266,7 +268,11 @@ namespace GameWorld.Core.Rendering.Geometry
 
         public void Merge(List<MeshObject> others)//
         {
-            var newVertexBufferSize = others.Sum(x => x.VertexCount()) + VertexCount();
+            var vertexCount = others.Sum(x => (long)x.VertexCount()) + VertexCount();
+            if (vertexCount > MaxVertexCount)
+                throw new InvalidOperationException(Shared.Core.Services.LocalizationManager.Instance?.Get("Msg.Kitbash.CombineVertexLimit")
+                    ?? "合并后的网格超过 65536 个顶点。请减少选择的网格，或先减面再合并。");
+            var newVertexBufferSize = (int)vertexCount;
             var newVertexArray = new VertexPositionNormalTextureCustom[newVertexBufferSize];
 
             // Copy current vertex buffer
@@ -286,14 +292,14 @@ namespace GameWorld.Core.Rendering.Geometry
             // Copy others into main
             foreach (var geo in others)
             {
-                var geoOffset = (ushort)currentVertexIndex;
+                var geoOffset = currentVertexIndex;
                 var geoVertexIndex = 0;
                 for (; geoVertexIndex < geo.VertexCount();)
                     newVertexArray[currentVertexIndex++] = geo.VertexArray[geoVertexIndex++];
 
                 var geoIndexIndex = 0;
                 for (; geoIndexIndex < geo.GetIndexCount();)
-                    newIndexArray[currentIndexIndex++] = (ushort)(geo.IndexArray[geoIndexIndex++] + geoOffset); ;
+                    newIndexArray[currentIndexIndex++] = checked((ushort)(geo.IndexArray[geoIndexIndex++] + geoOffset));
             }
 
             VertexArray = newVertexArray;
@@ -435,11 +441,11 @@ namespace GameWorld.Core.Rendering.Geometry
 
             var newVertexList = new List<VertexPositionNormalTextureCustom>();
             var remappingTable = new Dictionary<ushort, ushort>();
-            for (ushort i = 0; i < VertexArray.Length; i++)
+            for (var i = 0; i < VertexArray.Length; i++)
             {
-                if (uniqueIndexSet.Contains(i))
+                if (uniqueIndexSet.Contains((ushort)i))
                 {
-                    remappingTable[i] = (ushort)remappingTable.Count();
+                    remappingTable[(ushort)i] = (ushort)remappingTable.Count();
                     newVertexList.Add(VertexArray[i]);
                 }
             }
@@ -463,11 +469,11 @@ namespace GameWorld.Core.Rendering.Geometry
 
             var newVertexList = new List<VertexPositionNormalTextureCustom>();
             var remappingTable = new Dictionary<ushort, ushort>();
-            for (ushort i = 0; i < VertexArray.Length; i++)
+            for (var i = 0; i < VertexArray.Length; i++)
             {
-                if (uniqeIndexes.Contains(i))
+                if (uniqeIndexes.Contains((ushort)i))
                 {
-                    remappingTable[i] = (ushort)remappingTable.Count();
+                    remappingTable[(ushort)i] = (ushort)remappingTable.Count();
                     newVertexList.Add(VertexArray[i]);
                 }
             }

@@ -1,16 +1,19 @@
 ﻿using System.Collections.Generic;
 using GameWorld.Core.Components.Selection;
+using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
 
 namespace GameWorld.Core.Commands.Face
 {
-    public class DuplicateFacesCommand : ICommand
+    public class DuplicateFacesCommand : IRedoableCommand
     {
         readonly SelectionManager _selectionManager;
 
         // Undo variables
         ISelectionState _oldState;
         ISelectable _newObject;
+        MeshObject _originalGeometry;
+        MeshObject _remainderGeometry;
 
         // Input variables
         List<int> _facesToDelete;
@@ -41,10 +44,8 @@ namespace GameWorld.Core.Commands.Face
             // Clone the object
             _newObject = SceneNodeHelper.CloneNode(_inputNode);
 
-            // Add to the scene
             if (!_deleteOriginal)
                 _newObject.Name += "_copy";
-            _newObject.Parent.AddObject(_newObject);
 
             var selectedFaceIndecies = new List<ushort>();
             var indexBuffer = _newObject.Geometry.GetIndexBuffer();
@@ -58,7 +59,31 @@ namespace GameWorld.Core.Commands.Face
             _newObject.Geometry.RemoveUnusedVertexes(selectedFaceIndecies.ToArray());
 
             if (_deleteOriginal)
-                _inputNode.Parent.RemoveObject(_inputNode);
+            {
+                _originalGeometry = _inputNode.Geometry;
+                var selectedFaces = _facesToDelete.ToHashSet();
+                var remainingIndices = new List<ushort>();
+                for (var face = 0; face < indexBuffer.Count; face += 3)
+                {
+                    if (!selectedFaces.Contains(face))
+                        remainingIndices.AddRange(indexBuffer.GetRange(face, 3));
+                }
+                _remainderGeometry = _originalGeometry.CloneSubMesh(remainingIndices.ToArray());
+            }
+
+            Redo();
+        }
+
+        public void Redo()
+        {
+            _newObject.Parent.AddObject(_newObject);
+            if (_deleteOriginal)
+            {
+                if (_remainderGeometry.GetIndexCount() == 0)
+                    _inputNode.Parent.RemoveObject(_inputNode);
+                else
+                    _inputNode.Geometry = _remainderGeometry;
+            }
 
             // Object state
             var objectState = new ObjectSelectionState();
@@ -71,7 +96,11 @@ namespace GameWorld.Core.Commands.Face
             _newObject.Parent.RemoveObject(_newObject);
 
             if (_deleteOriginal)
-                _inputNode.Parent.AddObject(_inputNode);
+            {
+                _inputNode.Geometry = _originalGeometry;
+                if (!_inputNode.Parent.Children.Contains(_inputNode))
+                    _inputNode.Parent.AddObject(_inputNode);
+            }
 
             _selectionManager.SetState(_oldState);
         }

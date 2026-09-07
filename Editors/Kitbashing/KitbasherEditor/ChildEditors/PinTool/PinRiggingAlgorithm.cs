@@ -44,6 +44,14 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
                 return false;
             }
 
+            if (SelectedMesh.Geometry.WeightCount == 0)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.PinSourceMustBeAnimated"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return false;
+            }
+
             var result = _commandFactory.Create<PinMeshToVertexCommand>()
                 .Configure(x => x.Configure(meshesToAffect, SelectedMesh, SelectedVertex.First()))
                 .BuildAndExecute();
@@ -77,6 +85,14 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
             {
                 _standardDialogs.ShowDialogBox(
                     LocalizationManager.Instance.Get("Msg.Kitbash.SelectionIsNotMesh"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
+
+            if (selectionAsMeshNode.Geometry.WeightCount == 0)
+            {
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.Get("Msg.Kitbash.PinSourceMustBeAnimated"),
                     LocalizationManager.Instance.Get("General.Error"));
                 return;
             }

@@ -7,12 +7,13 @@ using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 {
-    public class SkinWrapRiggingCommand : ICommand
+    public class SkinWrapRiggingCommand : IRedoableCommand
     {
         ISelectionState _selectionOldState;
         private readonly SelectionManager _selectionManager;
 
         List<MeshObject> _originalGeometries;
+        List<MeshObject> _updatedGeometries;
 
         List<Rmv2MeshNode> _giveAnimationToList;
         Rmv2MeshNode _takeAnimationFrom;
@@ -40,8 +41,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 
             var weightTransfer = RegiggingHelper.CreateWeightTransfer(
                 _takeAnimationFrom.Geometry,
-                _takeAnimationFrom.ModelMatrix);
-            var updatedGeometries = new List<MeshObject>(_giveAnimationToList.Count);
+                _takeAnimationFrom.GetRenderWorldMatrix());
+            _updatedGeometries = new List<MeshObject>(_giveAnimationToList.Count);
             _originalGeometries = _giveAnimationToList.Select(x => x.Geometry).ToList();
             _selectionOldState = _selectionManager.GetStateCopy();
 
@@ -55,7 +56,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
                 {
                     var inputVertexPosition = Vector3.Transform(
                         updatedGeometry.VertexArray[i].Position3(),
-                        giveAnimationTo.ModelMatrix);
+                        giveAnimationTo.GetRenderWorldMatrix());
                     var result = weightTransfer.FindClosestWeights(inputVertexPosition);
 
                     updatedGeometry.VertexArray[i].BlendIndices = result.Bones;
@@ -63,11 +64,16 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
                 }
 
                 updatedGeometry.RebuildVertexBuffer();
-                updatedGeometries.Add(updatedGeometry);
+                _updatedGeometries.Add(updatedGeometry);
             }
+            Redo();
+        }
 
+        public void Redo()
+        {
             for (var index = 0; index < _giveAnimationToList.Count; index++)
-                _giveAnimationToList[index].Geometry = updatedGeometries[index];
+                _giveAnimationToList[index].Geometry = _updatedGeometries[index];
+            _selectionManager.SetState(_selectionOldState.Clone());
         }
 
         public void Undo()

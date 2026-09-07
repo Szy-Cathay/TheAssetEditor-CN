@@ -6,10 +6,11 @@ using GameWorld.Core.Services.SceneSaving.Lod.MeshDecimatorIntegration;
 
 namespace GameWorld.Core.Commands.Object
 {
-    public class ReduceMeshCommand : ICommand
+    public class ReduceMeshCommand : IRedoableCommand
     {
         List<Rmv2MeshNode> _meshList;
         List<MeshObject> _originalGeometry = new List<MeshObject>();
+        readonly List<MeshObject> _reducedGeometry = new List<MeshObject>();
         float _factor;
         SelectionManager _selectionManager;
         ISelectionState _oldState;
@@ -38,9 +39,17 @@ namespace GameWorld.Core.Commands.Object
                 var originalMesh = meshNode.Geometry;
 
                 var reducedMesh = DecimatorMeshOptimizer.GetReducedMeshCopy(originalMesh, _factor);
-                meshNode.Geometry = reducedMesh;
+                _reducedGeometry.Add(reducedMesh);
                 _originalGeometry.Add(originalMesh);
             }
+            Redo();
+        }
+
+        public void Redo()
+        {
+            for (var i = 0; i < _meshList.Count; i++)
+                _meshList[i].Geometry = _reducedGeometry[i];
+            _selectionManager.SetState(_oldState.Clone());
         }
 
         public void Undo()

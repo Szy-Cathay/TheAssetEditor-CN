@@ -66,21 +66,22 @@ namespace GameWorld.Core.Services
 
             for (var i = 0; i < indexList.Count; i += 3)
             {
-                var isContainedInExistingObject = false;
-                foreach (var currentObject in subMeshList)
-                {
-                    if (currentObject.IsConnectedToFace(i))
-                    {
-                        currentObject.AddFace(i);
-                        isContainedInExistingObject = true;
-                    };
-                }
-
-                if (isContainedInExistingObject == false)
+                var connected = subMeshList.Where(x => x.IsConnectedToFace(i)).ToList();
+                if (connected.Count == 0)
                 {
                     var newItem = new SubFaceObject(indexList, vertextes);
                     newItem.AddFace(i);
                     subMeshList.Add(newItem);
+                }
+                else
+                {
+                    var target = connected[0];
+                    target.AddFace(i);
+                    foreach (var other in connected.Skip(1))
+                    {
+                        target.Merge(other);
+                        subMeshList.Remove(other);
+                    }
                 }
             }
 

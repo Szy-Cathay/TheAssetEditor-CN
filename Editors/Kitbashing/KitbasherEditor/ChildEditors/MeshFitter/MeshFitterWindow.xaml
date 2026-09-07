@@ -30,7 +30,6 @@
         </Expander>
         
         <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False" >
-            <Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{loc:Loc General.Apply}" Click="ApplyButtonClick"/>
             <Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{loc:Loc General.Ok}" Click="OkButtonClick" Style="{StaticResource AeButton.Primary}"/>
             <Button DockPanel.Dock="Right" Content="{loc:Loc General.Cancel}" Click="CancelButtonClick" Style="{StaticResource AeButton.Quiet}"/>
         </DockPanel>

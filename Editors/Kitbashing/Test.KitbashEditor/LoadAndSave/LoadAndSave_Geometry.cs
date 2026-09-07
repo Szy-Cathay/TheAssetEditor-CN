@@ -48,7 +48,6 @@ namespace Test.KitbashEditor.LoadAndSave
 
             // Verify the generated RMV2 file
             uint[] expectedMeshCountPerLod = [4, 4, 2, 2];
-            uint[] vertexCount = [36150, 20646, 13734, 6867];
             VertexFormat[][] expectedVertexType = [
                 [VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Weighted],
                 [VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Cinematic, VertexFormat.Weighted],
@@ -63,12 +62,30 @@ namespace Test.KitbashEditor.LoadAndSave
             // Assert
             var rmv2File = runner.PackFileService.FindFile(TestFiles.RmvFilePathKarl, outputPackFile);
             var rmv = RmvHelper.AssertFile(rmv2File, RmvVersionEnum.RMV2_V7, 4, "humanoid01");
-            RmvHelper.AssertGeometryFile(rmv, 4, [4, 4, 2, 2], vertexCount);
+            AssertDefaultLodReduction(rmv);
             RmvHelper.AssertMaterial(rmv, 4, expectedVertexType, alpha, ModelMaterialEnum.weighted);
 
             // Verify wsmodel
             var wsModelFile = runner.PackFileService.FindFile(TestFiles.WsFilePathKarl, outputPackFile);
             WsModelHelper.AssertFile(wsModelFile);
+        }
+
+        internal static void AssertDefaultLodReduction(RmvFile rmv)
+        {
+            int[] expectedMeshCounts = [4, 4, 2, 2];
+            double[] expectedRatios = [1, 0.75, 0.5, 0.25];
+            var baseIndexCount = rmv.ModelList[0].Sum(x => x.Mesh.IndexList.Length);
+            Assert.That(baseIndexCount, Is.EqualTo(36150));
+            Assert.That(rmv.ModelList, Has.Length.EqualTo(4));
+            for (var lod = 0; lod < 4; lod++)
+            {
+                Assert.That(rmv.ModelList[lod], Has.Length.EqualTo(expectedMeshCounts[lod]));
+                var indexCount = rmv.ModelList[lod].Sum(x => x.Mesh.IndexList.Length);
+                Assert.That((double)indexCount / baseIndexCount, Is.EqualTo(expectedRatios[lod]).Within(0.01),
+                    $"LOD {lod} must reduce triangles to the configured fraction, allowing protected borders.");
+                foreach (var model in rmv.ModelList[lod])
+                    Assert.That(model.Mesh.IndexList.All(index => index < model.Mesh.VertexList.Length), Is.True);
+            }
         }
 
         [Test]

@@ -27,6 +27,5 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         private void CancelButtonClick(object sender, RoutedEventArgs e) => Close();
 
-        private void ApplyButtonClick(object sender, RoutedEventArgs e) => ViewModel.OnApplyButton();
     }
 }

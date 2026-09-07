@@ -7,12 +7,13 @@ using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 {
-    public class PinMeshToVertexCommand : ICommand
+    public class PinMeshToVertexCommand : IRedoableCommand
     {
         ISelectionState _selectionOldState;
         SelectionManager _selectionManager;
 
         List<MeshObject> _originalGeos;
+        List<MeshObject> _updatedGeometries;
         List<Vector3> _originalPivots;
 
         List<Rmv2MeshNode> _meshesToPin;
@@ -36,8 +37,11 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 
         public void Execute()
         {
+            if (_source.Geometry.WeightCount == 0)
+                throw new InvalidOperationException(LocalizationManager.Instance?.Get("Msg.Kitbash.PinSourceMustBeAnimated")
+                    ?? "源网格没有骨骼权重，请选择带骨骼权重的网格顶点。");
             var sourceVert = _source.Geometry.GetVertexExtented(_vertexId);
-            var updatedGeometries = new List<MeshObject>(_meshesToPin.Count);
+            _updatedGeometries = new List<MeshObject>(_meshesToPin.Count);
             _originalGeos = _meshesToPin.Select(x => x.Geometry).ToList();
             _originalPivots = _meshesToPin.Select(x => x.PivotPoint).ToList();
             _selectionOldState = _selectionManager.GetStateCopy();
@@ -55,14 +59,19 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
                 }
 
                 updatedGeometry.RebuildVertexBuffer();
-                updatedGeometries.Add(updatedGeometry);
+                _updatedGeometries.Add(updatedGeometry);
             }
+            Redo();
+        }
 
+        public void Redo()
+        {
             for (var index = 0; index < _meshesToPin.Count; index++)
             {
-                _meshesToPin[index].Geometry = updatedGeometries[index];
+                _meshesToPin[index].Geometry = _updatedGeometries[index];
                 _meshesToPin[index].PivotPoint = Vector3.Zero;
             }
+            _selectionManager.SetState(_selectionOldState.Clone());
         }
 
         public void Undo()
