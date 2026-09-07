@@ -35,6 +35,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders
             _shaderType = shaderType;
             _resourceLibrary = resourceLibrary;
             Type = materialType;
+            _renderingTechniqueMap[RenderingTechnique.ViewportGeometry] = "ViewportGeometry";
         }
 
         public T GetCapability<T>() where T : class, ICapability

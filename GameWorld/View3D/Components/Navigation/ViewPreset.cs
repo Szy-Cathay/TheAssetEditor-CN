@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using System;
 
 namespace GameWorld.Core.Components.Navigation
@@ -33,10 +33,10 @@ namespace GameWorld.Core.Components.Navigation
                 ViewPresetType.Perspective => (0.8f, 0.32f),  // Default angled view
                 ViewPresetType.Front => (0f, 0f),              // Looking at -Z
                 ViewPresetType.Back => (MathHelper.Pi, 0f),    // Looking at +Z
-                ViewPresetType.Right => (-MathHelper.PiOver2, 0f),  // Looking at -X
-                ViewPresetType.Left => (MathHelper.PiOver2, 0f),    // Looking at +X
-                ViewPresetType.Top => (0f, -MathHelper.PiOver2 + 0.01f),   // Looking down (-Y)
-                ViewPresetType.Bottom => (0f, MathHelper.PiOver2 - 0.01f), // Looking up (+Y)
+                ViewPresetType.Right => (MathHelper.PiOver2, 0f),  // Looking at -X
+                ViewPresetType.Left => (-MathHelper.PiOver2, 0f),    // Looking at +X
+                ViewPresetType.Top => (0f, -MathHelper.PiOver2),   // Looking down (-Y)
+                ViewPresetType.Bottom => (0f, MathHelper.PiOver2), // Looking up (+Y)
                 _ => (0.8f, 0.32f)
             };
         }
@@ -47,12 +47,13 @@ namespace GameWorld.Core.Components.Navigation
         public static ViewPresetType? DetectViewPreset(float yaw, float pitch, float threshold = 0.1f)
         {
             float normalizedYaw = MathHelper.WrapAngle(yaw);
+            pitch = MathHelper.WrapAngle(pitch);
             float absPitch = Math.Abs(pitch);
 
             // Check top/bottom first (pitch is dominant)
-            if (pitch < -MathHelper.PiOver2 + threshold + 0.01f)
+            if (Math.Abs(pitch + MathHelper.PiOver2) < threshold + 0.01f)
                 return ViewPresetType.Top;
-            if (pitch > MathHelper.PiOver2 - threshold - 0.01f)
+            if (Math.Abs(pitch - MathHelper.PiOver2) < threshold + 0.01f)
                 return ViewPresetType.Bottom;
 
             // Check horizontal views (pitch near 0)
@@ -63,9 +64,9 @@ namespace GameWorld.Core.Components.Navigation
                 if (Math.Abs(normalizedYaw - MathHelper.Pi) < threshold ||
                     Math.Abs(normalizedYaw + MathHelper.Pi) < threshold)
                     return ViewPresetType.Back;
-                if (Math.Abs(normalizedYaw + MathHelper.PiOver2) < threshold)
-                    return ViewPresetType.Right;
                 if (Math.Abs(normalizedYaw - MathHelper.PiOver2) < threshold)
+                    return ViewPresetType.Right;
+                if (Math.Abs(normalizedYaw + MathHelper.PiOver2) < threshold)
                     return ViewPresetType.Left;
             }
 

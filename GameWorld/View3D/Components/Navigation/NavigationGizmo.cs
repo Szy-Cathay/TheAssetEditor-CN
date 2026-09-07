@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Input;
+﻿using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -105,6 +105,9 @@ namespace GameWorld.Core.Components.Navigation
         /// </summary>
         private NavigationAxis HitTestAxis(Vector2 mousePos)
         {
+            var inputSize = _mouse.GetScreenSize();
+            if (inputSize.X > 0 && inputSize.Y > 0)
+                mousePos *= new Vector2(_graphics.Viewport.Width / inputSize.X, _graphics.Viewport.Height / inputSize.Y);
             var axisEndpoints = GetAllAxisScreenPositions();
 
             float minDist = float.MaxValue;
@@ -112,6 +115,11 @@ namespace GameWorld.Core.Components.Navigation
 
             foreach (var data in axisEndpoints)
             {
+                // When aligned, both ends overlap; clicking the current axis selects its reverse.
+                var projectedAxis = (data.ScreenPos - _screenPosition) / (GIZMO_SIZE / 2);
+                if (projectedAxis.LengthSquared() < 1e-6f && data.Depth > 0)
+                    continue;
+
                 float dist = Vector2.Distance(mousePos, data.ScreenPos);
                 if (dist < HIT_RADIUS && dist < minDist)
                 {

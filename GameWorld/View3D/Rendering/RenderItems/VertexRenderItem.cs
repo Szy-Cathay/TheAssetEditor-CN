@@ -1,4 +1,4 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Geometry;
@@ -13,6 +13,7 @@ namespace GameWorld.Core.Rendering.RenderItems
         public bool IncludeInPhotoCapture => false;
 
         public VertexInstanceMesh VertexRenderer { get; set; }
+        public float PointSizeScale { get; set; } = 1;
 
         public Rmv2MeshNode Node { get; set; }
         public Matrix ModelMatrix { get; set; } = Matrix.Identity;
@@ -68,7 +69,7 @@ namespace GameWorld.Core.Rendering.RenderItems
                     Pose,
                     parameters.View,
                     parameters.Projection,
-                    device);
+                    device, parameters.OverlayOpacity, parameters.SelectedOverlayOpacity, PointSizeScale);
                 return;
             }
 
@@ -104,7 +105,7 @@ namespace GameWorld.Core.Rendering.RenderItems
             VertexRenderer.Draw(
                 parameters.View,
                 parameters.Projection,
-                device);
+                device, parameters.OverlayOpacity, parameters.SelectedOverlayOpacity, PointSizeScale);
         }
     }
 }

@@ -1,4 +1,4 @@
-using GameWorld.Core.Components;
+﻿using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Services;
@@ -17,8 +17,9 @@ namespace GameWorld.Core.Test.Rendering;
 [NonParallelizable]
 public class RenderEngineRenderTargetLifecycleTests
 {
-    [Test]
-    public void Draw_ReenablingSelectionOutlineAfterViewportReturnsToPreviousSizeDoesNotReuseDisposedTarget()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Draw_ReenablingSelectionOutlineAfterViewportReturnsToPreviousSizeDoesNotReuseDisposedTarget(bool surfaceDetail)
     {
         const int originalSize = 64;
         const int temporaryWidth = 80;
@@ -52,6 +53,11 @@ public class RenderEngineRenderTargetLifecycleTests
                 ShowGrid = false
             });
         renderEngine.Initialize();
+        if (surfaceDetail)
+        {
+            renderEngine.ShadingMode = ViewportShadingMode.Solid;
+            renderEngine.ShadingSettings = new() { CavityStrength = 0.5f, ShadowStrength = 0.6f };
+        }
 
         using var originalTarget = CreateHostTarget(
             device,
@@ -69,11 +75,17 @@ public class RenderEngineRenderTargetLifecycleTests
                 device,
                 originalTarget,
                 requestSelectionOutline: true);
+            var geometryTarget = GetGeometryTarget();
             DrawFrame(
                 renderEngine,
                 device,
                 temporaryTarget,
                 requestSelectionOutline: false);
+            if (surfaceDetail)
+            {
+                Assert.That(geometryTarget!.IsDisposed, Is.True);
+                Assert.That(GetGeometryTarget()!.Width, Is.EqualTo(temporaryWidth));
+            }
             DrawFrame(
                 renderEngine,
                 device,
@@ -87,12 +99,18 @@ public class RenderEngineRenderTargetLifecycleTests
                     originalTarget,
                     requestSelectionOutline: true),
                 Throws.Nothing);
+            if (surfaceDetail)
+                Assert.That(GetGeometryTarget()!.Width, Is.EqualTo(originalSize));
         }
         finally
         {
             device.SetRenderTarget(null);
             renderEngine.Dispose();
         }
+
+        RenderTarget2D? GetGeometryTarget() => (RenderTarget2D?)typeof(RenderEngineComponent)
+            .GetField("_surfaceGeometryTarget", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(renderEngine);
     }
 
     private static RenderTarget2D CreateHostTarget(

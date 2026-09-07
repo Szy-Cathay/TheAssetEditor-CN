@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Editors.KitbasherEditor.Components;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
@@ -29,7 +29,7 @@ using Test.TestingUtility.Shared;
 namespace GameWorld.Core.Test.Rendering;
 
 [NonParallelizable]
-public class RenderEngineSelectionMaskOffscreenTests
+public partial class RenderEngineSelectionMaskOffscreenTests
 {
     [Test]
     public void DenseStaticOverlay_PrioritizesSelectedVertexEdgesPastRenderLimit()
@@ -164,6 +164,7 @@ public class RenderEngineSelectionMaskOffscreenTests
         var objectRequestField = typeof(RenderEngineComponent).GetField(
             "_selectionOutlineRequested",
             BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(renderEngine.ShadingSettings.WireframeObjectSelection, Is.True);
         Assert.That(
             objectRequestField?.GetValue(renderEngine),
             Is.True,
@@ -214,6 +215,7 @@ public class RenderEngineSelectionMaskOffscreenTests
         {
             node.Render(renderEngine, Matrix.Identity);
             selectionOverlay.Draw(new GameTime());
+            Assert.That(renderEngine.ShadingSettings.WireframeObjectSelection, Is.False);
             device.SetRenderTargets(
                 new RenderTargetBinding(sceneTarget),
                 new RenderTargetBinding(maskTarget));
@@ -1023,8 +1025,8 @@ public class RenderEngineSelectionMaskOffscreenTests
                 "A selected edge must remain orange when it overlaps the black edit wireframe.");
             Assert.That(
                 widestOrangeColumn,
-                Is.GreaterThanOrEqualTo(2),
-                "A selected edge must be visibly thicker than the one-pixel edit wireframe.");
+                Is.InRange(1, 2),
+                "A selected edge must stay readable without becoming a thick strip over the mesh.");
         });
 
         mesh.VertexArray[0].Position.Y += 0.6f;
@@ -1559,7 +1561,7 @@ public class RenderEngineSelectionMaskOffscreenTests
         var count = 0;
         for (var index = 0; index < pixels.Count; index++)
         {
-            if (!IsOrange(pixels[index]))
+            if (pixels[index].A < 32 || !IsSelectedOrange(pixels[index]))
                 continue;
 
             rowSum += index / size;

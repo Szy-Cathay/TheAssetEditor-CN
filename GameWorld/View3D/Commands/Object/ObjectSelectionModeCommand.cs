@@ -127,6 +127,28 @@ namespace GameWorld.Core.Commands.Object
 
                 newEdgeState.ModifySelection(edges, false);
             }
+            // Edge → Face: require every boundary edge of the triangle.
+            else if (oldState is EdgeSelectionState oldEdges && newState is FaceSelectionState newFaces)
+            {
+                if (oldEdges.RenderObject == null || oldEdges.SelectedEdges.Count == 0)
+                    return;
+
+                var indices = oldEdges.RenderObject.Geometry.GetIndexBuffer();
+                var faces = new List<int>();
+                for (int i = 0; i < indices.Count; i += 3)
+                {
+                    var a = indices[i];
+                    var b = indices[i + 1];
+                    var c = indices[i + 2];
+                    if (oldEdges.SelectedEdges.Contains((Math.Min(a, b), Math.Max(a, b))) &&
+                        oldEdges.SelectedEdges.Contains((Math.Min(b, c), Math.Max(b, c))) &&
+                        oldEdges.SelectedEdges.Contains((Math.Min(c, a), Math.Max(c, a))))
+                        faces.Add(i);
+                }
+
+                newFaces.RenderObject = oldEdges.RenderObject;
+                newFaces.ModifySelection(faces, false);
+            }
             // Edge → Vertex: extract vertex indices from selected edges
             else if (oldState is EdgeSelectionState oldEdgeState && newState is VertexSelectionState newVertState2)
             {

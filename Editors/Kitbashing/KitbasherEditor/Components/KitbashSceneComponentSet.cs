@@ -1,4 +1,4 @@
-using GameWorld.Core.Commands;
+﻿using GameWorld.Core.Commands;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Rendering;
@@ -7,6 +7,7 @@ using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Shared.Core.Events;
+using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.Components
 {
@@ -15,6 +16,7 @@ namespace Editors.KitbasherEditor.Components
         public KitbashSelectionOverlayComponent SelectionOverlay { get; }
         public KitbashSelectionInputComponent SelectionInput { get; }
         public KitbashModelGizmoComponent ModelGizmo { get; }
+        public KitbashSelectionSettings SelectionSettings { get; } = new();
         public IGameComponent[] Components { get; }
 
         public KitbashSceneComponentSet(
@@ -28,7 +30,8 @@ namespace Editors.KitbasherEditor.Components
             CommandFactory commandFactory,
             SelectionManager selectionManager,
             SceneManager sceneManager,
-            IScopedResourceLibrary resourceLibrary)
+            IScopedResourceLibrary resourceLibrary,
+            IWpfGame scene)
         {
             ModelGizmo = new KitbashModelGizmoComponent(
                 eventHub,
@@ -49,18 +52,33 @@ namespace Editors.KitbasherEditor.Components
                 commandFactory,
                 sceneManager,
                 renderEngine,
-                ModelGizmo);
+                ModelGizmo,
+                SelectionSettings,
+                scene);
             SelectionOverlay = new KitbashSelectionOverlayComponent(
                 selectionManager,
                 renderEngine,
                 resourceLibrary,
-                deviceResolver);
+                deviceResolver,
+                SelectionSettings);
             Components =
             [
                 SelectionOverlay,
                 SelectionInput,
-                ModelGizmo
+                ModelGizmo,
+                new SelectionGestureCapture(SelectionInput)
             ];
+        }
+
+        private sealed class SelectionGestureCapture : BaseComponent
+        {
+            private readonly KitbashSelectionInputComponent _selection;
+            public SelectionGestureCapture(KitbashSelectionInputComponent selection)
+            {
+                _selection = selection;
+                UpdateOrder = (int)ComponentUpdateOrderEnum.InputCapture;
+            }
+            public override void Update(GameTime gameTime) => _selection.CaptureSelectionGesture();
         }
     }
 }

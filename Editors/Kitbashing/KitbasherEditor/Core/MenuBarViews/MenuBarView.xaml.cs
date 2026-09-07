@@ -22,6 +22,28 @@ namespace KitbasherEditor.Views
             InitializeComponent();
         }
 
+        private void SelectionTool_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MenuBarViewModel viewModel)
+                viewModel.FocusScene();
+        }
+
+        private void ShadingPopup_Opened(object? sender, EventArgs e)
+        {
+            if (DataContext is MenuBarViewModel viewModel)
+                viewModel.ViewportShading.RefreshSettings();
+        }
+
+        private void ShadingPopup_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key is not (Key.Escape or Key.Enter) || e.OriginalSource is ComboBox { IsDropDownOpen: true })
+                return;
+            ShadingArrowBtn.IsChecked = false;
+            e.Handled = true;
+            if (DataContext is MenuBarViewModel viewModel)
+                Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(viewModel.FocusScene));
+        }
+
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
             DetachWindowHandlers();

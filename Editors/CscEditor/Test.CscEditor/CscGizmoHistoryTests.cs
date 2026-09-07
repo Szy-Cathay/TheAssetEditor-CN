@@ -1,4 +1,4 @@
-using Editors.CscEditor.Services;
+﻿using Editors.CscEditor.Services;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
 using Microsoft.Xna.Framework;
@@ -79,6 +79,11 @@ public class CscGizmoHistoryTests
         public int DeletaScrollWheel() => 0;
         public Vector2 DeltaPosition() => Vector2.Zero;
         public Vector2 Position() => Vector2.Zero;
+        public Vector2? GetPressPosition(MouseButton button) => null;
+        public Vector2? CapturedCursorPosition => null;
+        public event Action CaptureInterrupted { add { } remove { } }
+        public void BeginContinuousDrag(bool wrap = true) { }
+        public void EndContinuousDrag() { }
         public bool IsMouseButtonDown(MouseButton button) => false;
         public bool IsMouseButtonPressed(MouseButton button) => false;
         public bool IsMouseButtonReleased(MouseButton button) => false;

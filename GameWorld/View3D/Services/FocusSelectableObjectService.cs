@@ -33,6 +33,8 @@ namespace GameWorld.Core.Services
         public void FocusScene()
         {
             var mainNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+            if (mainNode == null)
+                return;
 
             var nodes = mainNode.GetMeshNodes(0)
                 .Select(x => x as ISelectable)
@@ -44,23 +46,36 @@ namespace GameWorld.Core.Services
 
         public void FocusObjects(List<ISelectable> items)
         {
-            if (items.Count == 0)
-                return;
+            FramePositions(items.SelectMany(item => GetWorldPositions(item,
+                Enumerable.Range(0, item.Geometry.VertexCount()))));
+        }
 
-            // Create a suber bb
-            var bb = items[0].Geometry.BoundingBox;
-            for (var i = 1; i < items.Count; i++)
-                bb = BoundingBox.CreateMerged(bb, items[i].Geometry.BoundingBox);
+        IEnumerable<Vector3> GetWorldPositions(ISelectable item, IEnumerable<int> indices)
+        {
+            var pose = item is Rmv2MeshNode mesh ? MeshPoseSnapshot.Capture(mesh) : null;
+            var world = pose?.WorldTransform ?? _sceneManager.GetWorldPosition(item);
+            foreach (var index in indices)
+            {
+                if (index >= 0 && index < item.Geometry.VertexCount())
+                    yield return pose?.GetWorldPosition(index) ?? Vector3.Transform(item.Geometry.GetVertexById(index), world);
+            }
+        }
 
-            var bbCorners = bb.GetCorners();
-            var bbCenter = new Vector3(bbCorners.Average(x => x.X), bbCorners.Average(x => x.Y), bbCorners.Average(x => x.Z));
-
-            double fov = MathHelper.ToRadians(45);
-            double boundSphereRadius = bbCorners.Select(x => Vector3.Distance(x, bbCenter)).Max();
-            var camDistance = boundSphereRadius * 2.0 / Math.Tan(fov / 2.0) / 2;
-
-            _arcBallCamera.LookAt = bbCenter;
-            _arcBallCamera.Zoom = (float)camDistance;
+        void FramePositions(IEnumerable<Vector3> positions)
+        {
+            var min = new Vector3(float.PositiveInfinity);
+            var max = new Vector3(float.NegativeInfinity);
+            var hasPoint = false;
+            foreach (var point in positions)
+            {
+                if (!float.IsFinite(point.X) || !float.IsFinite(point.Y) || !float.IsFinite(point.Z))
+                    continue;
+                min = Vector3.Min(min, point);
+                max = Vector3.Max(max, point);
+                hasPoint = true;
+            }
+            if (hasPoint)
+                _arcBallCamera.FrameBounds(new BoundingBox(min, max));
         }
 
         void Focus(ISelectionState selectionState)
@@ -73,80 +88,28 @@ namespace GameWorld.Core.Services
             }
             else if (selectionState is VertexSelectionState vertexSelection)
             {
-                var vertexList = vertexSelection.SelectedVertices;
-                var objectPos = _sceneManager.GetWorldPosition(vertexSelection.RenderObject).Translation;
-                if (vertexList.Count == 0)
-                {
-                    _arcBallCamera.LookAt = objectPos;
-                    return;
-                }
-
-                var averageVertexPos = Vector3.Zero;
-                foreach (var vertexIndex in vertexList)
-                    averageVertexPos += vertexSelection.RenderObject.Geometry.GetVertexById(vertexIndex);
-
-                averageVertexPos = averageVertexPos / vertexList.Count;
-                _arcBallCamera.LookAt = averageVertexPos + objectPos;
+                FramePositions(GetWorldPositions(vertexSelection.RenderObject, vertexSelection.SelectedVertices));
             }
             else if (selectionState is FaceSelectionState faceSelection)
             {
-                var faceList = faceSelection.SelectedFaces;
-                var objectPos = _sceneManager.GetWorldPosition(faceSelection.RenderObject).Translation;
-                if (faceList.Count == 0)
+                var indices = faceSelection.SelectedFaces.SelectMany(face => new[]
                 {
-                    _arcBallCamera.LookAt = objectPos;
-                    return;
-                }
-
-                var averageFacePos = Vector3.Zero;
-                foreach (var faceIndex in faceList)
-                {
-                    var index0 = faceSelection.RenderObject.Geometry.GetIndex(faceIndex + 0);
-                    var index1 = faceSelection.RenderObject.Geometry.GetIndex(faceIndex + 1);
-                    var index2 = faceSelection.RenderObject.Geometry.GetIndex(faceIndex + 2);
-
-                    var face0 = faceSelection.RenderObject.Geometry.GetVertexById(index0);
-                    var face1 = faceSelection.RenderObject.Geometry.GetVertexById(index1);
-                    var face2 = faceSelection.RenderObject.Geometry.GetVertexById(index2);
-                    averageFacePos += (face0 + face1 + face2) / 3;
-                }
-                averageFacePos = averageFacePos / faceList.Count;
-                _arcBallCamera.LookAt = averageFacePos + objectPos;
+                    faceSelection.RenderObject.Geometry.GetIndex(face),
+                    faceSelection.RenderObject.Geometry.GetIndex(face + 1),
+                    faceSelection.RenderObject.Geometry.GetIndex(face + 2)
+                });
+                FramePositions(GetWorldPositions(faceSelection.RenderObject, indices));
             }
             else if (selectionState is EdgeSelectionState edgeSelection)
             {
-                var vertexIndices =
-                    edgeSelection.GetSelectedVertexIndices();
-                var objectPos = _sceneManager
-                    .GetWorldPosition(edgeSelection.RenderObject)
-                    .Translation;
-                if (vertexIndices.Count == 0)
-                {
-                    _arcBallCamera.LookAt = objectPos;
-                    return;
-                }
-
-                var averageVertexPos = Vector3.Zero;
-                foreach (var vertexIndex in vertexIndices)
-                {
-                    averageVertexPos += edgeSelection.RenderObject
-                        .Geometry
-                        .GetVertexById(vertexIndex);
-                }
-
-                _arcBallCamera.LookAt =
-                    averageVertexPos / vertexIndices.Count + objectPos;
+                FramePositions(GetWorldPositions(edgeSelection.RenderObject, edgeSelection.GetSelectedVertexIndices()));
             }
             else if (selectionState is BoneSelectionState boneSelection)
             {
-                var objectPos = _sceneManager
-                    .GetWorldPosition(boneSelection.RenderObject)
-                    .Translation;
+                var world = _sceneManager.GetWorldPosition(boneSelection.RenderObject);
+                var objectPos = world.Translation;
                 if (boneSelection.SelectedBones.Count == 0)
-                {
-                    _arcBallCamera.LookAt = objectPos;
                     return;
-                }
 
                 var currentFrame = AnimationSampler.Sample(
                     boneSelection.CurrentFrame,
@@ -160,8 +123,7 @@ namespace GameWorld.Core.Services
                     return;
                 }
 
-                var averageBonePos = Vector3.Zero;
-                var selectedBoneCount = 0;
+                var positions = new List<Vector3>();
                 foreach (var boneIndex in boneSelection.SelectedBones)
                 {
                     if (boneIndex < 0 ||
@@ -170,17 +132,15 @@ namespace GameWorld.Core.Services
                         continue;
                     }
 
-                    averageBonePos += currentFrame
+                    var bonePosition = currentFrame
                         .GetSkeletonAnimatedWorld(
                             boneSelection.Skeleton,
                             boneIndex)
                         .Translation;
-                    selectedBoneCount++;
+                    positions.Add(Vector3.Transform(bonePosition, world));
                 }
 
-                _arcBallCamera.LookAt = selectedBoneCount == 0
-                    ? objectPos
-                    : averageBonePos / selectedBoneCount + objectPos;
+                FramePositions(positions);
             }
         }
 
@@ -189,6 +149,7 @@ namespace GameWorld.Core.Services
         {
             _arcBallCamera.LookAt = Vector3.Zero;
             _arcBallCamera.Zoom = 10;
+            _arcBallCamera.OrthoSize = _arcBallCamera.PerspectiveViewHeight;
         }
     }
 }

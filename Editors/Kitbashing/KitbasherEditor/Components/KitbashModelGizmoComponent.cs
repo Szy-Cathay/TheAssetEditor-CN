@@ -60,6 +60,7 @@ namespace Editors.KitbasherEditor.Components
             _selectionManager = selectionManager;
 
             _eventHub.Register<SelectionChangedEvent>(this, Handle);
+            _mouse.CaptureInterrupted += OnCaptureInterrupted;
         }
 
         public override void Initialize()
@@ -80,6 +81,12 @@ namespace Editors.KitbasherEditor.Components
         /// Get the Gizmo instance for KitbashSelectionInputComponent to check modal transform state.
         /// </summary>
         public Gizmo Gizmo => _gizmo;
+
+        private void OnCaptureInterrupted()
+        {
+            if (_gizmo?.IsInModalTransform == true)
+                _gizmo.CancelModalTransform();
+        }
 
         private void OnSelectionChanged(ISelectionState state)
         {
@@ -257,6 +264,8 @@ namespace Editors.KitbasherEditor.Components
 
         public override void Update(GameTime gameTime)
         {
+            if (_mouse.MouseOwner is KitbashSelectionInputComponent)
+                return;
             var selectionMode = _selectionManager.GetState().Mode;
             if (!IsSupportedSelectionMode(selectionMode))
                 return;
@@ -269,23 +278,32 @@ namespace Editors.KitbasherEditor.Components
             // Active whenever there is a selection (no need to enable Gizmo first)
             // Press hotkey to enter modal transform mode, mouse moves to transform
             // Left click to confirm, Right click or Escape to cancel
-            if (_gizmo.Selection.Count > 0 && !_gizmo.IsInModalTransform)
+            if (_gizmo.Selection.Count > 0 && !_gizmo.IsInModalTransform &&
+                !_keyboard.IsKeyDownOrReleased(Keys.LeftControl) &&
+                !_keyboard.IsKeyDownOrReleased(Keys.RightControl) &&
+                !_keyboard.IsKeyDownOrReleased(Keys.LeftAlt) &&
+                !_keyboard.IsKeyDownOrReleased(Keys.RightAlt))
             {
-                if (_keyboard.IsKeyReleased(Keys.G))
+                if (_keyboard.IsKeyPressed(Keys.G))
                 {
                     StartModalTransform(GizmoMode.Translate);
-                    return;
                 }
-                else if (_keyboard.IsKeyReleased(Keys.R))
+                else if (_keyboard.IsKeyPressed(Keys.R))
                 {
                     StartModalTransform(GizmoMode.Rotate);
-                    return;
+                    if (_keyboard.GetKeyPressCount(Keys.R) > 1 && _keyboard.GetKeyPressCount(Keys.R) % 2 == 0)
+                        _gizmo.ToggleTrackballRotation();
                 }
-                else if (_keyboard.IsKeyReleased(Keys.S))
+                else if (_keyboard.IsKeyPressed(Keys.S))
                 {
                     StartModalTransform(GizmoMode.NonUniformScale);
-                    return;
                 }
+            }
+            else if (_gizmo.IsInModalTransform && !_gizmo.IsInNumericInput &&
+                _gizmo.ActiveMode == GizmoMode.Rotate && _keyboard.IsKeyPressed(Keys.R))
+            {
+                if (_keyboard.GetKeyPressCount(Keys.R) <= 1 || _keyboard.GetKeyPressCount(Keys.R) % 2 == 1)
+                    _gizmo.ToggleTrackballRotation();
             }
 
             // Tab = Toggle edit mode (Object <-> last sub-mode)
@@ -319,19 +337,6 @@ namespace Editors.KitbasherEditor.Components
                 }
             }
 
-            // Alt+Z cycles the three viewport shading modes.
-            // Only when NOT in modal transform and NOT dragging gizmo
-            if (!_gizmo.IsInModalTransform && !_isEnabled)
-            {
-                bool isAltHeld = _keyboard.IsKeyDown(Keys.LeftAlt) || _keyboard.IsKeyDown(Keys.RightAlt);
-                if (isAltHeld && _keyboard.IsKeyReleased(Keys.Z))
-                {
-                    _resourceLibary.ShadingMode =
-                        ViewportShadingPolicy.Next(
-                            _resourceLibary.ShadingMode);
-                }
-            }
-
             // Handle modal transform updates
             if (_gizmo.IsInModalTransform)
             {
@@ -354,7 +359,20 @@ namespace Editors.KitbasherEditor.Components
                 _keyboard.IsKeyDown(Keys.RightControl);
             _gizmo.SnapEnabled = _isCtrlPressed;
 
-            var isCameraMoving2 = _keyboard.IsKeyDown(Keys.LeftAlt);
+            var isCameraMoving2 = _keyboard.IsKeyDown(Keys.LeftAlt) || _keyboard.IsKeyDown(Keys.RightAlt);
+            if (!isCameraMoving2 && _mouse.MouseOwner == null && _mouse.IsMouseButtonPressed(MouseButton.Left))
+            {
+                var origin = _mouse.GetPressPosition(MouseButton.Left) ?? _mouse.Position();
+                _gizmo.SelectAxis(origin);
+                if (_gizmo.ActiveAxis != GizmoAxis.None)
+                {
+                    var axis = _gizmo.ActiveAxis;
+                    _gizmo.StartModalTransform(_gizmo.ActiveMode, origin, confirmOnMouseRelease: true);
+                    _gizmo.ActiveAxis = axis;
+                    _gizmo.Update(gameTime, true);
+                    return;
+                }
+            }
             _gizmo.Update(gameTime, !isCameraMoving2);
         }
 
@@ -418,7 +436,13 @@ namespace Editors.KitbasherEditor.Components
             // Don't set _isEnabled = true - Gizmo should not be visible during modal transform
             _mouse.MouseOwner = this;
 
-            _gizmo.StartModalTransform(mode);
+            var key = mode switch
+            {
+                GizmoMode.Translate => Keys.G,
+                GizmoMode.Rotate => Keys.R,
+                _ => Keys.S
+            };
+            _gizmo.StartModalTransform(mode, _keyboard.GetKeyPressPosition(key));
         }
 
         public void SetGizmoMode(GizmoMode mode)
@@ -481,6 +505,7 @@ namespace Editors.KitbasherEditor.Components
 
         public void Dispose()
         {
+            _mouse.CaptureInterrupted -= OnCaptureInterrupted;
             ExceptionDispatchInfo primaryError = null;
             var transformation = _activeTransformation;
 

@@ -117,6 +117,29 @@
                         VerticalAlignment="Center"
                         Margin="4,0">
                 <StackPanel Orientation="Horizontal">
+                    <ToggleButton Width="28" Height="28" Padding="4" Margin="0,0,4,0"
+                                  x:Name="XRaySelectionButton"
+                                  Style="{DynamicResource AeEditor.ToggleIcon}"
+                                  IsChecked="{Binding SelectionSettings.IsXRay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  ToolTip="{loc:Loc Kitbash.Selection.XRay}"
+                                  AutomationProperties.Name="{loc:Loc Kitbash.Selection.XRay}"
+                                  Focusable="False" Click="SelectionTool_Click">
+                        <ToggleButton.Resources>
+                            <ResourceDictionary>
+                                <ResourceDictionary.MergedDictionaries>
+                                    <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                                </ResourceDictionary.MergedDictionaries>
+                            </ResourceDictionary>
+                        </ToggleButton.Resources>
+                        <Viewbox Width="18" Height="18">
+                            <Grid Width="20" Height="20">
+                                <Rectangle Width="12" Height="12" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                           Stroke="{DynamicResource AeBrush.TextSecondary}" StrokeThickness="1.5"/>
+                                <Rectangle Width="12" Height="12" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                           Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeThickness="1.5"/>
+                            </Grid>
+                        </Viewbox>
+                    </ToggleButton>
                     <RadioButton Width="28"
                                  Height="28"
                                  Padding="4"
@@ -176,6 +199,96 @@
                             </Grid>
                         </Viewbox>
                     </RadioButton>
+                    <ToggleButton x:Name="ShadingArrowBtn" Height="28"
+                                  Style="{StaticResource AeButton.DropdownArrow}" Focusable="False"
+                                  ToolTip="{loc:Loc Kitbash.ViewportShading.Settings}"
+                                  AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Settings}" />
+                    <Popup x:Name="ShadingPopup" Placement="Bottom"
+                           PlacementTarget="{Binding ElementName=ShadingArrowBtn}"
+                           IsOpen="{Binding IsChecked, ElementName=ShadingArrowBtn, Mode=TwoWay}"
+                           StaysOpen="False" AllowsTransparency="True"
+                           Opened="ShadingPopup_Opened">
+                        <Border Style="{DynamicResource AeSurface.Overlay}" Padding="12" Width="324"
+                                PreviewKeyDown="ShadingPopup_PreviewKeyDown">
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Kitbash.ViewportShading.Settings}"
+                                           Style="{DynamicResource AeText.SectionTitle}" Margin="0,0,0,8" />
+                                <StackPanel Visibility="{Binding ViewportShading.IsWireframe, Converter={StaticResource BoolToCollapsedConverter}}">
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc Kitbash.ViewportShading.WireOpacity}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                                                   Text="{Binding ViewportShading.WireframeOpacity, StringFormat={}{0:P0}}" />
+                                        <Slider Minimum="0.1" Maximum="1" Value="{Binding ViewportShading.WireframeOpacity}" SmallChange="0.01" IsMoveToPointEnabled="True"
+                                                AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.WireOpacity}" />
+                                    </DockPanel>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding ViewportShading.IsSolid, Converter={StaticResource BoolToCollapsedConverter}}">
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc Kitbash.ViewportShading.Lighting}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <ComboBox SelectedIndex="{Binding ViewportShading.SolidLighting}" Style="{StaticResource AeInput.ComboBox}"
+                                                  AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Lighting}">
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.Studio}" />
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.Clay}" />
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.Metal}" />
+                                        </ComboBox>
+                                    </DockPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc Kitbash.ViewportShading.Cavity}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                                                   Text="{Binding ViewportShading.CavityStrength, StringFormat={}{0:P0}}" />
+                                        <Slider Minimum="0" Maximum="1" Value="{Binding ViewportShading.CavityStrength}" SmallChange="0.01" IsMoveToPointEnabled="True"
+                                                ToolTip="{loc:Loc Kitbash.ViewportShading.CavityHelp}" AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Cavity}" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc Kitbash.ViewportShading.Shadow}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                                                   Text="{Binding ViewportShading.ShadowStrength, StringFormat={}{0:P0}}" />
+                                        <Slider Minimum="0" Maximum="1" Value="{Binding ViewportShading.ShadowStrength}" SmallChange="0.01" IsMoveToPointEnabled="True"
+                                                ToolTip="{loc:Loc Kitbash.ViewportShading.ShadowHelp}" AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Shadow}" />
+                                    </DockPanel>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding ViewportShading.IsMaterialPreview, Converter={StaticResource BoolToCollapsedConverter}}">
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc Kitbash.ViewportShading.Environment}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <ComboBox SelectedIndex="{Binding ViewportShading.Environment}" Style="{StaticResource AeInput.ComboBox}"
+                                                  AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Environment}">
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.GameEnvironment}" />
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.StudioEnvironment}" />
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.OvercastEnvironment}" />
+                                            <ComboBoxItem Content="{loc:Loc Kitbash.ViewportShading.SunsetEnvironment}" />
+                                        </ComboBox>
+                                    </DockPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc KitbashTool.PhotoStudio.LightIntensity}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                                                   Text="{Binding ViewportShading.LightIntensity, StringFormat={}{0:0.00}}" />
+                                        <Slider Minimum="0.1" Maximum="3" Value="{Binding ViewportShading.LightIntensity}" SmallChange="0.01" IsMoveToPointEnabled="True"
+                                                AutomationProperties.Name="{loc:Loc KitbashTool.PhotoStudio.LightIntensity}" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Label Content="{loc:Loc Kitbash.ViewportShading.Rotation}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                                                   Text="{Binding ViewportShading.EnvironmentRotation, StringFormat={}{0:0}°}" />
+                                        <Slider Minimum="0" Maximum="360" Value="{Binding ViewportShading.EnvironmentRotation}" SmallChange="1" IsMoveToPointEnabled="True"
+                                                AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.Rotation}" />
+                                    </DockPanel>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding ViewportShading.HasSurface, Converter={StaticResource BoolToCollapsedConverter}}">
+                                <DockPanel Margin="0,0,0,8" Visibility="{Binding CanUseMeshSelectionTools.Value, Converter={StaticResource BoolToCollapsedConverter}}">
+                                    <Label Content="{loc:Loc Kitbash.ViewportShading.XRayOpacity}" Width="96" Style="{StaticResource AeForm.Label}" />
+                                    <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                                               Text="{Binding ViewportShading.XRayOpacity, StringFormat={}{0:P0}}" />
+                                    <Slider Minimum="0.05" Maximum="1" Value="{Binding ViewportShading.XRayOpacity}" SmallChange="0.01" IsMoveToPointEnabled="True"
+                                            IsEnabled="{Binding SelectionSettings.IsXRay}" ToolTip="{loc:Loc Kitbash.ViewportShading.XRayOpacityHelp}"
+                                            AutomationProperties.Name="{loc:Loc Kitbash.ViewportShading.XRayOpacity}" />
+                                </DockPanel>
+                                </StackPanel>
+                                <Button Content="{loc:Loc Kitbash.ViewportShading.Reset}" HorizontalAlignment="Right"
+                                        Style="{StaticResource AeButton.Quiet}" Command="{Binding ViewportShading.ResetCommand}"
+                                        ToolTip="{loc:Loc Kitbash.ViewportShading.ResetHelp}" />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
                 </StackPanel>
 
                 <Separator Style="{DynamicResource VerticalSeparatorStyle}"/>

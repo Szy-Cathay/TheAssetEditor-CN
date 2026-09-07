@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Navigation;
+﻿using GameWorld.Core.Components.Navigation;
 using Microsoft.Xna.Framework;
 using NUnit.Framework;
 using System;
@@ -38,7 +38,7 @@ namespace GameWorld.Core.Test.BlenderFeatures
         {
             var (yaw, pitch) = ViewPresets.GetViewAngles(ViewPresetType.Right);
 
-            Assert.That(yaw, Is.EqualTo(-MathHelper.PiOver2).Within(Epsilon), "Right view yaw should be -π/2");
+            Assert.That(yaw, Is.EqualTo(MathHelper.PiOver2).Within(Epsilon), "Right view looks from +X");
             Assert.That(pitch, Is.EqualTo(0f).Within(Epsilon), "Right view pitch should be 0");
         }
 
@@ -47,7 +47,7 @@ namespace GameWorld.Core.Test.BlenderFeatures
         {
             var (yaw, pitch) = ViewPresets.GetViewAngles(ViewPresetType.Left);
 
-            Assert.That(yaw, Is.EqualTo(MathHelper.PiOver2).Within(Epsilon), "Left view yaw should be π/2");
+            Assert.That(yaw, Is.EqualTo(-MathHelper.PiOver2).Within(Epsilon), "Left view looks from -X");
             Assert.That(pitch, Is.EqualTo(0f).Within(Epsilon), "Left view pitch should be 0");
         }
 
@@ -106,14 +106,14 @@ namespace GameWorld.Core.Test.BlenderFeatures
         [Test]
         public void ViewPresets_DetectViewPreset_Right()
         {
-            var result = ViewPresets.DetectViewPreset(-MathHelper.PiOver2, 0f);
+            var result = ViewPresets.DetectViewPreset(MathHelper.PiOver2, 0f);
             Assert.That(result, Is.EqualTo(ViewPresetType.Right), "Should detect Right view");
         }
 
         [Test]
         public void ViewPresets_DetectViewPreset_Left()
         {
-            var result = ViewPresets.DetectViewPreset(MathHelper.PiOver2, 0f);
+            var result = ViewPresets.DetectViewPreset(-MathHelper.PiOver2, 0f);
             Assert.That(result, Is.EqualTo(ViewPresetType.Left), "Should detect Left view");
         }
 
@@ -265,8 +265,8 @@ namespace GameWorld.Core.Test.BlenderFeatures
                 (0f, 0f, ViewPresetType.Front),
                 (MathHelper.Pi, 0f, ViewPresetType.Back),
                 (-MathHelper.Pi, 0f, ViewPresetType.Back),
-                (MathHelper.PiOver2, 0f, ViewPresetType.Left),
-                (-MathHelper.PiOver2, 0f, ViewPresetType.Right),
+                (MathHelper.PiOver2, 0f, ViewPresetType.Right),
+                (-MathHelper.PiOver2, 0f, ViewPresetType.Left),
             };
 
             foreach (var (yaw, pitch, expected) in testCases)

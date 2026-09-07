@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Input;
+﻿using GameWorld.Core.Components.Input;
 using GameWorld.Core.WpfWindow.Input;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -42,8 +42,13 @@ public class KeyboardComponentTests
 
     private sealed class TestKeyboard : IWpfKeyboard
     {
+        public string TextInput { get; set; } = "";
         public int InputContextVersion { get; set; }
         public KeyboardState State { get; set; } = new();
+        public KeyboardState ReleasedKeys { get; set; }
+        public KeyboardState PressedKeys { get; set; }
+        public Vector2? GetKeyPressPosition(Keys key) => null;
+        public int GetKeyPressCount(Keys key) => PressedKeys.IsKeyDown(key) ? 1 : 0;
 
         public KeyboardState GetState()
         {

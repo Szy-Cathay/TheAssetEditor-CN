@@ -116,7 +116,7 @@ MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : 
         lightCol_main, L_main, normalizedViewDirection, reflected_view_vec, slm_uncompressed);
 
     // Combine environment + directional light
-    float3 hdr_linear_col = env_light + combined_dir_light;
+    float3 hdr_linear_col = env_light + (ViewportEnvironmentEnabled ? 0 : combined_dir_light);
 
     // Apply global constant light colour
     hdr_linear_col *= Constant_LightColour;
@@ -131,7 +131,7 @@ MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : 
     float3 color = ldr_linear_col + emissiveColour;
 
     MainPixelOutput output;
-    output.Colour = float4(_gamma(color), 1.0f);
+    output.Colour = ViewportSurfaceColour(_gamma(color));
     output.SelectionMask = SelectionMaskEnabled
         ? float4(1.0f, 1.0f, 1.0f, 1.0f)
         : float4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -143,12 +143,11 @@ MainPixelOutput SolidPixelShader(
     bool bIsFrontFace : SV_IsFrontFace)
 {
     MainPixelOutput output;
-    output.Colour = float4(
-        ShadeViewportSolid(
+    output.Colour = ViewportSurfaceColour(
+        ViewportWireframe ? (SelectionMaskEnabled && ViewportWireframeObjectSelection ? float3(1.0f, 0.47f, 0.0f) : float3(0.45f, 0.46f, 0.48f)) : ShadeViewportSolid(
             input.normal,
             input.worldPosition,
-            CameraPos),
-        1.0f);
+            CameraPos, input.position.xy));
     output.SelectionMask = SelectionMaskEnabled
         ? float4(1.0f, 1.0f, 1.0f, 1.0f)
         : float4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -182,6 +181,15 @@ technique SolidDrawing
     {
         VertexShader = compile vs_5_0 MainVertexShader();
         PixelShader = compile ps_5_0 SolidPixelShader();
+    }
+};
+
+technique ViewportGeometry
+{
+    pass P0
+    {
+        VertexShader = compile vs_5_0 MainVertexShader();
+        PixelShader = compile ps_5_0 ViewportGeometryPixelShader();
     }
 };
 

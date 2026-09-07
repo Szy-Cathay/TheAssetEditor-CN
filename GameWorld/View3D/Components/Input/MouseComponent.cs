@@ -31,6 +31,11 @@ namespace GameWorld.Core.Components.Input
         int DeletaScrollWheel();
         Vector2 DeltaPosition();
         Vector2 Position();
+        Vector2? GetPressPosition(MouseButton button);
+        Vector2? CapturedCursorPosition { get; }
+        void BeginContinuousDrag(bool wrap = true);
+        void EndContinuousDrag();
+        event Action CaptureInterrupted;
 
         bool IsMouseButtonDown(MouseButton button);
         bool IsMouseButtonPressed(MouseButton button);
@@ -61,6 +66,10 @@ namespace GameWorld.Core.Components.Input
         MouseState _currentMouseState;
         MouseState _lastMousesState;
         WpfMouse _wpfMouse;
+        Vector2 _position;
+        Vector2 _lastPosition;
+        public event Action CaptureInterrupted;
+        public Vector2? CapturedCursorPosition => _wpfMouse?.CapturedCursorPosition;
 
         IGameComponent _mouseOwner;
         public IGameComponent MouseOwner
@@ -77,6 +86,8 @@ namespace GameWorld.Core.Components.Input
                         throw new Exception(error);
                     }
 
+                    if (value == null)
+                        EndContinuousDrag();
                     _mouseOwner = value;
                 }
             }
@@ -85,6 +96,7 @@ namespace GameWorld.Core.Components.Input
         public MouseComponent(IWpfGame game)
         {
             _wpfMouse = new WpfMouse(game, true);
+            _wpfMouse.CaptureInterrupted += OnCaptureInterrupted;
             UpdateOrder = (int)ComponentUpdateOrderEnum.Input;
         }
 
@@ -101,6 +113,8 @@ namespace GameWorld.Core.Components.Input
 
             _lastMousesState = _currentMouseState;
             _currentMouseState = currentState;
+            _lastPosition = _position;
+            _position = _wpfMouse.Position;
 
             if (_lastMousesState == null)
                 _lastMousesState = currentState;
@@ -108,6 +122,8 @@ namespace GameWorld.Core.Components.Input
 
         public bool IsMouseButtonReleased(MouseButton button)
         {
+            if ((_wpfMouse.ReleasedButtons & (1 << (int)button)) != 0)
+                return true;
             switch (button)
             {
                 case MouseButton.Left:
@@ -138,6 +154,8 @@ namespace GameWorld.Core.Components.Input
 
         public bool IsMouseButtonPressed(MouseButton button)
         {
+            if ((_wpfMouse.PressedButtons & (1 << (int)button)) != 0)
+                return true;
             switch (button)
             {
                 case MouseButton.Left:
@@ -153,14 +171,15 @@ namespace GameWorld.Core.Components.Input
 
         public Vector2 Position()
         {
-            return new Vector2(_currentMouseState.X, _currentMouseState.Y);
+            return _position;
         }
 
         public Vector2 DeltaPosition()
         {
-            var lastPos = new Vector2(_lastMousesState.X, _lastMousesState.Y);
-            return lastPos - Position();
+            return _lastPosition - _position;
         }
+
+        public Vector2? GetPressPosition(MouseButton button) => _wpfMouse.GetPressPosition((int)button);
 
         public int DeletaScrollWheel()
         {
@@ -211,11 +230,24 @@ namespace GameWorld.Core.Components.Input
 
         public void ClearStates()
         {
+            _wpfMouse.ClearButtonTransitions();
             // Preserve scroll wheel value to prevent sudden zoom when ClearStates is called
             // after user has scrolled (see Camera.cs line 226-233)
             var scrollWheelValue = _currentMouseState.ScrollWheelValue;
             _currentMouseState = new MouseState(0, 0, scrollWheelValue, ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released);
             _lastMousesState = new MouseState(0, 0, scrollWheelValue, ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released);
+            _position = _wpfMouse.Position;
+            _lastPosition = _position;
+        }
+
+        public void BeginContinuousDrag(bool wrap = true) => _wpfMouse.BeginContinuousDrag(wrap);
+        public void EndContinuousDrag() => _wpfMouse?.EndContinuousDrag();
+
+        private void OnCaptureInterrupted()
+        {
+            _mouseOwner = null;
+            ClearStates();
+            CaptureInterrupted?.Invoke();
         }
 
         public void Dispose()

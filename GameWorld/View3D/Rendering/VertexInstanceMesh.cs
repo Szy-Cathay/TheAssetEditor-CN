@@ -1,4 +1,4 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.Services;
@@ -69,6 +69,8 @@ namespace GameWorld.Core.Rendering
 
         public Vector3 SelectedColour { get; set; } =
             EditOverlayStyle.SelectedColour;
+
+        public bool FadeSelectedWithDensity { get; set; } = true;
 
         // Screen-space vertex diameter remains stable across mesh types.
         public float VertexPixelSize { get; set; } =
@@ -290,7 +292,8 @@ namespace GameWorld.Core.Rendering
         public void Draw(
             Matrix view,
             Matrix projection,
-            GraphicsDevice device)
+            GraphicsDevice device,
+            float opacity = 1, float selectedOpacity = 1, float pointSizeScale = 1)
         {
             if (_currentInstanceCount == 0)
                 return;
@@ -301,7 +304,7 @@ namespace GameWorld.Core.Rendering
                 new Vector2(
                     device.Viewport.Width,
                     device.Viewport.Height));
-            ApplyVisibilityParameters(view, projection, device);
+            ApplyVisibilityParameters(view, projection, device, opacity, selectedOpacity, pointSizeScale);
 
             // Alpha blending required for anti-aliased circle edges and outline ring transparency
             device.BlendState = BlendState.AlphaBlend;
@@ -315,7 +318,8 @@ namespace GameWorld.Core.Rendering
             MeshPoseSnapshot pose,
             Matrix view,
             Matrix projection,
-            GraphicsDevice device)
+            GraphicsDevice device,
+            float opacity = 1, float selectedOpacity = 1, float pointSizeScale = 1)
         {
             if (_currentInstanceCount == 0)
                 return;
@@ -333,7 +337,7 @@ namespace GameWorld.Core.Rendering
             _overlayBounds =
                 pose.GetConservativeAnimatedBounds();
             _overlayBoundsWorld = pose.WorldTransform;
-            ApplyVisibilityParameters(view, projection, device);
+            ApplyVisibilityParameters(view, projection, device, opacity, selectedOpacity, pointSizeScale);
             _effect.Parameters["CapabilityFlag_ApplyAnimation"]
                 .SetValue(pose.ApplyAnimation);
             _effect.Parameters["Animation_WeightCount"]
@@ -359,7 +363,8 @@ namespace GameWorld.Core.Rendering
         void ApplyVisibilityParameters(
             Matrix view,
             Matrix projection,
-            GraphicsDevice device)
+            GraphicsDevice device,
+            float opacity, float selectedStrength, float pointSizeScale)
         {
             var unselectedOpacity =
                 EditOverlayVisibility.CalculateDetailOpacity(
@@ -370,19 +375,21 @@ namespace GameWorld.Core.Rendering
                     device.Viewport.Width,
                     device.Viewport.Height,
                     _currentInstanceCount);
-            var selectedOpacity =
-                EditOverlayVisibility.CalculateDetailOpacity(
+            var selectedOpacity = FadeSelectedWithDensity
+                ? EditOverlayVisibility.CalculateDetailOpacity(
                     _overlayBounds,
                     _overlayBoundsWorld,
                     view,
                     projection,
                     device.Viewport.Width,
                     device.Viewport.Height,
-                    _selectedInstanceCount);
+                    _selectedInstanceCount)
+                : 1.0f;
             _effect.Parameters["UnselectedOpacity"]
-                .SetValue(unselectedOpacity);
+                .SetValue(unselectedOpacity * opacity);
             _effect.Parameters["SelectedOpacity"]
-                .SetValue(selectedOpacity);
+                .SetValue(selectedOpacity * selectedStrength);
+            _effect.Parameters["PointSizeScale"].SetValue(pointSizeScale);
         }
 
         void DrawInstances(

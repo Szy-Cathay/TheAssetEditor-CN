@@ -475,7 +475,8 @@ namespace GameWorld.Core.Components.Gizmo
                 ModalPreviewReplacementKind.Scale =>
                     TryScalePreview(
                         replacement.VectorValue,
-                        replacement.Pivot),
+                        replacement.Pivot,
+                        replacement.ScaleOrientation),
                 _ => throw new ArgumentOutOfRangeException(
                     nameof(replacement))
             };
@@ -533,7 +534,8 @@ namespace GameWorld.Core.Components.Gizmo
                 case ModalPreviewReplacementKind.Scale:
                     GizmoScaleEvent(
                         replacement.VectorValue,
-                        replacement.Pivot);
+                        replacement.Pivot,
+                        replacement.ScaleOrientation);
                     return;
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -697,24 +699,6 @@ namespace GameWorld.Core.Components.Gizmo
                 .Any(mappings => mappings.Length != 1);
         }
 
-        Matrix FixRotationAxis2(Matrix transform)
-        {
-            // Decompose the transform matrix into its scale, rotation, and translation components
-            transform.Decompose(out var scale, out var rotation, out var translation);
-
-            // Create a quaternion representing a 180-degree rotation around the X axis
-            var flipQuaternion = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathHelper.Pi);
-
-            // Apply the rotation to the quaternion to correct the axis alignment
-            var correctedQuaternion = flipQuaternion * rotation;
-
-            // Recompose the transform matrix with the corrected rotation
-            var fixedTransform = Matrix.CreateScale(scale) * Matrix.CreateFromQuaternion(correctedQuaternion) * Matrix.CreateTranslation(translation);
-
-            return fixedTransform;
-        }
-
-
         public void GizmoTranslateEvent(Vector3 translation, PivotType pivot)
         {
             if (_selectionState is BoneSelectionState)
@@ -759,15 +743,20 @@ namespace GameWorld.Core.Components.Gizmo
 
         public void GizmoScaleEvent(Vector3 scale, PivotType pivot)
         {
+            GizmoScaleEvent(scale, pivot, Matrix.Identity);
+        }
+
+        private void GizmoScaleEvent(Vector3 scale, PivotType pivot, Matrix orientation)
+        {
             var scaleFactor = scale + Vector3.One;
-            var scaleMatrix = Matrix.CreateScale(scaleFactor);
             if (_selectionState is BoneSelectionState)
             {
                 var pivotPoint = GetBonePivot(pivot);
                 if (!BoneTransformDelta.TryCreateScale(
                         scaleFactor,
                         pivotPoint,
-                        out var boneDelta) ||
+                        out var boneDelta,
+                        orientation) ||
                     !TransformBone(boneDelta))
                 {
                     return;
@@ -777,7 +766,7 @@ namespace GameWorld.Core.Components.Gizmo
             }
 
             RunDirectVertexPreview(
-                () => TryScalePreview(scale, pivot));
+                () => TryScalePreview(scale, pivot, orientation));
         }
 
         private PreviewApplyResult TryTranslatePreview(
@@ -813,17 +802,18 @@ namespace GameWorld.Core.Components.Gizmo
             }
 
             _totalGizomTransform *= rotation;
-            var fixedTransform = FixRotationAxis2(_totalGizomTransform);
-            fixedTransform.Decompose(out var _, out var quat, out var _);
-            Orientation = quat;
+            Orientation = Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(
+                Matrix.CreateFromQuaternion(Orientation) * rotation));
             return PreviewApplyResult.Applied(results);
         }
 
         private PreviewApplyResult TryScalePreview(
             Vector3 scale,
-            PivotType pivot)
+            PivotType pivot,
+            Matrix? orientation = null)
         {
-            var scaleMatrix = Matrix.CreateScale(scale + Vector3.One);
+            var basis = orientation ?? Matrix.Identity;
+            var scaleMatrix = Matrix.Transpose(basis) * Matrix.CreateScale(scale + Vector3.One) * basis;
             if (!TryApplyTransform(
                     scaleMatrix,
                     pivot,
@@ -869,7 +859,7 @@ namespace GameWorld.Core.Components.Gizmo
                 GizmoMode.Rotate => VertexTransformOperationMode.Rotate,
                 _ => VertexTransformOperationMode.Scale
             };
-            var pivotPoint = pivotType == PivotType.ObjectCenter ? Position : Vector3.Zero;
+            var pivotPoint = pivotType == PivotType.WorldOrigin ? Vector3.Zero : Position;
             var operation = new VertexTransformOperation(operationMode, transform, pivotPoint);
             if (_vertexTransformReplayPlan == null ||
                 _backupVertexArrays == null ||

@@ -15,6 +15,7 @@ namespace Editors.KitbasherEditor.UiCommands
 
         public void Execute()
         {
+            components.SelectionSettings.IsCircleSelection = false;
             components.ModelGizmo.ResetScale();
             transformToolViewModel.SetMode(TransformToolViewModel.TransformMode.None);
             components.ModelGizmo.Disable();

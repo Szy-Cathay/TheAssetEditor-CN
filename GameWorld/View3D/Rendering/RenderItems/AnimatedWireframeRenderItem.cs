@@ -1,4 +1,4 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Services;
@@ -90,6 +90,7 @@ namespace GameWorld.Core.Rendering.RenderItems
         HashSet<int>? _selectedVertices;
         Vector3 _selectedVertexColour;
 
+        public bool IsSelectionOverlay { get; set; }
         public float DepthBias { get; set; } =
             EditOverlayStyle.WireDepthBias;
         public float EdgeHalfWidth { get; set; } =
@@ -227,13 +228,13 @@ namespace GameWorld.Core.Rendering.RenderItems
             effect.Parameters["ViewportHeight"].SetValue(
                 (float)viewportHeight);
             effect.Parameters["BaseOpacity"].SetValue(
-                _colour.W);
+                _colour.W * (IsSelectionOverlay ? parameters.SelectedOverlayOpacity : parameters.OverlayOpacity));
             effect.Parameters["EdgeDepthBias"].SetValue(
                 DepthBias);
             effect.Parameters["EdgeHalfWidth"].SetValue(
                 EdgeHalfWidth);
             effect.Parameters["OverlayOpacity"].SetValue(
-                EditOverlayVisibility.CalculateDetailOpacity(
+                IsSelectionOverlay ? 1.0f : EditOverlayVisibility.CalculateDetailOpacity(
                     _pose.GetConservativeAnimatedBounds(),
                     _pose.WorldTransform,
                     parameters.View,

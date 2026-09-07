@@ -16,6 +16,7 @@ float4x4 World;
 float2 ViewportSize;
 float UnselectedOpacity = 1.0;
 float SelectedOpacity = 1.0;
+float PointSizeScale = 1.0;
 bool CapabilityFlag_ApplyAnimation = false;
 float4x4 Animation_Tranforms[256];
 int Animation_WeightCount = 0;
@@ -62,6 +63,7 @@ VSOutput CreateVertexPointOutput(
     float instanceWeight)
 {
     VSOutput output = (VSOutput)0;
+    instanceScale *= PointSizeScale;
 
     float2 clipOffset =
         input.Position.xy *

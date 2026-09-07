@@ -32,6 +32,24 @@ Texture2D<float4> MaskTexture;
 
 TextureCube<float4> tex_cube_diffuse;
 TextureCube<float4> tex_cube_specular;
+TextureCube<float4> ViewportDiffuse;
+TextureCube<float4> ViewportSpecular;
+bool ViewportEnvironmentEnabled = false;
+bool ViewportEnvironmentRotationEnabled = false;
+
+float4 SampleEnvironmentDiffuse(SamplerState samplerState, float3 direction)
+{
+    if (ViewportEnvironmentRotationEnabled)
+        direction = mul(direction, (float3x3) EnvMapTransform);
+    return ViewportEnvironmentEnabled ? ViewportDiffuse.SampleLevel(samplerState, direction, 0) : tex_cube_diffuse.Sample(samplerState, direction);
+}
+
+float4 SampleEnvironmentSpecular(SamplerState samplerState, float3 direction, float lod)
+{
+    if (ViewportEnvironmentRotationEnabled)
+        direction = mul(direction, (float3x3) EnvMapTransform);
+    return ViewportEnvironmentEnabled ? ViewportSpecular.SampleLevel(samplerState, direction, lod) : tex_cube_specular.SampleLevel(samplerState, direction, lod);
+}
 Texture2D<float4> specularBRDF_LUT;
 
 bool UseDiffuse = true;

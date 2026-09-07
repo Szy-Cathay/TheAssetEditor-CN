@@ -25,7 +25,7 @@ using MouseButton = GameWorld.Core.Components.Input.MouseButton;
 
 namespace Editors.KitbasherEditor.Components
 {
-    public sealed class KitbashSelectionInputComponent :
+    public sealed partial class KitbashSelectionInputComponent :
         BaseComponent,
         IDisposable
     {
@@ -35,7 +35,7 @@ namespace Editors.KitbasherEditor.Components
         Vector2 _startDrag;
         Vector2 _currentMousePos;
 
-        // Flag to skip next selection after modal transform confirmation
+        // Ignore the release belonging to a finished transform, not a fresh click.
         private bool _skipNextSelection = false;
 
         private readonly IKeyboardComponent _keyboardComponent;
@@ -47,13 +47,15 @@ namespace Editors.KitbasherEditor.Components
         private readonly SceneManager _sceneManger;
         private readonly RenderEngineComponent _resourceLibrary;
         private readonly KitbashModelGizmoComponent _gizmoComponent;
+        private readonly IWpfGame? _scene;
 
         public KitbashSelectionInputComponent(
             IMouseComponent mouseComponent, IKeyboardComponent keyboardComponent,
             ArcBallCamera camera, SelectionManager selectionManager,
             IDeviceResolver deviceResolverComponent, CommandFactory commandFactory,
             SceneManager sceneManager, RenderEngineComponent resourceLibrary,
-            KitbashModelGizmoComponent gizmoComponent)
+            KitbashModelGizmoComponent gizmoComponent,
+            KitbashSelectionSettings? settings = null, IWpfGame? scene = null)
         {
             _mouseComponent = mouseComponent;
             _keyboardComponent = keyboardComponent;
@@ -64,6 +66,10 @@ namespace Editors.KitbasherEditor.Components
             _sceneManger = sceneManager;
             _resourceLibrary = resourceLibrary;
             _gizmoComponent = gizmoComponent;
+            _scene = scene;
+            Settings = settings ?? new();
+            Settings.PropertyChanged += OnSelectionSettingsChanged;
+            _mouseComponent.CaptureInterrupted += OnSelectionCaptureInterrupted;
         }
 
         public override void Initialize()
@@ -86,9 +92,17 @@ namespace Editors.KitbasherEditor.Components
             {
                 gizmo.ClearJustFinishedFlag();
                 _skipNextSelection = true;
+                _isMouseDown = false;
+                return;
             }
 
-            // Keyboard shortcuts work regardless of mouse ownership
+            if (gizmo?.IsInModalTransform == true || _mouseComponent.MouseOwner == _gizmoComponent)
+                return;
+
+            if (UpdateAdvancedSelection())
+                return;
+
+            // Selection shortcuts must not interrupt an active transform.
             HandleSelectionKeyboardShortcuts();
             ChangeSelectionMode();
 
@@ -99,7 +113,12 @@ namespace Editors.KitbasherEditor.Components
 
             if (_mouseComponent.IsMouseButtonPressed(MouseButton.Left))
             {
-                _startDrag = _mouseComponent.Position();
+                var pressPosition = _mouseComponent.GetPressPosition(MouseButton.Left);
+                if (_skipNextSelection && !pressPosition.HasValue)
+                    return;
+
+                _skipNextSelection = false;
+                _startDrag = pressPosition ?? _mouseComponent.Position();
                 _isMouseDown = true;
 
                 if (_mouseComponent.MouseOwner != this)
@@ -121,12 +140,12 @@ namespace Editors.KitbasherEditor.Components
                     var selectionRectangle = CreateSelectionRectangle(_startDrag, _currentMousePos);
                     var isSelectionRect = IsSelectionRectangle(selectionRectangle);
                     if (isSelectionRect)
-                        SelectFromRectangle(selectionRectangle, _keyboardComponent.IsKeyDown(Keys.LeftShift), _keyboardComponent.IsKeyDown(Keys.LeftControl));
+                        SelectFromRectangle(selectionRectangle, IsShiftHeld(), IsControlHeld());
                     else
-                        SelectFromPoint(_currentMousePos, _keyboardComponent.IsKeyDown(Keys.LeftShift), _keyboardComponent.IsKeyDown(Keys.LeftControl));
+                        SelectFromPoint(_currentMousePos, IsShiftHeld(), IsControlHeld());
                 }
                 else
-                    SelectFromPoint(_currentMousePos, _keyboardComponent.IsKeyDown(Keys.LeftShift), _keyboardComponent.IsKeyDown(Keys.LeftControl));
+                    SelectFromPoint(_currentMousePos, IsShiftHeld(), IsControlHeld());
 
                 _isMouseDown = false;
             }
@@ -152,83 +171,43 @@ namespace Editors.KitbasherEditor.Components
             _commandFactory.Create<ObjectSelectionCommand>().Configure(x => x.Configure([selectable], false, true)).BuildAndExecute();
         }
 
+        private bool IsShiftHeld() => _keyboardComponent.IsKeyDownOrReleased(Keys.LeftShift) || _keyboardComponent.IsKeyDownOrReleased(Keys.RightShift);
+        private bool IsControlHeld() => _keyboardComponent.IsKeyDownOrReleased(Keys.LeftControl) || _keyboardComponent.IsKeyDownOrReleased(Keys.RightControl);
+
         void SelectFromRectangle(Rectangle screenRect, bool isSelectionModification, bool removeSelection)
         {
             var unprojectedSelectionRect = _camera.UnprojectRectangle(screenRect);
 
             var currentState = _selectionManager.GetState();
-            if (currentState.Mode == GeometrySelectionMode.Face && currentState is FaceSelectionState faceState)
+            if (currentState.Mode is GeometrySelectionMode.Face or GeometrySelectionMode.Vertex or GeometrySelectionMode.Edge)
             {
-                var worldPositions =
-                    GetEvaluatedWorldPositions(faceState.RenderObject);
-                var hasIntersection = worldPositions != null
-                    ? IntersectionMath.IntersectFaces(
-                        unprojectedSelectionRect,
-                        faceState.RenderObject.Geometry,
-                        worldPositions,
-                        out var faces)
-                    : IntersectionMath.IntersectFaces(
-                        unprojectedSelectionRect,
-                        faceState.RenderObject.Geometry,
-                        faceState.RenderObject.RenderMatrix,
-                        out faces);
-                if (hasIntersection)
-                    _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(faces, isSelectionModification, removeSelection)).BuildAndExecute();
-                else if (!isSelectionModification && !removeSelection && faceState.SelectedFaces.Count > 0)
-                    _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
-                return;
-            }
-            else if (currentState.Mode == GeometrySelectionMode.Vertex && currentState is VertexSelectionState vertexState)
-            {
-                var worldPositions =
-                    GetEvaluatedWorldPositions(vertexState.RenderObject);
-                var hasIntersection = worldPositions != null
-                    ? IntersectionMath.IntersectVertices(
-                        unprojectedSelectionRect,
-                        vertexState.RenderObject.Geometry,
-                        worldPositions,
-                        out var vertices)
-                    : IntersectionMath.IntersectVertices(
-                        unprojectedSelectionRect,
-                        vertexState.RenderObject.Geometry,
-                        vertexState.RenderObject.RenderMatrix,
-                        out vertices);
-                if (hasIntersection)
-                    _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(vertices, isSelectionModification, removeSelection)).BuildAndExecute();
-                else if (!isSelectionModification && !removeSelection && vertexState.SelectedVertices.Count > 0)
-                    _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
-                return;
-            }
-            else if (currentState.Mode == GeometrySelectionMode.Edge && currentState is EdgeSelectionState edgeState)
-            {
-                var edgeObject = edgeState.RenderObject as Rmv2MeshNode;
-                var worldPositions = edgeObject == null
-                    ? null
-                    : MeshPoseSnapshot
-                        .Capture(edgeObject)
-                        .GetWorldPositions();
-                if (edgeObject != null &&
-                    (worldPositions != null
-                        ? IntersectionMath.IntersectEdges(
-                            unprojectedSelectionRect,
-                            edgeObject.Geometry,
-                            worldPositions,
-                            out var edges)
-                        : IntersectionMath.IntersectEdges(
-                            unprojectedSelectionRect,
-                            edgeObject.Geometry,
-                            edgeObject.RenderMatrix,
-                            out edges)))
+                var selected = currentState.GetSingleSelectedObject();
+                if (selected == null)
+                    return;
+                var worldPositions = GetEvaluatedWorldPositions(selected) ?? selected.Geometry.VertexArray
+                    .Select(vertex => Vector3.Transform(new Vector3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z), selected.RenderMatrix)).ToArray();
+                var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
+                var viewport = _camera.InputViewport;
+                if (currentState is FaceSelectionState faceState)
                 {
-                    _commandFactory.Create<EdgeSelectionCommand>()
-                        .Configure(x => x.Configure(edges, isSelectionModification, removeSelection))
-                        .BuildAndExecute();
+                    var faces = IntersectionMath.IntersectVisibleFaces(screenRect, selected.Geometry, worldPositions,
+                        viewProjection, viewport.Width, viewport.Height, Settings.IsXRay);
+                    if (faces.Count > 0 || !isSelectionModification && !removeSelection && faceState.SelectedFaces.Count > 0)
+                        _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(faces, isSelectionModification, removeSelection)).BuildAndExecute();
                 }
-                else if (!isSelectionModification && !removeSelection && edgeState.SelectedEdges.Count > 0)
+                else if (currentState is VertexSelectionState vertexState)
                 {
-                    _commandFactory.Create<EdgeSelectionCommand>()
-                        .Configure(x => x.Configure([], false, false))
-                        .BuildAndExecute();
+                    var vertices = IntersectionMath.IntersectVisibleVertices(screenRect, selected.Geometry, worldPositions,
+                        viewProjection, viewport.Width, viewport.Height, Settings.IsXRay);
+                    if (vertices.Count > 0 || !isSelectionModification && !removeSelection && vertexState.SelectedVertices.Count > 0)
+                        _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(vertices, isSelectionModification, removeSelection)).BuildAndExecute();
+                }
+                else if (currentState is EdgeSelectionState edgeState)
+                {
+                    var edges = IntersectionMath.IntersectVisibleEdges(screenRect, selected.Geometry, worldPositions,
+                        viewProjection, viewport.Width, viewport.Height, Settings.IsXRay);
+                    if (edges.Count > 0 || !isSelectionModification && !removeSelection && edgeState.SelectedEdges.Count > 0)
+                        _commandFactory.Create<EdgeSelectionCommand>().Configure(x => x.Configure(edges, isSelectionModification, removeSelection)).BuildAndExecute();
                 }
                 return;
             }
@@ -274,6 +253,12 @@ namespace Editors.KitbasherEditor.Components
             var ray = _camera.CreateCameraRay(mousePosition);
             var currentState = _selectionManager.GetState();
 
+            if (Settings.IsXRay && currentState is FaceSelectionState xrayFaces)
+            {
+                SelectXrayFace(mousePosition, xrayFaces, isSelectionModification, removeSelection);
+                return;
+            }
+
             // Edit mode: handle mode-specific selection, never fall through to object picking
             if (currentState is FaceSelectionState faceState)
             {
@@ -291,7 +276,8 @@ namespace Editors.KitbasherEditor.Components
                         faceState.RenderObject.RenderMatrix,
                         out selectedFace);
                 if (distance != null)
-                    _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(selectedFace.Value, isSelectionModification, removeSelection)).BuildAndExecute();
+                    _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(selectedFace.Value, isSelectionModification,
+                        removeSelection || isSelectionModification && faceState.SelectedFaces.Contains(selectedFace.Value))).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && faceState.SelectedFaces.Count > 0)
                     _commandFactory.Create<FaceSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
                 return;
@@ -300,7 +286,7 @@ namespace Editors.KitbasherEditor.Components
             if (currentState is VertexSelectionState vertexState)
             {
                 var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
-                var viewport = _deviceResolverComponent.Device.Viewport;
+                var viewport = _camera.InputViewport;
                 var worldPositions =
                     GetEvaluatedWorldPositions(vertexState.RenderObject);
                 var distance = worldPositions != null
@@ -313,7 +299,7 @@ namespace Editors.KitbasherEditor.Components
                         viewport.Height,
                         out var selecteVert,
                         new HashSet<int>(
-                            vertexState.SelectedVertices))
+                            vertexState.SelectedVertices), Settings.IsXRay)
                     : IntersectionMath.IntersectVertex(
                         mousePosition,
                         vertexState.RenderObject.Geometry,
@@ -323,9 +309,10 @@ namespace Editors.KitbasherEditor.Components
                         viewport.Height,
                         out selecteVert,
                         new HashSet<int>(
-                            vertexState.SelectedVertices));
+                            vertexState.SelectedVertices), Settings.IsXRay);
                 if (distance != null)
-                    _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>() { selecteVert }, isSelectionModification, removeSelection)).BuildAndExecute();
+                    _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>() { selecteVert }, isSelectionModification,
+                        removeSelection || isSelectionModification && vertexState.SelectedVertices.Contains(selecteVert))).BuildAndExecute();
                 else if (!isSelectionModification && !removeSelection && vertexState.SelectedVertices.Count > 0)
                     _commandFactory.Create<VertexSelectionCommand>().Configure(x => x.Configure(new List<int>(), false, false)).BuildAndExecute();
                 return;
@@ -335,7 +322,7 @@ namespace Editors.KitbasherEditor.Components
             {
                 var edgeObject = edgeState.RenderObject as Rmv2MeshNode;
                 var viewProjection = _camera.ViewMatrix * _camera.ProjectionMatrix;
-                var viewport = _deviceResolverComponent.Device.Viewport;
+                var viewport = _camera.InputViewport;
                 var worldPositions = edgeObject == null
                     ? null
                     : MeshPoseSnapshot
@@ -351,7 +338,7 @@ namespace Editors.KitbasherEditor.Components
                             viewport.Width,
                             viewport.Height,
                             out var selectedEdge,
-                            edgeState.SelectedEdges)
+                            edgeState.SelectedEdges, Settings.IsXRay)
                         : IntersectionMath.IntersectEdge(
                             mousePosition,
                             edgeObject.Geometry,
@@ -360,10 +347,11 @@ namespace Editors.KitbasherEditor.Components
                             viewport.Width,
                             viewport.Height,
                             out selectedEdge,
-                            edgeState.SelectedEdges)) != null)
+                            edgeState.SelectedEdges, Settings.IsXRay)) != null)
                 {
                     _commandFactory.Create<EdgeSelectionCommand>()
-                        .Configure(x => x.Configure([selectedEdge], isSelectionModification, removeSelection))
+                        .Configure(x => x.Configure([selectedEdge], isSelectionModification,
+                            removeSelection || isSelectionModification && edgeState.SelectedEdges.Contains(selectedEdge)))
                         .BuildAndExecute();
                 }
                 else if (!isSelectionModification && !removeSelection && edgeState.SelectedEdges.Count > 0)
@@ -488,53 +476,84 @@ namespace Editors.KitbasherEditor.Components
         {
             var currentState = _selectionManager.GetState();
 
-            // A key = Select All / Deselect All (Blender behavior: toggle)
-            if (_keyboardComponent.IsKeyReleased(Keys.A) && !_keyboardComponent.IsKeyDown(Keys.LeftControl))
-            {
-                if (currentState.Mode == GeometrySelectionMode.Object)
-                {
-                    var objState = currentState as ObjectSelectionState;
-                    if (objState != null && objState.SelectionCount() > 0)
-                    {
-                        // Deselect All
-                        _commandFactory.Create<ObjectSelectionCommand>()
-                            .Configure(x => x.Configure(new List<ISelectable>(), false, false))
-                            .BuildAndExecute();
-                    }
-                    else
-                    {
-                        // Select All
-                        var allSelectables = SceneNodeHelper.GetChildrenOfType<ISelectable>(_sceneManger.RootNode);
-                        _commandFactory.Create<ObjectSelectionCommand>()
-                            .Configure(x => x.Configure(allSelectables, false, false))
-                            .BuildAndExecute();
-                    }
-                    return true;
-                }
-            }
-
-            // Ctrl+I = Invert Selection
-            if (_keyboardComponent.IsKeyDown(Keys.LeftControl) && _keyboardComponent.IsKeyReleased(Keys.I))
-            {
-                if (currentState.Mode == GeometrySelectionMode.Object && currentState is ObjectSelectionState objState)
-                {
-                    var allSelectables = SceneNodeHelper.GetChildrenOfType<ISelectable>(_sceneManger.RootNode);
-                    var currentlySelected = objState.CurrentSelection();
-                    var inverted = allSelectables.Where(x => !currentlySelected.Contains(x)).ToList();
-                    _commandFactory.Create<ObjectSelectionCommand>()
-                        .Configure(x => x.Configure(inverted, false, false))
-                        .BuildAndExecute();
-                    return true;
-                }
-            }
+            var control = _keyboardComponent.IsKeyDownOrReleased(Keys.LeftControl) ||
+                _keyboardComponent.IsKeyDownOrReleased(Keys.RightControl);
+            var alt = _keyboardComponent.IsKeyDownOrReleased(Keys.LeftAlt) ||
+                _keyboardComponent.IsKeyDownOrReleased(Keys.RightAlt);
+            if (_keyboardComponent.IsKeyReleased(Keys.A) && !control)
+                return SelectAllOrInvert(currentState, deselect: alt, invert: false);
+            if (control && !alt && _keyboardComponent.IsKeyReleased(Keys.I))
+                return SelectAllOrInvert(currentState, deselect: false, invert: true);
 
             // Ctrl+L = Select Linked (Blender behavior: select all connected geometry)
-            if (_keyboardComponent.IsKeyDown(Keys.LeftControl) && _keyboardComponent.IsKeyReleased(Keys.L))
+            if (control && _keyboardComponent.IsKeyReleased(Keys.L))
             {
                 return SelectLinked(currentState);
             }
 
             return false;
+        }
+
+        private bool SelectAllOrInvert(ISelectionState state, bool deselect, bool invert)
+        {
+            if (state is ObjectSelectionState objects)
+            {
+                var all = SceneNodeHelper.GetChildrenOfType<ISelectable>(_sceneManger.RootNode,
+                    node => node.IsVisible && !(node is GroupNode group && group.IsLockable && !group.IsSelectable))
+                    .Where(node => node.IsSelectable);
+                var selection = GetBulkSelection(all, objects.CurrentSelection(), deselect, invert);
+                if (selection != null)
+                    _commandFactory.Create<ObjectSelectionCommand>()
+                        .Configure(command => command.Configure(selection, false, false)).BuildAndExecute();
+                return true;
+            }
+
+            var mesh = state.GetSingleSelectedObject()?.Geometry;
+            if (mesh == null)
+                return false;
+            if (state is VertexSelectionState vertices)
+            {
+                var selection = GetBulkSelection(Enumerable.Range(0, mesh.VertexArray.Length), vertices.SelectedVertices, deselect, invert);
+                if (selection != null)
+                    _commandFactory.Create<VertexSelectionCommand>()
+                        .Configure(command => command.Configure(selection, false, false)).BuildAndExecute();
+                return true;
+            }
+            if (state is FaceSelectionState faces)
+            {
+                var selection = GetBulkSelection(Enumerable.Range(0, mesh.IndexArray.Length / 3).Select(index => index * 3), faces.SelectedFaces, deselect, invert);
+                if (selection != null)
+                    _commandFactory.Create<FaceSelectionCommand>()
+                        .Configure(command => command.Configure(selection, false, false)).BuildAndExecute();
+                return true;
+            }
+            if (state is EdgeSelectionState edges)
+            {
+                var all = new HashSet<(int, int)>();
+                var indices = mesh.GetIndexBuffer();
+                for (int i = 0; i < indices.Count; i += 3)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        var a = indices[i + j];
+                        var b = indices[i + (j + 1) % 3];
+                        all.Add((Math.Min(a, b), Math.Max(a, b)));
+                    }
+                }
+                var selection = GetBulkSelection(all, edges.SelectedEdges, deselect, invert);
+                if (selection != null)
+                    _commandFactory.Create<EdgeSelectionCommand>()
+                        .Configure(command => command.Configure(selection, false, false)).BuildAndExecute();
+                return true;
+            }
+            return false;
+        }
+
+        private static List<T> GetBulkSelection<T>(IEnumerable<T> all, IEnumerable<T> selected, bool deselect, bool invert)
+        {
+            var current = selected.ToHashSet();
+            var result = deselect ? new List<T>() : all.Where(item => !invert || !current.Contains(item)).ToList();
+            return current.SetEquals(result) ? null : result;
         }
 
         /// <summary>
@@ -694,6 +713,12 @@ namespace Editors.KitbasherEditor.Components
 
         public override void Draw(GameTime gameTime)
         {
+            if (Settings.IsCircleSelection && _gizmoComponent?.Gizmo?.IsInModalTransform != true &&
+                _mouseComponent.IsMouseOwner(this) && (_scene?.GetFocusElement().IsMouseOver ?? true))
+            {
+                DrawCircleSelection();
+                return;
+            }
             if (_isMouseDown)
             {
                 var destination = CreateSelectionRectangle(_startDrag, _currentMousePos);
@@ -735,7 +760,10 @@ namespace Editors.KitbasherEditor.Components
 
         public void Dispose()
         {
-            _textTexture.Dispose();
+            FinishCircleSelection();
+            _mouseComponent.CaptureInterrupted -= OnSelectionCaptureInterrupted;
+            Settings.PropertyChanged -= OnSelectionSettingsChanged;
+            _textTexture?.Dispose();
         }
     }
 }

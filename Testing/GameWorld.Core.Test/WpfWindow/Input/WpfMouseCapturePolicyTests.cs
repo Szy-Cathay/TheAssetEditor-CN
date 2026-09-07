@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -8,6 +8,23 @@ namespace GameWorld.Core.Test.WpfWindow.Input;
 
 public class WpfMouseCapturePolicyTests
 {
+    [TestCase(2, 0, 300, 2)]
+    [TestCase(298, 0, 300, 298)]
+    [TestCase(299, 0, 300, 3)]
+    [TestCase(0, 0, 300, 296)]
+    [TestCase(610, 0, 300, 18)]
+    [TestCase(-310, 0, 300, 282)]
+    [TestCase(-294, 0, 300, 2)]
+    [TestCase(594, 0, 300, 298)]
+    [TestCase(-1801, -2200, -1800, -2197)]
+    public void WrapCoordinate_PreservesOvershootAndLeavesBothInnerEdgesStable(
+        int position, int minimum, int maximum, int expected)
+    {
+        var wrapped = WpfMouse.WrapCoordinate(position, minimum, maximum);
+        Assert.That(wrapped, Is.EqualTo(expected));
+        Assert.That(WpfMouse.WrapCoordinate(wrapped, minimum, maximum), Is.EqualTo(wrapped));
+    }
+
     [Test]
     public void ShouldReleaseMouseCapture_CompletedClickInsideViewport_ReturnsTrue()
     {
