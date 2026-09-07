@@ -16,7 +16,10 @@
              Loaded="UserControl_Loaded"
              Unloaded="UserControl_Unloaded">
     <UserControl.Resources>
-
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
         <Style x:Key="VerticalSeparatorStyle" 
             TargetType="{x:Type Separator}"
             BasedOn="{StaticResource {x:Type Separator}}">
@@ -34,16 +37,6 @@
             </Setter>
         </Style>
 
-        <Style x:Key="ImageStyle" TargetType="Image">
-            <Setter Property="Width" Value="20"/>
-            <Setter Property="Height" Value="20"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.05"></Setter>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <DataTemplate x:Key="defaultButtonTemplate">
             <Button ToolTip="{Binding Action.ToolTipAttribute.Value}" Margin="1"
                     AutomationProperties.Name="{Binding Action.ToolTipAttribute.Value}"
@@ -51,9 +44,26 @@
                     IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                     Command="{Binding Path=Action.Command}" 
                     ToolTipService.ShowOnDisabled="True"
-                    Style="{StaticResource AeButton.Icon}"
+                    Style="{StaticResource AeButton.Quiet}" MinWidth="28" Height="28" Padding="4,0"
                     Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToCollapsedConverter}}">
-                <Image Style="{StaticResource ImageStyle}" Source="{Binding Image}"/>
+                <StackPanel Orientation="Horizontal">
+                <Rectangle Style="{StaticResource Kitbash.ToolbarGlyph}">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush ImageSource="{Binding Image}" />
+                    </Rectangle.OpacityMask>
+                </Rectangle>
+                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Margin" Value="5,0,2,0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Label}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                <DataTrigger Binding="{Binding Label}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                </StackPanel>
             </Button>
         </DataTemplate>
 
@@ -68,7 +78,11 @@
                             IsEnabled="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                             ToolTipService.ShowOnDisabled="True"
                             Visibility="{Binding IsVisible.Value, UpdateSourceTrigger=PropertyChanged , Converter={StaticResource BoolToCollapsedConverter}}">
-                <Image Style="{StaticResource ImageStyle}" Source="{Binding Image}"/>
+                <Rectangle Style="{StaticResource Kitbash.ToolbarGlyph}">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush ImageSource="{Binding Image}" />
+                    </Rectangle.OpacityMask>
+                </Rectangle>
             </RadioButton>
         </DataTemplate>
 
@@ -81,6 +95,7 @@
             DefaultButtonTemplate="{StaticResource defaultButtonTemplate}" 
             RadioButtonTemplate="{StaticResource radioButtonTemplate}"
             SeperatorTemplate="{StaticResource seperatorButtonTemplate}"/>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <DockPanel>
@@ -89,6 +104,7 @@
                 <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
                     <Setter Property="Header" Value="{Binding NameAttribute.Value}" />
                     <Setter Property="Command" Value="{Binding Action.Command}" />
+                    <Setter Property="ToolTip" Value="{Binding Action.ToolTipAttribute.Value}" />
                     <Setter Property="IsEnabled" Value="{Binding Action.IsActionEnabled.Value, UpdateSourceTrigger=PropertyChanged}" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsSeparator}" Value="True">
@@ -108,11 +124,15 @@
         </Menu>
 
         <Grid DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <ToolBarTray VerticalAlignment="Center">
                 <ToolBar ItemsSource="{Binding Path=CustomButtons}" ItemTemplateSelector="{StaticResource buttonStyleSelector}" />
             </ToolBarTray>
 
-            <StackPanel Orientation="Horizontal"
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center"
                         Margin="4,0">
@@ -206,9 +226,10 @@
                     <Popup x:Name="ShadingPopup" Placement="Bottom"
                            PlacementTarget="{Binding ElementName=ShadingArrowBtn}"
                            IsOpen="{Binding IsChecked, ElementName=ShadingArrowBtn, Mode=TwoWay}"
-                           StaysOpen="False" AllowsTransparency="True"
+                           StaysOpen="True" AllowsTransparency="True"
                            Opened="ShadingPopup_Opened">
-                        <Border Style="{DynamicResource AeSurface.Overlay}" Padding="12" Width="324"
+                        <Border x:Name="ShadingPanel" Style="{DynamicResource AeSurface.Overlay}" Padding="12" Width="324"
+                                Focusable="True" KeyboardNavigation.TabNavigation="Cycle"
                                 PreviewKeyDown="ShadingPopup_PreviewKeyDown">
                             <StackPanel>
                                 <TextBlock Text="{loc:Loc Kitbash.ViewportShading.Settings}"
@@ -307,7 +328,11 @@
                                   AutomationProperties.Name="{loc:Loc BlenderHelp.ProportionalEditing}"
                                   IsChecked="{Binding ProportionalEditing.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   Focusable="False">
-                        <Image Width="20" Height="20" Source="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Rectangle Style="{StaticResource Kitbash.ToolbarGlyph}">
+                            <Rectangle.OpacityMask>
+                                <ImageBrush ImageSource="{Binding ProportionalEditing.CurrentIcon, UpdateSourceTrigger=PropertyChanged}" />
+                            </Rectangle.OpacityMask>
+                        </Rectangle>
                     </ToggleButton>
                     <!-- Dropdown arrow - Focusable=False for same reason -->
                     <ToggleButton x:Name="PropArrowBtn"

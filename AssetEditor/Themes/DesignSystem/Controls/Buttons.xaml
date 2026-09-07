@@ -48,7 +48,13 @@
                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                             RecognizesAccessKey="True"
-                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" />
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsPressed" Value="True">
@@ -75,7 +81,7 @@
         TargetType="{x:Type Button}">
         <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Canvas}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.OnAccent}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AeBrush.AccentHover}" />
@@ -208,6 +214,7 @@
     </Style>
 
     <Style x:Key="AeButton.DropdownArrow" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
         <Setter Property="Width" Value="18" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="0" />
@@ -236,7 +243,7 @@
                             Fill="Transparent"
                             SnapsToDevicePixels="True"
                             Stretch="Fill"
-                            Stroke="{DynamicResource AeBrush.TextMuted}"
+                            Stroke="{TemplateBinding Foreground}"
                             StrokeEndLineCap="Round"
                             StrokeLineJoin="Round"
                             StrokeStartLineCap="Round"
@@ -253,14 +260,12 @@
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter
-                                TargetName="Chevron"
-                                Property="Stroke"
+                                Property="Foreground"
                                 Value="{DynamicResource AeBrush.AccentHover}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter
-                                TargetName="Chevron"
-                                Property="Stroke"
+                                Property="Foreground"
                                 Value="{DynamicResource AeBrush.Accent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">

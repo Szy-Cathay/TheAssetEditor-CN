@@ -3,6 +3,7 @@ using System.Linq;
 using GameWorld.Core.Commands;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
+using Shared.Core.Services;
 
 namespace GameWorld.Core.Commands.Object
 {
@@ -32,7 +33,7 @@ namespace GameWorld.Core.Commands.Object
         public void Execute()
         {
             _oldState = _selectionManager.GetStateCopy();
-            var groupNode = _parent.AddObject(new GroupNode("New Group") { IsUngroupable = true, IsSelectable = true, IsLockable = true });
+            var groupNode = _parent.AddObject(new GroupNode(LocalizationManager.Instance?.Get("Group.NewGroup") ?? "New Group") { IsUngroupable = true, IsSelectable = true, IsLockable = true });
 
             foreach (var item in _itemsToGroup)
             {

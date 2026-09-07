@@ -8,12 +8,15 @@ namespace GameWorld.Core.Services
     public class CommandStackChangedEvent
     {
         public string HintText { get; internal set; } = "";
+        public Type? CommandType { get; internal set; }
+        public bool IsRedo { get; internal set; }
         public bool IsMutation { get; internal set; }
     }
 
     public class CommandStackUndoEvent
     {
         public string HintText { get; set; } = "";
+        public Type? CommandType { get; internal set; }
         public bool IsMutation { get; internal set; }
     }
 
@@ -75,6 +78,7 @@ namespace GameWorld.Core.Services
                 _eventHub.Publish(new CommandStackChangedEvent()
                 {
                     HintText = command.HintText,
+                    CommandType = command.GetType(),
                     IsMutation = command.AffectsDocument,
                 });
             }
@@ -108,6 +112,7 @@ namespace GameWorld.Core.Services
             _eventHub.Publish(new CommandStackUndoEvent()
             {
                 HintText = command.HintText,
+                CommandType = command.GetType(),
                 IsMutation = command.AffectsDocument,
             });
             return true;
@@ -141,7 +146,9 @@ namespace GameWorld.Core.Services
             CurrentDocumentStateId = historyEntry.NextDocumentStateId;
             _eventHub.Publish(new CommandStackChangedEvent()
             {
+                IsRedo = true,
                 HintText = command.HintText,
+                CommandType = command.GetType(),
                 IsMutation = command.AffectsDocument,
             });
             return true;

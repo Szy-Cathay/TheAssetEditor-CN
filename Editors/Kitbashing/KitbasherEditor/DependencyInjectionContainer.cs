@@ -116,6 +116,7 @@ namespace Editors.KitbasherEditor
             // View models 
             serviceCollection.AddScoped<KitbasherView>();
             serviceCollection.AddScoped<KitbasherViewModel>();
+            serviceCollection.AddScoped<OperationFeedbackViewModel>();
             serviceCollection.AddScoped<IEditorInterface, KitbasherViewModel>();
             serviceCollection.AddScoped<SceneExplorerViewModel>();
             serviceCollection.AddTransient<SceneExplorerContextMenuHandler>();
@@ -130,6 +131,8 @@ namespace Editors.KitbasherEditor
             serviceCollection.AddTransient<AssignMaterialFromOtherMeshCommand>();
             serviceCollection.AddTransient<ConstructPrimitiveCommand>();
             serviceCollection.AddTransient<PrimitiveConstructor>();
+
+            RegisterWindow<Editors.KitbasherEditor.ChildEditors.MaterialSelection.MaterialSourceWindow>(serviceCollection);
 
             // Mesh fitter
             RegisterWindow<MeshFitterWindow>(serviceCollection);

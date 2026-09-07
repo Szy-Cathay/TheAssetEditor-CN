@@ -20,9 +20,28 @@ namespace Shared.Ui.BaseDialogs.ColourPickerButton
     /// </summary>
     public partial class ColourPickerButtonView : UserControl
     {
+        private void PickerOpened(object? sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+            {
+                if (PickerPopup.IsOpen)
+                    Keyboard.Focus((IInputElement)PickerPopup.Child);
+            }));
+        }
+
+        private void PickerPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape && e.OriginalSource is not ComboBox { IsDropDownOpen: true })
+            {
+                PickerButton.IsChecked = false;
+                e.Handled = true;
+            }
+        }
+
         public ColourPickerButtonView()
         {
             InitializeComponent();
+            Unloaded += (_, _) => PickerButton.IsChecked = false;
         }
 
     }

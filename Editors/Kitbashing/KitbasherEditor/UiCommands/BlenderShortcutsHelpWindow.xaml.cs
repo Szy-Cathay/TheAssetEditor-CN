@@ -5,7 +5,7 @@ using Shared.Core.Services;
 
 namespace Editors.KitbasherEditor.UiCommands
 {
-    public partial class BlenderShortcutsHelpWindow : Window
+    public partial class BlenderShortcutsHelpWindow : WindowHandling.AssetEditorWindow
     {
         public BlenderShortcutsHelpWindow()
         {

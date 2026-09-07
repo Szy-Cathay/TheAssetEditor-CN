@@ -188,6 +188,7 @@ public class UiDesignSystemResourceTests
         "AeBrush.TextSecondary",
         "AeBrush.TextMuted",
         "AeBrush.Accent",
+        "AeBrush.OnAccent",
         "AeBrush.AccentHover",
         "AeBrush.AccentSoft",
         "AeBrush.Success",

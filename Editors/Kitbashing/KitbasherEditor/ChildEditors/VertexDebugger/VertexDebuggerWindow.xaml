@@ -25,11 +25,12 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
             <RowDefinition/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="100" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -43,16 +44,47 @@
             <Button Grid.Column="2" Content="{loc:Loc VertexDebugger.ShowStatistics}" Margin="8,0,0,0" Click="Button_Click" Style="{StaticResource AeButton.Secondary}"/>
         </Grid>
 
-        <DataGrid Grid.Row="1" 
+        <DataGrid x:Name="VertexTable" Grid.Row="1" Margin="0,12,0,0"
                  ItemsSource="{Binding VertexList, UpdateSourceTrigger=PropertyChanged}" 
                  SelectedItem="{Binding SelectedVertex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
                  IsReadOnly="True" 
-                 AutoGenerateColumns="True"
+                 AutoGenerateColumns="False"
+                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                 FrozenColumnCount="1"
                  AlternationCount="2"
                  Style="{StaticResource AeTable.Grid}">
             <DataGrid.CellStyle>
                 <Style TargetType="DataGridCell" BasedOn="{StaticResource AeTable.Cell}" />
             </DataGrid.CellStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Id}" Binding="{Binding Id}" Width="64"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Position}" Binding="{Binding Position}" Width="220"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Uv0}" Binding="{Binding Uv0}" Width="180"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Uv1}" Binding="{Binding Uv1}" Width="180"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.BoneIndices}" Binding="{Binding AnimIndecies}" Width="180"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Weights}" Binding="{Binding AnimWeights}" Width="220"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.TotalWeight}" Binding="{Binding TotalWeight, StringFormat=0.####}" Width="88"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Normal}" Binding="{Binding Normal}" Width="220"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.NormalLength}" Binding="{Binding NormalLength, StringFormat=0.####}" Width="88"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Tangent}" Binding="{Binding Tangent}" Width="220"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.TangentLength}" Binding="{Binding TangentLength, StringFormat=0.####}" Width="88"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.BiNormal}" Binding="{Binding BiNormal}" Width="220"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.BiNormalLength}" Binding="{Binding BiNormalLength, StringFormat=0.####}" Width="100"/>
+                <DataGridTextColumn Header="{loc:Loc VertexDebugger.Column.Colour}" Binding="{Binding Colour}" Width="220"/>
+            </DataGrid.Columns>
         </DataGrid>
+        <TextBlock Grid.Row="1" Text="{loc:Loc VertexDebugger.EmptySelection}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource AeEmptyState.Description}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding VertexList.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <TextBlock Grid.Row="2" Text="{Binding StatisticsText}" TextWrapping="Wrap" Margin="0,8,0,0" Style="{StaticResource AeText.Body}"/>
     </Grid>
 </windowhandling:AssetEditorWindow>

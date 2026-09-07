@@ -29,9 +29,11 @@ namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
         private Vector3ViewModel _cameraPosition;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CameraYawDegrees))]
         private float _cameraYaw;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CameraPitchDegrees))]
         private float _cameraPitch;
 
         [ObservableProperty]
@@ -57,6 +59,18 @@ namespace Editors.KitbasherEditor.ChildEditors.PhotoStudio
 
         [ObservableProperty]
         private bool _doubleImageResolution = true;
+
+        public float CameraYawDegrees
+        {
+            get => MathHelper.ToDegrees(CameraYaw);
+            set => CameraYaw = MathHelper.ToRadians(value);
+        }
+
+        public float CameraPitchDegrees
+        {
+            get => MathHelper.ToDegrees(CameraPitch);
+            set => CameraPitch = MathHelper.ToRadians(value);
+        }
 
         public PhotoStudioViewModel(
             RenderEngineComponent renderEngineComponent,

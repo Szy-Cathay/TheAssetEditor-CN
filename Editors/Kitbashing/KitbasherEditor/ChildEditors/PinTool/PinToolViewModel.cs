@@ -15,7 +15,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
         SkinWrap
     }
 
-    public partial class PinToolViewModel : ObservableObject
+    public partial class PinToolViewModel : ObservableObject, IDisposable
     {
         private readonly SelectionManager _selectionManager;
         private readonly CommandFactory _commandFactory;
@@ -35,9 +35,40 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
             _pinMode = new PinRiggingAlgorithm(_commandFactory, _standardDialogs, _selectionManager);
             _skinWrapMode = new SkinWrapAlgorithm(_commandFactory, _standardDialogs, _selectionManager);
+            AffectedMeshCollection.CollectionChanged += OnTargetsChanged;
+            PinMode.PropertyChanged += OnSourceChanged;
+            SkinWrapMode.PropertyChanged += OnSourceChanged;
         }
 
-        [RelayCommand] void ClearAffectedMeshCollection() => AffectedMeshCollection.Clear();
+        public bool CanApply => AffectedMeshCollection.Count > 0 && (SelectedRiggingMode == RiggingMode.Pin
+            ? PinMode.SelectedMesh != null && PinMode.SelectedVertex.Count > 0 && !AffectedMeshCollection.Contains(PinMode.SelectedMesh)
+            : SkinWrapMode.TakeAnimationFromMesh != null && !AffectedMeshCollection.Contains(SkinWrapMode.TakeAnimationFromMesh));
+
+        public string SetupHint => LocalizationManager.Instance.Get(AffectedMeshCollection.Count == 0
+            ? "PinTool.ChooseTargetsHint"
+            : CanApply ? "PinTool.ReadyHint"
+            : SelectedRiggingMode == RiggingMode.Pin ? "PinTool.ChooseVertexHint" : "PinTool.ChooseSourceHint");
+
+        partial void OnSelectedRiggingModeChanged(RiggingMode value) => RefreshSetup();
+        private void OnTargetsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => RefreshSetup();
+        private void OnSourceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => RefreshSetup();
+        private void RefreshSetup()
+        {
+            OnPropertyChanged(nameof(CanApply));
+            OnPropertyChanged(nameof(SetupHint));
+            ClearAffectedMeshCollectionCommand.NotifyCanExecuteChanged();
+        }
+
+        public void Dispose()
+        {
+            AffectedMeshCollection.CollectionChanged -= OnTargetsChanged;
+            PinMode.PropertyChanged -= OnSourceChanged;
+            SkinWrapMode.PropertyChanged -= OnSourceChanged;
+        }
+
+        private bool HasTargets() => AffectedMeshCollection.Count > 0;
+
+        [RelayCommand(CanExecute = nameof(HasTargets))] void ClearAffectedMeshCollection() => AffectedMeshCollection.Clear();
         [RelayCommand] void AddSelectionToAffectMeshCollection() => AddSelectionToList(AffectedMeshCollection);
 
         void AddSelectionToList(ObservableCollection<Rmv2MeshNode> itemList)

@@ -70,21 +70,22 @@ namespace Shared.Ui.Common.Behaviors
         {
             var g = new Grid
             {
-                Background = tb.Background,
                 Width = tb.ActualWidth,
                 Height = tb.ActualHeight
             };
+            g.SetResourceReference(Panel.BackgroundProperty, "AeBrush.Surface2");
 
-            g.Children.Add(new Label
+            var label = new TextBlock
             {
-                Padding = new Thickness(2, 1, 1, 1),
+                Margin = new Thickness(2, 1, 1, 1),
                 FontSize = tb.FontSize,
                 FontFamily = tb.FontFamily,
-                Foreground = Brushes.LightGray,
-                Content = text,
+                Text = text,
                 VerticalAlignment = tb.VerticalContentAlignment,
-                VerticalContentAlignment = tb.VerticalContentAlignment
-            });
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            label.SetResourceReference(TextBlock.ForegroundProperty, "AeBrush.TextMuted");
+            g.Children.Add(label);
 
             var vb = new VisualBrush
             {

@@ -16,109 +16,131 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <ContentControl DockPanel.Dock="Top">
-
-        <Expander DockPanel.Dock="Top" IsExpanded="True" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
-            <Expander.Header>
-                <DockPanel DockPanel.Dock="Top" ToolTip="{loc:Loc Emissive.ToolTip}">
-                    <TextBlock Text="{loc:Loc Emissive.Header}" FontWeight="Normal" Margin="3"/>
+    <Expander IsExpanded="True" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
+        <Expander.Header>
+            <TextBlock Text="{loc:Loc Emissive.Header}" FontWeight="Normal" Margin="3" ToolTip="{loc:Loc Emissive.ToolTip}"/>
+        </Expander.Header>
+        <StackPanel>
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Texture}" Style="{StaticResource AeForm.Label}"/>
+                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveTexture}"/>
                 </DockPanel>
-            </Expander.Header>
-
-            <DockPanel LastChildFill="False">
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Texture}" Style="{StaticResource AeForm.Label}" />
-                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveTexture}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Tint}" Style="{StaticResource AeForm.Label}"/>
+                    <colourpickerbutton:ColourPickerButtonView Width="20" Height="20" HorizontalAlignment="Left" DataContext="{Binding EmissiveTint}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Distortion}" Style="{StaticResource AeForm.Label}" />
-                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveDistortionTexture}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Strength}" Style="{StaticResource AeForm.Label}"/>
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveStrength, UpdateSourceTrigger=LostFocus}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Direction}" Style="{StaticResource AeForm.Label}" />
-                    <mathviews1:Vector2View DataContext="{Binding EmissiveDirection}" />
+                <DockPanel ToolTip="{loc:Loc Emissive.FresnelStrength.ToolTip}">
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.FresnelStrength}" Style="{StaticResource AeForm.Label}"/>
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveFresnelStrength, UpdateSourceTrigger=LostFocus}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.DistortStrength}" Style="{StaticResource AeForm.Label}" />
-                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" MaxLength="8" Text="{Binding EmissiveDistortStrength, UpdateSourceTrigger=LostFocus}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.FresnelStrength}" Style="{StaticResource AeForm.Label}" />
-                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" MaxLength="8" Text="{Binding EmissiveFresnelStrength, UpdateSourceTrigger=LostFocus}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Tint}" Style="{StaticResource AeForm.Label}" />
-                    <colourpickerbutton:ColourPickerButtonView Width="20" Height="20" HorizontalAlignment="Left" DataContext="{Binding EmissiveTint}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient1}" Style="{StaticResource AeForm.Label}" />
+                <Grid ToolTip="{loc:Loc Emissive.Tiling.ToolTip}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Label Grid.Row="1" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Tiling}" Style="{StaticResource AeForm.Label}"/>
+                    <UniformGrid Grid.Column="1" Columns="2">
+                        <TextBlock Text="{loc:Loc Ui.Axis.U}" Style="{StaticResource AeText.Caption}"/>
+                        <TextBlock Text="{loc:Loc Ui.Axis.V}" Style="{StaticResource AeText.Caption}"/>
+                    </UniformGrid>
+                    <mathviews1:Vector2View Grid.Row="1" Grid.Column="1" DataContext="{Binding EmissiveTiling}"/>
+                </Grid>
+            <Expander Margin="0,4,0,0" Background="Transparent" BorderThickness="0">
+                <Expander.Header>
+                    <TextBlock Text="{loc:Loc Emissive.Gradient.Header}" FontWeight="Normal" Margin="3" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}"/>
+                </Expander.Header>
+                <StackPanel>
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient1}" Style="{StaticResource AeForm.Label}"/>
                     <DockPanel LastChildFill="False">
-                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient0}" />
-                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
-                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime0, UpdateSourceTrigger=LostFocus}" />
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient0}"/>
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" Style="{StaticResource AeForm.Label}"/>
+                        <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Right"
+                                 Text="{Binding GradientTime0, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}"/>
                     </DockPanel>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient2}" Style="{StaticResource AeForm.Label}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient2}" Style="{StaticResource AeForm.Label}"/>
                     <DockPanel LastChildFill="False">
-                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient1}" />
-                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
-                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime1, UpdateSourceTrigger=LostFocus}" />
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient1}"/>
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" Style="{StaticResource AeForm.Label}"/>
+                        <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Right"
+                                 Text="{Binding GradientTime1, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}"/>
                     </DockPanel>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient3}" Style="{StaticResource AeForm.Label}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient3}" Style="{StaticResource AeForm.Label}"/>
                     <DockPanel LastChildFill="False">
-                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient2}" />
-                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
-                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime2, UpdateSourceTrigger=LostFocus}" />
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient2}"/>
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" Style="{StaticResource AeForm.Label}"/>
+                        <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Right"
+                                 Text="{Binding GradientTime2, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}"/>
                     </DockPanel>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient4}" Style="{StaticResource AeForm.Label}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Gradient4}" Style="{StaticResource AeForm.Label}"/>
                     <DockPanel LastChildFill="False">
-                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient3}" />
-                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" />
-                        <TextBox DockPanel.Dock="Left" Width="50" HorizontalContentAlignment="Right" Text="{Binding GradientTime3, UpdateSourceTrigger=LostFocus}" />
+                        <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient3}"/>
+                        <Label DockPanel.Dock="Left" Margin="6,0,4,0" Content="{loc:Loc Emissive.Time}" Style="{StaticResource AeForm.Label}"/>
+                        <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Right"
+                                 Text="{Binding GradientTime3, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}"/>
                     </DockPanel>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Speed}" Style="{StaticResource AeForm.Label}" />
-                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveSpeed, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+            </Expander>
+            <Expander Margin="0,4,0,0" Background="Transparent" BorderThickness="0">
+                <Expander.Header>
+                    <TextBlock Text="{loc:Loc Emissive.Motion.Header}" FontWeight="Normal" Margin="3" ToolTip="{loc:Loc Emissive.Motion.Hint}"/>
+                </Expander.Header>
+                <StackPanel>
+                    <TextBlock Text="{loc:Loc Emissive.Motion.Hint}" Style="{StaticResource AeText.Caption}"
+                               TextWrapping="Wrap" Margin="4,0,4,4"/>
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Distortion}" Style="{StaticResource AeForm.Label}"/>
+                    <userinterface:ShaderTextureView DataContext="{Binding EmissiveDistortionTexture}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.PulseSpeed}" Style="{StaticResource AeForm.Label}" />
-                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissivePulseSpeed, UpdateSourceTrigger=LostFocus}" />
+                <Grid ToolTip="{loc:Loc Emissive.Direction.ToolTip}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Label Grid.Row="1" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Direction}" Style="{StaticResource AeForm.Label}"/>
+                    <UniformGrid Grid.Column="1" Columns="2">
+                        <TextBlock Text="{loc:Loc Ui.Axis.U}" Style="{StaticResource AeText.Caption}"/>
+                        <TextBlock Text="{loc:Loc Ui.Axis.V}" Style="{StaticResource AeText.Caption}"/>
+                    </UniformGrid>
+                    <mathviews1:Vector2View Grid.Row="1" Grid.Column="1" DataContext="{Binding EmissiveDirection}"/>
+                </Grid>
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.DistortStrength}" Style="{StaticResource AeForm.Label}"/>
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveDistortStrength, UpdateSourceTrigger=LostFocus}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.PulseStrength}" Style="{StaticResource AeForm.Label}" />
-                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissivePulseStrength, UpdateSourceTrigger=LostFocus}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Speed}" Style="{StaticResource AeForm.Label}"/>
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveSpeed, UpdateSourceTrigger=LostFocus}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Strength}" Style="{StaticResource AeForm.Label}" />
-                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissiveStrength, UpdateSourceTrigger=LostFocus}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.PulseSpeed}" Style="{StaticResource AeForm.Label}"/>
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissivePulseSpeed, UpdateSourceTrigger=LostFocus}"/>
                 </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.Tiling}" Style="{StaticResource AeForm.Label}" />
-                    <mathviews1:Vector2View DataContext="{Binding EmissiveTiling}" />
+                <DockPanel>
+                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc Emissive.PulseStrength}" Style="{StaticResource AeForm.Label}"/>
+                    <TextBox Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Text="{Binding EmissivePulseStrength, UpdateSourceTrigger=LostFocus}"/>
                 </DockPanel>
-
-            </DockPanel>
-        </Expander>
-    </ContentControl>
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </Expander>
 </UserControl>

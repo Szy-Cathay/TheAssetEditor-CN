@@ -58,6 +58,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
         [RelayCommand] void SetSelection()
         {
+            Description = "";
             SelectedVertex.Clear();
             SelectedMesh = null;
 

@@ -27,4 +27,5 @@ jobs:
       run: dotnet build AssetEditor.CN.sln --configuration Release --no-restore
 
     - name: Run all tests
-      run: dotnet test AssetEditor.CN.sln --configuration Release --no-build --no-restore --verbosity normal
+      # Native input tests must own the shared Windows desktop without competing test windows.
+      run: dotnet test AssetEditor.CN.sln --configuration Release --no-build --no-restore --verbosity normal --maxcpucount:1

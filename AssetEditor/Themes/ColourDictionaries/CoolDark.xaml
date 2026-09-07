@@ -227,6 +227,7 @@
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Disabled"                  Color="{StaticResource AColour.Tone9.Border.Disabled}"/>
     <!-- AE UI design-system semantic brushes -->
     <SolidColorBrush x:Key="AeBrush.Canvas" Color="{StaticResource AColour.Tone1.Background.Static}" />
+    <SolidColorBrush x:Key="AeBrush.OnAccent" Color="{StaticResource AColour.Tone1.Background.Static}" />
     <SolidColorBrush x:Key="AeBrush.Surface1" Color="{StaticResource AColour.Tone2.Background.Static}" />
     <SolidColorBrush x:Key="AeBrush.Surface2" Color="{StaticResource AColour.Tone3.Background.Static}" />
     <SolidColorBrush x:Key="AeBrush.Surface3" Color="{StaticResource AColour.Tone4.Background.Static}" />

@@ -19,6 +19,32 @@ public class PhotoStudioViewModelTests
     private const string ViewModelTypeName =
         "Editors.KitbasherEditor.ChildEditors.PhotoStudio.PhotoStudioViewModel";
 
+    [TestCase("CameraYaw", 90f)]
+    [TestCase("CameraPitch", 30f)]
+    public void DegreeInput_ConvertsToCameraRadiansAndRaisesDisplayNotification(string property, float degrees)
+    {
+        var context = CreateViewModel();
+        var changes = new List<string?>();
+        ((System.ComponentModel.INotifyPropertyChanged)context.ViewModel).PropertyChanged +=
+            (_, args) => changes.Add(args.PropertyName);
+
+        SetProperty(context.ViewModel, property + "Degrees", degrees);
+
+        Assert.That(GetProperty<float>(context.ViewModel, property), Is.EqualTo(MathHelper.ToRadians(degrees)).Within(0.0001));
+        Assert.That(GetProperty<float>(context.ViewModel, property + "Degrees"), Is.EqualTo(degrees).Within(0.001));
+        Assert.That(changes, Does.Contain(property + "Degrees"));
+    }
+
+    [TestCase("CameraYaw")]
+    [TestCase("CameraPitch")]
+    public void InvalidDegreeInput_DoesNotCorruptTheCamera(string property)
+    {
+        var context = CreateViewModel();
+        var previous = GetProperty<float>(context.ViewModel, property);
+        SetProperty(context.ViewModel, property + "Degrees", float.NaN);
+        Assert.That(GetProperty<float>(context.ViewModel, property), Is.EqualTo(previous));
+    }
+
     [Test]
     public void PositionEdit_RecalculatesOrbitWithoutCameraPositionSetter()
     {

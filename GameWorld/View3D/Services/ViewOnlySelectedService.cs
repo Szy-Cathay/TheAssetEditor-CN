@@ -10,6 +10,7 @@ namespace GameWorld.Core.Services
         private readonly SelectionManager _selectionManager;
 
         Dictionary<ISceneNode, bool>? _visMap;
+        public bool IsActive => _visMap != null;
 
         public ViewOnlySelectedService(SceneManager sceneManager, SelectionManager selectionManager)
         {

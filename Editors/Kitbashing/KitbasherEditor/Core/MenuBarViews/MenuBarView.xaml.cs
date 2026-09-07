@@ -20,6 +20,11 @@ namespace KitbasherEditor.Views
         public MenuBarView()
         {
             InitializeComponent();
+            AddHandler(MenuItem.SubmenuOpenedEvent, new RoutedEventHandler((_, _) =>
+            {
+                if (DataContext is MenuBarViewModel viewModel)
+                    viewModel.RefreshMenuLabels();
+            }));
         }
 
         private void SelectionTool_Click(object sender, RoutedEventArgs e)
@@ -32,6 +37,11 @@ namespace KitbasherEditor.Views
         {
             if (DataContext is MenuBarViewModel viewModel)
                 viewModel.ViewportShading.RefreshSettings();
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                if (ShadingPopup.IsOpen)
+                    Keyboard.Focus(ShadingPanel);
+            }));
         }
 
         private void ShadingPopup_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -44,6 +54,15 @@ namespace KitbasherEditor.Views
                 Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(viewModel.FocusScene));
         }
 
+        private void HostWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (ShadingPopup.IsOpen && !ShadingArrowBtn.IsMouseOver && !ShadingPanel.IsMouseOver
+                && (e.OriginalSource is not DependencyObject source || !ShadingPanel.IsAncestorOf(source)))
+                ShadingArrowBtn.IsChecked = false;
+        }
+
+        private void HostWindow_CloseShadingPopup(object? sender, EventArgs e) => ShadingArrowBtn.IsChecked = false;
+
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
             DetachWindowHandlers();
@@ -53,6 +72,10 @@ namespace KitbasherEditor.Views
                 _hostWindow = window;
                 window.KeyUp += HandleKeyPress;
                 window.KeyDown += HandleKeyDown;
+                window.PreviewMouseDown += HostWindow_PreviewMouseDown;
+                window.Deactivated += HostWindow_CloseShadingPopup;
+                window.LocationChanged += HostWindow_CloseShadingPopup;
+                window.SizeChanged += HostWindow_CloseShadingPopup;
             }
         }
 
@@ -62,11 +85,16 @@ namespace KitbasherEditor.Views
 
         private void DetachWindowHandlers()
         {
+            ShadingArrowBtn.IsChecked = false;
             if (_hostWindow == null)
                 return;
 
             _hostWindow.KeyUp -= HandleKeyPress;
             _hostWindow.KeyDown -= HandleKeyDown;
+            _hostWindow.PreviewMouseDown -= HostWindow_PreviewMouseDown;
+            _hostWindow.Deactivated -= HostWindow_CloseShadingPopup;
+            _hostWindow.LocationChanged -= HostWindow_CloseShadingPopup;
+            _hostWindow.SizeChanged -= HostWindow_CloseShadingPopup;
             _hostWindow = null;
         }
 

@@ -104,6 +104,25 @@ namespace Test.KitbashEditor
             Assert.That(context.ViewModel.LodNodes.Single(), Is.Not.SameAs(originalOverview));
         }
 
+        [Test]
+        public void SaveChoices_UseChineseLabelsWithoutChangingStrategyValues()
+        {
+            var context = CreateContext();
+            Initialize(context.ViewModel, context.Settings);
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.ViewModel.SelectedMeshStrategy.DisplayName, Is.EqualTo("不生成模型"));
+                Assert.That(context.ViewModel.SelectedWsModelStrategy.DisplayName, Is.EqualTo("不生成材质文件"));
+                Assert.That(context.ViewModel.LodStrategies.Select(item => item.DisplayName),
+                    Is.EqualTo(new[] { "保留现有 LOD", "自动生成", "全部使用 LOD 0" }));
+                Assert.That(context.ViewModel.SelectedLodStrategy.Value, Is.EqualTo(LodStrategy.NoLodGeneration));
+                Assert.That(context.ViewModel.SelectedLodStrategy.Description, Does.Contain("只修改贴图"));
+            });
+            context.ViewModel.SelectedLodStrategy = context.ViewModel.LodStrategies.Single(item => item.Value == LodStrategy.Lod0ForAll);
+            context.ViewModel.ApplySettings();
+            Assert.That(context.Settings.LodGenerationMethod, Is.EqualTo(LodStrategy.Lod0ForAll));
+        }
+
         private static void Initialize(
             SaveDialogViewModel viewModel,
             GeometrySaveSettings settings)
@@ -129,7 +148,7 @@ namespace Test.KitbashEditor
                 packFileService.Object,
                 eventHub.Object,
                 new GeometryStrategyProvider([new NoMeshStrategy()]),
-                new LodStrategyProvider([new NoLodGeneration()]),
+                new LodStrategyProvider([new NoLodGeneration(), new AssetEditorLodGeneration(), new Lod0ForAllLodGeneration()]),
                 new MaterialStrategyProvider([new NoWsModelStrategy()]));
             var viewModel = new SaveDialogViewModel(
                 sceneManager,

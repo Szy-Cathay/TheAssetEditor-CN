@@ -16,14 +16,28 @@
         FontFamily="{DynamicResource AppFontFamily}"
         FontWeight="{DynamicResource AppFontWeight}">
     <Window.Resources>
-        <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="LodCheckBox" TargetType="CheckBox" BasedOn="{StaticResource AeInput.CheckBox}">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Focusable" Value="False" />
+            </Style>
+            <Style x:Key="LodEditingCheckBox" TargetType="CheckBox" BasedOn="{StaticResource LodCheckBox}">
+                <Setter Property="IsHitTestVisible" Value="True" />
+                <Setter Property="Focusable" Value="True" />
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="12">
         <DockPanel LastChildFill="true">
             <Grid DockPanel.Dock="Top">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="auto"/>
+                    <ColumnDefinition Width="104"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
@@ -42,28 +56,28 @@
                 </DockPanel>
 
                 <Label Style="{StaticResource AeForm.Label}" Grid.Row="1" Grid.Column="0" Content="{loc:Loc SaveDialog.MeshFormat}"/>
-                <ComboBox Grid.Row="1" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1"
+                <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,1,0,1"
                       ItemsSource="{Binding MeshStrategies}" 
                       DisplayMemberPath="DisplayName" 
                       SelectedItem="{Binding SelectedMeshStrategy}"
                       ToolTip="{Binding Path=SelectedItem.Description, RelativeSource={RelativeSource Self}}"/>
 
                 <Label Style="{StaticResource AeForm.Label}" Grid.Row="2" Grid.Column="0" Content="{loc:Loc SaveDialog.WsModelFormat}"/>
-                <ComboBox Grid.Row="2" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1"
+                <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,1,0,1"
                          ItemsSource="{Binding WsStrategies}" 
                           DisplayMemberPath="DisplayName" 
                           SelectedItem="{Binding SelectedWsModelStrategy}"
                           ToolTip="{Binding Path=SelectedItem.Description, RelativeSource={RelativeSource Self}}"/>
 
                 <Label Style="{StaticResource AeForm.Label}" Grid.Row="3" Grid.Column="0" Content="{loc:Loc SaveDialog.LodStrategy}"/>
-                <ComboBox Grid.Row="3" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1" 
+                <ComboBox Grid.Row="3" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,1,0,1"
                         ItemsSource="{Binding LodStrategies}" 
                         DisplayMemberPath="DisplayName" 
                         SelectedItem="{Binding SelectedLodStrategy}"
                         ToolTip="{Binding Path=SelectedItem.Description, RelativeSource={RelativeSource Self}}"/>
 
                 <Label Style="{StaticResource AeForm.Label}" Grid.Row="4" Grid.Column="0" Content="{loc:Loc SaveDialog.NumberOfLods}"/>
-                <ComboBox Grid.Row="4" Grid.Column="1" Width="200" HorizontalAlignment="Right" Margin="0,1,0,1" 
+                <ComboBox Grid.Row="4" Grid.Column="1" HorizontalAlignment="Stretch" Margin="0,1,0,1"
                    ItemsSource="{Binding PossibleLodNumbers}" 
 
                    SelectedItem="{Binding NumberOfLodsToGenerate}"
@@ -81,8 +95,8 @@
                             <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.Distance}" Binding="{Binding CameraDistance, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource AeText.Body}" EditingElementStyle="{StaticResource AeInput.TextBox}"/>
                             <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.QltLevel}" Binding="{Binding QualityLvl, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource AeText.Body}" EditingElementStyle="{StaticResource AeInput.TextBox}"/>
                             <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.ReductionFactor}" Binding="{Binding LodReductionFactor, StringFormat={}{0:N2}, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource AeText.Body}" EditingElementStyle="{StaticResource AeInput.TextBox}"/>
-                            <DataGridCheckBoxColumn Header="{loc:Loc SaveDialog.MergeAlpha}" Binding="{Binding OptimizeLod_Alpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-                            <DataGridCheckBoxColumn Header="{loc:Loc SaveDialog.FastAnimVertex}" Binding="{Binding OptimizeLod_Vertex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+                            <DataGridCheckBoxColumn Header="{loc:Loc SaveDialog.MergeAlpha}" Binding="{Binding OptimizeLod_Alpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource LodCheckBox}" EditingElementStyle="{StaticResource LodEditingCheckBox}" />
+                            <DataGridCheckBoxColumn Header="{loc:Loc SaveDialog.FastAnimVertex}" Binding="{Binding OptimizeLod_Vertex, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" ElementStyle="{StaticResource LodCheckBox}" EditingElementStyle="{StaticResource LodEditingCheckBox}" />
 
                             <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumPolygons}" Binding="{Binding PolygonCount.Value}" IsReadOnly="True" ElementStyle="{StaticResource AeText.Body}" />
                             <common:DataGridNumericColumn Header="{loc:Loc SaveDialog.NumMeshes}" Binding="{Binding MeshCount.Value}" IsReadOnly="True" ElementStyle="{StaticResource AeText.Body}" />

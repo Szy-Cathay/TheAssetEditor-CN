@@ -27,6 +27,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
         [RelayCommand] void SetSelection()
         {
+            Description = "";
             TakeAnimationFromMesh = null;
 
             var description = LocalizationManager.Instance.Get("Msg.Kitbash.NoMeshSelected");

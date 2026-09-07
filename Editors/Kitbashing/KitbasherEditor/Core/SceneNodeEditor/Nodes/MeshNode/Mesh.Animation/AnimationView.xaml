@@ -11,67 +11,66 @@
         <System:Double x:Key="labelWidth">120</System:Double>
     </UserControl.Resources>
 
-    <Expander DockPanel.Dock="Top" IsExpanded="False">
+    <Expander IsExpanded="False">
         <Expander.Header>
-            <StackPanel Orientation="Horizontal" ToolTip="{loc:Loc MeshAnim.AnimationMatrix.ToolTip}">
-                <TextBlock Text="{loc:Loc MeshAnim.Header}" FontWeight="Bold" Margin="3"/>
-            </StackPanel>
+            <TextBlock Text="{loc:Loc MeshAnim.Header}" FontWeight="Bold" Margin="3"/>
         </Expander.Header>
-
-        <DockPanel LastChildFill="False" >
-            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.SkeletonName}"/>
-                <TextBlock  Text="{Binding Animation.SkeletonName}"  VerticalAlignment="Center"/>
+        <StackPanel>
+            <DockPanel>
+                <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}"
+                       DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.SkeletonName}"/>
+                <TextBlock Text="{Binding Animation.SkeletonName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding Animation.SkeletonName}"/>
             </DockPanel>
-
-            <DockPanel LastChildFill="True" DockPanel.Dock="Top">
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.Bones}"/>
-                <StackPanel>
-                    <Expander>
-                        <Expander.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{loc:Loc WeightedMaterial.Count}"/>
-                                <TextBlock Text="{Binding Animation.AnimatedBones.Count, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            </StackPanel>
-                        </Expander.Header>
-
-                        <StackPanel>
-                            <ListView ItemsSource="{Binding Animation.AnimatedBones}" MaxHeight="650" >
-
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="{loc:Loc MainNode.Name}" DisplayMemberBinding="{Binding Name.Value}"/>
-                                        <GridViewColumn Header="{loc:Loc MeshAnim.BoneIndex}" DisplayMemberBinding="{Binding BoneIndex.Value}"/>
-                                    </GridView>
-                                </ListView.View>
-
-                            </ListView>
-
-                        </StackPanel>
-                    </Expander>
-                </StackPanel>
-            </DockPanel>
-
-
-            <DockPanel DockPanel.Dock="Top" >
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AttachTo}"/>
-                <ComboBox
-                          IsEditable="True"
-                          IsTextSearchEnabled="false"
+            <DockPanel>
+                <Label Style="{StaticResource AeForm.Label}" Width="{StaticResource labelWidth}"
+                       DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AttachTo}"
+                       ToolTip="{loc:Loc MeshAnim.AttachTo.ToolTip}"/>
+                <ComboBox IsEditable="True" IsTextSearchEnabled="False"
                           DisplayMemberPath="Name.Value"
-                          Text="{Binding Animation.AttachableBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" 
-                          ItemsSource="{Binding Animation.AttachableBones.Values}" 
-                          SelectedItem="{Binding Animation.AttachableBones.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-
-               
+                          Text="{Binding Animation.AttachableBones.Filter, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                          ItemsSource="{Binding Animation.AttachableBones.Values}"
+                          SelectedItem="{Binding Animation.AttachableBones.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                          ToolTip="{loc:Loc MeshAnim.AttachTo.ToolTip}"
+                          AutomationProperties.Name="{loc:Loc MeshAnim.AttachTo}"/>
             </DockPanel>
-
-            <DockPanel DockPanel.Dock="Top">
-                <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MeshAnim.AnimationMatrix}"/>
-                <TextBox DockPanel.Dock="Top" Margin="0,2,0,2"  Text="{Binding Animation.AnimationMatrixOverride, UpdateSourceTrigger=LostFocus}" MaxLength="8"  VerticalContentAlignment="Center" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"/>
-            </DockPanel>
-            
-        </DockPanel>
+            <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Label Width="{StaticResource labelWidth}" Style="{StaticResource AeForm.Label}" Content="{loc:Loc MeshAnim.AnimationMatrix}"
+                       ToolTip="{loc:Loc MeshAnim.AnimationMatrix.ToolTip}"/>
+                <TextBox Grid.Column="1" Text="{Binding Animation.AnimationMatrixOverride, UpdateSourceTrigger=LostFocus}"
+                         MaxLength="8" Width="100" HorizontalAlignment="Left" HorizontalContentAlignment="Right"
+                         ToolTip="{loc:Loc MeshAnim.AnimationMatrix.ToolTip}"
+                         AutomationProperties.Name="{loc:Loc MeshAnim.AnimationMatrix}"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{loc:Loc MeshAnim.AnimationMatrix.DefaultHint}"
+                           Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,2,0,2"/>
+            </Grid>
+            <Expander Margin="0,4,0,0" Background="Transparent" BorderThickness="0">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{loc:Loc MeshAnim.Bones}" Margin="3"/>
+                        <TextBlock Text="{Binding Animation.AnimatedBones.Count, StringFormat={loc:Loc Kitbash.Sidebar.ItemCountFormat}}"
+                                   Style="{StaticResource AeText.Caption}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </StackPanel>
+                </Expander.Header>
+                <DataGrid ItemsSource="{Binding Animation.AnimatedBones}" Style="{StaticResource AeTable.Grid}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
+                          SelectionMode="Single" HeadersVisibility="Column" MaxHeight="240"
+                          AutomationProperties.Name="{loc:Loc MeshAnim.Bones}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="{loc:Loc MeshAnim.BoneIndex}" Binding="{Binding BoneIndex.Value}" Width="64"/>
+                        <DataGridTextColumn Header="{loc:Loc MainNode.Name}" Binding="{Binding Name.Value}" Width="*" MinWidth="100"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Expander>
+        </StackPanel>
     </Expander>
 </UserControl>

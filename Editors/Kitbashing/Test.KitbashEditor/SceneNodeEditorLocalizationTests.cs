@@ -98,7 +98,7 @@ namespace Test.KitbashEditor
                 Assert.That(
                     LocalizationManager.Instance.Get(
                         "Kitbash.AssignMaterial.SelectSource"),
-                    Is.EqualTo("选择要复制材质的网格"));
+                    Is.EqualTo("选择材质来源"));
                 Assert.That(
                     LocalizationManager.Instance.Get(
                         "Kitbash.AssignMaterial.NoSourceSelected"),

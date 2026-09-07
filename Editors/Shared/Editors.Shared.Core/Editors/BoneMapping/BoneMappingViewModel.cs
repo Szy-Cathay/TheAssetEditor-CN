@@ -60,6 +60,9 @@ namespace Shared.Ui.Editors.BoneMapping
             AnimatedBoneHelper.FilterBoneList(regex, OnlyShowUsedBones.Value, value.PossibleValues);
         }
 
+        public void ClearMeshFilter() => MeshBones.Filter = "";
+        public void ClearParentFilter() => ParentModelBones.Filter = "";
+
         public virtual void ClearBindingSelfAndChildren()
         {
             if (MeshBones.SelectedItem == null)

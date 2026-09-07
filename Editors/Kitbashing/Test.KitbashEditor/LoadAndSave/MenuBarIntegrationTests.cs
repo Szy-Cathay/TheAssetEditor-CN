@@ -9,7 +9,9 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
 using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.Ui.Common.MenuSystem;
 using Test.TestingUtility.Shared;
 
@@ -113,7 +115,7 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
-    public void FaceMode_SplitButtonIsEnabledForSelectedFaces()
+    public void FaceMode_SplitToolbarButtonIsEnabledForSelectedFaces()
     {
         SelectionManager.SetState(new FaceSelectionState
         {
@@ -121,10 +123,8 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
             SelectedFaces = [0]
         });
         var splitButton = _editor.MenuBar.CustomButtons.SingleOrDefault(button =>
-            button.ShowRule == ButtonVisibilityRule.FaceMode &&
-            button.Action.ToolTipAttribute.Value.StartsWith(
-                "将网格拆分",
-                StringComparison.Ordinal));
+            button.IsVisible.Value &&
+            button.Action is Editors.KitbasherEditor.Core.MenuBarViews.KitbasherMenuItem<DivideSubMeshCommand>);
 
         Assert.Multiple(() =>
         {
@@ -203,7 +203,7 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
     }
 
     [Test]
-    public void PhotoStudio_IsAvailableFromChineseMenuAndToolbar()
+    public void PhotoStudio_IsAvailableFromToolbarAndChineseMenu()
     {
         var renderingMenu = _editor.MenuBar.MenuItems.Single(
             item => item.NameAttribute.Value == "渲染");
@@ -222,6 +222,106 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
             Assert.That(photoStudioButtons, Is.EqualTo(1));
         });
     }
+
+    [Test]
+    public void SpecialistTools_AreDirectlyAvailableOnTheToolbarInTheirSelectionModes()
+    {
+        string[] VisibleCommands() => _editor.MenuBar.CustomButtons
+            .Where(button => button.IsVisible.Value && !button.IsSeperator)
+            .Select(button => button.Action.GetType().GetGenericArguments()[0].Name).ToArray();
+
+        SelectionManager.SetState(CreateObjectSelection());
+        Assert.That(VisibleCommands(), Is.SupersetOf(new[]
+        {
+            "DivideSubMeshCommand", "MergeObjectsCommand", "CreateStaticMeshCommand", "ReduceMeshCommand",
+            "OpenSkeletonReshaperToolCommand", "OpenReriggingToolCommand", "OpenPinToolCommand",
+            "AssignMaterialFromOtherMeshUiCommand", "OpenPhotoStudioCommand", "OpenBlenderShortcutsHelpCommand"
+        }));
+
+        SelectionManager.SetState(new FaceSelectionState { RenderObject = _meshNode, SelectedFaces = [0] });
+        Assert.That(VisibleCommands(), Is.SupersetOf(new[]
+        {
+            "ConvertFaceToVertexCommand", "ExpandFaceSelectionCommand", "DivideSubMeshCommand",
+            "DuplicateObjectCommand", "DeleteObjectCommand", "OpenPhotoStudioCommand", "OpenBlenderShortcutsHelpCommand"
+        }));
+        Assert.That(VisibleCommands(), Is.Unique);
+
+        SelectionManager.SetState(new VertexSelectionState(_meshNode, 0) { SelectedVertices = [0] });
+        Assert.That(VisibleCommands(), Does.Contain("OpenVertexDebuggerCommand"));
+        Assert.That(VisibleCommands(), Does.Not.Contain("MergeObjectsCommand"));
+    }
+
+    [Test]
+    public void StatisticsMenu_TogglesTheExistingViewportOverlay()
+    {
+        var statistics = _runner.GetRequiredServiceInCurrentEditorScope<FpsComponent>();
+        var item = FlattenMenu(_editor.MenuBar.MenuItems).Single(item => item.Name == "显示统计信息");
+        Assert.That(statistics.Visible, Is.False);
+        try
+        {
+            item.Action.Command.Execute(null);
+            Assert.That(statistics.Visible, Is.True);
+            Assert.That(item.Name, Is.EqualTo("隐藏统计信息"));
+            item.Action.Command.Execute(null);
+            Assert.That(statistics.Visible, Is.False);
+            Assert.That(item.Name, Is.EqualTo("显示统计信息"));
+        }
+        finally
+        {
+            if (statistics.Visible)
+                item.Action.Command.Execute(null);
+        }
+    }
+
+    [Test]
+    public void ViewportToolbar_FollowsBackgroundSettingsWithoutEditingTheModel()
+    {
+        var settings = _runner.GetRequiredServiceInCurrentEditorScope<ApplicationSettingsService>();
+        var eventHub = _runner.GetRequiredServiceInCurrentEditorScope<IEventHub>();
+        var original = ViewportRenderSettings.From(settings.CurrentSettings);
+        var dirty = _editor.HasUnsavedChanges;
+        try
+        {
+            eventHub.Publish(new ViewportRenderSettingsChangedEvent(original with
+            {
+                BackgroundColour = BackgroundColour.Custom,
+                CustomBackgroundColour = "255,255,255",
+            }));
+            Assert.That(_editor.MenuBar.ViewportBackground.Value, Is.EqualTo(System.Windows.Media.Colors.White));
+            Assert.That(_editor.HasUnsavedChanges, Is.EqualTo(dirty));
+        }
+        finally
+        {
+            eventHub.Publish(new ViewportRenderSettingsChangedEvent(original));
+        }
+    }
+
+    [Test]
+    public void SceneLabels_LocalizeOnlySyntheticNodesAndFollowModelRenames()
+    {
+        var manager = _editor.SceneExplorer.SceneManager;
+        var root = new KitbasherEditor.Views.SceneExplorerNode(manager.RootNode, false);
+        var model = manager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+        var editable = new KitbasherEditor.Views.SceneExplorerNode(model, false);
+        var userNode = new GroupNode("Root");
+        var wrapper = new KitbasherEditor.Views.SceneExplorerNode(userNode, false);
+        var notified = false;
+        wrapper.PropertyChanged += (_, args) => notified |= args.PropertyName == nameof(wrapper.DisplayName);
+        Assert.Multiple(() =>
+        {
+            Assert.That(root.DisplayName, Is.EqualTo("场景"));
+            Assert.That(manager.RootNode.Name, Is.EqualTo("Root"));
+            Assert.That(editable.DisplayName, Is.EqualTo("编辑中的模型"));
+            Assert.That(model.Name, Is.EqualTo("Editable Model"));
+            Assert.That(wrapper.DisplayName, Is.EqualTo("Root"));
+        });
+        userNode.Name = "renamed_mesh";
+        Assert.That(wrapper.DisplayName, Is.EqualTo("renamed_mesh"));
+        Assert.That(notified, Is.True);
+    }
+
+    private static IEnumerable<ToolbarItem> FlattenMenu(IEnumerable<ToolbarItem> items) =>
+        items.SelectMany(item => new[] { item }.Concat(FlattenMenu(item.Children)));
 
     [Test]
     public void RenderingMenu_DoesNotExposeLegacyRenderSettingsWindow()

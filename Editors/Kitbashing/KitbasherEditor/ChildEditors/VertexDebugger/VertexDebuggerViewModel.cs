@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 using Serilog;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
+using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.MathViews;
 
 namespace Editors.KitbasherEditor.ChildEditors.VertexDebugger
@@ -36,6 +37,13 @@ namespace Editors.KitbasherEditor.ChildEditors.VertexDebugger
         private readonly IEventHub _eventHub;
         private readonly ILogger _logger = Logging.Create<VertexDebuggerViewModel>();
 
+        private string _statisticsText = "";
+        public string StatisticsText
+        {
+            get => _statisticsText;
+            private set => SetAndNotify(ref _statisticsText, value);
+        }
+
         public VertexDebuggerViewModel(
             RenderEngineComponent renderEngineComponent,
             SelectionManager selectionManager,
@@ -57,6 +65,7 @@ namespace Editors.KitbasherEditor.ChildEditors.VertexDebugger
         {
             VertexList.Clear();
             SelectedVertex = null;
+            StatisticsText = "";
 
             if (_selectionManager.GetState() is VertexSelectionState selection)
             {
@@ -133,10 +142,16 @@ namespace Editors.KitbasherEditor.ChildEditors.VertexDebugger
 
         internal void ShowStatistics()
         {
-            var minUv0 = new Vector2(10000, 10000);
-            var maxUv0 = new Vector2(-10000, -10000);
-            var minUv1 = new Vector2(10000, 10000);
-            var maxUv1 = new Vector2(-10000, -10000);
+            if (VertexList.Count == 0)
+            {
+                StatisticsText = LocalizationManager.Instance.Get("VertexDebugger.EmptySelection");
+                return;
+            }
+
+            var minUv0 = VertexList[0].Uv0;
+            var maxUv0 = minUv0;
+            var minUv1 = VertexList[0].Uv1;
+            var maxUv1 = minUv1;
 
             foreach (var vert in VertexList)
             {
@@ -147,12 +162,9 @@ namespace Editors.KitbasherEditor.ChildEditors.VertexDebugger
                 maxUv1 = Vector2.Max(vert.Uv1, maxUv1);
             }
 
-            var str = "Mesh statistics\n";
-            str += $"   Vertex count = {VertexList.Count}\n";
-            str += $"   Uv0 = Min[{minUv0}] Max[{maxUv0}] \n";
-            str += $"   Uv1 = Min[{minUv1}] Max[{maxUv1}] \n";
-
-            _logger.Here().Information(str);    
+            StatisticsText = LocalizationManager.Instance.GetFormat("VertexDebugger.Statistics",
+                VertexList.Count, minUv0, maxUv0, minUv1, maxUv1);
+            _logger.Here().Information(StatisticsText);
         }
 
         void GetMinMaxUv()

@@ -9,6 +9,34 @@ namespace Testing.GameWorld.Core.Commands
     public class CommandExecutorTests
     {
         [Test]
+        public void CommandEvents_IdentifyTheCommandAndDistinguishRedo()
+        {
+            var eventHub = new Mock<IEventHub>();
+            var command = new Mock<ICommand>();
+            command.SetupGet(item => item.IsMutation).Returns(true);
+            var changes = new List<CommandStackChangedEvent>();
+            CommandStackUndoEvent? undo = null;
+            eventHub.Setup(hub => hub.Publish(It.IsAny<CommandStackChangedEvent>()))
+                .Callback<CommandStackChangedEvent>(changes.Add);
+            eventHub.Setup(hub => hub.Publish(It.IsAny<CommandStackUndoEvent>()))
+                .Callback<CommandStackUndoEvent>(notification => undo = notification);
+            var executor = new CommandExecutor(eventHub.Object);
+
+            executor.ExecuteCommand(command.Object);
+            executor.Undo();
+            executor.Redo();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(changes, Has.Count.EqualTo(2));
+                Assert.That(changes.All(change => change.CommandType == command.Object.GetType()), Is.True);
+                Assert.That(changes[0].IsRedo, Is.False);
+                Assert.That(changes[1].IsRedo, Is.True);
+                Assert.That(undo!.CommandType, Is.EqualTo(command.Object.GetType()));
+            });
+        }
+
+        [Test]
         public void Redo_PlainCommandExecutesAgainAndRestoresUndoStack()
         {
             var eventHub = new Mock<IEventHub>();

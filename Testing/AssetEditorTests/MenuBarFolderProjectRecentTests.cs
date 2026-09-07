@@ -21,6 +21,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using System.Xml.Linq;
 
 namespace AssetEditorTests;
@@ -64,9 +65,11 @@ public class MenuBarFolderProjectRecentTests
         });
     }
 
-    [Test]
+    [TestCase(false)]
+    [TestCase(true)]
     [NonParallelizable]
-    public void FileMenu_RendersLocalizedProjectAndReferenceWorkflow()
+    public void FileMenu_RendersLocalizedProjectAndReferenceWorkflow(
+        bool attachMenuAfterWindowLoaded)
     {
         var services = new ServiceCollection().BuildServiceProvider();
         WpfTestApplicationHost.InvokeWithThemeResources(
@@ -87,13 +90,20 @@ public class MenuBarFolderProjectRecentTests
                 };
                 var window = new Window
                 {
-                    Content = view,
+                    Content = attachMenuAfterWindowLoaded ? null : view,
                     Width = 1100,
                     Height = 240,
                 };
                 try
                 {
                     window.Show();
+                    if (attachMenuAfterWindowLoaded)
+                    {
+                        window.Dispatcher.Invoke(
+                            () => { },
+                            DispatcherPriority.ApplicationIdle);
+                        window.Content = view;
+                    }
                     window.UpdateLayout();
                     var menu = FindVisualDescendants<Menu>(window).Single();
                     var fileMenu = menu.Items
@@ -116,6 +126,11 @@ public class MenuBarFolderProjectRecentTests
                         NUnitAssert.That(view.ActualHeight, Is.GreaterThan(0));
                     });
 
+                    // MenuItem defers opening until its Loaded event has been processed.
+                    window.Dispatcher.Invoke(
+                        () => { },
+                        DispatcherPriority.ApplicationIdle);
+                    NUnitAssert.That(fileMenu.IsLoaded, Is.True);
                     Capture(window, "issue-88-main-menu.png");
                     fileMenu.IsSubmenuOpen = true;
                     window.UpdateLayout();

@@ -24,6 +24,17 @@
     <Style TargetType="{x:Type TabItem}" BasedOn="{StaticResource AeTab.Item}" />
     <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource AeScrollBar.Compact}" />
 
+    <Style x:Key="Kitbash.ToolbarGlyph" TargetType="{x:Type Rectangle}">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Fill" Value="{DynamicResource AeBrush.TextPrimary}" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+
+    <Style x:Key="Kitbash.ViewportToolbarGlyph" TargetType="{x:Type Rectangle}" BasedOn="{StaticResource Kitbash.ToolbarGlyph}">
+        <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Control}}}" />
+    </Style>
+
     <Style x:Key="Kitbash.VisibilityToggle" TargetType="{x:Type basedialogs:OptionalRadioButton}">
         <Setter Property="Width" Value="18" />
         <Setter Property="Height" Value="{StaticResource AeSize.CompactRowHeight}" />
@@ -398,6 +409,7 @@
     <Style x:Key="Kitbash.Expander" TargetType="{x:Type Expander}">
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Template">
             <Setter.Value>
@@ -411,7 +423,7 @@
                             HorizontalContentAlignment="Stretch"
                             Background="Transparent"
                             BorderBrush="{DynamicResource AeBrush.Border}"
-                            BorderThickness="0,0,0,1"
+                            BorderThickness="{TemplateBinding BorderThickness}"
                             Content="{TemplateBinding Header}"
                             ContentTemplate="{TemplateBinding HeaderTemplate}"
                             Focusable="False"
@@ -529,6 +541,18 @@
 
     <Style TargetType="{x:Type ToolBarTray}" BasedOn="{StaticResource {x:Type ToolBarTray}}">
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+    </Style>
+
+    <Style x:Key="Kitbash.ViewportToolRadioButton" TargetType="{x:Type RadioButton}" BasedOn="{StaticResource Kitbash.ToolRadioButton}">
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style TargetType="{x:Type ToolBar}" BasedOn="{StaticResource {x:Type ToolBar}}">
