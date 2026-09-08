@@ -187,6 +187,20 @@ public sealed class FolderProjectContainer :
         return eventArgs.Changes;
     }
 
+    public FolderProjectReconciliation RefreshFromDiskAndNotify()
+    {
+        lock (_watcherReconciliationGate)
+        {
+            PublishPendingWatcherReconciliation();
+            var eventArgs = RefreshFromDiskDetailed();
+            QueueWatcherReconciliation(eventArgs);
+            if (eventArgs.DirectoriesChanged)
+                SaveSettings();
+            PublishPendingWatcherReconciliation();
+            return eventArgs.Changes;
+        }
+    }
+
     private FolderProjectReconciledEventArgs RefreshFromDiskDetailed()
     {
         return ExecuteSerializedMutation(

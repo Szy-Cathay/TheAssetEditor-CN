@@ -834,6 +834,31 @@ public sealed class FolderProjectHistoryServiceTests
     }
 
     [Test]
+    public void RestoreProject_CurrentPointWithWorkingChanges_CreatesSafetyPointAndRestores()
+    {
+        using var project = new TemporaryProject();
+        var path = Path.Combine(project.Root, "db", "example.bin");
+        File.WriteAllBytes(path, [1]);
+        var service = CreateService();
+        var current = service.Initialize(project.Root);
+        File.WriteAllBytes(path, [2]);
+
+        var result = service.RestoreProject(project.Root, current, _ => { });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 1 }));
+            Assert.That(result.SafetyRestorePoint, Is.Not.Null);
+            Assert.That(service.GetRestorePoints(project.Root).Select(point => point.Id),
+                Is.EqualTo(new[] { result.RestorePoint.Id, result.SafetyRestorePoint!.Id, current.Id }));
+            Assert.That(service.GetStatus(project.Root).UnrecordedChanges, Is.Empty);
+        });
+        using var repository = new Repository(project.Root);
+        Assert.That(ReadBlobBytes(repository.Lookup<Commit>(result.SafetyRestorePoint!.Id)!, "db/example.bin"),
+            Is.EqualTo(new byte[] { 2 }));
+    }
+
+    [Test]
     public void GetRestoreImpactCount_IncludesHistoryAndUnrecordedDiskChanges()
     {
         using var project = new TemporaryProject();

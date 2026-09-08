@@ -27,6 +27,10 @@ public interface IFolderProjectUnsavedChangesService
     bool SaveUnsavedChanges(
         string projectRoot,
         IReadOnlyCollection<string>? repositoryPaths);
+
+    IEditorReloadOperation? PrepareFileReload(
+        string projectRoot,
+        IReadOnlyCollection<string> repositoryPaths);
 }
 
 public interface IFolderProjectUnsavedChangesPrompt
@@ -59,6 +63,18 @@ public sealed class FolderProjectUnsavedChangesService(
         }
 
         return true;
+    }
+
+    public IEditorReloadOperation? PrepareFileReload(
+        string projectRoot,
+        IReadOnlyCollection<string> repositoryPaths)
+    {
+        var project = packFileService.GetAllPackfileContainers()
+            .OfType<FolderProjectContainer>()
+            .FirstOrDefault(item => PathsEqual(item.ProjectRoot, projectRoot));
+        return project == null
+            ? null
+            : editorManager.PrepareFileReload(project, repositoryPaths);
     }
 
     private IReadOnlyList<ISaveableEditor> GetUnsavedEditors(

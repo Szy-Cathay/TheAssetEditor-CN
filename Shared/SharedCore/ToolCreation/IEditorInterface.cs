@@ -22,6 +22,11 @@ namespace Shared.Core.ToolCreation
         public void LoadFile(PackFile file);
     }
 
+    public interface IEditorReloadOperation : IDisposable
+    {
+        void Reload();
+    }
+
     public interface IEditorCreator
     {
         IEditorInterface CreateFromFile(PackFile file, EditorEnums? preferedEditor = null);
@@ -38,6 +43,9 @@ namespace Shared.Core.ToolCreation
         public void CloseTool(IEditorInterface tool);
         public bool TryCloseEditorsForContainer(
             PackFileContainer container);
+        IEditorReloadOperation PrepareFileReload(
+            FolderProjectContainer project,
+            IReadOnlyCollection<string> repositoryPaths);
         public bool ShouldBlockCloseCommand(IEditorInterface editor, bool hasUnsavedFiles);
 
         public void CloseOtherTools(IEditorInterface tool);

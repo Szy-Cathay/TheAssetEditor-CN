@@ -130,6 +130,8 @@
   "FolderProject.History.RestoreProject": "恢复整个工程",
   "FolderProject.History.DeleteRestorePoint": "删除还原点",
   "FolderProject.History.RestorePoints": "还原点",
+  "FolderProject.History.LoadMoreRestorePoints": "加载更早还原点",
+  "FolderProject.History.Restore.AlreadyCurrent": "磁盘文件已处于这个还原点，没有需要恢复的未记录修改。",
   "FolderProject.History.RestorePointSummary": "最近 {0} 个还原点",
   "FolderProject.History.NoRestorePoints": "当前没有可用还原点",
   "FolderProject.History.SelectedChanges": "还原点内容",

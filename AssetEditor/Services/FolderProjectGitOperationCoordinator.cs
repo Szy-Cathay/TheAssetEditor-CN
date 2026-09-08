@@ -355,7 +355,7 @@ public sealed class FolderProjectGitOperationCoordinator :
                     {
                         var loadedProject = FindLoadedProject(normalizedRoot);
                         if (loadedProject != null)
-                            await Task.Run(loadedProject.RefreshFromDisk);
+                            await Task.Run(loadedProject.RefreshFromDiskAndNotify);
                     }
                     catch (Exception failure)
                     {
@@ -398,7 +398,7 @@ public sealed class FolderProjectGitOperationCoordinator :
                     await Task.Run(() => rollbackOperation(result));
                     var loadedProject = FindLoadedProject(normalizedRoot);
                     if (loadedProject != null)
-                        await Task.Run(loadedProject.RefreshFromDisk);
+                        await Task.Run(loadedProject.RefreshFromDiskAndNotify);
                 }
                 catch (Exception recoveryFailure)
                 {

@@ -18,7 +18,8 @@ namespace AssetEditor.ViewModels;
 
 public partial class FolderProjectHistoryViewModel : ObservableObject
 {
-    private const int MaxRestorePoints = 100;
+    private const int RestorePointPageSize = 100;
+    private int _restorePointLimit = RestorePointPageSize;
     private readonly IFolderProjectHistoryService _historyService;
     private readonly IFolderProjectUnsavedChangesService
         _unsavedChangesService;
@@ -43,6 +44,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _hasUnrecordedChanges;
     [ObservableProperty] private bool _hasRestorePoints;
+    [ObservableProperty] private bool _hasMoreRestorePoints;
     [ObservableProperty] private bool _hasSelectedRestorePointChanges;
     [ObservableProperty] private bool _isRecoveryRequired;
     [ObservableProperty] private bool _canRecover;
@@ -74,6 +76,11 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     public Task SelectedChangesLoadTask { get; private set; } =
         Task.CompletedTask;
     public event EventHandler? RecoveryCompleted;
+
+    public string? RestoreProjectHint =>
+        IsReady && SelectedRestorePoint?.Id == _currentRestorePointId && !HasUnrecordedChanges
+            ? _localization.Get("FolderProject.History.Restore.AlreadyCurrent")
+            : null;
 
     public FolderProjectHistoryViewModel(
         IFolderProjectHistoryService historyService,
@@ -108,6 +115,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 StringComparison.OrdinalIgnoreCase))
         {
             _restorePointChangesCache.Clear();
+            _restorePointLimit = RestorePointPageSize;
         }
         _projectRoot = projectRoot;
         _closeAfterRecovery = false;
@@ -133,6 +141,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 StringComparison.OrdinalIgnoreCase))
         {
             _restorePointChangesCache.Clear();
+            _restorePointLimit = RestorePointPageSize;
         }
         _projectRoot = normalizedProjectRoot;
         _closeAfterRecovery = true;
@@ -155,6 +164,18 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
         await RunOperation(
             () => LoadSnapshot(projectRoot, validateUnrecordedChanges: true),
+            ApplySnapshot);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLoadMoreRestorePoints))]
+    private async Task LoadMoreRestorePoints()
+    {
+        var projectRoot = _projectRoot;
+        if (projectRoot == null)
+            return;
+        var nextLimit = checked(_restorePointLimit + RestorePointPageSize);
+        await RunOperation(
+            () => LoadSnapshot(projectRoot, restorePointLimit: nextLimit),
             ApplySnapshot);
     }
 
@@ -349,6 +370,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         await RunOperation(
             () => ExecuteWorkspaceFileOperation(
                 project,
+                [change.Path],
                 () =>
                 {
                     ReportProgress(new FolderProjectHistoryProgress(
@@ -388,6 +410,9 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         await RunOperation(
             () => ExecuteWorkspaceFileOperation(
                 project,
+                change.PreviousPath == null
+                    ? [change.Path]
+                    : [change.Path, change.PreviousPath],
                 () => _historyService.BeginDiscardChanges(
                     project.ProjectRoot,
                     [change.Path],
@@ -476,37 +501,65 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
     private async Task<HistorySnapshot> ExecuteWorkspaceFileOperation<T>(
         FolderProjectContainer project,
+        IReadOnlyCollection<string> repositoryPaths,
         Func<T> operation,
         Action<T> complete,
         Action<T> rollback)
     {
         HistorySnapshot? snapshot = null;
-        await _coordinator.ExecuteInPlaceTransactionalAsync(
-            project.ProjectRoot,
-            () =>
-            {
-                var result = operation();
-                ReportProgress(new FolderProjectHistoryProgress(
-                    FolderProjectHistoryProgressStage.ReconcilingProject,
-                    project.ProjectRoot));
-                return result;
-            },
-            result =>
-            {
-                project.RefreshFromDisk();
-                ReportProgress(new FolderProjectHistoryProgress(
-                    FolderProjectHistoryProgressStage.RefreshingInterface,
-                    project.ProjectRoot));
-                snapshot = LoadSnapshot(project.ProjectRoot);
-                complete(result);
-            },
-            rollback);
+        using var reloadEditors = _unsavedChangesService.PrepareFileReload(
+            project.ProjectRoot, repositoryPaths);
+        try
+        {
+            await _coordinator.ExecuteInPlaceTransactionalAsync(
+                project.ProjectRoot,
+                () =>
+                {
+                    var result = operation();
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage.ReconcilingProject,
+                        project.ProjectRoot));
+                    return result;
+                },
+                result =>
+                {
+                    project.RefreshFromDiskAndNotify();
+                    ReportProgress(new FolderProjectHistoryProgress(
+                        FolderProjectHistoryProgressStage.RefreshingInterface,
+                        project.ProjectRoot));
+                    snapshot = LoadSnapshot(project.ProjectRoot);
+                    ReloadEditors();
+                    complete(result);
+                },
+                rollback);
+        }
+        catch
+        {
+            ReloadEditors();
+            throw;
+        }
         return snapshot!;
+
+        void ReloadEditors()
+        {
+            if (reloadEditors == null)
+                return;
+            if (_synchronizationContext == null ||
+                ReferenceEquals(SynchronizationContext.Current, _synchronizationContext))
+            {
+                reloadEditors.Reload();
+            }
+            else
+            {
+                _synchronizationContext.Send(_ => reloadEditors.Reload(), null);
+            }
+        }
     }
 
     partial void OnSelectedRestorePointChanged(
         FolderProjectRestorePoint? value)
     {
+        OnPropertyChanged(nameof(RestoreProjectHint));
         RestoreProjectCommand.NotifyCanExecuteChanged();
         DeleteRestorePointCommand.NotifyCanExecuteChanged();
         SelectedRestorePointChanges.Clear();
@@ -587,8 +640,10 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
     private HistorySnapshot LoadSnapshot(
         string projectRoot,
-        bool validateUnrecordedChanges = false)
+        bool validateUnrecordedChanges = false,
+        int? restorePointLimit = null)
     {
+        var limit = restorePointLimit ?? _restorePointLimit;
         var status = validateUnrecordedChanges
             ? _historyService.GetStatus(projectRoot, ReportProgress)
             : _historyService.GetDisplayStatus(projectRoot);
@@ -597,9 +652,11 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             ? []
             : _historyService.GetRestorePoints(
                 projectRoot,
-                MaxRestorePoints,
+                checked(limit + 1),
                 ReportProgress);
-        return new HistorySnapshot(status, restorePoints);
+        return new HistorySnapshot(
+            projectRoot, status, restorePoints.Take(limit).ToArray(),
+            restorePoints.Count > limit, limit);
     }
 
     private HistorySnapshot? CreateRestorePointSnapshot(
@@ -634,6 +691,11 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
     private void ApplySnapshot(HistorySnapshot snapshot)
     {
+        if (!string.Equals(_projectRoot, snapshot.ProjectRoot, StringComparison.OrdinalIgnoreCase))
+            return;
+        var selectedRestorePointId = SelectedRestorePoint?.Id;
+        var selectedRestorePointChange = SelectedRestorePointChange;
+        var selectedUnrecordedPath = SelectedUnrecordedChange?.Path;
         IsReady = snapshot.Status.Availability ==
                   FolderProjectHistoryAvailability.Ready;
         IsRecoveryRequired = snapshot.Status.Availability ==
@@ -651,6 +713,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
             UnrecordedChanges,
             snapshot.Status.UnrecordedChanges);
         ReplaceCollection(RestorePoints, snapshot.RestorePoints);
+        _restorePointLimit = snapshot.RestorePointLimit;
+        HasMoreRestorePoints = snapshot.HasMoreRestorePoints;
         HasUnrecordedChanges = UnrecordedChanges.Count != 0;
         HasRestorePoints = RestorePoints.Count != 0;
         UnrecordedSummaryText = HasUnrecordedChanges
@@ -665,9 +729,14 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
                 RestorePoints.Count)
             : _localization.Get(
                 "FolderProject.History.NoRestorePoints");
-        SelectedRestorePoint = null;
-        SelectedRestorePointChanges.Clear();
-        HasSelectedRestorePointChanges = false;
+        SelectedRestorePoint = RestorePoints.FirstOrDefault(point => point.Id == selectedRestorePointId);
+        if (SelectedRestorePoint != null && selectedRestorePointChange != null)
+        {
+            SelectedRestorePointChange = SelectedRestorePointChanges
+                .FirstOrDefault(change => change == selectedRestorePointChange);
+        }
+        SelectedUnrecordedChange = UnrecordedChanges.FirstOrDefault(change =>
+            string.Equals(change.Path, selectedUnrecordedPath, StringComparison.OrdinalIgnoreCase));
         NotifyCommands();
     }
 
@@ -684,6 +753,9 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         catch (FolderProjectHistoryException exception)
         {
             ShowHistoryError(exception);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception exception)
         {
@@ -708,6 +780,9 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         catch (FolderProjectHistoryException exception)
         {
             ShowHistoryError(exception);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception exception)
         {
@@ -760,6 +835,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         SelectedUnrecordedChange = null;
         HasUnrecordedChanges = false;
         HasRestorePoints = false;
+        HasMoreRestorePoints = false;
         HasSelectedRestorePointChanges = false;
         UnrecordedSummaryText = _localization.Get(
             "FolderProject.History.NoUnrecordedChanges");
@@ -768,6 +844,8 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     }
 
     private bool CanRefresh() => _projectRoot != null && !IsBusy;
+
+    private bool CanLoadMoreRestorePoints() => CanRefresh() && HasMoreRestorePoints;
 
     private bool CanRecoverHistory() =>
         _projectRoot != null && CanRecover && !IsBusy;
@@ -780,7 +858,7 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
     private bool CanRestoreProject() =>
         _project != null && IsReady && !IsBusy &&
         SelectedRestorePoint != null &&
-        SelectedRestorePoint.Id != _currentRestorePointId;
+        (SelectedRestorePoint.Id != _currentRestorePointId || HasUnrecordedChanges);
 
     private bool CanDeleteRestorePoint() =>
         _project != null && IsReady && !IsBusy &&
@@ -804,7 +882,9 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
 
     private void NotifyCommands()
     {
+        OnPropertyChanged(nameof(RestoreProjectHint));
         RefreshCommand.NotifyCanExecuteChanged();
+        LoadMoreRestorePointsCommand.NotifyCanExecuteChanged();
         RecoverHistoryCommand.NotifyCanExecuteChanged();
         CreateRestorePointCommand.NotifyCanExecuteChanged();
         RestoreProjectCommand.NotifyCanExecuteChanged();
@@ -862,12 +942,29 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         ObservableCollection<T> target,
         IReadOnlyList<T> values)
     {
-        target.Clear();
-        foreach (var value in values)
-            target.Add(value);
+        var retained = values.ToHashSet();
+        for (var index = target.Count - 1; index >= 0; index--)
+        {
+            if (!retained.Contains(target[index]))
+                target.RemoveAt(index);
+        }
+        for (var index = 0; index < values.Count; index++)
+        {
+            var value = values[index];
+            if (index < target.Count && EqualityComparer<T>.Default.Equals(target[index], value))
+                continue;
+            var previousIndex = target.IndexOf(value);
+            if (previousIndex < 0)
+                target.Insert(index, value);
+            else
+                target.Move(previousIndex, index);
+        }
     }
 
     private sealed record HistorySnapshot(
+        string ProjectRoot,
         FolderProjectHistoryStatus Status,
-        IReadOnlyList<FolderProjectRestorePoint> RestorePoints);
+        IReadOnlyList<FolderProjectRestorePoint> RestorePoints,
+        bool HasMoreRestorePoints,
+        int RestorePointLimit);
 }
