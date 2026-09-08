@@ -32,7 +32,7 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
                 []));
         historyService.Setup(item => item.GetRestorePoints(
                 project.ProjectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns([]);
         var history = new FolderProjectHistoryViewModel(
@@ -172,7 +172,7 @@ public sealed class FolderProjectHistoryWorkspaceViewModelTests
             .Returns(status);
         historyService.Setup(item => item.GetRestorePoints(
                 project.ProjectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns([]);
         historyService.Setup(item => item.CreateRestorePoint(

@@ -232,12 +232,21 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <Button
+                    <DockPanel
                         Margin="0,0,0,12"
-                        HorizontalAlignment="Right"
-                        Command="{Binding DeleteRestorePointCommand}"
-                        Content="{loc:Loc FolderProject.History.DeleteRestorePoint}"
-                        Style="{StaticResource AeButton.Danger}" />
+                        LastChildFill="False">
+                        <Button
+                            DockPanel.Dock="Left"
+                            Command="{Binding LoadMoreRestorePointsCommand}"
+                            Content="{loc:Loc FolderProject.History.LoadMoreRestorePoints}"
+                            Style="{StaticResource AeButton.Quiet}"
+                            Visibility="{Binding HasMoreRestorePoints, Converter={StaticResource BoolToCollapsedConverter}}" />
+                        <Button
+                            DockPanel.Dock="Right"
+                            Command="{Binding DeleteRestorePointCommand}"
+                            Content="{loc:Loc FolderProject.History.DeleteRestorePoint}"
+                            Style="{StaticResource AeButton.Danger}" />
+                    </DockPanel>
 
                     <Grid Margin="0,0,0,4">
                         <Grid.ColumnDefinitions>
@@ -301,6 +310,8 @@
                             Margin="8,0,0,0"
                             Command="{Binding RestoreProjectCommand}"
                             Content="{loc:Loc FolderProject.History.RestoreProject}"
+                            ToolTip="{Binding RestoreProjectHint}"
+                            ToolTipService.ShowOnDisabled="True"
                             Style="{StaticResource AeButton.Danger}" />
                     </Grid>
                 </StackPanel>

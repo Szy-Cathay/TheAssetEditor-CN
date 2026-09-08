@@ -15,6 +15,7 @@ using Shared.Core.Events.Global;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 
 namespace AssetEditorTests;
 
@@ -24,6 +25,67 @@ public class FolderProjectHistoryViewModelTests
     public void SetUp()
     {
         new LocalizationManager().LoadLanguage();
+    }
+
+    [Test]
+    public async Task Refresh_PreservesSelectedRestorePointFileAndWorkingChange()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("head", "当前还原点");
+        var change = new FolderProjectRestorePointChange(
+            "changed.bin", null,
+            FolderProjectRestorePointChangeKind.Modified, true);
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot, point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([change]);
+        var viewModel = CreateViewModel(history.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+        viewModel.SelectedRestorePointChange = change;
+        var workingChange = viewModel.UnrecordedChanges.Single();
+        viewModel.SelectedUnrecordedChange = workingChange;
+        var collectionResets = 0;
+        viewModel.RestorePoints.CollectionChanged += (_, args) =>
+        {
+            if (args.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+                collectionResets++;
+        };
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.SelectedRestorePoint, Is.SameAs(point));
+            NUnitAssert.That(viewModel.SelectedRestorePointChange, Is.SameAs(change));
+            NUnitAssert.That(viewModel.SelectedUnrecordedChange, Is.SameAs(workingChange));
+            NUnitAssert.That(viewModel.SelectedRestorePointChanges, Is.EqualTo(new[] { change }));
+            NUnitAssert.That(collectionResets, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task CurrentRestorePoint_WithUnrecordedChanges_CanRestoreProject()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var point = RestorePoint("head", "当前还原点");
+        var history = CreateHistoryService(project.ProjectRoot, [point]);
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot, point.Id,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([]);
+        var viewModel = CreateViewModel(history.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = point;
+        await viewModel.SelectedChangesLoadTask;
+
+        NUnitAssert.That(viewModel.RestoreProjectCommand.CanExecute(null), Is.True);
     }
 
     [Test]
@@ -45,7 +107,7 @@ public class FolderProjectHistoryViewModelTests
                 ]));
         history.Setup(item => item.GetRestorePoints(
                 project.ProjectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns([
                 RestorePoint("head", "调整单位数据"),
@@ -104,7 +166,7 @@ public class FolderProjectHistoryViewModelTests
             .Returns(readyStatus);
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>() ))
             .Returns([]);
         var recoveryOperation = new FolderProjectRecoveryOperation(
@@ -209,7 +271,7 @@ public class FolderProjectHistoryViewModelTests
             });
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>() ))
             .Returns([]);
         var dialogs = new Mock<IStandardDialogs>();
@@ -255,7 +317,7 @@ public class FolderProjectHistoryViewModelTests
             .Returns(recoveryStatus);
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns([]);
         history.Setup(item => item.BeginRecoverToSafeState(
@@ -535,6 +597,11 @@ public class FolderProjectHistoryViewModelTests
         var history = CreateHistoryService(
             project.ProjectRoot,
             [current, initial]);
+        history.Setup(item => item.GetStatus(
+                project.ProjectRoot,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready, current.Id, []));
         history.Setup(item => item.GetRestorePointChanges(
                 project.ProjectRoot,
                 It.IsAny<string>(),
@@ -554,6 +621,7 @@ public class FolderProjectHistoryViewModelTests
         NUnitAssert.That(
             viewModel.RestoreProjectCommand.CanExecute(null),
             Is.False);
+        NUnitAssert.That(viewModel.RestoreProjectHint, Does.Contain("没有需要恢复"));
         var notifiedStates = new List<bool>();
         viewModel.RestoreProjectCommand.CanExecuteChanged += (_, _) =>
             notifiedStates.Add(
@@ -1362,6 +1430,161 @@ public class FolderProjectHistoryViewModelTests
             });
     }
 
+    [Test]
+    public async Task LoadMoreRestorePoints_ReachesOldestPointAndKeepsLoadedPagesOnRefresh()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var points = Enumerable.Range(0, 205)
+            .Select(index => RestorePoint($"point-{index}", $"还原点 {index}", index == 204))
+            .ToArray();
+        var history = CreateHistoryService(project.ProjectRoot);
+        history.Setup(item => item.GetRestorePoints(
+                project.ProjectRoot, It.IsAny<int>(),
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns<string, int, Action<FolderProjectHistoryProgress>>(
+                (_, count, _) => points.Take(count).ToArray());
+        history.Setup(item => item.GetRestorePointChanges(
+                project.ProjectRoot, It.IsAny<string>(),
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns([]);
+        var viewModel = CreateViewModel(history.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        NUnitAssert.That(viewModel.RestorePoints, Has.Count.EqualTo(100));
+        NUnitAssert.That(viewModel.HasMoreRestorePoints, Is.True);
+
+        await viewModel.LoadMoreRestorePointsCommand.ExecuteAsync(null);
+        NUnitAssert.That(viewModel.RestorePoints, Has.Count.EqualTo(200));
+        await viewModel.LoadMoreRestorePointsCommand.ExecuteAsync(null);
+        viewModel.SelectedRestorePoint = viewModel.RestorePoints.Last();
+        await viewModel.SelectedChangesLoadTask;
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(viewModel.RestorePoints, Has.Count.EqualTo(205));
+            NUnitAssert.That(viewModel.SelectedRestorePoint, Is.SameAs(points.Last()));
+            NUnitAssert.That(viewModel.RestoreProjectCommand.CanExecute(null), Is.True);
+            NUnitAssert.That(viewModel.HasMoreRestorePoints, Is.False);
+            NUnitAssert.That(viewModel.LoadMoreRestorePointsCommand.CanExecute(null), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task LoadMoreRestorePoints_FailureKeepsCurrentPageAndCanRetry()
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var points = Enumerable.Range(0, 101).Select(index => RestorePoint($"point-{index}", "还原点")).ToArray();
+        var history = CreateHistoryService(project.ProjectRoot, points);
+        history.Setup(item => item.GetRestorePoints(
+                project.ProjectRoot, 201,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Throws(new IOException("History read failed."));
+        var viewModel = CreateViewModel(history.Object);
+        viewModel.OpenProject(project);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        await viewModel.LoadMoreRestorePointsCommand.ExecuteAsync(null);
+        NUnitAssert.That(viewModel.RestorePoints, Has.Count.EqualTo(100));
+        NUnitAssert.That(viewModel.LoadMoreRestorePointsCommand.CanExecute(null), Is.True);
+        history.Setup(item => item.GetRestorePoints(
+                project.ProjectRoot, 201,
+                It.IsAny<Action<FolderProjectHistoryProgress>>()))
+            .Returns(points);
+        await viewModel.LoadMoreRestorePointsCommand.ExecuteAsync(null);
+        NUnitAssert.That(viewModel.RestorePoints, Has.Count.EqualTo(101));
+        NUnitAssert.That(viewModel.HasMoreRestorePoints, Is.False);
+    }
+
+    [TestCase(ThemeType.DarkTheme)]
+    [TestCase(ThemeType.LightTheme)]
+    [TestCase(ThemeType.HighContrastDark)]
+    [TestCase(ThemeType.HighContrastLight)]
+    [NonParallelizable]
+    public async Task HistoryView_RefreshAndLoadMorePreserveSelectionAndScroll(ThemeType theme)
+    {
+        using var directory = new TemporaryDirectory();
+        using var project = CreateProject(directory.Path);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        WpfTestApplicationHost.InvokeWithThemeResources(
+            WpfTestApplicationHost.EmptyServices, async () =>
+            {
+                Window? window = null;
+                var previousTheme = ThemesController.CurrentTheme;
+                try
+                {
+                    ThemesController.SetTheme(theme);
+                    var points = Enumerable.Range(0, 205)
+                        .Select(index => RestorePoint($"point-{index}", $"还原点 {index}"))
+                        .ToArray();
+                    var history = CreateHistoryService(project.ProjectRoot);
+                    history.Setup(item => item.GetRestorePoints(project.ProjectRoot, It.IsAny<int>(),
+                            It.IsAny<Action<FolderProjectHistoryProgress>>()))
+                        .Returns<string, int, Action<FolderProjectHistoryProgress>>(
+                            (_, count, _) => points.Take(count).ToArray());
+                    history.Setup(item => item.GetRestorePointChanges(project.ProjectRoot, It.IsAny<string>(),
+                            It.IsAny<Action<FolderProjectHistoryProgress>>()))
+                        .Returns([new FolderProjectRestorePointChange("changed.bin", null,
+                            FolderProjectRestorePointChangeKind.Modified, true)]);
+                    var viewModel = CreateViewModel(history.Object);
+                    viewModel.OpenProject(project);
+                    await viewModel.RefreshCommand.ExecuteAsync(null);
+                    var view = new FolderProjectHistoryView { DataContext = viewModel };
+                    window = new Window
+                    {
+                        Width = 360, Height = 480, Content = view,
+                        WindowStyle = WindowStyle.None, ShowActivated = false, ShowInTaskbar = false,
+                    };
+                    window.Show();
+                    viewModel.SelectedRestorePoint = viewModel.RestorePoints[50];
+                    await viewModel.SelectedChangesLoadTask;
+                    viewModel.SelectedRestorePointChange = viewModel.SelectedRestorePointChanges.Single();
+                    await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    window.UpdateLayout();
+                    var historyList = FindDescendants<ListView>(view)
+                        .Single(list => ReferenceEquals(list.ItemsSource, viewModel.RestorePoints));
+                    var listScroll = FindDescendants<ScrollViewer>(historyList).First();
+                    var outerScroll = FindDescendants<ScrollViewer>(view).First();
+                    listScroll.ScrollToVerticalOffset(40);
+                    outerScroll.ScrollToVerticalOffset(100);
+                    await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    var listOffset = listScroll.VerticalOffset;
+                    var outerOffset = outerScroll.VerticalOffset;
+                    NUnitAssert.That(listOffset, Is.GreaterThan(0));
+                    NUnitAssert.That(outerOffset, Is.GreaterThan(0));
+
+                    await viewModel.RefreshCommand.ExecuteAsync(null);
+                    await viewModel.LoadMoreRestorePointsCommand.ExecuteAsync(null);
+                    await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    window.UpdateLayout();
+
+                    NUnitAssert.Multiple(() =>
+                    {
+                        NUnitAssert.That(viewModel.SelectedRestorePoint, Is.SameAs(points[50]));
+                        NUnitAssert.That(historyList.SelectedItem, Is.SameAs(points[50]));
+                        NUnitAssert.That(viewModel.SelectedRestorePointChange?.Path, Is.EqualTo("changed.bin"));
+                        NUnitAssert.That(listScroll.VerticalOffset, Is.EqualTo(listOffset).Within(1));
+                        NUnitAssert.That(outerScroll.VerticalOffset, Is.EqualTo(outerOffset).Within(1));
+                        NUnitAssert.That(FindDescendants<Button>(view)
+                            .Single(button => ReferenceEquals(button.Command, viewModel.LoadMoreRestorePointsCommand)).IsVisible, Is.True);
+                    });
+                    completion.SetResult();
+                }
+                catch (Exception exception)
+                {
+                    completion.SetException(exception);
+                }
+                finally
+                {
+                    window?.Close();
+                    ThemesController.SetTheme(previousTheme);
+                }
+            });
+        await completion.Task;
+    }
+
     private static FolderProjectHistoryViewModel CreateViewModel(
         IFolderProjectHistoryService history,
         IFolderProjectUnsavedChangesService? unsaved = null,
@@ -1444,7 +1667,7 @@ public class FolderProjectHistoryViewModelTests
             .Returns(status);
         history.Setup(item => item.GetRestorePoints(
                 projectRoot,
-                100,
+                101,
                 It.IsAny<Action<FolderProjectHistoryProgress>>()))
             .Returns(restorePoints ?? [RestorePoint("head", "现有还原点")]);
         history.Setup(item => item.CreateRestorePoint(

@@ -25,6 +25,7 @@ namespace AssetEditor.Services
         private readonly Func<string, string, MessageBoxButton, MessageBoxResult> _showMessage;
         private readonly Dictionary<IEditorInterface, PackFileContainer>
             _editorOwners = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<FolderProjectContainer, HashSet<string>> _reloadingPaths = [];
 
         public ObservableCollection<IEditorInterface> CurrentEditorsList { get; set; } = [];
         [ObservableProperty] private int _selectedEditorIndex = -1;
@@ -60,13 +61,27 @@ namespace AssetEditor.Services
 
         public IEditorInterface CreateFromFile(PackFile file, EditorEnums? preferedEditor)
         {
+            var owner = file == null ? null : _packFileService.GetPackFileContainer(file);
+            if (owner is FolderProjectContainer project &&
+                _reloadingPaths.TryGetValue(project, out var paths) &&
+                paths.Contains(_packFileService.GetFullPath(file, project).Replace('/', '\\')))
+            {
+                return null;
+            }
+            return CreateFromFileCore(file, preferedEditor, owner);
+        }
+
+        private IEditorInterface CreateFromFileCore(
+            PackFile file,
+            EditorEnums? preferedEditor,
+            PackFileContainer? owner)
+        {
             if (file == null)
             {
                 _logger.Here().Error($"Attempting to open file, but file is NULL");
                 return null;
             }
 
-            var owner = _packFileService.GetPackFileContainer(file);
             for (var i = 0; i < CurrentEditorsList.Count; i++)
             {
                 var existingEditor = CurrentEditorsList[i];
@@ -205,6 +220,112 @@ namespace AssetEditor.Services
                 _packFileService.GetPackFileContainer(
                     fileEditor.CurrentFile),
                 container);
+        }
+
+        public IEditorReloadOperation PrepareFileReload(
+            FolderProjectContainer project,
+            IReadOnlyCollection<string> repositoryPaths)
+        {
+            var paths = repositoryPaths
+                .Select(path => path.Replace('/', '\\'))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var selectedEditor = CurrentEditorsList.ElementAtOrDefault(SelectedEditorIndex);
+            var editors = CurrentEditorsList
+                .Where(editor => IsOwnedBy(editor, project) &&
+                    editor is IFileEditor fileEditor &&
+                    paths.Contains(_packFileService.GetFullPath(fileEditor.CurrentFile, project)
+                        .Replace('/', '\\')))
+                .ToList();
+            if (editors.OfType<ISaveableEditor>().Any(editor => editor.HasUnsavedChanges) &&
+                _showMessage(
+                    LocalizationManager.Instance.Get("Msg.UnsavedChangesOnClose"),
+                    LocalizationManager.Instance.Get("Msg.CloseTitle"),
+                    MessageBoxButton.OKCancel) != MessageBoxResult.OK)
+            {
+                throw new OperationCanceledException("The file editors were not closed.");
+            }
+
+            var states = editors.Select(editor => (
+                Path: _packFileService.GetFullPath(((IFileEditor)editor).CurrentFile, project),
+                Editor: _editorDatabase.GetEditorInfos()
+                    .FirstOrDefault(info => info.ViewModel == editor.GetType())?.EditorEnum,
+                Index: CurrentEditorsList.IndexOf(editor),
+                WasSelected: ReferenceEquals(editor, selectedEditor))).ToArray();
+            if (!_reloadingPaths.TryGetValue(project, out var activePaths))
+            {
+                activePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                _reloadingPaths.Add(project, activePaths);
+            }
+            if (activePaths.Overlaps(paths))
+                throw new InvalidOperationException("These file editors are already being reloaded.");
+            activePaths.UnionWith(paths);
+            try
+            {
+                foreach (var editor in editors)
+                    DestroyEditor(editor);
+            }
+            catch
+            {
+                ReleasePaths();
+                throw;
+            }
+
+            var reopenedEditors = new List<IEditorInterface>();
+            return new EditorReloadOperation(Reload, ReleasePaths);
+
+            void Reload()
+            {
+                foreach (var editor in reopenedEditors)
+                    DestroyEditor(editor);
+                reopenedEditors.Clear();
+                if (!_packFileService.GetAllPackfileContainers().Contains(project) ||
+                    !ReferenceEquals(_packFileService.GetEditablePack(), project))
+                    return;
+
+                var nextSelection = selectedEditor;
+                foreach (var state in states)
+                {
+                    var file = _packFileService.FindFile(state.Path, project);
+                    if (file == null)
+                        continue;
+                    var editor = CreateFromFileCore(file, state.Editor, project) ??
+                        throw new InvalidOperationException("The file editor could not be reopened.");
+                    reopenedEditors.Add(editor);
+                    CurrentEditorsList.Move(
+                        CurrentEditorsList.IndexOf(editor),
+                        Math.Min(state.Index, CurrentEditorsList.Count - 1));
+                    if (state.WasSelected)
+                        nextSelection = editor;
+                }
+                if (nextSelection != null && CurrentEditorsList.Contains(nextSelection))
+                    SetEditorAsCurrent(nextSelection);
+            }
+
+            void ReleasePaths()
+            {
+                activePaths.ExceptWith(paths);
+                if (activePaths.Count == 0)
+                    _reloadingPaths.Remove(project);
+            }
+        }
+
+        private sealed class EditorReloadOperation(Action reload, Action release) : IEditorReloadOperation
+        {
+            private bool _disposed;
+
+            public void Reload()
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                reload();
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                    return;
+                _disposed = true;
+                release();
+            }
         }
 
         private void OnForceShutdownEditor(ForceShutdownEvent e)
