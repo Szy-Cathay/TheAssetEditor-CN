@@ -24,6 +24,13 @@ public partial class MessageDialogWindow : AssetEditorWindow
         MessageBoxImage image = MessageBoxImage.None)
     {
         InitializeComponent();
+        Result = buttonSet switch
+        {
+            MessageDialogButtonSet.Ok => MessageBoxResult.OK,
+            MessageDialogButtonSet.YesNo => MessageBoxResult.No,
+            _ => MessageBoxResult.Cancel,
+        };
+        NoButton.IsCancel = buttonSet == MessageDialogButtonSet.YesNo;
         Title = title;
         MessageText.Text = message;
         MessageImage = image;

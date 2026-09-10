@@ -13,6 +13,7 @@ using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.BaseDialogs.StandardDialog.PackFile;
 using Shared.Ui.Common.Exceptions;
+using WindowHandling;
 
 namespace Shared.Ui.BaseDialogs.StandardDialog
 {
@@ -161,14 +162,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
 
         private static void ApplyOwner(Window window)
         {
-            var owner = Application.Current?.MainWindow;
-            if (owner != null &&
-                owner.IsLoaded &&
-                !ReferenceEquals(owner, window) &&
-                window.Owner == null)
-            {
-                window.Owner = owner;
-            }
+            AssetEditorWindow.SetOwnerToActiveWindow(window);
         }
 
         private static bool? ShowOwnedDialog(Window window)

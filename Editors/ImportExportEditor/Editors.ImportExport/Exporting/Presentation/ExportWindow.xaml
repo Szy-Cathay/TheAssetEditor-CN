@@ -26,7 +26,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid>
+        <Grid IsEnabled="{Binding IsEnabled, ElementName=ExportButton}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="120" />
                 <ColumnDefinition Width="*" />
@@ -71,6 +71,7 @@
 
         <Border
             Grid.Row="1"
+            IsEnabled="{Binding IsEnabled, ElementName=ExportButton}"
             Margin="0,14,0,0"
             Padding="12"
             Background="{DynamicResource AeBrush.Surface}"
@@ -90,6 +91,7 @@
             <Button
                 Margin="0,0,8,0"
                 Content="{loc:Loc General.Cancel}"
+                IsEnabled="{Binding IsEnabled, ElementName=ExportButton}"
                 IsCancel="True" />
             <Button
                 x:Name="ExportButton"
