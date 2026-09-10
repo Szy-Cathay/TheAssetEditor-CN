@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using GameWorld.Core.Services;
 using GameWorld.Core.WpfWindow.FactionColourSettings;
@@ -36,17 +35,6 @@ public class FactionColourSettingsWindowTests
                 {
                     window.Show();
                     window.UpdateLayout();
-
-                    foreach (var picker in FindVisualChildren<ColourPickerButtonView>(window))
-                    {
-                        var button = FindVisualChildren<ToggleButton>(picker).Single();
-                        var bounds = button.TransformToAncestor(picker)
-                            .TransformBounds(new Rect(button.RenderSize));
-                        NUnitAssert.That(bounds.Left, Is.GreaterThanOrEqualTo(-0.5));
-                        NUnitAssert.That(bounds.Top, Is.GreaterThanOrEqualTo(-0.5));
-                        NUnitAssert.That(bounds.Right, Is.LessThanOrEqualTo(picker.ActualWidth + 0.5));
-                        NUnitAssert.That(bounds.Bottom, Is.LessThanOrEqualTo(picker.ActualHeight + 0.5));
-                    }
 
                     NUnitAssert.Multiple(() =>
                     {

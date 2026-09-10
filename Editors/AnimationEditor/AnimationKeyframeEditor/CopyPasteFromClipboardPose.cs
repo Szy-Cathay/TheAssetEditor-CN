@@ -86,7 +86,7 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 if ((parsedClipboardFrame.SkeletonName != skeleton.SkeletonName) && !_parent.DontWarnDifferentSkeletons.Value)
                 {
                     var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SkeletonMismatch", parsedClipboardFrame.SkeletonName, skeleton.SkeletonName), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result != DialogResult.Yes) return;
+                    if (result == DialogResult.No) return;
                 }
 
                 _parent.CommandFactory.Create<PasteWholeInRangeTransformFromClipboardBoneCommand>().Configure(x => x.Configure(
@@ -129,7 +129,7 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 if ((parsedClipboardFrame.SkeletonName != skeleton.SkeletonName) && !_parent.DontWarnDifferentSkeletons.Value)
                 {
                     var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SkeletonMismatch", parsedClipboardFrame.SkeletonName, skeleton.SkeletonName), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result != DialogResult.Yes) return;
+                    if (result == DialogResult.No) return;
                 }
 
                 var framesCount = parsedClipboardFrame.Frames.Keys.Count;
@@ -184,7 +184,7 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 if ((parsedClipboardFrame.SkeletonName != skeleton.SkeletonName) && !_parent.DontWarnDifferentSkeletons.Value)
                 {
                     var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SkeletonMismatch", parsedClipboardFrame.SkeletonName, skeleton.SkeletonName), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result != DialogResult.Yes) return;
+                    if (result == DialogResult.No) return;
                 }
 
                 var pastedFramesLength = parsedClipboardFrame.Frames.Count;
@@ -246,7 +246,7 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 if ((parsedClipboardFrame.SkeletonName != skeleton.SkeletonName) && !_parent.DontWarnDifferentSkeletons.Value)
                 {
                     var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SkeletonMismatch", parsedClipboardFrame.SkeletonName, skeleton.SkeletonName), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result != DialogResult.Yes) return;
+                    if (result == DialogResult.No) return;
                 }
 
 
@@ -305,7 +305,7 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 if ((parsedClipboardFrame.SkeletonName != skeleton.SkeletonName) && !_parent.DontWarnDifferentSkeletons.Value)
                 {
                     var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SkeletonMismatch", parsedClipboardFrame.SkeletonName, skeleton.SkeletonName), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result != DialogResult.Yes) return;
+                    if (result == DialogResult.No) return;
                 }
 
                 var framesCount = parsedClipboardFrame.Frames.Keys.Count;
@@ -367,7 +367,7 @@ namespace AnimationEditor.AnimationKeyframeEditor
                 if ((parsedClipboardFrame.SkeletonName != skeleton.SkeletonName) && !_parent.DontWarnDifferentSkeletons.Value)
                 {
                     var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SkeletonMismatch", parsedClipboardFrame.SkeletonName, skeleton.SkeletonName), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result != DialogResult.Yes) return;
+                    if (result == DialogResult.No) return;
                 }
 
                 _parent.CommandFactory.Create<PasteIntoSelectedBonesInRangeTransformFromClipboardBoneCommand>().Configure(x => x.Configure(

@@ -1,6 +1,6 @@
+using System.Linq;
 using System.Windows;
 using Shared.Core.Services;
-using WindowHandling;
 
 using DialogResult = System.Windows.Forms.DialogResult;
 using MessageBoxButtons = System.Windows.Forms.MessageBoxButtons;
@@ -71,7 +71,12 @@ public static class UnifiedMessageBox
             message,
             ToButtonSet(buttons),
             image);
-        AssetEditorWindow.SetOwnerToActiveWindow(dialog);
+        var owner = application.Windows
+            .OfType<Window>()
+            .FirstOrDefault(window => window.IsActive) ??
+            application.MainWindow;
+        if (owner is { IsLoaded: true } && owner != dialog)
+            dialog.Owner = owner;
         dialog.ShowDialog();
         return dialog.Result;
     }

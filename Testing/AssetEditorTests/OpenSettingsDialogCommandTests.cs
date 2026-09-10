@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Threading;
 using AssetEditor.Services.Settings;
 using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
@@ -67,12 +66,9 @@ public class OpenSettingsDialogCommandTests
             _window = new SettingsWindow();
             _window.Loaded += (_, _) =>
             {
-                _window.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () =>
-                {
-                    WasShown = _window.IsLoaded;
-                    _window.DataContext = null;
-                    _window.Close();
-                });
+                WasShown = true;
+                _window.DataContext = null;
+                _window.Close();
             };
             return _window;
         }

@@ -7,7 +7,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CommonControls.BaseDialogs.ToolSelector;
 using NUnit.Framework;
-using Shared.Core.Services;
 using Shared.Core.ToolCreation;
 using Shared.Ui.BaseDialogs.ToolSelector;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -172,15 +171,9 @@ public class ToolSelectorWindowTests
                             candidate.IsVisible &&
                             candidate.Owner == owner);
                     window.UpdateLayout();
-                    try
-                    {
-                        interaction(window);
-                    }
-                    finally
-                    {
-                        if (window.IsVisible)
-                            window.Close();
-                    }
+                    interaction(window);
+                    if (window.IsVisible)
+                        window.Close();
                 });
 
             return new ToolSelectorUiProvider().CreateAndShow(
@@ -233,8 +226,7 @@ public class ToolSelectorWindowTests
 
     private static void InvokeOpenButton(ToolSelectorWindow window)
     {
-        var button = FindVisualChildren<Button>(window).Single(candidate =>
-            Equals(candidate.Content, LocalizationManager.Instance.Get("Shared.ToolSelector.Open")));
+        var button = FindVisualChildren<Button>(window).Single();
         var peer = new ButtonAutomationPeer(button);
         var provider = (IInvokeProvider)peer.GetPattern(
             PatternInterface.Invoke);

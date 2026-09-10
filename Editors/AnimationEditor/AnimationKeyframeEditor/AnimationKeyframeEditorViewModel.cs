@@ -356,7 +356,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             var currentFrame = _rider.Player.CurrentFrame;
 
             var result = MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.RemoveFrameConfirm", currentFrame), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result != DialogResult.Yes) return;
+            if (result == DialogResult.No) return;
 
             _commandFactory.Create<DeleteFrameBoneCommand>().Configure(x => x.Configure(_rider.AnimationClip, currentFrame)).BuildAndExecute();
             _selectionComponent.SetBoneSelectionMode();
