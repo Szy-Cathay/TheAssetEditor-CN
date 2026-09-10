@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Threading;
-using System.Linq;
 using System.ComponentModel;
 using System.Windows;
 using CommonControls;
-using Shared.Ui.Common.OperationProgress;
 
 namespace Editors.Audio.AudioProjectConverter
 {
@@ -13,14 +11,10 @@ namespace Editors.Audio.AudioProjectConverter
         private readonly CancellationTokenSource _initializationCancellation =
             new();
         private bool _closeWhenIdle;
-        private readonly OperationProgressWindowHost _operationProgressHost;
 
         public AudioProjectConverterWindow()
         {
             InitializeComponent();
-            _operationProgressHost = ProgressSurface.Children
-                .OfType<OperationProgressWindowHost>()
-                .Single();
             DarkTitleBarHelper.Enable(this);
             Loaded += AudioProjectConverterWindowLoaded;
         }
@@ -32,7 +26,6 @@ namespace Editors.Audio.AudioProjectConverter
             if (DataContext is AudioProjectConverterViewModel viewModel)
             {
                 viewModel.SetCloseAction(Close);
-                viewModel.SetProgressCompletionAction(_operationProgressHost.CompleteAsync);
                 viewModel.PropertyChanged += OnViewModelPropertyChanged;
                 await viewModel.InitializeAsync(
                     _initializationCancellation.Token);

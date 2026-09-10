@@ -1252,8 +1252,6 @@ namespace AssetEditorTests
         [TestMethod]
         public async Task AudioProjectConverter_WhenRepositoryLoadFails_RemainsDisabled()
         {
-            var dialogs = new Mock<IStandardDialogs>();
-            var progressCompleted = false;
             var repository = new Mock<IAudioRepository>();
             repository
                 .Setup(x => x.Load(
@@ -1262,7 +1260,7 @@ namespace AssetEditorTests
                     It.IsAny<CancellationToken>()))
                 .Throws(new InvalidOperationException("load failed"));
             var viewModel = new AudioProjectConverterViewModel(
-                dialogs.Object,
+                Mock.Of<IStandardDialogs>(),
                 Mock.Of<IAudioPackOutputService>(),
                 repository.Object,
                 Mock.Of<IAudioEditorFileService>(),
@@ -1278,22 +1276,9 @@ namespace AssetEditorTests
                 IsUsingWwiseProject = false
             };
 
-            viewModel.SetProgressCompletionAction(() =>
-            {
-                progressCompleted = true;
-                return Task.CompletedTask;
-            });
-            dialogs.Setup(service => service.ShowDialogBox(It.IsAny<string>(), It.IsAny<string>()))
-                .Callback(() =>
-                {
-                    Assert.IsTrue(progressCompleted);
-                    Assert.IsFalse(viewModel.IsBusy);
-                });
-
             await viewModel.InitializeAsync(CancellationToken.None);
 
             Assert.IsFalse(viewModel.IsOkButtonEnabled);
-            dialogs.Verify(service => service.ShowDialogBox(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
         }
 
         [TestMethod]

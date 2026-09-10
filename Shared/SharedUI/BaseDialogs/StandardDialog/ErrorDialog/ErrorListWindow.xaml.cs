@@ -11,7 +11,6 @@ using Microsoft.Win32;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.ErrorListDialog;
-using WindowHandling;
 using static Shared.Ui.BaseDialogs.ErrorListDialog.ErrorListViewModel;
 
 namespace CommonControls.BaseDialogs.ErrorListDialog
@@ -23,7 +22,7 @@ namespace CommonControls.BaseDialogs.ErrorListDialog
     {
         public ErrorListWindow()
         {
-            AssetEditorWindow.SetOwnerToActiveWindow(this);
+            Owner = System.Windows.Application.Current.MainWindow;
             InitializeComponent();
             DarkTitleBarHelper.Enable(this);
         }

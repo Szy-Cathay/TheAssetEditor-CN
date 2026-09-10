@@ -143,7 +143,6 @@ namespace Editors.AnimatioReTarget.Editor.Saving
                 _settings.BatchTargetFolder,
                 _settings.BatchOverwriteExisting);
             BatchAnimationRetargetResult? result = null;
-            Exception? batchException = null;
             SetBatchOperationState(true);
             ResetProgress();
             _batchCancellation = new CancellationTokenSource();
@@ -161,23 +160,17 @@ namespace Editors.AnimatioReTarget.Editor.Saving
             }
             catch (Exception exception)
             {
-                batchException = exception;
+                _standardDialogs.ShowExceptionWindow(
+                    exception,
+                    LocalizationManager.Instance.Get(
+                        "AnimReTarget.Batch.Error.ExecutionFailed"));
             }
             finally
             {
                 _batchCancellation.Dispose();
                 _batchCancellation = null;
-                _batchProgress.CancelCommand = null;
                 await _batchProgress.CompleteAsync();
                 SetBatchOperationState(false);
-            }
-
-            if (batchException != null)
-            {
-                _standardDialogs.ShowExceptionWindow(
-                    batchException,
-                    LocalizationManager.Instance.Get(
-                        "AnimReTarget.Batch.Error.ExecutionFailed"));
             }
 
             if (result != null)

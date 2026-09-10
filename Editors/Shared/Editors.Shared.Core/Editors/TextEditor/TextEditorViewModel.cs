@@ -105,7 +105,7 @@ namespace Shared.Ui.Editors.TextEditor
 
                 if (_converter.CanSaveOnError())
                 {
-                    if (MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SaveWithErrors", error.Text), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                    if (MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.SaveWithErrors", error.Text), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButton.YesNo) == MessageBoxResult.No)
                         return false;
                 }
                 else

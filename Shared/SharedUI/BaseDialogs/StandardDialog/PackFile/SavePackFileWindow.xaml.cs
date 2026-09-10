@@ -63,7 +63,7 @@ namespace Shared.Ui.BaseDialogs.StandardDialog.PackFile
 
             if (SelectedFile != null)
             {
-                if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.ReplaceFile"), "", System.Windows.MessageBoxButton.YesNo) != System.Windows.MessageBoxResult.Yes)
+                if (MessageBox.Show(LocalizationManager.Instance.Get("Msg.ReplaceFile"), "", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.No)
                     return;
             }
 

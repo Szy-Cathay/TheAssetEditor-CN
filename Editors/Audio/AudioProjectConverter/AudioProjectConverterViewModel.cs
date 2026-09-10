@@ -41,7 +41,6 @@ namespace Editors.Audio.AudioProjectConverter
 
         private readonly ILogger _logger = Logging.Create<AudioProjectConverterViewModel>();
         private System.Action _closeAction;
-        private Func<Task> _completeProgressAction = () => Task.CompletedTask;
 
         [ObservableProperty] private string _audioProjectName;
         [ObservableProperty] private string _outputDirectoryPath;
@@ -112,7 +111,6 @@ namespace Editors.Audio.AudioProjectConverter
             ProgressMaximum = 0;
             ProgressIsIndeterminate = true;
             UpdateOkButtonIsEnabled();
-            Exception? loadException = null;
             try
             {
                 var progress = new Progress<AudioLoadProgress>(value =>
@@ -141,24 +139,18 @@ namespace Editors.Audio.AudioProjectConverter
             }
             catch (Exception exception)
             {
-                loadException = exception;
                 Status = LocalizationManager.Instance.Get(
                     "AudioProjectConverter.LoadFailed");
-            }
-            finally
-            {
-                await _completeProgressAction();
-                IsLoading = false;
-                UpdateOkButtonIsEnabled();
-            }
-
-            if (loadException != null && !cancellationToken.IsCancellationRequested)
-            {
                 _standardDialogs.ShowDialogBox(
                     LocalizationManager.Instance.GetFormat(
                         "AudioProjectConverter.LoadFailed.Detail",
-                        loadException.Message),
+                        exception.Message),
                     LocalizationManager.Instance.Get("Msg.GeneralError"));
+            }
+            finally
+            {
+                IsLoading = false;
+                UpdateOkButtonIsEnabled();
             }
         }
 
@@ -275,8 +267,6 @@ namespace Editors.Audio.AudioProjectConverter
                     cancellationToken,
                     _lifetimeCancellationToken);
             IsProcessing = true;
-            Exception? conversionException = null;
-            var saved = false;
             Status = LocalizationManager.Instance.Get(
                 "AudioProjectConverter.Processing");
             ProgressDetail = Status;
@@ -318,7 +308,7 @@ namespace Editors.Audio.AudioProjectConverter
                         outputs.Count,
                         outputs.Count));
                     Status = string.Empty;
-                    saved = true;
+                    CloseWindowAction();
                 }
             }
             catch (OperationCanceledException)
@@ -328,30 +318,22 @@ namespace Editors.Audio.AudioProjectConverter
             }
             catch (Exception exception)
             {
-                conversionException = exception;
                 _logger.Here().Error(
                     exception,
                     "Audio Project conversion failed");
                 Status = LocalizationManager.Instance.Get(
                     "AudioProjectConverter.Failed");
+                _standardDialogs.ShowDialogBox(
+                    LocalizationManager.Instance.GetFormat(
+                        "AudioProjectConverter.Failed.Detail",
+                        exception.Message),
+                    LocalizationManager.Instance.Get("Msg.GeneralError"));
             }
             finally
             {
                 TryDeleteWorkspace(workspacePath);
-                await _completeProgressAction();
                 IsProcessing = false;
             }
-
-            if (conversionException != null && !linkedCancellation.IsCancellationRequested)
-            {
-                _standardDialogs.ShowDialogBox(
-                    LocalizationManager.Instance.GetFormat(
-                        "AudioProjectConverter.Failed.Detail",
-                        conversionException.Message),
-                    LocalizationManager.Instance.Get("Msg.GeneralError"));
-            }
-            else if (saved)
-                CloseWindowAction();
         }
 
         private List<AudioPackOutput> CreateConversionOutputs(
@@ -1305,8 +1287,5 @@ namespace Editors.Audio.AudioProjectConverter
         [RelayCommand] public void CloseWindowAction() => _closeAction?.Invoke();
 
         public void SetCloseAction(System.Action closeAction) =>_closeAction = closeAction;
-
-        public void SetProgressCompletionAction(Func<Task> completeProgressAction) =>
-            _completeProgressAction = completeProgressAction;
     }
 }

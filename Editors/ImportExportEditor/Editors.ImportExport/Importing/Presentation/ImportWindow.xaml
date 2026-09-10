@@ -27,7 +27,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid IsEnabled="{Binding IsEnabled, ElementName=ImportButton}">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="120" />
                 <ColumnDefinition Width="*" />
@@ -64,7 +64,6 @@
 
         <Border
             Grid.Row="1"
-            IsEnabled="{Binding IsEnabled, ElementName=ImportButton}"
             Margin="0,14,0,0"
             Padding="12"
             Background="{DynamicResource AeBrush.Surface}"
@@ -97,7 +96,6 @@
             <Button
                 Margin="0,0,8,0"
                 Content="{loc:Loc General.Cancel}"
-                IsEnabled="{Binding IsEnabled, ElementName=ImportButton}"
                 IsCancel="True" />
             <Button
                 x:Name="ImportButton"
