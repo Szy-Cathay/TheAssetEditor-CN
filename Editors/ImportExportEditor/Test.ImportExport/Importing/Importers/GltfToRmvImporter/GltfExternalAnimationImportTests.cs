@@ -184,12 +184,15 @@ public class GltfExternalAnimationImportTests
         }
     }
 
-    [TestCase(".gltf")]
-    [TestCase(".glb")]
+    [TestCase(".gltf", false)]
+    [TestCase(".glb", false)]
+    [TestCase(".gltf", true)]
+    [TestCase(".glb", true)]
     public void Import_BlenderRoundTripWithUnitScaleKeys_CreatesAnimation(
-        string extension)
+        string extension,
+        bool diagonalBindRotation)
     {
-        var fixture = CreateExistingGameSkeletonRoundTrip(extension);
+        var fixture = CreateExistingGameSkeletonRoundTrip(extension, diagonalBindRotation);
 
         try
         {
@@ -411,7 +414,7 @@ public class GltfExternalAnimationImportTests
     }
 
     private static (string Directory, string Path, AnimationFile Skeleton)
-        CreateExistingGameSkeletonRoundTrip(string extension)
+        CreateExistingGameSkeletonRoundTrip(string extension, bool diagonalBindRotation)
     {
         var geometry = new MeshBuilder<
             VertexPositionNormalTangent,
@@ -452,13 +455,13 @@ public class GltfExternalAnimationImportTests
         else
             modelRoot.SaveGLB(path);
 
-        return (directory, path, CreateStoredGameSkeleton());
+        return (directory, path, CreateStoredGameSkeleton(diagonalBindRotation));
     }
 
-    private static AnimationFile CreateStoredGameSkeleton()
+    private static AnimationFile CreateStoredGameSkeleton(bool diagonalBindRotation)
     {
         var targetBindRotation = Quaternion.CreateFromAxisAngle(
-            Vector3.UnitZ,
+            diagonalBindRotation ? Vector3.Normalize(new Vector3(1, 2, 3)) : Vector3.UnitZ,
             MathF.PI / 2.0f);
         const float storedQuaternionLength = 1.000078f;
         var frame = new AnimationFile.Frame
