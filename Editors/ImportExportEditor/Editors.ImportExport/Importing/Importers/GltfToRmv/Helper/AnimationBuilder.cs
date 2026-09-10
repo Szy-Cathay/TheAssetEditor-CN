@@ -664,7 +664,9 @@ public class AnimationBuilder
             for (var boneIndex = 0; boneIndex < _skeleton.Bones.Length; boneIndex++)
             {
                 var gameTranslation = bindFrame.Transforms[boneIndex].ToVector3();
-                var gameRotation = bindFrame.Quaternion[boneIndex].ToQuaternion();
+                // Quantized game rotations must not introduce scale or shear into retargeting.
+                var gameRotation = Xna.Quaternion.Normalize(
+                    bindFrame.Quaternion[boneIndex].ToQuaternion());
                 _targetBindLocal[boneIndex] =
                     Matrix4x4.CreateFromQuaternion(new Quaternion(
                         gameRotation.X,

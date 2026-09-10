@@ -292,8 +292,14 @@ public class AnimationBuilderTests
         });
     }
 
-    [Test]
-    public void Build_UnitScaleKeysWithRetargetMatrixDrift_DoesNotRejectScale()
+    [TestCase(0, 0, 1, 1.000078f)]
+    [TestCase(1, 2, 3, 1.000078f)]
+    [TestCase(1, 2, 3, 0.99995f)]
+    public void Build_UnitScaleKeysWithRetargetMatrixDrift_PreservesRotation(
+        float axisX,
+        float axisY,
+        float axisZ,
+        float storedQuaternionLength)
     {
         var modelRoot = ModelRoot.CreateModel();
         var scene = modelRoot.UseScene("default");
@@ -324,9 +330,8 @@ public class AnimationBuilderTests
         });
         var skeleton = CreateSingleBoneSkeleton();
         var targetBindRotation = Numerics.Quaternion.CreateFromAxisAngle(
-            Numerics.Vector3.UnitZ,
+            Numerics.Vector3.Normalize(new Numerics.Vector3(axisX, axisY, axisZ)),
             MathF.PI / 2.0f);
-        const float storedQuaternionLength = 1.000078f;
         skeleton.AnimationParts[0].DynamicFrames[0].Quaternion[0] =
             new Shared.GameFormats.RigidModel.Transforms.RmvVector4(
                 targetBindRotation.X * storedQuaternionLength,
@@ -351,7 +356,15 @@ public class AnimationBuilderTests
             rotation.Y * rotation.Y +
             rotation.Z * rotation.Z +
             rotation.W * rotation.W);
-        Assert.That(rotationLength, Is.EqualTo(1.0f).Within(0.000001f));
+        Assert.Multiple(() =>
+        {
+            Assert.That(rotationLength, Is.EqualTo(1.0f).Within(0.000001f));
+            Assert.That(
+                MathF.Abs(Numerics.Quaternion.Dot(
+                    targetBindRotation,
+                    new Numerics.Quaternion(rotation.X, rotation.Y, rotation.Z, rotation.W))),
+                Is.EqualTo(1.0f).Within(0.000001f));
+        });
     }
 
     [Test]
