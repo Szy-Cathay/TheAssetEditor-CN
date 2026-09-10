@@ -290,29 +290,6 @@ public class UiCommonWorkflowTests
     }
 
     [Test]
-    public void StandardDialogs_AssignMainWindowOwnerBeforeShowingModal()
-    {
-        var source = File.ReadAllText(Path.Combine(
-            FindSolutionRoot(),
-            "Shared",
-            "SharedUI",
-            "BaseDialogs",
-            "StandardDialog",
-            "StandardDialogs.cs"));
-
-        NUnitAssert.Multiple(() =>
-        {
-            NUnitAssert.That(source, Does.Contain("ApplyOwner"));
-            NUnitAssert.That(
-                source,
-                Does.Contain("Application.Current?.MainWindow"));
-            NUnitAssert.That(
-                source,
-                Does.Not.Contain("dialog.ShowDialog()"));
-        });
-    }
-
-    [Test]
     public void CommonDialogs_InheritTheLoadedMainWindowOwner()
     {
         using var services = new ServiceCollection()

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using CommonControls;
@@ -15,9 +16,7 @@ namespace WindowHandling
 
         public AssetEditorWindow()
         {
-            var mainWindow = Application.Current?.MainWindow;
-            if (mainWindow != null && mainWindow != this && mainWindow.IsLoaded)
-                Owner = mainWindow;
+            SetOwnerToActiveWindow(this);
             Deactivated += AssetEdWindow_Deactivated;
             SetResourceReference(StyleProperty, "CustomWindowStyle");
             SetResourceReference(BackgroundProperty, "AeBrush.Canvas");
@@ -25,6 +24,16 @@ namespace WindowHandling
             SetResourceReference(FontFamilyProperty, "AppFontFamily");
             SetResourceReference(FontWeightProperty, "AppFontWeight");
             DarkTitleBarHelper.Enable(this);
+        }
+
+        public static void SetOwnerToActiveWindow(Window window)
+        {
+            var application = Application.Current;
+            var owner = application?.Windows.OfType<Window>()
+                .FirstOrDefault(candidate => candidate != window && candidate.IsActive) ??
+                window.Owner ?? application?.MainWindow;
+            if (owner is { IsLoaded: true } && owner != window)
+                window.Owner = owner;
         }
 
         private void AssetEdWindow_Deactivated(object? sender, EventArgs e)

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using System.Windows;
 using CommonControls.BaseDialogs.ToolSelector;
 using Shared.Core.ToolCreation;
+using WindowHandling;
 
 namespace Shared.Ui.BaseDialogs.ToolSelector
 {
@@ -9,7 +9,8 @@ namespace Shared.Ui.BaseDialogs.ToolSelector
     {
         public EditorEnums CreateAndShow(IEnumerable<EditorEnums> editors)
         {
-            var window = new ToolSelectorWindow() { Owner = Application.Current.MainWindow };
+            var window = new ToolSelectorWindow();
+            AssetEditorWindow.SetOwnerToActiveWindow(window);
 
             foreach (var tool in editors)
                 window.PossibleTools.Items.Add(tool);
