@@ -97,7 +97,8 @@ public partial class ViewportMouseInteractionTests
                     var displacement = -mouse.DeltaPosition();
                     UpdateNavigation();
                     if (Vector2.Distance(physical, NativePosition(viewport)) > 100) wraps++;
-                    Assert.IsTrue(displacement.Length() < 32, "Wrapping must not add a viewport-sized movement.");
+                    Assert.IsTrue(displacement.Length() < 32,
+                        $"Step {step}: wrapping added displacement {displacement}; physical {physical} -> {NativePosition(viewport)}.");
                     if (mode == 0)
                         Assert.AreEqual(yaw + displacement.X * 0.01f, camera.Yaw, 0.00001f);
                     else if (mode == 1)

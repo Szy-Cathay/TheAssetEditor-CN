@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using CommunityToolkit.Mvvm.Input;
+using System.ComponentModel;
 using Editors.ImportExport.Common;
 using System.Windows.Controls;
 using Editors.ImportExport.Exporting.Presentation;
@@ -41,6 +42,9 @@ public partial class ImportWindow : AssetEditorWindow
 
     private async void ImportButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_viewModel.IsOperationActive)
+            return;
+
         if (!PathValidator.IsValid(_viewModel.SystemPath))
         {
             _standardDialogs.ShowDialogBox(
@@ -53,6 +57,7 @@ public partial class ImportWindow : AssetEditorWindow
         ResetProgress();
         _viewModel.IsOperationActive = true;
         ImportResult? result = null;
+        Exception? importException = null;
         try
         {
             var progress = new Progress<OperationProgressUpdate>(ApplyProgress);
@@ -71,16 +76,22 @@ public partial class ImportWindow : AssetEditorWindow
         }
         catch (Exception ex)
         {
-            _standardDialogs.ShowExceptionWindow(ex, "高级 glTF/GLB 导入失败。");
+            importException = ex;
         }
         finally
         {
             _importCancellation?.Dispose();
             _importCancellation = null;
             _importOperationProgress.CancelCommand = null;
-            _viewModel.IsOperationActive = false;
             await _importOperationProgress.CompleteAsync();
+            _viewModel.IsOperationActive = false;
             ImportButton.IsEnabled = true;
+        }
+
+        if (importException != null)
+        {
+            _standardDialogs.ShowExceptionWindow(importException, "高级 glTF/GLB 导入失败。");
+            return;
         }
 
         if (result == null)
@@ -109,6 +120,13 @@ public partial class ImportWindow : AssetEditorWindow
             resultMessage,
             LocalizationManager.Instance.Get("ImportWindow.FailureTitle"),
             UiMessageBoxIcon.Error);
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_viewModel.IsOperationActive)
+            e.Cancel = true;
+        base.OnClosing(e);
     }
 
     private void ResetProgress()

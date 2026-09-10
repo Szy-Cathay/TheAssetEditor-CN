@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Input;
 using CommonControls;
+using WindowHandling;
 
 namespace CommonControls.BaseDialogs
 {
@@ -21,7 +22,7 @@ namespace CommonControls.BaseDialogs
             DarkTitleBarHelper.Enable(this);
             Title = title;
             TextValue = initialValue;
-            Owner = Application.Current.MainWindow;
+            AssetEditorWindow.SetOwnerToActiveWindow(this);
 
             if (focusTextInput)
             {

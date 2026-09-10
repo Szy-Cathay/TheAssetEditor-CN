@@ -229,6 +229,7 @@
         </Grid>
 
         <Grid
+            x:Name="ProgressSurface"
             Grid.Row="2"
             Margin="16,0,16,12">
             <progress:OperationProgressWindowHost

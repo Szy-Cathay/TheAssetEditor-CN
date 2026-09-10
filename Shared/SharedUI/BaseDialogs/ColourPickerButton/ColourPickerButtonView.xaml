@@ -18,6 +18,7 @@
     </UserControl.Resources>
     <Grid>
         <ToggleButton x:Name="PickerButton" Style="{StaticResource AeEditor.ToggleIcon}"
+                      Width="Auto" Height="Auto" Padding="2"
                       ToolTip="{loc:Loc Shared.ColourPicker.Choose}" AutomationProperties.Name="{loc:Loc Shared.ColourPicker.Choose}">
             <Border Width="18" Height="18" BorderBrush="{DynamicResource AeBrush.BorderStrong}" BorderThickness="1">
                 <Border.Background><SolidColorBrush Color="{Binding PickedColor}"/></Border.Background>

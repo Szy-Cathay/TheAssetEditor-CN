@@ -646,6 +646,8 @@ public partial class ViewportMouseInteractionTests
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll")]
     private static extern nint SetThreadDpiAwarenessContext(nint context);
     [DllImport("user32.dll")]
     private static extern bool ScreenToClient(nint hwnd, ref NativePoint point);
@@ -654,6 +656,14 @@ public partial class ViewportMouseInteractionTests
 
     private static void NativeMouseInputEvent(int dx, int dy, uint flags)
     {
+        if ((flags & 0x0001) == 0)
+        {
+            // Button packets must use the cursor's current position after SetCursorPos or a wrap.
+            Assert.IsTrue(GetCursorPos(out var cursor));
+            dx = (int)Math.Ceiling((cursor.X - GetSystemMetrics(76) + 0.5) * 65536 / GetSystemMetrics(78));
+            dy = (int)Math.Ceiling((cursor.Y - GetSystemMetrics(77) + 0.5) * 65536 / GetSystemMetrics(79));
+            flags |= 0x0001 | 0x8000 | 0x4000;
+        }
         var input = new NativeInput { Mouse = new NativeMouseInput { X = dx, Y = dy, Flags = flags } };
         Assert.AreEqual(1u, SendInput(1, new[] { input }, Marshal.SizeOf<NativeInput>()));
     }
