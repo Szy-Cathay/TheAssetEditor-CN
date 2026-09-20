@@ -118,10 +118,36 @@
                                     <TextBlock Text="{Binding GameName}"
                                                VerticalAlignment="Center"
                                                Margin="0,0,12,0"/>
-                                    <TextBox Grid.Column="1"
+                                    <TextBox x:Name="GamePathTextBox" Grid.Column="1"
+                                             MinWidth="300"
                                              Text="{Binding Path}"
                                              IsReadOnly="True"
+                                             AutomationProperties.Name="{Binding GameName}"
                                              Style="{StaticResource AeInput.TextBox}"/>
+                                    <TextBlock x:Name="GamePathHint" Grid.Column="1"
+                                               Text="{loc:Loc SettingsWindow.GamePathHint}"
+                                               Margin="8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AeBrush.TextMuted}"
+                                               FontStyle="Italic"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}"
+                                                   BasedOn="{StaticResource AeText.Body}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding Text, ElementName=GamePathTextBox}" Value=""/>
+                                                            <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=GamePathTextBox}" Value="False"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                     <Button Grid.Column="2"
                                             Content="{loc:Loc SettingsWindow.Browse}"
                                             Command="{Binding BrowseCommand}"

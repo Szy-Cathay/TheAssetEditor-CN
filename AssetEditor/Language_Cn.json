@@ -324,6 +324,7 @@
   "SettingsWindow.CancelButton": "取消",
   "SettingsWindow.Title": "设置",
   "SettingsWindow.GameFiles": "游戏 data 目录",
+  "SettingsWindow.GamePathHint": "请浏览选择游戏 data 目录",
   "SettingsWindow.WwiseCli": "Wwise CLI 目录",
   "SettingsWindow.Browse": "浏览…",
   "SettingsWindow.Timing.ImmediatePreview": "即时预览；取消时恢复",
