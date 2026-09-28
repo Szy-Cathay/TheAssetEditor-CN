@@ -71,7 +71,7 @@ public sealed class OperationProgressVisibilityController
 
     private async Task RevealAfterDelayAsync(int version)
     {
-        await Task.Delay(ShowDelay).ConfigureAwait(false);
+        await DelayAtLeastAsync(ShowDelay).ConfigureAwait(false);
         if (_dispatcher.HasShutdownStarted)
             return;
 
@@ -86,8 +86,22 @@ public sealed class OperationProgressVisibilityController
         int version,
         TimeSpan delay)
     {
-        await Task.Delay(delay).ConfigureAwait(false);
+        await DelayAtLeastAsync(delay).ConfigureAwait(false);
         await HideAsync(version).ConfigureAwait(false);
+    }
+
+    private static async Task DelayAtLeastAsync(TimeSpan duration)
+    {
+        var startedTimestamp = Stopwatch.GetTimestamp();
+        while (true)
+        {
+            var remaining = duration -
+                            Stopwatch.GetElapsedTime(startedTimestamp);
+            if (remaining <= TimeSpan.Zero)
+                return;
+
+            await Task.Delay(remaining).ConfigureAwait(false);
+        }
     }
 
     private async Task HideAsync(int version)

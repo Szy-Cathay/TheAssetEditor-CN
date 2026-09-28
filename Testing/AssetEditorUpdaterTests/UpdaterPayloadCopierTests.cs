@@ -577,6 +577,10 @@ public class UpdaterPayloadCopierTests
         {
             Assert.Ignore("Creating directory symbolic links is not permitted on this machine.");
         }
+        catch (IOException exception) when (exception.HResult == unchecked((int)0x80070522))
+        {
+            Assert.Ignore("Creating directory symbolic links is not permitted on this machine.");
+        }
         catch (PlatformNotSupportedException)
         {
             Assert.Ignore("Directory symbolic links are not supported on this machine.");
@@ -590,6 +594,10 @@ public class UpdaterPayloadCopierTests
             File.CreateSymbolicLink(path, targetPath);
         }
         catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("Creating file symbolic links is not permitted on this machine.");
+        }
+        catch (IOException exception) when (exception.HResult == unchecked((int)0x80070522))
         {
             Assert.Ignore("Creating file symbolic links is not permitted on this machine.");
         }

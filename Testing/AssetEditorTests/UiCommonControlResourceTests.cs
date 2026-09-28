@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
@@ -573,10 +574,17 @@ public class UiCommonControlResourceTests
                     window.Show();
                     button.ApplyTemplate();
                     window.UpdateLayout();
+                    PumpDispatcherUntil(
+                        () => button.IsLoaded,
+                        TimeSpan.FromSeconds(1));
+                    NUnitAssert.That(button.IsLoaded, Is.True);
                     var scale = GetInteractionScale(button);
 
                     button.SetPressed(true);
-                    PumpDispatcher(TimeSpan.FromMilliseconds(90));
+                    PumpDispatcherUntil(
+                        () => Math.Abs(scale.ScaleX - 0.985) < 0.001 &&
+                            Math.Abs(scale.ScaleY - 0.985) < 0.001,
+                        TimeSpan.FromSeconds(1));
                     NUnitAssert.Multiple(() =>
                     {
                         NUnitAssert.That(
@@ -599,7 +607,10 @@ public class UiCommonControlResourceTests
                     });
 
                     button.SetPressed(false);
-                    PumpDispatcher(TimeSpan.FromMilliseconds(150));
+                    PumpDispatcherUntil(
+                        () => Math.Abs(scale.ScaleX - 1) < 0.001 &&
+                            Math.Abs(scale.ScaleY - 1) < 0.001,
+                        TimeSpan.FromSeconds(1));
                     NUnitAssert.Multiple(() =>
                     {
                         NUnitAssert.That(
@@ -1298,6 +1309,15 @@ public class UiCommonControlResourceTests
         };
         timer.Start();
         Dispatcher.PushFrame(frame);
+    }
+
+    private static void PumpDispatcherUntil(
+        Func<bool> condition,
+        TimeSpan timeout)
+    {
+        var elapsed = Stopwatch.StartNew();
+        while (!condition() && elapsed.Elapsed < timeout)
+            PumpDispatcher(TimeSpan.FromMilliseconds(16));
     }
 
     private sealed class PressStateTestButton : Button
