@@ -230,10 +230,69 @@ public class AudioProjectExplorerInteractionTests
         });
     }
 
+    [Test]
+    public void NewGameDialogueEvents_AppearInTheRenderedTreeAndTypeFilters()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(LocalizationManager.Instance)
+            .BuildServiceProvider();
+        WpfTestApplicationHost.InvokeWithThemeResources(services, () =>
+        {
+            var (viewModel, view, window) = CreateView(includeNewEvents: true);
+            try
+            {
+                var dialogueEventBranches = Flatten(viewModel.AudioProjectTree)
+                    .Where(node => node.Type ==
+                        AudioProjectTreeNodeType.DialogueEvents)
+                    .ToDictionary(node => node.GameSoundBank);
+                var campaignEvent = dialogueEventBranches[
+                        Wh3SoundBank.CampaignVOConversational]
+                    .Children.Single(node => node.Name ==
+                        "campaign_vo_cs_end_times_structure_nagash");
+                var battleEvent = dialogueEventBranches[
+                        Wh3SoundBank.BattleVOConversational]
+                    .Children.Single(node => node.Name ==
+                        "battle_vo_conversation_environment_devastation");
+
+                viewModel.SelectedNode = Flatten(viewModel.AudioProjectTree)
+                    .Single(node => node.Type ==
+                        AudioProjectTreeNodeType.StateGroup);
+                view.UpdateLayout();
+                var typeComboBox = (ComboBox)view.FindName(
+                    "DialogueEventTypeFilterComboBox");
+
+                SetSelectedItem(typeComboBox, Wh3DialogueEventType.CityDetails);
+                FlushBindings(view);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(FindTreeViewItem(view, campaignEvent).Visibility,
+                        Is.EqualTo(Visibility.Visible));
+                    Assert.That(FindTreeViewItem(view, battleEvent).Visibility,
+                        Is.EqualTo(Visibility.Collapsed));
+                });
+
+                SetSelectedItem(typeComboBox, Wh3DialogueEventType.UnitEnvironment);
+                FlushBindings(view);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(FindTreeViewItem(view, campaignEvent).Visibility,
+                        Is.EqualTo(Visibility.Collapsed));
+                    Assert.That(FindTreeViewItem(view, battleEvent).Visibility,
+                        Is.EqualTo(Visibility.Visible));
+                });
+            }
+            finally
+            {
+                viewModel.Dispose();
+                window.Close();
+            }
+        });
+    }
+
     private static (
         AudioProjectExplorerViewModel ViewModel,
         AudioProjectExplorerView View,
-        Window Window) CreateView()
+        Window Window) CreateView(bool includeNewEvents = false)
     {
         var dialogueDefinitions = Wh3DialogueEventInformation.Information
             .Where(item => item.SoundBank == Wh3SoundBank.CampaignVO)
@@ -274,6 +333,31 @@ public class AudioProjectExplorerInteractionTests
                 StateGroup.CreateForAudioProjectFile("VO_Actor", [])
             ],
         };
+        if (includeNewEvents)
+        {
+            audioProject.SoundBanks.Add(new SoundBank(
+                "campaign_vo_conversational_test",
+                Wh3SoundBank.CampaignVOConversational,
+                "english(uk)")
+            {
+                DialogueEvents =
+                [
+                    new DialogueEvent(
+                        "campaign_vo_cs_end_times_structure_nagash")
+                ],
+            });
+            audioProject.SoundBanks.Add(new SoundBank(
+                "battle_vo_conversational_test",
+                Wh3SoundBank.BattleVOConversational,
+                "english(uk)")
+            {
+                DialogueEvents =
+                [
+                    new DialogueEvent(
+                        "battle_vo_conversation_environment_devastation")
+                ],
+            });
+        }
         var eventHub = new TestEventHub();
         var state = new AudioEditorStateService
         {
