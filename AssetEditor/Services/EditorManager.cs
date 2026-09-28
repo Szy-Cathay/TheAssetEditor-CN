@@ -13,6 +13,7 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
+using WindowHandling;
 
 namespace AssetEditor.Services
 {
@@ -147,6 +148,8 @@ namespace AssetEditor.Services
                 DataContext = editorViewModel,
                 Title = editorViewModel.DisplayName
             };
+
+            AssetEditorWindow.SetOwnerToActiveWindow(newWindow);
 
             return newWindow;
         }

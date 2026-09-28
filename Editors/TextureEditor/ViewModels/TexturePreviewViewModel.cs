@@ -6,6 +6,7 @@ using GameWorld.Core.Utility;
 using Shared.Core.Misc;
 using Shared.Core.Services;
 using TextureEditor.Views;
+using WindowHandling;
 
 namespace Editors.TextureEditor.ViewModels
 {
@@ -64,6 +65,10 @@ namespace Editors.TextureEditor.ViewModels
             containingWindow.Width = 550;
             containingWindow.Height = 600;
             containingWindow.Content = new TextureInformationView() { DataContext = _information.GetAsText() };
+            AssetEditorWindow.SetOwnerToActiveWindow(containingWindow);
+            containingWindow.WindowStartupLocation = containingWindow.Owner == null
+                ? WindowStartupLocation.CenterScreen
+                : WindowStartupLocation.CenterOwner;
             containingWindow.ShowDialog();
         }
 

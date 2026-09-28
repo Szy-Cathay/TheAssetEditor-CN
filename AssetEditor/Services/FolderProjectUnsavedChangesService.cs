@@ -8,6 +8,7 @@ using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
+using WindowHandling;
 
 namespace AssetEditor.Services;
 
@@ -139,22 +140,18 @@ public sealed class FolderProjectUnsavedChangesPrompt(
     public FolderProjectUnsavedChangesChoice Show()
     {
         var choice = FolderProjectUnsavedChangesChoice.Cancel;
-        var owner = Application.Current?.Windows
-            .OfType<Window>()
-            .FirstOrDefault(item => item.IsActive) ??
-            Application.Current?.MainWindow;
         var window = new Window
         {
             Title = localization.Get(
                 "FolderProject.History.Unsaved.Title"),
-            Owner = owner,
-            WindowStartupLocation = owner == null
-                ? WindowStartupLocation.CenterScreen
-                : WindowStartupLocation.CenterOwner,
             ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.WidthAndHeight,
             ShowInTaskbar = false,
         };
+        AssetEditorWindow.SetOwnerToActiveWindow(window);
+        window.WindowStartupLocation = window.Owner == null
+            ? WindowStartupLocation.CenterScreen
+            : WindowStartupLocation.CenterOwner;
         if (Application.Current?.TryFindResource("CustomWindowStyle") is
             Style style)
         {

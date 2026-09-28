@@ -1,6 +1,7 @@
 ﻿using Shared.Core.Misc;
 using System.Windows;
 using CommonControls;
+using WindowHandling;
 
 namespace AnimationEditor.MountAnimationCreator
 {
@@ -20,6 +21,10 @@ namespace AnimationEditor.MountAnimationCreator
             var options = new BatchProcessOptions() { FragmentName = fragmentName, SavePrefix = savePrefix };
             var window = new BatchProcessOptionsWindow();
             window.DataContext = options;
+            AssetEditorWindow.SetOwnerToActiveWindow(window);
+            window.WindowStartupLocation = window.Owner == null
+                ? WindowStartupLocation.CenterScreen
+                : WindowStartupLocation.CenterOwner;
             if (window.ShowDialog() == true)
                 return options;
             return null;

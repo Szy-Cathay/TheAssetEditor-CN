@@ -6,6 +6,7 @@ using CommonControls;
 
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
+using WindowHandling;
 
 namespace AssetEditor.Views.FolderProject;
 
@@ -30,11 +31,7 @@ public partial class FolderProjectSetupWindow : Window
         DarkTitleBarHelper.Enable(this);
         Title = title;
         DescriptionTextBlock.Text = description;
-        if (Application.Current?.MainWindow is { IsVisible: true } owner &&
-            !ReferenceEquals(owner, this))
-        {
-            Owner = owner;
-        }
+        AssetEditorWindow.SetOwnerToActiveWindow(this);
     }
 
     private void BrowseProjectFolder_Click(

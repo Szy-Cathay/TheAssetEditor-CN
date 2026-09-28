@@ -2,6 +2,7 @@
 using System.Windows;
 using AssetEditor.Services;
 using CommonControls;
+using WindowHandling;
 
 namespace AssetEditor.Views.ExternalPack
 {
@@ -15,11 +16,7 @@ namespace AssetEditor.Views.ExternalPack
             InitializeComponent();
             DarkTitleBarHelper.Enable(this);
             PackPathTextBox.Text = packPath;
-            if (Application.Current?.MainWindow is { IsVisible: true } owner &&
-                !ReferenceEquals(owner, this))
-            {
-                Owner = owner;
-            }
+            AssetEditorWindow.SetOwnerToActiveWindow(this);
         }
 
         private void OpenAsReference_Click(

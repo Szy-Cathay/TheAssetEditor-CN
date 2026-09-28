@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Shared.Ui.BaseDialogs.SelectionListDialog;
 using Shared.Ui.Common;
+using WindowHandling;
 
 namespace CommonControls.SelectionListDialog
 {
@@ -104,6 +105,10 @@ namespace CommonControls.SelectionListDialog
                 dataContext.ItemList.Add(item);
 
             window.SetDataContextAndFilterConfig<T>(dataContext);
+            AssetEditorWindow.SetOwnerToActiveWindow(window);
+            window.WindowStartupLocation = window.Owner == null
+                ? WindowStartupLocation.CenterScreen
+                : WindowStartupLocation.CenterOwner;
 
             if (modal)
                 window.ShowDialog();

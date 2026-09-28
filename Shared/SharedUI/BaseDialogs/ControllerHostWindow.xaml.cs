@@ -20,7 +20,9 @@ namespace CommonControls.BaseDialogs
         }
 
         public ControllerHostWindow(bool alwaysTopMost = false, ResizeMode resizeMode = ResizeMode.NoResize)
+            : this()
         {
+            SizeToContent = SizeToContent.Manual;
             if (alwaysTopMost)
                 Deactivated += Window_Deactivated;
 

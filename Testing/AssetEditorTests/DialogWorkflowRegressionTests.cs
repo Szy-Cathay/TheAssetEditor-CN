@@ -3,6 +3,9 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using AnimationEditor.MountAnimationCreator;
+using CommonControls.BaseDialogs;
+using CommonControls.SelectionListDialog;
 using Editors.ImportExport.Exporting.Exporters;
 using Editors.ImportExport.Exporting.Presentation;
 using Editors.ImportExport.Importing;
@@ -19,6 +22,7 @@ using Shared.Ui.BaseDialogs.PackFileTree;
 using Shared.Ui.BaseDialogs.PackFileTree.ContextMenu;
 using Shared.Ui.BaseDialogs.StandardDialog;
 using Shared.Ui.BaseDialogs.StandardDialog.PackFile;
+using Shared.Ui.BaseDialogs.SelectionListDialog;
 using Shared.Ui.Common.OperationProgress;
 using WindowHandling;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -122,6 +126,90 @@ public class DialogWorkflowRegressionTests
             });
             child.ShowDialog();
             NUnitAssert.That(actualOwner, Is.SameAs(child));
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Confirmation_UsesStableOwnerWhenProgressWindowIsActive(bool unified)
+    {
+        WithWindows(() =>
+        {
+            var root = Application.Current.MainWindow;
+            using var progress = new OperationProgressWindow(new OperationProgressWindowHost())
+            {
+                Owner = root,
+                Left = -10000, Top = -10000, ShowInTaskbar = false,
+            };
+            progress.Show();
+            NUnitAssert.That(progress.Activate(), Is.True);
+
+            var dialogs = new StandardDialogs(null!, null!, null!, null!, null!, null!);
+            Window? actualOwner = null;
+            var survivedProgressClose = false;
+            Later(() =>
+            {
+                var confirmation = Application.Current.Windows
+                    .OfType<MessageDialogWindow>().Single();
+                actualOwner = confirmation.Owner;
+                progress.Complete();
+                survivedProgressClose = confirmation.IsVisible;
+                if (survivedProgressClose)
+                    Click((Button)confirmation.FindName("NoButton"));
+            });
+
+            var accepted = unified
+                ? UnifiedMessageBox.Show(
+                    "放弃全部修改？", "确认", MessageBoxButton.YesNo) ==
+                  MessageBoxResult.Yes
+                : dialogs.ShowYesNoBox("放弃全部修改？", "确认") ==
+                  ShowMessageBoxResult.OK;
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(actualOwner, Is.SameAs(root));
+                NUnitAssert.That(survivedProgressClose, Is.True);
+                NUnitAssert.That(accepted, Is.False);
+            });
+        });
+    }
+
+    [Test]
+    public void ControllerHost_ParameterizedConstructorLoadsWindowResources()
+    {
+        WithWindows(() =>
+        {
+            var dialog = new ControllerHostWindow(false, ResizeMode.CanResize);
+            NUnitAssert.Multiple(() =>
+            {
+                NUnitAssert.That(dialog.Content, Is.InstanceOf<Grid>());
+                NUnitAssert.That(dialog.ResizeMode, Is.EqualTo(ResizeMode.CanResize));
+            });
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void StandaloneModalWindow_UsesMainWindowAsOwner(bool batchOptions)
+    {
+        WithWindows(() =>
+        {
+            Window? actualOwner = null;
+            Later(() =>
+            {
+                var dialog = Application.Current.Windows.OfType<Window>()
+                    .Single(window => window != Application.Current.MainWindow);
+                actualOwner = dialog.Owner;
+                dialog.Close();
+            });
+
+            if (batchOptions)
+                BatchProcessOptionsWindow.ShowDialog("test", "test");
+            else
+                SelectionListWindow.ShowDialog(
+                    "test",
+                    Array.Empty<SelectionListViewModel<string>.Item>());
+
+            NUnitAssert.That(actualOwner, Is.SameAs(Application.Current.MainWindow));
         });
     }
 

@@ -5,6 +5,7 @@ using AssetEditor.Views.Updater;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.Events;
 using Shared.Core.Services;
+using WindowHandling;
 
 namespace AssetEditor.UiCommands
 {
@@ -19,6 +20,7 @@ namespace AssetEditor.UiCommands
             viewModel.SetReleaseInfo(newerReleases);
             viewModel.SetCloseAction(window.Close);
             window.DataContext = viewModel;
+            AssetEditorWindow.SetOwnerToActiveWindow(window);
             window.ShowDialog();
         }
     }

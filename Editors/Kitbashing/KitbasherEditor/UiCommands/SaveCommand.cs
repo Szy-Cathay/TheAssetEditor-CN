@@ -1,4 +1,5 @@
 ﻿using System.Runtime;
+using System.Windows;
 using System.Windows.Input;
 using Editors.KitbasherEditor.Core.MenuBarViews;
 using Editors.KitbasherEditor.ViewModels.SaveDialog;
@@ -7,6 +8,7 @@ using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services.SceneSaving;
 using Shared.Core.Misc;
 using Shared.Ui.Common.MenuSystem;
+using WindowHandling;
 
 namespace Editors.KitbasherEditor.UiCommands
 {
@@ -31,6 +33,10 @@ namespace Editors.KitbasherEditor.UiCommands
             {
                 var window = _saveWindowFactory.Create();
                 window.Initialize(_settings);
+                AssetEditorWindow.SetOwnerToActiveWindow(window);
+                window.WindowStartupLocation = window.Owner == null
+                    ? WindowStartupLocation.CenterScreen
+                    : WindowStartupLocation.CenterOwner;
                 var saveScene = window.ShowDialog();
                 if (saveScene != true)
                     return null;

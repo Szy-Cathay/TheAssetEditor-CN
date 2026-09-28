@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using CommonControls;
+using Shared.Ui.Common.OperationProgress;
 
 // there is a bug in visual studio code generation. Having generated classes with
 // Overlapping names (Shared.Ui and Editors.Shared) causes compile errors as the code
@@ -30,8 +31,10 @@ namespace WindowHandling
         {
             var application = Application.Current;
             var owner = application?.Windows.OfType<Window>()
-                .FirstOrDefault(candidate => candidate != window && candidate.IsActive) ??
-                window.Owner ?? application?.MainWindow;
+                .FirstOrDefault(candidate => candidate != window && candidate.IsActive);
+            while (owner is OperationProgressWindow)
+                owner = owner.Owner;
+            owner ??= window.Owner ?? application?.MainWindow;
             if (owner is { IsLoaded: true } && owner != window)
                 window.Owner = owner;
         }
