@@ -340,6 +340,7 @@
   "UpdaterWindow.ReleaseNotes": "更新日志",
   "UpdaterWindow.UpdateButton": "更新",
   "UpdaterWindow.CancelButton": "取消",
+  "UpdaterWindow.CheckFailed": "无法从 Gitee 获取更新信息，请稍后重新启动程序重试。",
 
   "Shared.TextInput.Title": "文本输入",
   "Shared.TextInput.Ok": "确定",

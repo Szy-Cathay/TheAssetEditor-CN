@@ -191,9 +191,23 @@ namespace AssetEditor
 
         private static async Task CheckVersion(IUiCommandFactory uiCommandFactory)
         {
-            var newerReleases = await VersionChecker.GetNewerReleases();
-            if (newerReleases != null)
-                uiCommandFactory.Create<OpenUpdaterWindowCommand>().Execute(newerReleases);
+            try
+            {
+                var newerReleases = await VersionChecker.GetNewerReleases();
+                if (newerReleases != null)
+                    uiCommandFactory.Create<OpenUpdaterWindowCommand>().Execute(newerReleases);
+            }
+            catch (Exception exception)
+            {
+                Logging.Create<App>().Here().Warning(
+                    $"Unable to check for updates: {exception}");
+                if (Current?.MainWindow?.DataContext is MainViewModel viewModel)
+                {
+                    viewModel.UpdateCheckStatus = LocalizationManager.Instance.Get(
+                        "UpdaterWindow.CheckFailed");
+                    viewModel.HasUpdateCheckFailure = true;
+                }
+            }
         }
 
         private static void LogRuntimeEnvironment()

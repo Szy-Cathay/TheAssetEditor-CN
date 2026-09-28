@@ -11,6 +11,8 @@ namespace AssetEditorUpdater
 
     public class AssetEditorUpdater
     {
+        private static readonly Uri s_releaseFeedUri = new(
+            "https://gitee.com/szy-cathay/AssetEditor-CN-Downloads/raw/master/update-feed.json");
         private static readonly Uri s_latestReleaseUri = new(
             "https://gitee.com/api/v5/repos/szy-cathay/AssetEditor-CN-Downloads/releases/latest");
         private const string AssetEditorExe = "AssetEditor.CN.exe";
@@ -318,7 +320,7 @@ namespace AssetEditorUpdater
             using var httpClient = CreateHttpClient();
             var latestRelease = await GetLatestReleaseAsync(httpClient);
             if (latestRelease == null)
-                return;
+                throw new InvalidOperationException("无法从 Gitee 获取最新版本。");
 
             var installedVersion = GetAssetEditorVersion(installationDirectory);
             var latestVersion = ParseReleaseVersion(latestRelease.TagName);
@@ -332,7 +334,7 @@ namespace AssetEditorUpdater
 
             var downloadPlan = await GetDownloadPlanAsync(httpClient, latestRelease);
             if (downloadPlan == null)
-                return;
+                throw new InvalidOperationException("Gitee 更新文件清单无效。");
 
             workspace = UpdateInstaller.ValidateWorkspace(
                 installationDirectory,
@@ -346,7 +348,7 @@ namespace AssetEditorUpdater
                 installationDirectory,
                 workspace);
             if (downloadResult == false)
-                return;
+                throw new InvalidOperationException("无法从 Gitee 下载并校验最新版本。");
 
             UpdateInstaller.Install(assetPath, installationDirectory, workspace);
 
@@ -354,7 +356,7 @@ namespace AssetEditorUpdater
             if (File.Exists(assetEditorPath))
                 LaunchAssetEditor(installationDirectory, assetEditorPath);
             else
-                Console.WriteLine("更新失败：未找到 AssetEditor.CN.exe。");
+                throw new FileNotFoundException("更新失败：未找到 AssetEditor.CN.exe。", assetEditorPath);
 
         }
 
@@ -362,8 +364,9 @@ namespace AssetEditorUpdater
         {
             try
             {
-                return await GiteeUpdateSource.GetLatestReleaseAsync(
+                return await GiteeUpdateSource.GetLatestReleaseWithFallbackAsync(
                     httpClient,
+                    s_releaseFeedUri,
                     s_latestReleaseUri);
             }
             catch (Exception exception) when (

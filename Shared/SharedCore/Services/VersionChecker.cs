@@ -18,6 +18,8 @@ namespace Shared.Core.Services
 
         private const string GiteeOwner = "szy-cathay";
         private const string GiteeRepository = "AssetEditor-CN-Downloads";
+        private static readonly Uri s_releaseFeedUri = new(
+            $"https://gitee.com/{GiteeOwner}/{GiteeRepository}/raw/master/update-feed.json");
         private static readonly Uri s_releasesApiUri = new(
             $"https://gitee.com/api/v5/repos/{GiteeOwner}/{GiteeRepository}/releases?per_page=100");
         private static readonly HttpClient s_httpClient = CreateHttpClient();
@@ -43,24 +45,33 @@ namespace Shared.Core.Services
 
             try
             {
+                using var response = await httpClient.GetAsync(s_releaseFeedUri);
+                response.EnsureSuccessStatusCode();
+                await using var responseStream = await response.Content.ReadAsStreamAsync();
+                var release = await JsonSerializer.DeserializeAsync<GiteeRelease>(responseStream);
+                if (release == null || !TryParseReleaseVersion(release.TagName, out _))
+                    throw new InvalidDataException("The Gitee update feed has no valid release.");
+
+                return MapReleases([release]);
+            }
+            catch (Exception exception) when (
+                exception is HttpRequestException
+                or JsonException
+                or InvalidDataException
+                or TaskCanceledException
+                or NotSupportedException)
+            {
+                s_logger.Information($"Unable to retrieve Gitee update feed: {exception.Message}");
+            }
+
+            try
+            {
                 using var response = await httpClient.GetAsync(s_releasesApiUri);
                 response.EnsureSuccessStatusCode();
                 await using var responseStream = await response.Content.ReadAsStreamAsync();
                 var releases = await JsonSerializer.DeserializeAsync<List<GiteeRelease>>(
                     responseStream);
-                if (releases == null || releases.Count == 0)
-                    return null;
-
-                return releases
-                    .Where(release => TryParseReleaseVersion(release.TagName, out _))
-                    .Select(release => new UpdateRelease(
-                        release.TagName!,
-                        string.IsNullOrWhiteSpace(release.Name) ? release.TagName! : release.Name,
-                        release.Body ?? string.Empty,
-                        $"https://gitee.com/{GiteeOwner}/{GiteeRepository}/releases/tag/{Uri.EscapeDataString(release.TagName!)}",
-                        release.CreatedAt))
-                    .OrderByDescending(release => ParseReleaseVersion(release.TagName))
-                    .ToList();
+                return releases == null ? null : MapReleases(releases);
             }
             catch (Exception exception) when (
                 exception is HttpRequestException
@@ -69,8 +80,25 @@ namespace Shared.Core.Services
                 or NotSupportedException)
             {
                 s_logger.Information($"Unable to retrieve latest release from Gitee: {exception.Message}");
-                return null;
+                throw new InvalidOperationException(
+                    "Unable to retrieve update information from Gitee.",
+                    exception);
             }
+        }
+
+        private static IReadOnlyList<UpdateRelease> MapReleases(
+            IEnumerable<GiteeRelease> releases)
+        {
+            return releases
+                .Where(release => TryParseReleaseVersion(release.TagName, out _))
+                .Select(release => new UpdateRelease(
+                    release.TagName!,
+                    string.IsNullOrWhiteSpace(release.Name) ? release.TagName! : release.Name,
+                    release.Body ?? string.Empty,
+                    $"https://gitee.com/{GiteeOwner}/{GiteeRepository}/releases/tag/{Uri.EscapeDataString(release.TagName!)}",
+                    release.CreatedAt))
+                .OrderByDescending(release => ParseReleaseVersion(release.TagName))
+                .ToList();
         }
 
         private static List<UpdateRelease> GetReleasesSinceCurrentVersion(

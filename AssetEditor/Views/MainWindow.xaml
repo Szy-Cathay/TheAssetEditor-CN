@@ -250,7 +250,11 @@
             Grid.Row="2"
             Style="{StaticResource AeShell.StatusBar}">
             <Grid Margin="8,0">
-                <StackPanel Orientation="Horizontal">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Orientation="Horizontal">
                     <StackPanel.Style>
                         <Style TargetType="{x:Type StackPanel}">
                             <Setter Property="Visibility" Value="Visible" />
@@ -286,6 +290,16 @@
                         Style="{StaticResource AeShell.StatusText}"
                         Text="{Binding EditablePackFile}" />
                 </StackPanel>
+
+                <TextBlock
+                    x:Name="UpdateCheckStatusText"
+                    Grid.Row="1"
+                    Margin="0,0,0,4"
+                    Foreground="{DynamicResource AeBrush.Warning}"
+                    Style="{StaticResource AeShell.StatusText}"
+                    Text="{Binding UpdateCheckStatus}"
+                    ToolTip="{Binding UpdateCheckStatus}"
+                    Visibility="{Binding HasUpdateCheckFailure, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                 <progress:OperationProgressWindowHost
                     x:Name="ApplicationLoadingProgress"
