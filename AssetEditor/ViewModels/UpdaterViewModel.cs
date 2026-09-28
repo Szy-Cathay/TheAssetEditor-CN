@@ -39,8 +39,8 @@ namespace AssetEditor.ViewModels
             _newerReleases = newerReleases;
 
             var latestRelease = _newerReleases[0];
-            var latestVersion = VersionChecker.ParseReleaseVersion(latestRelease.TagName);
-            var currentVersion = VersionChecker.GetCurrentVersion();
+            var latestVersion = VersionChecker.GetReleaseDisplayVersion(latestRelease);
+            var currentVersion = VersionChecker.GetCurrentDisplayVersion();
             UpdateInfo = string.Format(_localisationManager.Get("UpdaterWindow.UpdateInfo"), currentVersion, latestVersion);
 
             ReleaseNotesItems.Clear();

@@ -98,6 +98,31 @@ namespace Shared.Core.Services
             return NormalizeVersion(version);
         }
 
+        public static string GetCurrentDisplayVersion()
+        {
+            var informationalVersion = Assembly.GetEntryAssembly()?
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion;
+            return FormatDisplayVersion(informationalVersion, GetCurrentVersion());
+        }
+
+        internal static string FormatDisplayVersion(string? informationalVersion, Version numericVersion)
+        {
+            var label = informationalVersion?.Split('+', 2)[0].Trim();
+            return string.IsNullOrWhiteSpace(label) ? numericVersion.ToString() : label;
+        }
+
+        public static string GetReleaseDisplayVersion(UpdateRelease release)
+        {
+            var version = ParseReleaseVersion(release.TagName);
+            var hotfixLabel = $"{version.Major}.{version.Minor}.{version.Build}-hotfix";
+            if (version.Revision > 0
+                && string.Equals(release.Name, hotfixLabel, StringComparison.OrdinalIgnoreCase))
+                return release.Name;
+
+            return version.ToString();
+        }
+
         internal static Version NormalizeVersion(Version version)
         {
             if (version.Revision > 0)

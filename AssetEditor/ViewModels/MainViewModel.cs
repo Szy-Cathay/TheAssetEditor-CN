@@ -77,7 +77,7 @@ namespace AssetEditor.ViewModels
 
             ToolsFactory = toolFactory;
 
-            ApplicationTitle = LocalizationManager.Instance.GetFormat("Title.AppTitle", VersionChecker.GetCurrentVersion());
+            ApplicationTitle = LocalizationManager.Instance.GetFormat("Title.AppTitle", VersionChecker.GetCurrentDisplayVersion());
             CurrentGame = LocalizationManager.Instance.GetFormat("Title.CurrentGame", GameInformationDatabase.GetGameById(applicationSettingsService.CurrentSettings.CurrentGame).DisplayName);
         }
 

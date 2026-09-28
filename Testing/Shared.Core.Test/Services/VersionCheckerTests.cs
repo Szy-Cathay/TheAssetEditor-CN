@@ -20,6 +20,34 @@ namespace Test.Shared.Core.Services
         }
 
         [Test]
+        public void NumericHotfixTag_IsNewerThanPublishedPatchVersion()
+        {
+            var publishedVersion = VersionChecker.ParseReleaseVersion("v2.4.9");
+            var hotfixVersion = VersionChecker.ParseReleaseVersion("v2.4.9.1");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(hotfixVersion, Is.GreaterThan(publishedVersion));
+                Assert.That(VersionChecker.GetReleaseDisplayVersion(
+                    new UpdateRelease("v2.4.9.1", "2.4.9-hotfix", "", "", null)),
+                    Is.EqualTo("2.4.9-hotfix"));
+                Assert.That(VersionChecker.GetReleaseDisplayVersion(
+                    new UpdateRelease("v2.4.10", "Asset Editor 国区版 2.4.10", "", "", null)),
+                    Is.EqualTo("2.4.10"));
+            });
+        }
+
+        [Test]
+        public void InformationalVersion_DisplaysHotfixLabelWithoutCommitMetadata()
+        {
+            var displayVersion = VersionChecker.FormatDisplayVersion(
+                "2.4.9-hotfix+8b4f26f8",
+                new Version(2, 4, 9, 1));
+
+            Assert.That(displayVersion, Is.EqualTo("2.4.9-hotfix"));
+        }
+
+        [Test]
         public async Task GetReleasesAsync_MapsGiteeReleasesAndSortsByVersion()
         {
             const string json = """
