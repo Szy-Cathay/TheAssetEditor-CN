@@ -4,7 +4,7 @@
 
 ## 1. 阅读触发与事实优先级
 
-出现下列任一范围时，开始工作前完整阅读本文：
+出现下列任一范围时，先读第 1、2、16、17 节及任务相关章节；涉及共享层、多个子系统或整体验收时通读全文：
 
 - 超级视图、SuperView、Animation META、动画元数据预览；
 - persistent/animation metadata 双页签、Fragment/Slot、预览实例；
