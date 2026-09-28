@@ -271,6 +271,52 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
+        public void SoundEngine_Extensible24BitPcmUses16BitPlaybackProvider()
+        {
+            using var stream = new MemoryStream(
+                CreateSilentExtensiblePcmWav(TimeSpan.FromSeconds(1)),
+                writable: false);
+            using var reader = new WaveFileReader(stream);
+            var provider = SoundEngine.CreatePlaybackProvider(
+                reader,
+                out var compatibleStream);
+
+            try
+            {
+                Assert.IsNotNull(compatibleStream);
+                Assert.AreEqual(WaveFormatEncoding.Pcm, provider.WaveFormat.Encoding);
+                Assert.AreEqual(16, provider.WaveFormat.BitsPerSample);
+                Assert.AreEqual(48000, provider.WaveFormat.SampleRate);
+                Assert.AreEqual(1, provider.WaveFormat.Channels);
+
+                var buffer = new byte[1024];
+                Assert.IsTrue(provider.Read(buffer, 0, buffer.Length) > 0);
+                reader.Position = 0;
+                Assert.IsTrue(provider.Read(buffer, 0, buffer.Length) > 0);
+            }
+            finally
+            {
+                compatibleStream?.Dispose();
+            }
+        }
+
+        [TestMethod]
+        public void SoundEngine_Regular16BitPcmKeepsOriginalReader()
+        {
+            using var stream = new MemoryStream(
+                CreateSilentWav(TimeSpan.FromSeconds(1)),
+                writable: false);
+            using var reader = new WaveFileReader(stream);
+
+            var provider = SoundEngine.CreatePlaybackProvider(
+                reader,
+                out var compatibleStream);
+
+            Assert.AreSame(reader, provider);
+            Assert.IsNull(compatibleStream);
+        }
+
+        [TestMethod]
         public async Task WaveformRenderer_RendersDirectlyFromWavData()
         {
             var renderer = new WaveformRendererService(
