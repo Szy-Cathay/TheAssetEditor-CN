@@ -38,6 +38,38 @@ internal static class GiteeUpdateSource
 {
     private const string ManifestSuffix = ".manifest.json";
 
+    internal static async Task<GiteeRelease> GetLatestReleaseWithFallbackAsync(
+        HttpClient httpClient,
+        Uri releaseFeedUri,
+        Uri latestReleaseApiUri)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(releaseFeedUri);
+        ArgumentNullException.ThrowIfNull(latestReleaseApiUri);
+
+        try
+        {
+            var release = await GetLatestReleaseAsync(httpClient, releaseFeedUri)
+                ?? throw new InvalidDataException("The Gitee update feed is empty.");
+            ValidateReleaseMetadata(release);
+            return release;
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException
+            or JsonException
+            or InvalidDataException
+            or TaskCanceledException
+            or NotSupportedException)
+        {
+            Console.Error.WriteLine($"无法读取 Gitee 更新清单，尝试发行版接口：{exception.Message}");
+        }
+
+        var apiRelease = await GetLatestReleaseAsync(httpClient, latestReleaseApiUri)
+            ?? throw new InvalidDataException("The Gitee release API returned no release.");
+        ValidateReleaseMetadata(apiRelease);
+        return apiRelease;
+    }
+
     internal static async Task<GiteeRelease?> GetLatestReleaseAsync(
         HttpClient httpClient,
         Uri latestReleaseUri)

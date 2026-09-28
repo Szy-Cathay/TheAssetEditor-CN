@@ -1,5 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using AssetEditorUpdater;
 using UpdaterProgram = AssetEditorUpdater.AssetEditorUpdater;
 
@@ -7,6 +9,75 @@ namespace AssetEditorUpdaterTests;
 
 public class GiteeUpdateSourceTests
 {
+    [Test]
+    public async Task GetLatestReleaseWithFallbackAsync_UsesFeedWithoutCallingRateLimitedApi()
+    {
+        var feedUri = new Uri("https://gitee.com/downloads/raw/master/update-feed.json");
+        var apiUri = new Uri("https://gitee.com/api/v5/repos/downloads/releases/latest");
+        var release = CreateRelease("v2.4.9.1", "part01.zip");
+        var requestedUris = new List<Uri>();
+        using var client = new HttpClient(new RouteResponseHandler(uri =>
+        {
+            requestedUris.Add(uri);
+            return uri == feedUri
+                ? JsonResponse(release)
+                : new HttpResponseMessage(HttpStatusCode.Forbidden);
+        }));
+
+        var result = await GiteeUpdateSource.GetLatestReleaseWithFallbackAsync(
+            client,
+            feedUri,
+            apiUri);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TagName, Is.EqualTo(release.TagName));
+            Assert.That(requestedUris, Is.EqualTo(new[] { feedUri }));
+        });
+    }
+
+    [Test]
+    public async Task GetLatestReleaseWithFallbackAsync_MissingFeedUsesReleaseApi()
+    {
+        var feedUri = new Uri("https://gitee.com/downloads/raw/master/update-feed.json");
+        var apiUri = new Uri("https://gitee.com/api/v5/repos/downloads/releases/latest");
+        var release = CreateRelease("v2.4.9.1", "part01.zip");
+        var requestedUris = new List<Uri>();
+        using var client = new HttpClient(new RouteResponseHandler(uri =>
+        {
+            requestedUris.Add(uri);
+            return uri == feedUri
+                ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : JsonResponse(release);
+        }));
+
+        var result = await GiteeUpdateSource.GetLatestReleaseWithFallbackAsync(
+            client,
+            feedUri,
+            apiUri);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TagName, Is.EqualTo(release.TagName));
+            Assert.That(requestedUris, Is.EqualTo(new[] { feedUri, apiUri }));
+        });
+    }
+
+    [Test]
+    public void GetLatestReleaseWithFallbackAsync_BothSourcesForbiddenFails()
+    {
+        var feedUri = new Uri("https://gitee.com/downloads/raw/master/update-feed.json");
+        var apiUri = new Uri("https://gitee.com/api/v5/repos/downloads/releases/latest");
+        using var client = new HttpClient(new RouteResponseHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.Forbidden)));
+
+        Assert.ThrowsAsync<HttpRequestException>(async () =>
+            await GiteeUpdateSource.GetLatestReleaseWithFallbackAsync(
+                client,
+                feedUri,
+                apiUri));
+    }
+
     [Test]
     public void CreateDownloadPlan_UsesManifestOrderAndRequiresEveryPart()
     {
@@ -136,8 +207,8 @@ public class GiteeUpdateSourceTests
     }
 
     [Test]
-    [Explicit("Downloads and installs the current public Gitee release.")]
-    public async Task LiveGiteeRelease_DownloadsVerifiesAndInstallsInIsolation()
+    [Explicit("Downloads and installs the current public Gitee update feed.")]
+    public async Task LiveGiteeFeed_DownloadsVerifiesAndInstallsInIsolation()
     {
         var root = CreateTemporaryDirectory();
         try
@@ -158,7 +229,7 @@ public class GiteeUpdateSourceTests
             var latestRelease = await GiteeUpdateSource.GetLatestReleaseAsync(
                 client,
                 new Uri(
-                    "https://gitee.com/api/v5/repos/szy-cathay/AssetEditor-CN-Downloads/releases/latest"));
+                    "https://gitee.com/szy-cathay/AssetEditor-CN-Downloads/raw/master/update-feed.json"));
             Assert.That(latestRelease, Is.Not.Null);
             var plan = await GiteeUpdateSource.CreateDownloadPlanAsync(client, latestRelease!);
             var archivePath = UpdaterProgram.GetAssetDownloadPath(
@@ -177,7 +248,7 @@ public class GiteeUpdateSourceTests
             Assert.Multiple(() =>
             {
                 Assert.That(new FileInfo(archivePath).Length, Is.EqualTo(plan.Size));
-                Assert.That(Hash(File.ReadAllBytes(archivePath)), Is.EqualTo(plan.Sha256));
+                Assert.That(Hash(File.ReadAllBytes(archivePath)), Is.EqualTo(plan.Sha256.ToLowerInvariant()));
             });
 
             UpdateInstaller.Install(
@@ -281,6 +352,17 @@ public class GiteeUpdateSourceTests
         return Convert.ToHexString(SHA256.HashData(contents)).ToLowerInvariant();
     }
 
+    private static HttpResponseMessage JsonResponse(GiteeRelease release)
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(release),
+                Encoding.UTF8,
+                "application/json")
+        };
+    }
+
     private static string CreateTemporaryDirectory()
     {
         return Directory.CreateDirectory(
@@ -302,6 +384,17 @@ public class GiteeUpdateSourceTests
             {
                 Content = new ByteArrayContent(bytes)
             });
+        }
+    }
+
+    private sealed class RouteResponseHandler(Func<Uri, HttpResponseMessage> responseFactory)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(responseFactory(request.RequestUri!));
         }
     }
 

@@ -37,6 +37,8 @@ namespace AssetEditor.ViewModels
         [ObservableProperty] public partial string ApplicationTitle { get; set; }
         [ObservableProperty] public partial string CurrentGame { get; set; }
         [ObservableProperty] public partial string EditablePackFile { get; set; }
+        [ObservableProperty] public partial string UpdateCheckStatus { get; set; } = "";
+        [ObservableProperty] public partial bool HasUpdateCheckFailure { get; set; }
         [ObservableProperty] public partial bool IsPackFileExplorerVisible { get; set; } = true;
         [ObservableProperty] public partial GridLength FileTreeColumnWidth { get; set; } = new GridLength(0.28, GridUnitType.Star);
         [ObservableProperty] public partial bool IsLoadingPacks { get; set; } = false;

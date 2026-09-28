@@ -48,7 +48,40 @@ namespace Test.Shared.Core.Services
         }
 
         [Test]
-        public async Task GetReleasesAsync_MapsGiteeReleasesAndSortsByVersion()
+        public async Task GetReleasesAsync_UsesPublicFeedWhenApiIsRateLimited()
+        {
+            const string json = """
+                {
+                  "tag_name": "v2.4.9.1",
+                  "name": "2.4.9-hotfix",
+                  "body": "Hotfix notes",
+                  "created_at": "2026-09-29T00:00:00+08:00"
+                }
+                """;
+            var requestedUris = new List<Uri>();
+            using var client = new HttpClient(new RouteResponseHandler(uri =>
+            {
+                requestedUris.Add(uri);
+                return uri.AbsolutePath.Contains("/raw/master/update-feed.json")
+                    ? new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(json, Encoding.UTF8, "application/json")
+                    }
+                    : new HttpResponseMessage(HttpStatusCode.Forbidden);
+            }));
+
+            var releases = await VersionChecker.GetReleasesAsync(client);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(releases, Has.Count.EqualTo(1));
+                Assert.That(releases![0].TagName, Is.EqualTo("v2.4.9.1"));
+                Assert.That(requestedUris, Has.Count.EqualTo(1));
+            });
+        }
+
+        [Test]
+        public async Task GetReleasesAsync_MissingFeedFallsBackToApiAndSortsByVersion()
         {
             const string json = """
                 [
@@ -66,7 +99,17 @@ namespace Test.Shared.Core.Services
                   }
                 ]
                 """;
-            using var client = new HttpClient(new StaticResponseHandler(json));
+            var requestedUris = new List<Uri>();
+            using var client = new HttpClient(new RouteResponseHandler(uri =>
+            {
+                requestedUris.Add(uri);
+                return uri.AbsolutePath.Contains("/raw/master/update-feed.json")
+                    ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                    : new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(json, Encoding.UTF8, "application/json")
+                    };
+            }));
 
             var releases = await VersionChecker.GetReleasesAsync(client);
 
@@ -79,19 +122,21 @@ namespace Test.Shared.Core.Services
                 Assert.That(releases[0].Body, Is.EqualTo("Notes 1"));
                 Assert.That(releases[0].PublishedAt, Is.EqualTo(
                     DateTimeOffset.Parse("2026-08-13T11:00:00+08:00")));
+                Assert.That(requestedUris, Has.Count.EqualTo(2));
             });
         }
 
         [Test]
-        public async Task GetReleasesAsync_RequestFailureReturnsNull()
+        public void GetReleasesAsync_BothSourcesUnavailableThrows()
         {
             using var client = new HttpClient(new StaticResponseHandler(
                 "failure",
                 HttpStatusCode.ServiceUnavailable));
 
-            var releases = await VersionChecker.GetReleasesAsync(client);
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await VersionChecker.GetReleasesAsync(client));
 
-            Assert.That(releases, Is.Null);
+            Assert.That(exception!.InnerException, Is.TypeOf<HttpRequestException>());
         }
 
         private sealed class StaticResponseHandler(
@@ -106,6 +151,17 @@ namespace Test.Shared.Core.Services
                 {
                     Content = new StringContent(content, Encoding.UTF8, "application/json")
                 });
+            }
+        }
+
+        private sealed class RouteResponseHandler(Func<Uri, HttpResponseMessage> responseFactory)
+            : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(responseFactory(request.RequestUri!));
             }
         }
     }

@@ -37,6 +37,10 @@ public class UiMainShellGallery
     [TestCase(ThemeType.LightTheme, "focus")]
     [TestCase(ThemeType.HighContrastDark, "focus")]
     [TestCase(ThemeType.HighContrastLight, "focus")]
+    [TestCase(ThemeType.DarkTheme, "update-error")]
+    [TestCase(ThemeType.LightTheme, "update-error")]
+    [TestCase(ThemeType.HighContrastDark, "update-error")]
+    [TestCase(ThemeType.HighContrastLight, "update-error")]
     public void MainShell_RendersRequiredThemeAndWidth(
         ThemeType theme,
         string variant) => WithMainShellServices(
@@ -319,7 +323,8 @@ public class UiMainShellGallery
                 editorDatabase,
                 includeEditors: !isNarrow,
                 isLoading: isNarrow,
-                gitEnabled: !isNarrow);
+                gitEnabled: !isNarrow,
+                updateFailure: variant == "update-error");
             window = new MainWindow(
                 ((IAssetEditorMain)Application.Current).ServiceProvider)
             {
@@ -353,6 +358,8 @@ public class UiMainShellGallery
                 "EditorsTabControl");
             var statusBar = (Border)window.FindName(
                 "ApplicationStatusBar");
+            var updateStatus = (TextBlock)window.FindName(
+                "UpdateCheckStatusText");
             editors.ApplyTemplate();
             var itemsHolder = editors.Template.FindName(
                 "PART_ItemsHolder",
@@ -372,6 +379,11 @@ public class UiMainShellGallery
                     Is.EqualTo(activityBar.SelectedIndex));
                 NUnitAssert.That(itemsHolder, Is.Not.Null);
                 NUnitAssert.That(statusBar.ActualHeight, Is.GreaterThanOrEqualTo(24));
+                NUnitAssert.That(
+                    updateStatus.Visibility,
+                    Is.EqualTo(variant == "update-error"
+                        ? Visibility.Visible
+                        : Visibility.Collapsed));
                 NUnitAssert.That(
                     ((ListBoxItem)activityBar.Items[1]).IsEnabled,
                     Is.EqualTo(!isNarrow));
@@ -522,6 +534,8 @@ public class UiMainShellGallery
             "Asset Editor 国区版 · 工作区";
         public string CurrentGame { get; } = "全面战争：战锤 III";
         public string EditablePackFile { get; } = "帝国将军.pack";
+        public string UpdateCheckStatus { get; }
+        public bool HasUpdateCheckFailure { get; }
         public bool IsPackFileExplorerVisible { get; } = true;
         public GridLength FileTreeColumnWidth { get; } =
             new(310, GridUnitType.Pixel);
@@ -543,7 +557,8 @@ public class UiMainShellGallery
             IEditorDatabase editorDatabase,
             bool includeEditors,
             bool isLoading,
-            bool gitEnabled)
+            bool gitEnabled,
+            bool updateFailure = false)
         {
             ToolsFactory = editorDatabase;
             HistoryWorkspace = new ShellPreviewHistoryWorkspace(gitEnabled);
@@ -552,6 +567,10 @@ public class UiMainShellGallery
                 EditorManager.CurrentEditorsList.Remove(editor));
             IsLoadingPacks = isLoading;
             LoadingProgressIsIndeterminate = isLoading;
+            HasUpdateCheckFailure = updateFailure;
+            UpdateCheckStatus = updateFailure
+                ? LocalizationManager.Instance.Get("UpdaterWindow.CheckFailed")
+                : string.Empty;
 
             if (!includeEditors)
                 return;
