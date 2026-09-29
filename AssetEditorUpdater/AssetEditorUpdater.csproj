@@ -6,8 +6,8 @@
     <AssemblyName>AssetEditor.CN.Updater</AssemblyName>
     <RootNamespace>AssetEditorUpdater</RootNamespace>
     <Product>AssetEditor.CN.Updater</Product>
-    <Version>2.4.9.1</Version>
-    <InformationalVersion>2.4.9-hotfix</InformationalVersion>
+    <Version>2.5.0</Version>
+    <InformationalVersion>2.5.0</InformationalVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

@@ -373,10 +373,11 @@ public partial class ViewportMouseInteractionTests
                 mouse.BeginContinuousDrag();
                 Assert.IsTrue(viewport.IsMouseCaptured);
                 mouse.SetCursorPosition(300, 100);
-                PumpInput();
+                PumpInput(20);
                 mouse.Update(new GameTime());
                 var first = mouse.Position();
-                Assert.AreEqual(300f, first.X, 1.1f);
+                Assert.AreEqual(300f, first.X, 1.1f,
+                    $"Scale={scale}, repetition={repetition}, physical={NativePosition(viewport)}, captured={mouse.CapturedCursorPosition}");
                 Assert.IsTrue(mouse.CapturedCursorPosition!.Value.X < 4);
                 Assert.IsTrue(mouse.DeltaPosition().X < -147);
                 // The warp's queued MouseMove must not count as physical movement.
@@ -389,7 +390,7 @@ public partial class ViewportMouseInteractionTests
                 }
                 var expected = first.X + 102 - mouse.CapturedCursorPosition.Value.X;
                 mouse.SetCursorPosition(102, 100);
-                PumpInput();
+                PumpInput(20);
                 mouse.Update(new GameTime());
                 Assert.AreEqual(expected, mouse.Position().X, 1.1f);
             });
@@ -519,7 +520,9 @@ public partial class ViewportMouseInteractionTests
             panel.Children.Add(viewport);
             panel.Children.Add(input);
             var window = new Window { Title = "Kitbash mouse regression", Content = panel,
-                SizeToContent = SizeToContent.WidthAndHeight, ShowInTaskbar = false };
+                SizeToContent = SizeToContent.WidthAndHeight, ShowInTaskbar = false,
+                Left = SystemParameters.WorkArea.Left + 100,
+                Top = SystemParameters.WorkArea.Top + 100 };
             var game = new Mock<IWpfGame>();
             game.Setup(value => value.GetFocusElement()).Returns(viewport);
             using var mouse = new MouseComponent(game.Object);

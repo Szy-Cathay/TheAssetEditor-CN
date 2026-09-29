@@ -36,7 +36,7 @@ public sealed class OperationProgressVisibilityController
             _ = RevealAfterDelayAsync(version);
     }
 
-    public Task EndAsync()
+    public async Task EndAsync()
     {
         _dispatcher.VerifyAccess();
         _isActive = false;
@@ -44,14 +44,17 @@ public sealed class OperationProgressVisibilityController
         if (!_isVisible)
         {
             _setVisibility(false);
-            return Task.CompletedTask;
+            return;
         }
 
+        // A visibility callback can end the operation before the window finishes showing.
+        await _dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
         var remaining = MinimumVisibleDuration -
                         Stopwatch.GetElapsedTime(_shownTimestamp);
-        return remaining > TimeSpan.Zero
-            ? HideAfterDelayAsync(version, remaining)
-            : HideAsync(version);
+        if (remaining > TimeSpan.Zero)
+            await HideAfterDelayAsync(version, remaining);
+        else
+            await HideAsync(version);
     }
 
     public void RevealImmediately()
@@ -122,8 +125,8 @@ public sealed class OperationProgressVisibilityController
             return;
 
         _isVisible = isVisible;
+        _setVisibility(isVisible);
         if (isVisible)
             _shownTimestamp = Stopwatch.GetTimestamp();
-        _setVisibility(isVisible);
     }
 }
