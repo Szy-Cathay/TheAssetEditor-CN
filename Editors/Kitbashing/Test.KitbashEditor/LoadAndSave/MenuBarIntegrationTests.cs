@@ -135,6 +135,44 @@ internal class MenuBarIntegrationTests : LoadAndSaveBase
         });
     }
 
+    [TestCase(GeometrySelectionMode.Face)]
+    [TestCase(GeometrySelectionMode.Edge)]
+    public void MeshEditMode_PublishesTheSelectedMeshBeforeUpdatingTheMenu(GeometrySelectionMode mode)
+    {
+        SelectionManager.SetState(CreateObjectSelection());
+        var executor = _runner.GetRequiredServiceInCurrentEditorScope<CommandExecutor>();
+        var documentState = executor.CurrentDocumentStateId;
+        var modeChanged = false;
+        var publishedObjects = new List<ISelectable?>();
+        void RecordSelection(ISelectionState state)
+        {
+            if (state.Mode == mode)
+                publishedObjects.Add(state.GetSingleSelectedObject());
+        }
+        SelectionManager.SelectionChanged += RecordSelection;
+        try
+        {
+            var button = _editor.MenuBar.SidebarButtons.Single(button => mode == GeometrySelectionMode.Face
+                ? button.Action is Editors.KitbasherEditor.Core.MenuBarViews.KitbasherMenuItem<FaceSelectionModeCommand>
+                : button.Action is Editors.KitbasherEditor.Core.MenuBarViews.KitbasherMenuItem<EdgeSelectionModeCommand>);
+            button.Action.TriggerAction();
+            modeChanged = true;
+
+            Assert.That(SelectionManager.GetState().Mode, Is.EqualTo(mode));
+            Assert.That(SelectionManager.GetState().GetSingleSelectedObject(), Is.SameAs(_meshNode));
+            Assert.That(publishedObjects, Is.Not.Empty);
+            Assert.That(publishedObjects[0], Is.SameAs(_meshNode));
+            Assert.That(executor.CurrentDocumentStateId, Is.EqualTo(documentState));
+        }
+        finally
+        {
+            SelectionManager.SelectionChanged -= RecordSelection;
+            if (modeChanged)
+                executor.Undo();
+            SelectionManager.SetState(CreateObjectSelection());
+        }
+    }
+
     [Test]
     public void VisibleToolbar_DoesNotContainAdjacentSeparators()
     {

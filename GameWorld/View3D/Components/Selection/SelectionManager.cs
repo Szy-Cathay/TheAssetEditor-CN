@@ -40,9 +40,9 @@ namespace GameWorld.Core.Components.Selection
                 GeometrySelectionMode.Object =>
                     new ObjectSelectionState(),
                 GeometrySelectionMode.Face =>
-                    new FaceSelectionState(),
+                    new FaceSelectionState { RenderObject = selectedObj },
                 GeometrySelectionMode.Edge =>
-                    new EdgeSelectionState(),
+                    new EdgeSelectionState { RenderObject = selectedObj },
                 GeometrySelectionMode.Vertex =>
                     new VertexSelectionState(
                         selectedObj,
