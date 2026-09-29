@@ -43,10 +43,6 @@ namespace GameWorld.Core.Commands.Object
 
             if (newSelectionState.Mode == GeometrySelectionMode.Object && _selectedItem != null)
                 (newSelectionState as ObjectSelectionState).ModifySelectionSingleObject(_selectedItem, false);
-            else if (newSelectionState.Mode == GeometrySelectionMode.Face)
-                (newSelectionState as FaceSelectionState).RenderObject = _selectedItem;
-            else if (newSelectionState.Mode == GeometrySelectionMode.Edge)
-                (newSelectionState as EdgeSelectionState).RenderObject = _selectedItem;
             else if (newSelectionState.Mode == GeometrySelectionMode.Vertex)
                 (newSelectionState as VertexSelectionState).RenderObject = _selectedItem;
             else if (newSelectionState.Mode == GeometrySelectionMode.Bone)
