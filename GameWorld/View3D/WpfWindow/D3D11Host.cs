@@ -1,9 +1,11 @@
 ﻿using GameWorld.Core.WpfWindow.Internals;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using SharpDX.Direct3D11;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -46,6 +48,8 @@ namespace GameWorld.Core.WpfWindow
         private bool _resetBackBuffer, _dpiChanged;
         private bool _isActive;
         private SpriteBatch _spriteBatch;
+        private DeviceContext _presentationContext;
+        private Query _presentationQuery;
         private double _dpiScalingFactor = 1;
         private static bool _useASingleSharedGraphicsDevice = true;
         private List<IDisposable> _toBeDisposedNextFrame = new List<IDisposable>();
@@ -390,6 +394,9 @@ namespace GameWorld.Core.WpfWindow
             CreateBackBuffer();
             Source = _d3D11Image;
             _spriteBatch = new SpriteBatch(GraphicsDevice);
+            var device = (SharpDX.Direct3D11.Device)GraphicsDevice.Handle;
+            _presentationContext = device.ImmediateContext;
+            _presentationQuery = new Query(device, new QueryDescription { Type = QueryType.Event });
         }
 
         private void OnIsFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
@@ -559,7 +566,6 @@ namespace GameWorld.Core.WpfWindow
                     // draw into cache
                     GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
                     Render(new GameTime(renderingEventArgs.RenderingTime, TimeSpan.FromTicks(deltaTicks)));
-                    GraphicsDevice.Flush();
 
                     _lastRenderingTime = renderingEventArgs.RenderingTime;
                 }
@@ -571,23 +577,29 @@ namespace GameWorld.Core.WpfWindow
                 // draw into cache
                 GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
                 Render(new GameTime(renderingEventArgs.RenderingTime, TimeSpan.Zero));
-                GraphicsDevice.Flush();
             }
 
             _d3D11Image.Lock();
-            // poor man's swap chain implementation
-            // now draw from cache to backbuffer
-            GraphicsDevice.SetRenderTarget(_sharedRenderTarget);
-            _spriteBatch.Begin();
-            _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
-            _spriteBatch.End();
-            GraphicsDevice.Flush();
-
-            _d3D11Image.Unlock();
-            GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
-            _d3D11Image.Invalidate(); // Always invalidate D3DImage to reduce flickering
-                                      // during window resizing.
-
+            try
+            {
+                // poor man's swap chain implementation
+                // now draw from cache to backbuffer
+                GraphicsDevice.SetRenderTarget(_sharedRenderTarget);
+                _spriteBatch.Begin();
+                _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
+                _spriteBatch.End();
+                GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
+                // Wait for the blit without copying a GPU texture back to the CPU.
+                _presentationContext.End(_presentationQuery);
+                GraphicsDevice.Flush();
+                while (!_presentationContext.IsDataAvailable(_presentationQuery, AsynchronousFlags.DoNotFlush))
+                    Thread.Yield();
+                _d3D11Image.MarkDirty();
+            }
+            finally
+            {
+                _d3D11Image.Unlock();
+            }
             _resetBackBuffer = false;
         }
 
@@ -624,6 +636,10 @@ namespace GameWorld.Core.WpfWindow
         private void UnitializeImageSource()
         {
             Source = null;
+            _presentationQuery?.Dispose();
+            _presentationQuery = null;
+            _presentationContext?.Dispose();
+            _presentationContext = null;
 
             if (_d3D11Image != null)
             {
