@@ -224,20 +224,31 @@
                             <TextBlock
                                 Grid.Column="1"
                                 VerticalAlignment="Center"
-                                Style="{StaticResource AeText.Body}"
+                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"
                                 Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
-                                TextTrimming="CharacterEllipsis" />
+                                TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource AeText.Body}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <Button
                                 Grid.Column="2"
                                 Margin="4,0,0,0"
                                 AutomationProperties.Name="{loc:Loc MainWindow.TabContextMenu.Close}"
                                 Command="{Binding DataContext.CloseToolCommand, RelativeSource={RelativeSource FindAncestor, AncestorType=TabControl}}"
                                 CommandParameter="{Binding}"
-                                Style="{StaticResource AeShell.TabCloseButton}">
+                                Style="{StaticResource AeShell.TabCloseButton}"
+                                ToolTip="{loc:Loc MainWindow.TabContextMenu.Close}">
                                 <materialIcons:MaterialIcon
-                                    Width="11"
-                                    Height="11"
-                                    Kind="CloseThick" />
+                                    Width="14"
+                                    Height="14"
+                                    Kind="Close" />
                             </Button>
                         </Grid>
                     </DataTemplate>

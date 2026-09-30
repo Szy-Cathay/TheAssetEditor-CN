@@ -240,6 +240,7 @@
     <SolidColorBrush x:Key="AeBrush.Accent" Color="#1268AA" />
     <SolidColorBrush x:Key="AeBrush.AccentHover" Color="#0B5D9C" />
     <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="#DCEBFA" />
+    <SolidColorBrush x:Key="AeBrush.EditorTabAccent" Color="#6750B5" />
     <SolidColorBrush x:Key="AeBrush.Success" Color="#267A42" />
     <SolidColorBrush x:Key="AeBrush.Warning" Color="#8A5A00" />
     <SolidColorBrush x:Key="AeBrush.Danger" Color="#B23B3B" />

@@ -20,6 +20,7 @@
     <CornerRadius x:Key="AeRadius.Control">4</CornerRadius>
     <CornerRadius x:Key="AeRadius.Surface">6</CornerRadius>
     <CornerRadius x:Key="AeRadius.Overlay">7</CornerRadius>
+    <CornerRadius x:Key="AeRadius.EditorTab">6,6,0,0</CornerRadius>
 
     <Duration x:Key="AeMotion.Pressed">0:0:0.090</Duration>
     <Duration x:Key="AeMotion.Release">0:0:0.160</Duration>

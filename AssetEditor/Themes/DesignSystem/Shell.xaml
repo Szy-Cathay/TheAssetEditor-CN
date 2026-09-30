@@ -111,8 +111,45 @@
         TargetType="{x:Type TabItem}">
         <Setter Property="MinWidth" Value="104" />
         <Setter Property="MaxWidth" Value="240" />
-        <Setter Property="Padding" Value="10,0,4,0" />
+        <Setter Property="Padding" Value="8,0,4,0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TabItem}">
+                    <Border
+                        x:Name="TabOutline"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1,1,1,0"
+                        CornerRadius="{StaticResource AeRadius.EditorTab}">
+                        <ContentPresenter
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="Center"
+                            ContentSource="Header"
+                            RecognizesAccessKey="True"
+                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource AeBrush.Canvas}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.EditorTabAccent}" />
+                            <Setter Property="Panel.ZIndex" Value="1" />
+                            <Setter TargetName="TabOutline" Property="Margin" Value="0,0,0,-1" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.48" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style
@@ -140,6 +177,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <Border
+                            x:Name="EditorTabStrip"
                             Background="{DynamicResource AeBrush.Surface1}"
                             BorderBrush="{DynamicResource AeBrush.Border}"
                             BorderThickness="0,0,0,1">
@@ -178,6 +216,9 @@
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="HasItems" Value="True">
+                            <Setter TargetName="EditorTabStrip" Property="BorderBrush" Value="{DynamicResource AeBrush.EditorTabAccent}" />
+                        </Trigger>
                         <Trigger Property="HasItems" Value="False">
                             <Setter TargetName="EmptyEditorState" Property="Visibility" Value="Visible" />
                         </Trigger>

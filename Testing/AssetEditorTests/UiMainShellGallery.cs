@@ -411,6 +411,9 @@ public class UiMainShellGallery
             SaveSnapshot(
                 window,
                 $"main-shell-{variant}-{theme}.png");
+            SaveSnapshot(
+                (FrameworkElement)editors.Template.FindName("EditorTabStrip", editors),
+                $"editor-tabs-{variant}-{theme}.png");
 
             if (variant == "normal")
             {

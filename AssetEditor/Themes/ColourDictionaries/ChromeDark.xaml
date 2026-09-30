@@ -236,6 +236,7 @@
     <SolidColorBrush x:Key="AeBrush.Accent" Color="{StaticResource AColour.ColourfulGlyph.Static}" />
     <SolidColorBrush x:Key="AeBrush.AccentHover" Color="{StaticResource AColour.ColourfulGlyph.MouseOver}" />
     <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="{StaticResource AColour.Tone4.Background.Selected}" />
+    <SolidColorBrush x:Key="AeBrush.EditorTabAccent" Color="#9785F5" />
     <SolidColorBrush x:Key="AeBrush.Success" Color="#72BC91" />
     <SolidColorBrush x:Key="AeBrush.Warning" Color="#E2B45F" />
     <SolidColorBrush x:Key="AeBrush.Danger" Color="#E17979" />

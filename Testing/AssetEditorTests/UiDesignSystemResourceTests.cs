@@ -191,6 +191,7 @@ public class UiDesignSystemResourceTests
         "AeBrush.OnAccent",
         "AeBrush.AccentHover",
         "AeBrush.AccentSoft",
+        "AeBrush.EditorTabAccent",
         "AeBrush.Success",
         "AeBrush.Warning",
         "AeBrush.Danger",
