@@ -3,7 +3,7 @@
         <Using Include="Shared.Ui.BaseDialogs.StandardDialog.UnifiedMessageBox" Alias="MessageBox" />
     </ItemGroup>
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
+        <OutputType>WinExe</OutputType>
         <LangVersion>preview</LangVersion>
         <TargetFramework>net10.0-windows</TargetFramework>
         <UseWPF>true</UseWPF>
