@@ -61,6 +61,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 | `AeBrush.OnAccent` | `#151719` | 强调背景上的文字与图标，随主题保持可读对比度 |
 | `AeBrush.AccentHover` | `#75B5E8` | 强调悬停 |
 | `AeBrush.AccentSoft` | `#263A4B` | 低强度选中背景 |
+| `AeBrush.EditorTabAccent` | `#9785F5` | 编辑器标签轮廓与标签栏底线；浅色主题使用深紫色，高对比主题沿用高对比强调色 |
 | `AeBrush.Success` | `#72BC91` | 成功 |
 | `AeBrush.Warning` | `#E2B45F` | 警告和未保存 |
 | `AeBrush.Danger` | `#E17979` | 错误、危险和播放中图标 |
@@ -89,6 +90,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - `AeSize.ControlHeight`：26 DIP；普通输入框、按钮和选择器优先使用此高度。
 - `AeSize.ProminentControlHeight`：30 DIP；只用于需要更强层级的主要操作。
 - `AeRadius.Compact/Control/Surface/Overlay`：3、4、6、7 DIP。
+- `AeRadius.EditorTab`：顶部 6 DIP 圆角、底部直角，用于主工作区编辑器标签。
 
 控件高度由密度角色决定，不随字号任意放大。文字、图标和下拉箭头必须在固定高度中视觉居中，不能出现“大输入框配小字”和过量上下留白。
 
