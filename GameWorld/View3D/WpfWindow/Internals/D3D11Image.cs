@@ -60,18 +60,14 @@ namespace GameWorld.Core.WpfWindow.Internals
         }
 
         /// <summary>
-        /// Invalidates the front buffer. (Needs to be called when the back buffer has changed.)
+        /// Marks the back buffer as changed while the caller holds the image lock.
         /// </summary>
-        public void Invalidate()
+        public void MarkDirty()
         {
             ThrowIfDisposed();
 
             if (_backBuffer != null)
-            {
-                Lock();
                 AddDirtyRect(new Int32Rect(0, 0, PixelWidth, PixelHeight));
-                Unlock();
-            }
         }
 
         /// <summary>
