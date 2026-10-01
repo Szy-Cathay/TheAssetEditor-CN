@@ -25,10 +25,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
                 return;
 
             var animSet = CreateExampleWarhammer3AnimSet(fileName);
-            editor.AnimationPackItems.PossibleValues.Add(animSet);
-            editor.AnimationPackItems.UpdatePossibleValues(editor.AnimationPackItems.PossibleValues);
-            editor.RefreshFileFilter();
-            editor.HasUnsavedChanges = true;
+            editor.AddAnimationSet(animSet);
         }
 
         protected virtual string? GetAnimSetFileName()
@@ -38,7 +35,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
                 "");
             if (input.Result)
             {
-                var filename = SaveUtility.EnsureEnding(input.Text, ".frg");
+                if (string.IsNullOrWhiteSpace(input.Text) || input.Text.Contains('/') || input.Text.Contains('\\'))
+                {
+                    _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("AnimPack.InvalidName"), LocalizationManager.Instance.Get("Msg.GeneralError"));
+                    return null;
+                }
+                var filename = System.IO.Path.GetFileNameWithoutExtension(input.Text.Trim()) + ".bin";
                 return filename;
             }
 
@@ -53,7 +55,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
             {
                 TableVersion = 4,
                 TableSubVersion = 3,
-                Name = binName,
+                Name = System.IO.Path.GetFileNameWithoutExtension(filename),
                 Unknown = "",
                 MountBin = "",
                 SkeletonName = "humanoid01",

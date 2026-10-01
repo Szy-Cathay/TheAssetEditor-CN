@@ -22,8 +22,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Commands
             var newFileName = GetNewFileName(animFile.FileName);
             if (newFileName != null && newFileName != animFile.FileName)
             {
-                animFile.FileName = newFileName;
-                editor.HasUnsavedChanges = true;
+                editor.RenameAnimationSet(animFile, newFileName);
             }
 
             // way to refresh the view

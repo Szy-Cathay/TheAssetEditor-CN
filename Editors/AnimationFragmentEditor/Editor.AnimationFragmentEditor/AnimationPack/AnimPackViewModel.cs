@@ -7,6 +7,8 @@ using Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinConve
 using Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinWh3Converter;
 using Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFragmentConverter;
 using Editors.AnimationFragmentEditor.AnimationPack.ViewModels;
+using Editors.AnimationFragmentEditor.CampaignAnimBin;
+using Shared.ByteParsing;
 using GameWorld.Core.Services;
 using Shared.Core.Events;
 using Shared.Core.Misc;
@@ -34,6 +36,7 @@ namespace CommonControls.Editors.AnimationPack
         private readonly IFileSaveService _packFileSaveService;
         private readonly MetaDataFileParser _metaDataFileParser;
         private readonly IStandardDialogs _standardDialogs;
+        private bool _isSelectingFile;
 
         public string DisplayName { get; set; } = "Not set";
 
@@ -47,8 +50,7 @@ namespace CommonControls.Editors.AnimationPack
             get => _fileFilterText;
             set
             {
-                SetAndNotifyWhenChanged(ref _fileFilterText, value ?? string.Empty);
-                RefreshFileFilter();
+                SetAndNotifyWhenChanged(ref _fileFilterText, value ?? string.Empty, _ => RefreshFileFilter());
             }
         }
 
@@ -58,8 +60,7 @@ namespace CommonControls.Editors.AnimationPack
             get => _useRegexFilter;
             set
             {
-                SetAndNotifyWhenChanged(ref _useRegexFilter, value);
-                RefreshFileFilter();
+                SetAndNotifyWhenChanged(ref _useRegexFilter, value, _ => RefreshFileFilter());
             }
         }
 
@@ -108,7 +109,34 @@ namespace CommonControls.Editors.AnimationPack
         }
 
         bool _isTableView = true;
-        public bool IsTableView { get => _isTableView; set => SetAndNotify(ref _isTableView, value); }
+        public bool IsTableView
+        {
+            get => _isTableView;
+            set
+            {
+                SetAndNotifyWhenChanged(ref _isTableView, value);
+                NotifyPropertyChanged(nameof(ShowBattleTable));
+                NotifyPropertyChanged(nameof(ShowCampaignTable));
+            }
+        }
+        public bool IsStandaloneCampaign { get; private set; }
+        public string SaveTitle => GetLocalizedText(IsStandaloneCampaign ? "AnimPack.Campaign.SaveFile" : "AnimPack.SavePack");
+        public bool IsCampaignSelected => CampaignEditorVM != null;
+        public bool ShowBattleTable => IsTableView && TableEditorVM != null;
+        public bool ShowCampaignTable => IsTableView && CampaignEditorVM != null;
+        public bool CanToggleView => TableEditorVM != null || CampaignEditorVM != null;
+        private CampaignTableEditorViewModel? _campaignEditorVM;
+        public CampaignTableEditorViewModel? CampaignEditorVM
+        {
+            get => _campaignEditorVM;
+            set
+            {
+                if (_campaignEditorVM != null) _campaignEditorVM.PropertyChanged -= ChildEditor_PropertyChanged;
+                _campaignEditorVM = value;
+                if (_campaignEditorVM != null) _campaignEditorVM.PropertyChanged += ChildEditor_PropertyChanged;
+                NotifyPropertyChanged(); NotifyEditState();
+            }
+        }
 
         public AnimPackViewModel(IUiCommandFactory uiCommandFactory, 
             IPackFileService pfs, 
@@ -127,7 +155,7 @@ namespace CommonControls.Editors.AnimationPack
             _standardDialogs = standardDialogs;
             AnimationPackItems = new FilterCollection<IAnimationPackFile>(new List<IAnimationPackFile>(), OnItemSelected, BeforeItemSelected)
             {
-                SearchFilter = (value, rx) => { return rx.Match(value.FileName).Success; }
+                SearchFilter = (value, rx) => (!OnlyEditableFiles || IsEditable(value)) && rx.Match(value.FileName).Success
             };
         }
 
@@ -141,7 +169,7 @@ namespace CommonControls.Editors.AnimationPack
             NotifyPropertyChanged(nameof(FilterSummary));
         }
 
-        private bool CanUseSelectedItem() => AnimationPackItems.SelectedItem != null;
+        private bool CanUseSelectedItem() => AnimationPackItems.SelectedItem != null && !IsStandaloneCampaign;
 
         [RelayCommand(CanExecute = nameof(CanUseSelectedItem))]
         private void RenameAction() => _uiCommandFactory.Create<RenameSelectedFileCommand>().Execute(this);
@@ -153,35 +181,46 @@ namespace CommonControls.Editors.AnimationPack
             if (AnimationPackItems.SelectedItem is { } selectedItem)
                 Clipboard.SetText(selectedItem.FileName);
         }
-        [RelayCommand] private void CreateEmptyWarhammer3AnimSetFileAction() => _uiCommandFactory.Create<CreateEmptyWarhammer3AnimSetFileCommand>().Execute(this);
+        [RelayCommand(CanExecute = nameof(CanCreateFile))] private void CreateEmptyWarhammer3AnimSetFileAction() => _uiCommandFactory.Create<CreateEmptyWarhammer3AnimSetFileCommand>().Execute(this);
         [RelayCommand] private void ExportAnimationSlotsWh3Action() => _uiCommandFactory.Create<ExportAnimationSlotCommand>().Warhammer3();
         [RelayCommand] private void ExportAnimationSlotsWh2Action() => _uiCommandFactory.Create<ExportAnimationSlotCommand>().Warhammer2();
 
         [RelayCommand] private void SaveAction() => Save();
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanToggleView))]
         private void ToggleViewMode()
         {
+            if (!CommitInputs()) return;
             if (HasUnsavedChildChanges() && !SaveActiveFile())
                 return;
             IsTableView = !IsTableView;
+            NotifySelectionState();
         }
 
         bool BeforeItemSelected(IAnimationPackFile item)
         {
-            if (HasUnsavedChildChanges())
+            if (_isCommittingInputs || _isSelectingFile || ReferenceEquals(item, AnimationPackItems.SelectedItem)) return false;
+            _isSelectingFile = true;
+            try
             {
-                if (_standardDialogs.ShowYesNoBox(
-                        GetLocalizedText("Msg.UnsavedChangesLost"),
-                        GetLocalizedText("Msg.UnsavedChangesOnQuitTitle")) != ShowMessageBoxResult.OK)
-                    return false;
-            }
+                if (!CommitInputs()) return false;
+                if (HasUnsavedChildChanges())
+                {
+                    if (_standardDialogs.ShowYesNoBox(
+                            GetLocalizedText("AnimPack.ApplyBeforeSwitch"),
+                            GetLocalizedText("AnimPack.ApplyBeforeSwitch.Title")) != ShowMessageBoxResult.OK)
+                        return false;
+                    return SaveActiveFile();
+                }
 
-            return true;
+                return true;
+            }
+            finally { _isSelectingFile = false; }
         }
 
         void OnItemSelected(IAnimationPackFile seletedFile)
         {
+            CampaignEditorVM = null;
             _activeConverter = null;
             if (seletedFile is AnimationFragmentFile typedFragment)
                 _activeConverter = new AnimationFragmentFileToXmlConverter(_skeletonAnimationLookUpHelper, _appSettings.CurrentSettings.CurrentGame);
@@ -189,6 +228,8 @@ namespace CommonControls.Editors.AnimationPack
                 _activeConverter = new AnimationBinFileToXmlConverter();
             else if (seletedFile is AnimationBinWh3 wh3Bin)
                 _activeConverter = new AnimationBinWh3FileToXmlConverter(_skeletonAnimationLookUpHelper, _metaDataFileParser, CurrentFile);
+            else if (seletedFile is CampaignAnimationPackFile)
+                _activeConverter = new CampaignAnimBinToXmlConverter();
 
             if (seletedFile == null || _activeConverter == null || seletedFile.IsUnknownFile)
             {
@@ -210,13 +251,39 @@ namespace CommonControls.Editors.AnimationPack
                 SelectedItemViewModel.Text = _activeConverter.GetText(seletedFile.ToByteArray());
                 SelectedItemViewModel.ResetChangeLog();
 
-                // Create table editor vm
-                var tableVM = new AnimSetTableEditorViewModel(
-                    _pfs, _skeletonAnimationLookUpHelper, _metaDataFileParser,
-                    CurrentFile, _appSettings.CurrentSettings.CurrentGame);
-                tableVM.LoadFromBinary(seletedFile.ToByteArray(), seletedFile.FileName);
-                tableVM.SaveCommand = new RelayCommand(() => SaveActiveFile());
-                TableEditorVM = tableVM;
+                TableEditorVM = null!;
+                if (seletedFile is CampaignAnimationPackFile)
+                {
+                    var campaign = new CampaignTableEditorViewModel(_pfs, _standardDialogs)
+                    {
+                        IsStandaloneFile = IsStandaloneCampaign,
+                        SaveCommand = new RelayCommand(() => { if (IsStandaloneCampaign) Save(); else SaveActiveFile(); }),
+                        OpenResource = OpenReferencedResource,
+                        Preview = PreviewAnimation,
+                    };
+                    campaign.LoadFromBinary(seletedFile.ToByteArray(), seletedFile.FileName);
+                    var resources = ResourcePaths;
+                    campaign.SkeletonNames = resources.Where(p => p.Replace('\\', '/').Contains("/skeletons/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".anim", StringComparison.OrdinalIgnoreCase)).Select(p => System.IO.Path.GetFileNameWithoutExtension(p.Replace('\\', '/'))).Distinct().ToList();
+                    campaign.AnimationFiles = resources.Where(p => p.EndsWith(".anim", StringComparison.OrdinalIgnoreCase)).ToList();
+                    campaign.MetaFiles = resources.Where(p => p.EndsWith(".meta", StringComparison.OrdinalIgnoreCase) && !p.EndsWith(".snd.meta", StringComparison.OrdinalIgnoreCase)).ToList();
+                    campaign.SoundFiles = resources.Where(p => p.EndsWith(".snd.meta", StringComparison.OrdinalIgnoreCase)).ToList();
+                    CampaignEditorVM = campaign;
+                }
+                else if (seletedFile is AnimationBin)
+                    IsTableView = false;
+                else
+                {
+                    var tableVM = new AnimSetTableEditorViewModel(
+                        _pfs, _skeletonAnimationLookUpHelper, _metaDataFileParser,
+                        CurrentFile, _appSettings.CurrentSettings.CurrentGame);
+                    tableVM.LoadFromBinary(seletedFile.ToByteArray(), seletedFile.FileName);
+                    tableVM.SetResourceNames(ResourcePaths);
+                    tableVM.SaveCommand = new RelayCommand(() => SaveActiveFile());
+                    tableVM.ShowValidation = report => _standardDialogs.ShowErrorViewDialog(GetLocalizedText("AnimPack.Validation.Title"), report);
+                    tableVM.OpenResource = OpenReferencedResource;
+                    tableVM.PreviewRow = row => PreviewAnimation(row.AnimationFile, tableVM.IsWh3 ? tableVM.SkeletonName : tableVM.Skeleton, row.MetaFile, row.SoundFile);
+                    TableEditorVM = tableVM;
+                }
             }
             NotifySelectionState();
         }
@@ -233,7 +300,7 @@ namespace CommonControls.Editors.AnimationPack
         }
 
         public bool HasEditConflict =>
-            TableEditorVM?.IsDirty == true &&
+            (TableEditorVM?.IsDirty == true || CampaignEditorVM?.IsDirty == true) &&
             SelectedItemViewModel?.HasUnsavedChanges() == true;
 
         public bool HasEditStatus => HasUnsavedChanges;
@@ -248,7 +315,9 @@ namespace CommonControls.Editors.AnimationPack
             {
                 if (HasEditConflict)
                     return GetLocalizedText("AnimPack.Status.EditConflict");
-                if (TableEditorVM?.IsDirty == true)
+                if (IsStandaloneCampaign && HasUnsavedChanges)
+                    return GetLocalizedText("AnimPack.Campaign.UnsavedFile");
+                if (TableEditorVM?.IsDirty == true || CampaignEditorVM?.IsDirty == true)
                     return GetLocalizedText("AnimPack.Status.TablePending");
                 if (SelectedItemViewModel?.HasUnsavedChanges() == true)
                     return GetLocalizedText("AnimPack.Status.XmlPending");
@@ -263,6 +332,7 @@ namespace CommonControls.Editors.AnimationPack
         private bool HasUnsavedChildChanges()
         {
             return TableEditorVM?.IsDirty == true ||
+                CampaignEditorVM?.IsDirty == true ||
                 SelectedItemViewModel?.HasUnsavedChanges() == true;
         }
 
@@ -272,6 +342,8 @@ namespace CommonControls.Editors.AnimationPack
         private void ChildEditor_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (sender == TableEditorVM && e.PropertyName != nameof(AnimSetTableEditorViewModel.IsDirty))
+                return;
+            if (sender == CampaignEditorVM && e.PropertyName != nameof(CampaignTableEditorViewModel.IsDirty))
                 return;
             if (sender == SelectedItemViewModel && e.PropertyName != nameof(SimpleTextEditorViewModel.Text))
                 return;
@@ -290,14 +362,26 @@ namespace CommonControls.Editors.AnimationPack
         {
             NotifyPropertyChanged(nameof(HasSelectedItem));
             NotifyPropertyChanged(nameof(IsSelectedItemUnsupported));
+            NotifyPropertyChanged(nameof(IsStandaloneCampaign));
+            NotifyPropertyChanged(nameof(SaveTitle));
+            NotifyPropertyChanged(nameof(IsCampaignSelected));
+            NotifyPropertyChanged(nameof(ShowBattleTable));
+            NotifyPropertyChanged(nameof(ShowCampaignTable));
+            NotifyPropertyChanged(nameof(CanToggleView));
+            ToggleViewModeCommand.NotifyCanExecuteChanged();
             RenameActionCommand.NotifyCanExecuteChanged();
             RemoveActionCommand.NotifyCanExecuteChanged();
             CopyFullPathActionCommand.NotifyCanExecuteChanged();
+            CreateAnimationSetCommand.NotifyCanExecuteChanged();
+            CreateCampaignFileCommand.NotifyCanExecuteChanged();
+            CreateEmptyWarhammer3AnimSetFileActionCommand.NotifyCanExecuteChanged();
+            CloneSelectedFileCommand.NotifyCanExecuteChanged();
         }
 
 
         public bool SaveActiveFile()
         {
+            if (!CommitInputs()) return false;
             if (_packFile == null)
             {
                 _standardDialogs.ShowDialogBox(
@@ -317,7 +401,7 @@ namespace CommonControls.Editors.AnimationPack
                 return false;
             }
 
-            var tableDirty = TableEditorVM?.IsDirty == true;
+            var tableDirty = TableEditorVM?.IsDirty == true || CampaignEditorVM?.IsDirty == true;
             var xmlDirty = SelectedItemViewModel?.HasUnsavedChanges() == true;
             if (tableDirty && xmlDirty)
             {
@@ -335,13 +419,19 @@ namespace CommonControls.Editors.AnimationPack
                 (tableDirty == xmlDirty && IsTableView);
             var tableEditorToSave = saveTable ? TableEditorVM : null;
 
-            if (tableEditorToSave != null)
+            try
             {
-                bytes = tableEditorToSave.SaveToBinary(fileName, out error);
+                if (saveTable && CampaignEditorVM != null)
+                    bytes = CampaignEditorVM.SaveToBinary(fileName, out error);
+                else if (tableEditorToSave != null)
+                    bytes = tableEditorToSave.SaveToBinary(fileName, out error);
+                else
+                    bytes = converter.ToBytes(textEditor.Text, fileName, _pfs, out error);
             }
-            else
+            catch (Exception e)
             {
-                bytes = converter.ToBytes(textEditor.Text, fileName, _pfs, out error);
+                _standardDialogs.ShowExceptionWindow(e, GetLocalizedText("Msg.GeneralError"));
+                return false;
             }
 
             if (bytes == null || error != null)
@@ -354,10 +444,32 @@ namespace CommonControls.Editors.AnimationPack
                 return false;
             }
 
-            selectedFile.CreateFromBytes(bytes);
+            try
+            {
+                _ = selectedFile switch
+                {
+                    CampaignAnimationPackFile => (IAnimationPackFile)new CampaignAnimationPackFile(fileName, bytes),
+                    AnimationBinWh3 => new AnimationBinWh3(fileName, bytes),
+                    AnimationFragmentFile => new AnimationFragmentFile(fileName, bytes, _appSettings.CurrentSettings.CurrentGame),
+                    AnimationBin => new AnimationBin(fileName, bytes),
+                    _ => new UnknownAnimFile(fileName, bytes),
+                };
+                selectedFile.CreateFromBytes(bytes);
+            }
+            catch (Exception e)
+            {
+                _standardDialogs.ShowExceptionWindow(e, GetLocalizedText("Msg.GeneralError"));
+                return false;
+            }
             selectedFile.IsChanged.Value = true;
 
-            if (tableEditorToSave != null)
+            if (saveTable && CampaignEditorVM != null)
+            {
+                CampaignEditorVM.MarkSaved();
+                textEditor.Text = converter.GetText(bytes);
+                textEditor.ResetChangeLog();
+            }
+            else if (tableEditorToSave != null)
             {
                 tableEditorToSave.IsDirty = false;
                 textEditor.Text = converter.GetText(bytes);
@@ -367,6 +479,7 @@ namespace CommonControls.Editors.AnimationPack
             {
                 textEditor.ResetChangeLog();
                 TableEditorVM?.LoadFromBinary(bytes, fileName);
+                CampaignEditorVM?.LoadFromBinary(bytes, fileName);
             }
             HasUnsavedChanges = true;
 
@@ -376,6 +489,7 @@ namespace CommonControls.Editors.AnimationPack
 
         public bool Save()
         {
+            if (!CommitInputs()) return false;
             if (_packFile == null)
             {
                 _standardDialogs.ShowDialogBox(
@@ -384,7 +498,7 @@ namespace CommonControls.Editors.AnimationPack
                 return false;
             }
 
-            var tableDirty = TableEditorVM?.IsDirty == true;
+            var tableDirty = TableEditorVM?.IsDirty == true || CampaignEditorVM?.IsDirty == true;
             var xmlDirty = SelectedItemViewModel?.HasUnsavedChanges() == true;
             if (tableDirty && xmlDirty)
             {
@@ -408,9 +522,11 @@ namespace CommonControls.Editors.AnimationPack
 
             var savePath = _pfs.GetFullPath(_packFile);
 
-            var result = _packFileSaveService.Save(savePath, AnimationPackSerializer.ConvertToBytes(newAnimPack), false);
+            var outputBytes = IsStandaloneCampaign ? AnimationPackItems.PossibleValues.Single().ToByteArray() : AnimationPackSerializer.ConvertToBytes(newAnimPack);
+            var result = _packFileSaveService.Save(savePath, outputBytes, false);
             if (result == null)
                 return false;
+            _packFile = result;
 
             HasUnsavedChanges = false;
             foreach (var file in AnimationPackItems.PossibleValues)
@@ -422,12 +538,18 @@ namespace CommonControls.Editors.AnimationPack
         public void LoadFile(PackFile file)
         {
             _packFile = file;
-            var animPack = AnimationPackSerializer.Load(_packFile, _pfs);
+            var path = _pfs.GetFullPath(file);
+            IsStandaloneCampaign = path.Replace('\\', '/').Contains("animations/campaign/database/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+            var animPack = IsStandaloneCampaign ? new AnimationPackFileDatabase(path) : AnimationPackSerializer.Load(_packFile, _pfs, _appSettings.CurrentSettings.CurrentGame);
+            if (IsStandaloneCampaign) animPack.AddFile(new CampaignAnimationPackFile(path, file.DataSource.ReadData()));
             var itemNames = animPack.Files.ToList();
             AnimationPackItems.UpdatePossibleValues(itemNames);
+            _resourcePaths = null;
+            OnlyEditableFiles = true;
             RefreshFileFilter();
             NotifySelectionState();
             DisplayName = animPack.FileName;
+            if (IsStandaloneCampaign) AnimationPackItems.SelectedItem = itemNames.Single();
         }
     }
 }

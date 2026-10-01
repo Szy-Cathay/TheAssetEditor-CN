@@ -160,7 +160,7 @@
                 Grid.Row="2"
                 MinHeight="0"
                 ItemsSource="{Binding SelectedTag.Variables, UpdateSourceTrigger=PropertyChanged}"
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 Style="{StaticResource AeList.View}"
                 VirtualizingPanel.IsVirtualizing="True"
@@ -173,7 +173,7 @@
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="{x:Type ListViewItem}">
-                                    <ContentPresenter />
+                                    <ContentPresenter MinWidth="260" />
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>

@@ -97,13 +97,17 @@ namespace Editors.Shared.Core.Common
             var metaDataChanged = false;
             if (updateSkeleton)
             {
-                skeletonChanged = true;
-                metaDataChanged = true;
                 var skeletonName = SceneNodeHelper.GetSkeletonName(loadedNode);
                 var fullSkeletonName = $"animations\\skeletons\\{skeletonName}.anim";
-                var skeletonFile = _packFileService.FindFile(fullSkeletonName);
-                SetMetaFile(sceneObject, null, null);
-                SetSkeleton(sceneObject, skeletonFile, false);
+                skeletonChanged = sceneObject.Skeleton == null || !string.Equals(
+                    fullSkeletonName, sceneObject.SkeletonName.Value.Replace('/', '\\'), StringComparison.OrdinalIgnoreCase);
+                if (skeletonChanged)
+                {
+                    metaDataChanged = true;
+                    var skeletonFile = _packFileService.FindFile(fullSkeletonName);
+                    SetMetaFile(sceneObject, null, null);
+                    SetSkeleton(sceneObject, skeletonFile, false);
+                }
             }
             sceneObject.MeshName.Value = file.Name;
             sceneObject.ShowMesh.Value = sceneObject.ShowMesh.Value;
@@ -112,6 +116,22 @@ namespace Editors.Shared.Core.Common
             WireAttachmentResolvers(sceneObject);
 
             _eventHub.Publish(new SceneObjectUpdateEvent(sceneObject, true, skeletonChanged, skeletonChanged, metaDataChanged));
+            sceneObject.TriggerMeshChanged();
+        }
+
+        public void RemoveMesh(SceneObject sceneObject)
+        {
+            if (sceneObject.ModelNode == null)
+                return;
+
+            foreach (var item in sceneObject.MetaDataItems)
+                item.CleanUp();
+            sceneObject.MetaDataItems.Clear();
+            sceneObject.Player.AnimationRules.Clear();
+            sceneObject.ParentNode.RemoveObject(sceneObject.ModelNode);
+            sceneObject.ModelNode = null!;
+            sceneObject.MeshName.Value = "";
+            _eventHub.Publish(new SceneObjectUpdateEvent(sceneObject, true, false, false, false));
             sceneObject.TriggerMeshChanged();
         }
 

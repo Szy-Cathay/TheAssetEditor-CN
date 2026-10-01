@@ -82,5 +82,7 @@ namespace Editors.Shared.Core.Common.ReferenceModel
             if (result.Result == true && result.File != null)
                 FragAndSlotSelection.LoadAnimation(result.File);
         }
+
+        public void RemoveMesh() => _sceneObjectBuilder.RemoveMesh(Data);
     }
 }

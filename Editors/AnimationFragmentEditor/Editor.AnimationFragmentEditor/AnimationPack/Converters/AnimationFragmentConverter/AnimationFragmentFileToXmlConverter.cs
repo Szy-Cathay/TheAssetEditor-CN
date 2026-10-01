@@ -20,7 +20,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFrag
             _preferedGame = preferedGame;
         }
 
-        protected override ITextConverter.SaveError Validate(Animation xmlAnimation, string text, IPackFileService pfs, string filepath) => Validator.Validate(_skeletonAnimationLookUpHelper, xmlAnimation, text, pfs, filepath);
+        protected override ITextConverter.SaveError Validate(Animation xmlAnimation, string text, IPackFileService pfs, string filepath) => Validator.Validate(_skeletonAnimationLookUpHelper, xmlAnimation, text, pfs, filepath, _preferedGame);
       
         protected override Animation ConvertBinaryToXml(byte[] bytes)
         {
@@ -28,11 +28,18 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFrag
             var outputBin = new Animation();
             outputBin.AnimationFragmentEntry = new List<AnimationEntry>();
             outputBin.Skeleton = fragmentFile.Skeletons.Values.FirstOrDefault();
+            outputBin.Skeletons = fragmentFile.Skeletons.Values.ToList();
 
             foreach (var item in fragmentFile.Fragments)
             {
                 var entry = new AnimationEntry();
                 entry.Slot = item.Slot.Value;
+                entry.SlotId = item.Slot.Id;
+                entry.RecordId = item.RecordId;
+                entry.Skeleton = item.Skeleton;
+                entry.Comment = item.Comment;
+                entry.Ignore = item.Ignore;
+                entry.ReservedWeaponFlags = item.WeaponBone & ~63;
                 entry.File = new ValueItem() { Value = item.AnimationFile };
                 entry.Meta = new ValueItem() { Value = item.MetaDataFile };
                 entry.Sound = new ValueItem() { Value = item.SoundMetaDataFile };
@@ -52,22 +59,25 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFrag
         protected override byte[] ConvertXmlToBinary(Animation animation, string fileName)
         {
             var output = new AnimationFragmentFile(fileName, null, _preferedGame);
-            output.Skeletons = new StringArrayTable(animation.Skeleton, animation.Skeleton);
+            output.Skeletons = new StringArrayTable(animation.Skeletons?.Count > 0 ? animation.Skeletons.ToArray() : [animation.Skeleton, animation.Skeleton]);
 
             foreach (var item in animation.AnimationFragmentEntry)
             {
                 var entry = new AnimationSetEntry()
                 {
                     AnimationFile = item.File.Value,
+                    RecordId = item.RecordId,
                     MetaDataFile = item.Meta.Value,
                     SoundMetaDataFile = item.Sound.Value,
-                    Comment = "",
+                    Comment = item.Comment ?? string.Empty,
                     BlendInTime = item.BlendInTime.Value,
-                    Ignore = false,
+                    Ignore = item.Ignore,
                     SelectionWeight = item.SelectionWeight.Value,
-                    Slot = _preferedGame == GameTypeEnum.Troy ? AnimationSlotTypeHelperTroy.GetfromValue(item.Slot) : DefaultAnimationSlotTypeHelper.GetfromValue(item.Slot),
-                    Skeleton = animation.Skeleton,
+                    Slot = (_preferedGame == GameTypeEnum.Troy ? AnimationSlotTypeHelperTroy.GetfromValue(item.Slot) : DefaultAnimationSlotTypeHelper.GetfromValue(item.Slot))
+                        ?? new AnimationSlotType(item.SlotId, item.Slot),
+                    Skeleton = item.Skeleton ?? animation.Skeleton,
                     Unknown0 = item.Unknown,
+                    WeaponBone = item.ReservedWeaponFlags & ~63,
                 };
 
                 var unknown1Flags = item.WeaponBone.Split(",");

@@ -33,35 +33,29 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid x:Name="PlaybackCommandRow">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <WrapPanel x:Name="PlaybackCommandRow">
+                <StackPanel Margin="0,2" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock
                         Margin="0,0,8,0"
                         VerticalAlignment="Center"
                         Text="{loc:Loc AnimationView.Animation}" />
                     <ToggleButton
                         IsChecked="{Binding IsEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                        AutomationProperties.Name="{loc:Loc AnimationView.EnableAnimation}"
+                        ToolTip="{loc:Loc AnimationView.EnableAnimation}"
                         Style="{StaticResource AeInput.Switch}" />
                 </StackPanel>
 
                 <Grid
-                    Grid.Column="1"
-                    Margin="12,0,0,0"
+                    Margin="12,2,0,2"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
                     <StackPanel
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
                         <Button
                             Click="{s:MethodBinding SetAnimationFirstFrame}"
+                            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.FirstFrame}"
+                            ToolTip="{loc:Loc SharedAnimPlayer.FirstFrame}"
                             Style="{StaticResource AeButton.Icon}">
                             <Canvas Width="16" Height="16">
                                 <Path Data="M 3,3 L 3,13 M 13,3 L 5,8 L 13,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeEndLineCap="Round" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeThickness="1.5" />
@@ -69,6 +63,8 @@
                         </Button>
                         <Button
                             Click="{s:MethodBinding SetAnimationPrivFrame}"
+                            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.PreviousFrame}"
+                            ToolTip="{loc:Loc SharedAnimPlayer.PreviousFrame}"
                             Style="{StaticResource AeButton.Icon}">
                             <Canvas Width="16" Height="16">
                                 <Path Data="M 13,3 L 6,8 L 13,13 Z M 8,3 L 1,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" />
@@ -76,14 +72,38 @@
                         </Button>
                         <ToggleButton
                             Click="{s:MethodBinding ToggleAnimationPausePlay}"
-                            IsChecked="{Binding IsPlaying.Value, Mode=OneWay}"
-                            Style="{StaticResource AeEditor.PlaybackToggle}">
+                            IsChecked="{Binding IsPlaying.Value, Mode=OneWay}">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton" BasedOn="{StaticResource AeEditor.PlaybackToggle}">
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:Loc SharedAnimPlayer.Play}" />
+                                    <Setter Property="ToolTip" Value="{loc:Loc SharedAnimPlayer.Play}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPlaying.Value}" Value="True">
+                                            <Setter Property="AutomationProperties.Name" Value="{loc:Loc SharedAnimPlayer.Pause}" />
+                                            <Setter Property="ToolTip" Value="{loc:Loc SharedAnimPlayer.Pause}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ToggleButton.Style>
                             <Canvas Width="16" Height="16">
-                                <Path Data="M 4,2 L 14,8 L 4,14 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}" />
+                                <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}">
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Data" Value="M 4,2 L 14,8 L 4,14 Z" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPlaying.Value}" Value="True">
+                                                    <Setter Property="Data" Value="M 3,2 L 7,2 L 7,14 L 3,14 Z M 10,2 L 14,2 L 14,14 L 10,14 Z" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
                             </Canvas>
                         </ToggleButton>
                         <Button
                             Click="{s:MethodBinding SetAnimationNextFrame}"
+                            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.NextFrame}"
+                            ToolTip="{loc:Loc SharedAnimPlayer.NextFrame}"
                             Style="{StaticResource AeButton.Icon}">
                             <Canvas Width="16" Height="16">
                                 <Path Data="M 3,3 L 10,8 L 3,13 Z M 8,3 L 15,8 L 8,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" />
@@ -91,6 +111,8 @@
                         </Button>
                         <Button
                             Click="{s:MethodBinding SetAnimationLastFrame}"
+                            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.LastFrame}"
+                            ToolTip="{loc:Loc SharedAnimPlayer.LastFrame}"
                             Style="{StaticResource AeButton.Icon}">
                             <Canvas Width="16" Height="16">
                                 <Path Data="M 3,3 L 11,8 L 3,13 Z M 13,3 L 13,13" Fill="{DynamicResource AeBrush.TextPrimary}" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeEndLineCap="Round" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeThickness="1.5" />
@@ -100,8 +122,7 @@
                 </Grid>
 
                 <TextBlock
-                    Grid.Column="3"
-                    Margin="12,0,0,0"
+                    Margin="12,2,0,2"
                     VerticalAlignment="Center"
                     Style="{StaticResource AeText.Technical}"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
@@ -112,8 +133,7 @@
                     <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
                 </TextBlock>
                 <TextBlock
-                    Grid.Column="4"
-                    Margin="12,0,0,0"
+                    Margin="12,2,0,2"
                     VerticalAlignment="Center"
                     Style="{StaticResource AeText.Technical}"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
@@ -123,21 +143,19 @@
                     <Run Text="{Binding SelectedAnimationFrameCount.Value}" />
                 </TextBlock>
                 <TextBlock
-                    Grid.Column="5"
-                    Margin="12,0,0,0"
+                    Margin="12,2,0,2"
                     VerticalAlignment="Center"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
                     <Run Text="{Binding SelectedAnimationFps.Value, StringFormat=N2}" />
                     <Run Text="{loc:Loc SharedAnimPlayer.Fps}" />
                 </TextBlock>
                 <CheckBox
-                    Grid.Column="6"
-                    Margin="12,0,0,0"
+                    Margin="12,2,0,2"
                     VerticalAlignment="Center"
                     Content="{loc:Loc SharedAnimPlayer.Loop}"
                     IsChecked="{Binding LoopAnimation.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}" />
-            </Grid>
+            </WrapPanel>
 
             <Grid
                 x:Name="PlaybackTimelineRow"

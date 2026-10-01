@@ -50,6 +50,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFrag
 
             [XmlAttribute(AttributeName = "Slot")]
             public string Slot { get; set; }
+            [XmlAttribute, System.ComponentModel.DefaultValue(-1)]
+            public int SlotId { get; set; } = -1;
+            public int? RecordId { get; set; }
+            public string Skeleton { get; set; }
+            public string Comment { get; set; } = string.Empty;
+            public bool Ignore { get; set; }
+            public int ReservedWeaponFlags { get; set; }
         }
 
         [XmlRoot(ElementName = "Animation")]
@@ -59,5 +66,6 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFrag
             public List<AnimationEntry> AnimationFragmentEntry { get; set; }
             [XmlAttribute(AttributeName = "skeleton")]
             public string Skeleton { get; set; }
+            public List<string> Skeletons { get; set; } = new();
         }
 }

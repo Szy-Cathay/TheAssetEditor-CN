@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:converters="clr-namespace:Editors.AnimationFragmentEditor.AnimationPack.Converters"
+             xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
@@ -12,7 +13,7 @@
              Foreground="{DynamicResource AeBrush.TextPrimary}"
              FontFamily="{DynamicResource AppFontFamily}"
              FontWeight="{DynamicResource AppFontWeight}"
-             GotKeyboardFocus="Editor_GotKeyboardFocus">
+             GotKeyboardFocus="Editor_GotKeyboardFocus" Validation.Error="Input_ValidationError">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -21,11 +22,25 @@
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+            <Style TargetType="TextBox" BasedOn="{StaticResource AeInput.TextBox}">
+                <Setter Property="Validation.ErrorTemplate">
+                    <Setter.Value>
+                        <ControlTemplate>
+                            <Border BorderBrush="{DynamicResource AeBrush.Danger}" BorderThickness="1" CornerRadius="4"
+                                    ToolTip="{loc:Loc AnimPack.Campaign.InvalidField}">
+                                <AdornedElementPlaceholder />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style TargetType="DataGridCell" BasedOn="{StaticResource AeTable.Cell}"><Setter Property="Padding" Value="4"/></Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
     <UserControl.InputBindings>
         <KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}" />
+        <KeyBinding Key="Y" Modifiers="Control" Command="{Binding RedoCommand}" />
         <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyRowsCommand}" />
         <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteRowsCommand}" />
         <KeyBinding Key="D" Modifiers="Control" Command="{Binding DuplicateEntryCommand}" />
@@ -38,66 +53,38 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <GroupBox Grid.Row="0" Header="{loc:Loc AnimPack.Table.General}" Padding="8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" MinWidth="80" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" MinWidth="80" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0" Grid.Column="0"
-                           Margin="0,0,6,0"
-                           VerticalAlignment="Center"
-                           Text="{loc:Loc AnimPack.Table.Name}"
-                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-                <TextBox Grid.Row="0" Grid.Column="1"
-                         Margin="0,2"
-                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-
-                <TextBlock Grid.Row="0" Grid.Column="2"
-                           Margin="12,0,6,0"
-                           VerticalAlignment="Center"
-                           Text="{loc:Loc AnimPack.Table.Skeleton}" />
-                <TextBox Grid.Row="0" Grid.Column="3"
-                         Margin="0,2"
-                         Text="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged}"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-                <TextBox Grid.Row="0" Grid.Column="3"
-                         Margin="0,2"
-                         Text="{Binding Skeleton, UpdateSourceTrigger=PropertyChanged}"
-                         Visibility="{Binding IsWh3, Converter={StaticResource InverseBoolToVis}}" />
-
-                <TextBlock Grid.Row="1" Grid.Column="0"
-                           Margin="0,0,6,0"
-                           VerticalAlignment="Center"
-                           Text="{loc:Loc AnimPack.Table.Mount}"
-                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-                <TextBox Grid.Row="1" Grid.Column="1"
-                         Margin="0,2"
-                         Text="{Binding MountBin, UpdateSourceTrigger=PropertyChanged}"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-
-                <TextBlock Grid.Row="1" Grid.Column="2"
-                           Margin="12,0,6,0"
-                           VerticalAlignment="Center"
-                           Text="{loc:Loc AnimPack.Table.Locomotion}"
-                           Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-                <TextBox Grid.Row="1" Grid.Column="3"
-                         Margin="0,2"
-                         Text="{Binding LocomotionGraph, UpdateSourceTrigger=PropertyChanged}"
-                         Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}" />
-            </Grid>
-        </GroupBox>
-
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <TextBlock Text="{loc:Loc AnimPack.Table.Name}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <TextBox Grid.Column="1" Text="{Binding Name}" IsReadOnly="True" Margin="0,0,12,4" ToolTip="{loc:Loc AnimPack.NameReadonlyTip}" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Grid.Column="2" Text="{loc:Loc AnimPack.Table.Skeleton}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{loc:Loc AnimPack.Table.Skeleton}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsWh3, Converter={StaticResource InverseBoolToVis}}"/>
+            <ComboBox Grid.Column="3" Margin="0,0,0,4" IsEditable="True" IsTextSearchEnabled="True" ItemsSource="{Binding SkeletonNames}" Text="{Binding SkeletonName, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc AnimPack.SkeletonTip}" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <ComboBox Grid.Column="1" Grid.ColumnSpan="3" Margin="0,0,0,4" IsEditable="True" ItemsSource="{Binding SkeletonNames}" Text="{Binding Skeleton, UpdateSourceTrigger=LostFocus}" Visibility="{Binding IsWh3, Converter={StaticResource InverseBoolToVis}}"/>
+            <TextBlock Grid.Row="1" Text="{loc:Loc AnimPack.Table.Mount}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,12,4" IsEditable="True" ItemsSource="{Binding AnimationSetNames}" Text="{Binding MountBin, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc AnimPack.MountTip}" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{loc:Loc AnimPack.Unmount}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <ComboBox Grid.Row="1" Grid.Column="3" Margin="0,0,0,4" IsEditable="True" ItemsSource="{Binding AnimationSetNames}" Text="{Binding UnmountBin, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc AnimPack.UnmountTip}" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+            <WrapPanel Grid.Row="2" Grid.ColumnSpan="4" Visibility="{Binding HasWh3Header, Converter={StaticResource BoolToVis}}">
+                <CheckBox Content="{loc:Loc AnimPack.SimpleFlight}" IsChecked="{Binding SimpleFlight}" ToolTip="{loc:Loc AnimPack.SimpleFlightTip}" Margin="0,4,16,4"/>
+                <CheckBox Content="{loc:Loc AnimPack.NewCavalry}" IsChecked="{Binding NewCavalryTechnology}" ToolTip="{loc:Loc AnimPack.NewCavalryTip}" Margin="0,4,16,4"/>
+            </WrapPanel>
+            <Expander Grid.Row="3" Grid.ColumnSpan="4" Header="{loc:Loc AnimPack.Advanced}" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}">
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="{loc:Loc AnimPack.Table.Locomotion}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding HasWh3Header, Converter={StaticResource BoolToVis}}"/>
+                    <ComboBox Grid.Column="1" IsEditable="True" IsTextSearchEnabled="False" ItemsSource="{Binding GraphNames}" Text="{Binding LocomotionGraph, UpdateSourceTrigger=LostFocus}" ToolTip="{Binding LocomotionGraph}" Visibility="{Binding HasWh3Header, Converter={StaticResource BoolToVis}}"/>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                        <Button Command="{Binding OpenMountCommand}" Content="{loc:Loc AnimPack.OpenMount}" Style="{StaticResource AeButton.Quiet}"/>
+                        <Button Command="{Binding OpenUnmountCommand}" Content="{loc:Loc AnimPack.OpenUnmount}" Style="{StaticResource AeButton.Quiet}"/>
+                    </StackPanel>
+                </Grid>
+            </Expander>
+        </Grid>
         <WrapPanel Grid.Row="1" Margin="0,6,0,4">
             <Button Margin="0,0,4,4"
                     Command="{Binding SaveCommand}"
@@ -109,6 +96,9 @@
                     Content="{loc:Loc General.Undo}"
                     Style="{StaticResource AeButton.Quiet}"
                     ToolTip="{loc:Loc AnimPack.Table.UndoTip}" />
+            <Button Margin="0,0,4,4" Command="{Binding RedoCommand}" Content="{loc:Loc General.Redo}" Style="{StaticResource AeButton.Quiet}"/>
+            <Button Margin="0,0,4,4" Command="{Binding ValidateCommand}" Content="{loc:Loc AnimPack.Check}" Style="{StaticResource AeButton.Secondary}"/>
+            <Button Margin="0,0,4,4" Command="{Binding PreviewAnimationCommand}" Content="{loc:Loc AnimPack.Preview.Title}" Style="{StaticResource AeButton.Secondary}"/>
             <Separator Height="28" Margin="2,0,6,4" />
             <Button Margin="0,0,4,4" Command="{Binding AddEntryCommand}" Content="{loc:Loc General.New}" Style="{StaticResource AeButton.Secondary}" />
             <Button Margin="0,0,4,4" Command="{Binding DeleteEntriesCommand}" Content="{loc:Loc General.Delete}" Style="{StaticResource AeButton.Danger}" />
@@ -141,7 +131,20 @@
                     ToolTip="{loc:Loc AnimPack.Table.PasteTip}" />
         </WrapPanel>
 
-        <Border Grid.Row="2"
+        <StackPanel Grid.Row="2">
+        <DockPanel Margin="0,0,0,8">
+            <CheckBox DockPanel.Dock="Right" Content="{loc:Loc AnimPack.ProblemRows}" IsChecked="{Binding OnlyProblemRows}" Margin="12,0,0,0" ToolTip="{loc:Loc AnimPack.ProblemRowsTip}"/>
+            <TextBox Text="{Binding RowFilter, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:Loc AnimPack.RowSearchTip}" behaviors:TextBoxExtensions.Watermark="{loc:Loc AnimPack.RowSearchPlaceholder}"/>
+        </DockPanel>
+        <Expander Header="{loc:Loc AnimPack.BatchReplace}" Margin="0,0,0,8">
+            <WrapPanel Margin="0,8,0,0">
+                <TextBox Width="180" Text="{Binding ReplaceFrom, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc AnimPack.ReplaceFrom}" behaviors:TextBoxExtensions.Watermark="{loc:Loc AnimPack.ReplaceFrom}" Margin="0,0,8,4"/>
+                <TextBox Width="180" Text="{Binding ReplaceTo, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc AnimPack.ReplaceTo}" behaviors:TextBoxExtensions.Watermark="{loc:Loc AnimPack.ReplaceTo}" Margin="0,0,8,4"/>
+                <CheckBox Content="{loc:Loc AnimPack.ReplaceSelected}" IsChecked="{Binding ReplaceSelectedOnly}" Margin="0,0,8,4"/>
+                <Button Command="{Binding ReplacePathsCommand}" Content="{loc:Loc AnimPack.BatchReplace}" Style="{StaticResource AeButton.Secondary}" Margin="0,0,0,4"/>
+            </WrapPanel>
+        </Expander>
+        <Border
                 Margin="0,0,0,6"
                 Style="{StaticResource AeFeedback.Notice}"
                 Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVis}}">
@@ -155,14 +158,15 @@
                            TextWrapping="Wrap" />
             </DockPanel>
         </Border>
+        </StackPanel>
 
         <Grid Grid.Row="3" MinHeight="0">
             <DataGrid x:Name="MainDataGrid"
                       Margin="0"
-                      ItemsSource="{Binding Rows}"
+                      ItemsSource="{Binding FilteredRows}"
                       SelectedItem="{Binding SelectedRow}"
                       AutoGenerateColumns="False"
-                      ColumnWidth="Auto"
+                      ColumnWidth="*"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
                       CanUserResizeColumns="True"
@@ -178,7 +182,7 @@
                       Style="{StaticResource AeTable.Grid}">
 
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn SortMemberPath="SlotName">
+                    <DataGridTemplateColumn SortMemberPath="SlotName" Width="160">
                         <DataGridTemplateColumn.Header>
                             <TextBlock Text="{loc:Loc AnimPack.Table.Slot}"
                                        ToolTip="{loc:Loc AnimPack.Table.Slot.ToolTip}" />
@@ -198,7 +202,7 @@
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.AnimationFile}" SortMemberPath="AnimationFile">
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.AnimationFile}" SortMemberPath="AnimationFile" Width="2*" MinWidth="160">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock VerticalAlignment="Center"
@@ -222,7 +226,7 @@
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.MetaFile}" SortMemberPath="MetaFile">
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.MetaFile}" SortMemberPath="MetaFile" Width="*" MinWidth="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock VerticalAlignment="Center"
@@ -246,7 +250,7 @@
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.SoundFile}" SortMemberPath="SoundFile">
+                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.SoundFile}" SortMemberPath="SoundFile" Width="*" MinWidth="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock VerticalAlignment="Center"
@@ -270,55 +274,6 @@
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn SortMemberPath="BlendInTime">
-                        <DataGridTemplateColumn.Header>
-                            <TextBlock Text="{loc:Loc AnimPack.Table.BlendIn}"
-                                       ToolTip="{loc:Loc AnimPack.Table.BlendIn.ToolTip}" />
-                        </DataGridTemplateColumn.Header>
-                        <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding BlendInTime}" /></DataTemplate></DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox BorderThickness="0" Text="{Binding BlendInTime, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn SortMemberPath="SelectionWeight">
-                        <DataGridTemplateColumn.Header>
-                            <TextBlock Text="{loc:Loc AnimPack.Table.Weight}"
-                                       ToolTip="{loc:Loc AnimPack.Table.Weight.ToolTip}" />
-                        </DataGridTemplateColumn.Header>
-                        <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding SelectionWeight}" /></DataTemplate></DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox BorderThickness="0" Text="{Binding SelectionWeight, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.WeaponBone}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <CheckBox Margin="1,0" Content="1" FontSize="10" IsChecked="{Binding Wb0, Mode=OneWay}" IsHitTestVisible="False" />
-                                    <CheckBox Margin="1,0" Content="2" FontSize="10" IsChecked="{Binding Wb1, Mode=OneWay}" IsHitTestVisible="False" />
-                                    <CheckBox Margin="1,0" Content="3" FontSize="10" IsChecked="{Binding Wb2, Mode=OneWay}" IsHitTestVisible="False" />
-                                    <CheckBox Margin="1,0" Content="4" FontSize="10" IsChecked="{Binding Wb3, Mode=OneWay}" IsHitTestVisible="False" />
-                                    <CheckBox Margin="1,0" Content="5" FontSize="10" IsChecked="{Binding Wb4, Mode=OneWay}" IsHitTestVisible="False" />
-                                    <CheckBox Margin="1,0" Content="6" FontSize="10" IsChecked="{Binding Wb5, Mode=OneWay}" IsHitTestVisible="False" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <CheckBox Margin="1,0" Content="1" FontSize="10" IsChecked="{Binding Wb0, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Margin="1,0" Content="2" FontSize="10" IsChecked="{Binding Wb1, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Margin="1,0" Content="3" FontSize="10" IsChecked="{Binding Wb2, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Margin="1,0" Content="4" FontSize="10" IsChecked="{Binding Wb3, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Margin="1,0" Content="5" FontSize="10" IsChecked="{Binding Wb4, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Margin="1,0" Content="6" FontSize="10" IsChecked="{Binding Wb5, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn Header="{loc:Loc AnimPack.Table.Unk}" SortMemberPath="Unk">
-                        <DataGridTemplateColumn.CellTemplate><DataTemplate><CheckBox HorizontalAlignment="Center" IsChecked="{Binding Unk, Mode=OneWay}" IsHitTestVisible="False" /></DataTemplate></DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><CheckBox HorizontalAlignment="Center" IsChecked="{Binding Unk, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
 
                 <DataGrid.ContextMenu>
@@ -335,24 +290,72 @@
                 </DataGrid.ContextMenu>
             </DataGrid>
 
-            <Border>
+            <Border IsHitTestVisible="False">
                 <Border.Style>
                     <Style TargetType="Border" BasedOn="{StaticResource AeEmptyState.Panel}">
                         <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Rows.Count}" Value="0">
+                            <DataTrigger Binding="{Binding FilteredRows.IsEmpty}" Value="True">
                                 <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource AeEmptyState.Title}" Text="{loc:Loc AnimPack.Table.EmptyTitle}" />
-                    <TextBlock Style="{StaticResource AeEmptyState.Description}"
-                               Text="{loc:Loc AnimPack.Table.EmptyDescription}"
-                               TextWrapping="Wrap" />
+                    <TextBlock TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource AeEmptyState.Title}"><Setter Property="Text" Value="{loc:Loc AnimPack.Rows.FilterEmptyTitle}"/><Style.Triggers><DataTrigger Binding="{Binding Rows.Count}" Value="0"><Setter Property="Text" Value="{loc:Loc AnimPack.Table.EmptyTitle}"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                    <TextBlock TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource AeEmptyState.Description}"><Setter Property="Text" Value="{loc:Loc AnimPack.Rows.FilterEmptyDescription}"/><Style.Triggers><DataTrigger Binding="{Binding Rows.Count}" Value="0"><Setter Property="Text" Value="{loc:Loc AnimPack.Table.EmptyDescription}"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                 </StackPanel>
             </Border>
         </Grid>
+        <Expander Grid.Row="4" Header="{loc:Loc AnimPack.SlotParameters}" IsExpanded="True" Margin="0,8,0,0">
+            <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="{loc:Loc AnimPack.SharedSlotHelp}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,4,0,8" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+                    <WrapPanel>
+                        <Grid Width="220" Margin="0,0,12,4">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{loc:Loc AnimPack.Table.BlendIn}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding SelectedRow.BlendInTime, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" ToolTip="{loc:Loc AnimPack.Table.BlendIn.ToolTip}"/>
+                        </Grid>
+                        <Grid Width="220" Margin="0,0,12,4">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{loc:Loc AnimPack.Table.Weight}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding SelectedRow.SelectionWeight, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" ToolTip="{loc:Loc AnimPack.Table.Weight.ToolTip}"/>
+                        </Grid>
+                        <CheckBox Content="{loc:Loc AnimPack.SingleFrame}" IsChecked="{Binding SelectedRow.Unk}" ToolTip="{loc:Loc AnimPack.SingleFrameTip}" Margin="0,0,8,4" Visibility="{Binding IsWh3, Converter={StaticResource BoolToVis}}"/>
+                    </WrapPanel>
+                    <WrapPanel ToolTip="{loc:Loc AnimPack.WeaponFlagsTip}">
+                        <TextBlock Text="{loc:Loc AnimPack.Table.WeaponBone}" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                        <CheckBox Content="{loc:Loc AnimPack.WeaponFlag0}" IsChecked="{Binding SelectedRow.Wb0}" Margin="0,0,8,4"/>
+                        <CheckBox Content="{loc:Loc AnimPack.WeaponFlag1}" IsChecked="{Binding SelectedRow.Wb1}" Margin="0,0,8,4"/>
+                        <CheckBox Content="{loc:Loc AnimPack.WeaponFlag2}" IsChecked="{Binding SelectedRow.Wb2}" Margin="0,0,8,4"/>
+                        <CheckBox Content="{loc:Loc AnimPack.WeaponFlag3}" IsChecked="{Binding SelectedRow.Wb3}" Margin="0,0,8,4"/>
+                        <CheckBox Content="{loc:Loc AnimPack.WeaponFlag4}" IsChecked="{Binding SelectedRow.Wb4}" Margin="0,0,8,4"/>
+                        <CheckBox Content="{loc:Loc AnimPack.WeaponFlag5}" IsChecked="{Binding SelectedRow.Wb5}" Margin="0,0,8,4"/>
+                    </WrapPanel>
+                    <WrapPanel>
+                        <Button Command="{Binding ApplyParametersToSelectedCommand}" Content="{loc:Loc AnimPack.ApplyParametersSelected}" Style="{StaticResource AeButton.Secondary}" Margin="0,0,8,4"/>
+                        <Button Command="{Binding OpenAnimationCommand}" Content="{loc:Loc AnimPack.OpenAnimation}" Style="{StaticResource AeButton.Quiet}" Margin="0,0,4,4"/>
+                        <Button Command="{Binding OpenMetaCommand}" Content="{loc:Loc AnimPack.OpenMeta}" Style="{StaticResource AeButton.Quiet}" Margin="0,0,4,4"/>
+                        <Button Command="{Binding OpenSoundCommand}" Content="{loc:Loc AnimPack.OpenSound}" Style="{StaticResource AeButton.Quiet}" Margin="0,0,0,4"/>
+                    </WrapPanel>
+                    <Expander Header="{loc:Loc AnimPack.Advanced}" Visibility="{Binding IsWh3, Converter={StaticResource InverseBoolToVis}}">
+                        <WrapPanel Margin="0,8,0,0">
+                            <CheckBox Content="{loc:Loc AnimPack.FragmentIgnore}" IsChecked="{Binding SelectedRow.Ignore}" Margin="0,0,8,4"/>
+                            <Grid Width="220" Margin="0,0,12,4">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc AnimPack.FragmentUnknownLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox Grid.Column="1" Text="{Binding SelectedRow.FragmentUnknown, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" ToolTip="{loc:Loc AnimPack.FragmentUnknown}"/>
+                            </Grid>
+                            <Grid Width="280" Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc AnimPack.FragmentComment}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox Grid.Column="1" Text="{Binding SelectedRow.Comment, UpdateSourceTrigger=LostFocus}"/>
+                            </Grid>
+                        </WrapPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+        </Expander>
     </Grid>
 </UserControl>

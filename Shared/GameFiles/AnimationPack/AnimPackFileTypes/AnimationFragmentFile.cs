@@ -28,6 +28,7 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
         public AnimationFragmentFile(string fileName, byte[] bytes, GameTypeEnum preferedGame)
         {
             FileName = fileName;
+            _preferedGame = preferedGame;
             if (bytes != null)
                 CreateFromBytes(bytes);
         }
@@ -36,10 +37,16 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
         {
             var data = new ByteChunk(bytes);
 
+            var skeletonCount = data.ReadInt32();
+            if (skeletonCount < 0 || skeletonCount > data.BytesLeft / 2)
+                throw new InvalidDataException("骨架数量超出实际数据范围。");
+            data.Index -= 4;
             Skeletons = new StringArrayTable(data);
             MinSlotId = data.ReadInt32();
             MaxSlotId = data.ReadInt32();
             var numFragItems = data.ReadInt32();
+            if (numFragItems < 0 || numFragItems > data.BytesLeft / 35)
+                throw new InvalidDataException("动画片段数量超出实际数据范围。");
 
             Fragments.Clear();
             for (var i = 0; i < numFragItems; i++)
@@ -56,23 +63,17 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
                 MaxSlotId = Fragments.Max(x => x.Slot.Id);
             }
 
-            Fragments = Fragments.OrderBy(x => x.Slot.Id).ToList();
-            foreach (var fragment in Fragments)
-            {
-                fragment.AnimationFile = fragment.AnimationFile.Replace("\\", "/").ToLower();
-                fragment.MetaDataFile = fragment.MetaDataFile.Replace("\\", "/").ToLower();
-                fragment.SoundMetaDataFile = fragment.SoundMetaDataFile.Replace("\\", "/").ToLower();
-            }
-
             // Save
             using var memStream = new MemoryStream();
-            memStream.Write(Skeletons.ToByteArray());
+            memStream.Write(ByteParsers.Int32.EncodeValue(Skeletons.Values.Count, out _));
+            foreach (var skeleton in Skeletons.Values)
+                memStream.Write(ByteParsers.String.WriteCaString(skeleton));
 
             memStream.Write(ByteParsers.Int32.EncodeValue(MinSlotId, out _));
             memStream.Write(ByteParsers.Int32.EncodeValue(MaxSlotId, out _));
 
             memStream.Write(ByteParsers.Int32.EncodeValue(Fragments.Count, out _));
-            foreach (var fragment in Fragments)
+            foreach (var fragment in Fragments.OrderBy(x => x.Slot.Id))
                 memStream.Write(fragment.ToByteArray());
 
             return memStream.ToArray();
@@ -81,7 +82,7 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
 
     public class AnimationSetEntry
     {
-        int _id { get; set; }
+        public int? RecordId { get; set; }
         int _slot { get; set; }
 
         public AnimationSlotType Slot { get; set; }
@@ -98,13 +99,13 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
 
         public AnimationSetEntry(ByteChunk data, GameTypeEnum preferedGame)
         {
-            _id = data.ReadInt32();
+            RecordId = data.ReadInt32();
             _slot = data.ReadInt32();
 
             if (preferedGame == GameTypeEnum.Troy)
-                Slot = DefaultAnimationSlotTypeHelper.GetFromId(_slot);
-            else
                 Slot = AnimationSlotTypeHelperTroy.GetFromId(_slot);
+            else
+                Slot = DefaultAnimationSlotTypeHelper.GetFromId(_slot);
 
             AnimationFile = data.ReadString();
             MetaDataFile = data.ReadString();
@@ -126,6 +127,7 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
             return new AnimationSetEntry()
             {
                 Slot = Slot.Clone(),
+                RecordId = RecordId,
                 AnimationFile = AnimationFile,
                 MetaDataFile = MetaDataFile,
                 SoundMetaDataFile = SoundMetaDataFile,
@@ -144,13 +146,13 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
         {
             using var memStream = new MemoryStream();
 
-            memStream.Write(ByteParsers.Int32.EncodeValue(Slot.Id, out _));
+            memStream.Write(ByteParsers.Int32.EncodeValue(RecordId ?? Slot.Id, out _));
             memStream.Write(ByteParsers.Int32.EncodeValue(Slot.Id, out _));
 
-            memStream.Write(ByteParsers.String.WriteCaString(AnimationFile.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(MetaDataFile.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(SoundMetaDataFile.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(Skeleton.ToLower()));
+            memStream.Write(ByteParsers.String.WriteCaString(AnimationFile));
+            memStream.Write(ByteParsers.String.WriteCaString(MetaDataFile));
+            memStream.Write(ByteParsers.String.WriteCaString(SoundMetaDataFile));
+            memStream.Write(ByteParsers.String.WriteCaString(Skeleton));
 
             memStream.Write(ByteParsers.Single.EncodeValue(BlendInTime, out _));
             memStream.Write(ByteParsers.Single.EncodeValue(SelectionWeight, out _));

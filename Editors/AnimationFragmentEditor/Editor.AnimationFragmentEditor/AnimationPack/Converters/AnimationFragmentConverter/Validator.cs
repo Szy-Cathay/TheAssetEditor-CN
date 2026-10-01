@@ -1,7 +1,8 @@
-﻿using CommonControls.BaseDialogs.ErrorListDialog;
-using GameWorld.Core.Services;
+﻿using GameWorld.Core.Services;
 using Shared.Core.ErrorHandling;
 using Shared.Core.PackFiles;
+using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.GameFormats.AnimationPack;
 using Shared.Ui.Editors.TextEditor;
 
@@ -9,70 +10,41 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationFrag
 {
     public static class Validator
     {
-        public static ITextConverter.SaveError Validate(ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper, Animation xmlAnimation, string text, IPackFileService pfs, string filepath)
+        public static ITextConverter.SaveError Validate(ISkeletonAnimationLookUpHelper helper, Animation animation, string text, IPackFileService pfs, string filepath, GameTypeEnum game = GameTypeEnum.Unknown)
         {
-            if (string.IsNullOrWhiteSpace(xmlAnimation.Skeleton))
-                return new ITextConverter.SaveError() { ErrorLength = 0, ErrorLineNumber = 1, ErrorPosition = 0, Text = "Missing skeleton item on root" };
-
-            var lastIndex = 0;
-
-            for (int i = 0; i < xmlAnimation.AnimationFragmentEntry.Count; i++)
-            {
-                var item = xmlAnimation.AnimationFragmentEntry[i];
-                lastIndex = text.IndexOf("<AnimationFragmentEntry", lastIndex + 1, StringComparison.InvariantCultureIgnoreCase);
-
-                if (item.Slot == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No slot provided");
-
-                var slot = DefaultAnimationSlotTypeHelper.GetfromValue(item.Slot);
-                if (slot == null)
-                    return ITextConverter.GenerateError(text, lastIndex, $"{item.Slot} is an invalid animation slot.");
-
-                if (item.File == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No file item provided");
-
-                if (item.Meta == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No meta item provided");
-
-                if (item.Sound == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No sound item provided");
-
-                if (item.BlendInTime == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No BlendInTime item provided");
-
-                if (item.SelectionWeight == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No SelectionWeight item provided");
-
-                if (item.WeaponBone == null)
-                    return ITextConverter.GenerateError(text, lastIndex, "No WeaponBone item provided");
-
-                if (ValueConverterHelper.ValidateBoolArray(item.WeaponBone) == false)
-                    return ITextConverter.GenerateError(text, lastIndex, "WeaponBone bool array contains invalid values. Should contain 6 true/false values");
-            }
-
-            var errorList = new ErrorList();
-            if (skeletonAnimationLookUpHelper.GetSkeletonFileFromName(xmlAnimation.Skeleton) == null)
-                errorList.Warning("Root", $"Skeleton {xmlAnimation.Skeleton} is not found");
-
-            foreach (var item in xmlAnimation.AnimationFragmentEntry)
-            {
-                if (string.IsNullOrWhiteSpace(item.File.Value))
-                    errorList.Warning(item.Slot, "Item does not have an animation");
-
-                if (pfs.FindFile(item.File.Value) == null)
-                    errorList.Warning(item.Slot, $"Animation {item.File.Value} is not found");
-
-                if (item.Meta.Value != "" && pfs.FindFile(item.Meta.Value) == null)
-                    errorList.Warning(item.Slot, $"Meta {item.Meta.Value} is not found");
-
-                if (item.Sound.Value != "" && pfs.FindFile(item.Sound.Value) == null)
-                    errorList.Warning(item.Slot, $"Sound {item.Sound.Value} is not found");
-            }
-
-            if (errorList.Errors.Count != 0)
-                ErrorListWindow.ShowDialog("Errors", errorList, false);
-
-            return null;
+            var report = Check(helper, animation, pfs, game);
+            return report.Errors.Any(e => e.IsError) ? new ITextConverter.SaveError { Text = string.Join(Environment.NewLine, report.Errors.Where(e => e.IsError).Select(e => e.Description)) } : null;
         }
+
+        public static ErrorList Check(ISkeletonAnimationLookUpHelper helper, Animation animation, IPackFileService pfs, GameTypeEnum game)
+        {
+            var report = new ErrorList();
+            if (string.IsNullOrWhiteSpace(animation.Skeleton))
+                report.Error(Text("AnimPack.Table.Skeleton"), Text("AnimPack.Validation.SkeletonRequired"));
+            else if (helper.GetSkeletonFileFromName(animation.Skeleton) == null)
+                report.Warning(Text("AnimPack.Table.Skeleton"), Format("AnimPack.Validation.ResourceUnavailable", animation.Skeleton));
+            if (animation.AnimationFragmentEntry == null)
+            { report.Error(Text("AnimPack.Validation.Format"), Text("AnimPack.Validation.AnimationsRequired")); return report; }
+            foreach (var item in animation.AnimationFragmentEntry)
+            {
+                var label = item.Slot ?? Text("AnimPack.Table.Slot");
+                var slot = game == GameTypeEnum.Troy ? AnimationSlotTypeHelperTroy.GetfromValue(item.Slot ?? "") : DefaultAnimationSlotTypeHelper.GetfromValue(item.Slot ?? "");
+                if (slot == null && item.SlotId < 0) report.Error(label, Text("AnimPack.Validation.SlotInvalid"));
+                if (item.File == null || item.Meta == null || item.Sound == null || item.BlendInTime == null || item.SelectionWeight == null)
+                { report.Error(label, Text("AnimPack.Validation.DataRequired")); continue; }
+                if (!float.IsFinite(item.BlendInTime.Value) || item.BlendInTime.Value < 0 || !float.IsFinite(item.SelectionWeight.Value) || item.SelectionWeight.Value < 0)
+                    report.Error(label, Text("AnimPack.Validation.ParametersInvalid"));
+                if (!ValueConverterHelper.ValidateBoolArray(item.WeaponBone))
+                    report.Error(label, Text("AnimPack.Validation.WeaponFlagsInvalid"));
+                if (string.IsNullOrWhiteSpace(item.File.Value))
+                    report.Error(label, Text("AnimPack.Validation.AnimationRequired"));
+                foreach (var path in new[] { item.File.Value, item.Meta.Value, item.Sound.Value })
+                    if (!string.IsNullOrWhiteSpace(path) && pfs.FindFile(path) == null)
+                        report.Warning(label, Format("AnimPack.Validation.ResourceUnavailable", path));
+            }
+            return report;
+        }
+        private static string Text(string key) => LocalizationManager.Instance?.Get(key) ?? key;
+        private static string Format(string key, params object[] values) => LocalizationManager.Instance?.GetFormat(key, values) ?? key;
     }
 }

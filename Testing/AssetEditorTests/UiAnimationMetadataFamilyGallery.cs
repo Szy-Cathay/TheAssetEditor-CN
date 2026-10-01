@@ -113,6 +113,58 @@ public class UiAnimationMetadataFamilyGallery
             () => Render(theme, variant));
     }
 
+    [TestCase(ThemeType.DarkTheme, 490d)]
+    [TestCase(ThemeType.LightTheme, 490d)]
+    [TestCase(ThemeType.HighContrastDark, 490d)]
+    [TestCase(ThemeType.HighContrastLight, 490d)]
+    [TestCase(ThemeType.DarkTheme, 800d)]
+    [TestCase(ThemeType.LightTheme, 800d)]
+    [TestCase(ThemeType.HighContrastDark, 800d)]
+    [TestCase(ThemeType.HighContrastLight, 800d)]
+    public void PreviewMetadata_ShortHostKeepsTagListAndSaveAccessible(ThemeType theme, double height)
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var previousTheme = ThemesController.CurrentTheme;
+            ThemesController.SetTheme(theme);
+            RegisterApplicationResources();
+            var host = new EditorHostView
+            {
+                DataContext = new MetadataSuperViewGalleryModel(false, true, 1),
+            };
+            var window = Host(host, 740, height);
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                window.UpdateLayout();
+                var metadata = FindVisualDescendants<MetadataSuperView>(host).Single();
+                var scroll = FindVisualDescendants<ScrollViewer>(host).Single(view => view.Content is DockPanel);
+                var tags = FindVisualDescendants<ListView>(metadata).Single(view => view.IsVisible && view.DisplayMemberPath == "DisplayName");
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(metadata.ActualHeight, Is.EqualTo(Math.Max(480, scroll.ViewportHeight)).Within(1));
+                    NUnitAssert.That(tags.ActualHeight, Is.GreaterThanOrEqualTo(48));
+                });
+                var save = FindVisualDescendants<Button>(metadata).Single(button => button.IsVisible && button.Content?.ToString() == "保存");
+                save.BringIntoView();
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                window.UpdateLayout();
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(save.TranslatePoint(new Point(0, 0), scroll).Y, Is.GreaterThanOrEqualTo(-1));
+                    NUnitAssert.That(save.TranslatePoint(new Point(0, save.ActualHeight), scroll).Y, Is.LessThanOrEqualTo(scroll.ViewportHeight + 1));
+                });
+            }
+            finally
+            {
+                window.Close();
+                ThemesController.SetTheme(previousTheme);
+            }
+        });
+    }
+
     private static IEnumerable<TestCaseData> Cases()
     {
         foreach (var theme in new[]
@@ -591,6 +643,7 @@ public class UiAnimationMetadataFamilyGallery
             HasEditStatus = true,
             HasEditConflict = false,
             EditStatusMessage = "表格修改尚未应用到动画包。",
+            ShowBattleTable = true,
             TableEditorVM = CreateAnimSetModel(),
             SelectedItemViewModel = new GalleryModel
             {
@@ -604,61 +657,25 @@ public class UiAnimationMetadataFamilyGallery
         };
     }
 
-    private static GalleryModel CreateAnimSetModel() => new()
+    private static Editors.AnimationFragmentEditor.AnimationPack.ViewModels.AnimSetTableEditorViewModel CreateAnimSetModel()
     {
-        IsWh3 = true,
-        Name = "empire_general",
-        SkeletonName = "humanoid01",
-        MountBin = "battle_entities/empire_mount.bin",
-        LocomotionGraph = "humanoid_locomotion",
-        Rows = new[]
-        {
-            new GalleryModel
-            {
-                SlotName = "stand_idle",
-                AnimationFile = "animations/humanoid/szy_shenhua_celestial_general_very_long_stand_idle_variant_01.anim",
-                AnimationFileName = "szy_shenhua_celestial_general_very_long_stand_idle_variant_01.anim",
-                MetaFile = "animations/humanoid/stand_idle.meta",
-                MetaFileName = "stand_idle.meta",
-                SoundFile = "",
-                SoundFileName = "",
-                BlendInTime = 0.25f,
-                SelectionWeight = 1.0f,
-                Wb0 = true,
-                Unk = false,
-            },
-            new GalleryModel
-            {
-                SlotName = "walk",
-                AnimationFile = "animations/humanoid/walk.anim",
-                AnimationFileName = "walk.anim",
-                MetaFile = "animations/humanoid/walk.meta",
-                MetaFileName = "walk.meta",
-                SoundFile = "footsteps/armour_heavy",
-                SoundFileName = "armour_heavy",
-                BlendInTime = 0.15f,
-                SelectionWeight = 0.8f,
-                Wb0 = true,
-                Wb1 = true,
-                Unk = false,
-            },
-        },
-        SlotNames = new[] { "stand_idle", "walk", "run" },
-        AnimFiles = new[] { "stand_idle.anim", "walk.anim", "run.anim" },
-        MetaFiles = new[] { "stand_idle.meta", "walk.meta" },
-        SoundFiles = new[] { "footsteps/armour_heavy" },
-        HasFeedback = false,
-        SaveCommand = GalleryCommand.Instance,
-        UndoCommand = GalleryCommand.Instance,
-        AddEntryCommand = GalleryCommand.Instance,
-        DeleteEntriesCommand = GalleryCommand.Instance,
-        DuplicateEntryCommand = GalleryCommand.Instance,
-        MoveUpCommand = GalleryCommand.Instance,
-        MoveDownCommand = GalleryCommand.Instance,
-        CopyRowsCommand = GalleryCommand.Instance,
-        PasteRowsCommand = GalleryCommand.Instance,
-    };
-
+        var service = new Moq.Mock<Shared.Core.PackFiles.IPackFileService>();
+        service.Setup(p => p.GetAllPackfileContainers()).Returns([]);
+        var model = new Editors.AnimationFragmentEditor.AnimationPack.ViewModels.AnimSetTableEditorViewModel(
+            service.Object, Moq.Mock.Of<GameWorld.Core.Services.ISkeletonAnimationLookUpHelper>(),
+            new Shared.GameFormats.AnimationMeta.Parsing.MetaDataFileParser(Moq.Mock.Of<Shared.GameFormats.AnimationMeta.Parsing.IMetaDataDatabase>()),
+            null!, GameTypeEnum.Warhammer3);
+        var bin = new Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3.AnimationBinWh3("empire_general.bin")
+        { Name = "empire_general", SkeletonName = "humanoid01", MountBin = "empire_mount", LocomotionGraph = "animations/locomotion_graphs/entity_locomotion_graph.xml" };
+        bin.AnimationTableEntries.Add(new() { AnimationId = 1, BlendIn = 0.25f, SelectionWeight = 1, WeaponBools = 1,
+            AnimationRefs = [new() { AnimationFile = "animations/humanoid/szy_shenhua_celestial_general_very_long_stand_idle_variant_01.anim", AnimationMetaFile = "animations/humanoid/stand_idle.meta" }] });
+        bin.AnimationTableEntries.Add(new() { AnimationId = 2, BlendIn = 0.15f, SelectionWeight = 0.8f, WeaponBools = 3,
+            AnimationRefs = [new() { AnimationFile = "animations/humanoid/walk.anim", AnimationMetaFile = "animations/humanoid/walk.meta", AnimationSoundMetaFile = "animations/audio/walk.snd.meta" }] });
+        model.LoadFromBinary(bin.ToByteArray(), bin.FileName);
+        model.SelectedRow = model.Rows[0];
+        model.SaveCommand = GalleryCommand.Instance;
+        return model;
+    }
     private static GalleryModel CreateBoneModel(bool includeManyBones = false)
     {
         var child = new GalleryModel
@@ -1185,13 +1202,13 @@ public class UiAnimationMetadataFamilyGallery
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(table.CanUserResizeColumns, Is.True);
-                NUnitAssert.That(table.Columns, Has.Count.EqualTo(8));
+                NUnitAssert.That(table.Columns, Has.Count.EqualTo(4));
                 NUnitAssert.That(table.Columns, Has.All.Matches<DataGridColumn>(column =>
                     column.Visibility == Visibility.Visible));
                 NUnitAssert.That(
-                    table.Columns,
+                    table.Columns.Skip(1),
                     Has.All.Matches<DataGridColumn>(column =>
-                        column.Width.UnitType == DataGridLengthUnitType.Auto),
+                        column.Width.UnitType == DataGridLengthUnitType.Star),
                     columnDetails);
                 NUnitAssert.That(
                     ScrollViewer.GetHorizontalScrollBarVisibility(table),
@@ -1204,10 +1221,7 @@ public class UiAnimationMetadataFamilyGallery
                     {
                         LocalizationManager.Instance.Get(
                             "AnimPack.Table.Slot.ToolTip"),
-                        LocalizationManager.Instance.Get(
-                            "AnimPack.Table.BlendIn.ToolTip"),
-                        LocalizationManager.Instance.Get(
-                            "AnimPack.Table.Weight.ToolTip"),
+
                     }));
             });
 
@@ -1217,7 +1231,7 @@ public class UiAnimationMetadataFamilyGallery
                     .Single(viewer => viewer.Name == "DG_ScrollViewer");
                 NUnitAssert.That(
                     scrollViewer.ScrollableWidth,
-                    Is.GreaterThan(0),
+                    table.Columns.Sum(column => column.ActualWidth) > scrollViewer.ViewportWidth ? Is.GreaterThan(0) : Is.EqualTo(0),
                     columnDetails);
             }
         }
@@ -1229,7 +1243,7 @@ public class UiAnimationMetadataFamilyGallery
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(
-                    FindVisualDescendants<GridSplitter>(window),
+                    FindVisualDescendants<GridSplitter>(window).Where(splitter => splitter.IsVisible),
                     Has.Exactly(1).Items);
                 NUnitAssert.That(tableView.IsVisible, Is.True);
                 NUnitAssert.That(textView.IsVisible, Is.False);
@@ -1659,8 +1673,14 @@ public class UiAnimationMetadataFamilyGallery
         }
     }
 
-    private sealed class MetadataSuperViewGalleryModel
+    private sealed class MetadataSuperViewGalleryModel : Editors.Shared.Core.Common.BaseControl.IEditorViewModelTypeProvider
     {
+        public Type EditorViewModelType => typeof(MetadataSuperView);
+        public GridLength LeftColumnWidth { get; set; } = new(3, GridUnitType.Star);
+        public GridLength RightColumnWidth { get; set; } = new(2, GridUnitType.Star);
+        public ScrollBarVisibility EditorContentVerticalScrollBarVisibility => ScrollBarVisibility.Auto;
+        public GalleryModel Player { get; } = CreateAnimationPlayerModel();
+        public GalleryModel[] SceneObjects { get; } = [CreateSceneObjectModel()];
         public int SelectedTabControllerIndex { get; set; }
         public GalleryModel PersistentMetaEditor { get; } =
             CreateMetadataModel();
@@ -1941,6 +1961,8 @@ public class UiAnimationMetadataFamilyGallery
         public object? Translation { get; set; }
         public object? UpdateAnimationCommand { get; set; }
         public object? ToggleViewModeCommand { get; set; }
+        public object? ShowBattleTable { get; set; }
+        public bool ShowCampaignTable { get; set; }
         public object? TableEditorVM { get; set; }
         public object? UndoCommand { get; set; }
         public object? UseRegexFilter { get; set; }

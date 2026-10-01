@@ -58,6 +58,8 @@ namespace Shared.Core.Services
             return key;
         }
 
+        public string GetOrDefault(string key, string fallback) => _strings.GetValueOrDefault(key, fallback);
+
         public string GetFormat(string key, params object[] args)
         {
             try

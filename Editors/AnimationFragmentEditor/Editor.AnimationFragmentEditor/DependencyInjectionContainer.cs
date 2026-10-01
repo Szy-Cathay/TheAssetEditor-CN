@@ -42,7 +42,7 @@ namespace Editors.AnimationFragmentEditor
                 .Build(database);
 
             EditorInfoBuilder
-                .Create<TextEditorViewModel<CampaignAnimBinToXmlConverter>, TextEditorView>(EditorEnums.XML_CampaginBin_Edtior)
+                .Create<AnimPackViewModel, AnimationPackView>(EditorEnums.XML_CampaginBin_Edtior)
                 .AddExtention(".bin", EditorPriorites.High)
                 .ValidForFoldersContaining(@"animations\campaign\database")
                 .Build(database);

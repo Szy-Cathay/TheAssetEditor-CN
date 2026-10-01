@@ -33,10 +33,18 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinC
         public MountSkeleton MountSkeleton { get; set; }
         [XmlElement(ElementName = "Fragments")]
         public string Fragments { get; set; }
+        [XmlElement(ElementName = "FragmentParameter")]
+        public List<FragmentParameter> FragmentParameters { get; set; } = new();
         [XmlElement(ElementName = "Unknown")]
         public Unknown Unknown { get; set; }
         [XmlAttribute(AttributeName = "name")]
         public string Name { get; set; }
+    }
+
+    public class FragmentParameter
+    {
+        [XmlAttribute] public string Name { get; set; } = string.Empty;
+        [XmlAttribute] public int Value { get; set; }
     }
 
     public partial class AnimationBinFileToXmlConverter

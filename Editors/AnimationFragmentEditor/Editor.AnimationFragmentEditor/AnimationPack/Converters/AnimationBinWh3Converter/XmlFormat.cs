@@ -23,6 +23,10 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinW
         public List<Instance> Ref { get; set; } = new List<Instance>();
         [XmlAttribute(AttributeName = "Slot")]
         public string Slot { get; set; }
+        [XmlAttribute, System.ComponentModel.DefaultValue(-1)]
+        public int SlotId { get; set; } = -1;
+        [XmlAttribute, System.ComponentModel.DefaultValue(0)]
+        public int ReservedWeaponFlags { get; set; }
         [XmlAttribute(AttributeName = "BlendId")]
         public float BlendId { get; set; }
         [XmlAttribute(AttributeName = "SelectionWeight")]
@@ -42,6 +46,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinW
 
         public string Name { get; set; }
         public string MountBin { get; set; }
+        public string UnmountBin { get; set; } = string.Empty;
         public string SkeletonName { get; set; }
         public string LocomotionGraph { get; set; }
         public short UnknownValue1_RelatedToFlight { get; set; }

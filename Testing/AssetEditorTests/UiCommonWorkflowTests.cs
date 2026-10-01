@@ -1,4 +1,4 @@
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -182,8 +182,10 @@ public class UiCommonWorkflowTests
             Has.None.Contains("AeSurface.Panel"));
     }
 
-    [Test]
-    public void ErrorListView_RendersStructuredErrorDetails()
+    [TestCase("Error", "错误")]
+    [TestCase("Warning", "警告")]
+    [TestCase("Ok", "通过")]
+    public void ErrorListView_RendersStructuredErrorDetails(string errorType, string localizedType)
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -197,10 +199,11 @@ public class UiCommonWorkflowTests
                         [
                             new ErrorListDataItem
                             {
-                                ErrorType = "Error",
+                                ErrorType = errorType,
                                 ItemName = "STAND",
                                 Description = "Animation file is missing",
-                                IsError = true,
+                                IsError = errorType == "Error",
+                                IsWarning = errorType == "Warning",
                             },
                         ],
                     },
@@ -231,7 +234,8 @@ public class UiCommonWorkflowTests
                         NUnitAssert.That(
                             FindVisualDescendants<GridViewRowPresenter>(item),
                             Has.Exactly(1).Items);
-                        NUnitAssert.That(visibleText, Does.Contain("Error"));
+                        NUnitAssert.That(visibleText, Does.Contain(localizedType));
+                        NUnitAssert.That(visibleText, Does.Not.Contain(errorType));
                         NUnitAssert.That(visibleText, Does.Contain("STAND"));
                         NUnitAssert.That(
                             visibleText,
