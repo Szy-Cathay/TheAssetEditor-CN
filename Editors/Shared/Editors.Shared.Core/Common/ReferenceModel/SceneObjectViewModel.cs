@@ -11,6 +11,7 @@ namespace Editors.Shared.Core.Common.ReferenceModel
         private readonly IPackFileService _pfs;
         private readonly IStandardDialogs _uiProvider;
         private readonly SceneObjectEditor _sceneObjectBuilder;
+        private readonly ModelSkeletonResolver _modelSkeletonResolver;
 
         [ObservableProperty] string _headerName;
         [ObservableProperty] string _subHeaderName;
@@ -32,11 +33,13 @@ namespace Editors.Shared.Core.Common.ReferenceModel
             SceneObject data,
             string headerName,
             SceneObjectEditor sceneObjectBuilder,
-            ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper)
+            ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
+            ModelSkeletonResolver modelSkeletonResolver)
         {
             _pfs = packFileService;
             _uiProvider = uiProvider;
             _sceneObjectBuilder = sceneObjectBuilder;
+            _modelSkeletonResolver = modelSkeletonResolver;
             Data = data;
             HeaderName = headerName;
 
@@ -68,7 +71,14 @@ namespace Editors.Shared.Core.Common.ReferenceModel
 
         public void BrowseMesh()
         {
-            var result = _uiProvider.DisplayBrowseDialog([".variantmeshdefinition", ".wsmodel", ".rigid_model_v2"]);
+            List<string> extensions = [".variantmeshdefinition", ".wsmodel", ".rigid_model_v2"];
+            var skeletonName = Data.Skeleton?.SkeletonName;
+            var result = string.IsNullOrWhiteSpace(skeletonName)
+                ? _uiProvider.DisplayBrowseDialog(extensions)
+                : _uiProvider.DisplayBrowseDialog(extensions, new BrowseDialogFilter(
+                    string.Format(LocalizationManager.Instance.Get("SceneObject.CompatibleModels"), skeletonName),
+                    LocalizationManager.Instance.Get("SceneObject.CompatibleModels.ToolTip"),
+                    _modelSkeletonResolver.CreateFilter(skeletonName)));
             if (result.Result == true && result.File != null)
             {
                 var file = result.File;

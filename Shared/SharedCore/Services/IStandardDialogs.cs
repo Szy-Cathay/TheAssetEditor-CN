@@ -8,6 +8,7 @@ namespace Shared.Core.Services
     {
         SaveDialogResult DisplaySaveDialog(IPackFileService pfs, List<string> extensions);
         BrowseDialogResultFile DisplayBrowseDialog(List<string> extensions);
+        BrowseDialogResultFile DisplayBrowseDialog(List<string> extensions, BrowseDialogFilter filter);
         BrowseDialogResultFolder DisplayBrowseFolderDialog(
             PackFileContainer? container = null);
 
@@ -31,6 +32,7 @@ namespace Shared.Core.Services
 
     public record SaveDialogResult(bool Result, PackFile? SelectedPackFile, string? SelectedFilePath);
     public record BrowseDialogResultFile(bool Result, PackFile File);
+    public record BrowseDialogFilter(string Description, string ToolTip, Func<PackFile, bool> Matches);
     public record BrowseDialogResultFolder(bool Result, string Folder);
     public record TextInputDialogResult(bool Result, string Text);
     public record TitleDescriptionInputDialogResult(

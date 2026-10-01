@@ -42,6 +42,7 @@ namespace GameWorld.Core
             serviceCollection.AddSingleton<ISkeletonAnimationLookUpHelper, SkeletonAnimationLookUpHelper>();
             serviceCollection.AddScoped<FocusSelectableObjectService>();
             serviceCollection.AddScoped<ComplexMeshLoader>();
+            serviceCollection.AddTransient<ModelSkeletonResolver>();
             serviceCollection.AddScoped<Rmv2ModelNodeLoader>();
 
             // Shader

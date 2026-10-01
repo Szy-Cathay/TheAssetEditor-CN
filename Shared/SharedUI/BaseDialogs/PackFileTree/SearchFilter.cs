@@ -1,14 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
 using Shared.Core.Misc;
+using Shared.Core.PackFiles.Models;
 
 namespace Shared.Ui.BaseDialogs.PackFileTree
 {
     public class SearchFilter : NotifyPropertyChangedImpl, IDataErrorInfo
     {
+        public event EventHandler? Changed;
         public string Error { get; set; } = string.Empty;
         public string this[string columnName] => _filterError;
 
@@ -39,6 +41,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         }
 
         List<string>? _extensionFilter;
+        private Func<PackFile, bool>? _fileFilter;
         public int AutoExapandResultsAfterLimitedCount { get; set; } = 25;
 
         public SearchFilter(ObservableCollection<TreeNode> nodes)
@@ -87,6 +90,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                 ExpandMatchPaths(matches);
             }
 
+            Changed?.Invoke(this, EventArgs.Empty);
             return "";
         }
 
@@ -100,7 +104,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             {
                 var isMatch =
                     HasValidExtension(node.Name) &&
-                    expression.IsMatch(node.Name);
+                    expression.IsMatch(node.Name) &&
+                    (_fileFilter == null || node.Item != null && _fileFilter(node.Item));
                 node.IsVisible = ShowFoldersOnly == false && isMatch;
                 if (isMatch)
                     matches.Add(node);
@@ -129,6 +134,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
             var isEmptyDirectory =
                 hasSearchText == false &&
+                _fileFilter == null &&
                 node.NodeType == NodeType.Directory &&
                 node.Children.Count == 0;
             var isVisible = node.Children.Count == 0 &&
@@ -204,5 +210,11 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         }
 
         public void Refresh() => _filterError = Filter(FilterText);
+
+        public void SetFileFilter(Func<PackFile, bool>? filter)
+        {
+            _fileFilter = filter;
+            Refresh();
+        }
     }
 }
