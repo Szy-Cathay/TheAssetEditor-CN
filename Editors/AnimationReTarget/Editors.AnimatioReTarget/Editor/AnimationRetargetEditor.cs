@@ -120,7 +120,7 @@ namespace Editors.AnimatioReTarget.Editor
 
         private void OnSceneObjectUpdated(SceneObjectUpdateEvent e)
         {
-           if (e.Owner == _target && e.MeshChanged)
+           if (e.Owner == _target && (e.MeshChanged || e.SkeletonChanged))
                _sceneObjectEditor.CopyMeshFromOther(_generated, _target);
 
             if (e.Owner == _source && e.SkeletonChanged)

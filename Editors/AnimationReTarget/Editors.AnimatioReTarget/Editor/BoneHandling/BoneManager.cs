@@ -177,49 +177,6 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
             UpdateMappingSummary();
         }
 
-        [RelayCommand]
-        public void ApplyHumanoidMapping()
-        {
-            if (_targetSkeleton == null || _sourceSkeleton == null)
-            {
-                _standardDialogs.ShowDialogBox(
-                    LocalizationManager.Instance.Get("AnimReTarget.Error.SkeletonSelectionRequired"),
-                    LocalizationManager.Instance.Get("Msg.GeneralError"));
-                return;
-            }
-
-            var result = HumanoidBoneMapper.CreateMappings(
-                _sourceSkeleton.Data,
-                _targetSkeleton.Data);
-            var humanoidTargetBoneIndices = result.Mappings
-                .Select(mapping => mapping.TargetBoneIndex)
-                .ToHashSet();
-            var mappings = FlatBoneList
-                .Where(bone =>
-                    bone.HasMapping &&
-                    bone.MappedIndex >= 0 &&
-                    !HumanoidBoneMapper.IsRigSpecificDeformationBone(bone.BoneName))
-                .ToDictionary(bone => bone.BoneIndex, bone => bone.MappedIndex);
-            foreach (var mapping in result.Mappings)
-                mappings[mapping.TargetBoneIndex] = mapping.SourceBoneIndex;
-
-            foreach (var bone in FlatBoneList.Where(bone =>
-                         humanoidTargetBoneIndices.Contains(bone.BoneIndex)))
-            {
-                ResetBoneSettings(bone);
-            }
-
-            CreateMappingConfig();
-            ApplyMappings(mappings);
-            foreach (var bone in FlatBoneList.Where(bone =>
-                         humanoidTargetBoneIndices.Contains(bone.BoneIndex)))
-            {
-                bone.ApplyTranslation = result.TranslationTargetBoneIndices.Contains(
-                    bone.BoneIndex);
-            }
-        }
-
-
         [RelayCommand] void ShowBoneMappingWindow()
         {
             if (_targetSkeleton == null || _sourceSkeleton == null)
