@@ -121,7 +121,11 @@ namespace Editors.Shared.Core.Common
                 assetViewModel.ParentNode.RemoveObject(assetViewModel.ModelNode);
 
             if (other.ModelNode == null)
+            {
+                assetViewModel.ModelNode = null;
+                SetSkeleton(assetViewModel, _packFileService.FindFile(other.SkeletonName.Value));
                 return;
+            }
 
             assetViewModel.ModelNode = SceneNodeHelper.CloneNodeAndChildren(other.ModelNode);
 
@@ -132,6 +136,7 @@ namespace Editors.Shared.Core.Common
             assetViewModel.ParentNode.AddObject(assetViewModel.ModelNode);
             var skeletonFile = _packFileService.FindFile(other.SkeletonName.Value);
             SetSkeleton(assetViewModel, skeletonFile);
+            WireAttachmentResolvers(assetViewModel);
 
             assetViewModel.ShowMesh.Value = assetViewModel.ShowMesh.Value;
             assetViewModel.ShowSkeleton.Value = assetViewModel.ShowSkeleton.Value;

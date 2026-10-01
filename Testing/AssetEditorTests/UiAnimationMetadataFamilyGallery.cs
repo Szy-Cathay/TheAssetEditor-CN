@@ -709,7 +709,6 @@ public class UiAnimationMetadataFamilyGallery
             {
                 Bones = new[] { root },
                 SelectedBone = child,
-                ApplyHumanoidMappingCommand = GalleryCommand.Instance,
                 SaveCharacterProfileCommand = GalleryCommand.Instance,
                 MappingSummary = "24 / 96",
                 ShowBoneMappingWindowCommand = GalleryCommand.Instance,
@@ -1776,7 +1775,6 @@ public class UiAnimationMetadataFamilyGallery
         public object? AnimFiles { get; set; }
         public object? AnimPackName { get; set; }
         public object? AddEntryCommand { get; set; }
-        public object? ApplyHumanoidMappingCommand { get; set; }
         public object? ApplyRelativeScale { get; set; }
         public object? BoneIndex { get; set; }
         public object? BoneManager { get; set; }

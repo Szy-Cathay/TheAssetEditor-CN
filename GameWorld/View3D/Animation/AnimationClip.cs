@@ -75,18 +75,111 @@ namespace GameWorld.Core.Animation
 
         public AnimationClip(AnimationFile file, GameSkeleton skeleton)
         {
-            foreach (var animationPart in file.AnimationParts)
+            var targetBoneIndices = file.Bones != null && file.Bones.Length != 0 &&
+                                    file.Bones.All(bone => !string.IsNullOrEmpty(bone.Name))
+                ? file.Bones.Select(bone => skeleton.GetBoneIndexByName(bone.Name)).ToArray()
+                : null;
+            if (targetBoneIndices != null && file.Bones.Where((bone, index) => targetBoneIndices[index] >= 0)
+                .Any(bone => bone.ParentId >= 0
+                    ? targetBoneIndices[bone.ParentId] < 0 || targetBoneIndices[bone.ParentId] !=
+                        skeleton.GetParentBoneIndex(targetBoneIndices[bone.Id])
+                    : skeleton.GetParentBoneIndex(targetBoneIndices[bone.Id]) >= 0))
             {
-                var frames = CreateKeyFramesFromAnimationPart(animationPart, skeleton);
-                DynamicFrames.AddRange(frames);
+                DynamicFrames.AddRange(CreateFramesWithDifferentHierarchy(file, skeleton, targetBoneIndices));
+            }
+            else
+            {
+                foreach (var animationPart in file.AnimationParts)
+                {
+                    var frames = CreateKeyFramesFromAnimationPart(animationPart, skeleton, targetBoneIndices);
+                    DynamicFrames.AddRange(frames);
+                }
             }
 
             Duration = TimeSpan.FromSeconds(
                 file.Header.AnimationTotalPlayTimeInSec);
         }
 
+        private List<KeyFrame> CreateFramesWithDifferentHierarchy(AnimationFile file, GameSkeleton skeleton, int[] targetBoneIndices)
+        {
+            var sourceSkeleton = GameSkeleton.CreateFromAnimationFile(file, new AnimationPlayer());
+            for (var index = 0; index < file.Bones.Length; index++)
+            {
+                if (targetBoneIndices[index] < 0)
+                    continue;
+                var parent = file.Bones[index].ParentId;
+                var parentBindWorld = parent < 0
+                    ? Matrix.Identity
+                    : targetBoneIndices[parent] >= 0
+                        ? skeleton.GetWorldTransform(targetBoneIndices[parent])
+                        : sourceSkeleton.GetWorldTransform(parent);
+                var bindLocal = skeleton.GetWorldTransform(targetBoneIndices[index]) * Matrix.Invert(parentBindWorld);
+                bindLocal.Decompose(out _, out var rotation, out var position);
+                sourceSkeleton.Translation[index] = position;
+                sourceSkeleton.Rotation[index] = Quaternion.Normalize(rotation);
+            }
+            sourceSkeleton.RebuildSkeletonMatrix();
+            var sourceIndices = Enumerable.Repeat(-1, skeleton.BoneCount).ToArray();
+            for (var index = 0; index < targetBoneIndices.Length; index++)
+            {
+                if (targetBoneIndices[index] >= 0)
+                    sourceIndices[targetBoneIndices[index]] = index;
+            }
 
-        List<KeyFrame> CreateKeyFramesFromAnimationPart(AnimationPart animationPart, GameSkeleton skeleton)
+            var result = new List<KeyFrame>();
+            foreach (var part in file.AnimationParts)
+            {
+                foreach (var sourceFrame in CreateKeyFramesFromAnimationPart(part, sourceSkeleton, null))
+                {
+                    var targetFrame = new KeyFrame
+                    {
+                        Position = new List<Vector3>(skeleton.Translation),
+                        Rotation = new List<Quaternion>(skeleton.Rotation),
+                        Scale = Enumerable.Repeat(Vector3.One, skeleton.BoneCount).ToList(),
+                    };
+                    var sourceWorlds = new Matrix?[sourceSkeleton.BoneCount];
+                    var targetWorlds = new Matrix?[skeleton.BoneCount];
+                    Matrix SourceWorld(int index)
+                    {
+                        if (sourceWorlds[index] is Matrix cached)
+                            return cached;
+                        var world = Matrix.CreateFromQuaternion(Quaternion.Normalize(sourceFrame.Rotation[index])) *
+                            Matrix.CreateTranslation(sourceFrame.Position[index]);
+                        var parent = sourceSkeleton.GetParentBoneIndex(index);
+                        if (parent >= 0)
+                            world *= SourceWorld(parent);
+                        sourceWorlds[index] = world;
+                        return world;
+                    }
+                    Matrix TargetWorld(int index)
+                    {
+                        if (targetWorlds[index] is Matrix cached)
+                            return cached;
+                        var parent = skeleton.GetParentBoneIndex(index);
+                        var parentWorld = parent < 0 ? Matrix.Identity : TargetWorld(parent);
+                        if (sourceIndices[index] >= 0)
+                        {
+                            // Bone names identify tracks; the file hierarchy defines their original space.
+                            var local = SourceWorld(sourceIndices[index]) * Matrix.Invert(parentWorld);
+                            local.Decompose(out _, out var rotation, out var position);
+                            targetFrame.Position[index] = position;
+                            targetFrame.Rotation[index] = Quaternion.Normalize(rotation);
+                        }
+                        var world = Matrix.CreateFromQuaternion(targetFrame.Rotation[index]) *
+                            Matrix.CreateTranslation(targetFrame.Position[index]) * parentWorld;
+                        targetWorlds[index] = world;
+                        return world;
+                    }
+                    for (var index = 0; index < skeleton.BoneCount; index++)
+                        TargetWorld(index);
+                    result.Add(targetFrame);
+                }
+            }
+            return result;
+        }
+
+
+        List<KeyFrame> CreateKeyFramesFromAnimationPart(AnimationPart animationPart, GameSkeleton skeleton, int[]? targetBoneIndices)
         {
             var newDynamicFrames = new List<KeyFrame>();
 
@@ -98,32 +191,33 @@ namespace GameWorld.Core.Animation
 
             for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
             {
-                var newKeyframe = new KeyFrame();
+                var newKeyframe = new KeyFrame
+                {
+                    Position = new List<Vector3>(skeleton.Translation),
+                    Rotation = new List<Quaternion>(skeleton.Rotation),
+                    Scale = Enumerable.Repeat(Vector3.One, skeleton.BoneCount).ToList(),
+                };
 
                 for (var animationSkeletonBoneIndex = 0; animationSkeletonBoneIndex < animationSkeletonBoneCount; animationSkeletonBoneIndex++)
                 {
-                    // We can apply animations to a skeleton where the skeleton of the animation is different then the skeleton we are applying it to
-                    // If that is the case we just discard the information.
-                    var isBoneIndexValid = animationSkeletonBoneIndex < skeleton.BoneCount;
-                    if (isBoneIndexValid)
+                    var targetBoneIndex = targetBoneIndices == null
+                        ? animationSkeletonBoneIndex
+                        : animationSkeletonBoneIndex < targetBoneIndices.Length
+                            ? targetBoneIndices[animationSkeletonBoneIndex]
+                            : -1;
+                    if (targetBoneIndex >= 0 && targetBoneIndex < skeleton.BoneCount)
                     {
                         var translationLookup = animationPart.TranslationMappings[animationSkeletonBoneIndex];
                         if (translationLookup.IsDynamic)
-                            newKeyframe.Position.Add(animationPart.DynamicFrames[frameIndex].Transforms[translationLookup.Id].ToVector3());
+                            newKeyframe.Position[targetBoneIndex] = animationPart.DynamicFrames[frameIndex].Transforms[translationLookup.Id].ToVector3();
                         else if (translationLookup.IsStatic)
-                            newKeyframe.Position.Add(animationPart.StaticFrame.Transforms[translationLookup.Id].ToVector3());
-                        else
-                            newKeyframe.Position.Add(skeleton.Translation[animationSkeletonBoneIndex]);
+                            newKeyframe.Position[targetBoneIndex] = animationPart.StaticFrame.Transforms[translationLookup.Id].ToVector3();
 
                         var rotationLookup = animationPart.RotationMappings[animationSkeletonBoneIndex];
                         if (rotationLookup.IsDynamic)
-                            newKeyframe.Rotation.Add(animationPart.DynamicFrames[frameIndex].Quaternion[rotationLookup.Id].ToQuaternion());
+                            newKeyframe.Rotation[targetBoneIndex] = animationPart.DynamicFrames[frameIndex].Quaternion[rotationLookup.Id].ToQuaternion();
                         else if (rotationLookup.IsStatic)
-                            newKeyframe.Rotation.Add(animationPart.StaticFrame.Quaternion[rotationLookup.Id].ToQuaternion());
-                        else
-                            newKeyframe.Rotation.Add(skeleton.Rotation[animationSkeletonBoneIndex]);
-
-                        newKeyframe.Scale.Add(Vector3.One);
+                            newKeyframe.Rotation[targetBoneIndex] = animationPart.StaticFrame.Quaternion[rotationLookup.Id].ToQuaternion();
                     }
                 }
 

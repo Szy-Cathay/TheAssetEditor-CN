@@ -35,44 +35,25 @@
                 <ColumnDefinition Width="*" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
-            <Border
+            <StackPanel
                 Grid.Row="0"
                 Grid.ColumnSpan="3"
                 Margin="0,8,0,8"
-                Style="{StaticResource AeFeedback.Notice}">
-                <StackPanel>
-                    <TextBlock
-                        Style="{StaticResource AeText.Label}"
-                        Text="{loc:Loc AnimReTarget.HumanoidMapping.Title}" />
-                    <TextBlock
-                        Margin="0,4,0,8"
-                        Style="{StaticResource AeText.Body}"
-                        Text="{loc:Loc AnimReTarget.HumanoidMapping.Description}"
-                        TextWrapping="Wrap" />
-                    <StackPanel Orientation="Horizontal">
-                        <Button
-                            AutomationProperties.Name="{loc:Loc AnimReTarget.HumanoidMapping.Action}"
-                            Command="{Binding BoneManager.ApplyHumanoidMappingCommand}"
-                            Content="{loc:Loc AnimReTarget.HumanoidMapping.Action}"
-                            Style="{StaticResource AeButton.Primary}"
-                            ToolTip="{loc:Loc AnimReTarget.HumanoidMapping.ToolTip}" />
-                        <Button
-                            Margin="6,0,0,0"
-                            AutomationProperties.Name="{loc:Loc AnimReTarget.Profile.Save}"
-                            Command="{Binding BoneManager.SaveCharacterProfileCommand}"
-                            Content="{loc:Loc AnimReTarget.Profile.Save}"
-                            Style="{StaticResource AeButton.Secondary}"
-                            ToolTip="{loc:Loc AnimReTarget.Profile.Save.ToolTip}" />
-                        <TextBlock
-                            Margin="10,0,0,0"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource AeText.Caption}">
-                            <Run Text="{loc:Loc AnimReTarget.HumanoidMapping.Summary}" />
-                            <Run Text="{Binding BoneManager.MappingSummary, Mode=OneWay}" />
-                        </TextBlock>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+                Orientation="Horizontal">
+                <Button
+                    AutomationProperties.Name="{loc:Loc AnimReTarget.Profile.Save}"
+                    Command="{Binding BoneManager.SaveCharacterProfileCommand}"
+                    Content="{loc:Loc AnimReTarget.Profile.Save}"
+                    Style="{StaticResource AeButton.Secondary}"
+                    ToolTip="{loc:Loc AnimReTarget.Profile.Save.ToolTip}" />
+                <TextBlock
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource AeText.Caption}">
+                    <Run Text="{loc:Loc AnimReTarget.MappingSummary}" />
+                    <Run Text="{Binding BoneManager.MappingSummary, Mode=OneWay}" />
+                </TextBlock>
+            </StackPanel>
 
             <TreeView Grid.Row="1" Grid.Column="0"
                       MaxHeight="520"
