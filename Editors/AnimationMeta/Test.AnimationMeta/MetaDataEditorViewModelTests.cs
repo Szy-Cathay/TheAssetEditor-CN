@@ -13,6 +13,7 @@ using Shared.Core.Misc;
 using Shared.Core.PackFiles.Models;
 using Shared.Core.Services;
 using Shared.Core.ToolCreation;
+using Shared.GameFormats.Animation;
 using Shared.GameFormats.AnimationMeta.Definitions;
 using Shared.GameFormats.AnimationMeta.Parsing;
 using Test.TestingUtility.Shared;
@@ -1935,6 +1936,76 @@ namespace Test.AnimationMeta
             {
                 superView.Close();
             }
+        }
+
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void SuperView_ActionPackPreview_LoadingCompatibleMeshKeepsAnimationAndMetadata(bool reloadMesh, bool removeMesh)
+        {
+            const string animationPath = @"animations\battle\humanoid01\2handed_hammer\stand\hu1_2hh_stand_idle_01.anim";
+            var runner = new AssetEditorTestRunner();
+            runner.CreateCaContainer();
+            runner.LoadPackFile(PathHelper.GetDataFile("Karl_and_celestialgeneral.pack"), true);
+            var creator = runner.ServiceProvider.GetRequiredService<IEditorCreator>();
+            var superView = (SuperViewViewModel)creator.Create(EditorEnums.SuperView_Editor);
+            try
+            {
+                var parser = runner.GetRequiredServiceInCurrentEditorScope<MetaDataFileParser>();
+                var saves = runner.GetRequiredServiceInCurrentEditorScope<IFileSaveService>();
+                var metadata = SaveTimedMetaFile(saves, parser, @"animations\battle\codex\preview.anm.meta");
+                var persistent = SaveTimedMetaFile(saves, parser, @"animations\battle\codex\preview_persistent.meta");
+                var sceneEditor = runner.GetRequiredServiceInCurrentEditorScope<SceneObjectEditor>();
+                superView.PreviewAnimation(
+                    AnimationFile.Create(runner.PackFileService.FindFile(animationPath)!),
+                    AnimationFile.Create(runner.PackFileService.FindFile(@"animations\skeletons\humanoid01.anim")!),
+                    animationPath, metadata, persistent);
+                var scene = superView.SceneObjects.Single();
+                var skeleton = scene.Data.Skeleton;
+                var clip = scene.Data.AnimationClip;
+                var mesh = runner.PackFileService.FindFile(@"variantmeshes\wh_variantmodels\hu1\emp\emp_karl_franz\emp_karl_franz.wsmodel")!;
+                sceneEditor.SetMesh(scene.Data, mesh);
+                var animationTag = superView.MetaEditor.Tags.Single();
+                var persistentTag = superView.PersistentMetaEditor.Tags.Single();
+                if (reloadMesh)
+                {
+                    animationTag.Variables.Single(v => v.PropertyName == "StartTime").ValueAsString = "1.25";
+                    persistentTag.Variables.Single(v => v.PropertyName == "EndTime").ValueAsString = "2.25";
+                }
+                if (removeMesh)
+                {
+                    scene.RemoveMesh();
+                    Assert.That(scene.Data.ModelNode, Is.Null);
+                    Assert.That(scene.Data.MeshName.Value, Is.Empty);
+                    Assert.That(scene.Data.AnimationClip, Is.SameAs(clip));
+                }
+                if (reloadMesh)
+                    sceneEditor.SetMesh(scene.Data, mesh);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(scene.Data.Skeleton, Is.SameAs(skeleton));
+                    Assert.That(scene.Data.AnimationClip, Is.SameAs(clip));
+                    Assert.That(scene.Data.MetaData, Is.SameAs(metadata));
+                    Assert.That(scene.Data.PersistMetaData, Is.SameAs(persistent));
+                    Assert.That(superView.MetaEditor.Tags, Has.Count.EqualTo(1));
+                    Assert.That(superView.PersistentMetaEditor.Tags, Has.Count.EqualTo(1));
+                    Assert.That(superView.MetaEditor.Tags.Single(), Is.SameAs(animationTag));
+                    Assert.That(superView.PersistentMetaEditor.Tags.Single(), Is.SameAs(persistentTag));
+                    if (reloadMesh)
+                    {
+                        Assert.That(((FirePos_v10)superView.MetaEditor.ParsedFile!.Attributes.Single()).StartTime, Is.EqualTo(1.25f));
+                        Assert.That(((FirePos_v10)superView.PersistentMetaEditor.ParsedFile!.Attributes.Single()).EndTime, Is.EqualTo(2.25f));
+                    }
+                    Assert.That(scene.FragAndSlotSelection.AnimationFileName, Is.EqualTo(animationPath));
+                    Assert.That(scene.FragAndSlotSelection.MetaDataName, Does.EndWith("preview.anm.meta"));
+                    Assert.That(scene.FragAndSlotSelection.MetaDataPersistName, Does.EndWith("preview_persistent.meta"));
+                    Assert.That(superView.Player.IsEnabled.Value, Is.True);
+                    Assert.That(scene.Data.Player.Duration.TotalSeconds, Is.GreaterThan(0));
+                    Assert.That(superView.HasUnsavedChanges, Is.EqualTo(reloadMesh));
+                });
+            }
+            finally { superView.Close(); }
         }
 
         private static PackFile SaveTimedMetaFile(

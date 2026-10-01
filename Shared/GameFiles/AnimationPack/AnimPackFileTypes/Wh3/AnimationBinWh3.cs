@@ -15,10 +15,10 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
         public uint TableSubVersion { get; set; } = 3;
         public string Name { get; set; } = "";
         public string MountBin { get; set; } = "";
-        public string Unknown { get; set; } = "";    // Name of the rider bin
+        public string Unknown { get; set; } = "";    // Unmount table name
         public string SkeletonName { get; set; } = "";
         public string LocomotionGraph { get; set; } = "";
-        public short UnknownValue1 { get; set; } = 0;   // bool 2x, IsSimpleFlight and IsLarge
+        public short UnknownValue1 { get; set; } = 0;   // Simple flight and new cavalry technology
 
         public AnimationBinWh3(string fileName, byte[] data = null)
         {
@@ -35,12 +35,12 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
             if (TableVersion == 4)
                 memStream.Write(ByteParsers.UInt32.EncodeValue(TableSubVersion, out _));
 
-            memStream.Write(ByteParsers.String.WriteCaString(Name.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(MountBin.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(Unknown.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(SkeletonName.ToLower()));
+            memStream.Write(ByteParsers.String.WriteCaString(Name));
+            memStream.Write(ByteParsers.String.WriteCaString(MountBin));
+            memStream.Write(ByteParsers.String.WriteCaString(Unknown));
+            memStream.Write(ByteParsers.String.WriteCaString(SkeletonName));
             if (TableVersion == 4)
-                memStream.Write(ByteParsers.String.WriteCaString(LocomotionGraph.ToLower()));
+                memStream.Write(ByteParsers.String.WriteCaString(LocomotionGraph));
 
             memStream.Write(ByteParsers.Short.EncodeValue(UnknownValue1, out _));
 
@@ -56,9 +56,9 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
 
                 foreach (var animation in animationEntry.AnimationRefs)
                 {
-                    memStream.Write(ByteParsers.String.WriteCaString(animation.AnimationFile.ToLower()));
-                    memStream.Write(ByteParsers.String.WriteCaString(animation.AnimationMetaFile.ToLower()));
-                    memStream.Write(ByteParsers.String.WriteCaString(animation.AnimationSoundMetaFile.ToLower()));
+                    memStream.Write(ByteParsers.String.WriteCaString(animation.AnimationFile));
+                    memStream.Write(ByteParsers.String.WriteCaString(animation.AnimationMetaFile));
+                    memStream.Write(ByteParsers.String.WriteCaString(animation.AnimationSoundMetaFile));
                 }
             }
 
@@ -116,6 +116,8 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
             AnimationTableEntries.Clear();
 
             var slotCount = chunk.ReadUInt32();
+            if (slotCount > chunk.BytesLeft / 21)
+                throw new InvalidDataException("动画槽位数量超出实际数据范围。");
             for (var i = 0; i < slotCount; i++)
             {
                 var animID = chunk.ReadUInt32();
@@ -124,6 +126,8 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
                 var boneWeaponbools = chunk.ReadInt32();
                 var frgUnk0 = chunk.ReadBool();
                 var numVariants = chunk.ReadUInt32();
+                if (numVariants > chunk.BytesLeft / 6)
+                    throw new InvalidDataException("候选动作数量超出实际数据范围。");
 
                 var entry = new AnimationBinEntry()
                 {
@@ -207,9 +211,9 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
 
         public class AnimationRef
         {
-            public string AnimationFile { get; set; }
-            public string AnimationMetaFile { get; set; }
-            public string AnimationSoundMetaFile { get; set; }
+            public string AnimationFile { get; set; } = string.Empty;
+            public string AnimationMetaFile { get; set; } = string.Empty;
+            public string AnimationSoundMetaFile { get; set; } = string.Empty;
         }
     }
 }

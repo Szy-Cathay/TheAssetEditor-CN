@@ -12,6 +12,7 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
         public NotifyAttr<bool> IsChanged { get; set; } = new NotifyAttr<bool>(false);
 
         uint _version;
+        byte[] _sourceBytes = [];
         public List<MatchedAnimationTableEntry> Entries { get; set; } = new List<MatchedAnimationTableEntry>();
 
         public MatchedAnimFile(string fileName, byte[] bytes)
@@ -23,19 +24,24 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
 
         public void CreateFromBytes(byte[] bytes)
         {
+            _sourceBytes = bytes;
             var chunk = new ByteChunk(bytes);
             _version = chunk.ReadUInt32();
             var count = chunk.ReadUInt32();
+            if (count > chunk.BytesLeft / 40)
+                throw new InvalidDataException("配对动作数量超出实际数据范围。");
             Entries.Clear();
             for (var i = 0; i < count; i++)
             {
                 var entry = new MatchedAnimationTableEntry();
+                ValidateIntTable(chunk);
                 entry.AttackTable = new IntArrayTable(chunk);
                 entry.AttackUnknown0 = chunk.ReadInt32();
                 entry.AttackUnknown1 = chunk.ReadInt32();
                 entry.AttackUnknown2 = chunk.ReadInt32();
                 entry.AttackAnimation = chunk.ReadString();
                 entry.MountAnimation = chunk.ReadString();
+                ValidateIntTable(chunk);
                 entry.DefenceTable = new IntArrayTable(chunk);
                 entry.DefenceUnknown0 = chunk.ReadInt32();
                 entry.DefenceUnknown1 = chunk.ReadInt32();
@@ -68,7 +74,15 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
 
         public byte[] ToByteArray()
         {
-            throw new NotImplementedException();
+            return _sourceBytes;
+        }
+
+        static void ValidateIntTable(ByteChunk chunk)
+        {
+            var count = chunk.ReadInt32();
+            if (count < 0 || count > chunk.BytesLeft / 4)
+                throw new InvalidDataException("配对动作索引数量超出实际数据范围。");
+            chunk.Index -= 4;
         }
     }
 

@@ -18,10 +18,13 @@ using Shared.Core.Services;
 using Shared.Core.ToolCreation;
 using Shared.GameFormats.AnimationMeta.Definitions;
 using Shared.GameFormats.AnimationMeta.Parsing;
+using Shared.GameFormats.Animation;
+using Shared.Core.PackFiles.Models;
+using GameWorld.Core.Animation;
 
 namespace Editors.AnimationMeta.SuperView
 {
-    public partial class SuperViewViewModel : EditorHostBase, ISaveableEditor
+    public partial class SuperViewViewModel : EditorHostBase, ISaveableEditor, IAnimationPreviewEditor
     {
         SceneObjectViewModel _asset = null!;
 
@@ -389,7 +392,9 @@ namespace Editors.AnimationMeta.SuperView
             : base(editorHostParameters)
         {
             EditorContentVerticalScrollBarVisibility =
-                ScrollBarVisibility.Disabled;
+                ScrollBarVisibility.Auto;
+            LeftColumnWidth = new System.Windows.GridLength(3, System.Windows.GridUnitType.Star);
+            RightColumnWidth = new System.Windows.GridLength(2, System.Windows.GridUnitType.Star);
             DisplayName = LocalizationManager.Instance.Get("DisplayName.SuperView");
             _packFileService = packFileService;
             _eventHub = eventHub;
@@ -489,7 +494,7 @@ namespace Editors.AnimationMeta.SuperView
                 OnMetaEditorFieldValidityChanged;
             MetaEditor.FieldValidityChanged += OnMetaEditorFieldValidityChanged;
 
-            var assetViewModel = _sceneObjectViewModelBuilder.CreateAsset("SuperViewRoot", true, "Root", Color.Black, null);
+            var assetViewModel = _sceneObjectViewModelBuilder.CreateAsset("SuperViewRoot", true, LocalizationManager.Instance.Get("SuperView.MainModel"), Color.Black, null);
             SceneObjects.Add(assetViewModel);
 
             assetViewModel.Data.MetaDataChanged += OnMetaDataChanged;
@@ -1165,10 +1170,13 @@ namespace Editors.AnimationMeta.SuperView
         private void OnSceneObjectUpdated(SceneObjectUpdateEvent e)
         {
             _animationMetaPreviewVisibilityOverride = null;
-            _combatEditSession.ResetDocument(PersistentMetaEditor);
-            _combatEditSession.ResetDocument(MetaEditor);
-            PersistentMetaEditor.LoadFile(e.Owner.PersistMetaData);
-            MetaEditor.LoadFile(e.Owner.MetaData);
+            if (e.MetaDataChanged)
+            {
+                _combatEditSession.ResetDocument(PersistentMetaEditor);
+                _combatEditSession.ResetDocument(MetaEditor);
+                PersistentMetaEditor.LoadFile(e.Owner.PersistMetaData);
+                MetaEditor.LoadFile(e.Owner.MetaData);
+            }
 
             RecreateMetaDataInformation();
             UpdateCombatEditTarget();
@@ -1192,6 +1200,25 @@ namespace Editors.AnimationMeta.SuperView
 
             // Disable selection on all nodes - SuperView is read-only visualization
             DisableSelectionOnAllNodes();
+        }
+
+        public void PreviewAnimation(AnimationFile animation, AnimationFile skeleton, string animationPath, PackFile? metadata, PackFile? persistentMetadata = null)
+        {
+            _asset.Data.SkeletonName.Value = $"animations\\skeletons\\{skeleton.Header.SkeletonName}.anim";
+            _asset.Data.Skeleton = new GameSkeleton(skeleton, _asset.Data.Player);
+            _asset.Data.SkeletonSceneNode.Skeleton = _asset.Data.Skeleton;
+            _asset.Data.TriggerSkeletonChanged();
+            _sceneObjectBuilder.SetAnimationClip(_asset.Data, new AnimationClip(animation, _asset.Data.Skeleton), animationPath);
+            _asset.FragAndSlotSelection.AnimationFileName = animationPath;
+            string? ResourcePath(PackFile? file) => file == null ? null
+                : _packFileService.GetPackFileContainer(file) == null ? file.Name : _packFileService.GetFullPath(file);
+            _asset.FragAndSlotSelection.MetaDataName = ResourcePath(metadata);
+            _asset.FragAndSlotSelection.MetaDataPersistName = ResourcePath(persistentMetadata);
+            _sceneObjectBuilder.SetMetaFile(_asset.Data, metadata, persistentMetadata);
+            _asset.Data.ShowSkeleton.Value = true;
+            Player.IsEnabled.Value = true;
+            DisableSelectionOnAllNodes();
+            FocusService.FocusSelection();
         }
 
 

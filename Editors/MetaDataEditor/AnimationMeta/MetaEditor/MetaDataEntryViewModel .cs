@@ -130,7 +130,7 @@ namespace Editors.AnimationMeta.Presentation
                 if (LocalizationManager.Instance != null)
                 {
                     var key = $"MetaData.Prop.{propertyName}";
-                    var localized = LocalizationManager.Instance.Get(key);
+                    var localized = LocalizationManager.Instance.GetOrDefault(key, key);
                     if (localized != key)
                         return localized;
                 }
@@ -162,7 +162,7 @@ namespace Editors.AnimationMeta.Presentation
             {
                 if (LocalizationManager.Instance != null)
                 {
-                    var localized = LocalizationManager.Instance.Get(key);
+                    var localized = LocalizationManager.Instance.GetOrDefault(key, key);
                     if (localized != key)
                         return localized;
                 }
@@ -184,7 +184,7 @@ namespace Editors.AnimationMeta.Presentation
                 if (LocalizationManager.Instance != null)
                 {
                     var key = $"MetaData.PropTip.{propertyName}";
-                    var localized = LocalizationManager.Instance.Get(key);
+                    var localized = LocalizationManager.Instance.GetOrDefault(key, key);
                     if (localized != key)
                         return localized;
                 }

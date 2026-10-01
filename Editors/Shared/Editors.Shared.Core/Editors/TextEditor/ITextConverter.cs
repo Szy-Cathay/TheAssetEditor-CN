@@ -1,5 +1,6 @@
 ﻿using System.Xml.Serialization;
 using Shared.Core.PackFiles;
+using Shared.Core.Services;
 
 namespace Shared.Ui.Editors.TextEditor
 {
@@ -46,7 +47,7 @@ namespace Shared.Ui.Editors.TextEditor
             var item = new XmlDeserializationEvents();
             item.OnUnknownElement = (x, e) => Error = new ITextConverter.SaveError()
             {
-                Text = "Unsuported xml element : " + e.Element.LocalName + $" at line {e.LineNumber} and position {e.LinePosition}",
+                Text = LocalizationManager.Instance.GetFormat("TextEditor.Xml.UnknownElement", e.Element.LocalName, e.LineNumber, e.LinePosition),
                 ErrorLineNumber = e.LineNumber,
                 ErrorPosition = e.LinePosition - e.Element.LocalName.Length,
                 ErrorLength = e.Element.LocalName.Length
@@ -54,7 +55,7 @@ namespace Shared.Ui.Editors.TextEditor
 
             item.OnUnknownAttribute = (x, e) => Error = new ITextConverter.SaveError()
             {
-                Text = "Unsuported xml attribute : " + e.Attr.LocalName + $" at line {e.LineNumber} and position {e.LinePosition}",
+                Text = LocalizationManager.Instance.GetFormat("TextEditor.Xml.UnknownAttribute", e.Attr.LocalName, e.LineNumber, e.LinePosition),
                 ErrorLineNumber = e.LineNumber,
                 ErrorPosition = e.LinePosition - e.Attr.LocalName.Length,
                 ErrorLength = e.Attr.LocalName.Length
@@ -62,7 +63,7 @@ namespace Shared.Ui.Editors.TextEditor
 
             item.OnUnknownNode = (x, e) => Error = new ITextConverter.SaveError()
             {
-                Text = "Unsuported xml node : " + e.LocalName + $" at line {e.LineNumber} and position {e.LinePosition}",
+                Text = LocalizationManager.Instance.GetFormat("TextEditor.Xml.UnknownNode", e.LocalName, e.LineNumber, e.LinePosition),
                 ErrorLineNumber = e.LineNumber,
                 ErrorPosition = e.LinePosition - e.LocalName.Length,
                 ErrorLength = e.LocalName.Length

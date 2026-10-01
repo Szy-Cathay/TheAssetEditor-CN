@@ -9,9 +9,14 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
         public bool IsUnknownFile { get; set; } = true;
         public NotifyAttr<bool> IsChanged { get; set; } = new NotifyAttr<bool>(false);
 
-        byte[] _data;
+        ReadOnlyMemory<byte> _data;
+        public ReadOnlyMemory<byte> RawData => _data;
 
         public UnknownAnimFile(string fileName, byte[] data)
+            : this(fileName, (ReadOnlyMemory<byte>)data)
+        { }
+
+        public UnknownAnimFile(string fileName, ReadOnlyMemory<byte> data)
         {
             FileName = fileName;
             _data = data;
@@ -24,7 +29,7 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
 
         public byte[] ToByteArray()
         {
-            return _data;
+            return _data.ToArray();
         }
     }
 }

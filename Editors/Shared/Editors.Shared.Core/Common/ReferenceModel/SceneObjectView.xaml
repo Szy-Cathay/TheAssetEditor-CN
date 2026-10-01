@@ -30,7 +30,7 @@
 
         <Grid Margin="22,4,8,6">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -48,38 +48,44 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Label
-                Grid.Row="0"
-                Grid.Column="0"
-                Content="{loc:Loc SceneObject.Mesh}"
-                Style="{StaticResource AeForm.Label}" />
-            <TextBox
-                Grid.Row="0"
-                Grid.Column="1"
-                Margin="0,2,0,2"
-                IsReadOnly="True"
-                Text="{Binding Data.MeshName.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
-            <Button
-                Grid.Row="0"
-                Grid.Column="2"
-                Margin="4,2,0,2"
-                Content="{loc:Loc General.Browse}"
-                Click="{s:MethodBinding BrowseMesh}" />
-            <ToggleButton
-                Grid.Row="0"
-                Grid.Column="3"
-                Margin="4,2,0,2"
-                AutomationProperties.Name="{loc:Loc General.ToggleVisibility}"
-                IsChecked="{Binding Data.ShowMesh.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                Style="{StaticResource AeButton.VisibilityToggle}"
-                ToolTip="{loc:Loc General.ToggleVisibility}" />
-            <Button
-                Grid.Row="0"
-                Grid.Column="4"
-                Margin="2"
-                Content="{loc:Loc SceneObject.RemoveMesh}"
-                Click="{s:MethodBinding RemoveMesh}"
-                Style="{StaticResource AeButton.Icon}" />
+            <Grid Grid.Row="0" Grid.ColumnSpan="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Label
+                    Content="{loc:Loc SceneObject.Mesh}"
+                    Style="{StaticResource AeForm.Label}" />
+                <TextBox
+                    Grid.Column="1"
+                    Margin="0,2,0,2"
+                    IsReadOnly="True"
+                    ToolTip="{Binding Data.MeshName.Value}"
+                    Text="{Binding Data.MeshName.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
+                <Button
+                    Grid.Column="2"
+                    Margin="4,2,0,2"
+                    Content="{loc:Loc General.Browse}"
+                    Click="{s:MethodBinding BrowseMesh}" />
+                <ToggleButton
+                    Grid.Column="3"
+                    Margin="4,2,0,2"
+                    AutomationProperties.Name="{loc:Loc General.ToggleVisibility}"
+                    IsChecked="{Binding Data.ShowMesh.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                    Style="{StaticResource AeButton.VisibilityToggle}"
+                    ToolTip="{loc:Loc General.ToggleVisibility}" />
+                <Button
+                    Grid.Column="4"
+                    Margin="2"
+                    Content="{loc:Loc SceneObject.RemoveMesh}"
+                    AutomationProperties.Name="{loc:Loc SceneObject.RemoveMesh.ToolTip}"
+                    ToolTip="{loc:Loc SceneObject.RemoveMesh.ToolTip}"
+                    Click="{s:MethodBinding RemoveMesh}"
+                    Style="{StaticResource AeButton.Icon}" />
+            </Grid>
 
             <Label
                 Grid.Row="1"
@@ -101,6 +107,7 @@
                         BorderThickness="0"
                         IsHitTestVisible="False"
                         IsReadOnly="True"
+                        ToolTip="{Binding Data.SkeletonName.Value}"
                         Text="{Binding Data.SkeletonName.Value, UpdateSourceTrigger=PropertyChanged}" />
                 </Expander.Header>
                 <TreeView
@@ -211,6 +218,7 @@
                 Grid.ColumnSpan="3"
                 Margin="0,2,0,2"
                 IsReadOnly="True"
+                ToolTip="{Binding FragAndSlotSelection.AnimationFileName}"
                 Text="{Binding FragAndSlotSelection.AnimationFileName, UpdateSourceTrigger=PropertyChanged}"
                 Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
             <Button
@@ -233,6 +241,7 @@
                 Grid.ColumnSpan="4"
                 Margin="0,2,0,2"
                 IsReadOnly="True"
+                ToolTip="{Binding FragAndSlotSelection.MetaDataName}"
                 Text="{Binding FragAndSlotSelection.MetaDataName, UpdateSourceTrigger=PropertyChanged}"
                 Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
 
@@ -248,6 +257,7 @@
                 Grid.ColumnSpan="4"
                 Margin="0,2,0,2"
                 IsReadOnly="True"
+                ToolTip="{Binding FragAndSlotSelection.MetaDataPersistName}"
                 Text="{Binding FragAndSlotSelection.MetaDataPersistName, UpdateSourceTrigger=PropertyChanged}"
                 Visibility="{Binding ShowAnimationControls, Converter={StaticResource BoolToCollapsedConverter}}" />
         </Grid>

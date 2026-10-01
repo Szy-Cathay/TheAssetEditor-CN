@@ -8,6 +8,7 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:local="clr-namespace:CommonControls.Editors.AnimationPack"
              xmlns:converters="clr-namespace:Editors.AnimationFragmentEditor.AnimationPack.Converters"
+             xmlns:campaign="clr-namespace:Editors.AnimationFragmentEditor.CampaignAnimBin"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
              d:DesignHeight="720" d:DesignWidth="1180"
@@ -23,6 +24,7 @@
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+            <converters:ResourceNameConverter x:Key="ResourceName" />
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -32,16 +34,20 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="0.3*" MinWidth="180" />
+            <ColumnDefinition>
+                <ColumnDefinition.Style><Style TargetType="ColumnDefinition"><Setter Property="Width" Value="0.32*"/><Setter Property="MinWidth" Value="200"/><Style.Triggers><DataTrigger Binding="{Binding IsStandaloneCampaign}" Value="True"><Setter Property="Width" Value="0"/><Setter Property="MinWidth" Value="0"/></DataTrigger></Style.Triggers></Style></ColumnDefinition.Style>
+            </ColumnDefinition>
             <ColumnDefinition Width="5" />
             <ColumnDefinition Width="*" MinWidth="320" />
         </Grid.ColumnDefinitions>
 
         <Menu Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">
             <MenuItem Header="{loc:Loc AnimPack.FileMenu}">
-                <MenuItem Header="{loc:Loc AnimPack.SavePack}" Command="{Binding SaveActionCommand}" />
+                <MenuItem Header="{Binding SaveTitle}" Command="{Binding SaveActionCommand}" />
                 <Separator />
                 <MenuItem Header="{loc:Loc AnimPack.NewAnimSetWh3}" Command="{Binding CreateEmptyWarhammer3AnimSetFileActionCommand}" />
+                <MenuItem Header="{loc:Loc AnimPack.Campaign.CreateTitle}" Command="{Binding CreateCampaignFileCommand}" />
+                <MenuItem Header="{loc:Loc AnimPack.CloneTitle}" Command="{Binding CloneSelectedFileCommand}" />
                 <Separator />
                 <MenuItem Header="{loc:Loc AnimPack.ExportAnimSlotsWh3}" Command="{Binding ExportAnimationSlotsWh3ActionCommand}" />
                 <MenuItem Header="{loc:Loc AnimPack.ExportAnimSlotsWh2}" Command="{Binding ExportAnimationSlotsWh2ActionCommand}" />
@@ -52,17 +58,19 @@
                           IsChecked="{Binding IsTableView, Mode=OneWay}"
                           Command="{Binding ToggleViewModeCommand}" />
             </MenuItem>
+            <MenuItem Header="{Binding SaveTitle}" Command="{Binding SaveActionCommand}" ToolTip="{loc:Loc AnimPack.SaveAutoApplyTip}"/>
         </Menu>
 
-        <Grid Grid.Row="1" Grid.Column="0" Margin="8">
+        <Grid Grid.Row="1" Grid.Column="0" Margin="8" Visibility="{Binding IsStandaloneCampaign, Converter={StaticResource InverseBoolToVis}}">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid>
+            <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -87,7 +95,7 @@
                           IsChecked="{Binding UseRegexFilter}" />
             </Grid>
 
-            <Border Grid.Row="1"
+            <Border Grid.Row="2"
                     Margin="0,6,0,0"
                     Style="{StaticResource AeFeedback.Notice}"
                     Visibility="{Binding IsFileFilterInvalid, Converter={StaticResource BoolToVis}}">
@@ -103,15 +111,15 @@
                 </DockPanel>
             </Border>
 
-            <TextBlock Grid.Row="2"
-                       Margin="2,6,2,4"
-                       Foreground="{DynamicResource AeBrush.TextMuted}"
-                       Style="{StaticResource AeText.Caption}"
-                       Text="{Binding FilterSummary}" />
+            <StackPanel Grid.Row="3" Margin="2,6,2,4">
+                <TextBlock Foreground="{DynamicResource AeBrush.TextMuted}" Style="{StaticResource AeText.Caption}" Text="{Binding FilterSummary}"/>
+                <CheckBox Content="{loc:Loc AnimPack.OnlyEditable}" IsChecked="{Binding OnlyEditableFiles}" Margin="0,4,0,0"/>
+            </StackPanel>
 
-            <Grid Grid.Row="3" MinHeight="0">
+            <Grid Grid.Row="4" MinHeight="0">
                 <ListView ItemsSource="{Binding AnimationPackItems.Values}"
-                          SelectedItem="{Binding AnimationPackItems.SelectedItem, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                          SelectedItem="{Binding AnimationPackItems.SelectedItem, Mode=OneWay}"
+                          SelectionChanged="FileSelectionChanged"
                           Style="{StaticResource AeList.View}">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem" BasedOn="{StaticResource AeList.Item}">
@@ -147,7 +155,7 @@
                                                             Visibility="{Binding IsUnknownFile, Converter={StaticResource BoolToVis}}" />
                                 <TextBlock Grid.Column="2"
                                            Margin="4,0,0,0"
-                                           Text="{Binding FileName}"
+                                           Text="{Binding FileName, Converter={StaticResource ResourceName}}"
                                            TextTrimming="CharacterEllipsis" />
                             </Grid>
                         </DataTemplate>
@@ -164,12 +172,26 @@
                     </StackPanel>
                 </Border>
             </Grid>
+            <Expander Grid.Row="0" Header="{loc:Loc AnimPack.CreateFileTitle}" Margin="0,0,0,8" Visibility="{Binding IsStandaloneCampaign, Converter={StaticResource InverseBoolToVis}}">
+                <StackPanel Margin="0,8,0,0">
+                    <TextBlock Text="{loc:Loc AnimPack.NewFormatLabel}" Margin="0,0,0,4"/>
+                    <ComboBox ItemsSource="{Binding NewFormats}" SelectedItem="{Binding NewFormat}" DisplayMemberPath="Label"/>
+                    <TextBlock Text="{loc:Loc AnimPack.Table.Skeleton}" Margin="0,8,0,4"/>
+                    <ComboBox IsEditable="True" ItemsSource="{Binding AvailableSkeletons}" Text="{Binding NewSkeletonName, UpdateSourceTrigger=LostFocus}"/>
+                    <TextBlock Text="{loc:Loc AnimPack.TemplateLabel}" Margin="0,8,0,4"/>
+                    <ComboBox ItemsSource="{Binding TemplateFiles}" SelectedItem="{Binding NewTemplate}">
+                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding FileName, Converter={StaticResource ResourceName}}" ToolTip="{Binding FileName}"/></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Command="{Binding CreateAnimationSetCommand}" Content="{loc:Loc General.New}" Style="{StaticResource AeButton.Primary}" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Expander>
         </Grid>
 
         <GridSplitter Grid.Row="1" Grid.Column="1"
-                      Style="{StaticResource AeVerticalGridSplitterStyle}" />
+                      Style="{StaticResource AeVerticalGridSplitterStyle}" Visibility="{Binding IsStandaloneCampaign, Converter={StaticResource InverseBoolToVis}}" />
 
-        <Grid Grid.Row="1" Grid.Column="2" Margin="8">
+        <ScrollViewer x:Name="EditorScrollViewer" Grid.Row="1" Grid.Column="2" Margin="8" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Grid MinWidth="450" MinHeight="650" Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -200,7 +222,8 @@
 
             <Grid Grid.Row="1" MinHeight="0">
                 <local:AnimSetTableEditorView DataContext="{Binding TableEditorVM}"
-                                              Visibility="{Binding DataContext.IsTableView, RelativeSource={RelativeSource AncestorType={x:Type local:AnimationPackView}}, Converter={StaticResource BoolToVis}}" />
+                                              Visibility="{Binding DataContext.ShowBattleTable, RelativeSource={RelativeSource AncestorType={x:Type local:AnimationPackView}}, Converter={StaticResource BoolToVis}}" />
+                <campaign:CampaignTableEditorView DataContext="{Binding CampaignEditorVM}" Visibility="{Binding DataContext.ShowCampaignTable, RelativeSource={RelativeSource AncestorType={x:Type local:AnimationPackView}}, Converter={StaticResource BoolToVis}}"/>
                 <texteditor:TextEditorView DataContext="{Binding SelectedItemViewModel}"
                                            Visibility="{Binding DataContext.IsTableView, RelativeSource={RelativeSource AncestorType={x:Type local:AnimationPackView}}, Converter={StaticResource InverseBoolToVis}}" />
 
@@ -225,5 +248,6 @@
                 </Border>
             </Grid>
         </Grid>
+        </ScrollViewer>
     </Grid>
 </UserControl>

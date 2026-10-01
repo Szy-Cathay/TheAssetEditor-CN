@@ -27,10 +27,26 @@
             <ListView.View>
                 <GridView>
                     
-                    <GridViewColumn DisplayMemberBinding="{Binding Path=ErrorType}">
+                    <GridViewColumn>
                         <GridViewColumn.Header>
                             <GridViewColumnHeader Content="{loc:Loc Shared.ErrorList.ColumnHeader.Error}" Padding="5,0,0,0" Width="auto" HorizontalContentAlignment="Left" Name="ErrorType"/>
                         </GridViewColumn.Header>
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding ErrorType}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ErrorType}" Value="Error"><Setter Property="Text" Value="{loc:Loc General.Error}" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding ErrorType}" Value="Warning"><Setter Property="Text" Value="{loc:Loc General.Warning}" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding ErrorType}" Value="Ok"><Setter Property="Text" Value="{loc:Loc Shared.ErrorList.Level.Ok}" /></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
                     </GridViewColumn>
 
                     <GridViewColumn DisplayMemberBinding="{Binding Path=ItemName}">

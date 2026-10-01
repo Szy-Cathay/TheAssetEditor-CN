@@ -11,7 +11,7 @@ using Shared.Ui.Editors.TextEditor;
 
 namespace Editors.AnimationFragmentEditor.CampaignAnimBin
 {
-    class CampaignAnimBinToXmlConverter : ITextConverter
+    public class CampaignAnimBinToXmlConverter : ITextConverter
     {
         public string GetText(byte[] bytes)
         {
@@ -48,14 +48,20 @@ namespace Editors.AnimationFragmentEditor.CampaignAnimBin
                 var typedObject = obj as CampaignAnimationBin;
                 var fileName = Path.GetFileNameWithoutExtension(filePath);
 
-                var bytes = CampaignAnimationBinLoader.Write(typedObject, fileName);
-
-                Validator.ValidateAnimationData(typedObject, pfs, filePath);
                 if (errorHandler.Error != null)
                 {
                     error = errorHandler.Error;
                     return null;
                 }
+                if (typedObject == null)
+                    throw new InvalidDataException(LocalizationManager.Instance.Get("AnimPack.Campaign.InvalidXml"));
+                var report = Validator.Check(typedObject, pfs, filePath);
+                if (report.Errors.Any(item => item.IsError))
+                {
+                    error = new ITextConverter.SaveError { Text = string.Join(Environment.NewLine, report.Errors.Where(item => item.IsError).Select(item => item.Description)) };
+                    return null;
+                }
+                var bytes = CampaignAnimationBinLoader.Write(typedObject, fileName);
                 error = null;
                 return bytes;
 

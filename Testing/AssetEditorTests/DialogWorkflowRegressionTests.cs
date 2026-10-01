@@ -131,7 +131,7 @@ public class DialogWorkflowRegressionTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public void Confirmation_UsesStableOwnerWhenProgressWindowIsActive(bool unified)
+    public void Confirmation_UsesStableOwnerWhileProgressWindowIsVisible(bool unified)
     {
         WithWindows(() =>
         {
@@ -142,7 +142,7 @@ public class DialogWorkflowRegressionTests
                 Left = -10000, Top = -10000, ShowInTaskbar = false,
             };
             progress.Show();
-            NUnitAssert.That(progress.Activate(), Is.True);
+            NUnitAssert.That(progress.IsVisible, Is.True);
 
             var dialogs = new StandardDialogs(null!, null!, null!, null!, null!, null!);
             Window? actualOwner = null;

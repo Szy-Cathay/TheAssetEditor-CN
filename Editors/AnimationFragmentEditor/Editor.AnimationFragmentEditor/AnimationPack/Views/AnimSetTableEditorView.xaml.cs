@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,6 +14,12 @@ namespace CommonControls.Editors.AnimationPack
         private DispatcherTimer? _filterTimer;
         private ComboBox? _filterTarget;
         private bool _skipNextFilter; // Skip filter after ComboBox selection
+        private int _validationErrors;
+        private void Input_ValidationError(object sender, ValidationErrorEventArgs e)
+        {
+            _validationErrors = Math.Max(0, _validationErrors + (e.Action == ValidationErrorEventAction.Added ? 1 : -1));
+            if (DataContext is AnimSetTableEditorViewModel vm) vm.HasInvalidFields = _validationErrors > 0;
+        }
 
         public AnimSetTableEditorView()
         {
@@ -35,6 +41,12 @@ namespace CommonControls.Editors.AnimationPack
         {
             if (DataContext is AnimSetTableEditorViewModel vm)
                 vm.MultiSelectedRows = MainDataGrid.SelectedItems;
+            if (!MainDataGrid.IsKeyboardFocusWithin && MainDataGrid.SelectedItem is { } selected)
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (MainDataGrid.SelectedItem == selected && MainDataGrid.Items.Contains(selected))
+                        MainDataGrid.ScrollIntoView(selected);
+                }, DispatcherPriority.Loaded);
         }
 
         // Save snapshot before cell editing starts, so Ctrl+Z can undo cell changes

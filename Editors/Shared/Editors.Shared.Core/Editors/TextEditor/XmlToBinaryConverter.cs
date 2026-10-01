@@ -72,7 +72,13 @@ namespace Editors.Shared.Core.Editors.TextEditor
             {
                 var inner = ExceptionHelper.GetInnerMostException(e);
                 if (inner is XmlException xmlException)
-                    error = new ITextConverter.SaveError() { Text = xmlException.Message, ErrorLineNumber = xmlException.LineNumber, ErrorPosition = xmlException.LinePosition, ErrorLength = 0 };
+                    error = new ITextConverter.SaveError()
+                    {
+                        Text = LocalizationManager.Instance.GetFormat("TextEditor.Xml.InvalidSyntax", xmlException.LineNumber, xmlException.LinePosition),
+                        ErrorLineNumber = xmlException.LineNumber,
+                        ErrorPosition = Math.Max(0, xmlException.LinePosition - 1),
+                        ErrorLength = 0
+                    };
                 else
                     throw;
   

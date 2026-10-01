@@ -9,6 +9,8 @@
              xmlns:inspection="clr-namespace:Editors.AnimationMeta.SuperView.Inspection"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
+             MinHeight="480"
+             Height="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}"
              d:DesignHeight="450"
              d:DesignWidth="800">
     <Grid MinHeight="0">

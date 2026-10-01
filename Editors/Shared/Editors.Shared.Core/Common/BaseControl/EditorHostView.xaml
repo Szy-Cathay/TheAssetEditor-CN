@@ -27,7 +27,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{Binding LeftColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="{Binding RightColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <ColumnDefinition MinWidth="320" Width="{Binding RightColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid.ColumnDefinitions>
 
         <Grid.RowDefinitions>

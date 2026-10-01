@@ -129,7 +129,7 @@ public class UiAnimationMetadataFamilyTests
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(table, Does.Contain("CanUserResizeColumns=\"True\""));
-            NUnitAssert.That(table, Does.Contain("ColumnWidth=\"Auto\""));
+            NUnitAssert.That(table, Does.Contain("ColumnWidth=\"*\""));
             NUnitAssert.That(
                 table,
                 Does.Contain(
@@ -142,7 +142,9 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(table, Does.Contain("AnimPack.Table.BlendIn"));
             NUnitAssert.That(table, Does.Contain("AnimPack.Table.Weight"));
             NUnitAssert.That(table, Does.Contain("AnimPack.Table.WeaponBone"));
-            NUnitAssert.That(table, Does.Contain("AnimPack.Table.Unk"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.SingleFrame"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.SlotParameters"));
+            NUnitAssert.That(table, Does.Contain("AnimPack.SharedSlotHelp"));
             NUnitAssert.That(table, Does.Contain("materialIcons:MaterialIcon"));
             NUnitAssert.That(table, Does.Not.Contain("&#x25B2;"));
             NUnitAssert.That(table, Does.Not.Contain("&#x25BC;"));
@@ -717,7 +719,7 @@ public class UiAnimationMetadataFamilyTests
                     "VerticalScrollBarVisibility=\"{Binding EditorContentVerticalScrollBarVisibility}\""));
             NUnitAssert.That(
                 superViewViewModel,
-                Does.Contain("ScrollBarVisibility.Disabled"));
+                Does.Contain("ScrollBarVisibility.Auto"));
             NUnitAssert.That(
                 attributeView,
                 Does.Contain("HorizontalAlignment=\"Left\""));

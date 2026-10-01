@@ -25,6 +25,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinC
                 var entry = new BinEntry();
                 entry.Name = item.Name;
                 entry.Fragments = string.Join(", ", item.FragmentReferences.Select(x => x.Name));
+                entry.FragmentParameters = item.FragmentReferences.Select(r => new FragmentParameter { Name = r.Name, Value = r.Unknown }).ToList();
                 entry.Skeleton = new Skeleton() { Value = item.SkeletonName };
                 entry.MountSkeleton = new MountSkeleton() { Value = item.MountName };
                 entry.Unknown = new Unknown() { Value = item.Unknown };
@@ -44,12 +45,14 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.Converters.AnimationBinC
                     Unknown = item.Unknown.Value
                 };
 
-                var refs = item.Fragments.Split(",");
+                var refs = (item.Fragments ?? "").Split(",");
+                var parameters = (item.FragmentParameters ?? []).GroupBy(p => p.Name).ToDictionary(g => g.Key, g => new Queue<int>(g.Select(p => p.Value)));
                 foreach (var refInstance in refs)
                 {
                     var str = refInstance.Trim();
                     if (string.IsNullOrEmpty(str) == false)
-                        entry.FragmentReferences.Add(new AnimationBinEntry.FragmentReference() { Name = str, Unknown = 0 });
+                        entry.FragmentReferences.Add(new AnimationBinEntry.FragmentReference() { Name = str,
+                            Unknown = parameters.TryGetValue(str, out var values) && values.Count > 0 ? values.Dequeue() : 0 });
                 }
 
                 output.AnimationTableEntries.Add(entry);

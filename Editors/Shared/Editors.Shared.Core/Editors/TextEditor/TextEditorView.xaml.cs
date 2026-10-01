@@ -100,8 +100,10 @@ namespace CommonControls.Editors.TextEditor
 
         public void HightLightText(int lineNumber, int offset, int length)
         {
+            lineNumber = Math.Clamp(lineNumber, 1, textEditor.Document.LineCount);
             var line = textEditor.Document.GetLineByNumber(lineNumber);
-            textEditor.Select(line.Offset + offset, length);
+            var start = line.Offset + Math.Clamp(offset, 0, line.Length);
+            textEditor.Select(start, Math.Clamp(length, 0, textEditor.Document.TextLength - start));
             textEditor.ScrollTo(lineNumber, 0);
         }
 

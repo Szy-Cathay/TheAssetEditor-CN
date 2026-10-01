@@ -638,7 +638,7 @@ namespace GameWorld.Core.WpfWindow
             Source = null;
             _presentationQuery?.Dispose();
             _presentationQuery = null;
-            _presentationContext?.Dispose();
+            // The immediate context is owned by the shared graphics device.
             _presentationContext = null;
 
             if (_d3D11Image != null)

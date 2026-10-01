@@ -37,6 +37,10 @@ namespace Shared.GameFormats.AnimationPack
     {
         static IAnimFileSerializer DeterminePossibleSerializers(string fullPath)
         {
+            fullPath = fullPath.Replace('\\', '/');
+            if (fullPath.Contains("animations/campaign/database/", StringComparison.OrdinalIgnoreCase)
+                && fullPath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                return new CampaignAnimationFileSerializer();
             if (fullPath.Contains("animations/database/battle/bin/", StringComparison.InvariantCultureIgnoreCase))
             {
                 if (fullPath.Contains("matched_combat", StringComparison.InvariantCultureIgnoreCase))
@@ -93,14 +97,14 @@ namespace Shared.GameFormats.AnimationPack
 
             foreach (var item in animPack.Files)
             {
-                var itemByteArray = item.ToByteArray();
+                ReadOnlyMemory<byte> itemByteArray = item is UnknownAnimFile unknown ? unknown.RawData : item.ToByteArray();
                 var file = new AnimationEntryMetaData()
                 {
                     Name = item.FileName,
                     Size = itemByteArray.Length
                 };
                 memStream.Write(file.ToByteArray());
-                memStream.Write(itemByteArray);
+                memStream.Write(itemByteArray.Span);
             }
 
             return memStream.ToArray();
@@ -116,19 +120,21 @@ namespace Shared.GameFormats.AnimationPack
             {
                 return new UnknownAnimFile(
                     animationInfoDataFile.Name,
-                    data.GetBytesFromBuffer(
-                        animationInfoDataFile.StartOffset,
-                        animationInfoDataFile.Size));
+                    data.Buffer.AsMemory(animationInfoDataFile.StartOffset, animationInfoDataFile.Size));
             }
         }
 
         static List<AnimationEntryMetaData> FindAllSubFiles(ByteChunk data)
         {
             var toalFileCount = data.ReadInt32();
+            if (toalFileCount < 0 || toalFileCount > data.BytesLeft / 6)
+                throw new InvalidDataException("动作包的文件数量超出实际数据范围。");
             var fileList = new List<AnimationEntryMetaData>(toalFileCount);
             for (var i = 0; i < toalFileCount; i++)
             {
                 var file = new AnimationEntryMetaData(data);
+                if (file.Size < 0 || file.Size > data.BytesLeft)
+                    throw new InvalidDataException("动作包内的文件长度超出实际数据范围。");
                 fileList.Add(file);
                 data.Index += file.Size;
             }
@@ -143,7 +149,12 @@ namespace Shared.GameFormats.AnimationPack
 
     public class UnknownAnimFileSerializer : IAnimFileSerializer
     {
-        public IAnimationPackFile Load(AnimationEntryMetaData info, ByteChunk data, GameTypeEnum preferedGam) => new UnknownAnimFile(info.Name, data.GetBytesFromBuffer(info.StartOffset, info.Size));
+        public IAnimationPackFile Load(AnimationEntryMetaData info, ByteChunk data, GameTypeEnum preferedGam) => new UnknownAnimFile(info.Name, data.Buffer.AsMemory(info.StartOffset, info.Size));
+    }
+
+    public class CampaignAnimationFileSerializer : IAnimFileSerializer
+    {
+        public IAnimationPackFile Load(AnimationEntryMetaData info, ByteChunk data, GameTypeEnum preferedGame) => new CampaignAnimationPackFile(info.Name, data.GetBytesFromBuffer(info.StartOffset, info.Size));
     }
 
     public class AnimationSetFileSerializer : IAnimFileSerializer

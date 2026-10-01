@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -44,6 +44,8 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         private string _name = string.Empty;
         private string _skeletonName = string.Empty;
         private string _mountBin = string.Empty;
+        private string _unmountBin = string.Empty;
+        private List<string> _fragmentSkeletons = new();
         private string _locomotionGraph = string.Empty;
         private uint _tableVersion = 4;
         private uint _tableSubVersion = 3;
@@ -55,6 +57,9 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         // State
         private bool _isWh3 = true;
         private bool _isDirty;
+        private bool _hasInvalidFields;
+        public bool HasInvalidFields { get => _hasInvalidFields; set { SetAndNotifyWhenChanged(ref _hasInvalidFields, value); if (value) MarkDirty(); } }
+        private string _savedXml = string.Empty;
         private AnimationEntryRowViewModel? _selectedRow;
         private IList _multiSelectedRows = new List<AnimationEntryRowViewModel>();
         private ITextConverter? _activeConverter;
@@ -64,22 +69,27 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
         // Undo system - snapshot based (includes header metadata)
         private readonly Stack<TableSnapshot> _undoSnapshots = new();
+        private readonly Stack<TableSnapshot> _redoSnapshots = new();
         private const int MaxUndoDepth = 50;
 
         private record TableSnapshot(
             List<AnimationEntryRowViewModel> Rows,
-            string Name, string SkeletonName, string MountBin, string LocomotionGraph,
+            string Name, string SkeletonName, string MountBin, string UnmountBin, string LocomotionGraph,
             uint TableVersion, uint TableSubVersion, short UnknownValue1,
-            string Skeleton, bool IsWh3, bool IsDirty);
+            string Skeleton, List<string> FragmentSkeletons, bool IsWh3, bool IsDirty);
 
         private TableSnapshot CaptureSnapshot() => new(
             Rows.Select(r => r.Clone()).ToList(),
-            Name, SkeletonName, MountBin, LocomotionGraph,
+            Name, SkeletonName, MountBin, UnmountBin, LocomotionGraph,
             TableVersion, TableSubVersion, UnknownValue1,
-            Skeleton, IsWh3, IsDirty);
+            Skeleton, _fragmentSkeletons.ToList(), IsWh3, IsDirty);
 
         public void SaveSnapshot()
         {
+            _redoSnapshots.Clear();
+            RedoCommand.NotifyCanExecuteChanged();
+            if (_undoSnapshots.Count > 0 && SnapshotEquals(_undoSnapshots.Peek(), CaptureSnapshot()))
+                return;
             _undoSnapshots.Push(CaptureSnapshot());
             if (_undoSnapshots.Count > MaxUndoDepth)
             {
@@ -113,11 +123,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             return left.Name == right.Name &&
                 left.SkeletonName == right.SkeletonName &&
                 left.MountBin == right.MountBin &&
+                left.UnmountBin == right.UnmountBin &&
                 left.LocomotionGraph == right.LocomotionGraph &&
                 left.TableVersion == right.TableVersion &&
                 left.TableSubVersion == right.TableSubVersion &&
                 left.UnknownValue1 == right.UnknownValue1 &&
                 left.Skeleton == right.Skeleton &&
+                left.FragmentSkeletons.SequenceEqual(right.FragmentSkeletons) &&
                 left.IsWh3 == right.IsWh3 &&
                 left.IsDirty == right.IsDirty &&
                 left.Rows.Count == right.Rows.Count &&
@@ -135,6 +147,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 left.SelectionWeight == right.SelectionWeight &&
                 left.Unk == right.Unk &&
                 left.VariantIndex == right.VariantIndex &&
+                left.SlotGroupId == right.SlotGroupId &&
+                left.HasReference == right.HasReference &&
+                left.FragmentUnknown == right.FragmentUnknown &&
+                left.FragmentRecordId == right.FragmentRecordId &&
+                left.FragmentSkeleton == right.FragmentSkeleton &&
+                left.Comment == right.Comment && left.Ignore == right.Ignore &&
                 left.GetWeaponBoneAsInt() == right.GetWeaponBoneAsInt();
         }
 
@@ -179,17 +197,74 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         public string Name { get => _name; set => SetAndMarkDirty(ref _name, value); }
         public string SkeletonName { get => _skeletonName; set => SetAndMarkDirty(ref _skeletonName, value); }
         public string MountBin { get => _mountBin; set => SetAndMarkDirty(ref _mountBin, value); }
+        public string UnmountBin { get => _unmountBin; set => SetAndMarkDirty(ref _unmountBin, value); }
         public string LocomotionGraph { get => _locomotionGraph; set => SetAndMarkDirty(ref _locomotionGraph, value); }
-        public uint TableVersion { get => _tableVersion; set => SetAndMarkDirty(ref _tableVersion, value); }
+        public uint TableVersion
+        {
+            get => _tableVersion;
+            set
+            {
+                SetAndMarkDirty(ref _tableVersion, value);
+                NotifyPropertyChanged(nameof(HasWh3Header));
+            }
+        }
         public uint TableSubVersion { get => _tableSubVersion; set => SetAndMarkDirty(ref _tableSubVersion, value); }
-        public short UnknownValue1 { get => _unknownValue1; set => SetAndMarkDirty(ref _unknownValue1, value); }
+        public short UnknownValue1
+        {
+            get => _unknownValue1;
+            set
+            {
+                SetAndMarkDirty(ref _unknownValue1, value);
+                NotifyPropertyChanged(nameof(SimpleFlight));
+                NotifyPropertyChanged(nameof(NewCavalryTechnology));
+            }
+        }
+        public bool SimpleFlight { get => (UnknownValue1 & 1) != 0; set => UnknownValue1 = (short)((UnknownValue1 & ~1) | (value ? 1 : 0)); }
+        public bool NewCavalryTechnology { get => (UnknownValue1 & 256) != 0; set => UnknownValue1 = (short)((UnknownValue1 & ~256) | (value ? 256 : 0)); }
 
         // Fragment header
-        public string Skeleton { get => _skeleton; set => SetAndMarkDirty(ref _skeleton, value); }
+        public string Skeleton
+        {
+            get => _skeleton;
+            set
+            {
+                var oldSkeleton = _skeleton;
+                SetAndMarkDirty(ref _skeleton, value);
+                if (!_suppressDirtyTracking && oldSkeleton != value)
+                {
+                    _suppressDirtyTracking = true;
+                    try
+                    {
+                        _fragmentSkeletons = _fragmentSkeletons.Select(s => s == oldSkeleton ? value : s).ToList();
+                        foreach (var row in Rows.Where(r => r.FragmentSkeleton == oldSkeleton))
+                            row.FragmentSkeleton = value;
+                    }
+                    finally { _suppressDirtyTracking = false; }
+                }
+            }
+        }
 
         // State
-        public bool IsWh3 { get => _isWh3; set => SetAndNotify(ref _isWh3, value); }
-        public bool IsDirty { get => _isDirty; set => SetAndNotifyWhenChanged(ref _isDirty, value); }
+        public bool IsWh3
+        {
+            get => _isWh3;
+            set
+            {
+                SetAndNotify(ref _isWh3, value);
+                NotifyPropertyChanged(nameof(HasWh3Header));
+            }
+        }
+        public bool HasWh3Header => IsWh3 && TableVersion == 4;
+        public bool IsDirty
+        {
+            get => _isDirty;
+            set
+            {
+                if (!value && _activeConverter != null)
+                    _savedXml = BuildXmlString();
+                SetAndNotifyWhenChanged(ref _isDirty, value);
+            }
+        }
         public string FeedbackMessage
         {
             get => _feedbackMessage;
@@ -240,7 +315,8 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         {
             if (EqualityComparer<T>.Default.Equals(field, value))
                 return;
-
+            if (!_suppressDirtyTracking)
+                SaveSnapshot();
             SetAndNotifyWhenChanged(ref field, value, propertyName: propertyName);
             MarkDirty();
         }
@@ -248,7 +324,10 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         private void MarkDirty()
         {
             if (!_suppressDirtyTracking)
+            {
                 IsDirty = true;
+                NotifyRowCommandStates();
+            }
         }
 
         private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -256,7 +335,10 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             if (e.Action == NotifyCollectionChangedAction.Reset)
             {
                 foreach (var row in _trackedRows)
+                {
+                    row.Editing -= Row_Editing;
                     row.PropertyChanged -= Row_PropertyChanged;
+                }
                 _trackedRows.Clear();
 
                 foreach (var row in Rows)
@@ -284,21 +366,67 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         private void TrackRow(AnimationEntryRowViewModel row)
         {
             if (_trackedRows.Add(row))
+            {
+                row.Editing += Row_Editing;
                 row.PropertyChanged += Row_PropertyChanged;
+            }
         }
 
         private void UntrackRow(AnimationEntryRowViewModel row)
         {
             if (_trackedRows.Remove(row))
+            {
+                row.Editing -= Row_Editing;
                 row.PropertyChanged -= Row_PropertyChanged;
+            }
         }
 
-        private void Row_PropertyChanged(object? sender, PropertyChangedEventArgs e) => MarkDirty();
+        private void Row_Editing(object? sender, EventArgs e)
+        {
+            if (!_suppressDirtyTracking)
+                SaveSnapshot();
+        }
+
+        private void Row_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_suppressDirtyTracking || sender is not AnimationEntryRowViewModel row)
+                return;
+            _suppressDirtyTracking = true;
+            try
+            {
+                if (e.PropertyName is nameof(AnimationEntryRowViewModel.AnimationFile) or nameof(AnimationEntryRowViewModel.MetaFile) or nameof(AnimationEntryRowViewModel.SoundFile))
+                    row.HasReference = true;
+                if (e.PropertyName == nameof(AnimationEntryRowViewModel.SlotName))
+                {
+                    var helper = IsWh3 ? (TableVersion == 4 ? AnimationSlotTypeHelperWh3.GetInstance() : AnimationSlotTypeHelper3k.GetInstance())
+                        : (_gameType == GameTypeEnum.Troy ? AnimationSlotTypeHelperTroy.GetInstance() : DefaultAnimationSlotTypeHelper.GetInstance());
+                    row.SlotIndex = helper.GetfromValue(row.SlotName)?.Id ?? -1;
+                    var peer = Rows.FirstOrDefault(r => r != row && r.SlotName == row.SlotName);
+                    row.SlotGroupId = peer?.SlotGroupId ?? Rows.Max(r => r.SlotGroupId) + 1;
+                    if (IsWh3 && peer != null) CopySlotParameters(peer, row);
+                }
+                if (IsWh3 && e.PropertyName is nameof(AnimationEntryRowViewModel.BlendInTime) or nameof(AnimationEntryRowViewModel.SelectionWeight)
+                    or nameof(AnimationEntryRowViewModel.Unk) or nameof(AnimationEntryRowViewModel.Wb0) or nameof(AnimationEntryRowViewModel.Wb1)
+                    or nameof(AnimationEntryRowViewModel.Wb2) or nameof(AnimationEntryRowViewModel.Wb3) or nameof(AnimationEntryRowViewModel.Wb4) or nameof(AnimationEntryRowViewModel.Wb5))
+                {
+                    foreach (var peer in Rows.Where(r => r != row && r.SlotGroupId == row.SlotGroupId))
+                    {
+                        peer.BlendInTime = row.BlendInTime;
+                        peer.SelectionWeight = row.SelectionWeight;
+                        peer.Unk = row.Unk;
+                        peer.SetWeaponBoneFromInt(row.GetWeaponBoneAsInt());
+                    }
+                }
+            }
+            finally { _suppressDirtyTracking = false; }
+            MarkDirty();
+            RefreshRowsFilter();
+        }
 
         private void LoadFileLists()
         {
             // Populate private lists (loaded once)
-            foreach (var container in _pfs.GetAllPackfileContainers())
+            foreach (var container in _pfs.GetAllPackfileContainers() ?? [])
             {
                 foreach (var kvp in container.FileList)
                 {
@@ -324,6 +452,8 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             {
                 Rows.Clear();
                 _undoSnapshots.Clear();
+                _redoSnapshots.Clear();
+                _activeConverter = null;
 
                 try
                 {
@@ -348,6 +478,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 _suppressDirtyTracking = false;
                 IsDirty = false;
                 UndoCommand.NotifyCanExecuteChanged();
+                RedoCommand.NotifyCanExecuteChanged();
             }
         }
 
@@ -357,6 +488,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             Name = bin.Name;
             SkeletonName = bin.SkeletonName;
             MountBin = bin.MountBin;
+            UnmountBin = bin.Unknown;
             LocomotionGraph = bin.LocomotionGraph;
             TableVersion = bin.TableVersion;
             TableSubVersion = bin.TableSubVersion;
@@ -373,18 +505,20 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             foreach (var entry in bin.AnimationTableEntries)
             {
                 var slotValue = slotHelper.TryGetFromId((int)entry.AnimationId);
-                var slotName = slotValue?.Value ?? $"Unknown[{entry.AnimationId}]";
+                var slotName = slotValue?.Value ?? LocalizationManager.Instance.GetFormat("AnimPack.Validation.UnknownSlot", entry.AnimationId);
 
-                for (int i = 0; i < entry.AnimationRefs.Count; i++)
+                for (int i = 0; i < Math.Max(1, entry.AnimationRefs.Count); i++)
                 {
-                    var animRef = entry.AnimationRefs[i];
+                    var animRef = entry.AnimationRefs.ElementAtOrDefault(i);
                     var row = new AnimationEntryRowViewModel
                     {
                         SlotIndex = (int)entry.AnimationId,
+                        SlotGroupId = bin.AnimationTableEntries.IndexOf(entry),
+                        HasReference = animRef != null,
                         SlotName = slotName,
-                        AnimationFile = animRef.AnimationFile,
-                        MetaFile = animRef.AnimationMetaFile,
-                        SoundFile = animRef.AnimationSoundMetaFile,
+                        AnimationFile = animRef?.AnimationFile ?? string.Empty,
+                        MetaFile = animRef?.AnimationMetaFile ?? string.Empty,
+                        SoundFile = animRef?.AnimationSoundMetaFile ?? string.Empty,
                         BlendInTime = entry.BlendIn,
                         SelectionWeight = entry.SelectionWeight,
                         Unk = entry.Unk,
@@ -402,6 +536,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         {
             IsWh3 = false;
             Skeleton = frag.Skeletons.Values.FirstOrDefault() ?? "";
+            _fragmentSkeletons = frag.Skeletons.Values.ToList();
 
             var slotHelper = _gameType == GameTypeEnum.Troy
                 ? AnimationSlotTypeHelperTroy.GetInstance()
@@ -416,6 +551,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 var row = new AnimationEntryRowViewModel
                 {
                     SlotIndex = item.Slot.Id,
+                    SlotGroupId = frag.Fragments.IndexOf(item),
+                    FragmentSkeleton = item.Skeleton,
+                    FragmentRecordId = item.RecordId,
+                    FragmentUnknown = item.Unknown0,
+                    Comment = item.Comment,
+                    Ignore = item.Ignore,
                     SlotName = item.Slot.Value,
                     AnimationFile = item.AnimationFile,
                     MetaFile = item.MetaDataFile,
@@ -432,100 +573,18 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
         public byte[]? SaveToBinary(string fileName, out ITextConverter.SaveError? error)
         {
-            if (IsWh3)
-                return SaveWh3Binary(fileName, out error);
-            else
-                return SaveFragmentBinary(fileName, out error);
-        }
-
-        private byte[]? SaveWh3Binary(string fileName, out ITextConverter.SaveError? error)
-        {
-            var xmlFormat = new Wh3Format.XmlFormat
+            if (HasInvalidFields)
             {
-                Version = TableVersion == 4 ? "Wh3" : "ThreeKingdom",
-                Data = new GeneralBinData
-                {
-                    TableVersion = TableVersion,
-                    TableSubVersion = TableSubVersion,
-                    Name = Name,
-                    MountBin = MountBin,
-                    SkeletonName = SkeletonName,
-                    LocomotionGraph = LocomotionGraph,
-                    UnknownValue1_RelatedToFlight = UnknownValue1,
-                },
-                Animations = new List<Wh3Format.Animation>()
-            };
-
-            // Group by SlotName, preserving original row order
-            var groups = new List<List<AnimationEntryRowViewModel>>();
-            var groupMap = new Dictionary<string, List<AnimationEntryRowViewModel>>();
-            foreach (var row in Rows)
-            {
-                if (!groupMap.TryGetValue(row.SlotName, out var group))
-                {
-                    group = new List<AnimationEntryRowViewModel>();
-                    groupMap[row.SlotName] = group;
-                    groups.Add(group);
-                }
-                group.Add(row);
+                error = new ITextConverter.SaveError { Text = LocalizationManager.Instance?.Get("AnimPack.Campaign.InvalidField") ?? "AnimPack.Campaign.InvalidField" };
+                return null;
             }
-
-            foreach (var group in groups)
+            if (_activeConverter == null)
             {
-                var first = group[0];
-                var animEntry = new Wh3Format.Animation
-                {
-                    Slot = first.SlotName,
-                    BlendId = first.BlendInTime,
-                    BlendOut = first.SelectionWeight,
-                    WeaponBone = first.WeaponBone,
-                    Unk = first.Unk,
-                    Ref = new List<Instance>()
-                };
-
-                foreach (var row in group)
-                {
-                    animEntry.Ref.Add(new Instance
-                    {
-                        File = row.AnimationFile,
-                        Meta = row.MetaFile,
-                        Sound = row.SoundFile,
-                    });
-                }
-
-                xmlFormat.Animations.Add(animEntry);
+                error = new ITextConverter.SaveError { Text = LocalizationManager.Instance?.Get("AnimPack.Table.Unsupported") ?? "AnimPack.Table.Unsupported" };
+                return null;
             }
-
-            var xmlText = SerializeToXml(xmlFormat);
-            return _activeConverter!.ToBytes(xmlText, fileName, _pfs, out error);
+            return _activeConverter.ToBytes(BuildXmlString(), fileName, _pfs, out error);
         }
-
-        private byte[]? SaveFragmentBinary(string fileName, out ITextConverter.SaveError? error)
-        {
-            var xmlFormat = new FragFormat.Animation
-            {
-                Skeleton = Skeleton,
-                AnimationFragmentEntry = new List<FragFormat.AnimationEntry>()
-            };
-
-            foreach (var row in Rows)
-            {
-                xmlFormat.AnimationFragmentEntry.Add(new FragFormat.AnimationEntry
-                {
-                    Slot = row.SlotName,
-                    File = new FragFormat.ValueItem { Value = row.AnimationFile },
-                    Meta = new FragFormat.ValueItem { Value = row.MetaFile },
-                    Sound = new FragFormat.ValueItem { Value = row.SoundFile },
-                    BlendInTime = new FragFormat.BlendInTime { Value = row.BlendInTime },
-                    SelectionWeight = new FragFormat.SelectionWeight { Value = row.SelectionWeight },
-                    WeaponBone = row.WeaponBone,
-                });
-            }
-
-            var xmlText = SerializeToXml(xmlFormat);
-            return _activeConverter!.ToBytes(xmlText, fileName, _pfs, out error);
-        }
-
         public string BuildXmlString()
         {
             if (IsWh3)
@@ -539,6 +598,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                         TableSubVersion = TableSubVersion,
                         Name = Name,
                         MountBin = MountBin,
+                        UnmountBin = UnmountBin,
                         SkeletonName = SkeletonName,
                         LocomotionGraph = LocomotionGraph,
                         UnknownValue1_RelatedToFlight = UnknownValue1,
@@ -547,13 +607,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 };
 
                 var groups = new List<List<AnimationEntryRowViewModel>>();
-                var groupMap = new Dictionary<string, List<AnimationEntryRowViewModel>>();
+                var groupMap = new Dictionary<int, List<AnimationEntryRowViewModel>>();
                 foreach (var row in Rows)
                 {
-                    if (!groupMap.TryGetValue(row.SlotName, out var group))
+                    if (!groupMap.TryGetValue(row.SlotGroupId, out var group))
                     {
                         group = new List<AnimationEntryRowViewModel>();
-                        groupMap[row.SlotName] = group;
+                        groupMap[row.SlotGroupId] = group;
                         groups.Add(group);
                     }
                     group.Add(row);
@@ -565,6 +625,8 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                     var animEntry = new Wh3Format.Animation
                     {
                         Slot = first.SlotName,
+                        SlotId = first.SlotIndex,
+                        ReservedWeaponFlags = first.ReservedWeaponFlags,
                         BlendId = first.BlendInTime,
                         BlendOut = first.SelectionWeight,
                         WeaponBone = first.WeaponBone,
@@ -572,7 +634,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                         Ref = new List<Instance>()
                     };
 
-                    foreach (var row in group)
+                    foreach (var row in group.Where(r => r.HasReference))
                     {
                         animEntry.Ref.Add(new Instance
                         {
@@ -592,6 +654,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 var xmlFormat = new FragFormat.Animation
                 {
                     Skeleton = Skeleton,
+                    Skeletons = _fragmentSkeletons.ToList(),
                     AnimationFragmentEntry = new List<FragFormat.AnimationEntry>()
                 };
 
@@ -600,6 +663,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                     xmlFormat.AnimationFragmentEntry.Add(new FragFormat.AnimationEntry
                     {
                         Slot = row.SlotName,
+                        SlotId = row.SlotIndex,
+                        Skeleton = row.FragmentSkeleton,
+                        Unknown = row.FragmentUnknown,
+                        RecordId = row.FragmentRecordId,
+                        Comment = row.Comment,
+                        Ignore = row.Ignore,
+                        ReservedWeaponFlags = row.ReservedWeaponFlags,
                         File = new FragFormat.ValueItem { Value = row.AnimationFile },
                         Meta = new FragFormat.ValueItem { Value = row.MetaFile },
                         Sound = new FragFormat.ValueItem { Value = row.SoundFile },
@@ -634,7 +704,21 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         [RelayCommand(CanExecute = nameof(CanUndo))]
         private void Undo()
         {
+            _redoSnapshots.Push(CaptureSnapshot());
             var snapshot = _undoSnapshots.Pop();
+            RestoreSnapshot(snapshot);
+        }
+
+        private bool CanRedo() => _redoSnapshots.Count > 0;
+        [RelayCommand(CanExecute = nameof(CanRedo))]
+        private void Redo()
+        {
+            _undoSnapshots.Push(CaptureSnapshot());
+            RestoreSnapshot(_redoSnapshots.Pop());
+        }
+
+        private void RestoreSnapshot(TableSnapshot snapshot)
+        {
             _suppressDirtyTracking = true;
             try
             {
@@ -645,19 +729,23 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 Name = snapshot.Name;
                 SkeletonName = snapshot.SkeletonName;
                 MountBin = snapshot.MountBin;
+                UnmountBin = snapshot.UnmountBin;
                 LocomotionGraph = snapshot.LocomotionGraph;
                 TableVersion = snapshot.TableVersion;
                 TableSubVersion = snapshot.TableSubVersion;
                 UnknownValue1 = snapshot.UnknownValue1;
                 Skeleton = snapshot.Skeleton;
+                _fragmentSkeletons = snapshot.FragmentSkeletons.ToList();
                 IsWh3 = snapshot.IsWh3;
             }
             finally
             {
                 _suppressDirtyTracking = false;
             }
-            IsDirty = snapshot.IsDirty;
+            var restoredDirty = string.IsNullOrEmpty(_savedXml) ? snapshot.IsDirty : BuildXmlString() != _savedXml;
+            SetAndNotifyWhenChanged(ref _isDirty, restoredDirty, propertyName: nameof(IsDirty));
             UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
         }
 
         [RelayCommand] private void AddEntry()
@@ -666,6 +754,7 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             var newRow = new AnimationEntryRowViewModel
             {
                 SlotIndex = 0,
+                SlotGroupId = Rows.FirstOrDefault(r => r.SlotName == "STAND")?.SlotGroupId ?? (Rows.Count == 0 ? 0 : Rows.Max(r => r.SlotGroupId) + 1),
                 SlotName = "STAND",
                 AnimationFile = "",
                 MetaFile = "",
@@ -675,6 +764,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                 VariantIndex = 0,
             };
             Rows.Add(newRow);
+            if (IsWh3 && Rows.FirstOrDefault(r => r != newRow && r.SlotGroupId == newRow.SlotGroupId) is { } peer)
+            {
+                _suppressDirtyTracking = true;
+                try { CopySlotParameters(peer, newRow); }
+                finally { _suppressDirtyTracking = false; }
+            }
             SelectedRow = newRow;
             IsDirty = true;
         }
@@ -748,6 +843,8 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
             var data = new ClipboardData
             {
                 SourceFormat = IsWh3 ? "Wh3" : "Fragment",
+                TableVersion = IsWh3 ? TableVersion : 0,
+                Game = _gameType.ToString(),
                 Rows = rows.Select(r => new ClipboardRow
                 {
                     SlotIndex = r.SlotIndex,
@@ -761,6 +858,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                     Wb3 = r.Wb3, Wb4 = r.Wb4, Wb5 = r.Wb5,
                     Unk = r.Unk,
                     VariantIndex = r.VariantIndex,
+                    HasReference = r.HasReference,
+                    FragmentUnknown = r.FragmentUnknown,
+                    FragmentRecordId = r.FragmentRecordId,
+                    FragmentSkeleton = r.FragmentSkeleton,
+                    Comment = r.Comment, Ignore = r.Ignore,
+                    ReservedWeaponFlags = r.ReservedWeaponFlags,
                 }).ToList()
             };
 
@@ -772,6 +875,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
         private void NotifyRowCommandStates()
         {
+            PreviewAnimationCommand.NotifyCanExecuteChanged();
+            OpenAnimationCommand.NotifyCanExecuteChanged();
+            OpenMetaCommand.NotifyCanExecuteChanged();
+            OpenSoundCommand.NotifyCanExecuteChanged();
+            OpenMountCommand.NotifyCanExecuteChanged();
+            OpenUnmountCommand.NotifyCanExecuteChanged();
+            ApplyParametersToSelectedCommand.NotifyCanExecuteChanged();
             DeleteEntriesCommand.NotifyCanExecuteChanged();
             DuplicateEntryCommand.NotifyCanExecuteChanged();
             MoveUpCommand.NotifyCanExecuteChanged();
@@ -818,6 +928,14 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
 
                 SaveSnapshot();
                 var insertIndex = SelectedRow != null ? Rows.IndexOf(SelectedRow) + 1 : Rows.Count;
+                if (!string.IsNullOrEmpty(data.SourceFormat) && data.SourceFormat != (IsWh3 ? "Wh3" : "Fragment")
+                    || IsWh3 && data.TableVersion != 0 && data.TableVersion != TableVersion
+                    || !IsWh3 && !string.IsNullOrEmpty(data.Game) && data.Game != _gameType.ToString())
+                {
+                    DiscardLastSnapshot();
+                    FeedbackMessage = LocalizationManager.Instance?.Get("AnimPack.Table.PasteFormatMismatch") ?? "AnimPack.Table.PasteFormatMismatch";
+                    return;
+                }
 
                 foreach (var row in data.Rows)
                 {
@@ -825,6 +943,13 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                     {
                         SlotIndex = row.SlotIndex,
                         SlotName = row.SlotName,
+                        SlotGroupId = Rows.FirstOrDefault(r => r.SlotName == row.SlotName)?.SlotGroupId ?? (Rows.Count == 0 ? 0 : Rows.Max(r => r.SlotGroupId) + 1),
+                        HasReference = row.HasReference,
+                        FragmentUnknown = row.FragmentUnknown,
+                        FragmentRecordId = row.FragmentRecordId,
+                        FragmentSkeleton = row.FragmentSkeleton,
+                        Comment = row.Comment, Ignore = row.Ignore,
+                        ReservedWeaponFlags = row.ReservedWeaponFlags,
                         AnimationFile = row.AnimationFile,
                         MetaFile = row.MetaFile,
                         SoundFile = row.SoundFile,
@@ -836,6 +961,12 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
                         Wb3 = row.Wb3, Wb4 = row.Wb4, Wb5 = row.Wb5,
                     };
                     Rows.Insert(insertIndex++, newRow);
+                    if (IsWh3 && Rows.FirstOrDefault(r => r != newRow && r.SlotGroupId == newRow.SlotGroupId) is { } peer)
+                    {
+                        _suppressDirtyTracking = true;
+                        try { CopySlotParameters(peer, newRow); }
+                        finally { _suppressDirtyTracking = false; }
+                    }
                 }
 
                 IsDirty = true;
@@ -851,11 +982,20 @@ namespace Editors.AnimationFragmentEditor.AnimationPack.ViewModels
         private class ClipboardData
         {
             public string SourceFormat { get; set; } = "";
+            public uint TableVersion { get; set; }
+            public string Game { get; set; } = "";
             public List<ClipboardRow> Rows { get; set; } = new();
         }
 
         private class ClipboardRow
         {
+            public bool HasReference { get; set; } = true;
+            public int FragmentUnknown { get; set; }
+            public int? FragmentRecordId { get; set; }
+            public string FragmentSkeleton { get; set; } = string.Empty;
+            public string Comment { get; set; } = string.Empty;
+            public bool Ignore { get; set; }
+            public int ReservedWeaponFlags { get; set; }
             public int SlotIndex { get; set; }
             public string SlotName { get; set; } = "";
             public string AnimationFile { get; set; } = "";

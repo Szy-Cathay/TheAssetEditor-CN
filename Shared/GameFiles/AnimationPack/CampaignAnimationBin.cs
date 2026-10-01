@@ -8,6 +8,7 @@ namespace Shared.GameFormats.AnimationPack
         public string Reference { get; set; }
         public string SkeletonName { get; set; }
         public int Version { get; set; }
+        public int HeaderValue { get; set; } = 1;
         public List<StatusItem> Status { get; set; } = new List<StatusItem>();
 
         public interface ICampaignAnimationBinEntry
@@ -57,10 +58,10 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(Type, ref stringTable);
-                chuck.WriteStringTableIndex(MetaFile, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(Type, ref stringTable, false);
+                chuck.WriteStringTableIndex(MetaFile, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
                 chuck.Write(BlendTime, ByteParsers.Single);
                 chuck.Write(Weight, ByteParsers.Single);
                 return chuck.GetBytes();
@@ -91,12 +92,12 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
-                chuck.WriteStringTableIndex(Type, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(Type, ref stringTable, false);
                 chuck.Write(BlendTime, ByteParsers.Single);
-                chuck.WriteStringTableIndex(TransitionTo, ref stringTable);
+                chuck.WriteStringTableIndex(TransitionTo, ref stringTable, false);
                 return chuck.GetBytes();
             }
         }
@@ -123,10 +124,10 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
-                chuck.WriteStringTableIndex(Type, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(Type, ref stringTable, false);
                 chuck.Write(BlendTime, ByteParsers.Single);
                 return chuck.GetBytes();
             }
@@ -157,9 +158,9 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
                 chuck.Write(Weight, ByteParsers.Single);
                 chuck.Write(BlendTime, ByteParsers.Single);
                 chuck.Write(PoseId, ByteParsers.Int32);
@@ -184,7 +185,7 @@ namespace Shared.GameFormats.AnimationPack
                 output.SoundMeta = byteChunk.ReadStringTableIndex(stringTable);
                 output.Weight = byteChunk.ReadSingle();
                 output.BlendTime = byteChunk.ReadSingle();
-                output.Dock = byteChunk.ReadStringTableIndex(stringTable).ToUpper();
+                output.Dock = byteChunk.ReadStringTableIndex(stringTable);
                 return output;
             }
 
@@ -192,12 +193,12 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
                 chuck.Write(Weight, ByteParsers.Single);
                 chuck.Write(BlendTime, ByteParsers.Single);
-                chuck.WriteStringTableIndex(Dock.ToUpper(), ref stringTable, false);
+                chuck.WriteStringTableIndex(Dock, ref stringTable, false);
                 return chuck.GetBytes();
             }
         }
@@ -226,10 +227,10 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Value0, ref stringTable);
-                chuck.WriteStringTableIndex(Value1, ref stringTable);
-                chuck.WriteStringTableIndex(Value2, ref stringTable);
-                chuck.WriteStringTableIndex(Value3, ref stringTable);
+                chuck.WriteStringTableIndex(Value0, ref stringTable, false);
+                chuck.WriteStringTableIndex(Value1, ref stringTable, false);
+                chuck.WriteStringTableIndex(Value2, ref stringTable, false);
+                chuck.WriteStringTableIndex(Value3, ref stringTable, false);
                 chuck.Write(Value4, ByteParsers.Single);
                 chuck.Write(Value5, ByteParsers.Single);
                 return chuck.GetBytes();
@@ -238,6 +239,8 @@ namespace Shared.GameFormats.AnimationPack
 
         public class ActionEntry : ICampaignAnimationBinEntry
         {
+            public bool HasExtraString { get; set; }
+            public string ExtraString { get; set; } = string.Empty;
             public string Animation { get; set; }
             public string Type { get; set; }
             public string Meta { get; set; }
@@ -249,10 +252,35 @@ namespace Shared.GameFormats.AnimationPack
 
             public static ActionEntry FromChunck(ByteChunk byteChunk, string[] stringTable)
             {
+                var start = byteChunk.Index;
+                try
+                {
+                    var standard = ReadAction(byteChunk, stringTable, false);
+                    var standardEnd = byteChunk.Index;
+                    if (standard.ActionType == stringTable[0] || standard.ActionType == stringTable[1])
+                    {
+                        byteChunk.Index = start;
+                        try { return ReadAction(byteChunk, stringTable, true); }
+                        catch { byteChunk.Index = standardEnd; }
+                    }
+                    return standard;
+                }
+                catch
+                {
+                    byteChunk.Index = start;
+                    return ReadAction(byteChunk, stringTable, true);
+                }
+            }
+
+            static ActionEntry ReadAction(ByteChunk byteChunk, string[] stringTable, bool extraString)
+            {
                 var output = new ActionEntry();
                 output.Animation = byteChunk.ReadStringTableIndex(stringTable);
                 output.Type = byteChunk.ReadStringTableIndex(stringTable);
                 output.Meta = byteChunk.ReadStringTableIndex(stringTable);
+                output.HasExtraString = extraString;
+                if (extraString)
+                    output.ExtraString = byteChunk.ReadStringTableIndex(stringTable);
 
                 output.SoundMeta = byteChunk.ReadStringTableIndex(stringTable);
                 output.BlendTime = byteChunk.ReadSingle();
@@ -266,12 +294,14 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(Type, ref stringTable);
-                chuck.WriteStringTableIndex(Meta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(Type, ref stringTable, false);
+                chuck.WriteStringTableIndex(Meta, ref stringTable, false);
+                if (HasExtraString)
+                    chuck.WriteStringTableIndex(ExtraString, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
                 chuck.Write(BlendTime, ByteParsers.Single);
-                chuck.WriteStringTableIndex(ActionType, ref stringTable);
+                chuck.WriteStringTableIndex(ActionType, ref stringTable, false);
                 chuck.Write(ActionId, ByteParsers.Int32);
                 chuck.Write(Unknown, ByteParsers.Bool);
                 return chuck.GetBytes();
@@ -306,10 +336,10 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
-                chuck.WriteStringTableIndex(Type, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(Type, ref stringTable, false);
                 chuck.Write(Weight, ByteParsers.Single);
                 chuck.Write(ModelScale, ByteParsers.Single);
                 chuck.Write(DistanceTraveled, ByteParsers.Single);
@@ -344,27 +374,51 @@ namespace Shared.GameFormats.AnimationPack
             public byte[] ToBytes(ref List<string> stringTable)
             {
                 var chuck = new ChuckWriter();
-                chuck.WriteStringTableIndex(Animation, ref stringTable);
-                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable);
-                chuck.WriteStringTableIndex(SoundMeta, ref stringTable);
-                chuck.WriteStringTableIndex(Type, ref stringTable);
+                chuck.WriteStringTableIndex(Animation, ref stringTable, false);
+                chuck.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(SoundMeta, ref stringTable, false);
+                chuck.WriteStringTableIndex(Type, ref stringTable, false);
                 chuck.Write(BlendTime, ByteParsers.Single);
                 chuck.Write(Weight, ByteParsers.Single);
-                chuck.Write(Value, ByteParsers.Single);
+                chuck.Write(Value, ByteParsers.Int32);
                 return chuck.GetBytes();
             }
         }
 
         public class MissingType : ICampaignAnimationBinEntry
         {
+            public string Animation { get; set; }
+            public string Type { get; set; }
+            public string AnimationMeta { get; set; }
+            public string SoundMeta { get; set; }
+            public float Value0 { get; set; }
+            public float Value1 { get; set; }
+            public float Value2 { get; set; }
+            public int Value3 { get; set; }
+
             public static MissingType FromChunck(ByteChunk byteChunk, string[] stringTable)
             {
-                throw new Exception("Unknown datatype");
+                return new MissingType
+                {
+                    Animation = byteChunk.ReadStringTableIndex(stringTable),
+                    Type = byteChunk.ReadStringTableIndex(stringTable),
+                    AnimationMeta = byteChunk.ReadStringTableIndex(stringTable),
+                    SoundMeta = byteChunk.ReadStringTableIndex(stringTable),
+                    Value0 = byteChunk.ReadSingle(), Value1 = byteChunk.ReadSingle(),
+                    Value2 = byteChunk.ReadSingle(), Value3 = byteChunk.ReadInt32(),
+                };
             }
 
             public byte[] ToBytes(ref List<string> stringTable)
             {
-                throw new Exception("Unknown datatype");
+                var writer = new ChuckWriter();
+                writer.WriteStringTableIndex(Animation, ref stringTable, false);
+                writer.WriteStringTableIndex(Type, ref stringTable, false);
+                writer.WriteStringTableIndex(AnimationMeta, ref stringTable, false);
+                writer.WriteStringTableIndex(SoundMeta, ref stringTable, false);
+                writer.Write(Value0, ByteParsers.Single); writer.Write(Value1, ByteParsers.Single);
+                writer.Write(Value2, ByteParsers.Single); writer.Write(Value3, ByteParsers.Int32);
+                return writer.GetBytes();
             }
         }
     }
@@ -380,30 +434,34 @@ namespace Shared.GameFormats.AnimationPack
             var outputFile = new CampaignAnimationBin();
             outputFile.Version = data.ReadInt32();
 
-            if (outputFile.Version != 3)
-                throw new Exception("Version error +" + outputFile.Version);
+            if (outputFile.Version != 3 && outputFile.Version != 2)
+                throw new InvalidDataException($"战役动画版本 {outputFile.Version} 不受支持，仅支持版本 2 和 3。");
 
             var strTableOffset = data.ReadInt32();
+            if (strTableOffset < 24 || strTableOffset > data.Buffer.Length - 4)
+                throw new InvalidDataException("战役动画的字符串表位置无效。");
             var strTableChunk = new ByteChunk(data.Buffer, strTableOffset);
 
             var stringTable = ReadStrTable(strTableChunk);
 
             var skeletonStrIndex = data.ReadInt32();                // 1
             var selfRefStringIndex = data.ReadInt32();              // 0
-            var someValueAlwaysOne = data.ReadInt32();              // 1
+            outputFile.HeaderValue = data.ReadInt32();
 
-            outputFile.Reference = stringTable[0];
-            outputFile.SkeletonName = stringTable[1];
+            outputFile.Reference = stringTable[selfRefStringIndex];
+            outputFile.SkeletonName = stringTable[skeletonStrIndex];
 
             var numStatuses = data.ReadInt32();
+            if (numStatuses < 0 || numStatuses > (strTableOffset - data.Index) / 16)
+                throw new InvalidDataException("战役状态数量超出实际数据范围。");
             for (var i = 0; i < numStatuses; i++)
             {
-                var status = LoadStatus(data, stringTable);
+                var status = LoadStatus(data, stringTable, outputFile.Version);
                 outputFile.Status.Add(status);
             }
 
             if (strTableOffset != data.Index)
-                throw new Exception("Data left");
+                throw new InvalidDataException("战役动画包含未识别的数据，无法安全编辑。");
 
             return outputFile;
         }
@@ -415,7 +473,7 @@ namespace Shared.GameFormats.AnimationPack
 
             dataWriter.Write(1, ByteParsers.Int32);
             dataWriter.Write(0, ByteParsers.Int32);
-            dataWriter.Write(1, ByteParsers.Int32);
+            dataWriter.Write(bin.HeaderValue, ByteParsers.Int32);
 
             stringTable.Add(fileName);
             stringTable.Add(bin.SkeletonName);
@@ -423,7 +481,7 @@ namespace Shared.GameFormats.AnimationPack
             // Statuses
             dataWriter.Write(bin.Status.Count, ByteParsers.Int32);
             foreach (var status in bin.Status)
-                WriteStatus(status, dataWriter, ref stringTable);
+                WriteStatus(status, dataWriter, ref stringTable, bin.Version);
 
             var dataBytes = dataWriter.GetBytes();
             var finalWriter = new ChuckWriter();
@@ -438,7 +496,7 @@ namespace Shared.GameFormats.AnimationPack
             return finalWriter.GetBytes();
         }
 
-        static CampaignAnimationBin.StatusItem LoadStatus(ByteChunk data, string[] strTable)
+        static CampaignAnimationBin.StatusItem LoadStatus(ByteChunk data, string[] strTable, int version)
         {
             var statusName = data.ReadStringTableIndex(strTable);
             var currentStatus = new CampaignAnimationBin.StatusItem() { Name = statusName };
@@ -454,7 +512,8 @@ namespace Shared.GameFormats.AnimationPack
                 currentStatus.Idle = LoadSlots(data, strTable, CampaignAnimationBin.AnimationEntry.FromChunck);
                 currentStatus.Porthole = LoadSlots(data, strTable, CampaignAnimationBin.PortholeEntry.FromChunck);
                 currentStatus.Selection = LoadSlots(data, strTable, CampaignAnimationBin.AnimationEntry.FromChunck);
-                currentStatus.Transitions = LoadSlots(data, strTable, CampaignAnimationBin.TransitionEntry.FromChunck);
+                if (version >= 3)
+                    currentStatus.Transitions = LoadSlots(data, strTable, CampaignAnimationBin.TransitionEntry.FromChunck);
                 currentStatus.Action = LoadSlots(data, strTable, CampaignAnimationBin.ActionEntry.FromChunck);
                 currentStatus.Unk1 = LoadSlots(data, strTable, CampaignAnimationBin.MissingType.FromChunck);    // Always zero
                 currentStatus.Unknown = LoadSlots(data, strTable, CampaignAnimationBin.UnknownEntry.FromChunck); // What is this?
@@ -468,6 +527,8 @@ namespace Shared.GameFormats.AnimationPack
         static List<T> LoadSlots<T>(ByteChunk data, string[] stringTable, CreateEntryDelegate<T> createEntryDelegate)
         {
             var numItems = data.ReadInt32();
+            if (numItems < 0 || numItems > data.BytesLeft / 20)
+                throw new InvalidDataException("战役动作数量超出实际数据范围。");
             var output = new List<T>();
             for (var i = 0; i < numItems; i++)
             {
@@ -481,9 +542,9 @@ namespace Shared.GameFormats.AnimationPack
             return output;
         }
 
-        static void WriteStatus(CampaignAnimationBin.StatusItem statusItem, ChuckWriter writer, ref List<string> stringTable)
+        static void WriteStatus(CampaignAnimationBin.StatusItem statusItem, ChuckWriter writer, ref List<string> stringTable, int version)
         {
-            writer.WriteStringTableIndex(statusItem.Name, ref stringTable);
+            writer.WriteStringTableIndex(statusItem.Name, ref stringTable, false);
 
             if (statusItem.Name == "global")
             {
@@ -496,7 +557,8 @@ namespace Shared.GameFormats.AnimationPack
                 WriteSlot(statusItem.Idle, writer, ref stringTable);
                 WriteSlot(statusItem.Porthole, writer, ref stringTable);
                 WriteSlot(statusItem.Selection, writer, ref stringTable);
-                WriteSlot(statusItem.Transitions, writer, ref stringTable);
+                if (version >= 3)
+                    WriteSlot(statusItem.Transitions, writer, ref stringTable);
                 WriteSlot(statusItem.Action, writer, ref stringTable);
                 WriteSlot(statusItem.Unk1, writer, ref stringTable);
                 WriteSlot(statusItem.Unknown, writer, ref stringTable);
@@ -525,6 +587,8 @@ namespace Shared.GameFormats.AnimationPack
         {
             var stringTable = new List<string>();
             var numTableEntires = data.ReadInt32();
+            if (numTableEntires < 2 || numTableEntires > data.BytesLeft / 2)
+                throw new InvalidDataException("战役动画的字符串数量超出实际数据范围。");
             for (var i = 0; i < numTableEntires; i++)
                 stringTable.Add(data.ReadString());
             return stringTable.ToArray();

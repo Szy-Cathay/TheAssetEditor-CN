@@ -39,6 +39,8 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
 
             TableVersion = data.ReadInt32();
             var rowCount = data.ReadInt32();
+            if (rowCount < 0 || rowCount > data.BytesLeft / 12)
+                throw new InvalidDataException("动画集数量超出实际数据范围。");
             AnimationTableEntries = new List<AnimationBinEntry>();
             for (var i = 0; i < rowCount; i++)
                 AnimationTableEntries.Add(new AnimationBinEntry(data));
@@ -62,7 +64,7 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
             public byte[] ToByteArray()
             {
                 using var memStream = new MemoryStream();
-                memStream.Write(ByteParsers.String.WriteCaString(Name.ToLower()));
+                memStream.Write(ByteParsers.String.WriteCaString(Name));
                 memStream.Write(ByteParsers.Int32.EncodeValue(Unknown, out _));
                 return memStream.ToArray();
             }
@@ -82,6 +84,8 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
             SkeletonName = data.ReadString();
             MountName = data.ReadString();
             var count = data.ReadInt32();
+            if (count < 0 || count > data.BytesLeft / 6)
+                throw new InvalidDataException("动画片段数量超出实际数据范围。");
             for (var i = 0; i < count; i++)
                 FragmentReferences.Add(new FragmentReference(data));
             Unknown = data.ReadShort();
@@ -98,9 +102,9 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes
         {
             using var memStream = new MemoryStream();
 
-            memStream.Write(ByteParsers.String.WriteCaString(Name.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(SkeletonName.ToLower()));
-            memStream.Write(ByteParsers.String.WriteCaString(MountName.ToLower()));
+            memStream.Write(ByteParsers.String.WriteCaString(Name));
+            memStream.Write(ByteParsers.String.WriteCaString(SkeletonName));
+            memStream.Write(ByteParsers.String.WriteCaString(MountName));
 
             memStream.Write(ByteParsers.Int32.EncodeValue(FragmentReferences.Count, out _));
             foreach (var fragment in FragmentReferences)
