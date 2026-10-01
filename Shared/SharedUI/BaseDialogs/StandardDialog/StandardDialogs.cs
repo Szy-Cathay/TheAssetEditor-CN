@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using CommonControls.BaseDialogs;
 using CommonControls.BaseDialogs.ErrorListDialog;
@@ -56,6 +57,19 @@ namespace Shared.Ui.BaseDialogs.StandardDialog
             var saveResult = browser.ShowDialog();
             var output = new BrowseDialogResultFile(saveResult, browser.SelectedFile);
             return output;
+        }
+
+        public BrowseDialogResultFile DisplayBrowseDialog(List<string> extensions, BrowseDialogFilter filter)
+        {
+            var candidates = _pfs.GetAllPackfileContainers()
+                .SelectMany(container => _pfs.GetFileEntriesSnapshot(container))
+                .Where(entry => extensions.Contains(entry.Value.Extension, StringComparer.OrdinalIgnoreCase))
+                .DistinctBy(entry => entry.Value)
+                .ToArray();
+            using var browser = new PackFileBrowserWindow(_packFileBrowserBuilder, extensions,
+                showCaFiles: true, showFoldersOnly: false, filter, candidates);
+            ApplyOwner(browser);
+            return new BrowseDialogResultFile(browser.ShowDialog(), browser.SelectedFile);
         }
 
         public BrowseDialogResultFolder DisplayBrowseFolderDialog(

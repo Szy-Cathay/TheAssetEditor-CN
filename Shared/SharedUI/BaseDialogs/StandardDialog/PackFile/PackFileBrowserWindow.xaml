@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:packfiletree="clr-namespace:Shared.Ui.BaseDialogs.PackFileTree"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
+        xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress"
         xmlns:windowhandling="clr-namespace:WindowHandling"
         mc:Ignorable="d"
         Title="{loc:Loc Shared.PackFileBrowserWindow.Title}" Height="520" Width="860"
@@ -20,8 +21,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="SelectionHint" Margin="12,12,12,0" Style="{StaticResource AeText.Body}" TextWrapping="Wrap"/>
-        <packfiletree:PackFileBrowserView Grid.Row="1"
+        <StackPanel Margin="12,12,12,0">
+            <TextBlock x:Name="SelectionHint" Style="{StaticResource AeText.Body}" TextWrapping="Wrap"/>
+            <CheckBox x:Name="FileFilterToggle" Margin="0,8,0,0" Visibility="Collapsed"
+                Style="{StaticResource AeInput.CheckBox}" Checked="FileFilterChanged" Unchecked="FileFilterChanged"/>
+            <TextBlock x:Name="FileFilterStatus" Margin="0,4,0,0" Visibility="Collapsed"
+                Style="{StaticResource AeText.Caption}" TextWrapping="Wrap"/>
+        </StackPanel>
+        <packfiletree:PackFileBrowserView x:Name="Browser" Grid.Row="1"
             Margin="12"
             DataContext="{Binding ViewModel, Mode=OneTime}"
             KeyboardNavigation.IsTabStop="True"
@@ -39,5 +46,9 @@
                 Style="{StaticResource AeButton.Primary}" />
             </StackPanel>
         </Border>
+        <progress:OperationProgressWindowHost x:Name="FilterProgress" Grid.RowSpan="3"
+            WindowTitle="{loc:Loc Shared.PackFileBrowserWindow.FilterProgressTitle}"
+            CancelText="{loc:Loc General.Cancel}"
+            StatusText="{loc:Loc Shared.PackFileBrowserWindow.FilterProgressStatus}"/>
     </Grid>
 </windowhandling:AssetEditorWindow>

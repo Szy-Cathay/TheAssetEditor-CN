@@ -17,6 +17,7 @@ namespace Editors.Shared.Core.Common
         private readonly ISkeletonAnimationLookUpHelper _skeletonHelper;
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly IStandardDialogs _packFileUiProvider;
+        private readonly ModelSkeletonResolver _modelSkeletonResolver;
 
         public SceneObjectViewModelBuilder(
             AnimationPlayerViewModel animationPlayerViewModel, 
@@ -24,7 +25,8 @@ namespace Editors.Shared.Core.Common
             IPackFileService pfs,
             ISkeletonAnimationLookUpHelper skeletonHelper, 
             IUiCommandFactory uiCommandFactory,
-            IStandardDialogs packFileUiProvider)
+            IStandardDialogs packFileUiProvider,
+            ModelSkeletonResolver modelSkeletonResolver)
         {
             _animationPlayerViewModel = animationPlayerViewModel;
             _sceneObjectEditor = assetViewModelBuilder;
@@ -32,12 +34,13 @@ namespace Editors.Shared.Core.Common
             _skeletonHelper = skeletonHelper;
             _uiCommandFactory = uiCommandFactory;
             _packFileUiProvider = packFileUiProvider;
+            _modelSkeletonResolver = modelSkeletonResolver;
         }
 
         public SceneObjectViewModel CreateAsset(string uniqeId, bool createByDefault, string header, Color skeletonColour, AnimationToolInput input)
         {
             var mainAsset = _sceneObjectEditor.CreateAsset(uniqeId, header, skeletonColour);
-            var returnObj = new SceneObjectViewModel(_uiCommandFactory, _pfs, _packFileUiProvider, mainAsset, header, _sceneObjectEditor, _skeletonHelper);
+            var returnObj = new SceneObjectViewModel(_uiCommandFactory, _pfs, _packFileUiProvider, mainAsset, header, _sceneObjectEditor, _skeletonHelper, _modelSkeletonResolver);
 
             if (createByDefault)
             {

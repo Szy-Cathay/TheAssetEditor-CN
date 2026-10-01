@@ -9,20 +9,20 @@ namespace Shared.GameFormats.Vmd
 {
     public static class VariantMeshDefinitionLoader
     {
-
+        private static readonly XmlSerializer s_serializer = new(typeof(VariantMesh), new XmlRootAttribute("VARIANT_MESH"));
         public static VariantMesh Load(string fileContent, bool strict = false)
         {
-            var xRoot = new XmlRootAttribute("VARIANT_MESH");
-
-            var xmlserializer = new XmlSerializer(typeof(VariantMesh), xRoot);
             using var stringReader = new StringReader(fileContent);
             var reader = XmlReader.Create(stringReader);
 
             object result = null;
-            if (strict)
-                result = xmlserializer.Deserialize(reader, new UnknownXmlDataThrower().EventHandler);
-            else
-                result = xmlserializer.Deserialize(reader);
+            lock (s_serializer)
+            {
+                if (strict)
+                    result = s_serializer.Deserialize(reader, new UnknownXmlDataThrower().EventHandler);
+                else
+                    result = s_serializer.Deserialize(reader);
+            }
 
             var typedObject = result as VariantMesh;
             typedObject.FixStrings();

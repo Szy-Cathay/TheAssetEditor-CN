@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -218,6 +218,40 @@ public class PackFileSearchFilterTests
             NUnitAssert.That(root.IsVisible, Is.True);
             NUnitAssert.That(emptyFolder.IsVisible, Is.True);
         });
+    }
+
+    [Test]
+    public void FilePredicate_ComposesWithSearchAndExtensionFilters()
+    {
+        var owner = new PackFileContainer("test.pack");
+        var root = new TreeNode("test.pack", NodeType.Root, owner, null);
+        var matching = new TreeNode("griffon.wsmodel", NodeType.File, owner, root,
+            PackFile.CreateFromBytes("griffon.wsmodel", []));
+        var incompatible = new TreeNode("griffon_other.wsmodel", NodeType.File, owner, root,
+            PackFile.CreateFromBytes("griffon_other.wsmodel", []));
+        var otherType = new TreeNode("griffon.anim", NodeType.File, owner, root,
+            PackFile.CreateFromBytes("griffon.anim", []));
+        root.Children.Add(matching);
+        root.Children.Add(incompatible);
+        root.Children.Add(otherType);
+        var filter = new SearchFilter([root]);
+        filter.SetExtensions([".wsmodel"]);
+        filter.SetFileFilter(file => file == matching.Item);
+        filter.FilterText = "griffon";
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(matching.IsVisible, Is.True);
+            NUnitAssert.That(incompatible.IsVisible, Is.False);
+            NUnitAssert.That(otherType.IsVisible, Is.False);
+        });
+
+        filter.SetFileFilter(null);
+        NUnitAssert.That(incompatible.IsVisible, Is.True);
+        NUnitAssert.That(otherType.IsVisible, Is.False);
+        filter.FilterText = "other";
+        NUnitAssert.That(matching.IsVisible, Is.False);
+        NUnitAssert.That(incompatible.IsVisible, Is.True);
     }
 
     private static TreeNode AddFile(
