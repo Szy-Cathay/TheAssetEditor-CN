@@ -977,6 +977,7 @@
   "CampaignAnim.Convert": "转换",
   "CampaignAnim.Error.NoAnimation": "无法转换动画：未选择动画。",
   "CampaignAnim.Error.NoRootBone": "无法转换动画：未选择根骨骼。",
+  "CampaignAnim.Error.NoSkeletonForCorrection": "无法转换动画：请先加载骨骼，以保留动作的坐标校正。",
   "CampaignAnim.Error.NoFrames": "无法转换动画：动画不包含任何帧。",
   "CampaignAnim.Error.IncompleteFrame": "无法转换动画：第 {0} 帧的骨骼数据不完整。",
   "CampaignAnim.Error.BoneOutOfRange": "无法转换动画：第 {0} 帧中不存在索引为 {1} 的骨骼。",

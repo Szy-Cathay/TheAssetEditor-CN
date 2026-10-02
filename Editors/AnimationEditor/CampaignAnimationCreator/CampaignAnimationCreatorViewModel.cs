@@ -87,7 +87,8 @@ namespace AnimationEditor.CampaignAnimationCreator
             if (_convertCommand.Execute(
                     _selectedAnimationClip,
                     ModelBoneList.SelectedItem,
-                    out var convertedAnimation) == false ||
+                    out var convertedAnimation,
+                    _selectedUnit?.Skeleton) == false ||
                 _selectedUnit == null)
             {
                 return;

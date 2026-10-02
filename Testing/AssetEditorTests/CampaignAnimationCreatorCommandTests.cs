@@ -10,6 +10,7 @@ using Shared.Core.Services;
 using Shared.Core.ToolCreation;
 using Shared.GameFormats.Animation;
 using Shared.GameFormats.RigidModel.Transforms;
+using Shared.Ui.BaseDialogs.StandardDialog;
 
 namespace AssetEditorTests
 {
@@ -17,6 +18,8 @@ namespace AssetEditorTests
     [DoNotParallelize]
     public class CampaignAnimationCreatorCommandTests
     {
+        public TestContext TestContext { get; set; } = null!;
+
         [ClassInitialize]
         public static void Initialize(TestContext _)
         {
@@ -197,6 +200,201 @@ namespace AssetEditorTests
             }
         }
 
+        [DataTestMethod]
+        [DataRow(90f, 0f)]
+        [DataRow(-90f, 0f)]
+        [DataRow(0f, 90f)]
+        [DataRow(0f, -90f)]
+        public void Convert_FixedCoordinateRotation_PreservesBodyAndAttachmentPose(float pitch, float roll)
+        {
+            var correction = Quaternion.CreateFromYawPitchRoll(0, MathHelper.ToRadians(pitch), MathHelper.ToRadians(roll));
+            var (skeleton, source, root) = CreateCoordinateAnimation(correction);
+            var original = source.Clone();
+            var command = new ConvertCampaignAnimationCommand(new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+
+            Assert.IsTrue(command.Execute(source, root, out var converted, skeleton));
+            Assert.IsNotNull(converted);
+
+            for (var frameIndex = 0; frameIndex < source.DynamicFrames.Count; frameIndex++)
+            {
+                Assert.AreEqual(Vector3.Zero, converted.DynamicFrames[frameIndex].Position[0]);
+                Assert.AreEqual(Quaternion.Identity, converted.DynamicFrames[frameIndex].Rotation[0]);
+                AssertBodyPosePreserved(skeleton, original, converted, frameIndex);
+                foreach (var boneIndex in new[] { 2, 4, 5, 6 })
+                {
+                    Assert.AreEqual(original.DynamicFrames[frameIndex].Position[boneIndex], converted.DynamicFrames[frameIndex].Position[boneIndex]);
+                    Assert.AreEqual(original.DynamicFrames[frameIndex].Rotation[boneIndex], converted.DynamicFrames[frameIndex].Rotation[boneIndex]);
+                }
+                CollectionAssert.AreEqual(original.DynamicFrames[frameIndex].Position, source.DynamicFrames[frameIndex].Position);
+                CollectionAssert.AreEqual(original.DynamicFrames[frameIndex].Rotation, source.DynamicFrames[frameIndex].Rotation);
+                CollectionAssert.AreEqual(original.DynamicFrames[frameIndex].Scale, converted.DynamicFrames[frameIndex].Scale);
+            }
+        }
+
+        [TestMethod]
+        public void Convert_FixedCoordinateRotation_SaveAndReloadPreservesPose()
+        {
+            var (skeleton, source, root) = CreateCoordinateAnimation(Quaternion.CreateFromAxisAngle(Vector3.Right, -MathHelper.PiOver2));
+            var command = new ConvertCampaignAnimationCommand(new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+            Assert.IsTrue(command.Execute(source, root, out var converted, skeleton));
+
+            byte[]? savedBytes = null;
+            var packFiles = new Mock<IPackFileService>();
+            packFiles.Setup(x => x.GetEditablePack()).Returns(new PackFileContainer("test.pack"));
+            var fileSave = new Mock<IFileSaveService>();
+            fileSave.Setup(x => x.SaveAs(".anim", It.IsAny<byte[]>()))
+                .Callback<string, byte[]>((_, bytes) => savedBytes = bytes)
+                .Returns(PackFile.CreateFromBytes("campaign.anim", [1]));
+            var save = new SaveCampaignAnimationCommand(packFiles.Object, fileSave.Object, new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+
+            Assert.IsTrue(save.Execute(skeleton, converted));
+            Assert.IsNotNull(savedBytes);
+            var reloaded = new AnimationClip(AnimationFile.Create(new ByteChunk(savedBytes)), skeleton);
+            Assert.AreEqual(source.Duration, reloaded.Duration);
+            Assert.AreEqual(source.DynamicFrames.Count, reloaded.DynamicFrames.Count);
+            for (var frameIndex = 0; frameIndex < source.DynamicFrames.Count; frameIndex++)
+                AssertBodyPosePreserved(skeleton, source, reloaded, frameIndex, 0.001f);
+        }
+
+        [TestMethod]
+        public void Convert_FixedCoordinateRotation_HandlesQuaternionSignAndUniformScale()
+        {
+            var correction = Quaternion.CreateFromAxisAngle(Vector3.Right, -MathHelper.PiOver2);
+            var (skeleton, source, root) = CreateCoordinateAnimation(correction);
+            source.DynamicFrames[1].Rotation[0] = -correction;
+            foreach (var frame in source.DynamicFrames)
+                frame.Scale[0] = new Vector3(2);
+            var command = new ConvertCampaignAnimationCommand(new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+
+            Assert.IsTrue(command.Execute(source, root, out var converted, skeleton));
+            Assert.IsNotNull(converted);
+            for (var frameIndex = 0; frameIndex < source.DynamicFrames.Count; frameIndex++)
+            {
+                AssertBodyPosePreserved(skeleton, source, converted, frameIndex);
+                CollectionAssert.AreEqual(source.DynamicFrames[frameIndex].Scale, converted.DynamicFrames[frameIndex].Scale);
+            }
+        }
+
+        [DataTestMethod]
+        [DataRow(0f, 90f, 0f)]
+        [DataRow(5f, 0f, 0f)]
+        [DataRow(90f, 0f, 10f)]
+        public void Convert_HeadingAndAnimatedTilt_KeepExistingRootMotionRemoval(float pitch, float yaw, float pitchChange)
+        {
+            var correction = Quaternion.CreateFromYawPitchRoll(MathHelper.ToRadians(yaw), MathHelper.ToRadians(pitch), 0);
+            var (skeleton, source, root) = CreateCoordinateAnimation(correction);
+            if (pitchChange != 0)
+                source.DynamicFrames[1].Rotation[0] = Quaternion.CreateFromYawPitchRoll(MathHelper.ToRadians(yaw), MathHelper.ToRadians(pitch + pitchChange), 0);
+            var original = source.Clone();
+            var command = new ConvertCampaignAnimationCommand(new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+
+            Assert.IsTrue(command.Execute(source, root, out var converted, skeleton));
+            Assert.IsNotNull(converted);
+            for (var frameIndex = 0; frameIndex < source.DynamicFrames.Count; frameIndex++)
+            {
+                Assert.AreEqual(Vector3.Zero, converted.DynamicFrames[frameIndex].Position[0]);
+                Assert.AreEqual(Quaternion.Identity, converted.DynamicFrames[frameIndex].Rotation[0]);
+                for (var boneIndex = 1; boneIndex < source.AnimationBoneCount; boneIndex++)
+                {
+                    Assert.AreEqual(original.DynamicFrames[frameIndex].Position[boneIndex], converted.DynamicFrames[frameIndex].Position[boneIndex]);
+                    Assert.AreEqual(original.DynamicFrames[frameIndex].Rotation[boneIndex], converted.DynamicFrames[frameIndex].Rotation[boneIndex]);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void Convert_FixedCoordinateRotation_RepeatedConversionDoesNotChangePose()
+        {
+            var (skeleton, source, root) = CreateCoordinateAnimation(Quaternion.CreateFromAxisAngle(Vector3.Right, -MathHelper.PiOver2));
+            var command = new ConvertCampaignAnimationCommand(new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+
+            Assert.IsTrue(command.Execute(source, root, out var converted, skeleton));
+            Assert.IsTrue(command.Execute(converted, root, out var repeated, skeleton));
+            Assert.IsNotNull(repeated);
+            for (var frameIndex = 0; frameIndex < source.DynamicFrames.Count; frameIndex++)
+                AssertBodyPosePreserved(skeleton, source, repeated, frameIndex);
+            CollectionAssert.AreEqual(AnimationFile.ConvertToBytes(converted!.ConvertToFileFormat(skeleton)), AnimationFile.ConvertToBytes(repeated.ConvertToFileFormat(skeleton)));
+        }
+
+        [TestMethod]
+        public void Convert_FixedCoordinateRotation_NoSkeletonShowsChineseDialog()
+        {
+            var (_, source, root) = CreateCoordinateAnimation(Quaternion.CreateFromAxisAngle(Vector3.Right, -MathHelper.PiOver2));
+            var dialogs = new Mock<IStandardDialogs>();
+            string? message = null;
+            string? title = null;
+            dialogs.Setup(x => x.ShowDialogBox(It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<string, string>((text, caption) => { message = text; title = caption; });
+            var command = new ConvertCampaignAnimationCommand(dialogs.Object, LocalizationManager.Instance);
+
+            Assert.IsFalse(command.Execute(source, root, out var converted));
+            Assert.IsNull(converted);
+            Assert.AreEqual("无法转换动画：请先加载骨骼，以保留动作的坐标校正。", message);
+            Assert.AreEqual("错误", title);
+            WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+            {
+                using var dialog = new MessageDialogWindow(title!, message!, MessageDialogButtonSet.Ok, System.Windows.MessageBoxImage.Error);
+                Assert.AreEqual(message, dialog.Message);
+                var ok = (System.Windows.Controls.Button)dialog.FindName("OkButton");
+                Assert.AreEqual("确定", ok.Content);
+                var content = (System.Windows.FrameworkElement)dialog.Content;
+                dialog.Content = null;
+                var preview = new System.Windows.Controls.Border
+                {
+                    Background = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("AeBrush.Canvas"),
+                    Child = content
+                };
+                preview.Measure(new System.Windows.Size(440, 220));
+                preview.Arrange(new System.Windows.Rect(0, 0, 440, 220));
+                preview.UpdateLayout();
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(440, 220, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                bitmap.Render(preview);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                var path = Path.Combine(AppContext.BaseDirectory, "campaign-coordinate-correction-dialog.png");
+                using (var stream = File.Create(path)) encoder.Save(stream);
+                TestContext.AddResultFile(path);
+            });
+        }
+
+        [TestMethod]
+        public void Convert_FixedCoordinateRotation_SkeletonFrameMismatchReportsFrame()
+        {
+            var (skeleton, source, root) = CreateCoordinateAnimation(Quaternion.CreateFromAxisAngle(Vector3.Right, -MathHelper.PiOver2));
+            source.DynamicFrames[1].Position.RemoveAt(6);
+            source.DynamicFrames[1].Rotation.RemoveAt(6);
+            source.DynamicFrames[1].Scale.RemoveAt(6);
+            var dialogs = new Mock<IStandardDialogs>();
+            var command = new ConvertCampaignAnimationCommand(dialogs.Object, LocalizationManager.Instance);
+
+            Assert.IsFalse(command.Execute(source, root, out var converted, skeleton));
+            Assert.IsNull(converted);
+            dialogs.Verify(x => x.ShowDialogBox("无法转换动画：第 2 帧的骨骼数据不完整。", "错误"), Times.Once);
+        }
+
+        [TestMethod]
+        public void Convert_OrdinaryBoneQuarterTurn_KeepsExistingBehavior()
+        {
+            var (skeleton, source, _) = CreateCoordinateAnimation(Quaternion.Identity);
+            foreach (var frame in source.DynamicFrames)
+                frame.Rotation[1] = Quaternion.CreateFromAxisAngle(Vector3.Right, -MathHelper.PiOver2);
+            var original = source.Clone();
+            var command = new ConvertCampaignAnimationCommand(new Mock<IStandardDialogs>().Object, LocalizationManager.Instance);
+
+            Assert.IsTrue(command.Execute(source, new SkeletonBoneNode { BoneIndex = 1, BoneName = "root" }, out var converted, skeleton));
+            Assert.IsNotNull(converted);
+            for (var frameIndex = 0; frameIndex < source.DynamicFrames.Count; frameIndex++)
+            {
+                Assert.AreEqual(Quaternion.Identity, converted.DynamicFrames[frameIndex].Rotation[1]);
+                Assert.AreEqual(Vector3.Zero, converted.DynamicFrames[frameIndex].Position[1]);
+                foreach (var boneIndex in new[] { 0, 2, 3, 4, 5, 6 })
+                {
+                    Assert.AreEqual(original.DynamicFrames[frameIndex].Position[boneIndex], converted.DynamicFrames[frameIndex].Position[boneIndex]);
+                    Assert.AreEqual(original.DynamicFrames[frameIndex].Rotation[boneIndex], converted.DynamicFrames[frameIndex].Rotation[boneIndex]);
+                }
+            }
+        }
+
         [TestMethod]
         public void Save_NoSkeleton_ShowsLocalizedErrorAndDoesNotSave()
         {
@@ -342,6 +540,70 @@ namespace AssetEditorTests
             Assert.IsFalse(result);
             fileSaveService.Verify(x => x.SaveAs(".anim", It.IsAny<byte[]>()), Times.Once);
             dialogs.Verify(x => x.ShowDialogBox(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+
+        private static (GameSkeleton Skeleton, AnimationClip Animation, SkeletonBoneNode Root) CreateCoordinateAnimation(Quaternion correction)
+        {
+            var file = new AnimationFile
+            {
+                Header = { SkeletonName = "coordinate_animation_test" },
+                Bones =
+                [
+                    new() { Id = 0, Name = "animroot", ParentId = -1 },
+                    new() { Id = 1, Name = "root", ParentId = 0 },
+                    new() { Id = 2, Name = "head_0", ParentId = 1 },
+                    new() { Id = 3, Name = "weapon_1", ParentId = 0 },
+                    new() { Id = 4, Name = "attachment", ParentId = 3 },
+                    new() { Id = 5, Name = "independent_root", ParentId = -1 },
+                    new() { Id = 6, Name = "independent_child", ParentId = 5 }
+                ]
+            };
+            var skeleton = GameSkeleton.CreateFromAnimationFile(file, new AnimationPlayer());
+            var inverse = Quaternion.Inverse(correction);
+            var animation = new AnimationClip { Duration = TimeSpan.FromSeconds(0.15) };
+            for (var frameIndex = 0; frameIndex < 3; frameIndex++)
+            {
+                animation.DynamicFrames.Add(new AnimationClip.KeyFrame
+                {
+                    Position =
+                    [
+                        new Vector3(frameIndex * 0.25f, 0, frameIndex * 0.5f),
+                        Vector3.Transform(Vector3.Up, inverse),
+                        new Vector3(0.1f * frameIndex, 1, 0),
+                        Vector3.Transform(new Vector3(0.5f, 1.25f, -0.25f), inverse),
+                        new Vector3(0, 0.5f, 0),
+                        new Vector3(3, 2, 1),
+                        Vector3.Up
+                    ],
+                    Rotation = [correction, inverse, Quaternion.CreateFromYawPitchRoll(0.1f * frameIndex, 0, 0), inverse, Quaternion.Identity, Quaternion.Identity, Quaternion.Identity],
+                    Scale = Enumerable.Repeat(Vector3.One, 7).ToList()
+                });
+            }
+            return (skeleton, animation, new SkeletonBoneNode { BoneIndex = 0, BoneName = "animroot", ParentBoneIndex = -1 });
+        }
+
+        private static void AssertBodyPosePreserved(GameSkeleton skeleton, AnimationClip source, AnimationClip converted, int frameIndex, float tolerance = 0.0001f)
+        {
+            var before = AnimationSampler.Sample(frameIndex, 0, skeleton, source);
+            var after = AnimationSampler.Sample(frameIndex, 0, skeleton, converted);
+            for (var boneIndex = 1; boneIndex < skeleton.BoneCount; boneIndex++)
+            {
+                var expected = before.GetSkeletonAnimatedWorld(skeleton, boneIndex);
+                if (boneIndex < 5)
+                    expected.Translation -= source.DynamicFrames[frameIndex].Position[0];
+                var actual = after.GetSkeletonAnimatedWorld(skeleton, boneIndex);
+                AssertVector(expected.Right, actual.Right, tolerance);
+                AssertVector(expected.Up, actual.Up, tolerance);
+                AssertVector(expected.Backward, actual.Backward, tolerance);
+                AssertVector(expected.Translation, actual.Translation, tolerance);
+            }
+        }
+
+        private static void AssertVector(Vector3 expected, Vector3 actual, float tolerance)
+        {
+            Assert.AreEqual(expected.X, actual.X, tolerance);
+            Assert.AreEqual(expected.Y, actual.Y, tolerance);
+            Assert.AreEqual(expected.Z, actual.Z, tolerance);
         }
 
         private static SkeletonBoneNode CreateRootBone()
