@@ -333,27 +333,40 @@ namespace AssetEditorTests
             Assert.AreEqual("错误", title);
             WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
             {
+                var application = System.Windows.Application.Current;
+                var originalMainWindow = application.MainWindow;
+                var originalWindowCount = application.Windows.Count;
                 using var dialog = new MessageDialogWindow(title!, message!, MessageDialogButtonSet.Ok, System.Windows.MessageBoxImage.Error);
-                Assert.AreEqual(message, dialog.Message);
-                var ok = (System.Windows.Controls.Button)dialog.FindName("OkButton");
-                Assert.AreEqual("确定", ok.Content);
-                var content = (System.Windows.FrameworkElement)dialog.Content;
-                dialog.Content = null;
-                var preview = new System.Windows.Controls.Border
+                try
                 {
-                    Background = (System.Windows.Media.Brush)System.Windows.Application.Current.FindResource("AeBrush.Canvas"),
-                    Child = content
-                };
-                preview.Measure(new System.Windows.Size(440, 220));
-                preview.Arrange(new System.Windows.Rect(0, 0, 440, 220));
-                preview.UpdateLayout();
-                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(440, 220, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-                bitmap.Render(preview);
-                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-                var path = Path.Combine(AppContext.BaseDirectory, "campaign-coordinate-correction-dialog.png");
-                using (var stream = File.Create(path)) encoder.Save(stream);
-                TestContext.AddResultFile(path);
+                    Assert.AreEqual(message, dialog.Message);
+                    var ok = (System.Windows.Controls.Button)dialog.FindName("OkButton");
+                    Assert.AreEqual("确定", ok.Content);
+                    var content = (System.Windows.FrameworkElement)dialog.Content;
+                    dialog.Content = null;
+                    var preview = new System.Windows.Controls.Border
+                    {
+                        Background = (System.Windows.Media.Brush)application.FindResource("AeBrush.Canvas"),
+                        Child = content
+                    };
+                    preview.Measure(new System.Windows.Size(440, 220));
+                    preview.Arrange(new System.Windows.Rect(0, 0, 440, 220));
+                    preview.UpdateLayout();
+                    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(440, 220, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                    bitmap.Render(preview);
+                    var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                    var path = Path.Combine(AppContext.BaseDirectory, "campaign-coordinate-correction-dialog.png");
+                    using (var stream = File.Create(path)) encoder.Save(stream);
+                    TestContext.AddResultFile(path);
+                }
+                finally
+                {
+                    dialog.Close();
+                    application.MainWindow = originalMainWindow;
+                }
+                Assert.AreEqual(originalWindowCount, application.Windows.Count);
+                Assert.AreSame(originalMainWindow, application.MainWindow);
             });
         }
 
