@@ -439,18 +439,27 @@ public partial class ViewportMouseInteractionTests
         });
     }
 
-    [TestMethod]
-    public void PressMoveReleaseBetweenFrames_PreservesBothEdgesAndDragOrigin()
+    [DataTestMethod]
+    [DataRow(1)]
+    [DataRow(1.25)]
+    [DataRow(1.5)]
+    public void PressMoveReleaseBetweenFrames_PreservesBothEdgesAndDragOrigin(double scale)
     {
-        WithViewport(1, (viewport, mouse, _) =>
+        WithViewport(scale, (viewport, mouse, _) =>
         {
+            // Force a fractional screen origin to exercise native pixel rounding.
+            viewport.Margin = new Thickness(0.25, 0.25, 0, 0);
+            viewport.UpdateLayout();
             mouse.SetCursorPosition(50, 60);
+            var pressPosition = NativePosition(viewport);
             mouse.BeginContinuousDrag();
+            Assert.IsTrue(viewport.IsMouseCaptured);
             viewport.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
             {
                 RoutedEvent = Mouse.MouseDownEvent
             });
             mouse.SetCursorPosition(200, 160);
+            var releasePosition = NativePosition(viewport);
             PumpInput();
             viewport.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
             {
@@ -459,8 +468,9 @@ public partial class ViewportMouseInteractionTests
             mouse.Update(new GameTime());
             Assert.IsTrue(mouse.IsMouseButtonPressed(GameWorld.Core.Components.Input.MouseButton.Left));
             Assert.IsTrue(mouse.IsMouseButtonReleased(GameWorld.Core.Components.Input.MouseButton.Left));
-            Assert.AreEqual(new Vector2(50, 60), mouse.GetPressPosition(GameWorld.Core.Components.Input.MouseButton.Left));
-            Assert.AreEqual(new Vector2(200, 160), mouse.Position());
+            Assert.AreEqual(pressPosition, mouse.GetPressPosition(GameWorld.Core.Components.Input.MouseButton.Left));
+            Assert.AreEqual(releasePosition.X, mouse.Position().X, 0.05f);
+            Assert.AreEqual(releasePosition.Y, mouse.Position().Y, 0.05f);
             mouse.Update(new GameTime());
             Assert.IsFalse(mouse.IsMouseButtonPressed(GameWorld.Core.Components.Input.MouseButton.Left));
             Assert.IsFalse(mouse.IsMouseButtonReleased(GameWorld.Core.Components.Input.MouseButton.Left));
