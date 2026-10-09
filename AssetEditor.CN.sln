@@ -118,6 +118,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.CscEditor", "Editors\C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.Editors.Shared.Core", "Editors\Shared\Test.Editors.Shared.Core\Test.Editors.Shared.Core.csproj", "{9620FAF1-8A07-4398-8292-96BA754FAE73}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editors.VfxEditor", "Editors\VfxEditor\Editors.VfxEditor.csproj", "{6DF63304-FEB0-4352-8FCB-AF2E7036E354}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -280,6 +282,10 @@ Global
 		{9620FAF1-8A07-4398-8292-96BA754FAE73}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9620FAF1-8A07-4398-8292-96BA754FAE73}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9620FAF1-8A07-4398-8292-96BA754FAE73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DF63304-FEB0-4352-8FCB-AF2E7036E354}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DF63304-FEB0-4352-8FCB-AF2E7036E354}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DF63304-FEB0-4352-8FCB-AF2E7036E354}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DF63304-FEB0-4352-8FCB-AF2E7036E354}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -334,6 +340,7 @@ Global
 		{D4D7F33C-1CBF-4243-B742-ADFE9766DE22} = {D56F2BFC-4248-15FF-24D7-9085B42B73CB}
 		{E77A53A6-49B7-441A-8429-3BBA2BC42B70} = {18424B6A-CB8A-4CE1-935C-72459F31521B}
 		{9620FAF1-8A07-4398-8292-96BA754FAE73} = {18424B6A-CB8A-4CE1-935C-72459F31521B}
+		{6DF63304-FEB0-4352-8FCB-AF2E7036E354} = {07AC615B-A8FC-4E1A-BDD5-BC11452429A0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AB5968F3-98ED-4AFF-98EA-0DBEDCACADF2}

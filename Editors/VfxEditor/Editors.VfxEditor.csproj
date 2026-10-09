@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup>
+        <Using Include="Shared.Ui.BaseDialogs.StandardDialog.UnifiedMessageBox" Alias="MessageBox" />
+    </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <UseWPF>true</UseWPF>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\Shared\GameFiles\Shared.GameFormats.csproj" />
+        <ProjectReference Include="..\..\Shared\SharedUI\Shared.Ui.csproj" />
+    </ItemGroup>
+</Project>

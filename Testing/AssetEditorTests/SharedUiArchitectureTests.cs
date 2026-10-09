@@ -172,6 +172,10 @@ namespace AssetEditorTests
                     "{StaticResource AeVerticalGridSplitterStyle}",
                     "{StaticResource AeHorizontalGridSplitterStyle}",
                 ],
+                ["Editors/VfxEditor/VfxEditorView.xaml"] =
+                [
+                    "{StaticResource AeVerticalGridSplitterStyle}",
+                ],
                 ["Editors/Kitbashing/KitbasherEditor/Core/KitbasherView.xaml"] =
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",
