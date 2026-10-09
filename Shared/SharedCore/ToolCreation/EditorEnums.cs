@@ -23,5 +23,6 @@
         Twui_Editor,
         Csc_Editor,
         None,
+        Vfx_Editor,
     }
 }

@@ -6,6 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CommonControls.BaseDialogs.ToolSelector"
         xmlns:loc="clr-namespace:Shared.Ui.Common"
+        xmlns:editors="clr-namespace:Shared.Core.ToolCreation;assembly=Shared.Core"
         mc:Ignorable="d"
         Title="{loc:Loc Shared.ToolSelector.Title}"
         Height="250" Width="300"
@@ -27,6 +28,22 @@
      
         <Button DockPanel.Dock="Bottom" Margin="5" Click="Button_Click" Content="{loc:Loc Shared.ToolSelector.Open}" Style="{StaticResource AeButton.Primary}"/>
         <ListView DockPanel.Dock="Top" x:Name="PossibleTools"  Margin="5" >
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock>
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource AeText.Body}">
+                                <Setter Property="Text" Value="{Binding}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding}" Value="{x:Static editors:EditorEnums.Vfx_Editor}">
+                                        <Setter Property="Text" Value="{loc:Loc Vfx.Title}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </DataTemplate>
+            </ListView.ItemTemplate>
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />

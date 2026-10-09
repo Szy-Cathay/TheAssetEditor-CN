@@ -4,6 +4,22 @@ namespace Shared.Core.PackFiles.Utility
 {
     public static class PackFileServiceUtility
     {
+        public static void ExportSnapshot(string path, IReadOnlyDictionary<string, byte[]> entries,
+            Settings.GameInformation game, PackFileCAType type)
+        {
+            var snapshot = new PackFileContainer(Path.GetFileNameWithoutExtension(path))
+            {
+                Header = new PFHeader(Serialization.PackFileVersionConverter.ToString(game.PackFileVersion), type),
+            };
+            foreach (var entry in entries)
+            {
+                var resourcePath = FolderProjectPathPolicy.EnsureResourcePath(entry.Key);
+                snapshot.FileList.Add(resourcePath.ToLowerInvariant(), PackFile.CreateFromBytes(Path.GetFileName(resourcePath), entry.Value));
+            }
+            // Detached exports must not publish document-save events to the active workspace.
+            new PackFileService(null).SavePackContainer(snapshot, path, game);
+        }
+
         public static List<PackFile> FindAllFilesInDirectory(IPackFileService pfs, string dir, bool includeSubFolders = true)
         {
             dir = dir.Replace('/', '\\').ToLower();

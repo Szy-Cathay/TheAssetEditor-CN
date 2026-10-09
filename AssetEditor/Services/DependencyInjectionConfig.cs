@@ -36,6 +36,7 @@ namespace AssetEditor.Services
                 new Editors.Twui.DependencyInjectionContainer(),
                 new Editors.Ipc.DependencyInjectionContainer(),
                 new Editors.CscEditor.DependencyInjectionContainer(),
+                new Editors.VfxEditor.DependencyInjectionContainer(),
 
                 // Host application
                 new DependencyInjectionContainer(),
