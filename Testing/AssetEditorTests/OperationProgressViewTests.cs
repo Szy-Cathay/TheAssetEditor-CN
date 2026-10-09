@@ -37,6 +37,7 @@ public class OperationProgressViewTests
         (["Editors", "Audio", "DialogueEventMerger", "DialogueEventMergerWindow.xaml"], 1),
         (["Editors", "ImportExportEditor", "Editors.ImportExport", "Exporting", "Presentation", "ExportWindow.xaml"], 1),
         (["Editors", "ImportExportEditor", "Editors.ImportExport", "Importing", "Presentation", "ImportWindow.xaml"], 1),
+        (["Editors", "VfxEditor", "VfxEditorView.xaml"], 1),
         (["Shared", "SharedUI", "BaseDialogs", "PackFileTree", "PackFileBrowserView.xaml"], 1),
         (["Shared", "SharedUI", "BaseDialogs", "StandardDialog", "PackFile", "PackFileBrowserWindow.xaml"], 1),
     ];
