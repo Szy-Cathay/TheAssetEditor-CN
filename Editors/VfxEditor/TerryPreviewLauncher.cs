@@ -89,6 +89,9 @@ internal static class TerryPreviewLauncher
         var timer = Stopwatch.StartNew();
         var toolActivated = false;
         var filterApplied = false;
+        AutomationElement? input = null;
+        ValuePattern? value = null;
+        GridPattern? grid = null;
         while (timer.Elapsed < TimeSpan.FromSeconds(30))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -102,7 +105,8 @@ internal static class TerryPreviewLauncher
                 {
                     var tool = window.FindFirst(TreeScope.Descendants, new AndCondition(
                         new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.CheckBox),
-                        new PropertyCondition(AutomationElement.NameProperty, "Create VFX")));
+                        new OrCondition(new PropertyCondition(AutomationElement.NameProperty, "Create VFX"),
+                            new PropertyCondition(AutomationElement.NameProperty, "创建 VFX"))));
                     if (tool?.Current.IsEnabled == true && tool.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke))
                     {
                         // Invoke emits clicked; Toggle only changes the Qt button's checked state.
@@ -112,42 +116,65 @@ internal static class TerryPreviewLauncher
                 }
                 else
                 {
-                    var trees = window.FindAll(TreeScope.Descendants,
-                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Tree));
-                    foreach (AutomationElement tree in trees)
+                    if (input == null || value == null || grid == null)
                     {
-                        var current = tree.FindFirst(TreeScope.Children,
-                            new PropertyCondition(AutomationElement.NameProperty, TerryPreviewBuilder.EffectName));
-                        if (current == null) continue;
-                        var container = TreeWalker.ControlViewWalker.GetParent(tree);
-                        var inputs = container?.FindAll(TreeScope.Descendants,
-                            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
-                        if (inputs?.Count != 1) continue;
-                        if (!inputs[0].TryGetCurrentPattern(ValuePattern.Pattern, out var value)) continue;
-                        if (!filterApplied)
+                        // Qt exposes only some list items as children. Locate the selector itself,
+                        // then keep its patterns instead of traversing thousands of effects on each poll.
+                        var selector = window.FindFirst(TreeScope.Descendants,
+                            new PropertyCondition(AutomationElement.ClassNameProperty, "QTU::PathSelector"));
+                        var tree = selector?.FindFirst(TreeScope.Children,
+                            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Tree));
+                        input = selector == null ? null : FindFilterInput(selector);
+                        if (input?.TryGetCurrentPattern(ValuePattern.Pattern, out var inputPattern) == true
+                            && tree?.TryGetCurrentPattern(GridPattern.Pattern, out var treePattern) == true)
                         {
-                            filterApplied = ApplyFilter(process, inputs[0], (ValuePattern)value);
-                            break;
+                            value = (ValuePattern)inputPattern;
+                            grid = (GridPattern)treePattern;
                         }
+                    }
+                    if (input != null && value != null && grid != null)
+                    {
                         // Qt's grid reports filtered rows, including while the window is covered.
-                        if (tree.TryGetCurrentPattern(GridPattern.Pattern, out var grid)
-                            && ((GridPattern)grid).Current.RowCount == 1
-                            && ((GridPattern)grid).GetItem(0, 0).Current.Name == TerryPreviewBuilder.EffectName
-                            && ((ValuePattern)value).Current.Value == TerryPreviewBuilder.EffectName)
+                        if (grid.Current.RowCount == 1
+                            && grid.GetItem(0, 0).Current.Name == TerryPreviewBuilder.EffectName
+                            && value.Current.Value == TerryPreviewBuilder.EffectName)
                         {
                             Shared.Core.ErrorHandling.Logging.CreateStatic(typeof(TerryPreviewLauncher))
                                 .Information("Terry preview is ready in process {ProcessId}; current effect filter verified", process.Id);
                             return;
                         }
+                        if (!filterApplied) filterApplied = ApplyFilter(process, input, value);
                     }
                 }
             }
-            catch (ElementNotAvailableException) { }
+            catch (ElementNotAvailableException)
+            {
+                input = null;
+                value = null;
+                grid = null;
+                filterApplied = false;
+            }
             await Task.Delay(300, cancellationToken);
         }
         Shared.Core.ErrorHandling.Logging.CreateStatic(typeof(TerryPreviewLauncher))
             .Warning("Could not prepare Terry preview VFX; tool activated {Activated}, filter applied {Filtered}", toolActivated, filterApplied);
         throw new IOException(localization.Get("Vfx.Terry.FilterUnavailable"));
+    }
+
+    private static AutomationElement? FindFilterInput(AutomationElement selector)
+    {
+        var condition = new AndCondition(
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit),
+            new PropertyCondition(AutomationElement.ClassNameProperty, "QLineEdit"));
+        // The filter is nested beside the tree. Never descend into its thousands of rows.
+        var siblings = selector.FindAll(TreeScope.Children,
+            new NotCondition(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Tree)));
+        foreach (AutomationElement sibling in siblings)
+        {
+            var input = sibling.FindFirst(TreeScope.Element | TreeScope.Descendants, condition);
+            if (input != null) return input;
+        }
+        return null;
     }
 
     private static bool ApplyFilter(Process process, AutomationElement input, ValuePattern value)

@@ -132,6 +132,53 @@ public class TerryPreviewTests
     }
 
     [TestMethod]
+    [TestCategory("TerryIntegration")]
+    public async Task RealModEffect_OpensTerryAndVerifiesCurrentEffect()
+    {
+        var sample = Environment.GetEnvironmentVariable("ASSETEDITOR_TERRY_SAMPLE");
+        var gameData = Environment.GetEnvironmentVariable("ASSETEDITOR_TERRY_GAME_DATA");
+        if (Environment.GetEnvironmentVariable("ASSETEDITOR_TERRY_LAUNCH") != "1"
+            || string.IsNullOrEmpty(sample) || string.IsNullOrEmpty(gameData))
+        {
+            Assert.Inconclusive("Set ASSETEDITOR_TERRY_LAUNCH=1, ASSETEDITOR_TERRY_SAMPLE and ASSETEDITOR_TERRY_GAME_DATA to launch real Terry. Switch to another application during startup to check background preparation.");
+            return;
+        }
+        var running = System.Diagnostics.Process.GetProcessesByName("tweak.modder.x64");
+        foreach (var process in running) process.Dispose();
+        Assert.AreEqual(0, running.Length, "Close Terry before the integration test; existing scenes must be preserved.");
+        Shared.Core.ErrorHandling.Logging.Configure(Serilog.Events.LogEventLevel.Information);
+        var settings = new ApplicationSettingsService(GameTypeEnum.Warhammer3);
+        settings.CurrentSettings.GameDirectories.Add(new() { Game = GameTypeEnum.Warhammer3, Path = gameData });
+        var originals = new PackFileContainerLoader(settings).LoadAllCaFiles(GameTypeEnum.Warhammer3)!;
+        var root = Directory.GetParent(Path.GetDirectoryName(sample)!)!.FullName;
+        var source = File.ReadAllBytes(sample);
+        var local = new PackFileContainer("Terry test resources");
+        var files = new Mock<IPackFileService>();
+        files.Setup(x => x.GetAllPackfileContainers()).Returns([originals, local]);
+        files.Setup(x => x.FindFile(It.IsAny<string>(), It.IsAny<PackFileContainer>()))
+            .Returns((string path, PackFileContainer container) =>
+            {
+                var disk = Path.Combine(root, path);
+                if (container == local)
+                    return File.Exists(disk) ? PackFile.CreateFromFileSystem(Path.GetFileName(disk), disk) : null;
+                return container.FileList.GetValueOrDefault(path);
+            });
+        var localization = new LocalizationManager();
+        localization.LoadLanguage();
+        var service = new TerryPreviewService(files.Object, settings, localization);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        try
+        {
+            var result = await service.PreviewAsync(source, Path.GetRelativePath(root, sample), local, timeout.Token);
+            Assert.IsTrue(File.Exists(result.ScenePath));
+            Assert.IsTrue(result.EffectCount > 0);
+            CollectionAssert.AreEqual(source, File.ReadAllBytes(sample));
+            Console.WriteLine($"Terry verified the current effect: {result.ScenePath}");
+        }
+        finally { await service.DisableAsync(); }
+    }
+
+    [TestMethod]
     public async Task ExistingUnownedPreviewPack_IsNeverOverwrittenAndDataSettingIsAccepted()
     {
         var root = Path.Combine(Path.GetTempPath(), "ae-terry-test-" + Guid.NewGuid().ToString("N"));
