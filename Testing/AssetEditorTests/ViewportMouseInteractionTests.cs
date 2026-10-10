@@ -451,7 +451,10 @@ public partial class ViewportMouseInteractionTests
             viewport.Margin = new Thickness(0.25, 0.25, 0, 0);
             viewport.UpdateLayout();
             mouse.SetCursorPosition(50, 60);
+            PumpInput();
             var pressPosition = NativePosition(viewport);
+            Assert.AreEqual(50f, pressPosition.X, 1f);
+            Assert.AreEqual(60f, pressPosition.Y, 1f);
             mouse.BeginContinuousDrag();
             Assert.IsTrue(viewport.IsMouseCaptured);
             viewport.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
@@ -459,8 +462,11 @@ public partial class ViewportMouseInteractionTests
                 RoutedEvent = Mouse.MouseDownEvent
             });
             mouse.SetCursorPosition(200, 160);
-            var releasePosition = NativePosition(viewport);
             PumpInput();
+            // Observe the landing after native input is dispatched, before the next game frame.
+            var releasePosition = NativePosition(viewport);
+            Assert.AreEqual(200f, releasePosition.X, 1f);
+            Assert.AreEqual(160f, releasePosition.Y, 1f);
             viewport.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
             {
                 RoutedEvent = Mouse.MouseUpEvent
@@ -529,7 +535,7 @@ public partial class ViewportMouseInteractionTests
             panel.Children.Add(viewport);
             panel.Children.Add(input);
             var window = new Window { Title = "Kitbash mouse regression", Content = panel,
-                SizeToContent = SizeToContent.WidthAndHeight, ShowInTaskbar = false };
+                SizeToContent = SizeToContent.WidthAndHeight, ShowInTaskbar = false, Topmost = true };
             var game = new Mock<IWpfGame>();
             game.Setup(value => value.GetFocusElement()).Returns(viewport);
             using var mouse = new MouseComponent(game.Object);
@@ -540,8 +546,7 @@ public partial class ViewportMouseInteractionTests
                 window.UpdateLayout();
                 Keyboard.Focus(viewport);
                 Assert.IsTrue(viewport.IsKeyboardFocused);
-                mouse.SetCursorPosition(150, 100);
-                PumpInput();
+                ActivateNativeInputViewport(viewport, mouse);
                 action(viewport, mouse, input);
             }
             finally
