@@ -246,7 +246,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             _rider.SkeletonChanged += RiderSkeletonChanges;
             _rider.AnimationChanged += TryReGenerateAnimation;
 
-            MountLinkController = new MountLinkViewModel(_sceneObjectBuilder, _pfs, _skeletonAnimationLookUpHelper, rider, mount, UpdateCanSaveAndPreviewStates);
+            MountLinkController = new MountLinkViewModel(_sceneObjectBuilder, _pfs, rider, mount, _standardDialogs, UpdateCanSaveAndPreviewStates);
 
             MountSkeletonChanged(_mount.Skeleton);
             RiderSkeletonChanges(_rider.Skeleton);

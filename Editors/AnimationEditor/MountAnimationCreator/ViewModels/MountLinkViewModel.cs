@@ -1,152 +1,156 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Windows;
+﻿using System.IO;
+using AnimationEditor.MountAnimationCreator.Services;
+using Editors.AnimationVisualEditors.MountAnimationCreator.Services;
 using Editors.Shared.Core.Common;
 using GameWorld.Core.Services;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Utility;
-using Shared.GameFormats.AnimationPack;
-using Shared.Ui.Common;
 using Shared.Core.Services;
+using Shared.GameFormats.AnimationPack;
+using Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3;
+using Shared.Ui.Common;
 
 namespace AnimationEditor.MountAnimationCreator.ViewModels
 {
-    public class MountLinkViewModel : NotifyPropertyChangedImpl
+    public class MountLinkViewModel
     {
-        public FilterCollection<IAnimationBinGenericFormat> AnimationSetForMount { get; set; }
-        public FilterCollection<IAnimationBinGenericFormat> AnimationSetForRider { get; set; }
-
-        public FilterCollection<AnimationBinEntryGenericFormat> SelectedMountTag { get; set; }
-        public FilterCollection<AnimationBinEntryGenericFormat> SelectedRiderTag { get; set; }
+        public FilterCollection<IAnimationBinGenericFormat> AnimationSetForMount { get; }
+        public FilterCollection<IAnimationBinGenericFormat> AnimationSetForRider { get; }
+        public FilterCollection<AnimationBinEntryGenericFormat> SelectedMountTag { get; }
+        public FilterCollection<AnimationBinEntryGenericFormat> SelectedRiderTag { get; }
 
         private readonly SceneObject _rider;
         private readonly SceneObject _mount;
-        private readonly SceneObjectEditor _assetViewModelEditor;
+        private readonly SceneObjectEditor _editor;
         private readonly IPackFileService _pfs;
-        private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
-        private readonly Action _validateAction;
+        private readonly IStandardDialogs _dialogs;
+        private readonly Action _validate;
+        private readonly RiderAnimationService? _riderAnimations;
+        private bool _reloading;
 
-        public MountLinkViewModel(SceneObjectEditor assetViewModelEditor, IPackFileService pfs, ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper, SceneObject rider, SceneObject mount, Action validate)
+        public MountLinkViewModel(SceneObjectEditor editor, IPackFileService pfs,
+            SceneObject rider, SceneObject mount, IStandardDialogs dialogs, Action validate, ISkeletonAnimationLookUpHelper? lookup = null)
         {
-            _assetViewModelEditor = assetViewModelEditor;
+            _editor = editor;
             _pfs = pfs;
-            _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
             _rider = rider;
             _mount = mount;
-            _validateAction = validate;
-
-            AnimationSetForMount = new FilterCollection<IAnimationBinGenericFormat>(null, (value) => UpdateAnimationSet(value, SelectedMountTag, _mount.SkeletonName.Value));
-            AnimationSetForRider = new FilterCollection<IAnimationBinGenericFormat>(null, (value) => UpdateAnimationSet(value, SelectedRiderTag, _rider.SkeletonName.Value));
-            SelectedMountTag = new FilterCollection<AnimationBinEntryGenericFormat>(null, MountTagSeleted);
-            SelectedRiderTag = new FilterCollection<AnimationBinEntryGenericFormat>(null, RiderTagSelected);
-
-            SelectedMountTag.SearchFilter = (value, rx) => { return rx.Match(value.SlotName).Success; };
-            SelectedRiderTag.SearchFilter = (value, rx) => { return rx.Match(value.SlotName).Success; };
-            AnimationSetForMount.SearchFilter = (value, rx) => { return rx.Match(value.FullPath).Success; };
-            AnimationSetForRider.SearchFilter = (value, rx) => { return rx.Match(value.FullPath).Success; };
-
-            ReloadFragments();
+            _dialogs = dialogs;
+            _validate = validate;
+            _riderAnimations = lookup == null ? null : new RiderAnimationService(pfs, lookup);
+            SelectedMountTag = new(null, MountTagSelected) { SearchFilter = (value, rx) => rx.IsMatch(value.DisplayName) };
+            SelectedRiderTag = new(null, RiderTagSelected) { SearchFilter = (value, rx) => rx.IsMatch(value.DisplayName) };
+            AnimationSetForMount = new(null, value => UpdateAnimationSet(value, SelectedMountTag))
+                { SearchFilter = (value, rx) => rx.IsMatch(value.Name) || rx.IsMatch(value.FullPath) };
+            AnimationSetForRider = new(null, value => UpdateAnimationSet(value, SelectedRiderTag))
+                { SearchFilter = (value, rx) => rx.IsMatch(value.Name) || rx.IsMatch(value.FullPath) };
         }
 
         public void ReloadFragments(bool rider = true, bool mount = true)
         {
-            if (mount)
+            _reloading = true;
+            try
             {
-                var mountSkeletonName = Path.GetFileNameWithoutExtension(_mount.SkeletonName.Value);
-                var allPossibleMount = LoadAnimationSetForSkeleton(mountSkeletonName);
-                AnimationSetForMount.UpdatePossibleValues(allPossibleMount);
+                if (mount)
+                    Reload(_mount, AnimationSetForMount, SelectedMountTag);
+                if (rider)
+                    Reload(_rider, AnimationSetForRider, SelectedRiderTag);
             }
-
-            if (rider)
+            finally
             {
-                var selectedSlotId = SelectedRiderTag.SelectedItem?.SlotIndex;
-                var selectedRider = AnimationSetForRider.SelectedItem?.FullPath;
-                var riderSkeletonName = Path.GetFileNameWithoutExtension(_rider.SkeletonName.Value);
-                var allPossibleRider = LoadAnimationSetForSkeleton(riderSkeletonName);
-                AnimationSetForRider.UpdatePossibleValues(allPossibleRider);
-                if (selectedRider != null)
-                    AnimationSetForRider.SelectedItem = AnimationSetForRider.Values.FirstOrDefault(x => x.Name == selectedRider);
-
-                if (selectedSlotId != null)
-                    SelectedRiderTag.SelectedItem = SelectedRiderTag.Values.FirstOrDefault(x => x.SlotIndex == selectedSlotId.Value);
+                _reloading = false;
             }
+            _validate();
         }
 
-        public List<IAnimationBinGenericFormat> LoadAnimationSetForSkeleton(string skeletonName, bool onlyPacksThatCanBeSaved = false)
+        private void Reload(SceneObject scene, FilterCollection<IAnimationBinGenericFormat> tables, FilterCollection<AnimationBinEntryGenericFormat> slots)
         {
-            var outputFragments = new List<IAnimationBinGenericFormat>();
-            var animPacks = PackFileServiceUtility.GetAllAnimPacks(_pfs);
-            foreach (var animPack in animPacks)
+            var selectedTable = tables.SelectedItem?.FullPath;
+            var selectedPack = tables.SelectedItem?.PackFileReference?.FileName;
+            var selectedSlot = slots.SelectedItem;
+            tables.SelectedItem = null;
+            tables.UpdatePossibleValues(LoadAnimationSetForSkeleton(scene.Skeleton?.SkeletonName ?? "", includeOtherRiders: scene == _rider && _riderAnimations != null));
+            tables.SelectedItem = tables.PossibleValues.FirstOrDefault(x => x.FullPath == selectedTable && x.PackFileReference?.FileName == selectedPack);
+            slots.SelectedItem = slots.PossibleValues.FirstOrDefault(x => SameSlot(x, selectedSlot));
+        }
+
+        internal static bool SameSlot(AnimationBinEntryGenericFormat entry, AnimationBinEntryGenericFormat? other) =>
+            other != null && entry.SlotIndex == other.SlotIndex && entry.Index == other.Index && entry.AnimationFile == other.AnimationFile &&
+            entry.MetaFile == other.MetaFile && entry.SoundFile == other.SoundFile;
+
+        public List<IAnimationBinGenericFormat> LoadAnimationSetForSkeleton(string skeletonName, bool onlyPacksThatCanBeSaved = false, bool includeOtherRiders = false)
+        {
+            if (string.IsNullOrWhiteSpace(skeletonName))
+                return [];
+            skeletonName = Path.GetFileNameWithoutExtension(skeletonName);
+            var fragments = new List<IAnimationBinGenericFormat>();
+            var project = _pfs.GetEditablePack();
+            foreach (var file in PackFileServiceUtility.GetAllAnimPacks(_pfs))
             {
-                if (onlyPacksThatCanBeSaved == true)
+                if (onlyPacksThatCanBeSaved && (project == null || _pfs.GetPackFileContainer(file) != project))
+                    continue;
+                var database = AnimationPackSerializer.Load(file, _pfs);
+                fragments.AddRange(database.Files.OfType<AnimationBinWh3>().Where(x => x.TableVersion == 4 &&
+                    (x.SkeletonName.Equals(skeletonName, StringComparison.OrdinalIgnoreCase) ||
+                     (includeOtherRiders && !string.IsNullOrEmpty(x.MountBin)))));
+            }
+            return fragments;
+        }
+
+        private void UpdateAnimationSet(IAnimationBinGenericFormat? value, FilterCollection<AnimationBinEntryGenericFormat> slots)
+        {
+            slots.SelectedItem = null;
+            slots.UpdatePossibleValues(value?.Entries);
+            _validate();
+        }
+
+        private void MountTagSelected(AnimationBinEntryGenericFormat? value)
+        {
+            if (_reloading)
+                return;
+            LoadSlot(_mount, value);
+            if (value != null)
+            {
+                var matching = AnimationSlotTypeHelperWh3.GetMatchingRiderAnimation(value.SlotName);
+                SelectedRiderTag.Filter = "";
+                var candidates = SelectedRiderTag.PossibleValues.Where(x => x.SlotIndex == matching?.Id).ToList();
+                var matchingSlot = candidates.FirstOrDefault(x => x.Index == value.Index) ?? candidates.FirstOrDefault();
+                if (matchingSlot == null && matching != null && AnimationSetForRider.SelectedItem is AnimationBinWh3 table)
                 {
-                    if (_pfs.GetPackFileContainer(animPack).IsCaPackFile)
-                        continue;
+                    var equivalent = BatchProcessorService.FindSameAction(table, matching.Value);
+                    matchingSlot = SelectedRiderTag.PossibleValues.FirstOrDefault(x => x.SlotIndex == equivalent?.AnimationId);
                 }
-
-                var animPackFile = AnimationPackSerializer.Load(animPack, _pfs);
-                var fragments = animPackFile.GetGenericAnimationSets(skeletonName);
-                foreach (var fragment in fragments)
-                    outputFragments.Add(fragment);
+                SelectedRiderTag.SelectedItem = matchingSlot;
             }
-            return outputFragments;
+            _validate();
         }
 
-        void UpdateAnimationSet(IAnimationBinGenericFormat value, FilterCollection<AnimationBinEntryGenericFormat> collection, string skeletonName)
+        private void RiderTagSelected(AnimationBinEntryGenericFormat? value)
         {
-            if (value == null)
-            {
-                collection.UpdatePossibleValues(null);
-                _validateAction();
+            if (_reloading)
                 return;
-            }
+            LoadSlot(_rider, value);
+            _validate();
+        }
 
-            var newSkeletonName = value.SkeletonName;
-            var existingSkeletonName = Path.GetFileNameWithoutExtension(skeletonName);
-            if (newSkeletonName != existingSkeletonName)
+        private void LoadSlot(SceneObject scene, AnimationBinEntryGenericFormat? slot)
+        {
+            try
             {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.FragmentSkeletonMismatch"));
-                return;
+                var path = slot?.AnimationFile;
+                if (!string.IsNullOrWhiteSpace(path) && _pfs.FindFile(path) == null)
+                    throw new InvalidOperationException(LocalizationManager.Instance.GetFormat("MountAnim.MissingAnimation", path));
+                if (scene == _rider && _riderAnimations != null && !string.IsNullOrWhiteSpace(path) && scene.Skeleton != null)
+                    _editor.SetAnimationClip(scene, _riderAnimations.Load(path, scene.Skeleton), path);
+                else
+                    _editor.SetAnimation(scene, string.IsNullOrWhiteSpace(path) ? null! : path);
             }
-
-            collection.UpdatePossibleValues(value.Entries);
-            _validateAction();
-        }
-
-        private void MountTagSeleted(AnimationBinEntryGenericFormat value)
-        {
-           //if (value != null)
-           //{
-           //    var file = _pfs.FindFile(value.AnimationFile);
-           //    var animationRef = _skeletonAnimationLookUpHelper.FindAnimationRefFromPackFile(file);
-           //    _assetViewModelEditor.SetAnimation(_mount, animationRef);
-           //
-           //    var lookUp = "RIDER_" + value.SlotName;
-           //    SelectedRiderTag.Filter = "";
-           //    SelectedRiderTag.SelectedItem = SelectedRiderTag.Values.FirstOrDefault(x => x.SlotName == lookUp);
-           //}
-           //_validateAction();
-        }
-
-        private void RiderTagSelected(AnimationBinEntryGenericFormat value)
-        {
-          // if (value != null)
-          // {
-          //     var file = _pfs.FindFile(value.AnimationFile);
-          //     if (file == null)
-          //     {
-          //         _assetViewModelEditor.SetAnimation(_rider, null);
-          //     }
-          //     else
-          //     {
-          //         var animationRef = _skeletonAnimationLookUpHelper.FindAnimationRefFromPackFile(file);
-          //         _assetViewModelEditor.SetAnimation(_rider, animationRef);
-          //     }
-          // }
-          // _validateAction();
+            catch (Exception exception)
+            {
+                _editor.SetAnimation(scene, null!);
+                _dialogs.ShowExceptionWindow(exception, LocalizationManager.Instance.Get("DisplayName.MountTool"));
+            }
         }
     }
 }

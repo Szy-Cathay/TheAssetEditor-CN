@@ -59,7 +59,7 @@ namespace GameWorld.Core.Animation
         public event FrameChanged OnFrameChanged;
 
         GameSkeleton _skeleton;
-        TimeSpanExtension _timeSinceStart;
+        TimeSpanExtension _timeSinceStart = new();
         AnimationFrame _currentAnimFrame;
         AnimationClip _animationClip;
         GameSkeleton Skeleton { get { return _skeleton; } }

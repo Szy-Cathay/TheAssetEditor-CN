@@ -19,7 +19,6 @@ namespace Editors.AnimationVisualEditors
             serviceCollection.AddTransient<ConvertCampaignAnimationCommand>();
             serviceCollection.AddTransient<SaveCampaignAnimationCommand>();
 
-            serviceCollection.AddScoped<EditorHost<MountAnimationCreatorViewModel>>();
             serviceCollection.AddScoped<MountAnimationCreatorViewModel>();
             serviceCollection.AddScoped<MountVertexSelectionComponent>();
 
@@ -34,8 +33,8 @@ namespace Editors.AnimationVisualEditors
         public override void RegisterTools(IEditorDatabase database)
         {
             EditorInfoBuilder
-                .Create<EditorHost<MountAnimationCreatorViewModel>, EditorHostView>(EditorEnums.MountTool_Editor)
-                .AddToToolbar("DisplayName.MountTool", false)
+                .Create<MountAnimationCreatorViewModel, EditorHostView>(EditorEnums.MountTool_Editor)
+                .AddToToolbar("DisplayName.MountTool", true)
                 .Build(database);
 
             EditorInfoBuilder

@@ -18,7 +18,7 @@ namespace AnimationEditor.MountAnimationCreator
 
         public static BatchProcessOptions ShowDialog(string fragmentName, string savePrefix)
         {
-            var options = new BatchProcessOptions() { FragmentName = fragmentName, SavePrefix = savePrefix };
+            var options = new BatchProcessOptions() { AnimPackName = fragmentName, FragmentName = fragmentName, SavePrefix = savePrefix };
             var window = new BatchProcessOptionsWindow();
             window.DataContext = options;
             AssetEditorWindow.SetOwnerToActiveWindow(window);

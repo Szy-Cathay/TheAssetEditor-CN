@@ -188,6 +188,8 @@ namespace Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3
                             WeaponBools = item.WeaponBools,
                             Index = index
                         });
+                        if (index >= 0)
+                            index++;
                     }
                 }
 
