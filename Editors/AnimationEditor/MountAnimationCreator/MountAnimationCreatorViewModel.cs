@@ -1,367 +1,413 @@
-﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
 using AnimationEditor.AnimationKeyframeEditor;
-using System.Windows.Forms;
 using AnimationEditor.MountAnimationCreator.Services;
 using AnimationEditor.MountAnimationCreator.ViewModels;
+using Editors.AnimationVisualEditors.MountAnimationCreator.Services;
+using Editors.Shared.Core.Common;
+using Editors.Shared.Core.Common.BaseControl;
+using Editors.Shared.Core.Common.ReferenceModel;
+using GameWorld.Core.Animation;
+using GameWorld.Core.Components.Selection;
+using GameWorld.Core.SceneNodes;
+using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
+using Shared.Core.Events;
+using Shared.Core.Events.Global;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
+using Shared.Core.Services;
 using Shared.GameFormats.AnimationPack;
+using Shared.GameFormats.AnimationPack.AnimPackFileTypes.Wh3;
 using Shared.Ui.Common;
 using Clipboard = System.Windows.Clipboard;
-using Shared.Core.Events;
-using GameWorld.Core.Components.Selection;
-using GameWorld.Core.Animation;
-using GameWorld.Core.SceneNodes;
-using Editors.Shared.Core.Common.BaseControl;
-using Editors.Shared.Core.Common;
-using Editors.Shared.Core.Common.AnimationPlayer;
-using Editors.Shared.Core.Common.ReferenceModel;
-using Editors.AnimationVisualEditors.MountAnimationCreator.Services;
-using GameWorld.Core.Services;
-using Shared.Core.Services;
-using Shared.Core.Events.Global;
-
 
 namespace AnimationEditor.MountAnimationCreator
 {
-    public class MountAnimationCreatorViewModel : NotifyPropertyChangedImpl, IHostedEditor<MountAnimationCreatorViewModel>
+    public class MountAnimationCreatorViewModel : EditorHostBase
     {
-        public Type EditorViewModelType => typeof(EditorView);
-        private readonly SceneObjectViewModelBuilder _sceneObjectViewModelBuilder;
-        private readonly SceneObjectEditor _sceneObjectBuilder;
+        public override Type EditorViewModelType => typeof(EditorView);
         private readonly IFileSaveService _fileSaveService;
         private readonly IUiCommandFactory _uiCommandFactory;
-        private readonly AnimationPlayerViewModel _animationPlayerViewModel;
         private readonly IPackFileService _pfs;
         private readonly SelectionManager _selectionManager;
-        private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
-        private readonly IStandardDialogs _standardDialogs;
-        private readonly MountVertexSelectionComponent
-            _vertexSelectionComponent;
-        private readonly ReferenceObjectSelectionComponent
-            _objectSelectionComponent;
-        private readonly ReferenceObjectSelectionOutlineComponent
-            _selectionOutlineComponent;
+        private readonly ISkeletonAnimationLookUpHelper _lookup;
+        private readonly IStandardDialogs _dialogs;
+        private readonly IGlobalEventHub _globalEvents;
+        private readonly SceneObject _mount;
+        private readonly SceneObject _rider;
+        private readonly SceneObject _preview;
+        private readonly List<int> _mountVertices = [];
+        private Rmv2MeshNode? _mountVertexOwner;
+        private bool _updatingInputs;
+        private bool _previewMeshDirty = true;
 
-        SceneObject _mount;
-        SceneObject _rider;
-        SceneObject _newAnimation;
-  
-        List<int> _mountVertexes = new();
-        Rmv2MeshNode _mountVertexOwner;
+        public AnimationSettingsViewModel AnimationSettings { get; } = new();
+        public MountLinkViewModel MountLinkController { get; }
+        public FilterCollection<SkeletonBoneNode> SelectedRiderBone { get; }
+        public NotifyAttr<bool> CanPreview { get; } = new(false);
+        public NotifyAttr<bool> CanBatchProcess { get; } = new(false);
+        public NotifyAttr<bool> CanSave { get; } = new(false);
+        public NotifyAttr<bool> CanAddToFragment { get; } = new(false);
+        public NotifyAttr<bool> DisplayGeneratedSkeleton { get; }
+        public NotifyAttr<bool> DisplayGeneratedMesh { get; }
+        public NotifyAttr<string> SelectedVertexesText { get; } = new("");
+        public NotifyAttr<string> SavePrefixText { get; } = new("new_");
+        public ObservableCollection<uint> AnimationOutputFormats { get; } = [5, 6, 7];
+        public NotifyAttr<uint> SelectedAnimationOutputFormat { get; } = new(7);
+        public NotifyAttr<bool> EnsureUniqeFileName { get; } = new(true);
+        public NotifyAttr<string> Status { get; } = new("");
+        public FilterCollection<IAnimationBinGenericFormat> ActiveOutputFragment { get; }
+        public FilterCollection<AnimationBinEntryGenericFormat> ActiveFragmentSlot { get; }
 
-        AnimationToolInput _inputRiderData;
-        AnimationToolInput _inputMountData;
-
-        public AnimationSettingsViewModel AnimationSettings { get; set; } = new AnimationSettingsViewModel();
-        public MountLinkViewModel MountLinkController { get; set; }
-        public string EditorName => LocalizationManager.Instance.Get("DisplayName.MountTool");
-
-        public FilterCollection<SkeletonBoneNode> SelectedRiderBone { get; set; }
-
-        public NotifyAttr<bool> CanPreview { get; set; } = new NotifyAttr<bool>(false);
-        public NotifyAttr<bool> CanBatchProcess { get; set; } = new NotifyAttr<bool>(false);
-        public NotifyAttr<bool> CanSave { get; set; } = new NotifyAttr<bool>(false);
-        public NotifyAttr<bool> CanAddToFragment { get; set; } = new NotifyAttr<bool>(false);
-
-        public NotifyAttr<bool> DisplayGeneratedSkeleton { get; set; }
-        public NotifyAttr<bool> DisplayGeneratedMesh { get; set; }
-
-        public NotifyAttr<string> SelectedVertexesText { get; set; } = new NotifyAttr<string>("");
-        public NotifyAttr<string> SavePrefixText { get; set; } = new NotifyAttr<string>("new_");
-        public ObservableCollection<uint> AnimationOutputFormats { get; set; } = new ObservableCollection<uint>() { 5, 6, 7 };
-        public NotifyAttr<uint> SelectedAnimationOutputFormat { get; set; } = new NotifyAttr<uint>(7);
-        public NotifyAttr<bool> EnsureUniqeFileName { get; set; } = new NotifyAttr<bool>(true);
-
-        public FilterCollection<IAnimationBinGenericFormat> ActiveOutputFragment { get; set; }
-        public FilterCollection<AnimationBinEntryGenericFormat> ActiveFragmentSlot { get; set; }
-
-        public MountAnimationCreatorViewModel(IPackFileService pfs,
-            ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper, 
-            SelectionManager selectionManager,
-            SceneObjectViewModelBuilder sceneObjectViewModelBuilder,
-            AnimationPlayerViewModel animationPlayerViewModel,
-            SceneObjectEditor sceneObjectBuilder,
-            IFileSaveService fileSaveService,
-            IUiCommandFactory uiCommandFactory,
-            MountVertexSelectionComponent vertexSelectionComponent,
-            ReferenceObjectSelectionComponent objectSelectionComponent,
-            ReferenceObjectSelectionOutlineComponent selectionOutlineComponent,
-            IStandardDialogs standardDialogs)
+        public MountAnimationCreatorViewModel(IEditorHostParameters hostParameters, IPackFileService pfs,
+            ISkeletonAnimationLookUpHelper lookup, SelectionManager selectionManager,
+            IFileSaveService fileSaveService, IUiCommandFactory uiCommandFactory,
+            MountVertexSelectionComponent vertexSelection, ReferenceObjectSelectionComponent objectSelection,
+            ReferenceObjectSelectionOutlineComponent selectionOutline, IStandardDialogs dialogs, IGlobalEventHub globalEvents)
+            : base(hostParameters)
         {
-            _sceneObjectViewModelBuilder = sceneObjectViewModelBuilder;
-            _animationPlayerViewModel = animationPlayerViewModel;
-            _sceneObjectBuilder = sceneObjectBuilder;
+            _pfs = pfs;
+            _lookup = lookup;
+            _selectionManager = selectionManager;
             _fileSaveService = fileSaveService;
             _uiCommandFactory = uiCommandFactory;
-            _vertexSelectionComponent = vertexSelectionComponent;
-            _objectSelectionComponent = objectSelectionComponent;
-            _selectionOutlineComponent = selectionOutlineComponent;
-            _standardDialogs = standardDialogs;
-            _pfs = pfs;
+            _dialogs = dialogs;
+            _globalEvents = globalEvents;
+            DisplayName = Text("DisplayName.MountTool");
+            GameWorld!.AddComponent(vertexSelection);
+            GameWorld.AddComponent(objectSelection);
+            GameWorld.AddComponent(selectionOutline);
 
-            _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
-            _selectionManager = selectionManager;
+            DisplayGeneratedSkeleton = new(true, value => { if (_preview != null) _preview.ShowSkeleton.Value = value; });
+            DisplayGeneratedMesh = new(true, value => { if (_preview != null) _preview.ShowMesh.Value = value; });
+            SelectedRiderBone = new(null, _ => TryReGenerateAnimation());
+            ActiveFragmentSlot = new(null, _ => UpdateStates()) { SearchFilter = (value, rx) => rx.IsMatch(value.DisplayName) };
+            ActiveOutputFragment = new(null, value =>
+            {
+                ActiveFragmentSlot.SelectedItem = null;
+                ActiveFragmentSlot.UpdatePossibleValues(value?.Entries);
+                UpdateStates();
+            }) { SearchFilter = (value, rx) => rx.IsMatch(value.Name) || rx.IsMatch(value.FullPath) };
 
-            DisplayGeneratedSkeleton = new NotifyAttr<bool>(true, (value) => _newAnimation.ShowSkeleton.Value = value);
-            DisplayGeneratedMesh = new NotifyAttr<bool>(true, (value) => { if (_newAnimation.MainNode != null) _newAnimation.ShowMesh.Value = value; });
-
-            SelectedRiderBone = new FilterCollection<SkeletonBoneNode>(null, (x) => UpdateCanSaveAndPreviewStates());
-
-
-            ActiveOutputFragment = new FilterCollection<IAnimationBinGenericFormat>(null, OutputAnimationSetSelected);
-            ActiveOutputFragment.SearchFilter = (value, rx) => { return rx.Match(value.FullPath).Success; };
-
-            ActiveFragmentSlot = new FilterCollection<AnimationBinEntryGenericFormat>(null, (x) => UpdateCanSaveAndPreviewStates());
-            ActiveFragmentSlot.SearchFilter = (value, rx) => { return rx.Match(value.SlotName).Success; };
-
-            AnimationSettings.SettingsChanged += () => TryReGenerateAnimation(null);
+            var rider = _sceneObjectViewModelBuilder.CreateAsset("rider", true, Text("MountAnim.Rider"), Color.Black, null!);
+            var mount = _sceneObjectViewModelBuilder.CreateAsset("mount", true, Text("MountAnim.Mount"), Color.Black, null!);
+            _rider = rider.Data;
+            _mount = mount.Data;
+            _preview = SceneObjectEditor.CreateAsset("mount-preview", Text("MountAnim.GeneratedAnimation"), Color.Red);
+            Player.RegisterAsset(_preview);
+            SceneObjects.Add(rider);
+            SceneObjects.Add(mount);
+            MountLinkController = new MountLinkViewModel(SceneObjectEditor, pfs, _rider, _mount, dialogs, UpdateStates, lookup);
+            _mount.SkeletonChanged += MountSkeletonChanged;
+            _mount.AnimationChanged += TryReGenerateAnimation;
+            _mount.MeshChanged += MountMeshChanged;
+            _rider.SkeletonChanged += RiderSkeletonChanged;
+            _rider.AnimationChanged += TryReGenerateAnimation;
+            _rider.MeshChanged += RiderMeshChanged;
+            AnimationSettings.SettingsChanged += SettingsChanged;
+            _globalEvents.Register<PackFileContainerSetAsMainEditableEvent>(this, _ => RefreshViewAction());
+            UpdateStates();
         }
 
         public void SetDebugInputParameters(AnimationToolInput rider, AnimationToolInput mount)
         {
-            _inputRiderData = rider;
-            _inputMountData = mount;
+            LoadInput(_rider, rider);
+            LoadInput(_mount, mount);
         }
 
-        public void Initialize(EditorHost<MountAnimationCreatorViewModel> owner)
+        private void LoadInput(SceneObject scene, AnimationToolInput input)
         {
-            owner.GameWorld.Value.AddComponent(
-                _vertexSelectionComponent);
-            owner.GameWorld.Value.AddComponent(
-                _objectSelectionComponent);
-            owner.GameWorld.Value.AddComponent(
-                _selectionOutlineComponent);
-           // var riderItem = _sceneObjectViewModelBuilder.CreateAsset(true, "Rider", Color.Black, _inputRiderData);
-           // var mountItem = _sceneObjectViewModelBuilder.CreateAsset(true, "Mount", Color.Black, _inputMountData);
-           // mountItem.Data.IsSelectable = true;
-           //
-           // var propAsset = _sceneObjectBuilder.CreateAsset("New Anim", Color.Red);
-           // _animationPlayerViewModel.RegisterAsset(propAsset);
-           //
-           // Create(riderItem.Data, mountItem.Data, propAsset);
-           // owner.SceneObjects.Add(riderItem);
-           // owner.SceneObjects.Add(mountItem);
+            if (input.Mesh != null)
+                SceneObjectEditor.SetMesh(scene, input.Mesh);
+            if (input.Animation != null)
+                SceneObjectEditor.SetAnimation(scene, _pfs.GetFullPath(input.Animation));
         }
 
-        internal void Create(SceneObject rider, SceneObject mount, SceneObject newAnimation)
+        private void MountMeshChanged(SceneObject _)
         {
-            _newAnimation = newAnimation;
-            _mount = mount;
-            _rider = rider;
-
-            _mount.SkeletonChanged += MountSkeletonChanged;
-            _mount.AnimationChanged += TryReGenerateAnimation;
-            _rider.SkeletonChanged += RiderSkeletonChanges;
-            _rider.AnimationChanged += TryReGenerateAnimation;
-
-            MountLinkController = new MountLinkViewModel(_sceneObjectBuilder, _pfs, _skeletonAnimationLookUpHelper, rider, mount, UpdateCanSaveAndPreviewStates);
-
-            MountSkeletonChanged(_mount.Skeleton);
-            RiderSkeletonChanges(_rider.Skeleton);
+            _mount.IsSelectable = true;
+            if (MountAnimationGeneratorService.SettingsAreValid(AnimationSettings))
+                _mount.SetTransform(Matrix.CreateScale((float)AnimationSettings.Scale.Value));
+            ResetAttachment();
         }
 
-        private void TryReGenerateAnimation(AnimationClip newValue = null)
+        private void RiderMeshChanged(SceneObject _)
         {
-           // UpdateCanSaveAndPreviewStates();
-           // if (CanPreview.Value)
-           //     CreateMountAnimationAction();
-           // else
-           // {
-           //     if (_newAnimation != null)
-           //         _sceneObjectBuilder.SetAnimation(_newAnimation, null);
-           // }
+            _rider.IsSelectable = false;
+            _previewMeshDirty = true;
+            TryReGenerateAnimation();
         }
 
-        private void MountSkeletonChanged(GameSkeleton newValue)
+        private void MountSkeletonChanged(GameSkeleton _)
         {
-            UpdateCanSaveAndPreviewStates();
+            ResetAttachment();
             MountLinkController.ReloadFragments(false, true);
         }
 
-        private void RiderSkeletonChanges(GameSkeleton newValue)
+        private void RiderSkeletonChanged(GameSkeleton? skeleton)
         {
-            if (newValue == null)
+            if (_rider.SkeletonName.Value.Replace('\\', '/').Split('/').Contains("tech", StringComparer.OrdinalIgnoreCase) && skeleton != null)
             {
-                // ActiveOutputFragment.UpdatePossibleValues(null);
-                SelectedRiderBone.UpdatePossibleValues(null);
+                var runtimeRig = _pfs.FindFile($"animations/skeletons/{skeleton.SkeletonName}.anim");
+                if (runtimeRig != null)
+                {
+                    SceneObjectEditor.SetSkeleton(_rider, runtimeRig);
+                    return;
+                }
             }
-            else
+            _updatingInputs = true;
+            try
             {
-                //  ActiveOutputFragment.UpdatePossibleValues(MountLinkController.LoadFragmentsForSkeleton(newValue.SkeletonName, true));
-                SelectedRiderBone.UpdatePossibleValues(SkeletonBoneNodeHelper.CreateFlatSkeletonList(newValue));
+                SelectedRiderBone.SelectedItem = null;
+                SelectedRiderBone.UpdatePossibleValues(skeleton == null ? null : SkeletonBoneNodeHelper.CreateFlatSkeletonList(skeleton));
+                SelectedRiderBone.SelectedItem = SelectedRiderBone.PossibleValues.FirstOrDefault(x => x.BoneName.Equals("root", StringComparison.OrdinalIgnoreCase)) ??
+                    SelectedRiderBone.PossibleValues.FirstOrDefault(x => x.BoneName.Equals("bn_hips", StringComparison.OrdinalIgnoreCase));
+                AnimationSettings.IsRootNodeAnimation = skeleton?.GetBoneIndexByName("animroot") >= 0;
+                MountLinkController.ReloadFragments(true, false);
+                RefreshOutputFragments();
+                _previewMeshDirty = true;
             }
-
-            // Try setting using root bone
-            SelectedRiderBone.SelectedItem = SelectedRiderBone.PossibleValues.FirstOrDefault(x => string.Equals("root", x.BoneName, StringComparison.OrdinalIgnoreCase));
-            AnimationSettings.IsRootNodeAnimation = SelectedRiderBone.SelectedItem != null;
-
-            // Try setting using hip bone
-            if (AnimationSettings.IsRootNodeAnimation == false)
-                SelectedRiderBone.SelectedItem = SelectedRiderBone.PossibleValues.FirstOrDefault(x => string.Equals("bn_hips", x.BoneName, StringComparison.OrdinalIgnoreCase));
-
-            MountLinkController.ReloadFragments(true, false);
-            UpdateCanSaveAndPreviewStates();
+            finally
+            {
+                _updatingInputs = false;
+            }
+            TryReGenerateAnimation();
         }
 
-        void OutputAnimationSetSelected(IAnimationBinGenericFormat animationSet)
+        private void ResetAttachment()
         {
-            if (animationSet == null)
-                ActiveFragmentSlot.UpdatePossibleValues(null);
-            else
-                ActiveFragmentSlot.UpdatePossibleValues(animationSet.Entries);
-            UpdateCanSaveAndPreviewStates();
+            _mountVertices.Clear();
+            _mountVertexOwner = null;
+            SelectedVertexesText.Value = Text("Msg.NoVertexSelected");
+            TryReGenerateAnimation();
         }
 
-        void UpdateCanSaveAndPreviewStates()
+        private void SettingsChanged()
         {
-            var mountConnectionOk = SelectedRiderBone.SelectedItem != null && _mountVertexes.Count != 0;
-            var mountOK = _mount != null && _mount.AnimationClip != null && _mount.Skeleton != null;
-            var riderOK = _rider != null && _rider.AnimationClip != null && _rider.Skeleton != null;
-            CanPreview.Value = mountConnectionOk && _mountVertexes.Count != 0 && mountOK && riderOK;
-            CanBatchProcess.Value = MountLinkController?.AnimationSetForMount?.SelectedItem != null && MountLinkController?.AnimationSetForRider?.SelectedItem != null && mountConnectionOk;
-            CanAddToFragment.Value = ActiveOutputFragment?.SelectedItem != null && ActiveFragmentSlot?.SelectedItem != null;
-            CanSave.Value = mountConnectionOk && _mountVertexes.Count != 0 && mountOK && riderOK;
+            if (MountAnimationGeneratorService.SettingsAreValid(AnimationSettings))
+                _mount.SetTransform(Matrix.CreateScale((float)AnimationSettings.Scale.Value));
+            TryReGenerateAnimation();
+        }
+
+        private bool IsMountMesh(Rmv2MeshNode mesh) => _mount.ModelNode != null &&
+            (ReferenceEquals(_mount.ModelNode, mesh) || SceneNodeHelper.GetChildrenOfType<Rmv2MeshNode>(_mount.ModelNode).Contains(mesh));
+
+        private bool HasAttachment() => _mountVertexOwner != null && _mountVertices.Count > 0 && IsMountMesh(_mountVertexOwner) &&
+            _mountVertices.All(index => index >= 0 && index < _mountVertexOwner.Geometry.VertexCount()) &&
+            SelectedRiderBone.SelectedItem != null && _rider.Skeleton != null &&
+            SelectedRiderBone.PossibleValues.Contains(SelectedRiderBone.SelectedItem);
+
+        private void UpdateStates()
+        {
+            var connected = HasAttachment() && _mount.Skeleton != null &&
+                MountAnimationGeneratorService.SettingsAreValid(AnimationSettings);
+            CanPreview.Value = connected && _mount.AnimationClip?.Timebase != null && _rider.AnimationClip?.Timebase != null;
+            var canWrite = _pfs.GetEditablePack() != null;
+            CanSave.Value = CanPreview.Value && canWrite;
+            CanBatchProcess.Value = connected && canWrite && MountLinkController?.AnimationSetForMount.SelectedItem != null &&
+                MountLinkController.AnimationSetForRider.SelectedItem != null;
+            CanAddToFragment.Value = CanSave.Value && ActiveOutputFragment.SelectedItem != null && ActiveFragmentSlot.SelectedItem != null;
+            Status.Value = canWrite ? "" : Text("MountAnim.ProjectRequired");
         }
 
         public void SetMountVertex()
         {
-            var state = _selectionManager.GetState<VertexSelectionState>();
-            if (state == null || state.CurrentSelection().Count == 0)
+            var selection = _selectionManager.GetState<VertexSelectionState>();
+            var mesh = selection?.RenderObject as Rmv2MeshNode;
+            if (mesh == null || selection!.CurrentSelection().Count == 0 || !IsMountMesh(mesh) || mesh.Geometry.WeightCount == 0)
             {
-                SelectedVertexesText.Value = "No vertex selected";
-                _mountVertexes.Clear();
-                _mountVertexOwner = null;
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.NoVertexSelected"));
+                ResetAttachment();
+                _dialogs.ShowDialogBox(Text("MountAnim.SelectMountVertex"), DisplayName);
+                return;
             }
-            else
+            _mountVertexOwner = mesh;
+            _mountVertices.Clear();
+            _mountVertices.AddRange(selection.CurrentSelection().Order());
+            SelectedVertexesText.Value = LocalizationManager.Instance.GetFormat("MountAnim.SelectedVertices", _mountVertices.Count, _mountVertices[0]);
+            TryReGenerateAnimation();
+        }
+
+        private void TryReGenerateAnimation(AnimationClip? _ = null)
+        {
+            if (_updatingInputs)
+                return;
+            UpdateStates();
+            if (!CanPreview.Value)
             {
-                SelectedVertexesText.Value = $"{state.CurrentSelection().Count} vertexes selected";
-                _mountVertexOwner = state.RenderObject as Rmv2MeshNode;
-                _mountVertexes = new List<int>(state.CurrentSelection());
+                ClearPreview();
+                return;
             }
-
-            UpdateCanSaveAndPreviewStates();
+            try
+            {
+                GeneratePreview();
+            }
+            catch (Exception exception)
+            {
+                ClearPreview();
+                Status.Value = exception.Message;
+            }
         }
 
-        public void CreateMountAnimationAction()
+        private void ClearPreview()
         {
-           //var newRiderAnim = CreateAnimationGenerator().GenerateMountAnimation(_mount.AnimationClip, _rider.AnimationClip);
-           //
-           //// Apply
-           //_sceneObjectBuilder.CopyMeshFromOther(_newAnimation, _rider);
-           //_sceneObjectBuilder.SetAnimationClip(_newAnimation, newRiderAnim, new SkeletonAnimationLookUpHelper.AnimationReference("Generated animation", null));
-           //_newAnimation.ShowSkeleton.Value = DisplayGeneratedSkeleton.Value;
-           //_newAnimation.ShowMesh.Value = DisplayGeneratedMesh.Value;
-           //UpdateCanSaveAndPreviewStates();
+            if (_preview == null)
+                return;
+            SceneObjectEditor.SetAnimationClip(_preview, null, "");
+            _preview.ShowMesh.Value = false;
+            _preview.ShowSkeleton.Value = false;
         }
 
-        MountAnimationGeneratorService CreateAnimationGenerator()
+        private void GeneratePreview()
         {
-            return new MountAnimationGeneratorService(AnimationSettings, _mountVertexOwner, _mountVertexes.First(), SelectedRiderBone.SelectedItem.BoneIndex, _rider, _mount);
+            var clip = CreateGenerator().GenerateMountAnimation(_mount.AnimationClip, _rider.AnimationClip, isDeath: IsDeathAnimation);
+            if (_previewMeshDirty)
+            {
+                SceneObjectEditor.CopyMeshFromOther(_preview, _rider);
+                _preview.IsSelectable = false;
+                _previewMeshDirty = false;
+            }
+            SceneObjectEditor.SetAnimationClip(_preview, clip, Text("MountAnim.GeneratedAnimation"));
+            _preview.ShowSkeleton.Value = DisplayGeneratedSkeleton.Value;
+            _preview.ShowMesh.Value = DisplayGeneratedMesh.Value;
         }
 
-        public void AddAnimationToFragment()
+        public void CreateMountAnimationAction() => Execute(() =>
         {
-            // Find stuff in active slot.
-            //var selectedAnimationSlot = MountLinkController.SelectedRiderTag.SelectedItem;
-            //
-            //AnimationClip newRiderClip = null;
-            //if (MountAnimationGeneratorService.IsCopyOnlyAnimation(selectedAnimationSlot.SlotName))
-            //    newRiderClip = _rider.AnimationClip;
-            //else
-            //    newRiderClip = CreateAnimationGenerator().GenerateMountAnimation(_mount.AnimationClip, _rider.AnimationClip);
-            //
-            //var fileResult = MountAnimationGeneratorService.SaveAnimation(_pfs, _rider.AnimationName.Value.AnimationFile, SavePrefixText.Value, EnsureUniqeFileName.Value, newRiderClip, _newAnimation.Skeleton);
-            //if (fileResult == null)
-            //    return;
-            //
-            //var newAnimSlot = selectedAnimationSlot.Entry.Value.Clone();
-            //newAnimSlot.AnimationFile = _pfs.GetFullPath(fileResult);
-            //newAnimSlot.Slot = ActiveFragmentSlot.SelectedItem.Entry.Value.Slot.Clone();
-            //
-            //var toRemove = ActiveOutputFragment.SelectedItem.Fragments.FirstOrDefault(x => x.Slot.Id == ActiveFragmentSlot.SelectedItem.Entry.Value.Slot.Id);
-            //ActiveOutputFragment.SelectedItem.Fragments.Remove(toRemove);
-            //
-            //ActiveOutputFragment.SelectedItem.Fragments.Add(newAnimSlot);
-            //
-            //var bytes = AnimationPackSerializer.ConvertToBytes(ActiveOutputFragment.SelectedItem.Parent);
-            //SaveHelper.Save(_pfs, "animations\\animation_tables\\" + ActiveOutputFragment.SelectedItem.Parent.FileName, null, bytes, false);
-            //
-            //// Update status for the slot thing 
-            //var possibleValues = ActiveOutputFragment.SelectedItem.Fragments.Select(x => new FragmentStatusSlotItem(x));
-            //ActiveFragmentSlot.UpdatePossibleValues(possibleValues);
-            //MountLinkController.ReloadFragments(true, false);
-        }
+            UpdateStates();
+            if (CanPreview.Value)
+                GeneratePreview();
+        });
+
+        private MountAnimationGeneratorService CreateGenerator() => new(AnimationSettings, _mountVertexOwner!,
+            _mountVertices[0], SelectedRiderBone.SelectedItem!.BoneIndex, _rider, _mount);
+
+        private bool IsDeathAnimation => MountLinkController.SelectedRiderTag.SelectedItem?.SlotName.StartsWith("RIDER_DEATH_", StringComparison.Ordinal) == true ||
+            MountLinkController.SelectedRiderTag.SelectedItem?.SlotName.StartsWith("DEATH_", StringComparison.Ordinal) == true;
+
+        private BatchProcessorService CreateProcessor(BatchProcessOptions? options = null) => new(_pfs, _lookup, CreateGenerator(),
+            options ?? new BatchProcessOptions { SavePrefix = SavePrefixText.Value }, _fileSaveService, _dialogs,
+            SelectedAnimationOutputFormat.Value, EnsureUniqeFileName.Value);
+
+        public void SaveCurrentAnimationAction() => Execute(() =>
+        {
+            UpdateStates();
+            if (!CanSave.Value)
+                return;
+            var path = CreateProcessor().SaveSingleAnim(_mount.AnimationClip, _rider.AnimationClip, _rider.AnimationName.Value, IsDeathAnimation);
+            if (path != null)
+                Status.Value = LocalizationManager.Instance.GetFormat("MountAnim.Saved", path);
+        });
+
+        public void AddAnimationToFragment() => Execute(() =>
+        {
+            UpdateStates();
+            if (!CanAddToFragment.Value)
+                return;
+            var selected = ActiveOutputFragment.SelectedItem!;
+            var selectedSlot = ActiveFragmentSlot.SelectedItem!;
+            var project = _pfs.GetEditablePack()!;
+            var sourceFile = _pfs.FindFile(selected.PackFileReference.FileName, project);
+            if (sourceFile == null)
+                throw new InvalidOperationException(Text("MountAnim.OutputChanged"));
+            var database = AnimationPackSerializer.Load(sourceFile, _pfs);
+            var table = database.Files.OfType<AnimationBinWh3>().Single(x => x.FileName == selected.FullPath);
+            var row = table.AnimationTableEntries.Single(x => x.AnimationId == selectedSlot.SlotIndex);
+            var animationRef = row.AnimationRefs.ElementAtOrDefault(selectedSlot.Index > 0 ? selectedSlot.Index - 1 : 0);
+            if (animationRef == null || animationRef.AnimationFile != selectedSlot.AnimationFile ||
+                animationRef.AnimationMetaFile != selectedSlot.MetaFile || animationRef.AnimationSoundMetaFile != selectedSlot.SoundFile)
+                throw new InvalidOperationException(Text("MountAnim.OutputChanged"));
+
+            var processor = CreateProcessor();
+            var path = processor.GetAnimationPath(_rider.AnimationName.Value);
+            if (!EnsureUniqeFileName.Value && _pfs.FindFile(path, project) != null &&
+                _dialogs.ShowYesNoBox(Text("MountAnim.OverwriteGenerated"), DisplayName) != ShowMessageBoxResult.OK)
+                return;
+            var bytes = processor.GenerateAnimationBytes(_mount.AnimationClip, _rider.AnimationClip, IsDeathAnimation);
+            animationRef.AnimationFile = path;
+            if (MountLinkController.AnimationSetForMount.SelectedItem != null)
+                table.MountBin = MountLinkController.AnimationSetForMount.SelectedItem.Name;
+            _pfs.ApplyFileWrites(project, [
+                new PackFileWrite(path, bytes),
+                new PackFileWrite(selected.PackFileReference.FileName, AnimationPackSerializer.ConvertToBytes(database))
+            ]);
+            RefreshViewAction();
+            Status.Value = LocalizationManager.Instance.GetFormat("MountAnim.Saved", path);
+        });
+
+        public void BatchProcessUsingFragmentsAction() => Execute(() =>
+        {
+            UpdateStates();
+            if (!CanBatchProcess.Value)
+                return;
+            var mount = MountLinkController.AnimationSetForMount.SelectedItem!;
+            var rider = MountLinkController.AnimationSetForRider.SelectedItem!;
+            var name = rider.Name;
+            var options = BatchProcessOptionsWindow.ShowDialog(SavePrefixText.Value + name, SavePrefixText.Value);
+            if (options != null && CreateProcessor(options).Process(mount, rider))
+                RefreshViewAction();
+        });
 
         public void ViewMountFragmentAction() => ViewAnimationSet(MountLinkController.AnimationSetForMount.SelectedItem);
         public void ViewRiderFragmentAction() => ViewAnimationSet(MountLinkController.AnimationSetForRider.SelectedItem);
         public void ViewOutputFragmentAction() => ViewAnimationSet(ActiveOutputFragment.SelectedItem);
 
-        void ViewAnimationSet(IAnimationBinGenericFormat animationSet)
+        private void ViewAnimationSet(IAnimationBinGenericFormat? set)
         {
-            if (animationSet != null)
-            {
-                var animpackFileName = animationSet.PackFileReference.FileName;
-                _uiCommandFactory.Create<OpenEditorCommand>().ExecuteAsWindow(animpackFileName, 800, 900);
-            }
+            if (set != null)
+                _uiCommandFactory.Create<OpenEditorCommand>().ExecuteAsWindow(set.PackFileReference.FileName, 800, 900);
         }
 
-        public void RefreshViewAction()
+        private void RefreshOutputFragments()
+        {
+            var table = ActiveOutputFragment.SelectedItem?.FullPath;
+            var pack = ActiveOutputFragment.SelectedItem?.PackFileReference?.FileName;
+            var slot = ActiveFragmentSlot.SelectedItem;
+            ActiveOutputFragment.SelectedItem = null;
+            ActiveOutputFragment.UpdatePossibleValues(MountLinkController.LoadAnimationSetForSkeleton(_rider.Skeleton?.SkeletonName ?? "", true));
+            ActiveOutputFragment.SelectedItem = ActiveOutputFragment.PossibleValues.FirstOrDefault(x => x.FullPath == table && x.PackFileReference?.FileName == pack);
+            ActiveFragmentSlot.SelectedItem = ActiveFragmentSlot.PossibleValues.FirstOrDefault(x => MountLinkViewModel.SameSlot(x, slot));
+        }
+
+        public void RefreshViewAction() => Execute(() =>
         {
             MountLinkController.ReloadFragments();
-            ActiveOutputFragment.UpdatePossibleValues(MountLinkController.LoadAnimationSetForSkeleton(_rider.SkeletonName.Value, true));
-        }
+            RefreshOutputFragments();
+            UpdateStates();
+        });
 
-        public void SaveCurrentAnimationAction()
+        public void CopyAnimation() => Execute(() =>
         {
-           // var service = new BatchProcessorService(_pfs, _skeletonAnimationLookUpHelper, CreateAnimationGenerator(), new BatchProcessOptions { SavePrefix = SavePrefixText.Value }, _fileSaveService, SelectedAnimationOutputFormat.Value);
-           // service.SaveSingleAnim(_mount.AnimationClip, _rider.AnimationClip, _rider.AnimationName.Value.AnimationFile);
-        }
-
-        public void BatchProcessUsingFragmentsAction()
-        {
-            var mountFrag = MountLinkController.AnimationSetForMount.SelectedItem;
-            var riderFrag = MountLinkController.AnimationSetForRider.SelectedItem;
-
-            var newFileName = SavePrefixText.Value + Path.GetFileNameWithoutExtension(riderFrag.FullPath);
-            var batchSettings = BatchProcessOptionsWindow.ShowDialog(newFileName, SavePrefixText.Value);
-            if (batchSettings != null)
+            if (_preview.AnimationClip == null)
             {
-                var service = new BatchProcessorService(_pfs, _skeletonAnimationLookUpHelper, CreateAnimationGenerator(), batchSettings, _fileSaveService, _standardDialogs, SelectedAnimationOutputFormat.Value);
-                service.Process(mountFrag, riderFrag);
-                MountLinkController.ReloadFragments(true, false);
-
-                ActiveOutputFragment.UpdatePossibleValues(MountLinkController.LoadAnimationSetForSkeleton(_rider.Skeleton.SkeletonName, true));
-            }
-        }
-
-        public void CopyAnimation()
-        {
-            if (_newAnimation.AnimationClip == null)
-            {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.AnimationNotGenerated"), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _dialogs.ShowDialogBox(Text("Msg.AnimationNotGenerated"), DisplayName);
                 return;
             }
+            _preview.Player.Pause();
+            var frames = _preview.AnimationClip.DynamicFrames.Count;
+            Clipboard.SetText(JsonConvert.SerializeObject(AnimationCliboardCreator.CreateFrameClipboard(_preview.Skeleton, _preview.AnimationClip, 0, frames)));
+            Status.Value = LocalizationManager.Instance.GetFormat("Msg.CopiedFrames", 0, frames - 1);
+        });
 
-            _newAnimation.Player.Pause();
+        private void Execute(Action action)
+        {
+            try { action(); }
+            catch (Exception exception) { _dialogs.ShowExceptionWindow(exception, DisplayName); }
+        }
 
-            var currentFrame = 0;
-            var endFrame = _newAnimation.AnimationClip.DynamicFrames.Count;
-            var skeleton = _newAnimation.Skeleton;
-            var frames = _newAnimation.AnimationClip;
-            var jsonText = JsonConvert.SerializeObject(AnimationCliboardCreator.CreateFrameClipboard(skeleton, frames, currentFrame, endFrame));
-            Clipboard.SetText(jsonText);
-            MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.CopiedFrames", currentFrame, endFrame - 1), LocalizationManager.Instance.Get("Msg.GeneralError"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        private static string Text(string key) => LocalizationManager.Instance.Get(key);
+
+        public override void Close()
+        {
+            _globalEvents.UnRegister(this);
+            _mount.SkeletonChanged -= MountSkeletonChanged;
+            _mount.AnimationChanged -= TryReGenerateAnimation;
+            _mount.MeshChanged -= MountMeshChanged;
+            _rider.SkeletonChanged -= RiderSkeletonChanged;
+            _rider.AnimationChanged -= TryReGenerateAnimation;
+            _rider.MeshChanged -= RiderMeshChanged;
+            AnimationSettings.SettingsChanged -= SettingsChanged;
+            base.Close();
         }
     }
 }
-
-
-

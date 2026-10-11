@@ -68,7 +68,7 @@
                     <ColumnDefinition Width="0.25*"/>
                 </Grid.ColumnDefinitions>
                 <TextBox Grid.Column="0" Text="{Binding SelectedVertexesText.Value, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" IsReadOnly="true" />
-                <Button  Grid.Column="1" Click="{s:MethodBinding SetMountVertex}" Content="{loc:Loc MountAnim.Set}" Margin="3,0,0,0"/>
+                <Button  Grid.Column="1" Click="{s:MethodBinding SetMountVertex}" Content="{loc:Loc MountAnim.Set}" ToolTip="{loc:Loc MountAnim.SelectMountVertex}" Margin="3,0,0,0"/>
             </Grid>
 
 
