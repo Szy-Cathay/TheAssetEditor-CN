@@ -11,7 +11,7 @@ namespace Test.E2EVerification
 
         [Test]
         [Apartment(ApartmentState.STA)]
-        public void DragAndDrop()
+        public async Task DragAndDrop()
         {
             // Arrange
             var runner = new AssetEditorTestRunner();
@@ -22,7 +22,8 @@ namespace Test.E2EVerification
 
             var mainApplicationView = runner.ServiceProvider.GetRequiredService<MainViewModel>();
             var treeView = mainApplicationView.FileTree;
-            var packRootNode = treeView.Files[1];
+            await treeView.InitializeCaFilesAsync();
+            var packRootNode = treeView.Files.Single(root => ReferenceEquals(root.FileOwner, outputPackFile));
 
             // Act
             var fileToMove = treeView.GetFromPath(packRootNode, @"animations\battle\humanoid01\2handed_hammer\stand\hu1_2hh_stand_idle_01.anim") ??

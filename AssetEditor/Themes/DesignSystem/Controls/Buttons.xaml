@@ -11,7 +11,7 @@
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface3}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -66,7 +66,7 @@
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="Chrome" Property="Opacity" Value="{StaticResource AeInteraction.DisabledOpacity}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -79,17 +79,17 @@
         x:Key="AeButton.Primary"
         BasedOn="{StaticResource AeButton.Base}"
         TargetType="{x:Type Button}">
-        <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
-        <Setter Property="Foreground" Value="{DynamicResource AeBrush.OnAccent}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.TextPrimary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.Canvas}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AeBrush.AccentHover}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
+                <Setter Property="Background" Value="{DynamicResource AeBrush.TextSecondary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.TextSecondary}" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AeBrush.Accent}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.AccentHover}" />
+                <Setter Property="Background" Value="{DynamicResource AeBrush.TextSecondary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.TextMuted}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -205,7 +205,7 @@
                                 Value="{DynamicResource AeBrush.AccentHover}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Glyph" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="Glyph" Property="Opacity" Value="{StaticResource AeInteraction.DisabledOpacity}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -269,11 +269,16 @@
                                 Value="{DynamicResource AeBrush.Accent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chevron" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="Chevron" Property="Opacity" Value="{StaticResource AeInteraction.DisabledOpacity}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+    <Style TargetType="{x:Type Button}" BasedOn="{StaticResource AeButton.Secondary}">
+        <Setter Property="Height" Value="Auto" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="1" />
     </Style>
 </ResourceDictionary>

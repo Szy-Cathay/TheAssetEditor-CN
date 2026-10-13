@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using AssetEditor.Views;
 using NUnit.Framework;
@@ -114,18 +114,17 @@ public class UiMainShellTests
                 Does.Not.Contain("<RowDefinition Height=\"28\" />"));
             NUnitAssert.That(
                 mainWindow,
-                Does.Contain(
-                    "<RowDefinition Height=\"{StaticResource AeSize.TabGridLength}\" />"));
+                Does.Not.Contain("AeShell.SidebarHeader"));
+            NUnitAssert.That(mainWindow, Does.Not.Contain("WorkspaceHeader"));
             NUnitAssert.That(
                 workspaceSplitter,
-                Does.Contain("Margin=\"0,24,0,0\""));
+                Does.Not.Contain("Margin="));
             NUnitAssert.That(
                 workspaceSplitter,
                 Does.Not.Contain("Background="));
             NUnitAssert.That(
                 mainWindow,
-                Does.Contain(
-                    "<Grid Grid.Row=\"1\" Background=\"{DynamicResource AeBrush.Surface1}\">"));
+                Does.Not.Contain("WindowStyle=\"None\""));
             NUnitAssert.That(shell, Does.Contain("PART_ItemsHolder"));
             NUnitAssert.That(shell, Does.Contain("EmptyEditorState"));
         });

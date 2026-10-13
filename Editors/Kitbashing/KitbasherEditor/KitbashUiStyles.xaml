@@ -395,10 +395,10 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.Accent}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            <Setter TargetName="Chrome" Property="Opacity" Value="{StaticResource AeInteraction.DisabledOpacity}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

@@ -3,6 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AssetEditor.Views;
 using Moq;
 using NUnit.Framework;
 using NUnitAssert = NUnit.Framework.Assert;
@@ -18,6 +21,132 @@ namespace AssetEditorTests;
 
 public class FolderProjectTreeStateTests
 {
+    [Test]
+    public void ContainerAccessIndicators_FollowCurrentProjectWithoutChangingSelectionOrDirtyState()
+    {
+        using var firstDirectory = new TemporaryDirectory();
+        using var secondDirectory = new TemporaryDirectory();
+        using var first = FolderProjectContainer.Create(firstDirectory.Path, new FolderProjectSettings { Name = "工程一" });
+        using var second = FolderProjectContainer.Create(secondDirectory.Path, new FolderProjectSettings { Name = "工程二" });
+        var ca = new PackFileContainer("CA Pack") { IsCaPackFile = true };
+        var reference = new PackFileContainer("参考 Pack") { Role = PackFileContainerRole.Reference };
+        using var harness = CreateViewModel(first, second, ca, reference);
+        var roots = harness.ViewModel.Files;
+        roots[0].UnsavedChanged = true;
+        roots[2].IsSelected = true;
+        harness.EventHub.Publish(new PackFileContainerSetAsMainEditableEvent(second));
+
+        NUnitAssert.Multiple(() =>
+        {
+            NUnitAssert.That(roots.Select(node => node.IsCurrentEditProject), Is.EqualTo(new[] { false, true, false, false }));
+            NUnitAssert.That(roots.Select(node => node.IsReadOnlyContainer), Is.EqualTo(new[] { true, false, true, true }));
+            NUnitAssert.That(roots[0].UnsavedChanged, Is.True);
+            NUnitAssert.That(roots[2].IsSelected, Is.True);
+            NUnitAssert.That(new TreeNode("child", NodeType.Directory, ca, roots[2]).IsReadOnlyContainer, Is.False);
+        });
+
+        // A refreshed container can change access without changing the selected target.
+        var changed = new List<string?>();
+        roots[1].PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        second.IsCaPackFile = true;
+        harness.EventHub.Publish(new PackFileContainerSetAsMainEditableEvent(second));
+        NUnitAssert.That(roots[1].IsCurrentEditProject, Is.False);
+        NUnitAssert.That(roots[1].IsReadOnlyContainer, Is.True);
+        NUnitAssert.That(changed, Does.Contain(nameof(TreeNode.IsReadOnlyContainer)));
+        second.IsCaPackFile = false;
+        harness.EventHub.Publish(new PackFileContainerSetAsMainEditableEvent(second));
+        NUnitAssert.That(roots[1].IsReadOnlyContainer, Is.False);
+        harness.EventHub.Publish(new PackFileContainerSetAsMainEditableEvent(first));
+        NUnitAssert.That(roots[0].IsCurrentEditProject, Is.True);
+        NUnitAssert.That(roots[1].IsReadOnlyContainer, Is.True);
+    }
+
+    [TestCase(ThemeType.DarkTheme, 1)]
+    [TestCase(ThemeType.DarkTheme, 1.25)]
+    [TestCase(ThemeType.DarkTheme, 1.5)]
+    [TestCase(ThemeType.LightTheme, 1)]
+    [TestCase(ThemeType.LightTheme, 1.25)]
+    [TestCase(ThemeType.LightTheme, 1.5)]
+    [TestCase(ThemeType.HighContrastDark, 1)]
+    [TestCase(ThemeType.HighContrastDark, 1.25)]
+    [TestCase(ThemeType.HighContrastDark, 1.5)]
+    [TestCase(ThemeType.HighContrastLight, 1)]
+    [TestCase(ThemeType.HighContrastLight, 1.25)]
+    [TestCase(ThemeType.HighContrastLight, 1.5)]
+    [NonParallelizable]
+    public void ContainerAccessIndicators_RenderLocalizedRootStates(ThemeType theme, double scale)
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            using var directory = new TemporaryDirectory();
+            directory.Write("已修改的资源.meta", [1]);
+            using var project = FolderProjectContainer.Create(directory.Path, new FolderProjectSettings { Name = "我的模组工程" });
+            var ca = new PackFileContainer("CA PackFile") { IsCaPackFile = true };
+            var reference = new PackFileContainer("参考素材.pack") { Role = PackFileContainerRole.Reference };
+            using var harness = CreateViewModel(project, ca, reference);
+            var root = harness.ViewModel.Files[0];
+            root.IsNodeExpanded = true;
+            root.UnsavedChanged = true;
+            root.Children[0].UnsavedChanged = true;
+            harness.ViewModel.Files[2].IsSelected = true;
+            var previousTheme = ThemesController.CurrentTheme;
+            ThemesController.SetTheme(theme);
+            var view = new FileTreeView { DataContext = harness.ViewModel, LayoutTransform = new ScaleTransform(scale, scale) };
+            var window = new Window { Content = view, Width = 420 * scale, Height = 300 * scale, Left = -10000, Top = -10000, ShowActivated = false };
+            try
+            {
+                window.Show();
+                view.UpdateLayout();
+                var labels = FindIndicators(view, "ReadOnlyLabel").OfType<TextBlock>().Where(label => label.IsVisible).ToArray();
+                var pencil = FindIndicators(view, "CurrentProjectIcon").Single(icon => icon.IsVisible);
+                NUnitAssert.Multiple(() =>
+                {
+                    NUnitAssert.That(labels, Has.Length.EqualTo(2));
+                    NUnitAssert.That(labels.All(label => label.Text == "[只读]" && label.FontStyle == FontStyles.Italic), Is.True);
+                    NUnitAssert.That(labels.All(label => Equals(label.Foreground, Application.Current.FindResource("AeBrush.TextSecondary"))), Is.True);
+                    NUnitAssert.That(pencil.DataContext, Is.SameAs(root));
+                    NUnitAssert.That(pencil.ToolTip, Is.EqualTo("当前编辑工程"));
+                    NUnitAssert.That(FindIndicators(view, "PART_Header").OfType<ContentPresenter>().All(header =>
+                        ((TreeViewItem)header.TemplatedParent).FontWeight != FontWeights.Bold), Is.True);
+                });
+
+                var bitmap = new RenderTargetBitmap((int)Math.Ceiling(window.ActualWidth),
+                    (int)Math.Ceiling(window.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(window);
+                var output = Environment.GetEnvironmentVariable("AE_UI_QA_OUTPUT");
+                if (!string.IsNullOrEmpty(output))
+                {
+                    Directory.CreateDirectory(output);
+                    using var stream = File.Create(Path.Combine(output, $"file-tree-{theme}-{scale:0.##}.png"));
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    encoder.Save(stream);
+                }
+
+                harness.EventHub.Publish(new PackFileContainerSetAsMainEditableEvent(null));
+                view.UpdateLayout();
+                NUnitAssert.That(pencil.IsVisible, Is.False, "The old project's pencil must disappear immediately.");
+            }
+            finally
+            {
+                window.Close();
+                ThemesController.SetTheme(previousTheme);
+            }
+        });
+    }
+
+    private static IEnumerable<FrameworkElement> FindIndicators(DependencyObject parent, string name)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is FrameworkElement element && element.Name == name)
+                yield return element;
+            foreach (var descendant in FindIndicators(child, name))
+                yield return descendant;
+        }
+    }
+
     [Test]
     public void CtrlAndShiftSelection_UpdatesAllVisibleSelectedNodes()
     {

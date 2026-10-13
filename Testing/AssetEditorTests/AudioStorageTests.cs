@@ -1,4 +1,4 @@
-using Editors.Audio.AudioEditor.Core;
+﻿using Editors.Audio.AudioEditor.Core;
 using Editors.Audio.Shared.AudioProject;
 using Editors.Audio.Shared.GameInformation.Warhammer3;
 using Editors.Audio.Shared.Storage;
@@ -101,9 +101,13 @@ namespace AssetEditorTests
 
             loader.LoadBnkFiles([], progress, CancellationToken.None);
 
-            Assert.AreEqual(bankCount, progress.Values.Count);
-            Assert.AreEqual(bankCount, progress.Values.Max(value => value.Completed));
-            Assert.IsTrue(progress.Values.All(value => value.Total == bankCount));
+            var bankProgress = progress.Values.Where(value => value.Stage == AudioLoadStage.ReadingBanks).ToList();
+            Assert.AreEqual(bankCount + 1, bankProgress.Count);
+            Assert.AreEqual(0, bankProgress[0].Completed);
+            Assert.AreEqual(bankCount, bankProgress.Max(value => value.Completed));
+            Assert.IsTrue(bankProgress.All(value => value.Total == bankCount));
+            Assert.AreEqual(AudioLoadStage.DiscoveringBanks, progress.Values[0].Stage);
+            Assert.AreEqual(AudioLoadStage.BuildingIndex, progress.Values[^1].Stage);
         }
 
         [TestMethod]

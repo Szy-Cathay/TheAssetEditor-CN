@@ -1,4 +1,16 @@
-namespace Editors.Audio.Shared.Storage
+﻿namespace Editors.Audio.Shared.Storage
 {
-    public sealed record AudioLoadProgress(int Completed, int Total, string CurrentFile);
+    public enum AudioLoadStage
+    {
+        ReadingBanks,
+        ReadingMetadata,
+        DiscoveringBanks,
+        BuildingIndex
+    }
+
+    public sealed record AudioLoadProgress(
+        int Completed,
+        int Total,
+        string CurrentFile,
+        AudioLoadStage Stage = AudioLoadStage.ReadingBanks);
 }

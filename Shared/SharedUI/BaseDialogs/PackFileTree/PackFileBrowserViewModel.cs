@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -47,6 +48,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             _folderProjectHistoryStatusCache =
                 new(StringComparer.OrdinalIgnoreCase);
         private int _historyStatusRequestId;
+        private bool _disposed;
 
         public event FileSelectedDelegate FileOpen;
         public event NodeSelectedDelegate NodeSelected;
@@ -69,7 +71,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         public bool ShowFoldersOnly { get; }
 
-        public PackFileBrowserViewModel(ApplicationSettingsService applicationSettingsService, IContextMenuBuilder contextMenuBuilder, IPackFileService packFileService, IEventHub? eventHub, bool showCaFiles, bool showFoldersOnly, IFolderProjectHistoryService? historyService = null, PackFileTreeOperations? operations = null)
+        public PackFileBrowserViewModel(ApplicationSettingsService applicationSettingsService, IContextMenuBuilder contextMenuBuilder, IPackFileService packFileService, IEventHub? eventHub, bool showCaFiles, bool showFoldersOnly, IFolderProjectHistoryService? historyService = null, PackFileTreeOperations? operations = null, bool deferCaFiles = false)
         {
             _packFileService = packFileService;
             _eventHub = eventHub;
@@ -111,8 +113,38 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                 if (!showCaFiles)
                     loadFile = !item.IsCaPackFile;
 
-                if (loadFile)
+                if (loadFile && !(deferCaFiles && item.IsCaPackFile))
                     ReloadTree(item);
+            }
+        }
+
+        public async Task InitializeCaFilesAsync(
+            CancellationToken cancellationToken = default,
+            Action<long, long>? reportProgress = null)
+        {
+            if (!_showCaFiles || _disposed)
+                return;
+
+            foreach (var container in _packFileService.GetAllPackfileContainers()
+                         .Where(value => value.IsCaPackFile).ToArray())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (Files.Any(node => node.FileOwner == container))
+                    continue;
+
+                var showWemFiles = _applicationSettingsService.CurrentSettings.ShowCAWemFiles;
+                var isEditable = _packFileService.GetEditablePack() == container;
+                var root = await Task.Run(() => BuildContainerTree(
+                    container, showWemFiles, isEditable, cancellationToken, reportProgress),
+                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_disposed || !_packFileService.GetAllPackfileContainers().Contains(container) ||
+                    Files.Any(node => node.FileOwner == container))
+                    continue;
+
+                Files.Insert(GetContainerInsertionIndex(container), root);
+                if (!Filter.IsUnfiltered)
+                    Filter.Refresh();
             }
         }
 
@@ -843,11 +875,10 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private void MainEditablePackChanged(PackFileContainerSetAsMainEditableEvent e)
         {
             foreach (var item in Files)
-                item.IsMainEditabelPack = false;
-
-            var newContiner = Files.FirstOrDefault(x => x.FileOwner == e.Container);
-            if (newContiner != null)
-                newContiner.IsMainEditabelPack = true;
+            {
+                item.IsMainEditabelPack = ReferenceEquals(item.FileOwner, e.Container);
+                item.RefreshContainerAccess();
+            }
         }
 
         private void AddFiles(PackFileContainer container, List<PackFile> files)
@@ -1018,14 +1049,42 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             if (existingNode != null)
                 Files.Remove(existingNode);
 
+            var root = BuildContainerTree(container,
+                _applicationSettingsService.CurrentSettings.ShowCAWemFiles,
+                _packFileService.GetEditablePack() == container);
+
+            if (existingIndex == -1)
+                Files.Insert(GetContainerInsertionIndex(container), root);
+            else
+                Files.Insert(existingIndex, root);
+
+            Filter.Refresh();
+            RestoreTreeState(
+                root,
+                state,
+                selectedOutsideContainer,
+                activeOutsideContainer);
+            if (container is FolderProjectContainer project)
+                QueueFolderProjectHistoryStatusRefresh(project, root);
+        }
+
+        private static TreeNode BuildContainerTree(
+            PackFileContainer container, bool showWemFiles, bool isEditable,
+            CancellationToken cancellationToken = default,
+            Action<long, long>? reportProgress = null)
+        {
             var root = new TreeNode(container.Name, NodeType.Root, container, null);
-            root.IsMainEditabelPack = _packFileService.GetEditablePack() == container;
+            root.IsMainEditabelPack = isEditable;
             var directoryMap_new = new Dictionary<string, TreeNode>(container.FileList.Count);
-            var skipWemFiles = container.IsCaPackFile && _applicationSettingsService.CurrentSettings.ShowCAWemFiles == false;
+            var skipWemFiles = container.IsCaPackFile && !showWemFiles;
 
             List<(string FolderName, string FullFolderPath)> stackFileNames = new(10);
+            var processed = 0;
             foreach (var item in container.FileList)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (++processed % 2048 == 0)
+                    reportProgress?.Invoke(processed, container.FileList.Count);
                 ReadOnlySpan<char> pathSpan = item.Key;
                 var lastTreeNode = root;
 
@@ -1105,19 +1164,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
                                 node.GetFullPath()));
             }
 
-            if (existingIndex == -1)
-                Files.Insert(GetContainerInsertionIndex(container), root);
-            else
-                Files.Insert(existingIndex, root);
-
-            Filter.Refresh();
-            RestoreTreeState(
-                root,
-                state,
-                selectedOutsideContainer,
-                activeOutsideContainer);
-            if (container is FolderProjectContainer project)
-                QueueFolderProjectHistoryStatusRefresh(project, root);
+            cancellationToken.ThrowIfCancellationRequested();
+            reportProgress?.Invoke(processed, container.FileList.Count);
+            return root;
         }
 
         private void QueueFolderProjectHistoryStatusRefresh(
@@ -1429,6 +1478,7 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
 
         public void Dispose()
         {
+            _disposed = true;
             _historyStatusRequestId++;
             _eventHub?.UnRegister(this);
         }

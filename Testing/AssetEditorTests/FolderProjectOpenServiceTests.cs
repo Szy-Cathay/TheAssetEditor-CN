@@ -12,6 +12,44 @@ namespace AssetEditorTests;
 public class FolderProjectOpenServiceTests
 {
     [Test]
+    public void Open_ReentrantClick_DoesNotOpenAnotherContainer()
+    {
+        using var project = new TemporaryFolderProject();
+        using var container = FolderProjectContainer.Open(project.Path);
+        var history = new Mock<IFolderProjectHistoryService>();
+        history.Setup(item => item.GetDisplayStatus(project.Path))
+            .Returns(new FolderProjectHistoryStatus(
+                FolderProjectHistoryAvailability.Ready, "head", []));
+        var packFiles = new Mock<IPackFileService>();
+        var activated = false;
+        packFiles.Setup(item => item.TryActivateFolderProject(project.Path))
+            .Returns(() => activated);
+        packFiles.Setup(item => item.AddEditableFolderProject(container))
+            .Callback(() => activated = true)
+            .Returns(container);
+        FolderProjectOpenService? service = null;
+        var factory = new Mock<IFolderProjectFactory>();
+        var openCount = 0;
+        factory.Setup(item => item.Open(project.Path)).Returns(() =>
+        {
+            if (++openCount == 1)
+                service!.Open(project.Path);
+            return container;
+        });
+        service = new FolderProjectOpenService(
+            packFiles.Object, factory.Object, history.Object,
+            Mock.Of<IFolderProjectHistoryWindowService>(),
+            new ApplicationSettingsService(GameTypeEnum.Warhammer3),
+            Mock.Of<IStandardDialogs>(), new LocalizationManager());
+
+        service.Open(project.Path);
+        service.Open(project.Path);
+
+        NUnit.Framework.Assert.That(openCount, Is.EqualTo(1));
+        packFiles.Verify(item => item.AddEditableFolderProject(container), Times.Once);
+    }
+
+    [Test]
     public void Open_RecoveryRequired_ShowsHistoryRecoveryBeforeFactoryOpen()
     {
         using var project = new TemporaryFolderProject();

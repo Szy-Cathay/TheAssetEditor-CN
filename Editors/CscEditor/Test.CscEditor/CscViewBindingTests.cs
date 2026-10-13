@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Threading;
 using System.Windows;
@@ -534,6 +534,7 @@ public class CscViewBindingTests
                      "Themes/DesignSystem/Typography.xaml",
                      "Themes/DesignSystem/SurfaceStyles.xaml",
                      "Themes/Controls.xaml",
+                     "Themes/DesignSystem/Controls/Interaction.xaml",
                      "Themes/DesignSystem/Controls/Buttons.xaml",
                      "Themes/DesignSystem/Controls/Inputs.xaml",
                      "Themes/DesignSystem/Controls/Collections.xaml",

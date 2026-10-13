@@ -35,7 +35,7 @@
     </UserControl.InputBindings>
     <Grid>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-        <Grid.ColumnDefinitions><ColumnDefinition Width="160" MinWidth="120"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*" MinWidth="260"/></Grid.ColumnDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="160" MinWidth="120"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*" MinWidth="260"/></Grid.ColumnDefinitions>
         <Grid Grid.ColumnSpan="3" Margin="0,0,0,8">
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <TextBlock Text="{loc:Loc AnimPack.Campaign.Reference}" VerticalAlignment="Center" Margin="0,0,8,0"/>

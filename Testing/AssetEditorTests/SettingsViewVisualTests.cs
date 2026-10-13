@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -67,9 +67,9 @@ public class SettingsViewVisualTests
                             GetBrushSignature(value.Foreground)),
                         Does.Contain(secondary));
                     NUnitAssert.That(textBoxes, Is.Not.Empty);
-                    NUnitAssert.That(
-                        textBoxes.Select(value => GetBrushSignature(value.Background)),
-                        Has.All.EqualTo(inputBackground));
+                    foreach (var textBox in textBoxes)
+                        NUnitAssert.That(GetBrushSignature(textBox.Background),
+                            Is.EqualTo(textBox.IsReadOnly ? GetThemeBrush("AeBrush.Surface1") : inputBackground));
                     NUnitAssert.That(comboBoxes, Is.Not.Empty);
                     NUnitAssert.That(
                         comboBoxes.Select(value => GetBrushSignature(value.Background)),

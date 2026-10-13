@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using System.Threading;
@@ -25,6 +25,8 @@ public partial class FolderProjectProgressWindow : Window
     private ExceptionDispatchInfo? _failure;
     private bool _cancelled;
     private bool _operationCompleted;
+    private bool _closed;
+    private OperationProgressWindowTransition _transition = null!;
     private OperationProgressVisibilityController
         _visibilityController = null!;
 
@@ -58,6 +60,7 @@ public partial class FolderProjectProgressWindow : Window
     private void Initialize(string title, string message)
     {
         InitializeComponent();
+        _transition = new OperationProgressWindowTransition(this);
         _visibilityController = new OperationProgressVisibilityController(
             Dispatcher,
             SetWindowFeedbackVisibility);
@@ -68,7 +71,7 @@ public partial class FolderProjectProgressWindow : Window
         CancelFooter.Visibility = _canCancel
             ? Visibility.Visible
             : Visibility.Collapsed;
-        if (Application.Current?.MainWindow is { } owner &&
+        if (Application.Current?.MainWindow is { IsLoaded: true } owner &&
             !ReferenceEquals(owner, this))
         {
             Owner = owner;
@@ -76,6 +79,16 @@ public partial class FolderProjectProgressWindow : Window
 
         Loaded += OnLoaded;
         Closing += OnClosing;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _visibilityController.ForceHide();
+            if (!_operationCompleted)
+            {
+                _cancelled = true;
+                _cancellationTokenSource.Cancel();
+            }
+        };
     }
 
     public FolderProjectContainer? Run()
@@ -88,7 +101,8 @@ public partial class FolderProjectProgressWindow : Window
         }
         finally
         {
-            _cancellationTokenSource.Dispose();
+            if (_operationCompleted)
+                _cancellationTokenSource.Dispose();
         }
     }
 
@@ -104,19 +118,21 @@ public partial class FolderProjectProgressWindow : Window
         }
         finally
         {
-            _cancellationTokenSource.Dispose();
+            if (_operationCompleted)
+                _cancellationTokenSource.Dispose();
         }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         _visibilityController.Begin();
+        var cancellationToken = _cancellationTokenSource.Token;
         try
         {
             _result = await Task.Run(
                 () => _operation(
                     FolderProjectOperationProgress.Report,
-                    _cancellationTokenSource.Token));
+                    cancellationToken));
         }
         catch (OperationCanceledException)
             when (_cancellationTokenSource.IsCancellationRequested)
@@ -130,8 +146,12 @@ public partial class FolderProjectProgressWindow : Window
         finally
         {
             await _visibilityController.EndAsync();
+            await _transition.HideAsync();
             _operationCompleted = true;
-            DialogResult = _failure == null;
+            if (!_closed)
+                DialogResult = _failure == null;
+            else
+                _cancellationTokenSource.Dispose();
         }
     }
 
@@ -152,7 +172,9 @@ public partial class FolderProjectProgressWindow : Window
 
     private void SetWindowFeedbackVisibility(bool isVisible)
     {
-        Opacity = isVisible ? 1 : 0;
-        IsHitTestVisible = isVisible;
+        if (isVisible)
+            _transition.Show();
+        else
+            _ = _transition.HideAsync();
     }
 }

@@ -4,7 +4,9 @@
     <Style
         x:Key="AeVerticalGridSplitterStyle"
         TargetType="{x:Type GridSplitter}">
-        <Setter Property="Width" Value="5" />
+        <Setter Property="Width" Value="{StaticResource AeSize.SplitterHitTarget}" />
+        <Setter Property="Margin" Value="-3.5,0,-3.5,0" />
+        <Setter Property="Panel.ZIndex" Value="1" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="Background" Value="Transparent" />
@@ -21,23 +23,19 @@
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         Background="{TemplateBinding Background}"
-                        CornerRadius="{DynamicResource AeRadius.Compact}"
                         SnapsToDevicePixels="True">
-                        <StackPanel
+                        <Border x:Name="Divider"
+                            Width="1"
                             HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Orientation="Vertical">
-                            <Ellipse Width="2" Height="2" Margin="0,1" Fill="{DynamicResource AeBrush.TextMuted}" />
-                            <Ellipse Width="2" Height="2" Margin="0,1" Fill="{DynamicResource AeBrush.TextMuted}" />
-                            <Ellipse Width="2" Height="2" Margin="0,1" Fill="{DynamicResource AeBrush.TextMuted}" />
-                        </StackPanel>
+                            VerticalAlignment="Stretch"
+                            Background="{DynamicResource AeBrush.Border}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                            <Setter TargetName="Divider" Property="Background" Value="{DynamicResource AeBrush.BorderStrong}" />
                         </Trigger>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                            <Setter TargetName="Divider" Property="Background" Value="{DynamicResource AeBrush.Accent}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -48,7 +46,9 @@
     <Style
         x:Key="AeHorizontalGridSplitterStyle"
         TargetType="{x:Type GridSplitter}">
-        <Setter Property="Height" Value="5" />
+        <Setter Property="Height" Value="{StaticResource AeSize.SplitterHitTarget}" />
+        <Setter Property="Margin" Value="0,-3.5,0,-3.5" />
+        <Setter Property="Panel.ZIndex" Value="1" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="Background" Value="Transparent" />
@@ -65,23 +65,19 @@
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         Background="{TemplateBinding Background}"
-                        CornerRadius="{DynamicResource AeRadius.Compact}"
                         SnapsToDevicePixels="True">
-                        <StackPanel
-                            HorizontalAlignment="Center"
+                        <Border x:Name="Divider"
+                            Height="1"
+                            HorizontalAlignment="Stretch"
                             VerticalAlignment="Center"
-                            Orientation="Horizontal">
-                            <Ellipse Width="2" Height="2" Margin="1,0" Fill="{DynamicResource AeBrush.TextMuted}" />
-                            <Ellipse Width="2" Height="2" Margin="1,0" Fill="{DynamicResource AeBrush.TextMuted}" />
-                            <Ellipse Width="2" Height="2" Margin="1,0" Fill="{DynamicResource AeBrush.TextMuted}" />
-                        </StackPanel>
+                            Background="{DynamicResource AeBrush.Border}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                            <Setter TargetName="Divider" Property="Background" Value="{DynamicResource AeBrush.BorderStrong}" />
                         </Trigger>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
+                            <Setter TargetName="Divider" Property="Background" Value="{DynamicResource AeBrush.Accent}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

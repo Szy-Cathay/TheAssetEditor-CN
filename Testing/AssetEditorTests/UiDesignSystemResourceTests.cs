@@ -1,3 +1,4 @@
+﻿using System.ComponentModel;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -30,6 +31,7 @@ public class UiDesignSystemResourceTests
                     "Themes/DesignSystem/Typography.xaml",
                     "Themes/DesignSystem/SurfaceStyles.xaml",
                     "Themes/Controls.xaml",
+                    "Themes/DesignSystem/Controls/Interaction.xaml",
                     "Themes/DesignSystem/Controls/Buttons.xaml",
                     "Themes/DesignSystem/Controls/Inputs.xaml",
                     "Themes/DesignSystem/Controls/Collections.xaml",
@@ -49,6 +51,44 @@ public class UiDesignSystemResourceTests
                     }
                 });
             });
+    }
+
+    [Test]
+    public void ThemeSwitch_KeepsOpenWindowStylesAvailableThroughoutRefresh()
+    {
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var previous = ThemesController.CurrentTheme;
+            var window = new Window
+            {
+                Width = 320, Height = 200, Left = -10000, Top = -10000,
+                ShowActivated = false, ShowInTaskbar = false, Content = new Border(),
+            };
+            var styles = new List<Style?>();
+            var descriptor = DependencyPropertyDescriptor.FromProperty(FrameworkElement.StyleProperty, typeof(Window));
+            EventHandler changed = (_, _) => styles.Add(window.Style);
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                NUnitAssert.That(window.Style, Is.Not.Null);
+                descriptor.AddValueChanged(window, changed);
+                foreach (var theme in new[] { ThemeType.LightTheme, ThemeType.HighContrastDark, ThemeType.HighContrastLight, ThemeType.DarkTheme })
+                {
+                    ThemesController.SetTheme(theme);
+                    window.UpdateLayout();
+                    NUnitAssert.That(window.TryFindResource("CustomWindowStyle"), Is.Not.Null);
+                    NUnitAssert.That(window.Style, Is.Not.Null);
+                }
+                NUnitAssert.That(styles, Does.Not.Contain(null), "An open window must not temporarily lose its border and chrome style.");
+            }
+            finally
+            {
+                descriptor.RemoveValueChanged(window, changed);
+                window.Close();
+                ThemesController.SetTheme(previous);
+            }
+        });
     }
 
     [Test]
@@ -223,7 +263,7 @@ public class UiDesignSystemResourceTests
     }
 
     [Test]
-    public void DarkTheme_UsesApprovedGraphitePalette()
+    public void DarkTheme_UsesCodexReferenceNeutralPalette()
     {
         WpfTestApplicationHost.Invoke(_ =>
         {
@@ -231,19 +271,19 @@ public class UiDesignSystemResourceTests
                 "Themes/ColourDictionaries/DarkTheme.xaml");
             var expected = new Dictionary<string, string>
             {
-                ["AeBrush.Canvas"] = "#FF151719",
-                ["AeBrush.Surface1"] = "#FF1B1E21",
-                ["AeBrush.Surface2"] = "#FF212529",
-                ["AeBrush.Surface3"] = "#FF282D32",
-                ["AeBrush.SurfaceHover"] = "#FF30363C",
-                ["AeBrush.Border"] = "#FF343A40",
-                ["AeBrush.BorderStrong"] = "#FF464E56",
-                ["AeBrush.TextPrimary"] = "#FFE4E7E9",
-                ["AeBrush.TextSecondary"] = "#FFB0B6BC",
-                ["AeBrush.TextMuted"] = "#FF858D95",
+                ["AeBrush.Canvas"] = "#FF111111",
+                ["AeBrush.Surface1"] = "#FF181818",
+                ["AeBrush.Surface2"] = "#FF212121",
+                ["AeBrush.Surface3"] = "#FF292929",
+                ["AeBrush.SurfaceHover"] = "#FF333333",
+                ["AeBrush.Border"] = "#FF303030",
+                ["AeBrush.BorderStrong"] = "#FF4A4A4A",
+                ["AeBrush.TextPrimary"] = "#FFEDEDED",
+                ["AeBrush.TextSecondary"] = "#FFB5B5B5",
+                ["AeBrush.TextMuted"] = "#FF929292",
                 ["AeBrush.Accent"] = "#FF64A9E2",
                 ["AeBrush.AccentHover"] = "#FF75B5E8",
-                ["AeBrush.AccentSoft"] = "#FF263A4B",
+                ["AeBrush.AccentSoft"] = "#FF303030",
                 ["AeBrush.Success"] = "#FF72BC91",
                 ["AeBrush.Warning"] = "#FFE2B45F",
                 ["AeBrush.Danger"] = "#FFE17979",
@@ -281,32 +321,32 @@ public class UiDesignSystemResourceTests
                 NUnitAssert.That(dictionary["AeSpace.8"], Is.EqualTo(32d));
                 NUnitAssert.That(
                     dictionary["AeSize.ActivityRailWidth"],
-                    Is.EqualTo(30d));
-                NUnitAssert.That(dictionary["AeSize.TabHeight"], Is.EqualTo(24d));
+                    Is.EqualTo(44d));
+                NUnitAssert.That(dictionary["AeSize.TabHeight"], Is.EqualTo(28d));
                 NUnitAssert.That(
                     dictionary["AeSize.TabGridLength"],
-                    Is.EqualTo(new GridLength(24)));
+                    Is.EqualTo(new GridLength(28)));
                 NUnitAssert.That(
                     dictionary["AeSize.CompactRowHeight"],
                     Is.EqualTo(24d));
                 NUnitAssert.That(
                     dictionary["AeSize.ControlHeight"],
-                    Is.EqualTo(26d));
+                    Is.EqualTo(28d));
                 NUnitAssert.That(
                     dictionary["AeSize.ProminentControlHeight"],
-                    Is.EqualTo(30d));
+                    Is.EqualTo(32d));
                 NUnitAssert.That(
                     dictionary["AeRadius.Compact"],
-                    Is.EqualTo(new CornerRadius(3)));
-                NUnitAssert.That(
-                    dictionary["AeRadius.Control"],
                     Is.EqualTo(new CornerRadius(4)));
                 NUnitAssert.That(
+                    dictionary["AeRadius.Control"],
+                    Is.EqualTo(new CornerRadius(7)));
+                NUnitAssert.That(
                     dictionary["AeRadius.Surface"],
-                    Is.EqualTo(new CornerRadius(6)));
+                    Is.EqualTo(new CornerRadius(10)));
                 NUnitAssert.That(
                     dictionary["AeRadius.Overlay"],
-                    Is.EqualTo(new CornerRadius(7)));
+                    Is.EqualTo(new CornerRadius(12)));
                 NUnitAssert.That(
                     ((Duration)dictionary["AeMotion.Pressed"]).TimeSpan,
                     Is.EqualTo(TimeSpan.FromMilliseconds(90)));
@@ -325,6 +365,11 @@ public class UiDesignSystemResourceTests
                 NUnitAssert.That(
                     dictionary["AeMotion.OverlayOffset"],
                     Is.EqualTo(2d));
+                NUnitAssert.That(
+                    dictionary["AeMotion.WindowScale"],
+                    Is.EqualTo(0.96d));
+                NUnitAssert.That(((Duration)dictionary["AeMotion.WindowEnter"]).TimeSpan, Is.EqualTo(TimeSpan.FromMilliseconds(280)));
+                NUnitAssert.That(((Duration)dictionary["AeMotion.WindowExit"]).TimeSpan, Is.EqualTo(TimeSpan.FromMilliseconds(200)));
             });
         });
     }

@@ -10,6 +10,7 @@
              xmlns:valueconverters="clr-namespace:Shared.Ui.BaseDialogs.PackFileTree.ValueConverters"
              xmlns:loc="clr-namespace:Shared.Ui.Common"
              xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800"
              Background="Transparent"
@@ -91,7 +92,7 @@
         </Grid>
 
         <!-- TreeView -->
-        <TreeView x:Name="tvParameters" AllowDrop="True" Grid.Row="2" Margin="0, 2.5, 0, 5" PreviewKeyDown="TreeView_PreviewKeyDown"
+        <TreeView x:Name="tvParameters" AllowDrop="True" Grid.Row="2" Margin="0,4,0,0" PreviewKeyDown="TreeView_PreviewKeyDown"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding Path=Files, UpdateSourceTrigger=PropertyChanged}" 
                   VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                   BorderBrush="Transparent" Background="Transparent"
@@ -146,12 +147,6 @@
                             <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
                             <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
                         </DataTrigger>
-                        <DataTrigger Binding="{Binding IsMainEditabelPack, UpdateSourceTrigger=PropertyChanged}" Value="True">
-                            <Setter Property="FontWeight" Value="Bold" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding IsMainEditabelPack, UpdateSourceTrigger=PropertyChanged}" Value="False">
-                            <Setter Property="FontWeight" Value="Normal" />
-                        </DataTrigger>
                     </Style.Triggers>
 
                 </Style>
@@ -164,6 +159,7 @@
                             <ColumnDefinition Width="auto"/>
                             <ColumnDefinition Width="auto"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Image Width="12" Grid.Column="0" Source="{Binding Path=., Converter={StaticResource ImageValueConverter}, Mode=OneTime}"/>
                         <TextBlock Grid.Column="1" Text="{Binding UnsavedChanged, Converter={StaticResource BoolToChangedPrefixStr}, UpdateSourceTrigger=PropertyChanged}">
@@ -180,7 +176,7 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        <TextBlock Margin="4,0,0,0" Grid.Column="2" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBlock Margin="4,0,0,0" Grid.Column="2" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextTrimming="CharacterEllipsis">
                             <TextBlock.Style>
                                 <Style TargetType="{x:Type TextBlock}">
                                     <Style.Triggers>
@@ -198,6 +194,21 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                                    Visibility="{Binding ShowContainerAccessState, RelativeSource={RelativeSource AncestorType={x:Type packfiletree:PackFileBrowserView}}, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock x:Name="ReadOnlyLabel" Margin="8,0,0,0"
+                                       Text="{loc:Loc Shared.PackFileBrowser.ReadOnly}"
+                                       Style="{StaticResource AeText.Caption}"
+                                       FontStyle="Italic" FontWeight="Normal"
+                                       Foreground="{DynamicResource AeBrush.TextSecondary}"
+                                       Visibility="{Binding IsReadOnlyContainer, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <materialIcons:MaterialIcon x:Name="CurrentProjectIcon" Kind="PencilOutline"
+                                                        Width="16" Height="16" Margin="8,0,0,0"
+                                                        Foreground="{DynamicResource AeBrush.TextSecondary}"
+                                                        ToolTip="{loc:Loc Shared.PackFileBrowser.CurrentEditProject}"
+                                                        AutomationProperties.Name="{loc:Loc Shared.PackFileBrowser.CurrentEditProject}"
+                                                        Visibility="{Binding IsCurrentEditProject, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        </StackPanel>
                     </Grid>
                 </HierarchicalDataTemplate>
             </TreeView.ItemTemplate>

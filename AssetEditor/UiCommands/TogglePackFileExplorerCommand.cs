@@ -1,5 +1,4 @@
-﻿using System.Windows;
-using AssetEditor.ViewModels;
+﻿using AssetEditor.ViewModels;
 using Shared.Core.Events;
 
 namespace AssetEditor.UiCommands
@@ -16,7 +15,6 @@ namespace AssetEditor.UiCommands
         public void Execute()
         {
             _mainViewModel.IsPackFileExplorerVisible = !_mainViewModel.IsPackFileExplorerVisible;
-            _mainViewModel.FileTreeColumnWidth = _mainViewModel.IsPackFileExplorerVisible ? new GridLength(0.28, GridUnitType.Star) : new GridLength(0, GridUnitType.Pixel);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿<ResourceDictionary 
+﻿<ResourceDictionary
     x:Class="AssetEditor.Themes.Controls"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -11,7 +11,8 @@
     xmlns:chrome="clr-namespace:Xceed.Wpf.Toolkit.Chromes;assembly=Xceed.Wpf.Toolkit"
     xmlns:MdXaml="clr-namespace:MdXaml;assembly=MdXaml"
     xmlns:options="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
-    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui">
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui">
 
     <!-- Converters for WindowsTitleMenu -->
     <windowstitlemenu:WindowStateToPathConverter x:Key="windowStateToPathConverter"/>
@@ -208,8 +209,8 @@
         x:Key="WatermarkTextBox"
         TargetType="{x:Type extendedwpftoolkit:WatermarkTextBox}">
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="3" />
         <Setter Property="AllowDrop" Value="true" />
@@ -225,7 +226,7 @@
                             x:Name="Border"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            Background="{TemplateBinding Background}" CornerRadius="4">
+                            Background="{TemplateBinding Background}" CornerRadius="{StaticResource AeRadius.Control}">
                             <Grid>
                                 <ScrollViewer 
                                     x:Name="PART_ContentHost"
@@ -246,7 +247,7 @@
                             x:Name="MouseOverVisual"
                             Opacity="0"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            BorderBrush="{DynamicResource TextBox.MouseOver.Border}" />
+                            BorderBrush="{DynamicResource AeBrush.BorderStrong}" />
                         <Border 
                             x:Name="FocusVisual"
                             Opacity="0"
@@ -360,7 +361,7 @@
                                         BorderBrush="{TemplateBinding BorderBrush}"
                                         BorderThickness="{TemplateBinding BorderThickness}"
                                         SnapsToDevicePixels="True"
-                                        Background="{DynamicResource ComboBox.Static.Background}" CornerRadius="4">
+                                        Background="{DynamicResource AeBrush.Surface2}" CornerRadius="{StaticResource AeRadius.Control}">
                                         <Border 
                                             x:Name="splitBorder"
                                             Background="Transparent"
@@ -386,8 +387,8 @@
                                                 <Condition Binding="{Binding IsPressed, RelativeSource={RelativeSource Self}}" Value="false" />
                                                 <Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}" Value="true" />
                                             </MultiDataTrigger.Conditions>
-                                            <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource ComboBox.Static.Editable.Background}"/>
-                                            <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource ComboBox.Static.Editable.Border}"/>
+                                            <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource AeBrush.Surface2}"/>
+                                            <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource AeBrush.Border}"/>
                                         </MultiDataTrigger>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Fill" TargetName="Arrow" Value="{DynamicResource ComboBox.MouseOver.Glyph}"/>
@@ -466,7 +467,7 @@
                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
             <Border 
                 x:Name="Border"
-                Background="{DynamicResource ComboBox.Static.Background}"
+                Background="{DynamicResource AeBrush.Surface2}"
                 Margin="{TemplateBinding BorderThickness}"
                 Visibility="Collapsed">
                 <TextBox 
@@ -573,8 +574,8 @@
 
     <Style x:Key="WatermarkComboBox" TargetType="{x:Type extendedwpftoolkit:WatermarkComboBox}">
         <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
@@ -742,9 +743,9 @@
 
     <Style TargetType="{x:Type extendedwpftoolkit:ButtonSpinner}">
         <Setter Property="Background"
-            Value="{DynamicResource TextBox.Static.Background}" />
+            Value="{DynamicResource AeBrush.Surface2}" />
         <Setter Property="BorderBrush"
-            Value="{DynamicResource TextBox.Static.Border}" />
+            Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness"
             Value="1" />
         <Setter Property="Focusable"
@@ -772,7 +773,7 @@
                             SnapsToDevicePixels="True"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{StaticResource AeRadius.Control}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition x:Name="firstContentColumn"
@@ -828,7 +829,7 @@
                         <Trigger Property="IsEnabled"
                                  Value="False">
                             <Setter Property="Background"
-                                    Value="{DynamicResource TextBox.Static.Background}" />
+                                    Value="{DynamicResource AeBrush.Surface2}" />
                         </Trigger>
                         <Trigger SourceName="PART_IncreaseButton"
                                  Property="IsEnabled"
@@ -913,8 +914,8 @@
 
     <Style x:Key="NumericUpDown" TargetType="{x:Type prim:InputBase}">
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}" />
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}" />
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness"
             Value="1" />
         <Setter Property="HorizontalContentAlignment"
@@ -1084,7 +1085,7 @@
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="1"/>
-        <Setter Property="ap:CornerRadiusHelper.Value" Value="4"/>
+        <Setter Property="ap:CornerRadiusHelper.Value" Value="{StaticResource AeRadius.Control}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -1149,7 +1150,7 @@
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="1"/>
-        <Setter Property="ap:CornerRadiusHelper.Value" Value="4"/>
+        <Setter Property="ap:CornerRadiusHelper.Value" Value="{StaticResource AeRadius.Control}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -1214,7 +1215,7 @@
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="1"/>
-        <Setter Property="ap:CornerRadiusHelper.Value" Value="4"/>
+        <Setter Property="ap:CornerRadiusHelper.Value" Value="{StaticResource AeRadius.Control}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
@@ -1587,190 +1588,100 @@
             </Trigger>
         </Style.Triggers>
     </Style>
-    <!-- Thumbs -->
+    <!-- The thumb and its layout slot share a narrow footprint. -->
     <Style x:Key="ScrollBarThumbVertical" TargetType="{x:Type Thumb}">
-        <Setter Property="OverridesDefaultStyle" Value="true"/>
-        <Setter Property="IsTabStop" Value="false"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="IsTabStop" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Thumb}">
-                    <Rectangle x:Name="rectangle" Fill="{DynamicResource ScrollBar.Static.Thumb}" Height="{TemplateBinding Height}" SnapsToDevicePixels="True" Width="{TemplateBinding Width}" Margin="1,0"/>
+                    <Grid Background="Transparent">
+                        <Border x:Name="ThumbSurface"
+                                Width="{StaticResource AeSize.ScrollBarThumb}"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource AeBrush.TextMuted}"
+                                CornerRadius="{StaticResource AeRadius.Compact}"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="Fill" TargetName="rectangle" Value="{DynamicResource ScrollBar.MouseOver.Thumb}"/>
+                        <DataTrigger Binding="{Binding Orientation, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="Horizontal">
+                            <Setter TargetName="ThumbSurface" Property="Width" Value="Auto"/>
+                            <Setter TargetName="ThumbSurface" Property="Height" Value="{StaticResource AeSize.ScrollBarThumb}"/>
+                            <Setter TargetName="ThumbSurface" Property="HorizontalAlignment" Value="Stretch"/>
+                            <Setter TargetName="ThumbSurface" Property="VerticalAlignment" Value="Center"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="True">
+                            <Setter TargetName="ThumbSurface" Property="Background" Value="{DynamicResource AeBrush.TextSecondary}"/>
+                        </DataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="True"/>
+                                <Condition Binding="{Binding Orientation, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="Vertical"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="ThumbSurface" Property="Width" Value="{StaticResource AeSize.ScrollBarThumbActive}"/>
+                        </MultiDataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="True"/>
+                                <Condition Binding="{Binding Orientation, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="Horizontal"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="ThumbSurface" Property="Height" Value="{StaticResource AeSize.ScrollBarThumbActive}"/>
+                        </MultiDataTrigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbSurface" Property="Background" Value="{DynamicResource AeBrush.TextPrimary}"/>
                         </Trigger>
-                        <Trigger Property="IsDragging" Value="true">
-                            <Setter Property="Fill" TargetName="rectangle" Value="{DynamicResource ScrollBar.Pressed.Thumb}"/>
-                        </Trigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsDragging, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                <Condition Binding="{Binding Orientation, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="Vertical"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="ThumbSurface" Property="Width" Value="{StaticResource AeSize.ScrollBarThumbActive}"/>
+                        </MultiDataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsDragging, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                <Condition Binding="{Binding Orientation, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}" Value="Horizontal"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="ThumbSurface" Property="Height" Value="{StaticResource AeSize.ScrollBarThumbActive}"/>
+                        </MultiDataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="{StaticResource AeInteraction.DisabledOpacity}"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
-
-    <Style x:Key="ScrollBarThumbHorizontal" TargetType="{x:Type Thumb}">
-        <Setter Property="OverridesDefaultStyle" Value="true"/>
-        <Setter Property="IsTabStop" Value="false"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type Thumb}">
-                    <Rectangle x:Name="rectangle" Fill="{DynamicResource ScrollBar.Static.Thumb}" Height="{TemplateBinding Height}" SnapsToDevicePixels="True" Width="{TemplateBinding Width}" Margin="0,1"/>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="Fill" TargetName="rectangle" Value="{DynamicResource ScrollBar.MouseOver.Thumb}"/>
-                        </Trigger>
-                        <Trigger Property="IsDragging" Value="true">
-                            <Setter Property="Fill" TargetName="rectangle" Value="{DynamicResource ScrollBar.Pressed.Thumb}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Buttons -->
-
-    <Style x:Key="CompactScrollBarButton" TargetType="{x:Type RepeatButton}">
-        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="Background" Value="{DynamicResource ScrollBar.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Padding" Value="1"/>
-        <Setter Property="Focusable" Value="false"/>
-        <Setter Property="IsTabStop" Value="false"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type RepeatButton}">
-                    <Border x:Name="border" Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                            SnapsToDevicePixels="true">
-                        <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="Background" TargetName="border" Value="{DynamicResource ScrollBar.MouseOver.Background}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="true">
-                            <Setter Property="Background" TargetName="border" Value="{DynamicResource ScrollBar.Pressed.Background}"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Opacity" TargetName="contentPresenter" Value="0.56"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style x:Key="ScrollBarButton" TargetType="{x:Type RepeatButton}">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}"/>
-        <Setter Property="Background" Value="{DynamicResource ScrollBarButton.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ScrollBarButton.Static.Border}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Padding" Value="1"/>
-        <Setter Property="Focusable" Value="false"/>
-        <Setter Property="IsTabStop" Value="false"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type RepeatButton}">
-                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="true">
-                        <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="Background" TargetName="border" Value="{DynamicResource ScrollBar.MouseOver.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource ScrollBar.MouseOver.Border}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="true">
-                            <Setter Property="Background" TargetName="border" Value="{DynamicResource ScrollBar.Pressed.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource ScrollBar.Pressed.Border}"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Opacity" TargetName="contentPresenter" Value="0.56"/>
-                            <Setter Property="Background" TargetName="border" Value="{DynamicResource ScrollBar.Disabled.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource ScrollBar.Disabled.Border}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Scrollbars -->
 
     <Style TargetType="{x:Type ScrollBar}">
-        <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false"/>
-        <Setter Property="Stylus.IsFlicksEnabled" Value="false"/>
-        <Setter Property="Background" Value="{DynamicResource ScrollBar.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ScrollBar.Static.Border}"/>
-        <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
-        <Setter Property="BorderThickness" Value="1,0"/>
-        <Setter Property="Width" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
-        <Setter Property="MinWidth" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
+        <Setter Property="Stylus.IsPressAndHoldEnabled" Value="False"/>
+        <Setter Property="Stylus.IsFlicksEnabled" Value="False"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width" Value="{StaticResource AeSize.ScrollBarThickness}"/>
+        <Setter Property="MinWidth" Value="{StaticResource AeSize.ScrollBarThickness}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ScrollBar}">
-                    <Grid x:Name="Bg" SnapsToDevicePixels="true">
-                        <Grid.RowDefinitions>
-                            <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}"/>
-                            <RowDefinition Height="0.00001*"/>
-                            <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}"/>
-                        </Grid.RowDefinitions>
-                        <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.Row="1"/>
-                        <RepeatButton x:Name="PART_LineUpButton" Command="{x:Static ScrollBar.LineUpCommand}" Style="{StaticResource ScrollBarButton}">
-                            <Path x:Name="ArrowTop" Data="M 0,4 C0,4 0,6 0,6 0,6 3.5,2.5 3.5,2.5 3.5,2.5 7,6 7,6 7,6 7,4 7,4 7,4 3.5,0.5 3.5,0.5 3.5,0.5 0,4 0,4 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3,4,3,3" Stretch="Uniform"/>
-                        </RepeatButton>
-                        <Track x:Name="PART_Track" IsDirectionReversed="true" IsEnabled="{TemplateBinding IsMouseOver}" Grid.Row="1">
+                    <Grid Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" Orientation="{TemplateBinding Orientation}" IsDirectionReversed="True">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
+                                <RepeatButton x:Name="PageDecrease" Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
-                                <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
+                                <RepeatButton x:Name="PageIncrease" Command="{x:Static ScrollBar.PageDownCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
                             </Track.IncreaseRepeatButton>
                             <Track.Thumb>
                                 <Thumb Style="{StaticResource ScrollBarThumbVertical}"/>
                             </Track.Thumb>
                         </Track>
-                        <RepeatButton x:Name="PART_LineDownButton" Command="{x:Static ScrollBar.LineDownCommand}" Grid.Row="2" Style="{StaticResource ScrollBarButton}">
-                            <Path x:Name="ArrowBottom" Data="M 0,2.5 C0,2.5 0,0.5 0,0.5 0,0.5 3.5,4 3.5,4 3.5,4 7,0.5 7,0.5 7,0.5 7,2.5 7,2.5 7,2.5 3.5,6 3.5,6 3.5,6 0,2.5 0,2.5 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3,4,3,3" Stretch="Uniform"/>
-                        </RepeatButton>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineDownButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineDownButton}" Value="true"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowBottom" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                        </MultiDataTrigger>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineUpButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineUpButton}" Value="true"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowTop" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                        </MultiDataTrigger>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineDownButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineDownButton}" Value="false"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowBottom" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                        </MultiDataTrigger>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineUpButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineUpButton}" Value="false"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowTop" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                        </MultiDataTrigger>
-                        <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Fill" TargetName="ArrowTop" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                            <Setter Property="Fill" TargetName="ArrowBottom" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
+                        <Trigger Property="Orientation" Value="Horizontal">
+                            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                            <Setter TargetName="PageDecrease" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}"/>
+                            <Setter TargetName="PageIncrease" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -1780,222 +1691,13 @@
             <Trigger Property="Orientation" Value="Horizontal">
                 <Setter Property="Width" Value="Auto"/>
                 <Setter Property="MinWidth" Value="0"/>
-                <Setter Property="Height" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
-                <Setter Property="MinHeight" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
-                <Setter Property="BorderThickness" Value="0,1"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="{x:Type ScrollBar}">
-                            <Grid x:Name="Bg" SnapsToDevicePixels="true">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}"/>
-                                    <ColumnDefinition Width="0.00001*"/>
-                                    <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}"/>
-                                </Grid.ColumnDefinitions>
-                                <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.Column="1"/>
-                                <RepeatButton x:Name="PART_LineLeftButton" Command="{x:Static ScrollBar.LineLeftCommand}" Style="{StaticResource ScrollBarButton}">
-                                    <Path x:Name="ArrowLeft" Data="M 3.18,7 C3.18,7 5,7 5,7 5,7 1.81,3.5 1.81,3.5 1.81,3.5 5,0 5,0 5,0 3.18,0 3.18,0 3.18,0 0,3.5 0,3.5 0,3.5 3.18,7 3.18,7 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3" Stretch="Uniform"/>
-                                </RepeatButton>
-                                <Track x:Name="PART_Track" Grid.Column="1" IsEnabled="{TemplateBinding IsMouseOver}">
-                                    <Track.DecreaseRepeatButton>
-                                        <RepeatButton Command="{x:Static ScrollBar.PageLeftCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
-                                    </Track.DecreaseRepeatButton>
-                                    <Track.IncreaseRepeatButton>
-                                        <RepeatButton Command="{x:Static ScrollBar.PageRightCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
-                                    </Track.IncreaseRepeatButton>
-                                    <Track.Thumb>
-                                        <Thumb Style="{StaticResource ScrollBarThumbHorizontal}"/>
-                                    </Track.Thumb>
-                                </Track>
-                                <RepeatButton x:Name="PART_LineRightButton" Grid.Column="2" Command="{x:Static ScrollBar.LineRightCommand}" Style="{StaticResource ScrollBarButton}">
-                                    <Path x:Name="ArrowRight" Data="M 1.81,7 C1.81,7 0,7 0,7 0,7 3.18,3.5 3.18,3.5 3.18,3.5 0,0 0,0 0,0 1.81,0 1.81,0 1.81,0 5,3.5 5,3.5 5,3.5 1.81,7 1.81,7 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3" Stretch="Uniform"/>
-                                </RepeatButton>
-                            </Grid>
-                            <ControlTemplate.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineRightButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineRightButton}" Value="true"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowRight" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                                </MultiDataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineLeftButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineLeftButton}" Value="true"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowLeft" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                                </MultiDataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineRightButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineRightButton}" Value="false"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowRight" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                                </MultiDataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineLeftButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineLeftButton}" Value="false"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowLeft" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                                </MultiDataTrigger>
-                                <Trigger Property="IsEnabled" Value="false">
-                                    <Setter Property="Fill" TargetName="ArrowLeft" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                                    <Setter Property="Fill" TargetName="ArrowRight" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
+                <Setter Property="Height" Value="{StaticResource AeSize.ScrollBarThickness}"/>
+                <Setter Property="MinHeight" Value="{StaticResource AeSize.ScrollBarThickness}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="CompactScrollBarStyle" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource {x:Type ScrollBar}}">
-        <Setter Property="BorderThickness" Value="0,0"/>
-        <Setter Property="Width" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
-        <Setter Property="MinWidth" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type ScrollBar}">
-                    <Grid x:Name="Bg" SnapsToDevicePixels="true">
-                        <Grid.RowDefinitions>
-                            <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}"/>
-                            <RowDefinition Height="0.00001*"/>
-                            <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}"/>
-                        </Grid.RowDefinitions>
-                        <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.Row="1"/>
-                        <RepeatButton x:Name="PART_LineUpButton" Command="{x:Static ScrollBar.LineUpCommand}" Style="{StaticResource CompactScrollBarButton}">
-                            <Path x:Name="ArrowTop" Data="M 0,4 C0,4 0,6 0,6 0,6 3.5,2.5 3.5,2.5 3.5,2.5 7,6 7,6 7,6 7,4 7,4 7,4 3.5,0.5 3.5,0.5 3.5,0.5 0,4 0,4 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3,4,3,3" Stretch="Uniform"/>
-                        </RepeatButton>
-                        <Track x:Name="PART_Track" IsDirectionReversed="true" IsEnabled="{TemplateBinding IsMouseOver}" Grid.Row="1">
-                            <Track.DecreaseRepeatButton>
-                                <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
-                            </Track.DecreaseRepeatButton>
-                            <Track.IncreaseRepeatButton>
-                                <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
-                            </Track.IncreaseRepeatButton>
-                            <Track.Thumb>
-                                <Thumb Style="{StaticResource ScrollBarThumbVertical}"/>
-                            </Track.Thumb>
-                        </Track>
-                        <RepeatButton x:Name="PART_LineDownButton" Command="{x:Static ScrollBar.LineDownCommand}" Grid.Row="2" Style="{StaticResource CompactScrollBarButton}">
-                            <Path x:Name="ArrowBottom" Data="M 0,2.5 C0,2.5 0,0.5 0,0.5 0,0.5 3.5,4 3.5,4 3.5,4 7,0.5 7,0.5 7,0.5 7,2.5 7,2.5 7,2.5 3.5,6 3.5,6 3.5,6 0,2.5 0,2.5 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3,4,3,3" Stretch="Uniform"/>
-                        </RepeatButton>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineDownButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineDownButton}" Value="true"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowBottom" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                        </MultiDataTrigger>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineUpButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineUpButton}" Value="true"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowTop" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                        </MultiDataTrigger>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineDownButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineDownButton}" Value="false"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowBottom" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                        </MultiDataTrigger>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineUpButton}" Value="true"/>
-                                <Condition Binding="{Binding IsPressed, ElementName=PART_LineUpButton}" Value="false"/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Fill" TargetName="ArrowTop" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                        </MultiDataTrigger>
-                        <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Fill" TargetName="ArrowTop" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                            <Setter Property="Fill" TargetName="ArrowBottom" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-        <Style.Triggers>
-            <Trigger Property="Orientation" Value="Horizontal">
-                <Setter Property="Width" Value="Auto"/>
-                <Setter Property="MinWidth" Value="0"/>
-                <Setter Property="Height" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
-                <Setter Property="MinHeight" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
-                <Setter Property="BorderThickness" Value="0,0"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="{x:Type ScrollBar}">
-                            <Grid x:Name="Bg" Margin="0,0,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}"/>
-                                    <ColumnDefinition Width="0.00001*"/>
-                                    <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}"/>
-                                </Grid.ColumnDefinitions>
-                                <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.Column="1"/>
-                                <RepeatButton x:Name="PART_LineLeftButton" Command="{x:Static ScrollBar.LineLeftCommand}" Style="{StaticResource CompactScrollBarButton}">
-                                    <Path x:Name="ArrowLeft" Data="M 3.18,7 C3.18,7 5,7 5,7 5,7 1.81,3.5 1.81,3.5 1.81,3.5 5,0 5,0 5,0 3.18,0 3.18,0 3.18,0 0,3.5 0,3.5 0,3.5 3.18,7 3.18,7 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3" Stretch="Uniform"/>
-                                </RepeatButton>
-                                <Track x:Name="PART_Track" Grid.Column="1" IsEnabled="{TemplateBinding IsMouseOver}">
-                                    <Track.DecreaseRepeatButton>
-                                        <RepeatButton Command="{x:Static ScrollBar.PageLeftCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
-                                    </Track.DecreaseRepeatButton>
-                                    <Track.IncreaseRepeatButton>
-                                        <RepeatButton Command="{x:Static ScrollBar.PageRightCommand}" Style="{StaticResource RepeatButtonTransparent}"/>
-                                    </Track.IncreaseRepeatButton>
-                                    <Track.Thumb>
-                                        <Thumb Style="{StaticResource ScrollBarThumbHorizontal}"/>
-                                    </Track.Thumb>
-                                </Track>
-                                <RepeatButton x:Name="PART_LineRightButton" Grid.Column="2" Command="{x:Static ScrollBar.LineRightCommand}" Style="{StaticResource CompactScrollBarButton}">
-                                    <Path x:Name="ArrowRight" Data="M 1.81,7 C1.81,7 0,7 0,7 0,7 3.18,3.5 3.18,3.5 3.18,3.5 0,0 0,0 0,0 1.81,0 1.81,0 1.81,0 5,3.5 5,3.5 5,3.5 1.81,7 1.81,7 z" Fill="{DynamicResource ScrollBar.Static.Glyph}" Margin="3" Stretch="Uniform"/>
-                                </RepeatButton>
-                            </Grid>
-                            <ControlTemplate.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineRightButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineRightButton}" Value="true"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowRight" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                                </MultiDataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineLeftButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineLeftButton}" Value="true"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowLeft" Value="{DynamicResource ScrollBar.Pressed.Glyph}"/>
-                                </MultiDataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineRightButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineRightButton}" Value="false"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowRight" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                                </MultiDataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=PART_LineLeftButton}" Value="true"/>
-                                        <Condition Binding="{Binding IsPressed, ElementName=PART_LineLeftButton}" Value="false"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Fill" TargetName="ArrowLeft" Value="{DynamicResource ScrollBar.MouseOver.Glyph}"/>
-                                </MultiDataTrigger>
-                                <Trigger Property="IsEnabled" Value="false">
-                                    <Setter Property="Fill" TargetName="ArrowLeft" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                                    <Setter Property="Fill" TargetName="ArrowRight" Value="{DynamicResource ScrollBar.Disabled.Glyph}"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
+    <Style x:Key="CompactScrollBarStyle" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource {x:Type ScrollBar}}"/>
 
     <Style TargetType="{x:Type ScrollViewer}">
         <Setter Property="Background" Value="Transparent"/>
@@ -2088,7 +1790,7 @@
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" CornerRadius="4"/>
+                        <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" CornerRadius="{StaticResource AeRadius.Control}"/>
                         <Rectangle x:Name="PART_Track"/>
                         <Grid x:Name="PART_Indicator" ClipToBounds="true" HorizontalAlignment="Left" Margin="1,1">
                             <Rectangle x:Name="Indicator" Fill="{TemplateBinding Foreground}"/>
@@ -2385,7 +2087,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Label}">
-                    <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="true" CornerRadius="4">
+                    <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="true" CornerRadius="{StaticResource AeRadius.Control}">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -2399,8 +2101,8 @@
     </Style>
 
     <Style x:Key="{x:Type TextBoxBase}" TargetType="{x:Type TextBoxBase}">
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}"/>
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
         <Setter Property="CaretBrush" Value="{DynamicResource ABrush.Glyph.Static}"/>
         <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection}"/>
@@ -2415,7 +2117,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TextBoxBase}">
                     <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                            Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+                            Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
                         <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden"
                                       VerticalScrollBarVisibility="Hidden"/>
                     </Border>
@@ -2424,7 +2126,7 @@
                             <Setter Property="Opacity" TargetName="border" Value="0.56"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource TextBox.MouseOver.Border}"/>
+                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource AeBrush.BorderStrong}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -2436,7 +2138,7 @@
                     <Condition Property="IsInactiveSelectionHighlightEnabled" Value="true"/>
                     <Condition Property="IsSelectionActive" Value="false"/>
                 </MultiTrigger.Conditions>
-                <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection.Inactive}"/>
+                <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}"/>
             </MultiTrigger>
         </Style.Triggers>
     </Style>
@@ -2482,10 +2184,10 @@
         </Style.BasedOn>
     </Style>
 
-    <Style TargetType="{x:Type TextBox}">
+    <Style x:Key="AeInput.TextBoxBase" TargetType="{x:Type TextBox}">
         <Setter Property="Validation.ErrorTemplate" Value="{StaticResource TextBoxErrorTemplate}"/>
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}"/>
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
         <Setter Property="CaretBrush" Value="{DynamicResource ABrush.Glyph.Static}"/>
         <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection}"/>
@@ -2499,7 +2201,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TextBox}">
-                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
                         <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -2507,7 +2209,7 @@
                             <Setter Property="Opacity" TargetName="border" Value="0.56"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource TextBox.MouseOver.Border}"/>
+                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource AeBrush.BorderStrong}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -2519,15 +2221,16 @@
                     <Condition Property="IsInactiveSelectionHighlightEnabled" Value="true"/>
                     <Condition Property="IsSelectionActive" Value="false"/>
                 </MultiTrigger.Conditions>
-                <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection.Inactive}"/>
+                <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}"/>
             </MultiTrigger>
         </Style.Triggers>
     </Style>
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBoxBase}" />
 
     <Style x:Key="HintedTextBox" TargetType="{x:Type TextBox}">
         <Setter Property="Validation.ErrorTemplate" Value="{StaticResource TextBoxErrorTemplate}"/>
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}"/>
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
         <Setter Property="CaretBrush" Value="{DynamicResource ABrush.Glyph.Static}"/>
         <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection}"/>
@@ -2542,7 +2245,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TextBox}">
                     <Grid>
-                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
                             <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
                         </Border>
                         <TextBlock IsHitTestVisible="False"
@@ -2581,7 +2284,7 @@
                             <Setter Property="Opacity" TargetName="border" Value="0.56"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource TextBox.MouseOver.Border}"/>
+                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource AeBrush.BorderStrong}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -2593,15 +2296,15 @@
                     <Condition Property="IsInactiveSelectionHighlightEnabled" Value="true"/>
                     <Condition Property="IsSelectionActive" Value="false"/>
                 </MultiTrigger.Conditions>
-                <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection.Inactive}"/>
+                <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}"/>
             </MultiTrigger>
         </Style.Triggers>
     </Style>
 
     <Style x:Key="HintedPasswordBox" TargetType="{x:Type PasswordBox}">
         <Setter Property="PasswordChar" Value="●"/>
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}"/>
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="KeyboardNavigation.TabNavigation" Value="None"/>
@@ -2615,7 +2318,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type PasswordBox}">
                     <Grid>
-                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
                             <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
                         </Border>
                         <TextBlock IsHitTestVisible="False"
@@ -2654,7 +2357,7 @@
                             <Setter Property="Opacity" TargetName="border" Value="0.56"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource TextBox.MouseOver.Border}"/>
+                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource AeBrush.BorderStrong}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -2666,15 +2369,15 @@
                     <Condition Property="IsInactiveSelectionHighlightEnabled" Value="true"/>
                     <Condition Property="IsSelectionActive" Value="false"/>
                 </MultiTrigger.Conditions>
-                <Setter Property="SelectionBrush" Value="{DynamicResource TextBox.Selection.Inactive}"/>
+                <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}"/>
             </MultiTrigger>
         </Style.Triggers>
     </Style>
 
     <Style TargetType="{x:Type PasswordBox}">
         <Setter Property="PasswordChar" Value="●"/>
-        <Setter Property="Background" Value="{DynamicResource TextBox.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource TextBox.Static.Border}"/>
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="KeyboardNavigation.TabNavigation" Value="None"/>
@@ -2686,7 +2389,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type PasswordBox}">
-                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+                    <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
                         <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -2694,7 +2397,7 @@
                             <Setter Property="Opacity" TargetName="border" Value="0.56"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true">
-                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource TextBox.MouseOver.Border}"/>
+                            <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource AeBrush.BorderStrong}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -3020,7 +2723,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
-                    <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="true" CornerRadius="4">
+                    <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="true" CornerRadius="{StaticResource AeRadius.Control}">
                         <Border x:Name="arrowHost" Width="20" HorizontalAlignment="Right" Background="Transparent">
                             <Path x:Name="arrow" Data="F1 M 0,0 L 2.667,2.66665 L 5.3334,0 L 5.3334,-1.78168 L 2.6667,0.88501 L0,-1.78168 L0,0 Z" HorizontalAlignment="Center" Margin="0 3 0 0" VerticalAlignment="Center">
                                 <Path.Style>
@@ -3059,8 +2762,8 @@
                                 <Condition Binding="{Binding IsPressed, RelativeSource={RelativeSource Self}}" Value="false"/>
                                 <Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}" Value="true"/>
                             </MultiDataTrigger.Conditions>
-                            <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource ComboBox.Static.Editable.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource ComboBox.Static.Editable.Border}"/>
+                            <Setter Property="Background" TargetName="templateRoot" Value="{DynamicResource AeBrush.Surface2}"/>
+                            <Setter Property="BorderBrush" TargetName="templateRoot" Value="{DynamicResource AeBrush.Border}"/>
                         </MultiDataTrigger>
                         <Trigger Property="IsPressed" Value="true">
                             <Setter Property="Fill" TargetName="arrow" Value="{DynamicResource ComboBox.Pressed.Glyph}"/>
@@ -3114,7 +2817,7 @@
             </Grid.ColumnDefinitions>
             <Popup x:Name="PART_Popup" AllowsTransparency="true" Grid.ColumnSpan="2" IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Margin="1" PopupAnimation="{DynamicResource {x:Static SystemParameters.ComboBoxPopupAnimationKey}}" Placement="Bottom">
                 <themes:SystemDropShadowChrome x:Name="shadow" Color="Transparent" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{Binding ActualWidth, ElementName=templateRoot}">
-                    <Border x:Name="dropDownBorder" BorderBrush="{DynamicResource Popup.Static.Border}" BorderThickness="1" Background="{DynamicResource Popup.Static.Background}" CornerRadius="4">
+                    <Border x:Name="dropDownBorder" BorderBrush="{DynamicResource Popup.Static.Border}" BorderThickness="1" Background="{DynamicResource Popup.Static.Background}" CornerRadius="{StaticResource AeRadius.Control}">
                         <ScrollViewer x:Name="DropDownScrollViewer">
                             <Grid x:Name="grid" RenderOptions.ClearTypeHint="Enabled">
                                 <Canvas x:Name="canvas" HorizontalAlignment="Left" Height="0" VerticalAlignment="Top" Width="0">
@@ -3159,7 +2862,7 @@
             </Grid.ColumnDefinitions>
             <Popup x:Name="PART_Popup" AllowsTransparency="true" Grid.ColumnSpan="2" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" PopupAnimation="{DynamicResource {x:Static SystemParameters.ComboBoxPopupAnimationKey}}" Placement="Bottom">
                 <themes:SystemDropShadowChrome x:Name="shadow" Color="Transparent" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{Binding ActualWidth, ElementName=templateRoot}">
-                    <Border x:Name="dropDownBorder" BorderBrush="{DynamicResource Popup.Static.Border}" BorderThickness="1" Background="{DynamicResource Popup.Static.Background}" CornerRadius="4">
+                    <Border x:Name="dropDownBorder" BorderBrush="{DynamicResource Popup.Static.Border}" BorderThickness="1" Background="{DynamicResource Popup.Static.Background}" CornerRadius="{StaticResource AeRadius.Control}">
                         <ScrollViewer x:Name="DropDownScrollViewer">
                             <Grid x:Name="grid" RenderOptions.ClearTypeHint="Enabled">
                                 <Canvas x:Name="canvas" HorizontalAlignment="Left" Height="0" VerticalAlignment="Top" Width="0">
@@ -3172,7 +2875,7 @@
                 </themes:SystemDropShadowChrome>
             </Popup>
             <ToggleButton x:Name="toggleButton" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.ColumnSpan="2" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Style="{StaticResource ComboBoxToggleButtonStyle}"/>
-            <Border x:Name="border" Background="{DynamicResource TextBox.Static.Background}" Margin="{TemplateBinding BorderThickness}">
+            <Border x:Name="border" Background="{DynamicResource AeBrush.Surface2}" Margin="{TemplateBinding BorderThickness}">
                 <TextBox x:Name="PART_EditableTextBox" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}" Margin="{TemplateBinding Padding}" Style="{StaticResource ComboBoxEditableTextBox}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
             </Border>
         </Grid>
@@ -3243,11 +2946,11 @@
         </Setter>
     </Style>
 
-    <Style TargetType="{x:Type ComboBox}">
+    <Style x:Key="AeInput.ComboBoxBase" TargetType="{x:Type ComboBox}">
         <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}"/>
-        <Setter Property="Background" Value="{DynamicResource ComboBox.Static.Background}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ComboBox.Static.Border}"/>
-        <Setter Property="Foreground" Value="{DynamicResource ComboBox.Static.Foreground}"/>
+        <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -3266,6 +2969,7 @@
             </Trigger>
         </Style.Triggers>
     </Style>
+    <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource AeInput.ComboBoxBase}" />
 
     <Style x:Key="{x:Static GridView.GridViewScrollViewerStyleKey}" TargetType="{x:Type ScrollViewer}">
         <Setter Property="Template">
@@ -3687,24 +3391,24 @@
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsMouseOver" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource Item.MouseOver.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource Item.MouseOver.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.SurfaceHover}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.SurfaceHover}"/>
                         </MultiTrigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Selector.IsSelectionActive" Value="False"/>
                                 <Condition Property="IsSelected" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource Item.SelectedInactive.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource Item.SelectedInactive.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
                         </MultiTrigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Selector.IsSelectionActive" Value="True"/>
                                 <Condition Property="IsSelected" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource Item.SelectedActive.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource Item.SelectedActive.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="TextElement.Foreground" TargetName="Bd" Value="{DynamicResource ABrush.Foreground.Disabled}"/>
@@ -3731,7 +3435,7 @@
                 <ControlTemplate TargetType="{x:Type ListBox}">
                     <Border x:Name="Bd" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            Background="{TemplateBinding Background}" SnapsToDevicePixels="true" CornerRadius="4">
+                            Background="{TemplateBinding Background}" SnapsToDevicePixels="true" CornerRadius="{StaticResource AeRadius.Control}">
                         <ScrollViewer x:Name="PART_ScrollViewer" Focusable="false" Padding="{TemplateBinding Padding}">
                             <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                         </ScrollViewer>
@@ -3774,24 +3478,24 @@
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsMouseOver" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource Item.MouseOver.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource Item.MouseOver.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.SurfaceHover}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.SurfaceHover}"/>
                         </MultiTrigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Selector.IsSelectionActive" Value="False"/>
                                 <Condition Property="IsSelected" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource Item.SelectedInactive.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource Item.SelectedInactive.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
                         </MultiTrigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Selector.IsSelectionActive" Value="True"/>
                                 <Condition Property="IsSelected" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource Item.SelectedActive.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource Item.SelectedActive.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="TextElement.Foreground" TargetName="Bd" Value="{DynamicResource ABrush.Foreground.Disabled}"/>
@@ -4319,7 +4023,7 @@
         <Setter Property="Background" Value="{DynamicResource TabItem.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource TabItem.Static.Border}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Margin" Value="0, -2, 0, 0"/>
+        <Setter Property="Margin" Value="0"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -4333,9 +4037,9 @@
                             <RowDefinition x:Name="RowDefinition0" Height="Auto"/>
                             <RowDefinition x:Name="RowDefinition1" Height="*"/>
                         </Grid.RowDefinitions>
-                        <TabPanel x:Name="headerPanel" Background="{DynamicResource Window.Static.Border}" Grid.Column="0" IsItemsHost="true" Margin="0,2,2,0" Grid.Row="0" KeyboardNavigation.TabIndex="1" Panel.ZIndex="1"/>
+                        <TabPanel x:Name="headerPanel" Background="{DynamicResource Window.Static.Border}" Grid.Column="0" IsItemsHost="true" Grid.Row="0" KeyboardNavigation.TabIndex="1" Panel.ZIndex="1"/>
                         <Border x:Name="contentPanel" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                                Background="{DynamicResource TabItem.Static.Background}" Grid.Column="0" KeyboardNavigation.DirectionalNavigation="Contained" Grid.Row="1" KeyboardNavigation.TabIndex="2" KeyboardNavigation.TabNavigation="Local" CornerRadius="0,0,4,4">
+                                Background="{DynamicResource TabItem.Static.Background}" Grid.Column="0" KeyboardNavigation.DirectionalNavigation="Contained" Grid.Row="1" KeyboardNavigation.TabIndex="2" KeyboardNavigation.TabNavigation="Local">
                             <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" Margin="{TemplateBinding Padding}" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                         </Border>
                     </Grid>
@@ -4345,7 +4049,6 @@
                             <Setter Property="Grid.Row" TargetName="contentPanel" Value="0"/>
                             <Setter Property="Height" TargetName="RowDefinition0" Value="*"/>
                             <Setter Property="Height" TargetName="RowDefinition1" Value="Auto"/>
-                            <Setter Property="Margin" TargetName="headerPanel" Value="2,0,2,2"/>
                         </Trigger>
                         <Trigger Property="TabStripPlacement" Value="Left">
                             <Setter Property="Grid.Row" TargetName="headerPanel" Value="0"/>
@@ -4356,7 +4059,6 @@
                             <Setter Property="Width" TargetName="ColumnDefinition1" Value="*"/>
                             <Setter Property="Height" TargetName="RowDefinition0" Value="*"/>
                             <Setter Property="Height" TargetName="RowDefinition1" Value="0"/>
-                            <Setter Property="Margin" TargetName="headerPanel" Value="2,2,0,2"/>
                         </Trigger>
                         <Trigger Property="TabStripPlacement" Value="Right">
                             <Setter Property="Grid.Row" TargetName="headerPanel" Value="0"/>
@@ -4367,7 +4069,6 @@
                             <Setter Property="Width" TargetName="ColumnDefinition1" Value="Auto"/>
                             <Setter Property="Height" TargetName="RowDefinition0" Value="*"/>
                             <Setter Property="Height" TargetName="RowDefinition1" Value="0"/>
-                            <Setter Property="Margin" TargetName="headerPanel" Value="0,2,2,2"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
                             <Setter Property="TextElement.Foreground" TargetName="templateRoot" Value="{DynamicResource ABrush.Foreground.Disabled}"/>
@@ -4403,7 +4104,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                Grid.ColumnSpan="4" Grid.RowSpan="2" CornerRadius="4"/>
+                                Grid.ColumnSpan="4" Grid.RowSpan="2" CornerRadius="{StaticResource AeRadius.Control}"/>
                         <Border x:Name="Header" Grid.Column="1" Padding="3,1,3,0" Grid.Row="0" Grid.RowSpan="2">
                             <ContentPresenter VerticalAlignment="Center" ContentSource="Header" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                         </Border>
@@ -4551,8 +4252,8 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="6"/>
                         </Grid.RowDefinitions>
-                        <Border BorderBrush="Transparent" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.ColumnSpan="4" Grid.Column="0" CornerRadius="4" Grid.Row="1" Grid.RowSpan="3"/>
-                        <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Grid.ColumnSpan="4" CornerRadius="4" Grid.Row="1" Grid.RowSpan="3">
+                        <Border BorderBrush="Transparent" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Grid.ColumnSpan="4" Grid.Column="0" CornerRadius="{StaticResource AeRadius.Control}" Grid.Row="1" Grid.RowSpan="3"/>
+                        <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Grid.ColumnSpan="4" CornerRadius="{StaticResource AeRadius.Control}" Grid.Row="1" Grid.RowSpan="3">
                             <Border.OpacityMask>
                                 <MultiBinding ConverterParameter="7" Converter="{StaticResource BorderGapMaskConverter}">
                                     <Binding ElementName="Header" Path="ActualWidth"/>
@@ -4574,7 +4275,7 @@
         </Setter>
     </Style>
     <ControlTemplate x:Key="TopLevelMenuItemControlTemplate" TargetType="{x:Type MenuItem}">
-        <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+        <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
             <Grid x:Name="Grid" VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -4630,7 +4331,7 @@
     </ControlTemplate>
 
     <ControlTemplate x:Key="SubLevelMenuItem_SubmenuHeader_ControlTemplate" TargetType="{x:Type MenuItem}">
-        <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+        <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
             <Grid Margin="-1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition MinWidth="22" SharedSizeGroup="MenuItemIconColumnGroup" Width="Auto"/>
@@ -4696,7 +4397,7 @@
     </ControlTemplate>
 
     <ControlTemplate x:Key="SubLevelMenuItem_SubmenuItem_ControlTemplate" TargetType="{x:Type MenuItem}">
-        <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="4">
+        <Border x:Name="templateRoot" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True" CornerRadius="{StaticResource AeRadius.Control}">
             <Grid Margin="-1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition MinWidth="22" SharedSizeGroup="MenuItemIconColumnGroup" Width="Auto"/>
@@ -4793,7 +4494,7 @@
         </Style.Triggers>
     </Style>
 
-    <Style TargetType="{x:Type Menu}">
+    <Style x:Key="AeMenu.BarBase" TargetType="{x:Type Menu}">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MenuFontFamilyKey}}"/>
         <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MenuFontSizeKey}}"/>
@@ -4816,7 +4517,9 @@
         </Setter>
     </Style>
 
-    <Style TargetType="{x:Type ContextMenu}">
+    <Style TargetType="{x:Type Menu}" BasedOn="{StaticResource AeMenu.BarBase}" />
+
+    <Style x:Key="AeMenu.ContextBase" TargetType="{x:Type ContextMenu}">
         <Setter Property="Background" Value="{DynamicResource Popup.Static.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Popup.Static.Border}"/>
         <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Static}"/>
@@ -4828,8 +4531,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ContextMenu}">
-                    <themes:SystemDropShadowChrome Name="CONTEXT_ROOT_SHADOW" Color="Transparent" CornerRadius="0" SnapsToDevicePixels="True">
-                        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                    <themes:SystemDropShadowChrome Name="CONTEXT_ROOT_SHADOW" Color="Transparent" CornerRadius="{StaticResource AeRadius.Control}" SnapsToDevicePixels="True">
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" CornerRadius="{StaticResource AeRadius.Control}">
                             <ScrollViewer x:Name="ScrollViewer" VerticalScrollBarVisibility="Hidden">
                                 <ItemsPresenter />
                             </ScrollViewer>
@@ -4845,6 +4548,8 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <Style TargetType="{x:Type ContextMenu}" BasedOn="{StaticResource AeMenu.ContextBase}" />
 
     <PathGeometry x:Key="TreeArrow" Figures="M0,0 L0,6 L6,0 z"/>
     <Style x:Key="ExpandCollapseToggleStyle" TargetType="{x:Type ToggleButton}">
@@ -4961,8 +4666,8 @@
                             <Setter Property="Grid.Row" TargetName="VerLn" Value="2"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="true">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
                             <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Deeper}"/>
                         </Trigger>
                         <MultiTrigger>
@@ -4970,8 +4675,8 @@
                                 <Condition Property="IsSelected" Value="true"/>
                                 <Condition Property="IsSelectionActive" Value="false"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Inactive.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Inactive.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
                             <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}"/>
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="false">
@@ -5029,8 +4734,8 @@
                             <Setter Property="Visibility" TargetName="Expander" Value="Hidden"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="true">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.AccentSoft}"/>
                             <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Deeper}"/>
                         </Trigger>
                         <MultiTrigger>
@@ -5038,8 +4743,8 @@
                                 <Condition Property="IsSelected" Value="true"/>
                                 <Condition Property="IsSelectionActive" Value="false"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Inactive.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource TreeViewItem.Selected.Inactive.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.Surface3}"/>
                             <Setter Property="Foreground" Value="{DynamicResource ABrush.Foreground.Disabled}"/>
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="false">
@@ -5078,7 +4783,7 @@
                 <ControlTemplate TargetType="{x:Type TreeView}">
                     <Border x:Name="Bd" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            SnapsToDevicePixels="true" CornerRadius="4">
+                            SnapsToDevicePixels="true" CornerRadius="{StaticResource AeRadius.Control}">
                         <!-- CanContentScroll must be false, otherwise scrolling breaks -->
                         <ScrollViewer x:Name="_tv_scrollviewer_" Background="{TemplateBinding Background}"
                                       CanContentScroll="false" Focusable="false"
@@ -5090,8 +4795,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource TreeView.Disabled.Background}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource TreeView.Disabled.Border}"/>
+                            <Setter Property="Background" TargetName="Bd" Value="{DynamicResource AeBrush.Surface1}"/>
+                            <Setter Property="BorderBrush" TargetName="Bd" Value="{DynamicResource AeBrush.Border}"/>
                         </Trigger>
                         <Trigger Property="VirtualizingPanel.IsVirtualizing" Value="true">
                             <Setter Property="CanContentScroll" TargetName="_tv_scrollviewer_" Value="true"/>
@@ -5562,8 +5267,9 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Window}">
-                    <Border 
-                        Background="{TemplateBinding Background}" 
+                    <Border
+                        x:Name="WindowSurface"
+                        Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}" 
                         BorderThickness="{TemplateBinding BorderThickness}">
                         <DockPanel>
@@ -5690,7 +5396,11 @@
                             <Setter TargetName="btnMaximiseRestore" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="btnMinimise" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
-                        <Trigger Property="WindowStyle" Value="None">
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="WindowStyle" Value="None"/>
+                                <Condition Property="progress:OperationProgressWindowTransition.KeepTitleBar" Value="False"/>
+                            </MultiTrigger.Conditions>
                             <Setter TargetName="titlebar" Property="Visibility" Value="Collapsed"/>
                             <Setter Property="WindowChrome.WindowChrome">
                                 <Setter.Value>
@@ -5703,7 +5413,7 @@
                                         UseAeroCaptionButtons="False"/>
                                 </Setter.Value>
                             </Setter>
-                        </Trigger>
+                        </MultiTrigger>
                         <Trigger Property="Icon" Value="{x:Null}">
                             <Setter TargetName="titleIcon" Property="Visibility" Value="Collapsed"/>
                         </Trigger>

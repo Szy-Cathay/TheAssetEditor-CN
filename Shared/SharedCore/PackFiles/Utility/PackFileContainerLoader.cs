@@ -28,6 +28,10 @@ namespace Shared.Core.PackFiles.Utility
         PackFileContainer? LoadAllCaFiles(
             GameTypeEnum gameEnum,
             Action<CaPackLoadProgress> reportProgress);
+        PackFileContainer? LoadAllCaFiles(
+            GameTypeEnum gameEnum,
+            Action<CaPackLoadProgress> reportProgress,
+            CancellationToken cancellationToken);
         PackFileContainer LoadSystemFolderAsPackFileContainer(string packFileSystemPath);
     }
 
@@ -112,12 +116,22 @@ namespace Shared.Core.PackFiles.Utility
 
         public PackFileContainer? LoadAllCaFiles(
             GameTypeEnum gameEnum,
-            Action<CaPackLoadProgress> reportProgress)
+            Action<CaPackLoadProgress> reportProgress) =>
+            LoadAllCaFiles(gameEnum, reportProgress, CancellationToken.None);
+
+        public PackFileContainer? LoadAllCaFiles(
+            GameTypeEnum gameEnum,
+            Action<CaPackLoadProgress> reportProgress,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var game = GameInformationDatabase.GetGameById(gameEnum);
             var gamePathInfo = _settingsService.CurrentSettings.GameDirectories.FirstOrDefault(x => x.Game == game.Type);
-            var gameDataFolder = gamePathInfo!.Path;
+            var gameDataFolder = gamePathInfo?.Path;
             var gameName = game.DisplayName;
+
+            if (string.IsNullOrWhiteSpace(gameDataFolder) || !Directory.Exists(gameDataFolder))
+                return null;
 
             try
             {
@@ -126,6 +140,9 @@ namespace Shared.Core.PackFiles.Utility
                     CaPackLoadProgressStage.DiscoveringPacks,
                     gameDataFolder));
                 var allCaPackFiles = ManifestHelper.GetPackFilesFromManifest(gameDataFolder, out var manifestFileFound);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (allCaPackFiles.Count == 0)
+                    return null;
 
                 // When loading ca pack packs, we want to use the CA resolver as its faster. 
                 // If there is no manifest file, we need to use the duplicate resolver as it loads all file in the folder.
@@ -144,8 +161,13 @@ namespace Shared.Core.PackFiles.Utility
                 var processedPackCount = 0;
                 var totalPackCount = allCaPackFiles.Count;
 
-                Parallel.ForEach(allCaPackFiles, packFilePath =>
+                Parallel.ForEach(allCaPackFiles, new ParallelOptions
                 {
+                    CancellationToken = cancellationToken,
+                    MaxDegreeOfParallelism = Math.Min(4, Environment.ProcessorCount),
+                }, packFilePath =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var path = gameDataFolder + "\\" + packFilePath;
                     if (File.Exists(path))
                     {
@@ -154,6 +176,7 @@ namespace Shared.Core.PackFiles.Utility
 
                         var packFileSize = new FileInfo(path).Length;
                         var pack = PackFileSerializerLoader.Load(path, packFileSize, reader, packfileResolver);
+                        cancellationToken.ThrowIfCancellationRequested();
                         PackFileLog.LogPackCompression(pack);
                         var packCompressionStats = PackFileLog.GetCompressionInformation(pack);
                         lock (mergeLock)
@@ -183,6 +206,10 @@ namespace Shared.Core.PackFiles.Utility
                 }
                 );
 
+                cancellationToken.ThrowIfCancellationRequested();
+                if (packList.Count == 0)
+                    return null;
+
                 PackFileLog.LogPacksCompression(packsCompressionStats);
 
                 var caPackFileContainer = new PackFileContainer($"All Game Packs - {gameName}");
@@ -197,6 +224,7 @@ namespace Shared.Core.PackFiles.Utility
 
                 foreach (var packfile in orderedPackFiles)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (string.IsNullOrWhiteSpace(packfile.SystemFilePath) == false)
                         caPackFileContainer.SourcePackFilePaths.Add(packfile.SystemFilePath);
                     caPackFileContainer.MergePackFileContainer(packfile);
@@ -208,7 +236,12 @@ namespace Shared.Core.PackFiles.Utility
                         orderedPackFiles.Count));
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 return caPackFileContainer;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception e)
             {

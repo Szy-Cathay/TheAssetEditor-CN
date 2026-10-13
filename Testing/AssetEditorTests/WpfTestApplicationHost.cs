@@ -1,8 +1,10 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Shared.Core.Services;
 using Shared.Ui.Common;
+using Shared.Ui.Common.DataTemplates;
 using Shared.Ui.Common.ValueConverters;
 
 namespace AssetEditorTests;
@@ -116,6 +118,8 @@ internal static class WpfTestApplicationHost
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/Controls.xaml"));
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
+                "Themes/DesignSystem/Controls/Interaction.xaml"));
+            Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/DesignSystem/Controls/Buttons.xaml"));
             Resources.MergedDictionaries.Add(CreateResourceDictionary(
                 "Themes/DesignSystem/Controls/Inputs.xaml"));
@@ -129,6 +133,16 @@ internal static class WpfTestApplicationHost
                 "Themes/DesignSystem/Workflows.xaml"));
             Resources["BoolToChangedPrefixStr"] =
                 new BoolToStringConverter { TrueValue = "*" };
+            Resources["BoolToCollapsedConverter"] = new BoolToVisibilityConverter();
+            Resources["BoolToHiddenConverter"] = new BoolToVisibilityConverter { FalseValue = Visibility.Hidden };
+            Resources["InvBoolToHiddenConverter"] = new BoolToVisibilityConverter { TrueValue = Visibility.Hidden, FalseValue = Visibility.Visible };
+            Resources["NullToVisibilityConverter"] = new NullVisibilityConverter();
+            Resources["ColourConverter_black_red"] = new BoolToColourConverter { TrueValue = Brushes.Black, FalseValue = Brushes.Red };
+            Resources["BoolToColour_white_red"] = new BoolToColourConverter { TrueValue = Brushes.White, FalseValue = Brushes.Red };
+            Resources["BoolToColour_black_gray"] = new BoolToColourConverter { TrueValue = Brushes.Black, FalseValue = Brushes.Gray };
+            Resources["BoolToColour_white_gray"] = new BoolToColourConverter { TrueValue = Brushes.White, FalseValue = Brushes.Gray };
+            Resources["InvBoolConverter"] = new InverseBooleanConverter();
+            Resources["ViewTemplateDataSelector"] = new ViewTemplateDataSelector();
             _themeResourcesLoaded = true;
         }
 

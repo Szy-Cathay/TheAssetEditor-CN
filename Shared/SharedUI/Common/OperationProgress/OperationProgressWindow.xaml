@@ -11,6 +11,7 @@
     Background="{DynamicResource AeBrush.Canvas}"
     ResizeMode="CanResizeWithGrip"
     ShowInTaskbar="False"
+    ShowActivated="False"
     SizeToContent="Height"
     Style="{StaticResource CustomWindowStyle}"
     WindowStartupLocation="CenterOwner">
@@ -23,7 +24,7 @@
         <progress:OperationProgressView
             x:Name="ProgressView"
             CurrentDetailText="{Binding CurrentDetailText}"
-            IsOperationActive="{Binding IsOperationActive}"
+            IsOperationActive="True"
             IsProgressIndeterminate="{Binding IsProgressIndeterminate}"
             ProgressMaximum="{Binding ProgressMaximum}"
             ProgressValue="{Binding ProgressValue}"

@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="AssetEditor.Views.FolderProjectHistory.FolderProjectHistoryView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -31,6 +31,7 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource AeText.Caption}"
                         Text="{Binding LoadedProjectText}"
+                        ToolTip="{loc:Loc FolderProject.History.SameDiskNotice}"
                         TextTrimming="CharacterEllipsis" />
                     <Button
                         Grid.Column="1"

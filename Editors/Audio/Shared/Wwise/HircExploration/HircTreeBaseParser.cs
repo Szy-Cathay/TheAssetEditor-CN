@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Editors.Audio.AudioExplorer;
 using Editors.Audio.Shared.Storage;
 using Shared.Core.Services;
@@ -9,8 +10,9 @@ using Shared.GameFormats.Wwise.Hirc;
 
 namespace Editors.Audio.Shared.Wwise.HircExploration
 {
-    public abstract class HircTreeBaseParser(IAudioRepository audioRepository)
+    public abstract class HircTreeBaseParser(IAudioRepository audioRepository, CancellationToken cancellationToken = default)
     {
+        protected CancellationToken CancellationToken { get; } = cancellationToken;
         public readonly IAudioRepository AudioRepository = audioRepository;
         public readonly Dictionary<AkBkHircType, Action<HircItem, HircTreeNode>> HircProcessChildMap = [];
 
@@ -46,6 +48,7 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
 
         private void ProcessHircObject(HircItem item, HircTreeNode parent)
         {
+            CancellationToken.ThrowIfCancellationRequested();
             if (HircProcessChildMap.TryGetValue(item.HircType, out var func))
                 func(item, parent);
             else
@@ -65,6 +68,7 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
 
         protected void ProcessNext(uint hircId, HircTreeNode parent)
         {
+            CancellationToken.ThrowIfCancellationRequested();
             if (hircId == 0)
                 return;
 

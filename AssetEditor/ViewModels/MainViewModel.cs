@@ -26,6 +26,7 @@ namespace AssetEditor.ViewModels
         private readonly IUiCommandFactory _uiCommandFactory;
         private readonly IPackFileService _packFileService;
         private readonly IFolderProjectCloseGuard _folderProjectCloseGuard;
+        private GridLength _expandedFileTreeWidth = new(0.28, GridUnitType.Star);
 
         public PackFileBrowserViewModel FileTree { get; private set; }
         public MenuBarViewModel MenuBar { get; set; }
@@ -74,13 +75,20 @@ namespace AssetEditor.ViewModels
                 this,
                 _ => HistoryWorkspace?.ShowHistory());
 
-            FileTree = packFileBrowserBuilder.Create(ContextMenuType.MainApplication, showCaFiles: true, showFoldersOnly: false);
+            FileTree = packFileBrowserBuilder.Create(ContextMenuType.MainApplication, showCaFiles: true, showFoldersOnly: false, deferCaFiles: true);
             FileTree.FileOpen += OpenFile;
 
             ToolsFactory = toolFactory;
 
             ApplicationTitle = LocalizationManager.Instance.GetFormat("Title.AppTitle", VersionChecker.GetCurrentDisplayVersion());
             CurrentGame = LocalizationManager.Instance.GetFormat("Title.CurrentGame", GameInformationDatabase.GetGameById(applicationSettingsService.CurrentSettings.CurrentGame).DisplayName);
+        }
+
+        partial void OnIsPackFileExplorerVisibleChanged(bool value)
+        {
+            if (!value)
+                _expandedFileTreeWidth = FileTreeColumnWidth;
+            FileTreeColumnWidth = value ? _expandedFileTreeWidth : new GridLength(0);
         }
 
         void OpenFile(PackFile file) => _uiCommandFactory.Create<OpenEditorCommand>().Execute(file);

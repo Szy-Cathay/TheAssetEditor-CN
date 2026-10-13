@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Editors.Audio.AudioEditor.Presentation.WaveformVisualiser;
 using Editors.Audio.AudioExplorer;
@@ -19,6 +19,17 @@ namespace AssetEditorTests
     [TestClass]
     public class AudioExplorerTests
     {
+        [TestMethod]
+        public void Constructor_DoesNotReadAudioIndexesBeforeTheViewCanRender()
+        {
+            var repository = CreateRepositoryMock();
+            var viewModel = CreateViewModel(repository.Object);
+
+            repository.Verify(x => x.GetHircsByHircType(It.IsAny<AkBkHircType>()), Times.Never);
+            Assert.AreEqual(0, viewModel.ExplorerFilter.ExplorerList.Values.Count);
+            viewModel.Close();
+        }
+
         [TestMethod]
         public async Task LoadLanguages_RefreshesTheCurrentExplorerList()
         {
@@ -86,7 +97,7 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
-        public async Task LoadingPopup_StaysClosedForInitializationAndOpensForManualLoad()
+        public async Task LoadingPopup_IsActiveForInitializationAndManualLoad()
         {
             var popupStates = new List<bool>();
             AudioExplorerViewModel viewModel = null!;
@@ -107,7 +118,7 @@ namespace AssetEditorTests
             await viewModel.LoadAudioRepositoryForSelectedLanguagesAsync();
 
             CollectionAssert.AreEqual(
-                new[] { false, true },
+                new[] { true, true },
                 popupStates);
             viewModel.Close();
         }
@@ -147,6 +158,38 @@ namespace AssetEditorTests
 
             Assert.AreEqual("已取消加载。", viewModel.LoadStatus);
             Assert.AreEqual(0, viewModel.ExplorerFilter.ExplorerList.Values.Count);
+            viewModel.Close();
+        }
+
+        [TestMethod]
+        public async Task CompletedLoad_IgnoresLateProgressAndAllowsRetryAfterFailure()
+        {
+            IProgress<AudioLoadProgress>? retainedProgress = null;
+            var shouldFail = true;
+            var repository = CreateRepositoryMock();
+            repository
+                .Setup(x => x.Load(It.IsAny<List<string>>(), It.IsAny<IProgress<AudioLoadProgress>>(), It.IsAny<CancellationToken>()))
+                .Callback<List<string>, IProgress<AudioLoadProgress>, CancellationToken>((_, progress, _) =>
+                {
+                    retainedProgress = progress;
+                    progress.Report(new AudioLoadProgress(1, 2, "first.bnk"));
+                    if (shouldFail)
+                        throw new IOException("Unreadable test bank");
+                });
+            var viewModel = CreateViewModel(repository.Object);
+
+            await viewModel.InitializeAsync();
+            Assert.IsFalse(viewModel.IsLoading);
+            Assert.IsFalse(viewModel.IsLoadProgressWindowActive);
+            Assert.AreEqual(LocalizationManager.Instance.Get("AudioExplorer.LoadFailed"), viewModel.LoadStatus);
+            Assert.IsFalse(viewModel.CancelLoadingCommand.CanExecute(null));
+
+            shouldFail = false;
+            await viewModel.LoadAudioRepositoryForSelectedLanguagesAsync();
+            var completedStatus = viewModel.LoadStatus;
+            retainedProgress!.Report(new AudioLoadProgress(2, 2, "late.bnk"));
+            Assert.AreEqual(completedStatus, viewModel.LoadStatus);
+            Assert.IsFalse(viewModel.IsLoading);
             viewModel.Close();
         }
 
@@ -544,7 +587,7 @@ namespace AssetEditorTests
         }
 
         [TestMethod]
-        public void SelectingDuplicateIdFromAnotherBankBuildsTheNewHierarchy()
+        public async Task SelectingDuplicateIdFromAnotherBankBuildsTheNewHierarchy()
         {
             var first = new UnknownHircItem
             {
@@ -569,30 +612,31 @@ namespace AssetEditorTests
                 });
             var viewModel = CreateViewModel(repository.Object);
             viewModel.SearchByHircId = true;
+            await WaitForAsync(() => !viewModel.IsLoading);
             viewModel.SelectedNode = new HircTreeNode { Hirc = first };
             var secondItem = viewModel.ExplorerFilter.ExplorerList.Values
                 .Single(item => ReferenceEquals(item.HircItem, second));
 
             viewModel.ExplorerFilter.ExplorerList.SelectedItem = secondItem;
-
+            await WaitForAsync(() => !viewModel.IsLoading);
             Assert.AreSame(second, viewModel.TreeList.Single().Hirc);
             viewModel.Close();
         }
 
         [TestMethod]
-        public void SearchByVoActor_MissingStateGroupShowsAnEmptyList()
+        public async Task SearchByVoActor_MissingStateGroupShowsAnEmptyList()
         {
             var repository = CreateRepositoryMock();
             var viewModel = CreateViewModel(repository.Object);
 
             viewModel.SearchByVOActor = true;
-
+            await WaitForAsync(() => !viewModel.IsLoading);
             Assert.AreEqual(0, viewModel.ExplorerFilter.ExplorerList.Values.Count);
             viewModel.Close();
         }
 
         [TestMethod]
-        public void SelectingVoActor_DoesNotBlockWhileAllTreesAreBuilt()
+        public async Task SelectingVoActor_DoesNotBlockWhileAllTreesAreBuilt()
         {
             using var repositoryEntered = new ManualResetEventSlim();
             using var releaseRepository = new ManualResetEventSlim();
@@ -605,6 +649,7 @@ namespace AssetEditorTests
                 });
             var viewModel = CreateViewModel(repository.Object);
             viewModel.SearchByVOActor = true;
+            await WaitForAsync(() => !viewModel.IsLoading);
             repository
                 .Setup(x => x.GetHircsByHircType(AkBkHircType.Dialogue_Event))
                 .Callback(() =>
@@ -622,6 +667,12 @@ namespace AssetEditorTests
             {
                 Assert.IsTrue(repositoryEntered.Wait(TimeSpan.FromSeconds(2)));
                 Assert.IsTrue(selection.Wait(TimeSpan.FromMilliseconds(500)));
+                Assert.IsTrue(viewModel.IsLoadProgressWindowActive);
+                viewModel.CancelLoadingCommand.Execute(null);
+                releaseRepository.Set();
+                await WaitForAsync(() => !viewModel.IsLoading);
+                Assert.AreEqual(LocalizationManager.Instance.Get("AudioExplorer.LoadCancelled"), viewModel.LoadStatus);
+                Assert.AreEqual(0, viewModel.TreeList.Count);
             }
             finally
             {
@@ -686,13 +737,10 @@ namespace AssetEditorTests
                 });
             var viewModel = CreateViewModel(repository.Object);
             viewModel.SearchByVOActor = true;
-
+            await WaitForAsync(() => !viewModel.IsLoading);
             viewModel.ExplorerFilter.ExplorerList.SelectedItem =
                 viewModel.ExplorerFilter.ExplorerList.Values.Single();
-            await WaitForAsync(
-                () => viewModel.LoadStatus.Contains(
-                    "没有可播放音频",
-                    StringComparison.Ordinal));
+            await WaitForAsync(() => !viewModel.IsLoading);
 
             Assert.AreEqual(0, viewModel.TreeList.Count);
             Assert.AreEqual(

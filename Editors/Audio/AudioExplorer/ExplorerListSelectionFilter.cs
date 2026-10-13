@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Editors.Audio.Shared.Storage;
 using Shared.GameFormats.Wwise.Enums;
 using Shared.GameFormats.Wwise.Hirc;
@@ -14,7 +15,7 @@ namespace Editors.Audio.AudioExplorer
 
         public FilterCollection<ExplorerListItem> ExplorerList { get; set; }
 
-        public ExplorerListSelectionFilter(IAudioRepository audioRepository, bool searchByActionEvent, bool searchByDialogueEvent, bool searchByHircId, bool searchByVOActor)
+        public ExplorerListSelectionFilter(IAudioRepository audioRepository)
         {
             _audioRepository = audioRepository;
 
@@ -22,12 +23,11 @@ namespace Editors.Audio.AudioExplorer
             {
                 SearchFilter = (value, regex) => regex.Match(value.DisplayName).Success || regex.Match(value.Id.ToString()).Success
             };
-
-            Refresh(searchByActionEvent, searchByDialogueEvent, searchByHircId, searchByVOActor);
         }
 
-        public void Refresh(bool searchByActionEvent, bool searchByDialogueEvent, bool searchByHircId, bool searchByVOActor)
+        public List<ExplorerListItem> CreateValues(bool searchByActionEvent, bool searchByDialogueEvent, bool searchByHircId, bool searchByVOActor, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var selectedList = new List<ExplorerListItem>();
 
             if (searchByHircId)
@@ -81,12 +81,11 @@ namespace Editors.Audio.AudioExplorer
             }
             else
             {
-                ExplorerList.UpdatePossibleValues([]);
-                return;
+                return [];
             }
 
-            ExplorerList.Filter = "";
-            ExplorerList.UpdatePossibleValues(selectedList);
+            cancellationToken.ThrowIfCancellationRequested();
+            return selectedList;
         }
     }
 }

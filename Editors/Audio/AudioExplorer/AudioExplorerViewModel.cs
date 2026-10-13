@@ -53,6 +53,52 @@ namespace Editors.Audio.AudioExplorer
             List<AudioSource> Sources,
             int SkippedCount);
 
+        private sealed class BrowserLoadProgress(Action<AudioLoadProgress> report) : IProgress<AudioLoadProgress>, IDisposable
+        {
+            private readonly object _sync = new();
+            private readonly Dispatcher _dispatcher = SynchronizationContext.Current is DispatcherSynchronizationContext
+                ? Dispatcher.CurrentDispatcher : null;
+            private AudioLoadProgress _pending;
+            private bool _queued;
+            private bool _disposed;
+
+            public void Report(AudioLoadProgress value)
+            {
+                lock (_sync)
+                {
+                    if (_disposed)
+                        return;
+                    if (_dispatcher == null)
+                    {
+                        report(value);
+                        return;
+                    }
+                    _pending = value;
+                    if (_queued)
+                        return;
+                    _queued = true;
+                }
+                // Bank readers can finish together. Keep input and rendering ahead of progress updates.
+                _dispatcher.InvokeAsync(Flush, DispatcherPriority.Background);
+            }
+
+            private void Flush()
+            {
+                lock (_sync)
+                {
+                    _queued = false;
+                    if (!_disposed)
+                        report(_pending);
+                }
+            }
+
+            public void Dispose()
+            {
+                lock (_sync)
+                    _disposed = true;
+            }
+        }
+
         private readonly IAudioRepository _audioRepository;
         private readonly ISoundPlayer _soundPlayer;
         private readonly IAudioExportDialogService _audioExportDialogService;
@@ -60,7 +106,8 @@ namespace Editors.Audio.AudioExplorer
         private readonly DispatcherTimer _playbackTimer;
         private readonly Serilog.ILogger _logger = Logging.Create<AudioExplorerViewModel>();
         private bool _isInitialized;
-        private bool _suppressAutomaticLoadProgressWindow;
+        private bool _isRepositoryLoading;
+        private bool _closed;
         private bool _isUpdatingPlaybackPosition;
         private int _hiddenUnavailableReferenceCount;
         private int _playbackSelectionVersion;
@@ -69,6 +116,7 @@ namespace Editors.Audio.AudioExplorer
         private Task _playbackPreparationTask = Task.CompletedTask;
         private CancellationTokenSource _playbackPreparationCancellationTokenSource;
         private CancellationTokenSource _treeBuildCancellationTokenSource;
+        private Task _browserOperation = Task.CompletedTask;
 
         [ObservableProperty] private ExplorerListSelectionFilter _explorerFilter;
         [ObservableProperty] private ObservableCollection<HircTreeNode> _treeList = [];
@@ -159,7 +207,7 @@ namespace Editors.Audio.AudioExplorer
 
             SetSelectedLanguages();
 
-            ExplorerFilter = new ExplorerListSelectionFilter(_audioRepository, SearchByActionEvent, SearchByDialogueEvent, SearchByHircId, SearchByVOActor);
+            ExplorerFilter = new ExplorerListSelectionFilter(_audioRepository);
             ExplorerFilter.ExplorerList.SelectedItemChanged += OnEventSelected;
 
             WwiseObjectLabel = LocalizationManager.Instance.Get("AudioExplorer.WwiseObjectData");
@@ -221,7 +269,11 @@ namespace Editors.Audio.AudioExplorer
             RefreshList();
         }
 
-        partial void OnIsLoadingChanged(bool value) => RefreshExportAvailability();
+        partial void OnIsLoadingChanged(bool value)
+        {
+            RefreshExportAvailability();
+            CancelLoadingCommand.NotifyCanExecuteChanged();
+        }
 
         partial void OnIsExportingChanged(bool value) => RefreshExportAvailability();
 
@@ -449,7 +501,102 @@ namespace Editors.Audio.AudioExplorer
                 SetSelectedLanguages();
         }
 
-        private void RefreshList() => ExplorerFilter.Refresh(SearchByActionEvent, SearchByDialogueEvent, SearchByHircId, SearchByVOActor);
+        private void RefreshList()
+        {
+            if (_isRepositoryLoading || _closed)
+                return;
+            _browserOperation = RefreshListAsync();
+        }
+
+        private async Task RefreshListAsync()
+        {
+            var cancellationSource = BeginBrowserOperation("AudioExplorer.BuildingList");
+            try
+            {
+                var values = await CreateListAsync(cancellationSource.Token);
+                if (!IsCurrentBrowserOperation(cancellationSource))
+                    return;
+                ExplorerFilter.ExplorerList.UpdatePossibleValues(values);
+                CompleteLoadFeedback(LocalizationManager.Instance.GetFormat("AudioExplorer.LoadComplete", values.Count), values.Count);
+            }
+            catch (OperationCanceledException)
+            {
+                if (IsCurrentBrowserOperation(cancellationSource))
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadCancelled");
+            }
+            catch (Exception exception)
+            {
+                _logger.Here().Error($"Unable to build Audio Explorer list: {exception}");
+                if (IsCurrentBrowserOperation(cancellationSource))
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadFailed");
+            }
+            finally
+            {
+                EndBrowserOperation(cancellationSource);
+            }
+        }
+
+        private Task<List<ExplorerListItem>> CreateListAsync(CancellationToken cancellationToken)
+        {
+            var action = SearchByActionEvent;
+            var dialogue = SearchByDialogueEvent;
+            var hircId = SearchByHircId;
+            var actor = SearchByVOActor;
+            return Task.Run(() => ExplorerFilter.CreateValues(action, dialogue, hircId, actor, cancellationToken), cancellationToken);
+        }
+
+        private CancellationTokenSource BeginBrowserOperation(string statusKey)
+        {
+            CancelTreeBuild();
+            var cancellationSource = new CancellationTokenSource();
+            _treeBuildCancellationTokenSource = cancellationSource;
+            SetLoadFeedback(LocalizationManager.Instance.Get(statusKey));
+            UpdateLoadingState();
+            return cancellationSource;
+        }
+
+        private bool IsCurrentBrowserOperation(CancellationTokenSource cancellationSource) =>
+            !_closed && ReferenceEquals(_treeBuildCancellationTokenSource, cancellationSource);
+
+        private void EndBrowserOperation(CancellationTokenSource cancellationSource)
+        {
+            if (ReferenceEquals(_treeBuildCancellationTokenSource, cancellationSource))
+            {
+                _treeBuildCancellationTokenSource = null;
+                UpdateLoadingState();
+            }
+            cancellationSource.Dispose();
+        }
+
+        private void UpdateLoadingState()
+        {
+            IsLoading = !_closed && (_isRepositoryLoading || _treeBuildCancellationTokenSource != null);
+            IsLoadProgressWindowActive = IsLoading;
+        }
+
+        private void SetLoadFeedback(string status, string detail = "", int completed = 0, int total = 0)
+        {
+            LoadProgressValue = completed;
+            LoadProgressMaximum = total;
+            LoadProgress = total > 0 ? (int)Math.Round(completed * 100d / total) : 0;
+            LoadProgressIsIndeterminate = total <= 0;
+            LoadProgressDetail = detail;
+            LoadStatus = status;
+        }
+
+        private void CompleteLoadFeedback(string status, int completed)
+        {
+            SetLoadFeedback(status, completed: completed, total: completed);
+            LoadProgressIsIndeterminate = false;
+            LoadProgress = 100;
+        }
+
+        [RelayCommand(CanExecute = nameof(IsLoading))]
+        private void CancelLoading()
+        {
+            LoadAudioRepositoryForSelectedLanguagesCancelCommand.Execute(null);
+            _treeBuildCancellationTokenSource?.Cancel();
+        }
 
         private void SetSelectedLanguages()
         {
@@ -460,25 +607,18 @@ namespace Editors.Audio.AudioExplorer
 
         public async Task InitializeAsync()
         {
-            if (_isInitialized)
+            if (_isInitialized || _closed)
                 return;
 
             _isInitialized = true;
-            _suppressAutomaticLoadProgressWindow = true;
-            try
-            {
-                await LoadAudioRepositoryForSelectedLanguagesCommand
-                    .ExecuteAsync(null);
-            }
-            finally
-            {
-                _suppressAutomaticLoadProgressWindow = false;
-            }
+            await LoadAudioRepositoryForSelectedLanguagesCommand.ExecuteAsync(null);
         }
 
         [RelayCommand(IncludeCancelCommand = true)]
         public async Task LoadAudioRepositoryForSelectedLanguagesAsync(CancellationToken cancellationToken = default)
         {
+            if (_closed || _isRepositoryLoading)
+                return;
             if (!_audioRepository.IsCurrentGameSupported)
             {
                 LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.UnsupportedGame");
@@ -492,65 +632,69 @@ namespace Editors.Audio.AudioExplorer
                 return;
             }
 
-            IsLoading = true;
-            IsLoadProgressWindowActive =
-                !_suppressAutomaticLoadProgressWindow;
-            LoadProgress = 0;
-            LoadProgressValue = 0;
-            LoadProgressMaximum = 0;
-            LoadProgressDetail = string.Empty;
-            LoadProgressIsIndeterminate = true;
-            LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.Loading");
+            _isRepositoryLoading = true;
+            SetLoadFeedback(LocalizationManager.Instance.Get("AudioExplorer.Loading"));
             CancelTreeBuild();
+            UpdateLoadingState();
 
-            var progress = new Progress<AudioLoadProgress>(value =>
+            using var progress = new BrowserLoadProgress(value =>
             {
-                LoadProgress = value.Total == 0
-                    ? 0
-                    : (int)Math.Round(value.Completed * 100d / value.Total);
-                LoadProgressValue = value.Completed;
-                LoadProgressMaximum = value.Total;
-                LoadProgressDetail = Path.GetFileName(value.CurrentFile);
-                LoadProgressIsIndeterminate = value.Total <= 0;
-                LoadStatus = LocalizationManager.Instance.GetFormat(
-                    "AudioExplorer.LoadingProgress",
-                    value.Completed,
-                    value.Total,
-                    Path.GetFileName(value.CurrentFile));
+                if (_closed || !_isRepositoryLoading || cancellationToken.IsCancellationRequested)
+                    return;
+                var status = value.Stage switch
+                {
+                    AudioLoadStage.ReadingMetadata => LocalizationManager.Instance.Get("AudioExplorer.LoadingMetadata"),
+                    AudioLoadStage.DiscoveringBanks => LocalizationManager.Instance.Get("AudioExplorer.DiscoveringBanks"),
+                    AudioLoadStage.BuildingIndex => LocalizationManager.Instance.Get("AudioExplorer.Indexing"),
+                    _ => LocalizationManager.Instance.GetFormat("AudioExplorer.LoadingProgress",
+                        value.Completed, value.Total, Path.GetFileName(value.CurrentFile)),
+                };
+                SetLoadFeedback(status, Path.GetFileName(value.CurrentFile), value.Completed, value.Total);
             });
 
             try
             {
+                await _browserOperation;
                 await Task.Run(
                     () => _audioRepository.Load(languages, progress, cancellationToken),
                     cancellationToken);
+                progress.Dispose();
 
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_closed)
+                    return;
+                SetLoadFeedback(LocalizationManager.Instance.Get("AudioExplorer.BuildingList"));
+                var values = await CreateListAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_closed)
+                    return;
                 Reset();
-                RefreshList();
-                LoadProgress = 100;
-                LoadStatus = LocalizationManager.Instance.GetFormat(
+                ExplorerFilter.ExplorerList.UpdatePossibleValues(values);
+                CompleteLoadFeedback(LocalizationManager.Instance.GetFormat(
                     "AudioExplorer.LoadComplete",
-                    ExplorerFilter.ExplorerList.Values.Count);
+                    values.Count), values.Count);
             }
             catch (OperationCanceledException)
             {
-                LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadCancelled");
+                if (!_closed)
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadCancelled");
             }
             catch (Exception e)
             {
                 _logger.Here().Error($"Unable to load Audio Explorer data: {e}");
-                LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadFailed");
+                if (!_closed)
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadFailed");
             }
             finally
             {
-                IsLoadProgressWindowActive = false;
-                IsLoading = false;
+                _isRepositoryLoading = false;
+                UpdateLoadingState();
             }
         }
 
         private void OnEventSelected(ExplorerListItem newValue)
         {
-            if (newValue == null)
+            if (newValue == null || _closed || _isRepositoryLoading)
                 return;
 
             if (newValue.HircItem != null &&
@@ -563,21 +707,46 @@ namespace Editors.Audio.AudioExplorer
 
             if (SearchByVOActor)
             {
-                _treeBuildCancellationTokenSource = new CancellationTokenSource();
-                _ = BuildVoActorTreesAsync(
+                var cancellationSource = BeginBrowserOperation("AudioExplorer.BuildingTree");
+                _browserOperation = BuildVoActorTreesAsync(
                     newValue.DisplayName,
-                    _treeBuildCancellationTokenSource);
+                    cancellationSource);
                 return;
             }
             else
             {
-                var wwiseTreeParserChildren = new HircTreeChildrenParser(_audioRepository);
+                var cancellationSource = BeginBrowserOperation("AudioExplorer.BuildingEventTree");
+                _browserOperation = BuildEventTreeAsync(newValue.HircItem, cancellationSource);
+            }
+        }
 
-                var rootNode = wwiseTreeParserChildren.BuildHierarchy(newValue.HircItem);
-                rootNode.IsExpanded = true;
-
-                TreeList.Add(rootNode);
-                RefreshExportAvailability();
+        private async Task BuildEventTreeAsync(HircItem item, CancellationTokenSource cancellationSource)
+        {
+            var cancellationToken = cancellationSource.Token;
+            try
+            {
+                var root = await Task.Run(() => new HircTreeChildrenParser(_audioRepository, cancellationToken).BuildHierarchy(item), cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsCurrentBrowserOperation(cancellationSource))
+                    return;
+                root.IsExpanded = true;
+                TreeList.Add(root);
+                CompleteLoadFeedback(LocalizationManager.Instance.GetFormat("AudioExplorer.TreeReady", 1), 1);
+            }
+            catch (OperationCanceledException)
+            {
+                if (IsCurrentBrowserOperation(cancellationSource))
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadCancelled");
+            }
+            catch (Exception exception)
+            {
+                _logger.Here().Error($"Unable to build Audio Explorer tree: {exception}");
+                if (IsCurrentBrowserOperation(cancellationSource))
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.TreeBuildFailed");
+            }
+            finally
+            {
+                EndBrowserOperation(cancellationSource);
             }
         }
 
@@ -587,40 +756,51 @@ namespace Editors.Audio.AudioExplorer
         {
             var cancellationToken = cancellationSource.Token;
             LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.BuildingTree");
+            using var progress = new BrowserLoadProgress(value =>
+            {
+                if (IsCurrentBrowserOperation(cancellationSource) && !cancellationToken.IsCancellationRequested)
+                    SetLoadFeedback(LocalizationManager.Instance.Get("AudioExplorer.BuildingTree"),
+                        value.CurrentFile, value.Completed, value.Total);
+            });
 
             try
             {
                 var result = await Task.Run(() =>
                 {
-                    var parser = new HircTreeChildrenParser(_audioRepository);
+                    var parser = new HircTreeChildrenParser(_audioRepository, cancellationToken);
                     var dialogueEvents = _audioRepository.GetHircsByHircType(AkBkHircType.Dialogue_Event);
                     var matchingRoots = new List<HircTreeNode>();
                     var unavailableReferenceCount = 0;
                     var playableAudioCount = 0;
+                    var completed = 0;
 
                     foreach (var dialogueEvent in dialogueEvents)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var root = parser.BuildHierarchy(dialogueEvent);
-                        if (!FilterTreeByVOActor(root, voActor, cancellationToken))
-                            continue;
-
-                        unavailableReferenceCount += CountMissingReferences(root);
-                        if (!PruneBranchesWithoutPlayableAudio(root))
-                            continue;
-
-                        playableAudioCount += CountPlayableAudio(root);
-                        matchingRoots.Add(root);
+                        if (FilterTreeByVOActor(root, voActor, cancellationToken))
+                        {
+                            unavailableReferenceCount += CountMissingReferences(root);
+                            if (PruneBranchesWithoutPlayableAudio(root))
+                            {
+                                playableAudioCount += CountPlayableAudio(root);
+                                matchingRoots.Add(root);
+                            }
+                        }
+                        progress.Report(new AudioLoadProgress(++completed, dialogueEvents.Count,
+                            _audioRepository.GetNameFromId(dialogueEvent.Id)));
                     }
 
                     return (
                         Roots: matchingRoots,
                         UnavailableReferenceCount: unavailableReferenceCount,
-                        PlayableAudioCount: playableAudioCount);
+                        PlayableAudioCount: playableAudioCount,
+                        Completed: completed);
                 }, cancellationToken);
+                progress.Dispose();
 
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!ReferenceEquals(_treeBuildCancellationTokenSource, cancellationSource))
+                if (!IsCurrentBrowserOperation(cancellationSource))
                     return;
 
                 _hiddenUnavailableReferenceCount = result.UnavailableReferenceCount;
@@ -649,22 +829,23 @@ namespace Editors.Audio.AudioExplorer
                         result.Roots.Count);
                 }
 
+                CompleteLoadFeedback(LoadStatus, result.Completed);
                 RefreshExportAvailability();
             }
             catch (OperationCanceledException)
             {
+                if (IsCurrentBrowserOperation(cancellationSource))
+                    LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.LoadCancelled");
             }
             catch (Exception e)
             {
                 _logger.Here().Error($"Unable to build Audio Explorer trees: {e}");
-                if (ReferenceEquals(_treeBuildCancellationTokenSource, cancellationSource))
+                if (IsCurrentBrowserOperation(cancellationSource))
                     LoadStatus = LocalizationManager.Instance.Get("AudioExplorer.TreeBuildFailed");
             }
             finally
             {
-                if (ReferenceEquals(_treeBuildCancellationTokenSource, cancellationSource))
-                    _treeBuildCancellationTokenSource = null;
-                cancellationSource.Dispose();
+                EndBrowserOperation(cancellationSource);
             }
         }
 
@@ -1134,9 +1315,9 @@ namespace Editors.Audio.AudioExplorer
             {
                 ExplorerFilter.ExplorerList.SelectedItemChanged -= OnEventSelected;
                 ExplorerFilter.ExplorerList.SelectedItem = null;
+                ExplorerFilter.ExplorerList.UpdatePossibleValues([]);
                 ExplorerFilter.ExplorerList.Filter = string.Empty;
                 ExplorerFilter.ExplorerList.SelectedItemChanged += OnEventSelected;
-                ExplorerFilter.ExplorerList.UpdatePossibleValues([]);
             }
 
             SelectedNode = null;
@@ -1153,9 +1334,11 @@ namespace Editors.Audio.AudioExplorer
 
         public void Close()
         {
+            _closed = true;
             LoadAudioRepositoryForSelectedLanguagesCancelCommand.Execute(null);
             ExportAudioCancelCommand.Execute(null);
             CancelTreeBuild();
+            UpdateLoadingState();
             _playbackSelectionVersion++;
             _playbackPreparationCancellationTokenSource?.Cancel();
             _playbackPreparationCancellationTokenSource?.Dispose();

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Editors.Audio.AudioExplorer;
 using Editors.Audio.Shared.Storage;
 using Shared.Core.Services;
@@ -13,7 +14,7 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
     {
         private record ArgumentPathLookupKey(HircTreeNode ParentNode, int Depth, uint State);
 
-        public HircTreeChildrenParser(IAudioRepository audioRepository) : base(audioRepository)
+        public HircTreeChildrenParser(IAudioRepository audioRepository, CancellationToken cancellationToken = default) : base(audioRepository, cancellationToken)
         {
             HircProcessChildMap.Add(AkBkHircType.Event, ProcessEvent);
             HircProcessChildMap.Add(AkBkHircType.Action, ProcessAction);
@@ -47,6 +48,7 @@ namespace Editors.Audio.Shared.Wwise.HircExploration
             var argumentPathLookup = new Dictionary<ArgumentPathLookupKey, HircTreeNode>();
             foreach (var statePath in result.StatePaths)
             {
+                CancellationToken.ThrowIfCancellationRequested();
                 var currentNode = dialogueEventNode;
 
                 for (var depth = 0; depth < statePath.Items.Count; depth++)

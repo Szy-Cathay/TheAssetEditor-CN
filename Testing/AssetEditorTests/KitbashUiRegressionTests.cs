@@ -72,9 +72,20 @@ public class KitbashUiRegressionTests
                                     Is.GreaterThanOrEqualTo(4.5), $"{theme}, {styleKey}");
                                 if (styleKey == "AeButton.Primary")
                                 {
-                                    var hover = (SolidColorBrush)Application.Current.FindResource("AeBrush.AccentHover");
-                                    NUnitAssert.That(Contrast(foreground, hover.Color),
-                                        Is.GreaterThanOrEqualTo(4.5), $"{theme}, hovered {styleKey}");
+                                    var flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+                                    var hoverKey = (DependencyPropertyKey)typeof(UIElement).GetField("IsMouseOverPropertyKey", flags)!.GetValue(null)!;
+                                    var pressedKey = (DependencyPropertyKey)typeof(ButtonBase).GetField("IsPressedPropertyKey", flags)!.GetValue(null)!;
+                                    foreach (var pressed in new[] { false, true })
+                                    {
+                                        button.SetValue(hoverKey, true);
+                                        button.SetValue(pressedKey, pressed);
+                                        window.UpdateLayout();
+                                        NUnitAssert.That(Contrast(((SolidColorBrush)button.Foreground).Color,
+                                            ((SolidColorBrush)button.Background).Color), Is.GreaterThanOrEqualTo(4.5),
+                                            $"{theme}, {styleKey}, hover=true, pressed={pressed}");
+                                    }
+                                    button.SetValue(pressedKey, false);
+                                    button.SetValue(hoverKey, false);
                                 }
                             }
                         }

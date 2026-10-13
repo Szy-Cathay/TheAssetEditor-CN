@@ -59,11 +59,11 @@ public class StartupPackLoadingWindowTests
                             1,
                             1));
                         var window = loadingWindow!;
-                        window.Dispatcher.Invoke(() =>
+                        window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
                         {
                             ownerWasEnabledDuringLoad = IsWindowEnabled(
                                 new WindowInteropHelper(owner).Handle);
-                            loadingFeedbackWasVisible = window.Opacity > 0;
+                            loadingFeedbackWasVisible = window.IsHitTestVisible;
                             window.StartupOperationProgress
                                 .IsDetailsExpanded = true;
                             window.UpdateLayout();

@@ -26,9 +26,13 @@ public sealed class FolderProjectOpenService(
 {
     private readonly ILogger _logger =
         Logging.Create<FolderProjectOpenService>();
+    private bool _isOpening;
 
     public void Open(string projectRoot)
     {
+        if (_isOpening)
+            return;
+        _isOpening = true;
         FolderProjectContainer? project = null;
         try
         {
@@ -103,6 +107,10 @@ public sealed class FolderProjectOpenService(
             dialogs.ShowDialogBox(
                 localizationManager.Get("FolderProject.Open.Failed"),
                 localizationManager.Get("FolderProject.ErrorTitle"));
+        }
+        finally
+        {
+            _isOpening = false;
         }
     }
 
