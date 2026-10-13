@@ -46,6 +46,7 @@ public class StartupScreenLifecycleTests
                 Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false,
                 WindowStartupLocation = WindowStartupLocation.Manual,
             };
+            startup.Resources["AeMotion.WindowExit"] = new Duration(TimeSpan.Zero);
             timer.Start();
             try { Assert.That(RunForTest(startup), Is.False); }
             finally { timer.Stop(); }

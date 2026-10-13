@@ -354,6 +354,8 @@ public partial class StartupPackLoadingWindow : Window
         _canClose = true;
         _visibilityController.ForceHide();
         await _transition.HideAsync();
+        // Leave WPF's Closing callback before an immediate transition closes again.
+        await Dispatcher.Yield(DispatcherPriority.Background);
         if (_closed)
             return;
         if (_isShowingDialog)
