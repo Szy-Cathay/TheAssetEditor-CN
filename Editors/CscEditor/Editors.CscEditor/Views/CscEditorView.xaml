@@ -109,8 +109,8 @@
                      overlay's own fixed 242px footprint (see below) - avoids it overflowing/clipping
                      against the tree+details panel while looking through a camera. -->
                 <ColumnDefinition Width="*" MinWidth="242"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="340"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="340" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0">
@@ -155,7 +155,7 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="5"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto" MinHeight="200"/>
                 </Grid.RowDefinitions>
 

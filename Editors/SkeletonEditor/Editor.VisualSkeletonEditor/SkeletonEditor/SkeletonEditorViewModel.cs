@@ -18,9 +18,12 @@ using Shared.Ui.BaseDialogs.MathViews;
 
 namespace Editor.VisualSkeletonEditor.SkeletonEditor
 {
-    public partial class SkeletonEditorViewModel : EditorHostBase, IFileEditor
+    public partial class SkeletonEditorViewModel : EditorHostBase, IFileEditor, ISaveableEditor
     {
         SceneObject _techSkeletonNode;
+        GameSkeleton? _savedSkeleton;
+        string _savedSkeletonPath = "";
+        string _savedSourceSkeletonName = "";
 
         private readonly IPackFileService _packFileService;
         private readonly CopyPasteManager _copyPasteManager;
@@ -41,6 +44,7 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
         [ObservableProperty] string _selectedBoneName;
         [ObservableProperty] bool _showSkeleton = true;
         [ObservableProperty] bool _showRefMesh = true;
+        [ObservableProperty] bool _hasUnsavedChanges;
 
         public override Type EditorViewModelType => typeof(EditorView);
 
@@ -81,7 +85,13 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
         partial void OnSelectedBoneChanged(SkeletonBoneNode? value) => RefreshBoneInformation(value);
         partial void OnIsTechSkeletonChanged(bool value) => SetTechSkeletonTransform(value);
         partial void OnBoneVisualScaleChanged(float value) => _techSkeletonNode?.SelectedBoneScale(value);
-        partial void OnBoneScaleChanged(float value) => BoneTransformHandler.Scale(SelectedBone, _techSkeletonNode.Skeleton, (float)BoneScale);
+        partial void OnBoneScaleChanged(float value)
+        {
+            BoneTransformHandler.Scale(SelectedBone, _techSkeletonNode.Skeleton, value);
+            UpdateDirtyState();
+        }
+        partial void OnSkeletonNameChanged(string value) => UpdateDirtyState();
+        partial void OnSourceSkeletonNameChanged(string value) => UpdateDirtyState();
         partial void OnSelectedBoneNameChanged(string value) => UpdateSelectedBoneName(value);
         partial void OnShowSkeletonChanged(bool value) => _techSkeletonNode.ShowSkeleton.Value = value;
         partial void OnShowRefMeshChanged(bool value) => _techSkeletonNode.ShowMesh.Value = value;
@@ -97,6 +107,8 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
 
         void LoadSkeleton(SceneObject techSkeletonNode, string skeletonPath)
         {
+            if (techSkeletonNode.Skeleton != null && techSkeletonNode.SkeletonName.Value == skeletonPath)
+                return;
             try
             {
                 DisplayName = Path.GetFileName(skeletonPath);
@@ -109,7 +121,8 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
                 RefreshBoneList();
                 IsTechSkeleton = skeletonPath.ToLower().Contains("tech");
                 SourceSkeletonName = _techSkeletonNode.Skeleton.SkeletonName;
-                
+                CurrentFile = packFile;
+                RecordSavedState();
             }
             catch (Exception e)
             {
@@ -168,11 +181,12 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
 
         void UpdateSelectedBoneName(string newName)
         {
-            if (SelectedBone == null)
+            if (SelectedBone == null || SelectedBoneRotationOffset.DisableCallbacks)
                 return;
 
             SelectedBone.BoneName = newName;
             _techSkeletonNode.Skeleton.BoneNames[SelectedBone.BoneIndex] = newName;
+            UpdateDirtyState();
         }
 
         private void SetTechSkeletonTransform(bool value)
@@ -190,9 +204,14 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
                 SelectedBoneTranslationOffset.GetAsVector3(),
                 SelectedBoneRotationOffset.GetAsVector3(),
                 ShowBonesAsWorldTransform);
+            UpdateDirtyState();
         }
 
-        public void BakeSkeletonAction() => _techSkeletonNode.Skeleton.BakeScaleIntoSkeleton();
+        public void BakeSkeletonAction()
+        {
+            _techSkeletonNode.Skeleton.BakeScaleIntoSkeleton();
+            UpdateDirtyState();
+        }
 
         public void FocusSelectedBoneAction()
         {
@@ -210,18 +229,21 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
 
             _techSkeletonNode.Skeleton.CreateChildBone(SelectedBone.BoneIndex);
             RefreshBoneList();
+            UpdateDirtyState();
         }
 
         public void DuplicateBoneAction()
         {
             BoneManipulator.Duplicate(SelectedBone, _techSkeletonNode.Skeleton);
             RefreshBoneList();
+            UpdateDirtyState();
         }
 
         public void DeleteBoneAction()
         {
             BoneManipulator.Delete(SelectedBone, _techSkeletonNode.Skeleton);
             RefreshBoneList();
+            UpdateDirtyState();
         }
 
         public void CopyBoneAction()
@@ -234,17 +256,20 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
         {
             BoneManipulator.Paste(_copyPasteManager, SelectedBone, _techSkeletonNode.Skeleton);
             RefreshBoneList();
+            UpdateDirtyState();
         }
 
-        public void SaveSkeletonAction()
+        public void SaveSkeletonAction() => Save();
+
+        public bool Save()
         {
             if (_techSkeletonNode.Skeleton == null)
-                return;
+                return false;
 
             if (_techSkeletonNode.Skeleton.HasBoneScale())
             {
-                MessageBox.Show(LocalizationManager.Instance.Get("Msg.SkeletonHasScale"));
-                return;
+                _packFileUiProvider.ShowDialogBox(LocalizationManager.Instance.Get("Msg.SkeletonHasScale"));
+                return false;
             }
 
             var skeletonClip = AnimationClip.CreateSkeletonAnimation(_techSkeletonNode.Skeleton);
@@ -253,11 +278,40 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
             var animationBytes = AnimationFile.ConvertToBytes(animFile);
 
             var result = _packFileSaveService.Save(SkeletonName, animationBytes, false);
-            SkeletonName = _packFileService.GetFullPath(result);
+            if (result == null)
+                return false;
+            var savedPath = _packFileService.GetFullPath(result);
 
             var invMatrixFile = _techSkeletonNode.Skeleton.CreateInvMatrixFile();
-            var invMatrixPath = Path.ChangeExtension(SkeletonName, ".bone_inv_trans_mats");
-            _packFileSaveService.Save(invMatrixPath, invMatrixFile.GetBytes(), false);
+            var invMatrixPath = Path.ChangeExtension(savedPath, ".bone_inv_trans_mats");
+            if (_packFileSaveService.Save(invMatrixPath, invMatrixFile.GetBytes(), false) == null)
+                return false;
+            CurrentFile = result;
+            SkeletonName = savedPath;
+            RecordSavedState();
+            return true;
+        }
+
+        void RecordSavedState()
+        {
+            _savedSkeleton = _techSkeletonNode.Skeleton.Clone();
+            _savedSkeletonPath = SkeletonName;
+            _savedSourceSkeletonName = SourceSkeletonName;
+            HasUnsavedChanges = false;
+        }
+
+        void UpdateDirtyState()
+        {
+            var skeleton = _techSkeletonNode?.Skeleton;
+            if (skeleton == null || _savedSkeleton == null)
+                return;
+            HasUnsavedChanges = SkeletonName != _savedSkeletonPath || SourceSkeletonName != _savedSourceSkeletonName ||
+                !skeleton.BoneNames.SequenceEqual(_savedSkeleton.BoneNames) ||
+                !skeleton.Translation.SequenceEqual(_savedSkeleton.Translation) ||
+                !skeleton.Rotation.SequenceEqual(_savedSkeleton.Rotation) ||
+                !skeleton.Scale.SequenceEqual(_savedSkeleton.Scale) ||
+                Enumerable.Range(0, skeleton.BoneCount).Any(index =>
+                    skeleton.GetParentBoneIndex(index) != _savedSkeleton.GetParentBoneIndex(index));
         }
 
         public void LoadSkeletonAction()

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
@@ -22,6 +22,7 @@ public class UiCommonControlResourceTests
     private static readonly IReadOnlyDictionary<string, Type> ExpectedStyles =
         new Dictionary<string, Type>
         {
+            ["AeInteraction.Selectable"] = typeof(Control),
             ["AeButton.Primary"] = typeof(Button),
             ["AeButton.Secondary"] = typeof(Button),
             ["AeButton.Quiet"] = typeof(Button),
@@ -31,6 +32,7 @@ public class UiCommonControlResourceTests
             ["AeButton.VisibilityToggle"] = typeof(ToggleButton),
             ["AeInput.TextBox"] = typeof(TextBox),
             ["AeInput.ComboBox"] = typeof(ComboBox),
+            ["AeInput.ComboBoxItem"] = typeof(ComboBoxItem),
             ["AeInput.CheckBox"] = typeof(CheckBox),
             ["AeInput.RadioButton"] = typeof(RadioButton),
             ["AeInput.Switch"] = typeof(ToggleButton),
@@ -66,7 +68,7 @@ public class UiCommonControlResourceTests
         };
 
     [Test]
-    public void CommonControlDictionaries_ExposeApprovedKeyedStylesOnly()
+    public void CommonControlDictionaries_ExposeCanonicalStylesAndApprovedDefaults()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -91,9 +93,17 @@ public class UiCommonControlResourceTests
 
                     foreach (var dictionary in dictionaries)
                     {
+                        Type[] approvedDefaults = dictionary.Source?.OriginalString.Split('/').Last() switch
+                        {
+                            "Buttons.xaml" => [typeof(Button)],
+                            "Inputs.xaml" => [typeof(TextBox), typeof(ComboBox)],
+                            "Collections.xaml" => [typeof(ListBoxItem), typeof(TabItem)],
+                            "MenusAndFeedback.xaml" => [typeof(Menu), typeof(MenuItem), typeof(ContextMenu)],
+                            _ => [],
+                        };
                         NUnitAssert.That(
                             dictionary.Keys.OfType<Type>(),
-                            Is.Empty,
+                            Is.EquivalentTo(approvedDefaults),
                             dictionary.Source?.OriginalString);
                     }
                 });
@@ -310,7 +320,7 @@ public class UiCommonControlResourceTests
                 var style = (Style)Application.Current.FindResource(
                     "AeInput.TextBox");
                 var establishedStyle = (Style)Application.Current.FindResource(
-                    typeof(TextBox));
+                    "AeInput.TextBoxBase");
                 var textBox = new TextBox { Style = style };
                 var peer = new TextBoxAutomationPeer(textBox);
                 var valueProvider = (IValueProvider)peer.GetPattern(
@@ -322,7 +332,7 @@ public class UiCommonControlResourceTests
                     NUnitAssert.That(style.BasedOn, Is.SameAs(establishedStyle));
                     NUnitAssert.That(textBox.Focusable, Is.True);
                     NUnitAssert.That(textBox.IsReadOnly, Is.False);
-                    NUnitAssert.That(textBox.MinHeight, Is.EqualTo(26));
+                    NUnitAssert.That(textBox.MinHeight, Is.EqualTo(28));
                     NUnitAssert.That(
                         textBox.VerticalContentAlignment,
                         Is.EqualTo(VerticalAlignment.Center));
@@ -364,7 +374,7 @@ public class UiCommonControlResourceTests
 
                     NUnitAssert.Multiple(() =>
                     {
-                        NUnitAssert.That(comboBox.MinHeight, Is.EqualTo(26));
+                        NUnitAssert.That(comboBox.MinHeight, Is.EqualTo(28));
                         NUnitAssert.That(
                             toggle.ActualWidth,
                             Is.EqualTo(comboBox.ActualWidth).Within(1));
@@ -1189,18 +1199,21 @@ public class UiCommonControlResourceTests
         NUnitAssert.Multiple(() =>
         {
             NUnitAssert.That(menuSource, Does.Contain("AeBrush.AccentSoft"));
+            NUnitAssert.That(menuSource, Does.Contain("AeBrush.SurfaceHover"));
+            NUnitAssert.That(menuSource, Does.Contain("<Trigger Property=\"IsSubmenuOpen\" Value=\"True\">"));
             NUnitAssert.That(menuSource, Does.Not.Contain("PopupAnimation"));
             NUnitAssert.That(menuSource, Does.Not.Contain("StateOverlay"));
             NUnitAssert.That(
                 menuSource.Split(
                     "<Setter TargetName=\"Chrome\" Property=\"Background\"",
                     StringSplitOptions.None),
-                Has.Length.EqualTo(3));
+                Has.Length.EqualTo(5));
         });
     }
 
     private static ResourceDictionary[] LoadDictionaries() =>
     [
+        Load("Themes/DesignSystem/Controls/Interaction.xaml"),
         Load("Themes/DesignSystem/Controls/Buttons.xaml"),
         Load("Themes/DesignSystem/Controls/Inputs.xaml"),
         Load("Themes/DesignSystem/Controls/Collections.xaml"),

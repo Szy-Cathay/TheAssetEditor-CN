@@ -23,6 +23,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         [ObservableProperty] public partial ObservableCollection<TreeNode> Children { get; set; } = [];
         [ObservableProperty] public partial bool UnsavedChanged { get; set; }
         [ObservableProperty] public partial bool IsMainEditabelPack { get; set; }
+        [ObservableProperty] public partial bool IsCurrentEditProject { get; private set; }
+        [ObservableProperty] public partial bool IsReadOnlyContainer { get; private set; }
         [ObservableProperty] public partial bool IsIgnored { get; set; }
         [ObservableProperty] public partial bool IsVisible { get; set; } = true;
         [ObservableProperty] public partial bool IsSelected { get; set; }
@@ -37,9 +39,21 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             FileOwner = ower;
             Parent = parent;
             NodeType = type;
+            RefreshContainerAccess();
 
             if (string.IsNullOrWhiteSpace(name))
                 throw new Exception($"Packfile name or folder is empty '{GetFullPath()}', this is not allowed! Please report as a bug if it happens outside of packfile loading! If it happens while loading clean up the packfile in RPFM");
+        }
+
+        partial void OnIsMainEditabelPackChanged(bool value) => RefreshContainerAccess();
+
+        internal void RefreshContainerAccess()
+        {
+            IsCurrentEditProject = NodeType == NodeType.Root &&
+                                   IsMainEditabelPack && FileOwner is FolderProjectContainer
+                                   { IsCaPackFile: false, Role: not PackFileContainerRole.Reference };
+            IsReadOnlyContainer = NodeType == NodeType.Root &&
+                                  FileOwner != null && !IsCurrentEditProject;
         }
 
         public string GetFullPath()

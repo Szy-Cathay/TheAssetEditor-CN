@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
@@ -58,7 +58,7 @@ public class UiMainShellGallery
                 var headerPanel = (TabPanel)editors.Template.FindName(
                     "HeaderPanel",
                     editors);
-                var headerBand = (Border)VisualTreeHelper.GetParent(
+                var headerBand = (FrameworkElement)VisualTreeHelper.GetParent(
                     headerPanel);
                 var tabs = GetTabItems(editors);
                 var wrappedRows = RowOffsets(tabs, headerBand);
@@ -67,7 +67,7 @@ public class UiMainShellGallery
                 {
                     NUnitAssert.That(
                         headerBand.ActualHeight,
-                        Is.EqualTo(49).Within(0.1));
+                        Is.EqualTo(56).Within(0.1));
                     NUnitAssert.That(wrappedRows, Has.Count.EqualTo(2));
                     NUnitAssert.That(wrappedRows[0], Is.GreaterThanOrEqualTo(0));
                     NUnitAssert.That(
@@ -83,7 +83,7 @@ public class UiMainShellGallery
                 {
                     NUnitAssert.That(
                         headerBand.ActualHeight,
-                        Is.EqualTo(25).Within(0.1));
+                        Is.EqualTo(28).Within(0.1));
                     NUnitAssert.That(
                         RowOffsets(tabs, headerBand),
                         Has.Count.EqualTo(1));
@@ -372,7 +372,7 @@ public class UiMainShellGallery
             {
                 NUnitAssert.That(
                     activityBar.ActualWidth,
-                    Is.EqualTo(30).Within(0.1));
+                    Is.EqualTo(44).Within(0.1));
                 NUnitAssert.That(activityBar.SelectedIndex, Is.EqualTo(0));
                 NUnitAssert.That(
                     workspaceSidebar.SelectedIndex,
@@ -411,9 +411,12 @@ public class UiMainShellGallery
             SaveSnapshot(
                 window,
                 $"main-shell-{variant}-{theme}.png");
-            SaveSnapshot(
-                (FrameworkElement)editors.Template.FindName("EditorTabStrip", editors),
-                $"editor-tabs-{variant}-{theme}.png");
+            var editorStrip = (FrameworkElement)editors.Template.FindName("EditorTabStrip", editors);
+            NUnitAssert.That(editorStrip.Visibility, Is.EqualTo(isNarrow ? Visibility.Collapsed : Visibility.Visible));
+            if (isNarrow)
+                NUnitAssert.That(editorStrip.ActualHeight, Is.Zero);
+            if (!isNarrow)
+                SaveSnapshot(editorStrip, $"editor-tabs-{variant}-{theme}.png");
 
             if (variant == "normal")
             {
@@ -540,7 +543,7 @@ public class UiMainShellGallery
         public string UpdateCheckStatus { get; }
         public bool HasUpdateCheckFailure { get; }
         public bool IsPackFileExplorerVisible { get; } = true;
-        public GridLength FileTreeColumnWidth { get; } =
+        public GridLength FileTreeColumnWidth { get; set; } =
             new(310, GridUnitType.Pixel);
         public object? FileTree { get; }
         public object MenuBar { get; } = new();

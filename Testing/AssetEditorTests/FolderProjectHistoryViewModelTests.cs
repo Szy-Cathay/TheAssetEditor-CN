@@ -1,4 +1,4 @@
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -1279,12 +1279,16 @@ public class FolderProjectHistoryViewModelTests
                 source,
                 Does.Not.Contain("FolderProject.History.Title"));
             NUnitAssert.That(
-                source,
-                Does.Not.Contain("FolderProject.History.SameDiskNotice"));
+                document.Descendants().Single(item =>
+                    (string?)item.Attribute("Text") == "{Binding LoadedProjectText}")
+                    .Attribute("ToolTip")?.Value,
+                Is.EqualTo("{loc:Loc FolderProject.History.SameDiskNotice}"));
+            NUnitAssert.That(document.Descendants().Any(item =>
+                (string?)item.Attribute("Text") == "{loc:Loc FolderProject.History.SameDiskNotice}"), Is.False);
             NUnitAssert.That(
                 mainWindowSource,
                 Does.Contain(
-                    "ToolTip=\"{loc:Loc FolderProject.History.SameDiskNotice}\""));
+                    "ToolTip=\"{loc:Loc MainWindow.Activity.History}\""));
             foreach (var forbidden in new[]
                      {
                          "Git", "Stage", "Commit", "Branch", "Identity",

@@ -37,7 +37,7 @@
         </Grid.Style>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{Binding LeftColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition MinWidth="400" Width="{Binding RightColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid.ColumnDefinitions>
 
@@ -45,7 +45,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="0.25*"/>
-            <RowDefinition Height="5"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="0.75*"/>
         </Grid.RowDefinitions>
 

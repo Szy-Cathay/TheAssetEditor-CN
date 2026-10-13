@@ -35,6 +35,16 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
             set { SetValue(ShowTitleProperty, value); }
         }
 
+        public static readonly DependencyProperty ShowContainerAccessStateProperty =
+            DependencyProperty.Register(nameof(ShowContainerAccessState), typeof(bool),
+                typeof(PackFileBrowserView), new PropertyMetadata(false));
+
+        public bool ShowContainerAccessState
+        {
+            get => (bool)GetValue(ShowContainerAccessStateProperty);
+            set => SetValue(ShowContainerAccessStateProperty, value);
+        }
+
         private void TreeView_MouseDown(
             object sender,
             MouseButtonEventArgs e)

@@ -198,7 +198,7 @@
         <Grid Grid.Row="2" Visibility="{Binding HasDocument, Converter={StaticResource BoolVisibility}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" MinWidth="180" />
-                <ColumnDefinition Width="5" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" MinWidth="420" />
             </Grid.ColumnDefinitions>
             <Grid Background="{DynamicResource AeBrush.Surface1}">

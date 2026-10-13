@@ -1,4 +1,4 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Color x:Key="AColour.Foreground.Static"                   R="15"  G="15"  B="15"  A="255"/>
@@ -226,21 +226,21 @@
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Selected.Inactive"         Color="{StaticResource AColour.Tone9.Border.Selected.Inactive}"/>
     <SolidColorBrush x:Key="ABrush.Tone9.Border.Disabled"                  Color="{StaticResource AColour.Tone9.Border.Disabled}"/>
     <!-- AE UI design-system semantic brushes -->
-    <SolidColorBrush x:Key="AeBrush.Canvas" Color="#F1F3F5" />
-    <SolidColorBrush x:Key="AeBrush.OnAccent" Color="#F1F3F5" />
-    <SolidColorBrush x:Key="AeBrush.Surface1" Color="#F8F9FA" />
-    <SolidColorBrush x:Key="AeBrush.Surface2" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="AeBrush.Surface3" Color="#E8EBEF" />
-    <SolidColorBrush x:Key="AeBrush.SurfaceHover" Color="#DDE6EE" />
-    <SolidColorBrush x:Key="AeBrush.Border" Color="#C7CFD8" />
-    <SolidColorBrush x:Key="AeBrush.BorderStrong" Color="#929FAC" />
-    <SolidColorBrush x:Key="AeBrush.TextPrimary" Color="#20262D" />
-    <SolidColorBrush x:Key="AeBrush.TextSecondary" Color="#4C5763" />
-    <SolidColorBrush x:Key="AeBrush.TextMuted" Color="#66727E" />
+    <SolidColorBrush x:Key="AeBrush.Canvas" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AeBrush.OnAccent" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AeBrush.Surface1" Color="#F7F7F7" />
+    <SolidColorBrush x:Key="AeBrush.Surface2" Color="#F1F1F1" />
+    <SolidColorBrush x:Key="AeBrush.Surface3" Color="#E9E9E9" />
+    <SolidColorBrush x:Key="AeBrush.SurfaceHover" Color="#E2E2E2" />
+    <SolidColorBrush x:Key="AeBrush.Border" Color="#DDDDDD" />
+    <SolidColorBrush x:Key="AeBrush.BorderStrong" Color="#A5A5A5" />
+    <SolidColorBrush x:Key="AeBrush.TextPrimary" Color="#252525" />
+    <SolidColorBrush x:Key="AeBrush.TextSecondary" Color="#555555" />
+    <SolidColorBrush x:Key="AeBrush.TextMuted" Color="#707070" />
     <SolidColorBrush x:Key="AeBrush.Accent" Color="#1268AA" />
     <SolidColorBrush x:Key="AeBrush.AccentHover" Color="#0B5D9C" />
-    <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="#DCEBFA" />
-    <SolidColorBrush x:Key="AeBrush.EditorTabAccent" Color="#6750B5" />
+    <SolidColorBrush x:Key="AeBrush.AccentSoft" Color="#DFDFDF" />
+    <SolidColorBrush x:Key="AeBrush.EditorTabAccent" Color="#A5A5A5" />
     <SolidColorBrush x:Key="AeBrush.Success" Color="#267A42" />
     <SolidColorBrush x:Key="AeBrush.Warning" Color="#8A5A00" />
     <SolidColorBrush x:Key="AeBrush.Danger" Color="#B23B3B" />

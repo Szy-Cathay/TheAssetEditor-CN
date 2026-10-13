@@ -77,6 +77,16 @@ namespace AssetEditor.Views
             }
         }
 
+        private void OnEditorSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.OriginalSource, EditorsTabControl) ||
+                DataContext is not MainViewModel viewModel)
+                return;
+
+            foreach (var shortcut in viewModel.MenuBar.Editors)
+                shortcut.IsActive = shortcut.MatchesEditor(EditorsTabControl.SelectedItem as IEditorInterface);
+        }
+
         private void MainWindow_KeyDown(object sender, KeyEventArgs e)
         {
             if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
@@ -174,7 +184,7 @@ namespace AssetEditor.Views
             }
         }
 
-        private void NewWindowMenuItem_Click(object sender, RoutedEventArgs e)
+        private async void NewWindowMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Create a new DI scope for the new window
             // This ensures all scoped services (CommandExecutor, EventHub, etc.)
@@ -184,6 +194,7 @@ namespace AssetEditor.Views
 
             var mainWindow = scopedProvider.GetRequiredService<MainWindow>();
             mainWindow.DataContext = scopedProvider.GetRequiredService<MainViewModel>();
+            await ((MainViewModel)mainWindow.DataContext).FileTree.InitializeCaFilesAsync();
             mainWindow.WindowState = WindowState.Normal;
             mainWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
@@ -191,10 +202,6 @@ namespace AssetEditor.Views
             mainWindow.Closed += (s, args) => scope.Dispose();
 
             mainWindow.Show();
-
-            // Ensure the window doesn't cover up the windows bar
-            mainWindow.MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
-            mainWindow.MaxWidth = SystemParameters.MaximizedPrimaryScreenWidth;
         }
 
         public void ToggleWindowState()

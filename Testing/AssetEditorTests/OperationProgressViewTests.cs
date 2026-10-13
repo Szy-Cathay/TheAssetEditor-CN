@@ -109,6 +109,48 @@ public class OperationProgressViewTests
     }
 
     [Test]
+    public void IndeterminateIndicator_AnimatesOnlyWhileVisibleAndActive_AndStopsForRealCounts()
+    {
+        InvokeWithWpfApplication(() =>
+        {
+            var view = new OperationProgressView { UseDeferredVisibility = false, UseLeadingIndicator = true };
+            var window = new Window { Content = view, Width = 640, Height = 240, ShowActivated = false, ShowInTaskbar = false };
+            var rotation = (RotateTransform)view.FindName("RingRotation");
+            try
+            {
+                view.Report(new OperationProgressUpdate("正在整理资源", "读取索引"));
+                view.IsOperationActive = true;
+                window.Show();
+                window.UpdateLayout();
+                PumpDispatcher(TimeSpan.FromMilliseconds(60));
+                Assert.That(rotation.HasAnimatedProperties, Is.EqualTo(SystemParameters.ClientAreaAnimation));
+                var indicator = (Grid)view.FindName("IndeterminateIndicator");
+                Assert.That(indicator.IsVisible, Is.True);
+                view.Visibility = Visibility.Collapsed;
+                Assert.That(rotation.HasAnimatedProperties, Is.False);
+                view.Visibility = Visibility.Visible;
+                Assert.That(rotation.HasAnimatedProperties, Is.EqualTo(SystemParameters.ClientAreaAnimation));
+                view.Report(new OperationProgressUpdate("正在读取文件", "data.pack", 7, 12));
+                window.UpdateLayout();
+                Assert.That(rotation.HasAnimatedProperties, Is.False);
+                Assert.That(indicator.IsVisible, Is.False);
+                var bar = FindVisualDescendant<ProgressBar>(view)!;
+                Assert.That(bar.IsVisible, Is.True);
+                Assert.That(bar.Value, Is.EqualTo(7));
+                Assert.That(bar.Maximum, Is.EqualTo(12));
+                view.Report(new OperationProgressUpdate("正在整理资源", "生成资源树"));
+                view.IsOperationActive = false;
+                Assert.That(rotation.HasAnimatedProperties, Is.False);
+            }
+            finally
+            {
+                window.Close();
+            }
+            Assert.That(rotation.HasAnimatedProperties, Is.False);
+        });
+    }
+
+    [Test]
     public void SoundBankGeneration_ReportsCreatingBeforeExpensiveWork()
     {
         var source = File.ReadAllText(Path.Combine(
@@ -486,7 +528,9 @@ public class OperationProgressViewTests
                     Has.Exactly(1).Items,
                     "The progress window disappeared before its minimum visible duration.");
 
-                PumpDispatcher(TimeSpan.FromMilliseconds(250));
+                Assert.That(PumpDispatcherUntil(
+                    () => !Application.Current.Windows.OfType<OperationProgressWindow>().Any(),
+                    TimeSpan.FromSeconds(2)), Is.True);
                 Assert.That(
                     Application.Current.Windows
                         .OfType<OperationProgressWindow>(),
@@ -531,7 +575,13 @@ public class OperationProgressViewTests
                 var completion = host.CompleteAsync();
 
                 Assert.That(completion.IsCompleted, Is.False);
-                PumpDispatcher(TimeSpan.FromMilliseconds(350));
+                var closingWindow = Application.Current.Windows.OfType<OperationProgressWindow>().Single();
+                Assert.That(closingWindow.ShowActivated, Is.False);
+                Assert.That(FindVisualDescendant<OperationProgressView>(closingWindow)!.IsOperationActive, Is.True,
+                    "Progress content must remain visible until the exit transition closes the window.");
+                Assert.That(PumpDispatcherUntil(
+                    () => completion.IsCompleted,
+                    TimeSpan.FromSeconds(2)), Is.True);
                 Assert.Multiple(() =>
                 {
                     Assert.That(completion.IsCompletedSuccessfully, Is.True);
@@ -621,7 +671,9 @@ public class OperationProgressViewTests
                 generation.SetException(
                     new InvalidOperationException(
                         "No editable Pack was selected."));
-                PumpDispatcher(TimeSpan.FromMilliseconds(400));
+                Assert.That(PumpDispatcherUntil(
+                    () => generationTask.IsCompleted,
+                    TimeSpan.FromSeconds(2)), Is.True);
 
                 Assert.Multiple(() =>
                 {

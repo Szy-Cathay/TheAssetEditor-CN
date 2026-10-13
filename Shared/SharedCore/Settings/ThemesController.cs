@@ -82,8 +82,8 @@ namespace Shared.Core.Settings
             if (dictionary == null) return;
             var merged = Application.Current.Resources.MergedDictionaries;
             var idx = merged.IndexOf(dictionary);
-            merged.RemoveAt(idx);
-            merged.Insert(idx, dictionary);
+            // Keep window styles available while open windows refresh their resources.
+            merged[idx] = dictionary;
         }
 
         public static void SetTheme(ThemeType theme)

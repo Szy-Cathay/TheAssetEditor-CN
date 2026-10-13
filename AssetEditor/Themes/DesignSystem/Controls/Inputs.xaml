@@ -28,7 +28,7 @@
 
     <Style
         x:Key="AeInput.TextBox"
-        BasedOn="{StaticResource {x:Type TextBox}}"
+        BasedOn="{StaticResource AeInput.TextBoxBase}"
         TargetType="{x:Type TextBox}">
         <Setter Property="MinHeight" Value="{StaticResource AeSize.ControlHeight}" />
         <Setter Property="Padding" Value="6,2" />
@@ -36,17 +36,56 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CaretBrush" Value="{DynamicResource AeBrush.TextPrimary}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AeBrush.AccentSoft}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Style.Triggers>
+            <Trigger Property="IsReadOnly" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AeBrush.Surface1}" />
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextMuted}" />
+            </Trigger>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Danger}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AeInput.ComboBoxItem" TargetType="{x:Type ComboBoxItem}" BasedOn="{StaticResource AeInteraction.Selectable}">
+        <Setter Property="MinHeight" Value="{StaticResource AeSize.CompactRowHeight}" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
+                            CornerRadius="{StaticResource AeRadius.Control}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsHighlighted" Value="True" />
+                    <Condition Property="IsSelected" Value="False" />
+                </MultiTrigger.Conditions>
+                <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+            </MultiTrigger>
+        </Style.Triggers>
     </Style>
 
     <Style
         x:Key="AeInput.ComboBox"
-        BasedOn="{StaticResource {x:Type ComboBox}}"
+        BasedOn="{StaticResource AeInput.ComboBoxBase}"
         TargetType="{x:Type ComboBox}">
         <Setter Property="MinHeight" Value="{StaticResource AeSize.ControlHeight}" />
         <Setter Property="Padding" Value="6,0,22,0" />
@@ -54,31 +93,11 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
         <Setter Property="Background" Value="{DynamicResource AeBrush.Surface2}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.BorderStrong}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AeBrush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource AeFocus.Keyboard}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="ItemContainerStyle">
-            <Setter.Value>
-                <Style TargetType="{x:Type ComboBoxItem}">
-                    <Setter Property="MinHeight" Value="{StaticResource AeSize.CompactRowHeight}" />
-                    <Setter Property="Padding" Value="8,2" />
-                    <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}" />
-                    <Setter Property="Background" Value="Transparent" />
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                    <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource AeBrush.AccentSoft}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource AeInput.ComboBoxItem}" />
     </Style>
 
     <Style x:Key="AeInput.ExpandableField" TargetType="{x:Type Expander}">
@@ -379,5 +398,12 @@
         <Setter Property="FontSize" Value="11" />
         <Setter Property="Foreground" Value="{DynamicResource AeBrush.Danger}" />
         <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource AeInput.TextBox}">
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="4,1" />
+    </Style>
+    <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource AeInput.ComboBox}">
+        <Setter Property="MinHeight" Value="0" />
     </Style>
 </ResourceDictionary>

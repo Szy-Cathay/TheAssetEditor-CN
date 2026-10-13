@@ -1,4 +1,4 @@
-using Moq;
+﻿using Moq;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
@@ -26,6 +26,59 @@ namespace Test.Shared.Core.PackFiles
         {
             if (Directory.Exists(_tempDirectory))
                 Directory.Delete(_tempDirectory, true);
+        }
+
+        [Test]
+        public void LoadAllCaFiles_WhenNoPackFilesExist_DoesNotReportSuccess()
+        {
+            var settings = new ApplicationSettingsService(GameTypeEnum.Rome2);
+            settings.CurrentSettings.GameDirectories.Add(new ApplicationSettings.GamePathPair
+            {
+                Game = GameTypeEnum.Rome2,
+                Path = _tempDirectory,
+            });
+
+            var loaded = new PackFileContainerLoader(settings)
+                .LoadAllCaFiles(GameTypeEnum.Rome2);
+
+            Assert.That(loaded, Is.Null);
+        }
+
+        [Test]
+        public void LoadAllCaFiles_WithoutConfiguredDirectory_DoesNotThrow()
+        {
+            var loader = new PackFileContainerLoader(
+                new ApplicationSettingsService(GameTypeEnum.Rome2));
+
+            Assert.That(loader.LoadAllCaFiles(GameTypeEnum.Rome2), Is.Null);
+        }
+
+        [TestCase(CaPackLoadProgressStage.DiscoveringPacks)]
+        [TestCase(CaPackLoadProgressStage.ReadingPacks)]
+        [TestCase(CaPackLoadProgressStage.MergingPacks)]
+        public void LoadAllCaFiles_CancelledDuringStage_DoesNotReturnPartialContainer(
+            CaPackLoadProgressStage stage)
+        {
+            var bytes = CreatePackBytes();
+            File.WriteAllBytes(Path.Combine(_tempDirectory, "cancel.pack"), bytes);
+            File.WriteAllText(Path.Combine(_tempDirectory, "manifest.txt"), $"cancel.pack\t{bytes.Length}");
+            var settings = new ApplicationSettingsService(GameTypeEnum.Rome2);
+            settings.CurrentSettings.GameDirectories.Add(new ApplicationSettings.GamePathPair
+            {
+                Game = GameTypeEnum.Rome2,
+                Path = _tempDirectory,
+            });
+            using var cancellation = new CancellationTokenSource();
+
+            Assert.Throws<OperationCanceledException>(() =>
+                new PackFileContainerLoader(settings).LoadAllCaFiles(
+                    GameTypeEnum.Rome2,
+                    progress =>
+                    {
+                        if (progress.Stage == stage)
+                            cancellation.Cancel();
+                    },
+                    cancellation.Token));
         }
 
         [Test]

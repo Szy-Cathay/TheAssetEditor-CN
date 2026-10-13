@@ -23,6 +23,7 @@ using Shared.Core.PackFiles.Utility;
 using Shared.Core.Services;
 using Shared.Core.Settings;
 using Shared.Ui.Common;
+using Shared.Ui.Common.OperationProgress;
 
 namespace AssetEditor
 {
@@ -40,7 +41,7 @@ namespace AssetEditor
             } 
         }
 
-        protected override void OnStartup(StartupEventArgs e)
+        protected override async void OnStartup(StartupEventArgs e)
         {
             ApplicationStateRecorder.Initialize();
             PackFileLog.IsLoggingEnabled = false;
@@ -64,29 +65,33 @@ namespace AssetEditor
             var localizationManager = _serviceProvider.GetRequiredService<LocalizationManager>();
             localizationManager.LoadLanguage();
 
-            // Show the settings window if its the first time the tool is ran
-            if (settingsService.CurrentSettings.IsFirstTimeStartingApplication)
-                HandleFirstTimeSettings(uiCommandFactory, settingsService);
-
             var devConfigManager = _serviceProvider.GetRequiredService<DevelopmentConfigurationManager>();
             devConfigManager.Initialize(e);
             devConfigManager.OverrideSettings();
 
-            // Show window first, then load packs in background.
-            // Theme switching is handled by ThemesController (swaps colour dictionaries at runtime).
-            ShowMainWindow();
-
-            if (!devConfigManager.HasActiveConfiguration &&
-                !LoadCAPackFiles(settingsService, uiCommandFactory))
+            ApplyApplicationAppearance();
+            if (!devConfigManager.HasActiveConfiguration)
             {
-                Shutdown();
-                return;
+                if (!await LoadCAPackFiles(settingsService, uiCommandFactory))
+                {
+                    Shutdown();
+                    return;
+                }
             }
+            else
+                await ShowMainWindowAsync();
 
+            if (Dispatcher.HasShutdownStarted || MainWindow?.IsVisible != true)
+                return;
+            if (MainWindow != null)
+            {
+                MainWindow.IsEnabled = true;
+                MainWindow.Activate();
+            }
             FinishStartup(devConfigManager, e.Args);
         }
 
-        private bool LoadCAPackFiles(
+        private async Task<bool> LoadCAPackFiles(
             ApplicationSettingsService settingsService,
             IUiCommandFactory uiCommandFactory)
         {
@@ -94,8 +99,9 @@ namespace AssetEditor
                 .GetRequiredService<IPackFileService>();
             var containerLoader = _serviceProvider
                 .GetRequiredService<IPackFileContainerLoader>();
-            var loadingWindow = new StartupPackLoadingWindow(
-                reportProgress =>
+            StartupPackLoadingWindow? loadingWindow = null;
+            loadingWindow = new StartupPackLoadingWindow(
+                (reportProgress, cancellationToken) =>
                 {
                     var gamePath =
                         settingsService.GetGamePathForCurrentGame();
@@ -107,13 +113,24 @@ namespace AssetEditor
 
                     return containerLoader.LoadAllCaFiles(
                         settingsService.CurrentSettings.CurrentGame,
-                        reportProgress);
+                        reportProgress,
+                        cancellationToken);
                 },
-                container => packfileService.AddContainer(container),
+                container =>
+                {
+                    if (packfileService.AddContainer(container) == null)
+                        throw new InvalidOperationException("Unable to register the CA pack container.");
+                },
                 () => uiCommandFactory
                     .Create<OpenSettingsDialogCommand>()
-                    .Execute());
-            return loadingWindow.Run();
+                    .Execute(),
+                (progress, cancellationToken) => ShowMainWindowAsync(loadingWindow, progress, cancellationToken),
+                () =>
+                {
+                    if (settingsService.CurrentSettings.IsFirstTimeStartingApplication)
+                        HandleFirstTimeSettings(uiCommandFactory, settingsService);
+                });
+            return await loadingWindow.RunAsync();
         }
 
         private void FinishStartup(
@@ -150,7 +167,7 @@ namespace AssetEditor
             settingsService.Save();
         }
 
-        void ShowMainWindow()
+        private void ApplyApplicationAppearance()
         {
             var applicationSettingsService = _serviceProvider.GetRequiredService<ApplicationSettingsService>();
             ThemesController.SetTheme(applicationSettingsService.CurrentSettings.Theme);
@@ -164,11 +181,31 @@ namespace AssetEditor
                     applicationSettingsService.CurrentSettings
                         .AppFontWeight));
 
+        }
+
+        private async Task ShowMainWindowAsync(
+            StartupPackLoadingWindow? startupWindow = null,
+            Action<OperationProgressUpdate>? reportProgress = null,
+            CancellationToken cancellationToken = default)
+        {
+            var viewModel = _serviceProvider.GetRequiredService<MainViewModel>();
+            var treeStatus = LocalizationManager.Instance.Get("StartupPackLoading.BuildingTree");
+            reportProgress?.Invoke(new OperationProgressUpdate(treeStatus));
+            await viewModel.FileTree.InitializeCaFilesAsync(cancellationToken,
+                (completed, total) => reportProgress?.Invoke(new OperationProgressUpdate(
+                    treeStatus, null, completed, total)));
+            cancellationToken.ThrowIfCancellationRequested();
+            reportProgress?.Invoke(new OperationProgressUpdate(
+                LocalizationManager.Instance.Get("StartupPackLoading.OpeningWorkspace")));
+            await Dispatcher.Yield(DispatcherPriority.Background);
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             MainWindow = mainWindow;
-            mainWindow.DataContext = _serviceProvider.GetRequiredService<MainViewModel>();
+            mainWindow.DataContext = viewModel;
             mainWindow.Closed += OnMainWindowClosed;
-            mainWindow.Show();
+            if (startupWindow != null)
+                await startupWindow.HandOffToAsync(mainWindow, cancellationToken);
+            else
+                mainWindow.Show();
         }
 
        private void OnMainWindowClosed(object sender, EventArgs e)

@@ -1,10 +1,13 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 using Shared.Core.Services;
@@ -23,6 +26,11 @@ public partial class OperationProgressView : UserControl
         _visibilityController;
     private bool _isBatchApplying;
     private int _flushScheduled;
+    private bool _indicatorAnimating;
+
+    public static readonly DependencyProperty UseLeadingIndicatorProperty =
+        DependencyProperty.Register(nameof(UseLeadingIndicator), typeof(bool),
+            typeof(OperationProgressView), new PropertyMetadata(false));
 
     public static readonly DependencyProperty StatusTextProperty =
         DependencyProperty.Register(
@@ -109,6 +117,13 @@ public partial class OperationProgressView : UserControl
             "查看详情");
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        IsVisibleChanged += (_, _) => UpdateIndicatorAnimation();
+    }
+
+    public bool UseLeadingIndicator
+    {
+        get => (bool)GetValue(UseLeadingIndicatorProperty);
+        set => SetValue(UseLeadingIndicatorProperty, value);
     }
 
     public string StatusText
@@ -272,6 +287,8 @@ public partial class OperationProgressView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs eventArgs)
     {
+        SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
+        UpdateIndicatorAnimation();
         if (!UseDeferredVisibility)
             _visibilityController.RevealImmediately();
         else if (IsOperationActive)
@@ -280,8 +297,35 @@ public partial class OperationProgressView : UserControl
 
     private void OnUnloaded(object sender, RoutedEventArgs eventArgs)
     {
+        SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
+        RingRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+        _indicatorAnimating = false;
         _elapsedTimer.Stop();
         _visibilityController.ForceHide();
+    }
+
+    private void OnSystemParametersChanged(object? sender, PropertyChangedEventArgs e) =>
+        UpdateIndicatorAnimation();
+
+    private void UpdateIndicatorAnimation()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(UpdateIndicatorAnimation);
+            return;
+        }
+        if (RingRotation == null)
+            return;
+        var animate = IsLoaded && IsVisible && IsOperationActive &&
+                      IsProgressIndeterminate && SystemParameters.ClientAreaAnimation;
+        if (animate == _indicatorAnimating)
+            return;
+        _indicatorAnimating = animate;
+        var duration = TryFindResource("AeMotion.Indeterminate") is Duration motion
+            ? motion : new Duration(TimeSpan.FromSeconds(1.2));
+        RingRotation.BeginAnimation(RotateTransform.AngleProperty, animate
+            ? new DoubleAnimation(0, 360, duration) { RepeatBehavior = RepeatBehavior.Forever }
+            : null);
     }
 
     private static string GetText(string key, string fallback)
@@ -321,6 +365,7 @@ public partial class OperationProgressView : UserControl
         view.UpdateProgressSummary(
             (long)view.ProgressValue,
             total);
+        view.UpdateIndicatorAnimation();
     }
 
     private static void OnIsOperationActiveChanged(
@@ -348,6 +393,7 @@ public partial class OperationProgressView : UserControl
             if (view.UseDeferredVisibility)
                 _ = view._visibilityController.EndAsync();
         }
+        view.UpdateIndicatorAnimation();
     }
 
     private static void OnUseDeferredVisibilityChanged(

@@ -66,6 +66,7 @@ namespace Editors.Audio.Shared.Storage
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new AudioLoadProgress(0, 0, string.Empty, AudioLoadStage.DiscoveringBanks));
             var bankFiles = PackFileServiceUtility.FindAllWithExtentionIncludePaths(_packFileService, ".bnk");
             var bankFilesAsDictionary = bankFiles
                 .GroupBy(
@@ -100,8 +101,13 @@ namespace Editors.Audio.Shared.Storage
             var result = new Result();
             var startedCount = 0;
             var completedCount = 0;
+            progress?.Report(new AudioLoadProgress(0, wantedBnkFiles.Count, string.Empty));
 
-            var parallelOptions = new ParallelOptions { CancellationToken = cancellationToken };
+            var parallelOptions = new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount - 1, 1, 4),
+            };
             Parallel.ForEach(wantedBnkFiles, parallelOptions, bnkFile =>
             {
                 var filePath = bnkFile.Key;
@@ -140,6 +146,7 @@ namespace Editors.Audio.Shared.Storage
             });
 
             cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new AudioLoadProgress(0, 0, string.Empty, AudioLoadStage.BuildingIndex));
             result.PackFileByBnkName = new Dictionary<string, PackFile>(
                 packFileByBnkName,
                 StringComparer.OrdinalIgnoreCase);

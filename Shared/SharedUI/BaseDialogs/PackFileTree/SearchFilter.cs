@@ -44,6 +44,9 @@ namespace Shared.Ui.BaseDialogs.PackFileTree
         private Func<PackFile, bool>? _fileFilter;
         public int AutoExapandResultsAfterLimitedCount { get; set; } = 25;
 
+        internal bool IsUnfiltered => string.IsNullOrEmpty(FilterText) &&
+            !ShowFoldersOnly && _extensionFilter == null && _fileFilter == null;
+
         public SearchFilter(ObservableCollection<TreeNode> nodes)
         {
             _nodeCollection = nodes;

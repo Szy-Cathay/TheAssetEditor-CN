@@ -26,7 +26,7 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{Binding LeftColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition MinWidth="320" Width="{Binding RightColumnWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid.ColumnDefinitions>
 
@@ -96,7 +96,7 @@
             </ListView>
             </Expander>
 
-            <Rectangle Grid.Row="3" Fill="{DynamicResource AeBrush.Border}" Height="1" Margin="2"/>
+            <Rectangle Grid.Row="3" Fill="{DynamicResource AeBrush.Border}" Height="1"/>
 
             <ScrollViewer
                 Grid.Row="4"

@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
@@ -71,6 +71,7 @@ public sealed class OperationProgressWindowHost : FrameworkElement
 
     private OperationProgressWindow? _window;
     private Task _completionTask = Task.CompletedTask;
+    private Task _windowCloseTask = Task.CompletedTask;
     private readonly OperationProgressVisibilityController
         _visibilityController;
 
@@ -152,6 +153,8 @@ public sealed class OperationProgressWindowHost : FrameworkElement
 
     private void OnUnloaded(object sender, RoutedEventArgs eventArgs)
     {
+        _window?.Complete();
+        _window = null;
         _visibilityController.ForceHide();
     }
 
@@ -177,6 +180,12 @@ public sealed class OperationProgressWindowHost : FrameworkElement
 
         var owner = Window.GetWindow(this) ?? application?.MainWindow;
         _window = new OperationProgressWindow(this);
+        var window = _window;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_window, window))
+                _window = null;
+        };
         if (owner is { IsLoaded: true } && owner != _window)
             _window.Owner = owner;
         else
@@ -192,7 +201,13 @@ public sealed class OperationProgressWindowHost : FrameworkElement
 
         var window = _window;
         _window = null;
-        window.Complete();
+        _windowCloseTask = window.CompleteAsync();
+    }
+
+    private async Task EndAsync()
+    {
+        await _visibilityController.EndAsync();
+        await _windowCloseTask;
     }
 
     private static void OnIsOperationActiveChanged(
@@ -208,7 +223,7 @@ public sealed class OperationProgressWindowHost : FrameworkElement
         }
         else
         {
-            host._completionTask = host._visibilityController.EndAsync();
+            host._completionTask = host.EndAsync();
         }
     }
 }

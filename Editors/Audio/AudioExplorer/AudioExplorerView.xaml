@@ -180,29 +180,12 @@
                     Grid.ColumnSpan="2"
                     Margin="0, 0, 0, 3"
                     Text="{Binding LoadStatus}"
-                    TextWrapping="Wrap">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Style.Triggers>
-                                <DataTrigger
-                                    Binding="{Binding IsLoading}"
-                                    Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                                <DataTrigger
-                                    Binding="{Binding IsExporting}"
-                                    Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+                    TextWrapping="Wrap" />
 
                 <progress:OperationProgressWindowHost
                     Grid.Row="1"
                     Grid.Column="0"
-                    CancelCommand="{Binding LoadAudioRepositoryForSelectedLanguagesCancelCommand}"
+                    CancelCommand="{Binding CancelLoadingCommand}"
                     CancelText="{loc:Loc AudioExplorer.CancelLoading}"
                     CurrentDetailText="{Binding LoadProgressDetail}"
                     IsOperationActive="{Binding IsLoadProgressWindowActive}"
@@ -342,7 +325,7 @@
 
                 <TreeView.ItemContainerStyle>
                     <Style 
-                        TargetType="{x:Type TreeViewItem}">
+                        TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
                         <Setter 
                             Property="IsExpanded" 
                             Value="{Binding IsExpanded}"/>
@@ -376,6 +359,7 @@
                                             BorderBrush="{TemplateBinding BorderBrush}" 
                                             BorderThickness="{TemplateBinding BorderThickness}" 
                                             Background="{TemplateBinding Background}" 
+                                            CornerRadius="{StaticResource AeRadius.Control}"
                                             Grid.Column="1"
                                             Padding="{TemplateBinding Padding}" 
                                             SnapsToDevicePixels="true">
@@ -408,6 +392,10 @@
                                                 TargetName="Expander" 
                                                 Value="Hidden"/>
                                         </Trigger>
+                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Bd}" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+                                        </DataTrigger>
                                         <Trigger 
                                             Property="IsSelected" 
                                             Value="true">
@@ -418,7 +406,7 @@
                                             <Setter 
                                                 Property="BorderBrush" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource AeBrush.Accent}"/>
+                                                Value="Transparent"/>
                                             <Setter 
                                                 Property="Foreground" 
                                                 Value="{DynamicResource AeBrush.TextPrimary}"/>
@@ -435,14 +423,14 @@
                                             <Setter 
                                                 Property="Background" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource AeBrush.SurfaceHover}"/>
+                                                Value="{DynamicResource AeBrush.AccentSoft}"/>
                                             <Setter 
                                                 Property="BorderBrush" 
                                                 TargetName="Bd" 
-                                                Value="{DynamicResource AeBrush.BorderStrong}"/>
+                                                Value="Transparent"/>
                                             <Setter 
                                                 Property="Foreground" 
-                                                Value="{DynamicResource AeBrush.TextMuted}"/>
+                                                Value="{DynamicResource AeBrush.TextPrimary}"/>
                                         </MultiTrigger>
                                         <Trigger 
                                             Property="IsEnabled" 
@@ -477,7 +465,7 @@
 
             <Border
                 Grid.Row="8"
-                Padding="8, 7, 8, 8"
+                Padding="8,4"
                 BorderBrush="{DynamicResource AeBrush.Border}"
                 BorderThickness="0, 1, 0, 0"
                 Background="{DynamicResource AeBrush.Surface1}"
@@ -590,7 +578,6 @@
         <GridSplitter
             Grid.Row="0"
             Grid.Column="1" 
-            Width="5" 
             Style="{StaticResource AeVerticalGridSplitterStyle}"
             VerticalAlignment="Stretch" 
             HorizontalAlignment="Center"
@@ -611,7 +598,7 @@
 
             <Label 
                 Grid.Row="0"
-                Padding="5, 5, 5, 7"
+                Padding="8,4"
                 Content="{Binding WwiseObjectLabel}"
                 Background="{DynamicResource AeBrush.Canvas}"
                 BorderBrush="{DynamicResource AeBrush.Border}"
@@ -619,7 +606,7 @@
             
             <ScrollViewer
                 Grid.Row="1"
-                Padding="10, 10, 10, 10">
+                Padding="4">
                 <TextBox 
                     DockPanel.Dock="Top"
                     IsReadOnly="True" 

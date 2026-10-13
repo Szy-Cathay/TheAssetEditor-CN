@@ -91,34 +91,22 @@ namespace Editors.Audio.Shared.Storage
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var loadedData = false;
-
             if (!IsCurrentGameSupported)
                 return;
 
             var loadDatData = !_isDatDataLoaded;
             var loadBnkData = !_loadedBnkDataLanguages.SetEquals(languages);
 
-            if (loadDatData || loadBnkData)
-                MemoryOptimiser.LogMemory("Before loading AudioRepository");
-
             if (loadDatData)
             {
+                progress?.Report(new AudioLoadProgress(0, 0, string.Empty, AudioLoadStage.ReadingMetadata));
                 LoadDatData();
-                loadedData = true;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             if (loadBnkData)
             {
                 LoadBnkData(languages, progress, cancellationToken);
-                loadedData = true;
-            }
-
-            if (loadedData)
-            {
-                MemoryOptimiser.Optimise();
-                MemoryOptimiser.LogMemory("After loading AudioRepository");
             }
         }
 
