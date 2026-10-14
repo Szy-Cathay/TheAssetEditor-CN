@@ -34,7 +34,7 @@ public partial class OperationProgressView : UserControl
 
     public static readonly DependencyProperty ShowDetailsProperty =
         DependencyProperty.Register(nameof(ShowDetails), typeof(bool),
-            typeof(OperationProgressView), new PropertyMetadata(true));
+            typeof(OperationProgressView), new PropertyMetadata(true, OnShowDetailsChanged));
 
     public static readonly DependencyProperty StatusTextProperty =
         DependencyProperty.Register(
@@ -341,6 +341,23 @@ public partial class OperationProgressView : UserControl
     private static string GetText(string key, string fallback)
     {
         return LocalizationManager.Instance?.Get(key) ?? fallback;
+    }
+
+    private static void OnShowDetailsChanged(
+        DependencyObject dependencyObject,
+        DependencyPropertyChangedEventArgs eventArgs)
+    {
+        var view = (OperationProgressView)dependencyObject;
+        if ((bool)eventArgs.NewValue)
+        {
+            // Restore the host's implicit style instead of forcing details visible.
+            view.DetailsExpander.ClearValue(VisibilityProperty);
+        }
+        else
+        {
+            view.DetailsExpander.SetCurrentValue(VisibilityProperty, Visibility.Collapsed);
+            view.DetailsExpander.SetCurrentValue(Expander.IsExpandedProperty, false);
+        }
     }
 
     private static void OnCurrentDetailTextChanged(

@@ -188,6 +188,47 @@ public class InlineLoadingAndPlaybackViewTests
         });
     }
 
+    [TestCase(ThemeType.DarkTheme)]
+    [TestCase(ThemeType.LightTheme)]
+    [TestCase(ThemeType.HighContrastDark)]
+    [TestCase(ThemeType.HighContrastLight)]
+    public void ProgressDetails_PreservesHostImplicitStyleWhenDetailsAreAllowed(ThemeType theme)
+    {
+        WithTheme(theme, () =>
+        {
+            var windowCount = Application.Current.Windows.Count;
+            var progress = new OperationProgressView { UseDeferredVisibility = false };
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Visible));
+
+            var hostStyle = new Style(typeof(Expander), (Style)progress.FindResource(typeof(Expander)));
+            hostStyle.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+            progress.Resources[typeof(Expander)] = hostStyle;
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Collapsed),
+                "The startup host hides details through a local implicit style after construction.");
+
+            progress.ShowDetails = false;
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Collapsed));
+            NUnitAssert.That(progress.IsDetailsExpanded, Is.False);
+            progress.ShowDetails = true;
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Collapsed));
+
+            progress.Resources.Remove(typeof(Expander));
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Visible));
+            progress.ShowDetails = false;
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Collapsed));
+            progress.ShowDetails = true;
+            Layout(progress, 500);
+            NUnitAssert.That(progress.DetailsExpander.Visibility, Is.EqualTo(Visibility.Visible));
+            NUnitAssert.That(Application.Current.Windows.Count, Is.EqualTo(windowCount));
+        });
+    }
+
     [Test]
     public void HistoryLoading_StaysInsideSidebarContentColumn()
     {
