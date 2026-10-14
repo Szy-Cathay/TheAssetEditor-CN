@@ -332,7 +332,7 @@ rg -n '<(Button|ToggleButton|TextBox|ComboBox|TreeView|DataGrid|ProgressBar)\b' 
 4. 新增所有中文资源键、ToolTip 和自动化名称。
 5. 为默认、悬停、按下、禁用、选中、错误、空、加载等实际状态补测试。
 6. UI 资源或主题变更使用 `WpfTestApplicationHost`；公共边界变更运行 `SharedUiArchitectureTests`。
-7. 运行受影响项目 Release 构建、相关测试和 `git diff --check`；跨模块 UI 变更执行完整 Release 构建与完整测试。桌面输入用例受第 8 节的单独授权边界约束；用户要求停止后复用已有结果，保留失败、跳过和中止记录，不将局部通过写成整套通过。
+7. 本地运行受影响项目 Debug 构建、相关测试和 `git diff --check`；跨模块 UI 变更在本地执行完整 Debug 构建与完整测试。线上 CI 使用 Release；正式发布时按根 `AGENTS.md` 执行完整 Release 验证。CI 的编译配置不代表发布或发布授权。桌面输入用例受第 8 节的单独授权边界约束；用户要求停止后复用已有结果，保留失败、跳过和中止记录，不将局部通过写成整套通过。
 8. 交给用户在真实应用中完成主题、DPI、字体、窗口尺寸和交互验收。
 
 ## 12. 禁止项

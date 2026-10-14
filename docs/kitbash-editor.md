@@ -412,7 +412,7 @@ Mesh Fitter 调参时使用实时预览，确认只写入一次，取消恢复�
 | 节点属性/树 | `SceneNodeEditor*Tests` | 多选、空选、右键菜单、属性面板生命周期 |
 | 加载/保存 | `LoadAndSave/`、SaveDialog 与 round-trip 测试 | 用真实 Pack 文件重开并核对游戏内语义 |
 | 子工具 | 对应 MeshFitter/Pin/ReRigging/PhotoStudio 测试 | 子窗口关闭、主编辑器切换、实际输出 |
-| UI/XAML | 布局/本地化测试、Release 构建 | 实际中文界面、缩放、主题和焦点 |
+| UI/XAML | 布局/本地化测试、本地 Debug 构建；线上 CI 与正式发布使用 Release | 实际中文界面、缩放、主题和焦点 |
 
 如果修改了共享 View3D，再运行所有受影响调用者的测试和架构门禁。UI、轮廓、材质或离屏渲染的自动测试只能说明已覆盖的契约；最终外观必须经过本地视觉验收。
 

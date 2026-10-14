@@ -18,7 +18,7 @@ namespace AssetEditorTests
     public class StandardDialogMigrationTests
     {
         [Test]
-        public void AnimationBatchExporter_NoEditablePack_UsesStandardDialog()
+        public async Task AnimationBatchExporter_NoEditablePack_UsesStandardDialog()
         {
             _ = new LocalizationManager();
             var packFileService = new Mock<IPackFileService>();
@@ -30,7 +30,7 @@ namespace AssetEditorTests
                 Mock.Of<ISkeletonAnimationLookUpHelper>(),
                 dialogs.Object);
 
-            viewModel.Process();
+            await viewModel.Process();
 
             dialogs.Verify(service => service.ShowDialogBox(
                 It.IsAny<string>(),
@@ -41,8 +41,7 @@ namespace AssetEditorTests
         }
 
         [Test]
-        [Apartment(ApartmentState.STA)]
-        public void AnimationBatchExporter_Confirmed_ShowsResultsWithStandardDialog()
+        public void AnimationBatchExporter_Errors_UsesStandardResultDialog()
         {
             _ = new LocalizationManager();
             var editablePack = new PackFileContainer("output.pack");
@@ -61,10 +60,12 @@ namespace AssetEditorTests
                 Mock.Of<ISkeletonAnimationLookUpHelper>(),
                 dialogs.Object);
 
-            viewModel.Process();
+            var errors = new ErrorList();
+            errors.Error("test.anim", "Invalid animation");
+            viewModel.ShowResults(errors);
 
             dialogs.Verify(service => service.ShowErrorViewDialog(
-                "Bach result",
+                LocalizationManager.Instance.Get("AnimBatchExport.Results"),
                 It.IsAny<ErrorList>(),
                 true), Times.Once);
         }

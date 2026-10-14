@@ -108,13 +108,15 @@ Asset Editor 国区版是一款运行在 Windows 上的《全面战争》系列�
 - Windows
 - .NET 10 SDK
 
+本地开发、调试和人工验收使用正常 `Debug` 输出；线上 CI（PR、`master` 推送的自动构建与测试）使用 `Release`；正式发布的构建与打包也使用 `Release`，完整流程见[版本发布说明](docs/release.md)。CI 的 `Release` 仅表示编译配置，不代表发布或发布授权。测试范围和桌面输入授权遵守 [AGENTS.md](AGENTS.md) 的构建与验证规则。以下为本地构建示例：
+
 ```powershell
 git clone https://github.com/Szy-Cathay/TheAssetEditor-CN.git
 cd TheAssetEditor-CN
 
 dotnet restore AssetEditor.CN.sln
-dotnet build AssetEditor.CN.sln --configuration Release --no-restore
-dotnet test AssetEditor.CN.sln --configuration Release --no-build --no-restore --verbosity normal
+dotnet build AssetEditor.CN.sln --configuration Debug --no-restore
+dotnet test AssetEditor.CN.sln --configuration Debug --no-build --no-restore --verbosity normal
 ```
 
 ## 4. 致谢
