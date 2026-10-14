@@ -697,7 +697,7 @@ public class UiModelKitbashFamilyTests
                         window.UpdateLayout();
 
                         var selectorArea = FindVisualDescendants<Expander>(view)
-                            .Single();
+                            .Single(expander => expander.Name == "AnimationSelectorsExpander");
                         selectorArea.IsExpanded = true;
                         window.UpdateLayout();
 

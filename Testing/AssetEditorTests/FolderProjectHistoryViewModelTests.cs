@@ -1256,7 +1256,7 @@ public class FolderProjectHistoryViewModelTests
             NUnitAssert.That(
                 document.Descendants()
                     .Any(item => item.Name.LocalName ==
-                                 "OperationProgressWindowHost"),
+                                 "OperationProgressView"),
                 Is.True);
             NUnitAssert.That(source, Does.Contain("AeButton.Primary"));
             NUnitAssert.That(source, Does.Contain("AeButton.Secondary"));

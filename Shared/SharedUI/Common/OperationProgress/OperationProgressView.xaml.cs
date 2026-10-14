@@ -32,6 +32,10 @@ public partial class OperationProgressView : UserControl
         DependencyProperty.Register(nameof(UseLeadingIndicator), typeof(bool),
             typeof(OperationProgressView), new PropertyMetadata(false));
 
+    public static readonly DependencyProperty ShowDetailsProperty =
+        DependencyProperty.Register(nameof(ShowDetails), typeof(bool),
+            typeof(OperationProgressView), new PropertyMetadata(true));
+
     public static readonly DependencyProperty StatusTextProperty =
         DependencyProperty.Register(
             nameof(StatusText),
@@ -124,6 +128,12 @@ public partial class OperationProgressView : UserControl
     {
         get => (bool)GetValue(UseLeadingIndicatorProperty);
         set => SetValue(UseLeadingIndicatorProperty, value);
+    }
+
+    public bool ShowDetails
+    {
+        get => (bool)GetValue(ShowDetailsProperty);
+        set => SetValue(ShowDetailsProperty, value);
     }
 
     public string StatusText
@@ -380,7 +390,8 @@ public partial class OperationProgressView : UserControl
                 view._detailHistory.Add(view.CurrentDetailText);
             view._stopwatch.Restart();
             view._elapsedTimer.Start();
-            view.UpdateProgressSummary(0, 0);
+            view.UpdateProgressSummary((long)view.ProgressValue,
+                view.IsProgressIndeterminate ? 0 : (long)view.ProgressMaximum);
             if (view.UseDeferredVisibility)
                 view._visibilityController.Begin();
             else

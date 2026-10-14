@@ -119,6 +119,16 @@
             Expanded="OnDetailsExpansionChanged"
             Header="{Binding ElementName=ProgressView, Path=DetailsHeaderText}"
             Collapsed="OnDetailsExpansionChanged">
+            <Expander.Style>
+                <Style TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ElementName=ProgressView, Path=ShowDetails}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="IsExpanded" Value="False" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Expander.Style>
             <Border
                 Margin="0,8,0,0"
                 Style="{StaticResource AeWorkflow.ProgressHistory}">

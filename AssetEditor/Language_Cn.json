@@ -1735,6 +1735,7 @@
 
   "SharedAnimPlayer.MainAnimation": "主动画",
   "SharedAnimPlayer.Player": "播放器",
+  "SharedAnimPlayer.Title": "动画播放器",
   "SharedAnimPlayer.Frames": "帧",
   "SharedAnimPlayer.Loop": "循环",
   "SharedAnimPlayer.Seconds": " 秒",

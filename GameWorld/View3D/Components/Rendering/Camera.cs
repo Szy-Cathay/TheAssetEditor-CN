@@ -26,8 +26,8 @@ namespace GameWorld.Core.Components.Rendering
         public ArcBallCamera(IDeviceResolver deviceResolverComponent, IKeyboardComponent keyboardComponent, IMouseComponent mouseComponent)
         {
             Zoom = 10;
-            Yaw = 0.8f;
-            Pitch = 0.32f;
+            Yaw = MathHelper.ToRadians(26);
+            Pitch = MathHelper.ToRadians(-24);
             UpdateOrder = (int)ComponentUpdateOrderEnum.Camera;
 
             _deviceResolverComponent = deviceResolverComponent;

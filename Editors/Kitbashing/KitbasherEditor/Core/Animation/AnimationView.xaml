@@ -17,60 +17,36 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
-                <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <Border
+        BorderBrush="{DynamicResource AeBrush.Border}"
+        BorderThickness="0,1,0,0">
+        <Expander
+            x:Name="AnimationPlayerExpander"
+            Padding="8,4"
+            Header="{loc:Loc SharedAnimPlayer.Title}"
+            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.Title}"
+            IsExpanded="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+            <Grid
+                Margin="0,4,0,4"
+                Visibility="{Binding AnimationControllerVisability.Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-        <Border
-            Grid.Row="0"
-            Padding="8,4,8,3"
-            BorderBrush="{DynamicResource AeBrush.Border}"
-            BorderThickness="0,1,0,0">
-            <StackPanel
-                HorizontalAlignment="Center"
-                Orientation="Horizontal">
-                <TextBlock
-                    Margin="0,0,8,0"
-                    VerticalAlignment="Center"
-                    Text="{loc:Loc AnimationView.Animation}" />
-                <ToggleButton
-                    IsChecked="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    Style="{StaticResource AeInput.Switch}" />
-            </StackPanel>
-        </Border>
-
-        <Grid
-            Grid.Row="1"
-            Margin="8,2,8,8"
-            Visibility="{Binding AnimationControllerVisability.Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <Border
-                Grid.Row="0"
-                Padding="6"
-                Background="{DynamicResource AeBrush.Surface2}"
-                BorderBrush="{DynamicResource AeBrush.Border}"
-                BorderThickness="1"
-                CornerRadius="{StaticResource AeRadius.Control}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <StackPanel
-                        Grid.Column="0"
+                        x:Name="PlaybackCommandRow"
+                        HorizontalAlignment="Center"
                         Orientation="Horizontal">
                         <Button
                             Command="{Binding FirstFrameCommand}"
@@ -132,93 +108,99 @@
                             </Canvas>
                         </Button>
                     </StackPanel>
-                    <TextBlock
-                        Grid.Column="1"
-                        Margin="12,0"
-                        VerticalAlignment="Center">
-                        <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
-                        <Run Text="{Binding CurrentFrame}" />
-                        <Run Text=" / " />
-                        <Run Text="{Binding MaxFrames}" />
-                    </TextBlock>
+                    <WrapPanel
+                        x:Name="PlaybackInformationRow"
+                        Grid.Row="1"
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Center">
+                        <TextBlock
+                            Margin="8,0"
+                            VerticalAlignment="Center">
+                            <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
+                            <Run Text="{Binding CurrentFrame}" />
+                            <Run Text=" / " />
+                            <Run Text="{Binding MaxFrames}" />
+                        </TextBlock>
+                        <TextBlock
+                            Margin="8,0"
+                            VerticalAlignment="Center">
+                            <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
+                            <Run Text="{Binding PlaybackPositionSeconds, Mode=OneWay, StringFormat=N2}" />
+                            <Run Text=" / " />
+                            <Run Text="{Binding MaxTimeSeconds, Mode=OneWay, StringFormat=N2}" />
+                            <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
+                        </TextBlock>
+                    </WrapPanel>
                     <Slider
-                        Grid.Column="2"
+                        x:Name="PlaybackTimelineRow"
+                        Grid.Row="2"
+                        Margin="0,4,0,0"
                         Maximum="{Binding MaxTimeSeconds, Mode=OneWay}"
                         Style="{StaticResource AeEditor.PlaybackSlider}"
                         Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock
-                        Grid.Column="3"
-                        Margin="12,0,4,0"
-                        VerticalAlignment="Center">
-                        <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
-                        <Run Text="{Binding PlaybackPositionSeconds, Mode=OneWay, StringFormat=N2}" />
-                        <Run Text=" / " />
-                        <Run Text="{Binding MaxTimeSeconds, Mode=OneWay, StringFormat=N2}" />
-                        <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
-                    </TextBlock>
                 </Grid>
-            </Border>
 
-            <Border
-                Grid.Row="1"
-                Margin="0,4,0,0"
-                Background="{DynamicResource AeBrush.Surface2}"
-                BorderBrush="{DynamicResource AeBrush.Border}"
-                BorderThickness="1"
-                CornerRadius="{StaticResource AeRadius.Control}">
-                <Expander>
-                    <Expander.Header>
-                        <TextBlock
-                            FontWeight="SemiBold"
-                            TextTrimming="CharacterEllipsis">
-                            <Run Text="{Binding HeaderText, UpdateSourceTrigger=PropertyChanged}" />
-                            <Run Text="{Binding SelectedAnimation.FullPath, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}" />
-                        </TextBlock>
-                    </Expander.Header>
-                    <Grid Margin="6,4,6,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="78" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <TextBlock
-                            Grid.Row="0"
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            Text="{loc:Loc AnimationView.ExternalSkeleton}" />
-                        <filterdialog:CollapsableFilterControl
-                            Grid.Row="0"
-                            Grid.Column="1"
-                            IsEnabled="True"
-                            IsManipulationEnabled="False"
-                            LabelText="{loc:Loc AnimationView.ExternalSkeleton}"
-                            LabelTotalWidth="0"
-                            OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"
-                            SearchItems="{Binding SkeletonList, UpdateSourceTrigger=PropertyChanged}"
-                            SelectedItem="{Binding SelectedSkeleton, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                            ShowLabel="False" />
-                        <TextBlock
-                            Grid.Row="1"
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            Text="{loc:Loc AnimationView.TargetAnim}" />
-                        <filterdialog:CollapsableFilterControl
-                            Grid.Row="1"
-                            Grid.Column="1"
-                            MaxHeight="400"
-                            IsManipulationEnabled="False"
-                            LabelText="{loc:Loc AnimationView.TargetAnim}"
-                            LabelTotalWidth="0"
-                            OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"
-                            SearchItems="{Binding AnimationsForCurrentSkeleton, UpdateSourceTrigger=PropertyChanged}"
-                            SelectedItem="{Binding SelectedAnimation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                            ShowLabel="False" />
-                    </Grid>
-                </Expander>
-            </Border>
-        </Grid>
-    </Grid>
+                <Border
+                    Grid.Row="1"
+                    Margin="0,4,0,0"
+                    Background="{DynamicResource AeBrush.Surface2}"
+                    BorderBrush="{DynamicResource AeBrush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource AeRadius.Control}">
+                    <Expander x:Name="AnimationSelectorsExpander">
+                        <Expander.Header>
+                            <TextBlock
+                                FontWeight="SemiBold"
+                                TextTrimming="CharacterEllipsis">
+                                <Run Text="{Binding HeaderText, UpdateSourceTrigger=PropertyChanged}" />
+                                <Run Text="{Binding SelectedAnimation.FullPath, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </TextBlock>
+                        </Expander.Header>
+                        <Grid Margin="6,4,6,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="78" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Text="{loc:Loc AnimationView.ExternalSkeleton}" />
+                            <filterdialog:CollapsableFilterControl
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                IsEnabled="True"
+                                IsManipulationEnabled="False"
+                                LabelText="{loc:Loc AnimationView.ExternalSkeleton}"
+                                LabelTotalWidth="0"
+                                OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"
+                                SearchItems="{Binding SkeletonList, UpdateSourceTrigger=PropertyChanged}"
+                                SelectedItem="{Binding SelectedSkeleton, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                ShowLabel="False" />
+                            <TextBlock
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Text="{loc:Loc AnimationView.TargetAnim}" />
+                            <filterdialog:CollapsableFilterControl
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                MaxHeight="400"
+                                IsManipulationEnabled="False"
+                                LabelText="{loc:Loc AnimationView.TargetAnim}"
+                                LabelTotalWidth="0"
+                                OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"
+                                SearchItems="{Binding AnimationsForCurrentSkeleton, UpdateSourceTrigger=PropertyChanged}"
+                                SelectedItem="{Binding SelectedAnimation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                ShowLabel="False" />
+                        </Grid>
+                    </Expander>
+                </Border>
+            </Grid>
+        </Expander>
+    </Border>
 </UserControl>
