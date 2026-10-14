@@ -31,6 +31,7 @@ public class OperationProgressViewTests
     [
         (["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"], 1),
         (["AssetEditor", "Views", "MainWindow.xaml"], 1),
+        (["Editors", "AnimationFragmentEditor", "Editor.AnimationFragmentEditor", "AnimationBatchExporter", "AnimationBatchExportView.xaml"], 1),
         (["Editors", "AnimationReTarget", "Editors.AnimatioReTarget", "Editor", "Saving", "SaveWindow.xaml"], 1),
         (["Editors", "Audio", "AudioEditor", "Presentation", "NewAudioProject", "NewAudioProjectWindow.xaml"], 1),
         (["Editors", "Audio", "AudioProjectConverter", "AudioProjectConverterWindow.xaml"], 1),

@@ -11,8 +11,11 @@ using AssetEditor.Services.Settings;
 using Editors.AnimationMeta.SuperView.Inspection;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using NUnit.Framework;
 using Shared.Core.Services;
+using Shared.Core.PackFiles;
+using Shared.Core.PackFiles.Models;
 using Shared.Core.Settings;
 using Shared.Ui.Common.DataTemplates;
 using Shared.Ui.Common.ValueConverters;
@@ -587,24 +590,21 @@ public class UiAnimationMetadataFamilyGallery
         return layout;
     }
 
-    private static GalleryModel CreateBatchExportModel() => new()
+    private static object CreateBatchExportModel()
     {
-        PackfileList = new[]
-        {
-            new GalleryModel
-            {
-                Process = new GalleryModel { Value = true },
-                Name = new GalleryModel { Value = "帝国将军.pack" },
-            },
-            new GalleryModel
-            {
-                Process = new GalleryModel { Value = false },
-                Name = new GalleryModel { Value = "动画补丁.pack" },
-            },
-        },
-        PossibleOutputFormats = new[] { "ANIM v7", "ANIM v6" },
-        SelectedOutputFormat = new GalleryModel { Value = "ANIM v7" },
-    };
+        var source = new PackFileContainer("帝国将军.pack");
+        source.FileList.Add(@"animations\units\general_idle.anim", PackFile.CreateFromBytes("general_idle.anim", []));
+        source.FileList.Add(@"animations\units\general_walk.anim", PackFile.CreateFromBytes("general_walk.anim", []));
+        var output = new PackFileContainer("我的动画工程") { SystemFilePath = @"D:\Mods\我的动画工程" };
+        var service = new Mock<IPackFileService>();
+        service.Setup(x => x.GetAllPackfileContainers()).Returns([output, source]);
+        service.Setup(x => x.GetEditablePack()).Returns(output);
+        var model = new CommonControls.Editors.AnimationBatchExporter.AnimationBatchExportViewModel(
+            service.Object, Mock.Of<GameWorld.Core.Services.ISkeletonAnimationLookUpHelper>(), Mock.Of<IStandardDialogs>());
+        model.PackfileList.Single().Process.Value = true;
+        model.Animations.First().IsSelected.Value = true;
+        return model;
+    }
 
     private static GalleryModel CreateAnimationPackModel()
     {

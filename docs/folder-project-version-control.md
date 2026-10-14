@@ -145,4 +145,4 @@ ViewModel 不应直接拼接批量文件系统操作或调用 `LibGit2Sharp.Comm
 - `Testing/AssetEditorTests/FolderProjectCloseGuardTests.cs`
 - `Testing/AssetEditorTests/FolderProjectTreeStateTests.cs`
 
-状态语义变化先建立行为测试。真实窗口、watcher 时序、长操作或大型目录还需要 Release 应用实测；单元测试不能替代视觉、并发和性能验收。
+状态语义变化先建立行为测试。真实窗口、watcher 时序、长操作或大型目录还需要应用实测，本地开发和人工验收使用 Debug，线上 CI 与正式发布使用 Release；桌面操作遵守根 `AGENTS.md` 的单独授权边界。单元测试不能替代视觉、并发和性能验收。
