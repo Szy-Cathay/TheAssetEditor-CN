@@ -1,4 +1,4 @@
-using Editors.Shared.Core.Common;
+﻿using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.AnimationPlayer;
 using Editors.Shared.Core.Common.BaseControl;
 using GameWorld.Core.Animation;
@@ -122,6 +122,48 @@ public class AnimationPlayerViewModelTests
         });
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void SeekingToEnd_DoesNotRestartLoopOrChangePlaybackState(bool playing)
+    {
+        var scene = CreateSceneObject("main", 10, 1);
+        var model = new AnimationPlayerViewModel();
+        model.RegisterAsset(scene);
+        model.IsEnabled.Value = true;
+        if (!playing)
+            model.ToggleAnimationPausePlay();
+
+        model.PlaybackPositionSeconds = 1;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scene.Player.CurrentTime, Is.EqualTo(TimeSpan.FromSeconds(1)));
+            Assert.That(model.PlaybackPositionSeconds, Is.EqualTo(1));
+            Assert.That(scene.Player.IsPlaying, Is.EqualTo(playing));
+        });
+    }
+    [Test]
+    public void Scrubbing_FreezesAllPlayersAndMetadataAtTheLatestTime()
+    {
+        var first = CreateSceneObject("main", 10, 1);
+        var second = CreateSceneObject("reference", 20, 2);
+        var metadata = CreateSceneObject("metadata", 10, 1);
+        first.MetaDataItems.Add(new TestMetaDataInstance(metadata.Player));
+        var model = new AnimationPlayerViewModel();
+        model.RegisterAsset(first);
+        model.RegisterAsset(second);
+        model.IsEnabled.Value = true;
+        model.IsScrubbing = true;
+        model.PlaybackPositionSeconds = 0.4f;
+        foreach (var player in new[] { first.Player, second.Player, metadata.Player })
+        {
+            player.Update(new GameTime(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(0.1)));
+            Assert.That(player.CurrentTime.TotalSeconds, Is.EqualTo(0.4).Within(0.000001));
+            Assert.That(player.IsScrubbing, Is.True);
+        }
+        model.IsScrubbing = false;
+        Assert.That(new[] { first.Player, second.Player, metadata.Player }.All(player => !player.IsScrubbing), Is.True);
+    }
     private static SceneObject CreateSceneObject(
         string id,
         int frameCount,

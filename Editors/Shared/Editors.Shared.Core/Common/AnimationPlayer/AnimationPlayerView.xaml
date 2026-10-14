@@ -6,7 +6,8 @@
              xmlns:local="clr-namespace:AnimationEditor.Common.AnimationPlayer"
              xmlns:basecontrol="clr-namespace:Editors.Shared.Core.Common.BaseControl"
               xmlns:s="http://schemas.singulink.com/xaml"
-             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+             xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              mc:Ignorable="d"
              d:DesignWidth="800"
              Foreground="{DynamicResource AeBrush.TextPrimary}"
@@ -25,7 +26,7 @@
         BorderBrush="{DynamicResource AeBrush.Border}"
         BorderThickness="0,1,0,0">
         <Expander
-            x:Name="AnimationPlayerExpander"
+            x:Name="AnimationPlayerExpander" Style="{StaticResource AeEditor.PlaybackExpander}"
             Padding="8,4"
             IsExpanded="{Binding IsEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
             Header="{loc:Loc SharedAnimPlayer.Title}"
@@ -165,7 +166,7 @@
                     </Grid.RowDefinitions>
                     <Slider
                         Maximum="{Binding SelectedAnimationMaxTime.Value, Mode=OneWay}"
-                        Style="{StaticResource AeEditor.PlaybackSlider}"
+                        Style="{StaticResource AeEditor.PlaybackSlider}" behaviors:SliderScrubbing.IsScrubbing="{Binding IsScrubbing, Mode=TwoWay}"
                         Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <ContentControl
                         Grid.Row="1"

@@ -31,7 +31,13 @@ namespace KitbasherEditor.Views
             };
         }
 
-        private void SidebarOverlay_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateStatisticsPosition();
+        private void SidebarOverlay_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var radius = (CornerRadius)SidebarOverlay.FindResource("AeRadius.Control");
+            SidebarOverlay.Clip = new System.Windows.Media.RectangleGeometry(
+                new Rect(SidebarOverlay.RenderSize), radius.TopLeft, radius.TopLeft);
+            UpdateStatisticsPosition();
+        }
 
         private void UpdateStatisticsPosition()
         {

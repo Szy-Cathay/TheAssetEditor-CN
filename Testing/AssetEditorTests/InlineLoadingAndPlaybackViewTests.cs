@@ -47,6 +47,10 @@ public class InlineLoadingAndPlaybackViewTests
                     NUnitAssert.That(expander.Header, Is.EqualTo("动画播放器"));
                     NUnitAssert.That(AutomationProperties.GetName(expander), Is.EqualTo("动画播放器"));
                     NUnitAssert.That(header.ActualWidth, Is.GreaterThan(width - 32));
+                    var title = Descendants<TextBlock>(header).Single();
+                    var titleBounds = title.TransformToAncestor(header).TransformBounds(new Rect(title.RenderSize));
+                    NUnitAssert.That(titleBounds.Left + titleBounds.Width / 2, Is.EqualTo(header.ActualWidth / 2).Within(1));
+                    NUnitAssert.That(Descendants<System.Windows.Shapes.Path>(header), Is.Empty);
                     NUnitAssert.That(header.Focusable, Is.True, "Keep the original switch's keyboard accessibility.");
                     Render(view, $"{theme}-{view.GetType().Namespace}-{width}-collapsed");
                     var hit = VisualTreeHelper.HitTest(header,
@@ -425,6 +429,7 @@ public class InlineLoadingAndPlaybackViewTests
     {
         public bool IsEnabled { get; set; }
         public bool IsPlaying => true;
+        public bool IsScrubbing { get; set; }
         public NotifyAttr<Visibility> AnimationControllerVisability { get; } = new(Visibility.Visible);
         public int CurrentFrame { get; set; } = 19;
         public int MaxFrames { get; set; } = 47;

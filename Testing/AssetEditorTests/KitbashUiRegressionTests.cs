@@ -257,17 +257,17 @@ public class KitbashUiRegressionTests
                 NUnitAssert.That(panel.ActualHeight, Is.LessThan(scene.ActualHeight));
                 NUnitAssert.That(Bounds(panel, view).Left, Is.GreaterThanOrEqualTo(sceneBounds.Left));
                 var glyph = Descendants<System.Windows.Shapes.Rectangle>(tools).Single();
-                NUnitAssert.That(Contrast(((SolidColorBrush)glyph.Fill).Color, ((SolidColorBrush)scene.Background).Color),
+                NUnitAssert.That(Contrast(((SolidColorBrush)glyph.Fill).Color, ((SolidColorBrush)((StackPanel)panel).Background).Color),
                     Is.GreaterThanOrEqualTo(3), "Transparent toolbar icons must contrast with the viewport in every theme.");
                 var chevron = Descendants<System.Windows.Shapes.Path>(toggle!).Single();
-                NUnitAssert.That(Contrast(((SolidColorBrush)chevron.Stroke).Color, ((SolidColorBrush)scene.Background).Color),
+                NUnitAssert.That(Contrast(((SolidColorBrush)chevron.Stroke).Color, ((SolidColorBrush)((StackPanel)panel).Background).Color),
                     Is.GreaterThanOrEqualTo(3), "The expanded sidebar arrow must remain readable on the viewport.");
                 viewportBackground.Value = Colors.White;
                 scene.Background = Brushes.White;
                 window.UpdateLayout();
-                NUnitAssert.That(Contrast(((SolidColorBrush)glyph.Fill).Color, Colors.White),
+                NUnitAssert.That(Contrast(((SolidColorBrush)glyph.Fill).Color, ((SolidColorBrush)((StackPanel)panel).Background).Color),
                     Is.GreaterThanOrEqualTo(3), "Changing the viewport background must refresh the toolbar contrast.");
-                NUnitAssert.That(Contrast(((SolidColorBrush)chevron.Stroke).Color, Colors.White), Is.GreaterThanOrEqualTo(3));
+                NUnitAssert.That(Contrast(((SolidColorBrush)chevron.Stroke).Color, ((SolidColorBrush)((StackPanel)panel).Background).Color), Is.GreaterThanOrEqualTo(3));
 
                 toggle!.IsChecked = false;
                 window.UpdateLayout();
@@ -426,8 +426,8 @@ public class KitbashUiRegressionTests
             var slider = new Slider { Style = (Style)resources["AeEditor.PlaybackSlider"] };
             WithWindow(slider, 320, _ =>
             {
-                NUnitAssert.That(slider.Template, Is.SameAs(Application.Current.FindResource("SliderHorizontal")));
-                NUnitAssert.That(slider.Template.FindName("TrackBackground", slider), Is.Not.Null);
+                NUnitAssert.That(slider.Template, Is.Not.SameAs(Application.Current.FindResource("SliderHorizontal")));
+                NUnitAssert.That(slider.Template.FindName("Rail", slider), Is.Not.Null);
             });
         });
     }

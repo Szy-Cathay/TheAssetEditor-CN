@@ -47,7 +47,7 @@ namespace Editors.KitbasherEditor.ViewModels
 
 
         int _currentFrame = 0;
-        public int CurrentFrame { get { return _currentFrame; } set { SetAndNotify(ref _currentFrame, value); } }
+        public int CurrentFrame { get { return _currentFrame; } set { SetAndNotifyWhenChanged(ref _currentFrame, value); } }
 
         int _maxFrames = 0;
         public int MaxFrames { get { return _maxFrames; } set { SetAndNotify(ref _maxFrames, value); } }
@@ -63,8 +63,19 @@ namespace Editors.KitbasherEditor.ViewModels
                     ref _playbackPositionSeconds,
                     value);
                 if (!_isUpdatingPlaybackPosition)
-                    _player.SeekToTimeSeconds(value);
+                {
+                    if (IsScrubbing)
+                        _player.QueueSeekToTimeSeconds(value);
+                    else
+                        _player.SeekToTimeSeconds(value);
+                }
             }
+        }
+
+        public bool IsScrubbing
+        {
+            get => _player.IsScrubbing;
+            set => _player.IsScrubbing = value;
         }
 
         float _maxTimeSeconds;
@@ -90,7 +101,7 @@ namespace Editors.KitbasherEditor.ViewModels
         public bool IsEnabled { get { return _isEnabled; } set { SetAndNotify(ref _isEnabled, value); OnEnableChanged(IsEnabled); } }
 
         bool _isPlaying;
-        public bool IsPlaying { get { return _isPlaying; } private set { SetAndNotify(ref _isPlaying, value); } }
+        public bool IsPlaying { get { return _isPlaying; } private set { SetAndNotifyWhenChanged(ref _isPlaying, value); } }
 
         public AnimationControllerViewModel(IPackFileService pf,
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,

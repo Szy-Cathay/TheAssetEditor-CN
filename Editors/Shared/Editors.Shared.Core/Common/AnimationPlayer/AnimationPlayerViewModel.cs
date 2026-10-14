@@ -12,6 +12,17 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         float _playbackPositionSeconds;
         bool _isUpdatingPlaybackPosition;
         IEditorViewModelTypeProvider? _timelineAnnotationContent;
+        bool _isScrubbing;
+        public bool IsScrubbing
+        {
+            get => _isScrubbing;
+            set
+            {
+                SetAndNotifyWhenChanged(ref _isScrubbing, value);
+                foreach (var player in GetPlayers())
+                    player.IsScrubbing = value;
+            }
+        }
 
         public NotifyAttr<float> SelectedAnimationCurrentTime { get; private set; } = new();
         public NotifyAttr<float> SelectedAnimationMaxTime { get; private set; } = new();
@@ -133,6 +144,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
 
         private void OnAnimationFrameChanged(int currentFrame)
         {
+            var isSeeking = _isUpdatingPlaybackPosition;
             SelectedAnimationFrameCount.Value = SelectedMainAnimation.Asset.Player.FrameCount;
             SelectedAnimationCurrentFrame.Value = currentFrame;
             SelectedAnimationCurrentTime.Value =
@@ -144,7 +156,9 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             SetPlaybackPositionFromPlayer(
                 SelectedAnimationCurrentTime.Value);
 
-            if (SelectedAnimationCurrentFrame.Value + 1 == SelectedMainAnimation.Asset.Player.FrameCount)
+            if (!isSeeking && !IsScrubbing && !SelectedMainAnimation.Asset.Player.IsPlaying
+                && SelectedMainAnimation.Asset.Player.Duration > TimeSpan.Zero
+                && SelectedMainAnimation.Asset.Player.CurrentTime >= SelectedMainAnimation.Asset.Player.Duration)
             {
                 if (LoopAnimation.Value)
                 {
@@ -180,7 +194,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         private void UpdatePlayingState() => IsPlaying.Value = _assetList.Any(
             item => item.Player.IsPlaying && item.Player.IsEnabled);
 
-        void SeekPlayers(float timeSeconds)
+        HashSet<GameAnimationPlayer> GetPlayers()
         {
             var players = new HashSet<GameAnimationPlayer>(
                 ReferenceEqualityComparer.Instance);
@@ -194,11 +208,21 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
                 }
             }
 
+            return players;
+        }
+
+        void SeekPlayers(float timeSeconds)
+        {
             _isUpdatingPlaybackPosition = true;
             try
             {
-                foreach (var player in players)
-                    player.SeekToTimeSeconds(timeSeconds);
+                foreach (var player in GetPlayers())
+                {
+                    if (IsScrubbing)
+                        player.QueueSeekToTimeSeconds(timeSeconds);
+                    else
+                        player.SeekToTimeSeconds(timeSeconds);
+                }
             }
             finally
             {
@@ -208,6 +232,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
 
         void SetPlaybackPositionFromPlayer(float timeSeconds)
         {
+            var wasUpdatingPlaybackPosition = _isUpdatingPlaybackPosition;
             _isUpdatingPlaybackPosition = true;
             try
             {
@@ -215,7 +240,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             }
             finally
             {
-                _isUpdatingPlaybackPosition = false;
+                _isUpdatingPlaybackPosition = wasUpdatingPlaybackPosition;
             }
         }
 
