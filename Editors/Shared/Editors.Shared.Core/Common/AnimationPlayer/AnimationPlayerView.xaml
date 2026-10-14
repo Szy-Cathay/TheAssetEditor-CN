@@ -21,33 +21,25 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <Border
-        Margin="8,4,8,8"
-        Padding="6"
-        Background="{DynamicResource AeBrush.Surface2}"
+        Background="{DynamicResource AeBrush.Surface1}"
         BorderBrush="{DynamicResource AeBrush.Border}"
-        BorderThickness="1"
-        CornerRadius="{StaticResource AeRadius.Control}">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <WrapPanel x:Name="PlaybackCommandRow">
-                <StackPanel Margin="0,2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock
-                        Margin="0,0,8,0"
-                        VerticalAlignment="Center"
-                        Text="{loc:Loc AnimationView.Animation}" />
-                    <ToggleButton
-                        IsChecked="{Binding IsEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                        AutomationProperties.Name="{loc:Loc AnimationView.EnableAnimation}"
-                        ToolTip="{loc:Loc AnimationView.EnableAnimation}"
-                        Style="{StaticResource AeInput.Switch}" />
-                </StackPanel>
+        BorderThickness="0,1,0,0">
+        <Expander
+            x:Name="AnimationPlayerExpander"
+            Padding="8,4"
+            IsExpanded="{Binding IsEnabled.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+            Header="{loc:Loc SharedAnimPlayer.Title}"
+            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.Title}">
+            <Grid Margin="0,4,0,4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
                 <Grid
-                    Margin="12,2,0,2"
+                    x:Name="PlaybackCommandRow"
+                    HorizontalAlignment="Center"
                     Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
                     <StackPanel
                         Orientation="Horizontal"
@@ -121,60 +113,66 @@
                     </StackPanel>
                 </Grid>
 
-                <TextBlock
-                    Margin="12,2,0,2"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource AeText.Technical}"
-                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
-                    <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
-                    <Run Text="{Binding SelectedAnimationCurrentTime.Value, StringFormat=N2}" />
-                    <Run Text=" / " />
-                    <Run Text="{Binding SelectedAnimationMaxTime.Value, StringFormat=N2}" />
-                    <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
-                </TextBlock>
-                <TextBlock
-                    Margin="12,2,0,2"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource AeText.Technical}"
-                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
-                    <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
-                    <Run Text="{Binding SelectedAnimationCurrentFrame.Value}" />
-                    <Run Text=" / " />
-                    <Run Text="{Binding SelectedAnimationFrameCount.Value}" />
-                </TextBlock>
-                <TextBlock
-                    Margin="12,2,0,2"
-                    VerticalAlignment="Center"
-                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
-                    <Run Text="{Binding SelectedAnimationFps.Value, StringFormat=N2}" />
-                    <Run Text="{loc:Loc SharedAnimPlayer.Fps}" />
-                </TextBlock>
-                <CheckBox
-                    Margin="12,2,0,2"
-                    VerticalAlignment="Center"
-                    Content="{loc:Loc SharedAnimPlayer.Loop}"
-                    IsChecked="{Binding LoopAnimation.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}" />
-            </WrapPanel>
-
-            <Grid
-                x:Name="PlaybackTimelineRow"
-                Grid.Row="1"
-                Margin="0,6,0,0"
-                Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Slider
-                    Maximum="{Binding SelectedAnimationMaxTime.Value, Mode=OneWay}"
-                    Style="{StaticResource AeEditor.PlaybackSlider}"
-                    Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <ContentControl
+                <WrapPanel
+                    x:Name="PlaybackInformationRow"
                     Grid.Row="1"
-                    Content="{Binding TimelineAnnotationContent, Mode=OneWay}"
-                    ContentTemplateSelector="{StaticResource TimelineAnnotationSelector}" />
+                    Margin="0,4,0,0"
+                    HorizontalAlignment="Center">
+                    <TextBlock
+                        Margin="12,2,0,2"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource AeText.Technical}"
+                        Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                        <Run Text="{loc:Loc SharedAnimPlayer.Time}" />
+                        <Run Text="{Binding SelectedAnimationCurrentTime.Value, StringFormat=N2}" />
+                        <Run Text=" / " />
+                        <Run Text="{Binding SelectedAnimationMaxTime.Value, StringFormat=N2}" />
+                        <Run Text="{loc:Loc SharedAnimPlayer.Seconds}" />
+                    </TextBlock>
+                    <TextBlock
+                        Margin="12,2,0,2"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource AeText.Technical}"
+                        Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                        <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
+                        <Run Text="{Binding SelectedAnimationCurrentFrame.Value}" />
+                        <Run Text=" / " />
+                        <Run Text="{Binding SelectedAnimationFrameCount.Value}" />
+                    </TextBlock>
+                    <TextBlock
+                        Margin="12,2,0,2"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                        <Run Text="{Binding SelectedAnimationFps.Value, StringFormat=N2}" />
+                        <Run Text="{loc:Loc SharedAnimPlayer.Fps}" />
+                    </TextBlock>
+                    <CheckBox
+                        Margin="12,2,0,2"
+                        VerticalAlignment="Center"
+                        Content="{loc:Loc SharedAnimPlayer.Loop}"
+                        IsChecked="{Binding LoopAnimation.Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                        Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}" />
+                </WrapPanel>
+
+                <Grid
+                    x:Name="PlaybackTimelineRow"
+                    Grid.Row="2"
+                    Margin="0,4,0,0"
+                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Slider
+                        Maximum="{Binding SelectedAnimationMaxTime.Value, Mode=OneWay}"
+                        Style="{StaticResource AeEditor.PlaybackSlider}"
+                        Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ContentControl
+                        Grid.Row="1"
+                        Content="{Binding TimelineAnnotationContent, Mode=OneWay}"
+                        ContentTemplateSelector="{StaticResource TimelineAnnotationSelector}" />
+                </Grid>
             </Grid>
-        </Grid>
+        </Expander>
     </Border>
 </UserControl>

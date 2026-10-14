@@ -73,6 +73,11 @@
 - 主题资源位于 `AssetEditor/Themes/`。独立视图和测试不能假设 `App.xaml` 已自动加载全部资源。
 - 涉及 `Application`、`ResourceDictionary` 或 `Freezable` 的测试使用 `Testing/AssetEditorTests/WpfTestApplicationHost.cs` 的单一 STA/Dispatcher 宿主。
 
+### 3D 初始观察方向
+
+- 各 3D 宿主通过共享 `ArcBallCamera` 从目标上方俯视 24°、水平转角 26° 开始，与批准的空场景参考方向保持一致：红 X 轴从左下向右上缓斜，蓝 Z 轴从左上向右下较陡。保留焦点和视距；只设置初值，不限制后续自由绕转，不翻转模型。
+- Kitbash、共享动画/骨架/超级视图宿主与 CSC 复用此初值。照片工作室调参、读取已存相机设置和 CSC 的“透过相机查看”等显式操作仍按自身设置执行，不能被默认角度覆盖。
+
 ### 更新器
 
 - 主程序只启动发布包内的独立更新器；国区版运行时身份以根 `AGENTS.md` 为准。

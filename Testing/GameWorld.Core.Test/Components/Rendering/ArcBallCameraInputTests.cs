@@ -11,6 +11,26 @@ namespace GameWorld.Core.Test.Components.Rendering
     public class ArcBallCameraInputTests
     {
         [Test]
+        public void NewCamera_UsesReferenceViewWithoutChangingTargetDistanceOrFreeOrbit()
+        {
+            using var camera = new ArcBallCamera(null!, Mock.Of<IKeyboardComponent>(), Mock.Of<IMouseComponent>());
+            var offset = camera.Position - camera.LookAt;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(offset.Y, Is.GreaterThan(0));
+                Assert.That(MathHelper.ToDegrees(MathF.Asin(offset.Y / offset.Length())), Is.EqualTo(24f).Within(0.001f));
+                Assert.That(MathHelper.ToDegrees(camera.Yaw), Is.EqualTo(26f).Within(0.001f));
+                Assert.That(offset.Length(), Is.EqualTo(10f).Within(0.0001f));
+                Assert.That(camera.LookAt, Is.EqualTo(Vector3.Zero));
+            });
+
+            camera.Pitch = MathHelper.PiOver4;
+            Assert.That(camera.Position.Y, Is.LessThan(camera.LookAt.Y),
+                "The initial view must not restrict later free orbiting.");
+        }
+
+        [Test]
         public void Update_MiddleMouseWhileAnotherComponentOwnsMouse_DoesNotStealOwnership()
         {
             var owner = new TestComponent();

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Xml.Linq;
 using CommonControls.FilterDialog;
@@ -557,7 +558,9 @@ public class UiModelKitbashFamilyTests
             NUnitAssert.That(
                 source,
                 Does.Contain("Common/Styles/EditorWorkspaceStyles.xaml"));
-            NUnitAssert.That(source, Does.Contain("AeInput.Switch"));
+            NUnitAssert.That(source, Does.Contain("x:Name=\"AnimationPlayerExpander\""));
+            NUnitAssert.That(source, Does.Contain("Header=\"{loc:Loc SharedAnimPlayer.Title}\""));
+            NUnitAssert.That(source, Does.Contain("IsExpanded=\"{Binding IsEnabled, Mode=TwoWay"));
             NUnitAssert.That(source, Does.Contain("AeButton.Icon"));
             NUnitAssert.That(source, Does.Contain("AeEditor.PlaybackToggle"));
             NUnitAssert.That(source, Does.Contain("IsChecked=\"{Binding IsPlaying"));
@@ -599,41 +602,27 @@ public class UiModelKitbashFamilyTests
                     {
                         DataContext = new KitbashAnimationPlayerProbe(),
                     };
-                    var window = new Window
-                    {
-                        Content = view,
-                        Width = 1000,
-                        Height = 500,
-                        ShowActivated = false,
-                        ShowInTaskbar = false,
-                    };
-                    try
-                    {
-                        window.Show();
-                        window.UpdateLayout();
+                    view.Measure(new Size(1000, 500));
+                    view.Arrange(new Rect(0, 0, 1000, 500));
+                    view.UpdateLayout();
 
-                        var timeline = FindVisualDescendants<Slider>(view)
-                            .Single();
-                        var timeText = FindVisualDescendants<TextBlock>(view)
-                            .Select(textBlock => textBlock.Text)
-                            .First(text => text.Contains(
-                                localizationManager.Get(
-                                    "SharedAnimPlayer.Seconds"),
-                                StringComparison.Ordinal));
-                        NUnitAssert.Multiple(() =>
-                        {
-                            NUnitAssert.That(timeline.Maximum, Is.EqualTo(2.3));
-                            NUnitAssert.That(timeText, Does.Contain("2.30"));
-                            NUnitAssert.That(
-                                FindLogicalDescendants<CollapsableFilterControl>(
-                                    view).Count(),
-                                Is.EqualTo(2));
-                        });
-                    }
-                    finally
+                    var timeline = FindVisualDescendants<Slider>(view)
+                        .Single();
+                    var timeText = FindVisualDescendants<TextBlock>(view)
+                        .Select(textBlock => new TextRange(textBlock.ContentStart, textBlock.ContentEnd).Text)
+                        .First(text => text.Contains(
+                            localizationManager.Get(
+                                "SharedAnimPlayer.Seconds"),
+                            StringComparison.Ordinal));
+                    NUnitAssert.Multiple(() =>
                     {
-                        window.Close();
-                    }
+                        NUnitAssert.That(timeline.Maximum, Is.EqualTo(2.3));
+                        NUnitAssert.That(timeText, Does.Contain("2.30"));
+                        NUnitAssert.That(
+                            FindLogicalDescendants<CollapsableFilterControl>(
+                                view).Count(),
+                            Is.EqualTo(2));
+                    });
                 }
                 finally
                 {
@@ -697,7 +686,7 @@ public class UiModelKitbashFamilyTests
                         window.UpdateLayout();
 
                         var selectorArea = FindVisualDescendants<Expander>(view)
-                            .Single();
+                            .Single(expander => expander.Name == "AnimationSelectorsExpander");
                         selectorArea.IsExpanded = true;
                         window.UpdateLayout();
 

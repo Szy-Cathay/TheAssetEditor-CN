@@ -19,8 +19,10 @@
 
     <Grid Background="{DynamicResource AeBrush.Canvas}">
         <ScrollViewer
+            x:Name="HistoryContent"
             HorizontalScrollBarVisibility="Disabled"
-            VerticalScrollBarVisibility="Auto">
+            VerticalScrollBarVisibility="Auto"
+            Visibility="{Binding IsBusy, Converter={StaticResource RecoveryHiddenConverter}}">
             <StackPanel Margin="8">
                 <Grid Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
@@ -319,13 +321,28 @@
             </StackPanel>
         </ScrollViewer>
 
-        <progress:OperationProgressWindowHost
-            CurrentDetailText="{Binding OperationDetailText}"
-            IsOperationActive="{Binding IsBusy}"
-            IsProgressIndeterminate="{Binding IsOperationProgressIndeterminate}"
-            ProgressMaximum="{Binding OperationProgressMaximum}"
-            ProgressValue="{Binding OperationProgressValue}"
-            StatusText="{Binding OperationStatusText}"
-            WindowTitle="{loc:Loc FolderProject.History.OperationTitle}" />
+        <Grid
+            x:Name="HistoryLoadingContent"
+            Background="{DynamicResource AeBrush.Canvas}"
+            Visibility="{Binding IsBusy, Converter={StaticResource BoolToCollapsedConverter}}">
+            <ScrollViewer
+                MaxWidth="552"
+                VerticalAlignment="Center"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+                <progress:OperationProgressView
+                    x:Name="HistoryLoadingProgress"
+                    Margin="16"
+                    UseDeferredVisibility="False"
+                    UseLeadingIndicator="True"
+                    ShowDetails="False"
+                    CurrentDetailText="{Binding OperationDetailText}"
+                    IsOperationActive="{Binding IsBusy}"
+                    IsProgressIndeterminate="{Binding IsOperationProgressIndeterminate}"
+                    ProgressMaximum="{Binding OperationProgressMaximum}"
+                    ProgressValue="{Binding OperationProgressValue}"
+                    StatusText="{Binding OperationStatusText}" />
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>

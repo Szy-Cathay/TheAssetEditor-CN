@@ -38,133 +38,36 @@
     </UserControl.Resources>
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition 
-                Width="1*"/>
-            <ColumnDefinition 
-                Width="Auto"/>
-            <ColumnDefinition
-                Width="*"/>
-        </Grid.ColumnDefinitions>
-
-        <Grid.RowDefinitions>
-            <RowDefinition 
-                Height="*"/>
-        </Grid.RowDefinitions>
-
-        <Grid 
-            Grid.Row="0" 
-            Grid.Column="0">
+        <Grid x:Name="AudioContent">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsAudioPreviewLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition
+                    Width="1*"/>
+                <ColumnDefinition
+                    Width="Auto"/>
+                <ColumnDefinition
+                    Width="*"/>
+            </Grid.ColumnDefinitions>
 
             <Grid.RowDefinitions>
                 <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
                     Height="*"/>
-                <RowDefinition
-                    Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Grid
                 Grid.Row="0"
-                Margin="5, 5, 5, 5">
-
-                <Grid.RowDefinitions>
-                    <RowDefinition
-                        Height="Auto"/>
-                    <RowDefinition
-                        Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <TextBox
-                    Grid.Row="0"
-                    Height="25"
-                    Margin="0, 0, 0, 5"
-                    Text="{Binding ExplorerFilter.ExplorerList.Filter, UpdateSourceTrigger=PropertyChanged}"
-                    ToolTip="{loc:Loc AudioExplorer.FilterToolTip}"/>
-
-                <ComboBox
-                    Grid.Row="1"
-                    Height="25"
-                    IsEditable="False"
-                    IsTextSearchEnabled="False"
-                    DisplayMemberPath="DisplayName"
-                    ItemsSource="{Binding ExplorerFilter.ExplorerList.Values}"
-                    SelectedItem="{Binding ExplorerFilter.ExplorerList.SelectedItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                    <ComboBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <VirtualizingStackPanel/>
-                        </ItemsPanelTemplate>
-                    </ComboBox.ItemsPanel>
-                </ComboBox>
-            </Grid>
-
-            <Grid
-                Grid.Row="1"
-                Margin="5, 0, 0, 0">
-
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition 
-                        Width="Auto"/>
-                    <ColumnDefinition
-                        Width="Auto"/>
-                    <ColumnDefinition
-                        Width="Auto"/>
-                    <ColumnDefinition
-                        Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <CheckBox
-                    Margin="0, 0, 5, 0"
-                    Grid.Column="0"
-                    DockPanel.Dock="Top" 
-                    Content="{loc:Loc AudioExplorer.SearchByActionEvent}"
-                    IsChecked="{Binding SearchByActionEvent, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-
-                <CheckBox 
-                    Grid.Column="1"
-                    Margin="5, 0, 5, 0"
-                    DockPanel.Dock="Top" 
-                    Content="{loc:Loc AudioExplorer.SearchByDialogueEvent}"
-                    IsChecked="{Binding SearchByDialogueEvent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                
-                <CheckBox 
-                    Grid.Column="2"
-                    Margin="5, 0, 5, 0"
-                    DockPanel.Dock="Top" 
-                    Content="{loc:Loc AudioExplorer.SearchByVOActor}"
-                    IsChecked="{Binding SearchByVOActor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                
-                <CheckBox 
-                    Grid.Column="3"
-                    Margin="5, 0, 5, 0"
-                    DockPanel.Dock="Top" 
-                    Content="{loc:Loc AudioExplorer.SearchByID}"
-                    IsChecked="{Binding SearchByHircId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-            </Grid>
-
-            <Grid
-                Grid.Row="2"
-                Margin="5, 5, 5, 0">
-
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition
-                        Width="*"/>
-                    <ColumnDefinition
-                        Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                Grid.Column="0">
 
                 <Grid.RowDefinitions>
                     <RowDefinition
@@ -173,47 +76,24 @@
                         Height="Auto"/>
                     <RowDefinition
                         Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="*"/>
+                    <RowDefinition
+                        Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock
+                <Grid
                     Grid.Row="0"
-                    Grid.ColumnSpan="2"
-                    Margin="0, 0, 0, 3"
-                    Text="{Binding LoadStatus}"
-                    TextWrapping="Wrap" />
+                    Margin="5, 5, 5, 5">
 
-                <progress:OperationProgressWindowHost
-                    Grid.Row="1"
-                    Grid.Column="0"
-                    CancelCommand="{Binding CancelLoadingCommand}"
-                    CancelText="{loc:Loc AudioExplorer.CancelLoading}"
-                    CurrentDetailText="{Binding LoadProgressDetail}"
-                    IsOperationActive="{Binding IsLoadProgressWindowActive}"
-                    IsProgressIndeterminate="{Binding LoadProgressIsIndeterminate}"
-                    ProgressMaximum="{Binding LoadProgressMaximum}"
-                    ProgressValue="{Binding LoadProgressValue}"
-                    StatusText="{Binding LoadStatus}"
-                    WindowTitle="{loc:Loc OperationProgress.AudioLoad}" />
-
-                <progress:OperationProgressWindowHost
-                    Grid.Row="2"
-                    Grid.Column="0"
-                    CancelCommand="{Binding ExportAudioCancelCommand}"
-                    CancelText="{loc:Loc AudioExplorer.CancelExport}"
-                    CurrentDetailText="{Binding ExportProgressDetail}"
-                    IsOperationActive="{Binding IsExporting}"
-                    IsProgressIndeterminate="False"
-                    ProgressMaximum="{Binding ExportProgressMaximum}"
-                    ProgressValue="{Binding ExportProgressValue}"
-                    StatusText="{Binding LoadStatus}"
-                    WindowTitle="{loc:Loc OperationProgress.AudioExport}" />
-            </Grid>
-
-            <Expander
-                Grid.Row="3"
-                Margin="4, 5, 4, 0"
-                Header="{loc:Loc AudioExplorer.Languages}">
-                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition
                             Height="Auto"/>
@@ -221,259 +101,85 @@
                             Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <ListBox
+                    <TextBox
                         Grid.Row="0"
-                        Margin="0, 5, 0, 0"
-                        MaxHeight="500"
-                        ItemsSource="{Binding Languages}"
-                        SelectionMode="Extended"
-                        VerticalAlignment="Stretch"
-                        ScrollViewer.VerticalScrollBarVisibility="Auto">
-
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox
-                                    IsChecked="{Binding IsChecked, Mode=TwoWay}">
-                                    <ContentPresenter
-                                        Content="{Binding Language}"
-                                        ContentTemplate="{StaticResource EnumToStringTemplate}"/>
-                                </CheckBox>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    
-                    <Button
-                        Margin="0, 5, 0, 0"
-                        Grid.Row="1"
-                        Content="{loc:Loc AudioExplorer.LoadLanguages}"
-                        Style="{StaticResource AeButton.Primary}"
                         Height="25"
-                        Command="{Binding LoadAudioRepositoryForSelectedLanguagesCommand}"/>
-                    
+                        Margin="0, 0, 0, 5"
+                        Text="{Binding ExplorerFilter.ExplorerList.Filter, UpdateSourceTrigger=PropertyChanged}"
+                        ToolTip="{loc:Loc AudioExplorer.FilterToolTip}"/>
+
+                    <ComboBox
+                        Grid.Row="1"
+                        Height="25"
+                        IsEditable="False"
+                        IsTextSearchEnabled="False"
+                        DisplayMemberPath="DisplayName"
+                        ItemsSource="{Binding ExplorerFilter.ExplorerList.Values}"
+                        SelectedItem="{Binding ExplorerFilter.ExplorerList.SelectedItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                        <ComboBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ComboBox.ItemsPanel>
+                    </ComboBox>
                 </Grid>
-            </Expander>
 
-            <Grid
-                Grid.Row="4"
-                Margin="5, 5, 5, 5">
-                <Menu
-                    Height="25"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Center">
-                    <MenuItem
-                        Header="{loc:Loc AudioExplorer.Export}">
-                        <MenuItem
-                            Header="{loc:Loc AudioExplorer.ExportSelectedAudio}"
-                            IsEnabled="{Binding IsExportSelectedAudioEnabled}">
-                            <MenuItem
-                                Header="WAV"
-                                Command="{Binding ExportAudioCommand}"
-                                CommandParameter="{Binding ExportSelectedAudioWav}"/>
-                            <MenuItem
-                                Header="WEM"
-                                Command="{Binding ExportAudioCommand}"
-                                CommandParameter="{Binding ExportSelectedAudioWem}"/>
-                        </MenuItem>
-                        <MenuItem
-                            Header="{loc:Loc AudioExplorer.ExportSelectedBranch}"
-                            IsEnabled="{Binding IsExportSelectedBranchEnabled}">
-                            <MenuItem
-                                Header="WAV"
-                                Command="{Binding ExportAudioCommand}"
-                                CommandParameter="{Binding ExportSelectedBranchWav}"/>
-                            <MenuItem
-                                Header="WEM"
-                                Command="{Binding ExportAudioCommand}"
-                                CommandParameter="{Binding ExportSelectedBranchWem}"/>
-                        </MenuItem>
-                        <MenuItem
-                            Header="{loc:Loc AudioExplorer.ExportCurrentResults}"
-                            IsEnabled="{Binding IsExportCurrentResultsEnabled}">
-                            <MenuItem
-                                Header="WAV"
-                                Command="{Binding ExportAudioCommand}"
-                                CommandParameter="{Binding ExportCurrentResultsWav}"/>
-                            <MenuItem
-                                Header="WEM"
-                                Command="{Binding ExportAudioCommand}"
-                                CommandParameter="{Binding ExportCurrentResultsWem}"/>
-                        </MenuItem>
-                    </MenuItem>
-                </Menu>
-            </Grid>
+                <Grid
+                    Grid.Row="1"
+                    Margin="5, 0, 0, 0">
 
-            <Border 
-                Grid.Row="5"
-                Height="5" 
-                Background="{DynamicResource AeBrush.Border}"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition
+                            Width="Auto"/>
+                        <ColumnDefinition
+                            Width="Auto"/>
+                        <ColumnDefinition
+                            Width="Auto"/>
+                        <ColumnDefinition
+                            Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-            <Label 
-                Grid.Row="6" 
-                Margin="0, 0, 0, 0"
-                Content="{loc:Loc AudioExplorer.WwiseObjectHierarchyGraph}"/>
+                    <CheckBox
+                        Margin="0, 0, 5, 0"
+                        Grid.Column="0"
+                        DockPanel.Dock="Top"
+                        Content="{loc:Loc AudioExplorer.SearchByActionEvent}"
+                        IsChecked="{Binding SearchByActionEvent, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
 
-            <TreeView
-                Grid.Row="7"
-                Margin="0, 2, 0, 0"
-                Padding="0, 5, 0, 0"
-                BorderBrush="{DynamicResource AeBrush.Border}"
-                ItemsSource="{Binding TreeList, UpdateSourceTrigger=PropertyChanged}"
-                VirtualizingPanel.IsVirtualizing="True"
-                VirtualizingPanel.VirtualizationMode="Recycling"
-                VirtualizingPanel.IsVirtualizingWhenGrouping="True"
-                PreviewMouseDoubleClick="OnNodeDoubleClick">
+                    <CheckBox
+                        Grid.Column="1"
+                        Margin="5, 0, 5, 0"
+                        DockPanel.Dock="Top"
+                        Content="{loc:Loc AudioExplorer.SearchByDialogueEvent}"
+                        IsChecked="{Binding SearchByDialogueEvent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TreeView.ItemContainerStyle>
-                    <Style 
-                        TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
-                        <Setter 
-                            Property="IsExpanded" 
-                            Value="{Binding IsExpanded}"/>
-                        <Setter 
-                            Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate 
-                                    TargetType="{x:Type TreeViewItem}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition 
-                                                MinWidth="19" 
-                                                Width="Auto"/>
-                                            <ColumnDefinition 
-                                                Width="Auto"/>
-                                            <ColumnDefinition 
-                                                Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition 
-                                                Height="Auto"/>
-                                            <RowDefinition/>
-                                        </Grid.RowDefinitions>
-                                        <ToggleButton 
-                                            x:Name="Expander" 
-                                            ClickMode="Press" 
-                                            IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
-                                            Style="{StaticResource ExpandCollapseToggleStyle}"/>
-                                        <Border 
-                                            x:Name="Bd"
-                                            BorderBrush="{TemplateBinding BorderBrush}" 
-                                            BorderThickness="{TemplateBinding BorderThickness}" 
-                                            Background="{TemplateBinding Background}" 
-                                            CornerRadius="{StaticResource AeRadius.Control}"
-                                            Grid.Column="1"
-                                            Padding="{TemplateBinding Padding}" 
-                                            SnapsToDevicePixels="true">
-                                            <ContentPresenter 
-                                                x:Name="PART_Header" 
-                                                ContentSource="Header" 
-                                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
-                                                SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                                        </Border>
-                                        <ItemsPresenter 
-                                            x:Name="ItemsHost" Grid.ColumnSpan="2" 
-                                            Grid.Column="1" 
-                                            Grid.Row="1"/>
-                                    </Grid>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger 
-                                            Property="IsExpanded" 
-                                            Value="false">
-                                            <Setter 
-                                                Property="Visibility" 
-                                                TargetName="ItemsHost" 
-                                                Value="Collapsed"/>
-                                        </Trigger>
-                                        <Trigger 
-                                            Property="HasItems" 
-                                            Value="false">
-                                            <Setter 
-                                                Property="Visibility" 
-                                                TargetName="Expander" 
-                                                Value="Hidden"/>
-                                        </Trigger>
-                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Bd}" Value="True">
-                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
-                                            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
-                                        </DataTrigger>
-                                        <Trigger 
-                                            Property="IsSelected" 
-                                            Value="true">
-                                            <Setter 
-                                                Property="Background" 
-                                                TargetName="Bd" 
-                                                Value="{DynamicResource AeBrush.AccentSoft}"/>
-                                            <Setter 
-                                                Property="BorderBrush" 
-                                                TargetName="Bd" 
-                                                Value="Transparent"/>
-                                            <Setter 
-                                                Property="Foreground" 
-                                                Value="{DynamicResource AeBrush.TextPrimary}"/>
-                                        </Trigger>
-                                        <MultiTrigger>
-                                            <MultiTrigger.Conditions>
-                                                <Condition 
-                                                    Property="IsSelected" 
-                                                    Value="true"/>
-                                                <Condition 
-                                                    Property="IsSelectionActive" 
-                                                    Value="false"/>
-                                            </MultiTrigger.Conditions>
-                                            <Setter 
-                                                Property="Background" 
-                                                TargetName="Bd" 
-                                                Value="{DynamicResource AeBrush.AccentSoft}"/>
-                                            <Setter 
-                                                Property="BorderBrush" 
-                                                TargetName="Bd" 
-                                                Value="Transparent"/>
-                                            <Setter 
-                                                Property="Foreground" 
-                                                Value="{DynamicResource AeBrush.TextPrimary}"/>
-                                        </MultiTrigger>
-                                        <Trigger 
-                                            Property="IsEnabled" 
-                                            Value="false">
-                                            <Setter 
-                                                Property="Foreground" 
-                                                Value="{DynamicResource AeBrush.TextMuted}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </TreeView.ItemContainerStyle>
+                    <CheckBox
+                        Grid.Column="2"
+                        Margin="5, 0, 5, 0"
+                        DockPanel.Dock="Top"
+                        Content="{loc:Loc AudioExplorer.SearchByVOActor}"
+                        IsChecked="{Binding SearchByVOActor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <b:Interaction.Behaviors>
-                    <Behaviors:BindableSelectedItemBehavior
-                        SelectedItem="{Binding SelectedNode, Mode=TwoWay}"/>
-                </b:Interaction.Behaviors>
+                    <CheckBox
+                        Grid.Column="3"
+                        Margin="5, 0, 5, 0"
+                        DockPanel.Dock="Top"
+                        Content="{loc:Loc AudioExplorer.SearchByID}"
+                        IsChecked="{Binding SearchByHircId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
 
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate
-                        ItemsSource="{Binding Path=Children, UpdateSourceTrigger=PropertyChanged}">
-                        <StackPanel 
-                            Orientation="Horizontal">
-                            <TextBlock
-                                Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"/>
-                        </StackPanel>
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
-            </TreeView>
+                <Grid
+                    Grid.Row="2"
+                    Margin="5, 5, 5, 0">
 
-            <Border
-                Grid.Row="8"
-                Padding="8,4"
-                BorderBrush="{DynamicResource AeBrush.Border}"
-                BorderThickness="0, 1, 0, 0"
-                Background="{DynamicResource AeBrush.Surface1}"
-                Visibility="{Binding IsAudioPlaybackVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition
+                            Width="*"/>
+                        <ColumnDefinition
+                            Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
                     <Grid.RowDefinitions>
-                        <RowDefinition
-                            Height="64"/>
                         <RowDefinition
                             Height="Auto"/>
                         <RowDefinition
@@ -482,137 +188,491 @@
                             Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Grid
-                        x:Name="AudioWaveformGrid"
+                    <TextBlock
                         Grid.Row="0"
-                        Height="64"
-                        ClipToBounds="True"
-                        SizeChanged="OnAudioWaveformGridSizeChanged">
-                        <Image
-                            Stretch="Fill"
-                            SnapsToDevicePixels="True"
-                            Source="{Binding AudioWaveformBaseImageSource}"/>
-                        <Image
-                            Stretch="Fill"
-                            SnapsToDevicePixels="True"
-                            Source="{Binding AudioWaveformOverlayImageSource}">
-                            <Image.Clip>
-                                <RectangleGeometry
-                                    Rect="{Binding AudioWaveformOverlayClip}"/>
-                            </Image.Clip>
-                        </Image>
-                    </Grid>
+                        Grid.ColumnSpan="2"
+                        Margin="0, 0, 0, 3"
+                        Text="{Binding LoadStatus}"
+                        TextWrapping="Wrap" />
 
                     <progress:OperationProgressWindowHost
-                        Grid.Row="1"
-                        CurrentDetailText="{Binding AudioPreviewProgressDetail}"
-                        IsOperationActive="{Binding IsAudioPreviewLoading}"
-                        IsProgressIndeterminate="False"
-                        ProgressMaximum="{Binding AudioPreviewProgressMaximum}"
-                        ProgressValue="{Binding AudioPreviewProgressValue}"
-                        StatusText="{loc:Loc OperationProgress.AudioPreview}"
-                        WindowTitle="{loc:Loc OperationProgress.AudioPreview}" />
-
-                    <Grid
                         Grid.Row="2"
-                        Margin="0, 6, 0, 5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition
-                                Width="Auto"/>
-                            <ColumnDefinition
-                                Width="*"/>
-                            <ColumnDefinition
-                                Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock
-                            Grid.Column="0"
-                            MinWidth="42"
-                            VerticalAlignment="Center"
-                            Text="{Binding CurrentPlaybackTime, StringFormat={}{0:mm\\:ss}}"/>
-
-                        <Slider
-                            Grid.Column="1"
-                            Height="20"
-                            Margin="8, 0, 8, 0"
-                            Minimum="0"
-                            Maximum="{Binding TotalPlaybackSeconds}"
-                            Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                            IsMoveToPointEnabled="True"
-                            IsEnabled="{Binding IsPlayAudioButtonEnabled}"
-                            SmallChange="0.1"
-                            LargeChange="5"/>
-
-                        <TextBlock
-                            Grid.Column="2"
-                            MinWidth="42"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center"
-                            Text="{Binding TotalPlaybackTime, StringFormat={}{0:mm\\:ss}}"/>
-                    </Grid>
-
-                    <StackPanel
-                        Grid.Row="3"
-                        HorizontalAlignment="Center"
-                        Orientation="Horizontal">
-                        <Button
-                            MinWidth="95"
-                            Height="25"
-                            Content="{loc:Loc AudioExplorer.PlayPauseAudio}"
-                            Style="{StaticResource AeButton.Primary}"
-                            Command="{Binding PlayAudioCommand}"
-                            IsEnabled="{Binding IsPlayAudioButtonEnabled}"/>
-                        <Button
-                            MinWidth="60"
-                            Height="25"
-                            Margin="5, 0, 0, 0"
-                            Content="{loc:Loc AudioExplorer.StopAudio}"
-                            Style="{StaticResource AeButton.Secondary}"
-                            Command="{Binding StopAudioCommand}"
-                            IsEnabled="{Binding IsStopAudioButtonEnabled}"/>
-                    </StackPanel>
+                        Grid.Column="0"
+                        CancelCommand="{Binding ExportAudioCancelCommand}"
+                        CancelText="{loc:Loc AudioExplorer.CancelExport}"
+                        CurrentDetailText="{Binding ExportProgressDetail}"
+                        IsOperationActive="{Binding IsExporting}"
+                        IsProgressIndeterminate="False"
+                        ProgressMaximum="{Binding ExportProgressMaximum}"
+                        ProgressValue="{Binding ExportProgressValue}"
+                        StatusText="{Binding LoadStatus}"
+                        WindowTitle="{loc:Loc OperationProgress.AudioExport}" />
                 </Grid>
-            </Border>
-        </Grid>
 
-        <GridSplitter
-            Grid.Row="0"
-            Grid.Column="1" 
-            Style="{StaticResource AeVerticalGridSplitterStyle}"
-            VerticalAlignment="Stretch" 
-            HorizontalAlignment="Center"
-            ResizeBehavior="PreviousAndNext" 
-            ResizeDirection="Columns"/>
+                <Expander
+                    Grid.Row="3"
+                    Margin="4, 5, 4, 0"
+                    Header="{loc:Loc AudioExplorer.Languages}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition
+                                Height="Auto"/>
+                            <RowDefinition
+                                Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-        <Grid 
-            Grid.Row="1" 
-            Grid.Column="2"
-            Background="{DynamicResource AeBrush.Surface1}">
+                        <ListBox
+                            Grid.Row="0"
+                            Margin="0, 5, 0, 0"
+                            MaxHeight="500"
+                            ItemsSource="{Binding Languages}"
+                            SelectionMode="Extended"
+                            VerticalAlignment="Stretch"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto">
 
-            <Grid.RowDefinitions>
-                <RowDefinition
-                    Height="Auto"/>
-                <RowDefinition
-                    Height="*"/>
-            </Grid.RowDefinitions>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox
+                                        IsChecked="{Binding IsChecked, Mode=TwoWay}">
+                                        <ContentPresenter
+                                            Content="{Binding Language}"
+                                            ContentTemplate="{StaticResource EnumToStringTemplate}"/>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-            <Label 
-                Grid.Row="0"
-                Padding="8,4"
-                Content="{Binding WwiseObjectLabel}"
-                Background="{DynamicResource AeBrush.Canvas}"
-                BorderBrush="{DynamicResource AeBrush.Border}"
-                BorderThickness="0, 0, 0, 1"/>
-            
-            <ScrollViewer
-                Grid.Row="1"
-                Padding="4">
-                <TextBox 
-                    DockPanel.Dock="Top"
-                    IsReadOnly="True" 
+                        <Button
+                            Margin="0, 5, 0, 0"
+                            Grid.Row="1"
+                            Content="{loc:Loc AudioExplorer.LoadLanguages}"
+                            Style="{StaticResource AeButton.Primary}"
+                            Height="25"
+                            Command="{Binding LoadAudioRepositoryForSelectedLanguagesCommand}"/>
+
+                    </Grid>
+                </Expander>
+
+                <Grid
+                    Grid.Row="4"
+                    Margin="5, 5, 5, 5">
+                    <Menu
+                        Height="25"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                        <MenuItem
+                            Header="{loc:Loc AudioExplorer.Export}">
+                            <MenuItem
+                                Header="{loc:Loc AudioExplorer.ExportSelectedAudio}"
+                                IsEnabled="{Binding IsExportSelectedAudioEnabled}">
+                                <MenuItem
+                                    Header="WAV"
+                                    Command="{Binding ExportAudioCommand}"
+                                    CommandParameter="{Binding ExportSelectedAudioWav}"/>
+                                <MenuItem
+                                    Header="WEM"
+                                    Command="{Binding ExportAudioCommand}"
+                                    CommandParameter="{Binding ExportSelectedAudioWem}"/>
+                            </MenuItem>
+                            <MenuItem
+                                Header="{loc:Loc AudioExplorer.ExportSelectedBranch}"
+                                IsEnabled="{Binding IsExportSelectedBranchEnabled}">
+                                <MenuItem
+                                    Header="WAV"
+                                    Command="{Binding ExportAudioCommand}"
+                                    CommandParameter="{Binding ExportSelectedBranchWav}"/>
+                                <MenuItem
+                                    Header="WEM"
+                                    Command="{Binding ExportAudioCommand}"
+                                    CommandParameter="{Binding ExportSelectedBranchWem}"/>
+                            </MenuItem>
+                            <MenuItem
+                                Header="{loc:Loc AudioExplorer.ExportCurrentResults}"
+                                IsEnabled="{Binding IsExportCurrentResultsEnabled}">
+                                <MenuItem
+                                    Header="WAV"
+                                    Command="{Binding ExportAudioCommand}"
+                                    CommandParameter="{Binding ExportCurrentResultsWav}"/>
+                                <MenuItem
+                                    Header="WEM"
+                                    Command="{Binding ExportAudioCommand}"
+                                    CommandParameter="{Binding ExportCurrentResultsWem}"/>
+                            </MenuItem>
+                        </MenuItem>
+                    </Menu>
+                </Grid>
+
+                <Border
+                    Grid.Row="5"
+                    Height="5"
+                    Background="{DynamicResource AeBrush.Border}"/>
+
+                <Label
+                    Grid.Row="6"
+                    Margin="0, 0, 0, 0"
+                    Content="{loc:Loc AudioExplorer.WwiseObjectHierarchyGraph}"/>
+
+                <TreeView
+                    Grid.Row="7"
+                    Margin="0, 2, 0, 0"
+                    Padding="0, 5, 0, 0"
+                    BorderBrush="{DynamicResource AeBrush.Border}"
+                    ItemsSource="{Binding TreeList, UpdateSourceTrigger=PropertyChanged}"
+                    VirtualizingPanel.IsVirtualizing="True"
+                    VirtualizingPanel.VirtualizationMode="Recycling"
+                    VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                    PreviewMouseDoubleClick="OnNodeDoubleClick">
+
+                    <TreeView.ItemContainerStyle>
+                        <Style
+                            TargetType="{x:Type TreeViewItem}" BasedOn="{StaticResource AeTree.Item}">
+                            <Setter
+                                Property="IsExpanded"
+                                Value="{Binding IsExpanded}"/>
+                            <Setter
+                                Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate
+                                        TargetType="{x:Type TreeViewItem}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition
+                                                    MinWidth="19"
+                                                    Width="Auto"/>
+                                                <ColumnDefinition
+                                                    Width="Auto"/>
+                                                <ColumnDefinition
+                                                    Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition
+                                                    Height="Auto"/>
+                                                <RowDefinition/>
+                                            </Grid.RowDefinitions>
+                                            <ToggleButton
+                                                x:Name="Expander"
+                                                ClickMode="Press"
+                                                IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                                Style="{StaticResource ExpandCollapseToggleStyle}"/>
+                                            <Border
+                                                x:Name="Bd"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                Background="{TemplateBinding Background}"
+                                                CornerRadius="{StaticResource AeRadius.Control}"
+                                                Grid.Column="1"
+                                                Padding="{TemplateBinding Padding}"
+                                                SnapsToDevicePixels="true">
+                                                <ContentPresenter
+                                                    x:Name="PART_Header"
+                                                    ContentSource="Header"
+                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                            </Border>
+                                            <ItemsPresenter
+                                                x:Name="ItemsHost" Grid.ColumnSpan="2"
+                                                Grid.Column="1"
+                                                Grid.Row="1"/>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger
+                                                Property="IsExpanded"
+                                                Value="false">
+                                                <Setter
+                                                    Property="Visibility"
+                                                    TargetName="ItemsHost"
+                                                    Value="Collapsed"/>
+                                            </Trigger>
+                                            <Trigger
+                                                Property="HasItems"
+                                                Value="false">
+                                                <Setter
+                                                    Property="Visibility"
+                                                    TargetName="Expander"
+                                                    Value="Hidden"/>
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsMouseOver, ElementName=Bd}" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AeBrush.SurfaceHover}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextPrimary}" />
+                                            </DataTrigger>
+                                            <Trigger
+                                                Property="IsSelected"
+                                                Value="true">
+                                                <Setter
+                                                    Property="Background"
+                                                    TargetName="Bd"
+                                                    Value="{DynamicResource AeBrush.AccentSoft}"/>
+                                                <Setter
+                                                    Property="BorderBrush"
+                                                    TargetName="Bd"
+                                                    Value="Transparent"/>
+                                                <Setter
+                                                    Property="Foreground"
+                                                    Value="{DynamicResource AeBrush.TextPrimary}"/>
+                                            </Trigger>
+                                            <MultiTrigger>
+                                                <MultiTrigger.Conditions>
+                                                    <Condition
+                                                        Property="IsSelected"
+                                                        Value="true"/>
+                                                    <Condition
+                                                        Property="IsSelectionActive"
+                                                        Value="false"/>
+                                                </MultiTrigger.Conditions>
+                                                <Setter
+                                                    Property="Background"
+                                                    TargetName="Bd"
+                                                    Value="{DynamicResource AeBrush.AccentSoft}"/>
+                                                <Setter
+                                                    Property="BorderBrush"
+                                                    TargetName="Bd"
+                                                    Value="Transparent"/>
+                                                <Setter
+                                                    Property="Foreground"
+                                                    Value="{DynamicResource AeBrush.TextPrimary}"/>
+                                            </MultiTrigger>
+                                            <Trigger
+                                                Property="IsEnabled"
+                                                Value="false">
+                                                <Setter
+                                                    Property="Foreground"
+                                                    Value="{DynamicResource AeBrush.TextMuted}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+
+                    <b:Interaction.Behaviors>
+                        <Behaviors:BindableSelectedItemBehavior
+                            SelectedItem="{Binding SelectedNode, Mode=TwoWay}"/>
+                    </b:Interaction.Behaviors>
+
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate
+                            ItemsSource="{Binding Path=Children, UpdateSourceTrigger=PropertyChanged}">
+                            <StackPanel
+                                Orientation="Horizontal">
+                                <TextBlock
+                                    Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+
+                <Border
+                    Grid.Row="8"
+                    Padding="8,4"
+                    BorderBrush="{DynamicResource AeBrush.Border}"
+                    BorderThickness="0, 1, 0, 0"
                     Background="{DynamicResource AeBrush.Surface1}"
-                    BorderThickness="0, 0, 0, 0"
-                    Text="{Binding SelectedNodeText, UpdateSourceTrigger=PropertyChanged}"/>
+                    Visibility="{Binding IsAudioPlaybackVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition
+                                Height="64"/>
+                            <RowDefinition
+                                Height="Auto"/>
+                            <RowDefinition
+                                Height="Auto"/>
+                            <RowDefinition
+                                Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid
+                            x:Name="AudioWaveformGrid"
+                            Grid.Row="0"
+                            Height="64"
+                            ClipToBounds="True"
+                            SizeChanged="OnAudioWaveformGridSizeChanged">
+                            <Image
+                                Stretch="Fill"
+                                SnapsToDevicePixels="True"
+                                Source="{Binding AudioWaveformBaseImageSource}"/>
+                            <Image
+                                Stretch="Fill"
+                                SnapsToDevicePixels="True"
+                                Source="{Binding AudioWaveformOverlayImageSource}">
+                                <Image.Clip>
+                                    <RectangleGeometry
+                                        Rect="{Binding AudioWaveformOverlayClip}"/>
+                                </Image.Clip>
+                            </Image>
+                        </Grid>
+
+                        <Grid
+                            Grid.Row="2"
+                            Margin="0, 6, 0, 5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition
+                                    Width="Auto"/>
+                                <ColumnDefinition
+                                    Width="*"/>
+                                <ColumnDefinition
+                                    Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock
+                                Grid.Column="0"
+                                MinWidth="42"
+                                VerticalAlignment="Center"
+                                Text="{Binding CurrentPlaybackTime, StringFormat={}{0:mm\\:ss}}"/>
+
+                            <Slider
+                                Grid.Column="1"
+                                Height="20"
+                                Margin="8, 0, 8, 0"
+                                Minimum="0"
+                                Maximum="{Binding TotalPlaybackSeconds}"
+                                Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                IsMoveToPointEnabled="True"
+                                IsEnabled="{Binding IsPlayAudioButtonEnabled}"
+                                SmallChange="0.1"
+                                LargeChange="5"/>
+
+                            <TextBlock
+                                Grid.Column="2"
+                                MinWidth="42"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Text="{Binding TotalPlaybackTime, StringFormat={}{0:mm\\:ss}}"/>
+                        </Grid>
+
+                        <StackPanel
+                            Grid.Row="3"
+                            HorizontalAlignment="Center"
+                            Orientation="Horizontal">
+                            <Button
+                                MinWidth="95"
+                                Height="25"
+                                Content="{loc:Loc AudioExplorer.PlayPauseAudio}"
+                                Style="{StaticResource AeButton.Primary}"
+                                Command="{Binding PlayAudioCommand}"
+                                IsEnabled="{Binding IsPlayAudioButtonEnabled}"/>
+                            <Button
+                                MinWidth="60"
+                                Height="25"
+                                Margin="5, 0, 0, 0"
+                                Content="{loc:Loc AudioExplorer.StopAudio}"
+                                Style="{StaticResource AeButton.Secondary}"
+                                Command="{Binding StopAudioCommand}"
+                                IsEnabled="{Binding IsStopAudioButtonEnabled}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <GridSplitter
+                Grid.Row="0"
+                Grid.Column="1"
+                Style="{StaticResource AeVerticalGridSplitterStyle}"
+                VerticalAlignment="Stretch"
+                HorizontalAlignment="Center"
+                ResizeBehavior="PreviousAndNext"
+                ResizeDirection="Columns"/>
+
+            <Grid
+                Grid.Row="1"
+                Grid.Column="2"
+                Background="{DynamicResource AeBrush.Surface1}">
+
+                <Grid.RowDefinitions>
+                    <RowDefinition
+                        Height="Auto"/>
+                    <RowDefinition
+                        Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Label
+                    Grid.Row="0"
+                    Padding="8,4"
+                    Content="{Binding WwiseObjectLabel}"
+                    Background="{DynamicResource AeBrush.Canvas}"
+                    BorderBrush="{DynamicResource AeBrush.Border}"
+                    BorderThickness="0, 0, 0, 1"/>
+
+                <ScrollViewer
+                    Grid.Row="1"
+                    Padding="4">
+                    <TextBox
+                        DockPanel.Dock="Top"
+                        IsReadOnly="True"
+                        Background="{DynamicResource AeBrush.Surface1}"
+                        BorderThickness="0, 0, 0, 0"
+                        Text="{Binding SelectedNodeText, UpdateSourceTrigger=PropertyChanged}"/>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+        <Grid
+            x:Name="AudioLoadingContent"
+            Background="{DynamicResource AeBrush.Canvas}">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsAudioPreviewLoading}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <ScrollViewer
+                MaxWidth="552"
+                VerticalAlignment="Center"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+                <Grid MaxWidth="520" Margin="16">
+                    <StackPanel Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <progress:OperationProgressView
+                            UseDeferredVisibility="False"
+                            UseLeadingIndicator="True"
+                            ShowDetails="False"
+                            CurrentDetailText="{Binding LoadProgressDetail}"
+                            IsOperationActive="{Binding IsLoading}"
+                            IsProgressIndeterminate="{Binding LoadProgressIsIndeterminate}"
+                            ProgressMaximum="{Binding LoadProgressMaximum}"
+                            ProgressValue="{Binding LoadProgressValue}"
+                            StatusText="{Binding LoadStatus}" />
+                        <Button
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Center"
+                            Command="{Binding CancelLoadingCommand}"
+                            Content="{loc:Loc AudioExplorer.CancelLoading}"
+                            Style="{StaticResource AeButton.Secondary}" />
+                    </StackPanel>
+                    <Border>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsAudioPreviewLoading}" Value="True" />
+                                            <Condition Binding="{Binding IsLoading}" Value="False" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <progress:OperationProgressView
+                            UseDeferredVisibility="False"
+                            UseLeadingIndicator="True"
+                            ShowDetails="False"
+                            CurrentDetailText="{Binding AudioPreviewProgressDetail}"
+                            IsOperationActive="{Binding IsAudioPreviewLoading}"
+                            IsProgressIndeterminate="False"
+                            ProgressMaximum="{Binding AudioPreviewProgressMaximum}"
+                            ProgressValue="{Binding AudioPreviewProgressValue}"
+                            StatusText="{loc:Loc OperationProgress.AudioPreview}" />
+                    </Border>
+                </Grid>
             </ScrollViewer>
         </Grid>
     </Grid>

@@ -29,7 +29,6 @@ public class OperationProgressViewTests
 {
     private static readonly (string[] Path, int HostCount)[] IndependentProgressHostSurfaces =
     [
-        (["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"], 1),
         (["AssetEditor", "Views", "MainWindow.xaml"], 1),
         (["Editors", "AnimationFragmentEditor", "Editor.AnimationFragmentEditor", "AnimationBatchExporter", "AnimationBatchExportView.xaml"], 1),
         (["Editors", "AnimationReTarget", "Editors.AnimatioReTarget", "Editor", "Saving", "SaveWindow.xaml"], 1),
@@ -45,7 +44,7 @@ public class OperationProgressViewTests
     private static readonly (string[] Path, int HostCount)[] AudioEditorProgressHostSurfaces =
     [
         (["Editors", "Audio", "AudioEditor", "Presentation", "AudioEditorView.xaml"], 2),
-        (["Editors", "Audio", "AudioExplorer", "AudioExplorerView.xaml"], 3),
+        (["Editors", "Audio", "AudioExplorer", "AudioExplorerView.xaml"], 1),
     ];
     private static readonly string[][] LoadingWindowPaths =
     [
@@ -306,7 +305,8 @@ public class OperationProgressViewTests
                     element.Name.LocalName ==
                         nameof(OperationProgressWindowHost) &&
                     element.Attribute("WindowTitle") is null);
-                return hosts == item.HostCount && embeddedViews == 0 &&
+                var expectedEmbedded = item.Path.Contains("AudioExplorerView.xaml") ? 2 : 0;
+                return hosts == item.HostCount && embeddedViews == expectedEmbedded &&
                        untitledHosts == 0
                     ? null
                     : $"{string.Join('/', item.Path)}: " +
@@ -320,7 +320,7 @@ public class OperationProgressViewTests
     }
 
     [Test]
-    public void AudioEditorLoadingSurfaces_UseIndependentWindowHosts()
+    public void AudioLoadingSurfaces_OnlyExplorerLoadingUsesEmbeddedViews()
     {
         var solutionRoot = FindSolutionRoot();
         var mismatches = AudioEditorProgressHostSurfaces
@@ -334,7 +334,8 @@ public class OperationProgressViewTests
                 var embeddedViews = document.Descendants().Count(element =>
                     element.Name.LocalName ==
                     nameof(OperationProgressView));
-                return hosts == item.HostCount && embeddedViews == 0
+                var expectedEmbedded = item.Path.Contains("AudioExplorerView.xaml") ? 2 : 0;
+                return hosts == item.HostCount && embeddedViews == expectedEmbedded
                     ? null
                     : $"{string.Join('/', item.Path)}: " +
                       $"hosts={hosts}, embedded={embeddedViews}";
@@ -350,6 +351,11 @@ public class OperationProgressViewTests
     {
         var solutionRoot = FindSolutionRoot();
         var allowed = LoadingWindowPaths
+            .Concat(new string[][]
+            {
+                ["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"],
+                ["Editors", "Audio", "AudioExplorer", "AudioExplorerView.xaml"],
+            })
             .Select(parts => Path.GetFullPath(Path.Combine(
                 [solutionRoot, .. parts])))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -961,7 +967,7 @@ public class OperationProgressViewTests
             Assert.That(
                 audioExplorer,
                 Does.Contain(
-                    "IsOperationActive=\"{Binding IsLoadProgressWindowActive}\""));
+                    "IsOperationActive=\"{Binding IsLoading}\""));
         });
     }
 

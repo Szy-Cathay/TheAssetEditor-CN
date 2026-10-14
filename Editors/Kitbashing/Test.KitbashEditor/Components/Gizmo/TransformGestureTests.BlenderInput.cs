@@ -424,11 +424,18 @@ namespace Testing.GameWorld.Core.Components.Gizmo
             Assert.That(context.Mesh.VertexArray.Select(vertex => vertex.Position), Is.EqualTo(original));
         }
 
-        [TestCase(Keys.R, 13, 0)]
-        [TestCase(Keys.S, 0, 3)]
-        public void BlenderInput_CtrlSnapsSmallMouseMovementToBaseline(Keys mode, int x, int y)
+        [TestCase(Keys.R, 13, 0, 0.32f, 0.8f)]
+        [TestCase(Keys.R, 1, 0, -MathHelper.PiOver4, 0.8f)]
+        [TestCase(Keys.R, 1, 0, -MathHelper.Pi * 24 / 180, MathHelper.Pi * 26 / 180)]
+        [TestCase(Keys.S, 0, 3, 0.32f, 0.8f)]
+        [TestCase(Keys.S, 0, 3, -MathHelper.PiOver4, 0.8f)]
+        [TestCase(Keys.S, 0, 3, -MathHelper.Pi * 24 / 180, MathHelper.Pi * 26 / 180)]
+        public void BlenderInput_CtrlSnapsSmallMouseMovementToBaseline(Keys mode, int x, int y, float pitch, float yaw)
         {
             using var context = CreateBlenderInputContext();
+            // Pixel displacements must stay below the snap threshold at each view angle.
+            context.Camera.Pitch = pitch;
+            context.Camera.Yaw = yaw;
             var original = context.Mesh.VertexArray.ToArray();
             ReleaseKey(context, mode);
             context.Keyboard.Setup(keyboard => keyboard.IsKeyDown(Keys.LeftControl)).Returns(true);
