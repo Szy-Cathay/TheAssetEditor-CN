@@ -183,6 +183,10 @@ namespace AssetEditorTests
                 ],
                 ["Editors/Shared/Editors.Shared.Core/Common/BaseControl/EditorHostView.xaml"] =
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
+                ["Editors/Kitbashing/KitbasherEditor/ChildEditors/MeshFitter/MeshFitterWindow.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
+                ["Editors/Shared/Editors.Shared.Core/Editors/BoneMapping/View/BoneMappingView.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/TwuiEditor/Editor.Twui/Editor/Presentation/TwuiMainView.xaml"] =
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",

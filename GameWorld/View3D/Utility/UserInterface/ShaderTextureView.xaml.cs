@@ -20,6 +20,15 @@ namespace GameWorld.Core.Utility.UserInterface
     /// </summary>
     public partial class ShaderTextureView : UserControl
     {
+        public static readonly DependencyProperty ShowRenderToggleProperty = DependencyProperty.Register(
+            nameof(ShowRenderToggle), typeof(bool), typeof(ShaderTextureView), new PropertyMetadata(true));
+
+        public bool ShowRenderToggle
+        {
+            get => (bool)GetValue(ShowRenderToggleProperty);
+            set => SetValue(ShowRenderToggleProperty, value);
+        }
+
         public ShaderTextureView()
         {
             InitializeComponent();

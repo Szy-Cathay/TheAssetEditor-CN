@@ -290,7 +290,7 @@ public class UiModelKitbashFamilyTests
 
     [Test]
     [NonParallelizable]
-    public void BoneMappingActions_UseTwoReadableRows()
+    public void BoneMappingActions_WrapWithoutClippingOrOverlap()
     {
         var localizationManager = new LocalizationManager();
         localizationManager.LoadLanguage();
@@ -302,50 +302,37 @@ public class UiModelKitbashFamilyTests
             () =>
             {
                 var view = new BoneMappingView();
-                var window = new Window
+                var expectedLabels = new[]
                 {
-                    Content = view,
-                    Width = 1000,
-                    Height = 900,
-                    ShowActivated = false,
-                    ShowInTaskbar = false,
-                };
-                try
+                    "BoneMapping.AutoMapByName",
+                    "BoneMapping.AutoMapByHierarchy",
+                    "BoneMapping.DeleteSelf",
+                    "BoneMapping.DeleteSelfAndChildren",
+                    "BoneMapping.CopyToAllChildren",
+                }.Select(localizationManager.Get).ToHashSet();
+                foreach (var width in new[] { 1000d, 520d })
                 {
-                    window.Show();
-                    window.UpdateLayout();
-                    var expectedLabels = new[]
-                    {
-                        "BoneMapping.AutoMapByName",
-                        "BoneMapping.AutoMapByHierarchy",
-                        "BoneMapping.DeleteSelf",
-                        "BoneMapping.DeleteSelfAndChildren",
-                        "BoneMapping.CopyToAllChildren",
-                    }.Select(localizationManager.Get).ToHashSet();
+                    PlaybackAndViewportRefinementTests.Layout(view, width, 600);
                     var actions = FindVisualDescendants<Button>(view)
                         .Where(button =>
                             button.Content is string label &&
                             expectedLabels.Contains(label))
                         .ToArray();
-                    var rowOffsets = actions
-                        .Select(button => Math.Round(
-                            button.TranslatePoint(new Point(), view).Y,
-                            2))
-                        .Distinct()
-                        .ToArray();
-
-                    NUnitAssert.Multiple(() =>
+                    NUnitAssert.That(actions, Has.Length.EqualTo(5));
+                    var bounds = actions.Select(button => new Rect(button.TranslatePoint(new Point(), view), button.RenderSize)).ToArray();
+                    for (var index = 0; index < actions.Length; index++)
                     {
-                        NUnitAssert.That(actions, Has.Length.EqualTo(5));
-                        NUnitAssert.That(rowOffsets, Has.Length.EqualTo(2));
-                        NUnitAssert.That(
-                            actions.Select(button => button.ActualWidth),
-                            Has.All.GreaterThanOrEqualTo(150));
-                    });
-                }
-                finally
-                {
-                    window.Close();
+                        var button = actions[index];
+                        var text = new FormattedText((string)button.Content, System.Globalization.CultureInfo.CurrentUICulture,
+                            button.FlowDirection, new Typeface(button.FontFamily, button.FontStyle, button.FontWeight, button.FontStretch),
+                            button.FontSize, button.Foreground, VisualTreeHelper.GetDpi(button).PixelsPerDip);
+                        NUnitAssert.That(text.WidthIncludingTrailingWhitespace,
+                            Is.LessThanOrEqualTo(button.ActualWidth - button.Padding.Left - button.Padding.Right + 1), button.Content.ToString());
+                        NUnitAssert.That(bounds[index].Left, Is.GreaterThanOrEqualTo(0));
+                        NUnitAssert.That(bounds[index].Right, Is.LessThanOrEqualTo(width));
+                        for (var other = index + 1; other < bounds.Length; other++)
+                            NUnitAssert.That(Rect.Intersect(bounds[index], bounds[other]).IsEmpty, Is.True);
+                    }
                 }
             });
     }
@@ -530,7 +517,7 @@ public class UiModelKitbashFamilyTests
             NUnitAssert.That(propertySource, Does.Not.Contain("FontSize=\"20\""));
             NUnitAssert.That(
                 propertySource,
-                Does.Contain("Style=\"{DynamicResource Kitbash.PropertyTitle}\""));
+                Does.Contain("Style=\"{DynamicResource Kitbash.InspectorHeading}\""));
             NUnitAssert.That(
                 sceneNodeEditor,
                 Does.Contain("HorizontalContentAlignment=\"Stretch\""));
@@ -792,7 +779,7 @@ public class UiModelKitbashFamilyTests
     }
 
     [Test]
-    public void MainEditableSkeletonSelector_KeepsLabelOnTheInputRowWhenExpanded()
+    public void MainEditableSkeletonSelector_KeepsFullWidthInputAndOneLabelWhenExpanded()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -812,60 +799,45 @@ public class UiModelKitbashFamilyTests
                 try
                 {
                     var view = new MainEditableNodeView();
-                    var window = new Window
+                    view.Resources.MergedDictionaries.Add(new ResourceDictionary
                     {
-                        Content = view,
-                        Width = 400,
-                        Height = 720,
-                        ShowActivated = false,
-                        ShowInTaskbar = false,
-                    };
-                    try
+                        Source = new Uri("/Editors.KitbasherEditor;component/KitbashUiStyles.xaml", UriKind.Relative),
+                    });
+                    PlaybackAndViewportRefinementTests.Layout(view, 300, 720);
+
+                    var selector = FindVisualDescendants<
+                            CollapsableFilterControl>(view)
+                        .Single();
+                    var browseButton = FindVisualDescendants<Button>(selector)
+                        .First(button => button.Name == "BrowseButton");
+                    browseButton.RaiseEvent(new RoutedEventArgs(
+                        Button.ClickEvent));
+                    PlaybackAndViewportRefinementTests.Layout(view, 300, 720);
+
+                    var visibleLabels = FindVisualDescendants<Label>(view)
+                        .Where(label =>
+                            label.Visibility == Visibility.Visible &&
+                            Equals(label.Content, selector.LabelText))
+                        .ToArray();
+                    var selectedFileName = FindVisualDescendants<TextBox>(selector)
+                        .Single(textBox => textBox.Name == "SelectedFileName");
+                    var labelBottom = visibleLabels.Single().TransformToAncestor(view)
+                        .Transform(new Point(0, visibleLabels.Single().ActualHeight)).Y;
+                    var inputTop = selectedFileName.TransformToAncestor(view)
+                        .Transform(new Point()).Y;
+
+                    NUnitAssert.Multiple(() =>
                     {
-                        window.Show();
-                        window.UpdateLayout();
-
-                        var selector = FindVisualDescendants<
-                                CollapsableFilterControl>(view)
-                            .Single();
-                        var browseButton = FindVisualDescendants<Button>(selector)
-                            .First(button => button.Name == "BrowseButton");
-                        browseButton.RaiseEvent(new RoutedEventArgs(
-                            Button.ClickEvent));
-                        window.UpdateLayout();
-
-                        var visibleLabels = FindVisualDescendants<Label>(view)
-                            .Where(label =>
-                                label.Visibility == Visibility.Visible &&
-                                Equals(label.Content, selector.LabelText))
-                            .ToArray();
-                        var selectorLabel = FindVisualDescendants<Label>(selector)
-                            .Single(label =>
-                                Equals(label.Content, selector.LabelText));
-                        var selectedFileName = FindVisualDescendants<TextBox>(selector)
-                            .Single(textBox => textBox.Name == "SelectedFileName");
-                        var labelTop = selectorLabel.TransformToAncestor(selector)
-                            .Transform(new Point()).Y;
-                        var inputTop = selectedFileName.TransformToAncestor(selector)
-                            .Transform(new Point()).Y;
-
-                        NUnitAssert.Multiple(() =>
-                        {
-                            NUnitAssert.That(selector.ShowLabel, Is.True);
-                            NUnitAssert.That(selectedFileName.ActualWidth,
-                                Is.GreaterThanOrEqualTo(160));
-                            NUnitAssert.That(visibleLabels,
-                                Has.Length.EqualTo(1));
-                            NUnitAssert.That(selectorLabel.Visibility,
-                                Is.EqualTo(Visibility.Visible));
-                            NUnitAssert.That(labelTop,
-                                Is.EqualTo(inputTop).Within(1));
-                        });
-                    }
-                    finally
-                    {
-                        window.Close();
-                    }
+                        NUnitAssert.That(selector.ShowLabel, Is.False);
+                        NUnitAssert.That(selectedFileName.ActualWidth,
+                            Is.GreaterThanOrEqualTo(160));
+                        NUnitAssert.That(visibleLabels,
+                            Has.Length.EqualTo(1));
+                        NUnitAssert.That(labelBottom,
+                            Is.LessThanOrEqualTo(inputTop));
+                        NUnitAssert.That(FindVisualDescendants<Button>(selector)
+                            .Any(button => button.Name == "ClearButton"), Is.True);
+                    });
                 }
                 finally
                 {

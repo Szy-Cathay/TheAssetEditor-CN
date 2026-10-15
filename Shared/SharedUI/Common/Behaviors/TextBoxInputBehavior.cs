@@ -12,7 +12,7 @@ using Microsoft.Xaml.Behaviors;
 
 namespace Shared.Ui.Common.Behaviors
 {
-    public class TextBoxInputBehavior : Behavior<TextBox>
+    public partial class TextBoxInputBehavior : Behavior<TextBox>
     {
         const NumberStyles validNumberStyles = NumberStyles.AllowDecimalPoint |
                                                    NumberStyles.AllowThousands |
@@ -41,6 +41,7 @@ namespace Shared.Ui.Common.Behaviors
             base.OnAttached();
             AssociatedObject.PreviewTextInput += AssociatedObjectPreviewTextInput;
             AssociatedObject.PreviewKeyDown += AssociatedObjectPreviewKeyDown;
+            AttachNumericDrag();
 
             DataObject.AddPastingHandler(AssociatedObject, Pasting);
 
@@ -51,6 +52,7 @@ namespace Shared.Ui.Common.Behaviors
             base.OnDetaching();
             AssociatedObject.PreviewTextInput -= AssociatedObjectPreviewTextInput;
             AssociatedObject.PreviewKeyDown -= AssociatedObjectPreviewKeyDown;
+            DetachNumericDrag();
 
             DataObject.RemovePastingHandler(AssociatedObject, Pasting);
         }

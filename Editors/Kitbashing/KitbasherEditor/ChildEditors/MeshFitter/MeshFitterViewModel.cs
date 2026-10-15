@@ -1,5 +1,6 @@
 ﻿using GameWorld.Core.Animation;
 using GameWorld.Core.Commands;
+using System.Globalization;
 using GameWorld.Core.Commands.Object;
 using GameWorld.Core.Components;
 using GameWorld.Core.SceneNodes;
@@ -26,6 +27,8 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
         SkeletonNode _currentSkeletonNode;
         bool _isDisposed;
         bool _hasCommitted;
+        bool _updatingBoneValues;
+        bool _validPreview = true;
 
         public NotifyAttr<bool> RelativeScale { get; set; } = new NotifyAttr<bool>(false);
         public DoubleViewModel ScaleFactor { get; set; } = new DoubleViewModel(1);
@@ -86,6 +89,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
             _oldAnimationPlayers = _meshNodes.Select(x => x.AnimationPlayer).ToList();
             foreach (var mesh in _meshNodes)
                 mesh.AnimationPlayer = _animationPlayer;
+            OnBoneSelected();
         }
 
         protected override void MappingUpdated()
@@ -98,38 +102,49 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         private void SkeletonDisplayOffsetUpdated(Vector3ViewModel viewModel)
         {
+            if (!ValidVector(viewModel)) return;
             _currentSkeletonNode.ModelMatrix = Matrix.CreateTranslation((float)viewModel.X.Value, (float)viewModel.Y.Value, (float)viewModel.Z.Value);
         }
 
         void OnBoneSelected()
         {
-            IsBoneSelected.Value = MeshBones.SelectedItem != null;
-            if (MeshBones.SelectedItem != null)
+            _updatingBoneValues = true;
+            try
             {
-                BoneScaleFactor.Value = MeshBones.SelectedItem.BoneScaleOffset;
-                BoneRotationOffset.Set(MeshBones.SelectedItem.BoneRotOffset.X, MeshBones.SelectedItem.BoneRotOffset.Y, MeshBones.SelectedItem.BoneRotOffset.Z);
-                BonePositionOffset.Set(MeshBones.SelectedItem.BonePosOffset.X, MeshBones.SelectedItem.BonePosOffset.Y, MeshBones.SelectedItem.BonePosOffset.Z);
+                IsBoneSelected.Value = MeshBones.SelectedItem != null;
+                if (MeshBones.SelectedItem != null)
+                {
+                    BoneScaleFactor.Value = MeshBones.SelectedItem.BoneScaleOffset;
+                    BoneRotationOffset.Set(MeshBones.SelectedItem.BoneRotOffset.X, MeshBones.SelectedItem.BoneRotOffset.Y, MeshBones.SelectedItem.BoneRotOffset.Z);
+                    BonePositionOffset.Set(MeshBones.SelectedItem.BonePosOffset.X, MeshBones.SelectedItem.BonePosOffset.Y, MeshBones.SelectedItem.BonePosOffset.Z);
 
-                _currentSkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem.BoneIndex.Value;
-                var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-                rootNode.SkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem.MappedBoneIndex.Value;
+                    _currentSkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem.BoneIndex.Value;
+                    var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+                    rootNode.SkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem.MappedBoneIndex.Value;
+                }
+                else
+                {
+                    BoneScaleFactor.Value = 1;
+                    BoneRotationOffset.Set(0);
+                    BonePositionOffset.Set(0);
+
+                    _currentSkeletonNode.SelectedBoneIndex = null;
+
+                    var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+                    rootNode.SkeletonNode.SelectedBoneIndex = null;
+                }
             }
-            else
+            finally
             {
-                BoneScaleFactor.Value = 1;
-                BoneRotationOffset.Set(0);
-                BonePositionOffset.Set(0);
-
-                _currentSkeletonNode.SelectedBoneIndex = null;
-
-                var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-                rootNode.SkeletonNode.SelectedBoneIndex = null;
+                _updatingBoneValues = false;
+                NotifyPropertyChanged(nameof(HasValidTransform));
             }
         }
 
         void BoneScaleUpdate(float newValue, AnimatedBone bone)
         {
-            if (bone == null)
+            NotifyPropertyChanged(nameof(HasValidTransform));
+            if (bone == null || _updatingBoneValues || !HasValidInputs)
                 return;
             bone.BoneScaleOffset = newValue;
             ApplyMeshFittingTransforms();
@@ -137,7 +152,8 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         void BoneRotationUpdated(Vector3ViewModel newValue, AnimatedBone bone)
         {
-            if (bone == null)
+            NotifyPropertyChanged(nameof(HasValidTransform));
+            if (bone == null || _updatingBoneValues || !HasValidInputs)
                 return;
             bone.BoneRotOffset = new Vector3((float)newValue.X.Value, (float)newValue.Y.Value, (float)newValue.Z.Value);
             ApplyMeshFittingTransforms();
@@ -145,7 +161,8 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         void BonePositionUpdated(Vector3ViewModel newValue, AnimatedBone bone)
         {
-            if (bone == null)
+            NotifyPropertyChanged(nameof(HasValidTransform));
+            if (bone == null || _updatingBoneValues || !HasValidInputs)
                 return;
             bone.BonePosOffset = new Vector3((float)newValue.X.Value, (float)newValue.Y.Value, (float)newValue.Z.Value);
             ApplyMeshFittingTransforms();
@@ -153,6 +170,17 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         void ApplyMeshFittingTransforms()
         {
+            NotifyPropertyChanged(nameof(HasValidTransform));
+            if (_updatingBoneValues || !HasValidInputs)
+                return;
+            var previousFrame = _animationClip.DynamicFrames[0].Clone();
+            _validPreview = true;
+            if (MeshBones.SelectedItem is { } selectedBone)
+            {
+                selectedBone.BoneScaleOffset = (float)BoneScaleFactor.Value;
+                selectedBone.BonePosOffset = BonePositionOffset.GetAsVector3();
+                selectedBone.BoneRotOffset = BoneRotationOffset.GetAsVector3();
+            }
             // Rebuild the mapping index as its easy to work with
             var mapping = AnimatedBoneHelper.BuildRemappingList(MeshBones.PossibleValues.First());
 
@@ -251,9 +279,17 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                     Matrix.CreateFromQuaternion(boneRotation) *
                     Matrix.CreateTranslation(bonePosition) *
                     parentWorld;
+                var fitted = fittedWorldTransforms[i];
+                var determinant = fitted.Determinant();
+                if (!float.IsFinite(determinant) || determinant == 0 ||
+                    !float.IsFinite(fitted.M41) || !float.IsFinite(fitted.M42) || !float.IsFinite(fitted.M43))
+                    _validPreview = false;
             }
 
+            if (!_validPreview)
+                _animationClip.DynamicFrames[0] = previousFrame;
             _animationPlayer.Refresh();
+            NotifyPropertyChanged(nameof(HasValidTransform));
         }
 
         internal static float CalculateRelativeScale(float sourceBoneLength, float targetBoneLength)
@@ -277,6 +313,7 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                 MeshBones.SelectedItem.BoneRotOffset = Vector3.Zero;
                 MeshBones.SelectedItem.BoneScaleOffset = 1;
                 OnBoneSelected();
+                ApplyMeshFittingTransforms();
             }
         }
 
@@ -322,11 +359,24 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         protected override void ApplyChanges()
         {
-            if (_hasCommitted)
+            if (_hasCommitted || !HasValidTransform)
                 return;
             var frame = AnimationSampler.Sample(0, _fromSkeleton, _animationClip);
             _hasCommitted = _commandFactory.Create<CreateAnimatedMeshPoseCommand>().Configure(x => x.Configure(_meshNodes, frame)).BuildAndExecute();
         }
+
+        public bool HasValidTransform => _validPreview && HasValidInputs;
+
+        private bool HasValidInputs => ValidNumber(ScaleFactor, true) && ValidNumber(BoneScaleFactor, true) &&
+            ValidVector(BonePositionOffset) && ValidVector(BoneRotationOffset);
+
+        private static bool ValidNumber(DoubleViewModel value, bool positive = false) =>
+            double.TryParse(value.TextValue.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) &&
+            double.IsFinite(number) && Math.Abs(number) <= float.MaxValue && (!positive || number >= 0.00001);
+
+        private static bool ValidVector(Vector3ViewModel value) => ValidNumber(value.X) && ValidNumber(value.Y) && ValidNumber(value.Z);
+
+        public override bool OnOkButton() => HasValidTransform && base.OnOkButton();
 
     }
 }

@@ -1,4 +1,4 @@
-using Editors.KitbasherEditor.ChildEditors.PinTool;
+﻿using Editors.KitbasherEditor.ChildEditors.PinTool;
 using GameWorld.Core.Commands;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering.Geometry;
@@ -14,6 +14,33 @@ namespace Test.KitbashEditor
     {
         [OneTimeSetUp]
         public void LoadLocalization() => new LocalizationManager().LoadLanguage();
+
+        [Test]
+        public void StaticSkinWrapSource_IsRejectedBeforeApplying()
+        {
+            var source = CreateRiggedMesh();
+            source.Geometry.ChangeVertexType(Shared.GameFormats.RigidModel.UiVertexFormat.Static, false);
+            var state = new ObjectSelectionState();
+            state.ModifySelectionSingleObject(source, false);
+            using var model = CreateViewModel(CreateSelectionManager(state), Mock.Of<IStandardDialogs>());
+            model.AffectedMeshCollection.Add(CreateRiggedMesh());
+            model.SelectedRiggingMode = RiggingMode.SkinWrap;
+            model.SkinWrapMode.SetSelectionCommand.Execute(null);
+            Assert.That(model.CanApply, Is.False);
+            Assert.That(model.SkinWrapMode.TakeAnimationFromMesh, Is.Null);
+        }
+
+        [TestCase(-1)]
+        [TestCase(1)]
+        public void StalePinVertex_CannotBeApplied(int vertex)
+        {
+            using var model = CreateViewModel(CreateSelectionManager(new ObjectSelectionState()), Mock.Of<IStandardDialogs>());
+            model.AffectedMeshCollection.Add(CreateRiggedMesh());
+            model.PinMode.SelectedMesh = CreateRiggedMesh();
+            model.PinMode.SelectedVertex = [vertex];
+            Assert.That(model.CanApply, Is.False);
+            Assert.That(model.Apply(), Is.False);
+        }
 
         [Test]
         public void StaticPinSource_ShowsAnErrorAndCannotBeApplied()

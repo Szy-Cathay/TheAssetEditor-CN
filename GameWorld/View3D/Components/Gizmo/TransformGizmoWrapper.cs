@@ -415,19 +415,18 @@ namespace GameWorld.Core.Components.Gizmo
             }
         }
 
-        public void ReplaceInitialPreview(
+        public bool ReplaceInitialPreview(
             ModalPreviewReplacement replacement)
         {
             if (_activeCommand is TransformBoneCommand transformBoneCommand)
             {
-                ReplaceBoneInitialPreview(
+                return ReplaceBoneInitialPreview(
                     transformBoneCommand,
                     replacement);
-                return;
             }
 
             if (_activeCommand is not TransformVertexCommand || !_hasBackup)
-                return;
+                return false;
             if (_previewSynchronizationFaulted)
             {
                 throw new InvalidOperationException(
@@ -450,10 +449,12 @@ namespace GameWorld.Core.Components.Gizmo
                     RestoreVertexCandidateToBaseline();
                     SynchronizeBaselinePreview();
                 }
+                return result.Accepted;
             }
             catch (Exception exception)
             {
                 RecoverVertexPreviewAndRethrow(exception);
+                return false;
             }
         }
 
@@ -482,7 +483,7 @@ namespace GameWorld.Core.Components.Gizmo
             };
         }
 
-        private void ReplaceBoneInitialPreview(
+        private bool ReplaceBoneInitialPreview(
             TransformBoneCommand transformBoneCommand,
             ModalPreviewReplacement replacement)
         {
@@ -491,8 +492,7 @@ namespace GameWorld.Core.Components.Gizmo
             {
                 transformBoneCommand.RestoreInitialFrame();
                 ResetBonePreviewToBaseline();
-                ApplyBoneReplacement(replacement);
-                return;
+                return ApplyBoneReplacement(replacement);
             }
             catch (Exception exception)
             {
@@ -512,37 +512,23 @@ namespace GameWorld.Core.Components.Gizmo
             }
 
             primaryError.Throw();
+            return false;
         }
 
-        private void ApplyBoneReplacement(
-            ModalPreviewReplacement replacement)
+        private bool ApplyBoneReplacement(ModalPreviewReplacement replacement)
         {
-            switch (replacement.Kind)
+            var pivot = GetBonePivot(replacement.Pivot);
+            BoneTransformDelta delta = default;
+            var valid = replacement.Kind switch
             {
-                case ModalPreviewReplacementKind.RestoreOnly:
-                    return;
-                case ModalPreviewReplacementKind.Translate:
-                    GizmoTranslateEvent(
-                        replacement.VectorValue,
-                        replacement.Pivot);
-                    return;
-                case ModalPreviewReplacementKind.Rotate:
-                    GizmoRotateEvent(
-                        replacement.RotationValue,
-                        replacement.Pivot);
-                    return;
-                case ModalPreviewReplacementKind.Scale:
-                    GizmoScaleEvent(
-                        replacement.VectorValue,
-                        replacement.Pivot,
-                        replacement.ScaleOrientation);
-                    return;
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(replacement));
-            }
+                ModalPreviewReplacementKind.RestoreOnly => false,
+                ModalPreviewReplacementKind.Translate => BoneTransformDelta.TryCreateTranslation(replacement.VectorValue, pivot, out delta),
+                ModalPreviewReplacementKind.Rotate => BoneTransformDelta.TryCreateRotation(replacement.RotationValue, pivot, out delta),
+                ModalPreviewReplacementKind.Scale => BoneTransformDelta.TryCreateScale(replacement.VectorValue + Vector3.One, pivot, out delta, replacement.ScaleOrientation),
+                _ => throw new ArgumentOutOfRangeException(nameof(replacement))
+            };
+            return valid && TransformBone(delta);
         }
-
         private void EndTransform(Action transformEnd)
         {
             ExceptionDispatchInfo primaryError = null;

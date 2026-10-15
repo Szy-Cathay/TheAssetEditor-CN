@@ -140,29 +140,27 @@ public class OperationProgressWindowTransitionTests
     }
 
     [Test]
-    public void ShortStartup_UsesPerPixelTransparencyToHideTheNativeWindow()
+    public void Startup_InitialNativeSurfaceIsHiddenWithPerPixelTransparency()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices, () =>
             {
-                StartupPackLoadingWindow? window = null;
                 var surfaceOpacity = 1d;
                 var usesPerPixelOpacity = false;
-                window = new StartupPackLoadingWindow(report =>
-                {
-                    window!.Dispatcher.Invoke(() =>
-                    {
-                        surfaceOpacity = window.Opacity;
-                        usesPerPixelOpacity = HwndSource.FromHwnd(
-                            new WindowInteropHelper(window).Handle).CompositionTarget.UsesPerPixelOpacity;
-                    });
-                    return new PackFileContainer("All Game Packs") { IsCaPackFile = true };
-                }, _ => { }, () => { })
+                var window = new StartupPackLoadingWindow(
+                    _ => new PackFileContainer("All Game Packs") { IsCaPackFile = true }, _ => { }, () => { })
                 {
                     WindowStartupLocation = WindowStartupLocation.Manual,
                     Left = -10000,
                     Top = -10000,
                     ShowActivated = false,
+                };
+                // Observe the initial native surface before thread-pool scheduling can outlast the reveal delay.
+                window.SourceInitialized += (_, _) =>
+                {
+                    surfaceOpacity = window.Opacity;
+                    usesPerPixelOpacity = HwndSource.FromHwnd(
+                        new WindowInteropHelper(window).Handle).CompositionTarget.UsesPerPixelOpacity;
                 };
 
                 Assert.That(window.Run(), Is.True);

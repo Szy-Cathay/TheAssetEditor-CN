@@ -30,14 +30,14 @@ namespace Test.KitbashEditor
                         typeof(string),
                         null!,
                         CultureInfo.InvariantCulture),
-                    Is.EqualTo("标准蒙皮（最多 2 根骨骼）"));
+                    Is.EqualTo("2骨骼蒙皮"));
                 Assert.That(
                     converter.Convert(
                         UiVertexFormat.Cinematic,
                         typeof(string),
                         null!,
                         CultureInfo.InvariantCulture),
-                    Is.EqualTo("高质量蒙皮（最多 4 根骨骼）"));
+                    Is.EqualTo("4骨骼蒙皮"));
                 Assert.That(
                     converter.Convert(
                         VertexFormat.Collision_Format,
@@ -51,7 +51,7 @@ namespace Test.KitbashEditor
                         typeof(string),
                         null!,
                         CultureInfo.InvariantCulture),
-                    Is.EqualTo("金属度/粗糙度（自发光）"));
+                    Is.EqualTo("自发光材质"));
                 Assert.That(
                     converter.Convert(
                         true,
@@ -74,7 +74,7 @@ namespace Test.KitbashEditor
                 Assert.That(
                     LocalizationManager.Instance.Get(
                         "ModelMaterial.SelectedShader.ToolTip"),
-                    Does.Contain("切换类型会重新创建材质"));
+                    Does.Contain("切换会重新创建材质"));
                 Assert.That(
                     LocalizationManager.Instance.Get(
                         "Tint.ToolTip"),
@@ -86,7 +86,7 @@ namespace Test.KitbashEditor
                 Assert.That(
                     LocalizationManager.Instance.Get(
                         "Mesh.RenderBbox.ToolTip"),
-                    Does.Contain("不会写入模型"));
+                    Does.Contain("不写入模型"));
             });
         }
 

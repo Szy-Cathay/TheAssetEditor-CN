@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Xna.Framework;
 using Shared.ByteParsing;
 using Shared.Core.Misc;
+using Shared.Core.Services;
 using Shared.GameFormats.RigidModel.Transforms;
 using Shared.GameFormats.RigidModel.Types;
 
@@ -238,7 +239,7 @@ namespace Shared.GameFormats.RigidModel.MaterialHeaders
 
                 MaterialId = materialId,
                 BinaryVertexFormat = (VertexFormat)header._vertexType,
-                ModelName = StringSanitizer.FixedString(Encoding.ASCII.GetString(header._modelName)),
+                ModelName = StringSanitizer.FixedString(Encoding.UTF8.GetString(header._modelName)),
                 Filters = StringSanitizer.FixedString(Encoding.ASCII.GetString(header.Filters)),
                 MatrixIndex = header.MatrixIndex,
                 ParentMatrixIndex = header.ParentMatrixIndex,
@@ -278,6 +279,10 @@ namespace Shared.GameFormats.RigidModel.MaterialHeaders
         {
             if (material is not WeightedMaterial typedMaterial)
                 throw new Exception("Incorrect material provided for WeightedMaterial::Save");
+
+            if (typedMaterial.ModelName.Contains('\0') || Encoding.UTF8.GetByteCount(typedMaterial.ModelName) > 32)
+                throw new ArgumentException(LocalizationManager.Instance?.Get("Msg.Kitbash.ModelNameByteLimit")
+                    ?? "Model names must fit in 32 UTF-8 bytes and cannot contain a null character.");
 
             // Create the header
             var header = new WeightedMaterialStruct()

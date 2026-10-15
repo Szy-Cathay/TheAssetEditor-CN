@@ -7,6 +7,8 @@
     xmlns:windowhandling="clr-namespace:WindowHandling;assembly=Shared.Ui"
     xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
     xmlns:colourpicker="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui"
+    xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
     xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
     mc:Ignorable="d"
     ResizeMode="NoResize"
@@ -19,34 +21,25 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
-        <DataTemplate x:Key="PhotoVector">
-            <StackPanel>
-                <UniformGrid Columns="3" Margin="0,0,0,4">
-                    <TextBlock Text="{loc:Loc Ui.Axis.X}" Style="{StaticResource AeText.Caption}"/>
-                    <TextBlock Text="{loc:Loc Ui.Axis.Y}" Style="{StaticResource AeText.Caption}"/>
-                    <TextBlock Text="{loc:Loc Ui.Axis.Z}" Style="{StaticResource AeText.Caption}"/>
-                </UniformGrid>
-                <mathviews:Vector3View Vector3="{Binding}"/>
-            </StackPanel>
-        </DataTemplate>
+
         </ResourceDictionary>
     </windowhandling:AssetEditorWindow.Resources>
     <Grid>
         <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel Margin="16">
             <TextBlock Text="{loc:Loc KitbashTool.PhotoStudio.CameraInformation}" Style="{StaticResource AeText.SectionTitle}" Margin="0,0,0,8"/>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraPosition}" Style="{StaticResource AeForm.Label}"/><ContentControl Content="{Binding CameraPosition}" ContentTemplate="{StaticResource PhotoVector}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraYaw}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding CameraYawDegrees, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraPitch}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding CameraPitchDegrees, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraZoom}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding CameraZoom, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraTarget}" Style="{StaticResource AeForm.Label}"/><ContentControl Content="{Binding CameraLookAt}" ContentTemplate="{StaticResource PhotoVector}"/></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraPosition}" Style="{StaticResource AeForm.Label}"/><ContentControl Content="{Binding CameraPosition}" ContentTemplate="{StaticResource Kitbash.InspectorVector3}"/></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraYaw}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding CameraYawDegrees, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.25"/></b:Interaction.Behaviors></TextBox></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraPitch}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding CameraPitchDegrees, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.25"/></b:Interaction.Behaviors></TextBox></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraZoom}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding CameraZoom, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.01" DragMinimum="0.001"/></b:Interaction.Behaviors></TextBox></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.CameraTarget}" Style="{StaticResource AeForm.Label}"/><ContentControl Content="{Binding CameraLookAt}" ContentTemplate="{StaticResource Kitbash.InspectorVector3}"/></DockPanel>
             <Button Command="{Binding RefreshCameraValuesCommand}" Content="{loc:Loc KitbashTool.PhotoStudio.RefreshCameraValues}" HorizontalAlignment="Right" Style="{StaticResource AeButton.Quiet}"/>
             <TextBlock Text="{loc:Loc KitbashTool.PhotoStudio.LightInformation}" Style="{StaticResource AeText.SectionTitle}" Margin="0,16,0,8"/>
             <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.LightColour}" Style="{StaticResource AeForm.Label}"/><colourpicker:ColourPickerButtonView Width="26" Height="26" HorizontalAlignment="Left" DataContext="{Binding LightColour}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.LightIntensity}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding LightIntensity, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.EnvLightRotation}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding EnvLightRotationY, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationX}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding DirectLightRotationX, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
-            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationY}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Right" Text="{Binding DirectLightRotationY, UpdateSourceTrigger=LostFocus, StringFormat=0.###}"/></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.LightIntensity}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding LightIntensity, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.01" DragMinimum="0"/></b:Interaction.Behaviors></TextBox></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.EnvLightRotation}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding EnvLightRotationY, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.25"/></b:Interaction.Behaviors></TextBox></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationX}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding DirectLightRotationX, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.25"/></b:Interaction.Behaviors></TextBox></DockPanel>
+            <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.DirectLightRotationY}" Style="{StaticResource AeForm.Label}"/><TextBox HorizontalContentAlignment="Left" Text="{Binding DirectLightRotationY, UpdateSourceTrigger=LostFocus, StringFormat=0.###}" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}"><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.25"/></b:Interaction.Behaviors></TextBox></DockPanel>
             <DockPanel Margin="0,0,0,8"><Label DockPanel.Dock="Left" Width="140" Content="{loc:Loc KitbashTool.PhotoStudio.DoubleImageResolution}" Style="{StaticResource AeForm.Label}"/><CheckBox IsChecked="{Binding DoubleImageResolution}"/></DockPanel>
         </StackPanel>
         <Border Grid.Row="1" Style="{StaticResource AeWorkflow.DialogFooter}">

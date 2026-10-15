@@ -81,6 +81,7 @@ namespace Editors.KitbasherEditor.Components
         /// Get the Gizmo instance for KitbashSelectionInputComponent to check modal transform state.
         /// </summary>
         public Gizmo Gizmo => _gizmo;
+        public event Action<GizmoMode, ModalPreviewReplacement?> PreviewChanged;
 
         private void OnCaptureInterrupted()
         {
@@ -167,7 +168,8 @@ namespace Editors.KitbasherEditor.Components
             ExceptionDispatchInfo primaryError;
             try
             {
-                _activeTransformation.ReplaceInitialPreview(replacement);
+                var accepted = _activeTransformation.ReplaceInitialPreview(replacement);
+                PreviewChanged?.Invoke(_gizmo.ActiveMode, accepted ? replacement : ModalPreviewReplacement.RestoreOnly(replacement.Pivot));
                 return;
             }
             catch (Exception exception)
@@ -218,6 +220,7 @@ namespace Editors.KitbasherEditor.Components
                 _activeTransformation.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
             _activeTransformation?.BeginTransform();
             _mouse.MouseOwner = this;
+            PreviewChanged?.Invoke(_gizmo.ActiveMode, ModalPreviewReplacement.RestoreOnly(_gizmo.ActivePivot));
         }
 
         private void GizmoTransformEnd()
@@ -239,6 +242,7 @@ namespace Editors.KitbasherEditor.Components
 
         private void ReleaseMouseOwnership()
         {
+            PreviewChanged?.Invoke(_gizmo.ActiveMode, null);
             if (_mouse.MouseOwner != this)
                 return;
 

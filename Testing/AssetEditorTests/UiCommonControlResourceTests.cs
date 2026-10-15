@@ -712,11 +712,6 @@ public class UiCommonControlResourceTests
                         Content = "Test",
                         Style = (Style)editorStyles["AeEditor.ToggleIcon"],
                     }),
-                    ("editor playback", new ToggleButton
-                    {
-                        Content = "Test",
-                        Style = (Style)editorStyles["AeEditor.PlaybackToggle"],
-                    }),
                     ("optional radio", new OptionalRadioButton
                     {
                         Content = "Test",

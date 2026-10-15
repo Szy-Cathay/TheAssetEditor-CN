@@ -126,7 +126,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 
 除下述左活动栏特例外，这是用户已验收的固定行为，普通按钮、图标按钮、ToggleButton、播放器按钮和编辑器专用按钮都必须一致：
 
-左活动栏的资源、工程历史、编辑器快捷入口及底部设置图标不使用按压缩放或回弹。按住期间持续显示悬停或活动底色，活动状态优先于悬停；命令按钮仍在松开时执行，不能因点击而永久选中。此特例不影响最近工程或其他区域的按钮动画。
+左活动栏的资源、工程历史、编辑器快捷入口及底部设置图标不使用按压缩放或回弹。按住期间持续显示悬停或活动底色，活动状态优先于悬停；命令按钮仍在松开时执行，不能因点击而永久选中。此特例不影响最近工程或其他区域的按钮动画。Kitbash 场景左侧工具以 `AeBrush.Surface1` 底板隔开三维背景，图标不描边；悬停使用 `AeBrush.SurfaceHover`，选中使用更强的 `AeBrush.BorderStrong` 填充与 `AeBrush.TextPrimary` 图标，选中状态优先于悬停。
 
 按下和回弹统一复用 `AeMotion.ButtonPressStoryboard` 与 `AeMotion.ButtonReleaseStoryboard`，不得在业务页面复制另一套 Storyboard。
 
@@ -139,9 +139,9 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 - 键盘焦点使用 1 DIP 语义强调描边，不使用光晕、双层描边或持续状态覆盖层；键盘命令、访问键和自动化名称必须保留。
 - 禁用状态降低层级但保持文字可读；危险按钮使用 `Danger`，不能只靠红色表达风险。
 
-播放器播放期间，播放按钮背景持续保持选中高亮，播放图标使用 `AeBrush.Danger`；停止或暂停后恢复普通状态。播放器复用 `AeEditor.PlaybackToggle` 和可拖动的 `AeEditor.PlaybackSlider`，不单独制造另一套按钮或时间轴。
+播放器复用 `AeEditor.PlaybackToggle` 和 `AeEditor.PlaybackSlider`。播放/暂停按钮沿用左活动栏的背景与前景状态，播放期间保留选中底色；不使用危险色、边框、按压缩放或回弹。进度条使用细圆角轨道和圆形滑块，保留至少 24 DIP 高的拖动命中区域；`SliderScrubbing` 使点击轨道后可以继续拖动，捕获丢失、禁用或卸载时结束拖动，并保留键盘定位。
 
-3D 场景下方的播放器使用可整行点击的“动画播放器”展开标题，沿用原有动画启用绑定。展开后依次显示整体居中的播放控制、帧数/秒数等信息和通栏进度条；收起沿用原开关的停用语义。共享宿主和 Kitbash 的播放器保持相同排列，Kitbash 的骨骼/动画选择留在进度条下方，超级视图注释仍紧邻进度条。
+3D 场景下方的播放器使用 `AeEditor.PlaybackExpander`：可整行点击的“动画播放器”标题在完整标题栏居中，不显示箭头，沿用原有动画启用绑定。展开后依次显示整体居中的播放控制、帧数/秒数等信息和通栏进度条；收起沿用原开关的停用语义。共享宿主和 Kitbash 的播放器保持相同排列，Kitbash 的骨骼/动画选择留在进度条下方，超级视图注释仍紧邻进度条。
 
 ### 4.3 输入、选择和下拉箭头
 
@@ -171,6 +171,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 ### 5.1 主窗口与设置
 
 - 主窗口保持：单行顶部菜单与窗口按钮、44 DIP 左活动栏、可调宽度内容侧栏、多标签编辑区、紧凑底部状态栏。主窗口基于公共窗口样式，使用只有内容表面的局部模板容纳集成菜单，不增加独立标题行；保留 `SingleBorderWindow` 和 `WindowChrome` 的原生拖动、双击、系统菜单及当前显示器工作区计算。不得用 `WindowStyle=None`、主显示器尺寸上限或固定底部留白代替工作区边界。窗口按钮走系统命令与既有关闭检查。版本与游戏信息只在底部显示，状态文字垂直居中并保留上下留白，异常提示可自然增高。
+- 下拉菜单分割线使用公共 `MenuItem.SeparatorStyleKey`，线高 1 DIP、上下各留 2 DIP；数据驱动菜单的分隔容器不继承菜单项最小高度。普通菜单项保持原点击高度。
 - 相邻菜单、侧栏、标签页、编辑区与状态栏直接衔接，用单条边界分隔；宿主不重复叠加外边距，圆角用于可点击控件而非连成一体的工作区接缝。内容内部保留 4／8 DIP 等既有间距尺度，不以压缩文字或缩小点击目标换取紧凑。
 - 左活动栏、内容侧栏与编辑区共享工作区外框的顶边、底边及总高度。资源／工程历史不显示常驻标题行，只保留对应活动栏图标的中文悬停提示与无障碍名称；内容侧栏直接显示原有工具条和内容。编辑标签仅在有文档时出现，每行 28 DIP，分隔线叠绘在行内，不额外增加高度；空编辑区不保留空白标题行。不同区域内部的必要工具条和标签带不强行撑成等高，侧栏收起后保留活动栏及底部设置入口。
 - “文件”之前的图标只控制资源树／历史内容侧栏与其分隔线，保留最左侧活动栏及编辑器入口；展开时恢复收起前的宽度。顶部不再保留独立“视图”菜单。内容侧栏直接显示资源树或历史；新建、打开和最近工程放在空编辑区，复用顶部菜单的真实工程集合与打开命令。重复打开已有工程只激活该工程，正在打开时忽略重入点击。
@@ -183,19 +184,21 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 ### 5.2 编辑器属性表单
 
 - 字段行不显示装饰性的冒号。
-- 标签位于控件前方，标签列固定宽度并右对齐；不同长度的中文标签向控件侧对齐。
+- 标签默认位于控件前方，标签列固定宽度并右对齐；不同长度的中文标签向控件侧对齐。Kitbash 右侧属性区采用左对齐标签和输入文字，字段保持统一列边界。
 - 控件区域从同一条竖线开始，向右侧工作区对齐或拉伸；同组控件的左边界、右边界和行高保持一致。
 - 复选框、眼睛、浏览、清除等紧凑操作必须与对应字段在同一行并紧贴控件，不单独占用一条宽列。
+- Kitbash 贴图字段分为两行：上行为复选框和可点击的名称，下行为路径与预览、浏览、清除操作；两行紧邻，复选框与名称之间保留清晰间距。
 - 三轴数值、双值缩放和同类复合字段使用等宽子列。
+- 连续数值拖拽复用 `TextBoxInputBehavior` 的可选 `IsDragEnabled`，只对合适的数值字段显式开启。水平移动超过 6 DIP 后开始，Shift 精调，Esc/右键或交互中断取消；单击保留键盘输入。宿主通过开始/结束事件将一次拖动合并为一个撤销步骤，不得用于名称、路径或 ID。
 - 业务信息区优先左上对齐；只有空状态说明可以在空白工作区居中。
 
 ### 5.3 分组层级
 
-- 一级分组使用 `AeText.SectionTitle`、清晰的展开箭头和一级边界。
+- 除下述 Kitbash 右侧属性区外，一级分组使用 `AeText.SectionTitle`、清晰的展开箭头和一级边界。
 - 子分组相对父项缩进，标题字号可以与父项相同，但使用 Normal 字重。
 - 子分组不得与父分组占同样的整行背景和边框，否则会误导为同级。
-- Kitbash 的“基础贴图”“血液”“阵营颜色预览”等子项保持透明背景，不添加标题下横线；内容通过缩进和留白表达层级。
-- 分隔线只用于真正的区域边界，不在每个字段或子标题后重复绘制。
+- Kitbash 右侧属性区通过固定分类栏组织内容，字段直接展开；必要的分组标题使用灰色、斜体、常规字重，标题右侧接细线，保持透明背景，不使用折叠箭头、标题底色或标题下横线。
+- 分隔线只用于真正的区域边界；除上述 Kitbash 静态分组标题外，不在每个字段或子标题后重复绘制。
 
 ### 5.4 树、列表和密集编辑器
 
@@ -268,7 +271,7 @@ UI 修改只改变呈现或用户已明确要求的交互，不得顺带改变 B
 | 变量、文字、表面与焦点 | `AssetEditor/Themes/DesignSystem/DesignTokens.xaml`、`Typography.xaml`、`SurfaceStyles.xaml` | `AeSpace.*`、`AeSize.*`、`AeRadius.*`、`AeMotion.*`、`AeText.*`、`AeSurface.*`、`AeFocus.Keyboard` |
 | 主窗口工作区 | `AssetEditor/Themes/DesignSystem/Shell.xaml` | `AeShell.*` |
 | 设置与标准工作流 | `AssetEditor/Themes/DesignSystem/Workflows.xaml` | `AeWorkflow.*` |
-| 编辑器按钮与播放器 | `Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml` | `AeEditor.ToggleIcon`、`AeEditor.PlaybackToggle`、`AeEditor.PlaybackSlider` |
+| 编辑器按钮与播放器 | `Shared/SharedUI/Common/Styles/EditorWorkspaceStyles.xaml` | `AeEditor.ToggleIcon`、`AeEditor.PlaybackToggle`、`AeEditor.PlaybackSlider`、`AeEditor.PlaybackExpander` |
 | 分隔条 | `Shared/SharedUI/Common/Styles/GridSplitterStyles.xaml` | `AeVerticalGridSplitterStyle`、`AeHorizontalGridSplitterStyle` |
 | 统一窗口 | `Shared/SharedUI/Common/AssetEditorWindow.cs` | `AssetEditorWindow` 与 `CustomWindowStyle` |
 | 标准消息 | `Shared/SharedCore/Services/IStandardDialogs.cs`、`Shared/SharedUI/BaseDialogs/StandardDialog/` | `IStandardDialogs`、`UnifiedMessageBox`、`MessageDialogWindow` |

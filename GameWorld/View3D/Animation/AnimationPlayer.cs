@@ -62,6 +62,9 @@ namespace GameWorld.Core.Animation
         TimeSpanExtension _timeSinceStart = new();
         AnimationFrame _currentAnimFrame;
         AnimationClip _animationClip;
+        bool _seekPending;
+        bool _interpolateTimeSeek;
+        public bool IsScrubbing { get; set; }
         GameSkeleton Skeleton { get { return _skeleton; } }
         public AnimationClip AnimationClip { get { return _animationClip; } }
 
@@ -93,7 +96,9 @@ namespace GameWorld.Core.Animation
             get => _animationClip == null ? 0 : TimeToFrame(_timeSinceStart.TimeSpan);
             set
             {
-                if (CurrentFrame == value)
+                _seekPending = false;
+                _interpolateTimeSeek = false;
+                if (CurrentFrame == value && CurrentTime == FrameToStartTime(value))
                     return;
 
                 if (_animationClip != null)
@@ -125,6 +130,8 @@ namespace GameWorld.Core.Animation
                     throw new Exception("This animation does not work for this skeleton!");
             }
 
+            _seekPending = false;
+            _interpolateTimeSeek = false;
             AnimationRules.Clear();
             _skeleton = skeleton;
             _animationClip = animation;
@@ -143,12 +150,19 @@ namespace GameWorld.Core.Animation
                 return;
             }
 
-            if (!IsPlaying && !RefreshWhilePaused)
+            if (_seekPending)
+            {
+                Refresh();
+                return;
+            }
+
+            if (IsScrubbing || !IsPlaying && !RefreshWhilePaused)
                 return;
 
             var animationDuration = Duration;
             if (animationDuration > TimeSpan.Zero && IsPlaying)
             {
+                _interpolateTimeSeek = false;
                 _timeSinceStart.TimeSpan += gameTime.ElapsedGameTime;
                 if (_timeSinceStart.TimeSpan >= animationDuration)
                 {
@@ -171,6 +185,7 @@ namespace GameWorld.Core.Animation
 
         public void Refresh()
         {
+            _seekPending = false;
             try
             {
                 if (IsEnabled == false)
@@ -183,7 +198,7 @@ namespace GameWorld.Core.Animation
                 var timebase = _animationClip?.Timebase;
                 if (timebase != null)
                     sampleT = (float)(_timeSinceStart.TimeSpan.TotalSeconds / timebase.Duration.TotalSeconds);
-                _currentAnimFrame = AnimationSampler.Sample(sampleT, _skeleton, _animationClip, AnimationRules, !IsPlaying);
+                _currentAnimFrame = AnimationSampler.Sample(sampleT, _skeleton, _animationClip, AnimationRules, !IsPlaying && !_interpolateTimeSeek);
                 _skeleton?.Update();
             }
             catch
@@ -199,6 +214,13 @@ namespace GameWorld.Core.Animation
 
         public void SeekToTimeSeconds(float timeSeconds)
         {
+            QueueSeekToTimeSeconds(timeSeconds);
+            Refresh();
+        }
+
+        // The UI can request many positions before the next scene frame; sample only the latest.
+        public void QueueSeekToTimeSeconds(float timeSeconds)
+        {
             if (float.IsFinite(timeSeconds) == false)
                 throw new ArgumentOutOfRangeException(nameof(timeSeconds));
 
@@ -208,12 +230,15 @@ namespace GameWorld.Core.Animation
                 requestedTime = Duration;
 
             _timeSinceStart = new TimeSpanExtension(requestedTime);
+            _interpolateTimeSeek = true;
+            _seekPending = true;
             OnFrameChanged?.Invoke(CurrentFrame);
-            Refresh();
         }
 
         public void Stop()
         {
+            _seekPending = false;
+            IsScrubbing = false;
             IsPlaying = false;
             _currentAnimFrame = null;
             IsEnabled = false;

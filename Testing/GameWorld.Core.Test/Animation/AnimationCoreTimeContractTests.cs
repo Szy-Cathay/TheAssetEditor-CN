@@ -1,4 +1,4 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using Microsoft.Xna.Framework;
 using Shared.ByteParsing;
 using Shared.GameFormats.Animation;
@@ -213,6 +213,52 @@ internal class AnimationCoreTimeContractTests
         });
     }
 
+    [Test]
+    public void Player_PausedTimeSeek_InterpolatesBetweenFrames()
+    {
+        var player = new AnimationPlayer();
+        var skeleton = CreateSkeleton(player);
+        player.SetAnimation(CreateClip(4, 1), skeleton);
+        player.Play();
+        player.Pause();
+
+        player.SeekToTimeSeconds(0.125f);
+
+        Assert.That(player.GetCurrentAnimationFrame().BoneTransforms[0].Translation.X,
+            Is.EqualTo(0.5f).Within(0.00001f));
+    }
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Scrubbing_CoalescesPoseSamplingAndRetainsPlaybackState(bool playing)
+    {
+        var player = new AnimationPlayer { RefreshWhilePaused = false };
+        var skeleton = CreateSkeleton(player);
+        player.SetAnimation(CreateClip(4, 1), skeleton);
+        player.Play();
+        if (!playing) player.Pause();
+        player.Refresh();
+        var previousPose = player.GetCurrentAnimationFrame();
+        player.IsScrubbing = true;
+        for (var index = 1; index <= 100; index++)
+        {
+            player.QueueSeekToTimeSeconds(index * 0.00125f);
+            Assert.That(player.GetCurrentAnimationFrame(), Is.SameAs(previousPose));
+        }
+        player.Update(new GameTime(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1d / 60)));
+        var preview = player.GetCurrentAnimationFrame();
+        Assert.Multiple(() =>
+        {
+            Assert.That(preview, Is.Not.SameAs(previousPose));
+            Assert.That(preview.BoneTransforms[0].Translation.X, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(player.CurrentTime.TotalSeconds, Is.EqualTo(0.125).Within(0.000001));
+            Assert.That(player.IsPlaying, Is.EqualTo(playing));
+        });
+        player.Update(new GameTime(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1d / 60)));
+        Assert.That(player.GetCurrentAnimationFrame(), Is.SameAs(preview));
+        player.IsScrubbing = false;
+        player.Update(new GameTime(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(1d / 60)));
+        Assert.That(player.CurrentTime.TotalSeconds, Is.EqualTo(0.125 + (playing ? 1d / 60 : 0)).Within(0.000001));
+    }
     private static AnimationClip CreateClip(int frameCount, float durationSeconds)
     {
         var clip = new AnimationClip();

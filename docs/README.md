@@ -26,3 +26,11 @@
 ## 指令维护
 
 本路由参考 OpenAI 的 [GPT-6 Astra 指令与 Skill 建议](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)：仓库规则保留稳定边界，具体上下文按任务加载。为便于跨设备恢复，本项目把发布关键步骤保存在 `release.md`；授权和验收边界仍以根 `AGENTS.md` 为准。
+
+维护规则时同时遵循 OpenAI 的 [AGENTS.md 指南](https://learn.chatgpt.com/docs/agent-configuration/agents-md)和 [Codex 工作建议](https://learn.chatgpt.com/guides/best-practices)：目录越深的指令越具体，根文件保持简洁、可执行，将详细上下文链接到相关文档。规则来自已确认的项目约束，不把一次性操作记录扩充成通用要求。
+
+## 验收归档
+
+以下文件仅用于追溯用户要求保留的阶段验收，不作为默认加载的 AI 上下文，也不能代替当前代码和新改动的验证：
+
+- [KitbashEditor 界面与工具改进验收记录](maintenance/kitbash-editor-acceptance-20261015.md)

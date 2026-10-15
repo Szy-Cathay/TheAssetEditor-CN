@@ -7,17 +7,32 @@
              xmlns:sceneexplorer="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneExplorer"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800"
-             Background="{DynamicResource AeBrush.Surface1}">
+             Background="{DynamicResource AeBrush.Surface1}"
+             FontFamily="{DynamicResource AppFontFamily}" FontSize="12"
+             FontWeight="Normal" FontStyle="Normal">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Editors.KitbasherEditor;component/KitbashUiStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <Style TargetType="TextBox" BasedOn="{StaticResource AeInput.TextBox}">
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="TextAlignment" Value="Left" />
+            </Style>
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="Normal" />
+                <Setter Property="FontStyle" Value="Normal" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
     <Grid Background="{DynamicResource AeBrush.Surface1}">
-        <ScrollViewer Background="{DynamicResource AeBrush.Surface1}"
-                      HorizontalContentAlignment="Stretch"
-                      VerticalContentAlignment="Top">
-            <ContentControl Content="{Binding CurrentEditor}"
-                            Background="{DynamicResource AeBrush.Surface1}"
-                            HorizontalContentAlignment="Stretch"
-                            VerticalContentAlignment="Stretch"
-                            ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
-        </ScrollViewer>
+        <ContentControl x:Name="EditorContent" Content="{Binding CurrentEditor}"
+                        Background="{DynamicResource AeBrush.Surface1}"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch"
+                        ContentTemplateSelector="{StaticResource ViewTemplateDataSelector}"/>
 
         <TextBlock Text="{Binding EmptyStateText}"
                    Margin="16"
