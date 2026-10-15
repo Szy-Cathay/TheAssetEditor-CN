@@ -4,6 +4,7 @@ using Editors.AnimationMeta.SuperView.Editing;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Editors.AnimationMeta.SuperView.Visualisation.Instances;
 using Editors.Shared.Core.Common;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
@@ -1599,7 +1600,10 @@ namespace Test.AnimationMeta
                     sceneObject.Data,
                     animationFile,
                     persistentFile);
-                superView.Player.SelectedAnimationMaxTime.Value = 5;
+                var clip = new AnimationClip { Duration = TimeSpan.FromSeconds(5) };
+                for (var frameIndex = 0; frameIndex < 150; frameIndex++)
+                    clip.DynamicFrames.Add(new AnimationClip.KeyFrame());
+                sceneObjectEditor.SetAnimationClip(sceneObject.Data, clip, "timeline.anim");
                 var originalPreviews = sceneObject.Data.MetaDataItems.ToArray();
 
                 var persistentMarker = superView.MetaDataTimeline.Markers.Single(

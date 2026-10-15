@@ -214,6 +214,25 @@ public class AnimationRetargetLayoutTests
         });
     }
 
+    [Test]
+    public void DetachedWindowContent_DoesNotLeaveWindowsInApplication()
+    {
+        WithTheme(ThemeType.DarkTheme, () =>
+        {
+            var existingWindows = Application.Current.Windows.OfType<Window>().ToArray();
+            var save = new SaveWindow(new SaveSettings(), Mock.Of<IStandardDialogs>());
+            try
+            {
+                Layout(WindowContent(save), 660, 500);
+                Assert.That(Application.Current.Windows.OfType<Window>(), Is.EquivalentTo(existingWindows));
+            }
+            finally
+            {
+                save.Close();
+            }
+        });
+    }
+
     private static void WithTheme(ThemeType theme, Action action) =>
         WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
         {
@@ -235,14 +254,21 @@ public class AnimationRetargetLayoutTests
 
     private static Border WindowContent(Window window)
     {
-        var content = (FrameworkElement)window.Content;
-        window.Content = null;
-        var root = new Border { Child = content, Background = window.Background, DataContext = window.DataContext };
-        System.Windows.Documents.TextElement.SetFontFamily(root, window.FontFamily);
-        System.Windows.Documents.TextElement.SetFontSize(root, window.FontSize);
-        System.Windows.Documents.TextElement.SetFontWeight(root, window.FontWeight);
-        System.Windows.Documents.TextElement.SetForeground(root, window.Foreground);
-        return root;
+        try
+        {
+            var content = (FrameworkElement)window.Content;
+            window.Content = null;
+            var root = new Border { Child = content, Background = window.Background, DataContext = window.DataContext };
+            System.Windows.Documents.TextElement.SetFontFamily(root, window.FontFamily);
+            System.Windows.Documents.TextElement.SetFontSize(root, window.FontSize);
+            System.Windows.Documents.TextElement.SetFontWeight(root, window.FontWeight);
+            System.Windows.Documents.TextElement.SetForeground(root, window.Foreground);
+            return root;
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     private static void AssertInside(FrameworkElement item, FrameworkElement root)
